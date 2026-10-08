@@ -138,6 +138,7 @@
     "judgement_line_glow_enabled": true,
     "key_pulse_enabled": true,
     "hit_burst_style": "prism",
+    "hud_layout": "studio",
     "key_label_position": "bottom",
     "judgement_line_position": 0.82,
     "gameplay_field_offset_x": 0.0,

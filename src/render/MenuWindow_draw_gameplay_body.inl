@@ -1,4 +1,7 @@
         auto& scene_hud_cache = is_skin_preview ? skin_preview_hud_cache_ : gameplay_hud_cache_;
+        const bool studio = gameplay_studio_deck_enabled(data.gameplay.hud_layout,
+            normalize_gameplay_skin_source(data.gameplay.skin_source) != "native",
+            data.gameplay.ghost_visible, data.gameplay.peer_visible);
         const auto& scene_title_format = d2d_->preview_fonts.title_format;
         const auto& scene_body_format = d2d_->preview_fonts.body_format;
         const auto& scene_header_format = d2d_->preview_fonts.header_format;
@@ -11,7 +14,7 @@
         std::size_t readable_slot = 0;
         auto draw_readable_text_aligned = [&](const std::wstring& text, IDWriteTextFormat* format,
                                               const D2D1_RECT_F& rect, ID2D1Brush* brush,
-                                              DWRITE_TEXT_ALIGNMENT alignment) {
+                                              DWRITE_TEXT_ALIGNMENT alignment, bool plain = false, float spacing = 0.0f) {
             const float width = rect.right - rect.left, height = rect.bottom - rect.top;
             if (text.empty() || !format || !brush || width <= 0 || height <= 0) return;
             if (readable_slot >= readable_layouts.size() || !d2d_->text_outline_brush) {
@@ -20,27 +23,36 @@
             }
             auto& cached = readable_layouts[readable_slot++];
             if (!cached.layout || cached.text != text || cached.format.Get() != format ||
-                cached.width != width || cached.height != height || cached.alignment != alignment) {
+                cached.width != width || cached.height != height || cached.alignment != alignment || cached.spacing != spacing) {
                 cached.layout.Reset();
                 if (FAILED(d2d_->dwrite_factory->CreateTextLayout(text.c_str(), static_cast<UINT32>(text.size()),
                     format, width, height, cached.layout.ReleaseAndGetAddressOf()))) return;
                 cached.layout->SetTextAlignment(alignment);
+                if (spacing > 0.0f) {
+                    Microsoft::WRL::ComPtr<IDWriteTextLayout1> spaced;
+                    if (SUCCEEDED(cached.layout.As(&spaced)))
+                        spaced->SetCharacterSpacing(spacing * 0.5f, spacing * 0.5f, 0, DWRITE_TEXT_RANGE{0, static_cast<UINT32>(text.size())});
+                }
+                cached.spacing = spacing;
                 cached.text = text; cached.format = format;
                 cached.width = width; cached.height = height; cached.alignment = alignment;
             }
-            draw_text_layout_readable(D2D1::Point2F(rect.left, rect.top), cached.layout.Get(), brush,
-                                      D2D1_DRAW_TEXT_OPTIONS_CLIP);
+            if (plain) ctx->DrawTextLayout(D2D1::Point2F(rect.left, rect.top), cached.layout.Get(), brush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+            else draw_text_layout_readable(D2D1::Point2F(rect.left, rect.top), cached.layout.Get(), brush,
+                                           D2D1_DRAW_TEXT_OPTIONS_CLIP);
         };
         auto draw_readable_text = [&](const std::wstring& text, IDWriteTextFormat* format,
                                       const D2D1_RECT_F& rect, ID2D1Brush* brush) {
             draw_readable_text_aligned(text, format, rect, brush, DWRITE_TEXT_ALIGNMENT_LEADING);
         };
-        auto draw_fitted_readable_text = [&](const std::wstring& text, IDWriteTextFormat* format,
-                                               const D2D1_RECT_F& rect, ID2D1Brush* brush,
-                                               DWRITE_TEXT_ALIGNMENT alignment) {
+        auto draw_scaled_readable_text = [&](const std::wstring& text, IDWriteTextFormat* format,
+                                             const D2D1_RECT_F& rect, ID2D1Brush* brush,
+                                             DWRITE_TEXT_ALIGNMENT alignment, float scale) {
             if (!format || text.empty() || rect.right <= rect.left || rect.bottom <= rect.top) return;
-            const float scale = estimate_single_line_text_scale(text, format->GetFontSize(),
-                rect.right - rect.left, rect.bottom - rect.top, 0.10f);
+            if (scale >= 1.0f) {
+                draw_readable_text_aligned(text, format, rect, brush, alignment);
+                return;
+            }
             D2D1_MATRIX_3X2_F saved{};
             ctx->GetTransform(&saved);
             ctx->SetTransform(D2D1::Matrix3x2F::Scale(scale, scale,
@@ -50,6 +62,36 @@
                             rect.top + (rect.bottom - rect.top) / scale), brush, alignment);
             ctx->SetTransform(saved);
         };
+        auto draw_fitted_readable_text = [&](const std::wstring& text, IDWriteTextFormat* format,
+                                               const D2D1_RECT_F& rect, ID2D1Brush* brush,
+                                               DWRITE_TEXT_ALIGNMENT alignment) {
+            if (!format || text.empty() || rect.right <= rect.left || rect.bottom <= rect.top) return;
+            draw_scaled_readable_text(text, format, rect, brush, alignment,
+                estimate_single_line_text_scale(text, format->GetFontSize(),
+                    rect.right - rect.left, rect.bottom - rect.top, 0.10f));
+        };
+        // The width estimate is deliberately pessimistic and shrank Latin capitals
+        // that fit. Header strings change rarely, so measure them once instead.
+        auto& measured_text = is_skin_preview ? d2d_->preview_measured_text : d2d_->gameplay_measured_text;
+        auto measured_text_scale = [&](std::size_t slot, const std::wstring& text, IDWriteTextFormat* format,
+                                       float available_width, float minimum_scale) {
+            if (slot >= measured_text.size() || !format || text.empty() || available_width <= 0.0f) return 1.0f;
+            auto& entry = measured_text[slot];
+            if (entry.text != text || entry.format.Get() != format) {
+                entry.text = text;
+                entry.format = format;
+                entry.width = 0.0f;
+                Microsoft::WRL::ComPtr<IDWriteTextLayout> layout;
+                DWRITE_TEXT_METRICS metrics{};
+                if (SUCCEEDED(d2d_->dwrite_factory->CreateTextLayout(text.c_str(), static_cast<UINT32>(text.size()),
+                        format, 100000.0f, 1000.0f, layout.GetAddressOf())) &&
+                    SUCCEEDED(layout->GetMetrics(&metrics))) {
+                    entry.width = metrics.widthIncludingTrailingWhitespace;
+                }
+            }
+            return entry.width <= available_width ? 1.0f
+                : std::clamp(available_width / entry.width, std::clamp(minimum_scale, 0.05f, 1.0f), 1.0f);
+        };
         auto hud_font_scale = [](double value) {
             return static_cast<float>(std::clamp(std::isfinite(value) ? value : 1.0, 0.5, 2.0));
         };
@@ -58,6 +100,15 @@
                 const float extra = std::max(0.0f, format->GetFontSize()*1.4f+2.0f-(rect.bottom-rect.top));
                 rect.top -= extra*0.5f; rect.bottom += extra*0.5f;
             }
+            return rect;
+        };
+        // Single-line layouts are top-anchored; buttons and rows taller than one
+        // line need their text box centred on the row instead.
+        auto vcenter_text_rect = [](D2D1_RECT_F rect, IDWriteTextFormat* format) {
+            if (!format) return rect;
+            const float half = format->GetFontSize() * 0.68f + 1.0f;
+            const float middle = (rect.top + rect.bottom) * 0.5f;
+            rect.top = middle - half; rect.bottom = middle + half;
             return rect;
         };
         if (!is_skin_preview && !gameplay_field_drag_state_.active) {
@@ -287,6 +338,69 @@
                 data.gameplay.past_visual_span,
                 judgement_line_position));
         };
+        // The loading and countdown cards draw the header before the note pass,
+        // so the field geometry is resolved once up front for every branch.
+        const int lane_count = std::clamp(data.gameplay.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
+        const uint32_t hidden_scratch_mask = gameplay_hidden_scratch_mask(data.gameplay);
+        const auto lane_hidden = [&](std::size_t lane) { return (hidden_scratch_mask & (uint32_t{1} << lane)) != 0; };
+        std::array<double, kGameplayHudMaxLanes> effective_lane_width_scales{};
+        effective_lane_width_scales.fill(kGameplayLaneWidthScaleDefault);
+        std::size_t effective_lane_width_scale_count =
+            std::min(data.gameplay.lane_width_scale_count, effective_lane_width_scales.size());
+        for (std::size_t lane = 0; lane < effective_lane_width_scale_count; ++lane) {
+            effective_lane_width_scales[lane] = data.gameplay.lane_width_scales[lane];
+        }
+        if (use_imported_metrics &&
+            gameplay_note_sprite_cache_.imported_lane_width_scale_count ==
+                static_cast<std::size_t>(lane_count)) {
+            effective_lane_width_scale_count = static_cast<std::size_t>(lane_count);
+            for (std::size_t lane = 0; lane < effective_lane_width_scale_count; ++lane) {
+                effective_lane_width_scales[lane] = std::clamp(
+                    effective_lane_width_scales[lane] *
+                        gameplay_note_sprite_cache_.imported_lane_width_scales[lane],
+                    kGameplayLaneWidthScaleMin,
+                    kGameplayLaneWidthScaleMax);
+            }
+        }
+        std::array<double, kGameplayHudMaxLanes> effective_lane_spacing_scales{};
+        effective_lane_spacing_scales.fill(kGameplayLaneSpacingScaleDefault);
+        std::size_t effective_lane_spacing_scale_count =
+            std::min(data.gameplay.lane_spacing_scale_count, effective_lane_spacing_scales.size());
+        for (std::size_t gap = 0; gap < effective_lane_spacing_scale_count; ++gap) {
+            effective_lane_spacing_scales[gap] = data.gameplay.lane_spacing_scales[gap];
+        }
+        if (use_imported_metrics &&
+            gameplay_note_sprite_cache_.imported_lane_spacing_scale_count ==
+                static_cast<std::size_t>(std::max(0, lane_count - 1))) {
+            effective_lane_spacing_scale_count =
+                gameplay_note_sprite_cache_.imported_lane_spacing_scale_count;
+            for (std::size_t gap = 0; gap < effective_lane_spacing_scale_count; ++gap) {
+                effective_lane_spacing_scales[gap] = std::clamp(
+                    effective_lane_spacing_scales[gap] +
+                        gameplay_note_sprite_cache_.imported_lane_spacing_scales[gap],
+                    kGameplayLaneSpacingScaleMin,
+                    kGameplayLaneSpacingScaleMax);
+            }
+        }
+        const GameplaySurfaceLayout surface_layout =
+            build_gameplay_surface_layout(
+                lane_count,
+                note_width_scale,
+                note_art_width_ratio,
+                effective_lane_width_scale_count,
+                effective_lane_width_scales,
+                effective_lane_spacing_scale_count,
+                effective_lane_spacing_scales,
+                data.gameplay.ghost_visible,
+                data.gameplay.lane_center_gap_scale,
+                !is_skin_preview && gameplay_field_drag_state_.has_local_override
+                    ? gameplay_field_drag_state_.offset_x
+                    : data.gameplay.gameplay_field_offset_x,
+                data.gameplay.note_divider_gap_px, hidden_scratch_mask);
+        const float solo_header_right =
+            gameplay_solo_header_right(header_left, header_right, surface_layout.player_field.left);
+        const auto studio_deck = compute_gameplay_studio_deck_layout(surface_layout.player_field.left,
+            surface_layout.player_field.right, data.performance.visible ? header_safe_right : 1856.0f);
 
         auto draw_timing_indicator = [&](float indicator_left,
                                          float indicator_right,
@@ -434,9 +548,10 @@
                                              static_cast<double>(std::max<int64_t>(1, data.gameplay.duration_samples))),
                            0.0f,
                            1.0f);
+            const float track_radius = std::min(10.0f, (track_rect.bottom - track_rect.top) * 0.5f);
             if (d2d_->card_brush) {
                 d2d_->card_brush->SetOpacity(0.72f);
-                ctx->FillRoundedRectangle(D2D1::RoundedRect(track_rect, 10.0f, 10.0f), d2d_->card_brush.Get());
+                ctx->FillRoundedRectangle(D2D1::RoundedRect(track_rect, track_radius, track_radius), d2d_->card_brush.Get());
                 d2d_->card_brush->SetOpacity(1.0f);
             }
             if (d2d_->accent_brush && fill_ratio > 0.0f) {
@@ -447,12 +562,22 @@
                 const float fill_right = inner_left + (inner_right - inner_left) * fill_ratio;
                 const D2D1_RECT_F fill_rect =
                     D2D1::RectF(inner_left, inner_top, std::max(inner_left, fill_right), inner_bottom);
-                ctx->FillRoundedRectangle(D2D1::RoundedRect(fill_rect, 8.0f, 8.0f), d2d_->accent_brush.Get());
+                // A sub-radius fill drew a stray sliver at 0%; round only what fits.
+                const float fill_radius = std::min({8.0f, (fill_rect.right - fill_rect.left) * 0.5f,
+                                                    (fill_rect.bottom - fill_rect.top) * 0.5f});
+                if (fill_rect.right - fill_rect.left >= 2.0f)
+                    ctx->FillRoundedRectangle(D2D1::RoundedRect(fill_rect, fill_radius, fill_radius),
+                                              d2d_->accent_brush.Get());
             }
             if (d2d_->button_border_brush) {
-                ctx->DrawRoundedRectangle(D2D1::RoundedRect(track_rect, 10.0f, 10.0f),
+                ctx->DrawRoundedRectangle(D2D1::RoundedRect(track_rect, track_radius, track_radius),
                                           d2d_->button_border_brush.Get(),
                                           1.0f);
+            }
+            // The embedded battle track is too thin to seat a line of text; the
+            // clock clipped to half glyphs over the notes, so it shows the bar only.
+            if (track_rect.bottom - track_rect.top < 18.0f) {
+                return;
             }
 
             const std::wstring elapsed_total_w =
@@ -508,11 +633,14 @@
             d2d_->text_brush->SetColor(saved_text_color);
         };
 
+#include "MenuWindow_draw_studio_deck.inl"
         auto draw_gameplay_header = [&](const GameplayProgressTrackLayout* battle_column = nullptr) {
+            if (studio) draw_studio_header();
             const auto header_text_color=d2d_->text_brush->GetColor(), header_muted_color=d2d_->muted_brush->GetColor();
             d2d_->text_brush->SetColor(ng_color("title",header_text_color));
             d2d_->muted_brush->SetColor(ng_color("body",header_muted_color));
-            if (battle_column) {
+            if (studio) { /* The deck owns the left header. */ }
+            else if (battle_column) {
                 const float left = battle_column->left, right = battle_column->right;
                 draw_fitted_readable_text(scene_hud_cache.title_text, ng_font("title", scene_title_format.Get()),
                     D2D1::RectF(left, 72.0f, right, 114.0f), d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING);
@@ -527,30 +655,46 @@
                     top += 26.0f;
                 }
             } else {
+                // Long titles shrink to the column instead of sliding under the field.
                 if (scene_title_format && d2d_->text_brush) {
-                    const D2D1_RECT_F title_rect = ng_rect("title",D2D1::RectF(header_left, header_top, header_right * 0.60f, header_top + 52.0f));
-                    draw_readable_text(scene_hud_cache.title_text,
-                                      ng_font("title",scene_title_format.Get()),
-                                      title_rect,
-                                      d2d_->text_brush.Get());
+                    const D2D1_RECT_F title_rect = ng_rect("title",D2D1::RectF(header_left, header_top, solo_header_right, header_top + 52.0f));
+                    IDWriteTextFormat* title_format = ng_font("title",scene_title_format.Get());
+                    draw_scaled_readable_text(scene_hud_cache.title_text, title_format, title_rect,
+                        d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING,
+                        measured_text_scale(0, scene_hud_cache.title_text, title_format,
+                                            title_rect.right - title_rect.left, 0.60f));
                 }
                 if (scene_body_format && d2d_->muted_brush) {
-                    const D2D1_RECT_F artist_rect = ng_rect("artist",D2D1::RectF(header_left, header_top + 46.0f, header_right * 0.60f, header_top + 84.0f));
-                    draw_readable_text(scene_hud_cache.artist_text,
-                                      ng_font("body",scene_body_format.Get()),
-                                      artist_rect,
-                                      d2d_->muted_brush.Get());
+                    const D2D1_RECT_F artist_rect = ng_rect("artist",D2D1::RectF(header_left, header_top + 46.0f, solo_header_right, header_top + 84.0f));
+                    IDWriteTextFormat* artist_format = ng_font("body",scene_body_format.Get());
+                    draw_scaled_readable_text(scene_hud_cache.artist_text, artist_format, artist_rect,
+                        d2d_->muted_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING,
+                        measured_text_scale(1, scene_hud_cache.artist_text, artist_format,
+                                            artist_rect.right - artist_rect.left, 0.70f));
                 }
                 if (scene_hud_format && d2d_->muted_brush) {
-                    const D2D1_RECT_F speed_rect = ng_rect("speed",D2D1::RectF(header_left, header_top + 82.0f, header_right * 0.68f, header_top + 118.0f));
-                    draw_readable_text(scene_hud_cache.speed_text,
-                                      scene_hud_format.Get(),
-                                      speed_rect,
-                                      d2d_->muted_brush.Get());
+                    const D2D1_RECT_F speed_rect = ng_rect("speed",D2D1::RectF(header_left, header_top + 82.0f, solo_header_right, header_top + 118.0f));
+                    const float speed_width = speed_rect.right - speed_rect.left;
+                    // Two rows stay readable in the column. Opponent cards own the
+                    // band just below, so versus play keeps one fitted row.
+                    if (data.gameplay.peer_visible) {
+                        draw_scaled_readable_text(scene_hud_cache.speed_text, scene_hud_format.Get(), speed_rect,
+                            d2d_->muted_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING,
+                            measured_text_scale(2, scene_hud_cache.speed_text, scene_hud_format.Get(), speed_width, 0.10f));
+                    } else {
+                        // One two-line layout keeps the outlined text work of the old single row.
+                        const float scale = std::min(
+                            measured_text_scale(2, scene_hud_cache.speed_row_text[0], scene_hud_format.Get(), speed_width, 0.70f),
+                            measured_text_scale(3, scene_hud_cache.speed_row_text[1], scene_hud_format.Get(), speed_width, 0.70f));
+                        draw_scaled_readable_text(scene_hud_cache.speed_rows_text, scene_hud_format.Get(),
+                            D2D1::RectF(speed_rect.left, speed_rect.top, speed_rect.right,
+                                        speed_rect.top + scene_hud_format->GetFontSize() * 3.0f),
+                            d2d_->muted_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, scale);
+                    }
                 }
             }
             d2d_->text_brush->SetColor(ng_color("score",header_text_color));
-            if (!data.gameplay.ghost_visible && scene_title_format && d2d_->text_brush) {
+            if ((!studio || !studio_deck.right_hud_visible) && !data.gameplay.ghost_visible && scene_title_format && d2d_->text_brush) {
                 const D2D1_RECT_F score_rect = ng_rect("score",D2D1::RectF(std::max(header_left + 700.0f, header_safe_right - 610.0f),
                                 header_top,
                                 header_safe_right,
@@ -561,7 +705,7 @@
                                           d2d_->text_brush.Get(),
                                           DWRITE_TEXT_ALIGNMENT_TRAILING);
             }
-            if (!data.gameplay.ghost_visible && scene_body_format && d2d_->text_brush) {
+            if ((!studio || !studio_deck.right_hud_visible) && !data.gameplay.ghost_visible && scene_body_format && d2d_->text_brush) {
                 const D2D1_RECT_F combo_rect =
                     D2D1::RectF(std::max(header_left + 620.0f, header_safe_right - 690.0f),
                                 header_top + 52.0f,
@@ -573,7 +717,7 @@
                                           d2d_->text_brush.Get(),
                                           DWRITE_TEXT_ALIGNMENT_TRAILING);
             }
-            if (!data.gameplay.ghost_visible && scene_hud_format && d2d_->muted_brush) {
+            if ((!studio || !studio_deck.right_hud_visible) && !data.gameplay.ghost_visible && scene_hud_format && d2d_->muted_brush) {
                 const D2D1_RECT_F judge_stats_rect = ng_rect("stats",D2D1::RectF(std::max(header_left + 620.0f, header_safe_right - 690.0f),
                                 header_top + 82.0f,
                                 header_safe_right,
@@ -657,23 +801,32 @@
                 scene_hud_cache.battle_speed_pair_text[pair] = scene_hud_cache.battle_speed_text[pair * 2] +
                     L" / " + scene_hud_cache.battle_speed_text[pair * 2 + 1];
             }
+            for (std::size_t row = 0; row < scene_hud_cache.speed_row_text.size(); ++row) {
+                const auto& items = scene_hud_cache.battle_speed_text;
+                scene_hud_cache.speed_row_text[row] = items[row * 3] + L" / " + items[row * 3 + 1] +
+                    L" / " + items[row * 3 + 2];
+            }
+            scene_hud_cache.speed_rows_text =
+                scene_hud_cache.speed_row_text[0] + L"\n" + scene_hud_cache.speed_row_text[1];
+            // UI text collapses whitespace runs, so separators must survive as
+            // glyphs; "0.00% / DETAIL" previously rendered as "0.00%/ DETAIL".
+            const std::string separator = " \xC2\xB7 ";
             std::string score_summary =
                 loc("SCORE  ", "점수  ") + format_int_with_commas(data.gameplay.score);
             scene_hud_cache.score_text = to_wide(score_summary);
             scene_hud_cache.combo_text =
                 to_wide(loc("COMBO ", "콤보 ") + std::to_string(data.gameplay.combo) +
-                        "   " + loc("MAX ", "최대 ") + std::to_string(data.gameplay.max_combo) +
-                        "   " + loc("ACC ", "정확도 ") + format_decimal(data.gameplay.accuracy, 2) + "%");
-            scene_hud_cache.combo_text +=
-                to_wide(" / DETAIL " + format_decimal(data.gameplay.detailed_accuracy, 2) + "%");
+                        separator + loc("MAX ", "최대 ") + std::to_string(data.gameplay.max_combo) +
+                        separator + loc("ACC ", "정확도 ") + format_decimal(data.gameplay.accuracy, 2) + "%" +
+                        " / DETAIL " + format_decimal(data.gameplay.detailed_accuracy, 2) + "%");
             scene_hud_cache.combo_value_text = to_wide(std::to_string(data.gameplay.combo));
             scene_hud_cache.combo_label_text = wloc("COMBO", "콤보");
             scene_hud_cache.judge_stats_text =
                 to_wide("PG " + std::to_string(data.gameplay.pg) +
-                        "  GR " + std::to_string(data.gameplay.gr) +
-                        "  G " + std::to_string(data.gameplay.gd) +
-                        "  BAD " + std::to_string(data.gameplay.bd) +
-                        "  PR " + std::to_string(data.gameplay.pr));
+                        separator + "GR " + std::to_string(data.gameplay.gr) +
+                        separator + "G " + std::to_string(data.gameplay.gd) +
+                        separator + "BAD " + std::to_string(data.gameplay.bd) +
+                        separator + "PR " + std::to_string(data.gameplay.pr));
             scene_hud_cache.gauge_label_text = to_wide(gauge_label);
             scene_hud_cache.gauge_value_text =
                 to_wide(std::to_string(static_cast<int>(std::llround(data.gameplay.gauge))) + "%");
@@ -696,13 +849,13 @@
                 to_wide(loc("SCORE  ", "\uC810\uC218  ") + format_int_with_commas(data.gameplay.peer_score));
             scene_hud_cache.peer_combo_text =
                 to_wide(loc("COMBO ", "\uCF64\uBCF4 ") + std::to_string(data.gameplay.peer_combo) +
-                        "   " + loc("MAX ", "\uCD5C\uB300 ") + std::to_string(data.gameplay.peer_max_combo));
+                        separator + loc("MAX ", "\uCD5C\uB300 ") + std::to_string(data.gameplay.peer_max_combo));
             scene_hud_cache.peer_judge_stats_text =
                 to_wide("PG " + std::to_string(data.gameplay.peer_pg) +
-                        "  GR " + std::to_string(data.gameplay.peer_gr) +
-                        "  G " + std::to_string(data.gameplay.peer_gd) +
-                        "  BAD " + std::to_string(data.gameplay.peer_bd) +
-                        "  PR " + std::to_string(data.gameplay.peer_pr));
+                        separator + "GR " + std::to_string(data.gameplay.peer_gr) +
+                        separator + "G " + std::to_string(data.gameplay.peer_gd) +
+                        separator + "BAD " + std::to_string(data.gameplay.peer_bd) +
+                        separator + "PR " + std::to_string(data.gameplay.peer_pr));
             scene_hud_cache.peer_gauge_text =
                 to_wide(loc("GAUGE ", "\uAC8C\uC774\uC9C0 ") +
                         std::to_string(static_cast<int>(std::llround(data.gameplay.peer_gauge))) + "%");
@@ -725,27 +878,27 @@
             scene_hud_cache.ghost_score_text = to_wide(ghost_score_summary);
             scene_hud_cache.ghost_combo_text =
                 to_wide(loc("COMBO ", "콤보 ") + std::to_string(data.gameplay.ghost_combo) +
-                        "   " + loc("MAX ", "최대 ") + std::to_string(data.gameplay.ghost_max_combo) +
-                        "   " + loc("ACC ", "정확도 ") + format_decimal(data.gameplay.ghost_accuracy, 2) + "%");
-            scene_hud_cache.ghost_combo_text +=
-                to_wide(" / DETAIL " + format_decimal(data.gameplay.ghost_detailed_accuracy, 2) + "%");
+                        separator + loc("MAX ", "최대 ") + std::to_string(data.gameplay.ghost_max_combo) +
+                        separator + loc("ACC ", "정확도 ") + format_decimal(data.gameplay.ghost_accuracy, 2) + "%" +
+                        " / DETAIL " + format_decimal(data.gameplay.ghost_detailed_accuracy, 2) + "%");
             scene_hud_cache.ghost_combo_value_text =
                 to_wide(std::to_string(data.gameplay.ghost_combo));
             scene_hud_cache.ghost_judge_stats_text =
                 to_wide("PG " + std::to_string(data.gameplay.ghost_pg) +
-                        "  GR " + std::to_string(data.gameplay.ghost_gr) +
-                        "  G " + std::to_string(data.gameplay.ghost_gd) +
-                        "  BAD " + std::to_string(data.gameplay.ghost_bd) +
-                        "  PR " + std::to_string(data.gameplay.ghost_pr));
+                        separator + "GR " + std::to_string(data.gameplay.ghost_gr) +
+                        separator + "G " + std::to_string(data.gameplay.ghost_gd) +
+                        separator + "BAD " + std::to_string(data.gameplay.ghost_bd) +
+                        separator + "PR " + std::to_string(data.gameplay.ghost_pr));
             const auto summary_lines = [&](int combo, int max_combo, double accuracy, double detail,
                                            int pg, int gr, int gd, int bd, int pr) {
                 return std::array<std::wstring, 4>{
-                    to_wide(loc("COMBO ", "콤보 ") + std::to_string(combo) + "   " +
+                    to_wide(loc("COMBO ", "콤보 ") + std::to_string(combo) + separator +
                             loc("MAX ", "최대 ") + std::to_string(max_combo)),
                     to_wide(loc("ACC ", "정확도 ") + format_decimal(accuracy, 2) +
                             "% / DETAIL " + format_decimal(detail, 2) + "%"),
-                    to_wide("PG " + std::to_string(pg) + "   GR " + std::to_string(gr) + "   G " + std::to_string(gd)),
-                    to_wide("BAD " + std::to_string(bd) + "   PR " + std::to_string(pr))};
+                    to_wide("PG " + std::to_string(pg) + separator + "GR " + std::to_string(gr) +
+                            separator + "G " + std::to_string(gd)),
+                    to_wide("BAD " + std::to_string(bd) + separator + "PR " + std::to_string(pr))};
             };
             scene_hud_cache.battle_summary_text = summary_lines(data.gameplay.combo, data.gameplay.max_combo,
                 data.gameplay.accuracy, data.gameplay.detailed_accuracy, data.gameplay.pg, data.gameplay.gr,
@@ -780,6 +933,10 @@
                 scene_hud_cache.ghost_feedback_timing_text.clear();
             }
             scene_hud_cache.text_revision = data.gameplay.text_revision;
+        }
+        if (studio && scene_hud_cache.studio_text_revision != data.gameplay.text_revision) {
+            update_studio_text();
+            scene_hud_cache.studio_text_revision = data.gameplay.text_revision;
         }
 
         const double kComboAnimationDurationMs = ng_motion("combo_duration_ms");
@@ -979,8 +1136,8 @@
 
             if (scene_body_format && d2d_->muted_brush) {
                 const std::wstring hispeed_hint_w =
-                    wloc("HI-SPEED  F3/F4  +/-0.25   SHIFT+F5/F6  HALF/DOUBLE",
-                         "노트 배속  F3/F4  +/-0.25   SHIFT+F5/F6  절반/두 배");
+                    wloc("HI-SPEED  F3/F4  +/-0.25   F5/F6  HALF/DOUBLE",
+                         "노트 배속  F3/F4  +/-0.25   F5/F6  절반/두 배");
                 draw_readable_text_aligned(
                     hispeed_hint_w,
                     scene_body_format.Get(),
@@ -1003,63 +1160,6 @@
             return;
         }
 
-        const int lane_count = std::clamp(data.gameplay.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
-        const uint32_t hidden_scratch_mask = gameplay_hidden_scratch_mask(data.gameplay);
-        const auto lane_hidden = [&](std::size_t lane) { return (hidden_scratch_mask & (uint32_t{1} << lane)) != 0; };
-        std::array<double, kGameplayHudMaxLanes> effective_lane_width_scales{};
-        effective_lane_width_scales.fill(kGameplayLaneWidthScaleDefault);
-        std::size_t effective_lane_width_scale_count =
-            std::min(data.gameplay.lane_width_scale_count, effective_lane_width_scales.size());
-        for (std::size_t lane = 0; lane < effective_lane_width_scale_count; ++lane) {
-            effective_lane_width_scales[lane] = data.gameplay.lane_width_scales[lane];
-        }
-        if (use_imported_metrics &&
-            gameplay_note_sprite_cache_.imported_lane_width_scale_count ==
-                static_cast<std::size_t>(lane_count)) {
-            effective_lane_width_scale_count = static_cast<std::size_t>(lane_count);
-            for (std::size_t lane = 0; lane < effective_lane_width_scale_count; ++lane) {
-                effective_lane_width_scales[lane] = std::clamp(
-                    effective_lane_width_scales[lane] *
-                        gameplay_note_sprite_cache_.imported_lane_width_scales[lane],
-                    kGameplayLaneWidthScaleMin,
-                    kGameplayLaneWidthScaleMax);
-            }
-        }
-        std::array<double, kGameplayHudMaxLanes> effective_lane_spacing_scales{};
-        effective_lane_spacing_scales.fill(kGameplayLaneSpacingScaleDefault);
-        std::size_t effective_lane_spacing_scale_count =
-            std::min(data.gameplay.lane_spacing_scale_count, effective_lane_spacing_scales.size());
-        for (std::size_t gap = 0; gap < effective_lane_spacing_scale_count; ++gap) {
-            effective_lane_spacing_scales[gap] = data.gameplay.lane_spacing_scales[gap];
-        }
-        if (use_imported_metrics &&
-            gameplay_note_sprite_cache_.imported_lane_spacing_scale_count ==
-                static_cast<std::size_t>(std::max(0, lane_count - 1))) {
-            effective_lane_spacing_scale_count =
-                gameplay_note_sprite_cache_.imported_lane_spacing_scale_count;
-            for (std::size_t gap = 0; gap < effective_lane_spacing_scale_count; ++gap) {
-                effective_lane_spacing_scales[gap] = std::clamp(
-                    effective_lane_spacing_scales[gap] +
-                        gameplay_note_sprite_cache_.imported_lane_spacing_scales[gap],
-                    kGameplayLaneSpacingScaleMin,
-                    kGameplayLaneSpacingScaleMax);
-            }
-        }
-        const GameplaySurfaceLayout surface_layout =
-            build_gameplay_surface_layout(
-                lane_count,
-                note_width_scale,
-                note_art_width_ratio,
-                effective_lane_width_scale_count,
-                effective_lane_width_scales,
-                effective_lane_spacing_scale_count,
-                effective_lane_spacing_scales,
-                data.gameplay.ghost_visible,
-                data.gameplay.lane_center_gap_scale,
-                !is_skin_preview && gameplay_field_drag_state_.has_local_override
-                    ? gameplay_field_drag_state_.offset_x
-                    : data.gameplay.gameplay_field_offset_x,
-                data.gameplay.note_divider_gap_px, hidden_scratch_mask);
         if (!is_skin_preview) {
             gameplay_field_drag_state_.visible = data.gameplay.active && !data.gameplay.loading && !data.gameplay.paused;
             gameplay_field_drag_state_.left =
@@ -1230,6 +1330,8 @@
                                       float bottom_safe_margin,
                                       float vertical_offset,
                                       const GameplayTextPopAnimation& animation) {
+            if (studio) { draw_studio_combo(combo_field_layout, combo_value_text, animation,
+                top_safe_margin, bottom_safe_margin, vertical_offset); return; }
             if (combo_value_text.empty() || !d2d_->accent_brush || !scene_gameplay_combo_format) {
                 return;
             }
@@ -1284,7 +1386,17 @@
             ctx->DrawImage(d2d_->gameplay_static_command_list.Get());
         }
 
-        auto draw_key_labels = [&](const GameplayFieldLayout& label_field_layout) {
+        // Native keys travel inside a stationary well. draw_native_digital_key
+        // records each moving face so a legend rides its key; recomputing the
+        // skin-metric lookups per label cost measurable render time at 16K.
+        std::array<D2D1_RECT_F, kGameplayHudMaxLanes> native_key_faces{};
+        std::array<D2D1_RECT_F, kGameplayHudMaxLanes> native_ghost_key_faces{};
+        // The Luma Keys art reserves a recessed legend window at 204..238 of its
+        // 256px face (tools/generate_luma_keys_assets.py). The old field-bottom
+        // slot straddled the face's lower edge on every native key sprite.
+        constexpr float kLumaKeyLegendCenter = 221.0f / 256.0f;
+        const bool keycap_key_labels = !use_imported_metrics && key_label_position != "top";
+        auto draw_key_labels = [&](const GameplayFieldLayout& label_field_layout, bool ghost = false) {
             if (key_label_position == "off" || !scene_hud_format || !d2d_->text_brush ||
                 data.gameplay.key_label_count == 0) {
                 return;
@@ -1293,9 +1405,13 @@
             const float label_top = top_labels ? (label_field_layout.top + 8.0f)
                                                : (label_field_layout.bottom - 30.0f);
             const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
-            d2d_->text_brush->SetColor(ng_color("key_label",D2D1::ColorF(0xF7FAFD, 0.38f * visual_opacity)));
+            const D2D1_COLOR_F label_color =
+                ng_color("key_label",D2D1::ColorF(0xF7FAFD, (keycap_key_labels ? 0.62f : 0.38f) * visual_opacity));
+            d2d_->text_brush->SetColor(label_color);
             const std::size_t label_count =
                 std::min(data.gameplay.key_label_count, static_cast<std::size_t>(label_field_layout.lane_count));
+            IDWriteTextFormat* label_format = ng_font("key_label",scene_hud_format.Get());
+            const auto& key_faces = ghost ? native_ghost_key_faces : native_key_faces;
             for (std::size_t lane = 0; lane < label_count && lane < data.gameplay.key_labels.size(); ++lane) {
                 if (lane_hidden(lane)) continue;
                 const std::string& label = data.gameplay.key_labels[lane];
@@ -1303,13 +1419,45 @@
                     continue;
                 }
                 const int lane_index = static_cast<int>(lane);
-                const D2D1_RECT_F label_rect = ng_rect("key_label",D2D1::RectF(gameplay_lane_left(label_field_layout, lane_index) + 2.0f,
+                D2D1_RECT_F base_rect = D2D1::RectF(gameplay_lane_left(label_field_layout, lane_index) + 2.0f,
                                 label_top,
                                 gameplay_lane_right(label_field_layout, lane_index) - 2.0f,
-                                label_top + 22.0f));
+                                label_top + 22.0f);
+                const D2D1_RECT_F& face = key_faces[lane];
+                const bool on_keycap = keycap_key_labels && face.right > face.left && face.bottom > face.top;
+                if (on_keycap) {
+                    const float travel = ghost ? native_ghost_key_travel_[lane] : native_key_travel_[lane];
+                    const float face_height = face.bottom - face.top;
+                    const float center = face.top + face_height * kLumaKeyLegendCenter;
+                    base_rect = D2D1::RectF(face.left + 2.0f, center - 11.0f, face.right - 2.0f, center + 11.0f);
+                    // The window's LED strips run through its middle; a plate cut
+                    // from the window colour keeps them flanking the legend instead
+                    // of striking through it.
+                    if (auto* plate_brush = d2d_->note_fill_brush.Get()) {
+                        const float font_size = label_format->GetFontSize();
+                        const float face_center = (face.left + face.right) * 0.5f;
+                        const float half_width = std::min((face.right - face.left) * 0.36f,
+                            static_cast<float>(label.size()) * font_size * 0.34f + 7.0f);
+                        const uint32_t lane_rgb = lane < data.gameplay.lane_color_count ? data.gameplay.lane_colors[lane]
+                            : (gameplay_lane_uses_white_note(lane_index + 1) ? 0xF6F8FF : 0x4F80FF);
+                        const auto saved_plate = plate_brush->GetColor();
+                        plate_brush->SetColor(color_from_rgb(blend_rgb(lane_rgb, 0x06111B, 0.90f), 0.96f * visual_opacity));
+                        // Square, not rounded: the label pass is aliased, and rounded
+                        // rectangles re-tessellated per lane cost visible render time at 16K.
+                        ctx->FillRectangle(D2D1::RectF(face_center - half_width,
+                            face.top + face_height * (207.0f / 256.0f), face_center + half_width,
+                            face.top + face_height * (235.0f / 256.0f)), plate_brush);
+                        plate_brush->SetColor(saved_plate);
+                    }
+                    // A held key reads as lit, matching the pressed face crossfade.
+                    auto lit = label_color;
+                    lit.a = std::min(1.0f, label_color.a + 0.36f * std::clamp(travel, 0.0f, 1.0f) * visual_opacity);
+                    d2d_->text_brush->SetColor(lit);
+                }
+                const D2D1_RECT_F label_rect = ng_rect("key_label", base_rect);
                 draw_readable_text_aligned(to_wide(label),
-                                          ng_font("key_label",scene_hud_format.Get()),
-                                          label_rect,
+                                          label_format,
+                                          on_keycap ? readable_text_rect(label_rect, label_format) : label_rect,
                                           d2d_->text_brush.Get(),
                                           DWRITE_TEXT_ALIGNMENT_CENTER);
             }
@@ -1342,6 +1490,7 @@
             fill->SetColor(ng_color("key_well",color_from_rgb(0x03080F, visual_opacity)));
             ctx->FillRectangle(D2D1::RectF(bounds.left, bounds.top, bounds.right, bounds.bottom), fill);
             const auto face = D2D1::RectF(bounds.left, bounds.top + depth, bounds.right, bounds.bottom - std::min(height-1.0f,ng_metric("key_face_gap")) + depth);
+            (ghost ? native_ghost_key_faces : native_key_faces)[lane_index] = face;
             if (auto* idle = d2d_->lane_key_idle_bitmaps[lane_index].Get()) {
                 ctx->DrawBitmap(idle, face, visual_opacity, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
                 if (light > 0.005f && d2d_->lane_key_pressed_bitmaps[lane_index])
@@ -1456,10 +1605,35 @@
                     index < pressed_count && pressed[index] != 0, data.gameplay.key_backdrop_opacity) * visual_opacity;
                 if (alpha <= 0) continue;
                 const auto rgb = index < data.gameplay.lane_color_count ? data.gameplay.lane_colors[index] : 0xFFFFFFu;
-                brush->SetColor(color_from_rgb(gameplay_key_backdrop_color(rgb, data.gameplay.key_backdrop_brightness), alpha));
+                const auto light_rgb = gameplay_key_backdrop_color(rgb, data.gameplay.key_backdrop_brightness);
                 const float lane_left = gameplay_lane_left(layout, lane);
-                ctx->FillRectangle(D2D1::RectF(lane_left + 1, top,
-                    lane_left + gameplay_lane_width(layout, lane) - 1, bottom), brush);
+                const D2D1_RECT_F lane_rect = D2D1::RectF(lane_left + 1, top,
+                    lane_left + gameplay_lane_width(layout, lane) - 1, bottom);
+                // The configured opacity is the light's strength at the keys; it
+                // thins toward the top like a beam instead of a flat slab.
+                auto& light = d2d_->key_backdrop_brushes[index];
+                if (!light || d2d_->key_backdrop_brush_rgb[index] != light_rgb) {
+                    const D2D1_GRADIENT_STOP stops[] = {
+                        {0.00f, color_from_rgb(light_rgb, 0.10f)},
+                        {0.60f, color_from_rgb(light_rgb, 0.55f)},
+                        {1.00f, color_from_rgb(light_rgb, 1.00f)}};
+                    Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> collection;
+                    light.Reset();
+                    if (SUCCEEDED(ctx->CreateGradientStopCollection(stops, 3, collection.GetAddressOf())))
+                        static_cast<void>(ctx->CreateLinearGradientBrush(
+                            D2D1::LinearGradientBrushProperties(D2D1::Point2F(0, 0), D2D1::Point2F(0, 1)),
+                            collection.Get(), light.GetAddressOf()));
+                    d2d_->key_backdrop_brush_rgb[index] = light_rgb;
+                }
+                if (light) {
+                    light->SetStartPoint(D2D1::Point2F(0.0f, top));
+                    light->SetEndPoint(D2D1::Point2F(0.0f, bottom));
+                    light->SetOpacity(alpha);
+                    ctx->FillRectangle(lane_rect, light.Get());
+                } else {
+                    brush->SetColor(color_from_rgb(light_rgb, alpha));
+                    ctx->FillRectangle(lane_rect, brush);
+                }
             }
             brush->SetColor(saved_color);
             brush->SetOpacity(saved_opacity);
@@ -1769,6 +1943,8 @@
                                          std::size_t timing_history_count,
                                          const GameplayTextPopAnimation& feedback_animation,
                                          int64_t feedback_started_ns) {
+            if (studio) { draw_studio_feedback(feedback_field, has_feedback, feedback, feedback_delta_ms,
+                                               feedback_text, feedback_animation); return; }
             const bool show_feedback_overlay = has_feedback && !feedback_text.empty();
             const bool show_timing_feedback = data.gameplay.show_timing_feedback && has_feedback &&
                 !feedback_timing_text.empty();
@@ -1946,7 +2122,7 @@
             ? D2D1::RectF(ghost_summary.left + 12.0f, ghost_summary.bottom + 8.0f,
                           ghost_summary.right - 12.0f, ghost_summary.bottom + 20.0f)
             : ng_rect("progress", D2D1::RectF(progress_track_layout.left, 16.0f, progress_track_layout.right, 36.0f));
-        if (!embed_battle_header) draw_gameplay_progress_bar(progress_track_rect);
+        if (!studio && !embed_battle_header) draw_gameplay_progress_bar(progress_track_rect);
         if (data.gameplay.peer_visible) {
             const D2D1_RECT_F lead_track =
                 D2D1::RectF(opponents_left + 14.0f, 186.0f, opponents_right - 14.0f, 198.0f);
@@ -2103,7 +2279,8 @@
             }
         }
 
-        draw_vertical_gauge(surface_layout.player_gauge_left,
+        if (studio) draw_studio_rails();
+        else draw_vertical_gauge(surface_layout.player_gauge_left,
                             data.gameplay.gauge,
                             data.gameplay.gauge_label,
                             scene_hud_cache.gauge_label_text,
@@ -2207,7 +2384,7 @@
                                          lane_index));
             }
             if (!use_imported_metrics) {
-                draw_key_labels(ghost_field_layout);
+                draw_key_labels(ghost_field_layout, true);
             }
             batch_note_field = can_batch_note_field(data.gameplay.ghost_notes, data.gameplay.ghost_note_count);
             for (std::size_t note_index = 0; note_index < data.gameplay.ghost_note_count; ++note_index) {
@@ -2553,7 +2730,7 @@
                                scene_hud_cache.ghost_score_text, scene_hud_cache.ghost_battle_summary_text, false);
             if (embed_battle_header) draw_gameplay_progress_bar(progress_track_rect);
         }
-        if (data.gameplay.pacemaker_mode != "off" && !data.gameplay.pacemaker_mode.empty()) {
+        if ((!studio || !studio_deck.right_hud_visible) && data.gameplay.pacemaker_mode != "off" && !data.gameplay.pacemaker_mode.empty()) {
             const bool accuracy_target = data.gameplay.pacemaker_mode == "accuracy";
             const std::string delta = (data.gameplay.pacemaker_delta >= 0 ? "+" : "") +
                 (accuracy_target ? format_decimal(data.gameplay.pacemaker_delta) :
@@ -2569,11 +2746,43 @@
         }
         // Resume keeps the frozen note field visible; only the opening countdown
         // uses the early-return card above. This also leaves LN bodies in place.
+        // The count sits on the field the player is about to read, on a
+        // translucent card so the frozen notes around it stay legible.
         if (data.gameplay.paused && data.gameplay.countdown_active) {
-            draw_readable_text_aligned(wloc("RESUME ", "재개 ") +
-                to_wide(std::to_string(std::max(1, data.gameplay.countdown_value))),
-                scene_title_format.Get(), D2D1::RectF(84.0f, 180.0f, 450.0f, 270.0f),
-                d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING);
+            const float center_x = (field_left + field_right) * 0.5f;
+            // Below the combo/judgement stack and above the contact line.
+            const float center_y = std::min(field_top + field_height * 0.56f, hit_line_y - 110.0f);
+            const float half_width = std::max(60.0f, std::min(132.0f, (field_right - field_left) * 0.5f - 12.0f));
+            const D2D1_RECT_F card = D2D1::RectF(center_x - half_width, center_y - 92.0f,
+                                                 center_x + half_width, center_y + 92.0f);
+            if (d2d_->panel_brush) {
+                const float saved_opacity = d2d_->panel_brush->GetOpacity();
+                d2d_->panel_brush->SetOpacity(0.66f);
+                ctx->FillRoundedRectangle(D2D1::RoundedRect(card, 22.0f, 22.0f), d2d_->panel_brush.Get());
+                d2d_->panel_brush->SetOpacity(saved_opacity);
+            }
+            if (d2d_->accent_brush) {
+                const float saved_opacity = d2d_->accent_brush->GetOpacity();
+                d2d_->accent_brush->SetOpacity(0.55f);
+                ctx->DrawRoundedRectangle(D2D1::RoundedRect(card, 22.0f, 22.0f), d2d_->accent_brush.Get(), 1.6f);
+                d2d_->accent_brush->SetOpacity(saved_opacity);
+            }
+            if (scene_body_format && d2d_->muted_brush) {
+                draw_readable_text_aligned(wloc("RESUME", "재개"), scene_body_format.Get(),
+                    vcenter_text_rect(D2D1::RectF(card.left, card.top + 10.0f, card.right, card.top + 44.0f),
+                                      scene_body_format.Get()),
+                    d2d_->muted_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+            }
+            const D2D1_RECT_F count_rect = D2D1::RectF(card.left, card.top + 40.0f, card.right, card.bottom - 6.0f);
+            ID2D1Brush* count_brush = d2d_->logo_brush
+                                          ? static_cast<ID2D1Brush*>(d2d_->logo_brush.Get())
+                                          : static_cast<ID2D1Brush*>(d2d_->accent_brush.Get());
+            if (d2d_->logo_brush) set_brush_points(d2d_->logo_brush.Get(), count_rect);
+            if (scene_rank_format && count_brush) {
+                draw_readable_text_aligned(to_wide(std::to_string(std::max(1, data.gameplay.countdown_value))),
+                    scene_rank_format.Get(), vcenter_text_rect(count_rect, scene_rank_format.Get()),
+                    count_brush, DWRITE_TEXT_ALIGNMENT_CENTER);
+            }
         }
         if (data.gameplay.paused && !data.gameplay.countdown_active && d2d_->panel_brush && d2d_->card_brush &&
             d2d_->text_brush && scene_header_format && scene_body_format) {
@@ -2625,6 +2834,12 @@
                     d2d_->accent_brush->SetOpacity(0.28f);
                     ctx->FillRoundedRectangle(D2D1::RoundedRect(row_rect, 14.0f, 14.0f),
                                               d2d_->accent_brush.Get());
+                    // A solid leading rail marks the cursor without relying on fill tint alone.
+                    d2d_->accent_brush->SetOpacity(0.95f);
+                    ctx->FillRoundedRectangle(D2D1::RoundedRect(
+                        D2D1::RectF(row_rect.left + 12.0f, row_rect.top + 20.0f,
+                                    row_rect.left + 17.0f, row_rect.bottom - 20.0f), 2.5f, 2.5f),
+                        d2d_->accent_brush.Get());
                     d2d_->accent_brush->SetOpacity(saved_accent_opacity);
                 }
                 if (d2d_->button_border_brush) {
@@ -2636,7 +2851,7 @@
                     selected ? D2D1::ColorF(0xFFFFFF, 1.0f) : D2D1::ColorF(0xAAB7C4, 0.92f));
                 draw_readable_text_aligned(kPauseLabels[static_cast<std::size_t>(row)],
                                           scene_body_format.Get(),
-                                          row_rect,
+                                          vcenter_text_rect(row_rect, scene_body_format.Get()),
                                           d2d_->text_brush.Get(),
                                           DWRITE_TEXT_ALIGNMENT_CENTER);
             }
@@ -2679,27 +2894,29 @@
                         const D2D1_RECT_F button = D2D1::RectF(left, top, left + 36.0f, top + 36.0f);
                         ctx->DrawRoundedRectangle(D2D1::RoundedRect(button, 5, 5), d2d_->button_border_brush.Get(), 1);
                         draw_readable_text_aligned(direction == 0 ? L"-" : L"+", scene_body_format.Get(),
-                            button, d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+                            vcenter_text_rect(button, scene_body_format.Get()), d2d_->text_brush.Get(),
+                            DWRITE_TEXT_ALIGNMENT_CENTER);
                         if (!is_skin_preview) register_hit(button, MenuHitTargetKind::GameplayPauseAdjust,
                             static_cast<int>(row), direction == 0 ? MenuHitPart::Decrement : MenuHitPart::Increment);
                     }
                     d2d_->text_brush->SetColor(D2D1::ColorF(0xAAB7C4, 0.92f));
                     draw_readable_text_aligned(std::wstring(tuning_rows[row].label),
                                               scene_body_format.Get(),
-                                              line_rect,
+                                              vcenter_text_rect(line_rect, scene_body_format.Get()),
                                               d2d_->text_brush.Get(),
                                               DWRITE_TEXT_ALIGNMENT_LEADING);
                     d2d_->text_brush->SetColor(D2D1::ColorF(0xFFFFFF, 1.0f));
                     draw_readable_text_aligned(tuning_rows[row].value,
                                               scene_body_format.Get(),
-                                              D2D1::RectF(line_rect.left, line_rect.top,
+                                              vcenter_text_rect(D2D1::RectF(line_rect.left, line_rect.top,
                                                           line_rect.right - 110.0f, line_rect.bottom),
+                                                                scene_body_format.Get()),
                                               d2d_->text_brush.Get(),
                                               DWRITE_TEXT_ALIGNMENT_TRAILING);
                     d2d_->text_brush->SetColor(D2D1::ColorF(0x7F8C9B, 0.92f));
                     draw_readable_text_aligned(std::wstring(tuning_rows[row].keys),
                                               scene_hud_format.Get(),
-                                              line_rect,
+                                              vcenter_text_rect(line_rect, scene_hud_format.Get()),
                                               d2d_->text_brush.Get(),
                                               DWRITE_TEXT_ALIGNMENT_TRAILING);
                 }
@@ -2735,18 +2952,20 @@
             const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
             const float saved_text_opacity = d2d_->text_brush->GetOpacity();
 
-            d2d_->card_brush->SetOpacity(highlighted ? 0.98f : 0.84f);
+            // The handle stays discoverable but recedes while playing; hovering
+            // or dragging restores the full affordance. The hit area is unchanged.
+            d2d_->card_brush->SetOpacity(highlighted ? 0.98f : 0.40f);
             ctx->FillRoundedRectangle(handle, d2d_->card_brush.Get());
             d2d_->card_brush->SetOpacity(saved_card_opacity);
             if (d2d_->accent_brush) {
                 const float saved_accent_opacity = d2d_->accent_brush->GetOpacity();
-                d2d_->accent_brush->SetOpacity(highlighted ? 1.0f : 0.72f);
+                d2d_->accent_brush->SetOpacity(highlighted ? 1.0f : 0.30f);
                 ctx->DrawRoundedRectangle(handle,
                                           d2d_->accent_brush.Get(),
-                                          highlighted ? 2.4f : 1.6f);
+                                          highlighted ? 2.4f : 1.2f);
                 d2d_->accent_brush->SetOpacity(saved_accent_opacity);
             }
-            d2d_->text_brush->SetColor(D2D1::ColorF(0xFFFFFF, 1.0f));
+            d2d_->text_brush->SetColor(D2D1::ColorF(0xFFFFFF, highlighted ? 1.0f : 0.45f));
             d2d_->text_brush->SetOpacity(1.0f);
             draw_readable_text_aligned(L"\u2194",
                                       scene_body_format.Get(),

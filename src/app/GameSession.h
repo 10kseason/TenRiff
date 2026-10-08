@@ -68,6 +68,9 @@ public:
         std::array<int, kGameplayHudMaxLanes> scratch_lanes{};
         int64_t current_sample = 0;
         int64_t duration_samples = 0;
+        std::array<uint8_t, kGameplayRiffMapBins> riff_map{};
+        std::size_t riff_map_count = 0;
+        uint64_t riff_map_revision = 0;
         int sample_rate = 48000;
         int64_t audio_sample_time_ns = 0;
         double current_visual_position = 0.0;
@@ -430,6 +433,7 @@ private:
     [[nodiscard]] std::optional<int> lane_from_keycode(uint32_t keycode) const;
     [[nodiscard]] double lane_frequency_hz(int lane) const;
     [[nodiscard]] std::string find_first_chart(const std::string& root_path) const;
+    void prepare_riff_map();
 
     config::RuntimeConfig config_;
     config::Keymap keymap_;
@@ -439,6 +443,9 @@ private:
     std::string replay_source_path_;
     ChartFormat chart_format_ = ChartFormat::Unknown;
     gameplay::GameplayChart chart_;
+    std::array<uint8_t, kGameplayRiffMapBins> riff_map_{};
+    std::size_t riff_map_count_ = 0;
+    uint64_t riff_map_revision_ = 0;
     double chart_base_bpm_ = 0.0;
     std::vector<std::string> active_mods_{};
     double rate_multiplier_ = 1.0;
@@ -513,10 +520,7 @@ private:
     uint32_t f8_keycode_ = 0;
     uint32_t f9_keycode_ = 0;
     uint32_t f10_keycode_ = 0;
-    uint32_t lshift_keycode_ = 0;
-    uint32_t rshift_keycode_ = 0;
-    bool lshift_held_ = false;
-    bool rshift_held_ = false;
+    uint32_t f11_keycode_ = 0;
 
     // Judgement-line and visual-latency tuning while the chart plays. Same
     // press-then-auto-repeat shape as the hi-speed keys.

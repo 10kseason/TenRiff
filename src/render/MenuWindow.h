@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <deque>
 #include <memory>
+#include <limits>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -447,6 +448,9 @@ struct GameplayHudData {
     int lane_count = 10;
     int64_t current_sample = 0;
     int64_t duration_samples = 0;
+    std::array<uint8_t, kGameplayRiffMapBins> riff_map{};
+    std::size_t riff_map_count = 0;
+    uint64_t riff_map_revision = 0;
     int sample_rate = 48000;
     int64_t audio_sample_time_ns = 0;
     int64_t activity_publish_time_ns = 0;
@@ -505,6 +509,7 @@ struct GameplayHudData {
     double key_backdrop_brightness = 1.0;
     double key_backdrop_height = 1.0;
     std::string hit_burst_style = "prism";
+    std::string hud_layout = "studio";
     std::string key_label_position = "bottom";
     bool note_border_enabled = true;
     std::string note_shape = "rect";
@@ -692,6 +697,7 @@ struct SkinPreviewData {
     double key_backdrop_brightness = 1.0;
     double key_backdrop_height = 1.0;
     std::string hit_burst_style = "prism";
+    std::string hud_layout = "studio";
     std::string key_label_position = "bottom";
     bool note_border_enabled = true;
     std::string note_shape = "rect";
@@ -1033,6 +1039,13 @@ private:
     };
 
     struct GameplayHudCache {
+        uint64_t studio_text_revision = std::numeric_limits<uint64_t>::max();
+        std::array<std::wstring, 6> studio_setting_labels{}, studio_setting_values{};
+        std::array<std::wstring, 5> studio_judge_counts{};
+        std::wstring studio_score_padded, studio_score_significant, studio_accuracy, studio_detail,
+            studio_max, studio_pace, studio_gauge_name, studio_timing;
+        int64_t studio_elapsed_second = -1, studio_total_second = -1;
+        std::wstring studio_elapsed, studio_total;
         uint64_t text_revision = 0;
         bool animation_initialized = false;
         int animated_combo = 0;
@@ -1045,6 +1058,8 @@ private:
         int64_t ghost_judgement_animation_started_ns = 0;
         std::array<std::wstring, 6> battle_speed_text{};
         std::array<std::wstring, 3> battle_speed_pair_text{};
+        std::array<std::wstring, 2> speed_row_text{};
+        std::wstring speed_rows_text{};
         std::array<std::wstring, 4> battle_summary_text{};
         std::array<std::wstring, 4> ghost_battle_summary_text{};
         std::wstring title_text{};
@@ -1078,6 +1093,12 @@ private:
     };
 
     struct GameplayStaticCache {
+        bool studio = false;
+        uint64_t riff_map_revision = 0;
+        std::size_t riff_map_count = 0;
+        std::array<uint8_t, 64> riff_map{};
+        std::array<float, 4> accent{};
+        std::string gauge_label;
         uint32_t hidden_scratch_mask = 0;
         bool native_instrument = false;
         std::shared_ptr<const app::ImportedGameplaySkinDefinition> native_skin;

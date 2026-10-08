@@ -143,6 +143,7 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Move FAST/SLOW bar on the Y axis in base pixels.", "FAST/SLOW 막대의 세로 위치를 기준 픽셀 단위로 옮깁니다.", "FAST/SLOWバーを上下に移動します。"},
         {"Black fog at the top makes notes fade in. 0% is off; higher values extend the fog toward the judgement line.", "상단의 검은 안개 아래에서 노트가 서서히 나타납니다. 0%는 끔이며 높일수록 안개 범위가 판정선 쪽으로 넓어집니다.", "上部の黒い霧からノートが現れます。0%はオフ、値を上げると範囲が広がります。"},
         {"Black fog above the judgement line makes notes fade out. 0% is off; the judgement line, keys and HUD stay visible.", "판정선 위의 검은 안개로 노트가 서서히 사라집니다. 0%는 끔이며 판정선·키·HUD는 유지됩니다.", "判定ライン上の黒い霧でノートが消えます。0%はオフ。ライン・キー・HUDは表示されます。"},
+        {"Choose Classic or Studio Deck for native solo gameplay. Image skins, ghost battles and multiplayer keep the classic layout.", "Native 단독 플레이의 HUD를 클래식 또는 스튜디오 덱으로 고릅니다. 이미지 스킨·고스트 대전·멀티플레이는 기존 배치를 유지합니다.", "Nativeのソロプレイでクラシックかスタジオデッキを選びます。画像スキン・ゴースト対戦・マルチプレイは従来の配置を維持します。"},
     };
     static constexpr SettingsHelpText profile[] = {
         {"Choose the interface language. The change is applied and saved immediately.", "화면 언어를 선택합니다. 변경 즉시 적용하고 저장합니다.", "表示言語を選びます。すぐに適用・保存されます。"},

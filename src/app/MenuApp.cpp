@@ -766,6 +766,12 @@ std::vector<uint32_t> build_menu_probe_keycodes(const std::vector<uint32_t>& fix
     if (capture_all_keys) {
 #ifdef _WIN32
         for (uint32_t vkey = 0; vkey <= 0xFFu; ++vkey) {
+            // VK_SHIFT fires before its side-specific key in a polling scan.
+            // Capture LShift/RShift instead; existing VK_10 bindings still poll
+            // through the ordinary binding-only scope below.
+            if (vkey == 0x10u) {
+                continue;
+            }
             append_keycode(config::KeycodeMap::normalize_windows_polling_keycode(vkey));
         }
 #else
@@ -982,6 +988,7 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
                 input.scratch_lanes.begin());
     input.current_sample = state.current_sample;
     input.duration_samples = state.duration_samples;
+    input.riff_map_revision = state.riff_map_revision;
     input.sample_rate = state.sample_rate;
     input.audio_sample_time_ns = state.audio_sample_time_ns;
     input.audio_buffer_frames = state.audio_buffer_frames;
@@ -1207,6 +1214,7 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     key_f8_ = config::KeycodeMap::to_keycode("F8").value_or(0);
     key_f9_ = config::KeycodeMap::to_keycode("F9").value_or(0);
     key_f10_ = config::KeycodeMap::to_keycode("F10").value_or(0);
+    key_f11_ = config::KeycodeMap::to_keycode("F11").value_or(0);
     key_minus_ = config::KeycodeMap::to_keycode("Minus").value_or(0);
     key_plus_ = config::KeycodeMap::to_keycode("Plus").value_or(0);
 
@@ -1594,6 +1602,7 @@ std::vector<uint32_t> MenuApp::current_menu_probe_keycodes() const {
     append_fixed_key(key_f8_);
     append_fixed_key(key_f9_);
     append_fixed_key(key_f10_);
+    append_fixed_key(key_f11_);
     append_fixed_key(key_minus_);
     append_fixed_key(key_plus_);
     append_fixed_key(key_p_);
@@ -2055,7 +2064,7 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
     }
 
     if (event.state == input::InputState::Pressed &&
-        key_f8_ != 0 && event.keycode == key_f8_ &&
+        key_f11_ != 0 && event.keycode == key_f11_ &&
         open_multiplayer_chat_shortcut()) {
         return;
     }

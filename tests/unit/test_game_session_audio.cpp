@@ -31,6 +31,45 @@ struct CompletionTestDirectory {
 // Exercise the production input-to-voice-to-mixer path without starting a device,
 // input thread, decoder, profile or record writer.
 struct GameSessionAudioTestAccess {
+    static void check_riff_map_snapshot_lifecycle() {
+        const auto prepare = [](GameSession& session) {
+            session.chart_.lane_count = 1;
+            session.chart_.duration_samples = 64 * 48000;
+            // Far more heads than the visible-note snapshot can hold; the map
+            // must cover the whole chart, including the final timestamp.
+            for (int i = 0; i < 256; ++i) {
+                session.chart_.notes.push_back({1, i * 12000, std::nullopt});
+            }
+            session.chart_.notes.push_back({1, session.chart_.duration_samples, std::nullopt});
+            gameplay::GameplayConfig config;
+            session.engine_ = std::make_unique<gameplay::GameplayEngine>(session.chart_, config);
+            session.prepare_riff_map();
+        };
+        auto first = std::make_unique<GameSession>();
+        prepare(*first);
+        auto snapshot = first->hud_snapshot();
+        REQUIRE(snapshot.riff_map_count == kGameplayRiffMapBins);
+        CHECK(snapshot.riff_map[0] == 204);
+        CHECK(snapshot.riff_map[63] == 255);
+        CHECK(snapshot.note_count < first->chart_.notes.size());
+        CHECK(snapshot.duration_samples == first->chart_.duration_samples);
+        const auto first_revision = snapshot.riff_map_revision;
+        REQUIRE(first_revision != 0);
+        CHECK(first->hud_snapshot().riff_map_revision == first_revision);
+
+        first->chart_.notes.clear();
+        first->prepare_riff_map();
+        snapshot = first->hud_snapshot();
+        CHECK(snapshot.riff_map_count == 0);
+        CHECK(snapshot.riff_map_revision > first_revision);
+        CHECK(std::all_of(snapshot.riff_map.begin(), snapshot.riff_map.end(),
+                          [](uint8_t value) { return value == 0; }));
+
+        auto next_song = std::make_unique<GameSession>();
+        prepare(*next_song);
+        CHECK(next_song->hud_snapshot().riff_map_revision > snapshot.riff_map_revision);
+    }
+
     static void check_r4_player_and_ghost_boundaries() {
         const auto play = [](int rank, bool hard, int64_t delta, std::string_view ghost_ruleset) {
             auto session = std::make_unique<GameSession>();
@@ -432,13 +471,7 @@ struct GameSessionAudioTestAccess {
         auto session = pause_fixture();
         session->f5_keycode_ = 116; session->f6_keycode_ = 117;
         session->f7_keycode_ = 118; session->f8_keycode_ = 119;
-        session->lshift_keycode_ = 160;
         session->config_.speed.hi_speed = 4.0;
-        control(*session, 116);
-        CHECK(session->config_.speed.hi_speed == 4.0);
-        control(*session, 117);
-        CHECK(session->config_.speed.hi_speed == 4.0);
-        control(*session, 160);
         control(*session, 116);
         CHECK(session->config_.speed.hi_speed == 2.0);
         control(*session, 117);
@@ -522,7 +555,7 @@ struct GameSessionAudioTestAccess {
         CHECK(published_snapshots > 0);
     }
 
-    static void check_secondary_binding_input_queue() {
+    static void check_secondary_binding_input_queue(uint32_t primary_key = 32, uint32_t secondary_key = 33) {
         auto session = std::make_unique<GameSession>();
         session->sample_rate_ = 48000;
         session->chart_.lane_count = 1;
@@ -537,7 +570,7 @@ struct GameSessionAudioTestAccess {
         session->lane_activity_.assign(1, 0.0f);
         session->lane_pressed_.assign(1, 0);
         session->synthetic_tones_enabled_ = false;
-        session->key_to_lane_ = {{32, 1}, {33, 1}};
+        session->key_to_lane_ = {{primary_key, 1}, {secondary_key, 1}};
         session->lane_binding_state_.configure(session->key_to_lane_);
         const auto physical_event = [&](uint32_t key, input::InputState state, int64_t sample) {
             const int64_t time_ns = 1'000'000'000LL + (sample - 48000) * 1'000'000'000LL / 48000;
@@ -549,14 +582,14 @@ struct GameSessionAudioTestAccess {
             session->process_input_queue(sample, sample + 480, 0);
             session->engine_->advance(sample);
         };
-        physical_event(32, input::InputState::Pressed, 48000);
-        physical_event(33, input::InputState::Pressed, 60000);
-        physical_event(32, input::InputState::Released, 72000);
+        physical_event(primary_key, input::InputState::Pressed, 48000);
+        physical_event(secondary_key, input::InputState::Pressed, 60000);
+        physical_event(primary_key, input::InputState::Released, 72000);
         CHECK(session->lane_pressed_[0] == 1);
         CHECK(session->lane_binding_state_.pressed(1));
         CHECK(session->engine_->stats().counts.bd == 0);
         CHECK(session->engine_->stats().counts.pr == 0);
-        physical_event(33, input::InputState::Released, 96000);
+        physical_event(secondary_key, input::InputState::Released, 96000);
         session->engine_->advance(100800);
         CHECK(session->lane_pressed_[0] == 0);
         CHECK_FALSE(session->lane_binding_state_.pressed(1));
@@ -564,6 +597,146 @@ struct GameSessionAudioTestAccess {
         CHECK(session->engine_->stats().counts.bd == 0);
         CHECK(session->engine_->stats().counts.pr == 0);
         CHECK(session->engine_->replay().events.size() == 2);
+    }
+
+    static std::unique_ptr<GameSession> shift_lane_fixture(uint32_t key, bool hold = true) {
+        auto session = std::make_unique<GameSession>();
+        session->sample_rate_ = 48000;
+        session->chart_.lane_count = 1;
+        session->chart_.duration_samples = 144000;
+        gameplay::NoteEvent note{1, 48000, hold ? std::optional<int64_t>{96000} : std::nullopt};
+        note.release_required = hold;
+        session->chart_.notes.push_back(note);
+        gameplay::GameplayConfig config;
+        config.sample_rate = 48000;
+        config.practice_no_fail_enabled = true;
+        session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+        session->lane_activity_.assign(1, 0.0f);
+        session->lane_pressed_.assign(1, 0);
+        session->synthetic_tones_enabled_ = false;
+        session->gameplay_started_ = true;
+        session->escape_keycode_ = 27;
+        session->f5_keycode_ = 116;
+        session->f6_keycode_ = 117;
+        session->f8_keycode_ = 119;
+        session->key_to_lane_ = {{key, 1}};
+        session->lane_binding_state_.configure(session->key_to_lane_);
+        return session;
+    }
+
+    static void queue_physical_edge(GameSession& session, uint32_t key, input::InputState state,
+                                    int64_t sample, bool future_queue = false) {
+        const int64_t time_ns = 1'000'000'000LL + (sample - 48000) * 1'000'000'000LL / 48000;
+        session.startup_input_timing_anchor_ = {sample, time_ns, true};
+        session.current_playback_sample_ = sample;
+        input::InputEvent event{};
+        event.keycode = key;
+        event.state = state;
+        event.input_time_ns = time_ns;
+        if (future_queue) {
+            REQUIRE(session.future_events_.push({event, sample}));
+            session.process_future_events(sample, sample + 480, 0);
+        } else {
+            REQUIRE(session.input_thread_.queue().push(event));
+            session.process_input_queue(sample, sample + 480, 0);
+        }
+        session.engine_->advance(sample);
+    }
+
+    static void check_shift_lane_edges(uint32_t key, bool hold, bool future_queue) {
+        auto session = shift_lane_fixture(key, hold);
+        queue_physical_edge(*session, key, input::InputState::Pressed, 48000, future_queue);
+        REQUIRE(session->engine_->stats().counts.pg == 1);
+        CHECK(session->lane_pressed_[0] == 1);
+        CHECK(session->lane_binding_state_.pressed(1));
+        queue_physical_edge(*session, key, input::InputState::Released, 96000, future_queue);
+        session->engine_->advance(100800);
+        CHECK(session->lane_pressed_[0] == 0);
+        CHECK_FALSE(session->lane_binding_state_.pressed(1));
+        CHECK(session->engine_->stats().counts.pg == (hold ? 2 : 1));
+        CHECK(session->engine_->stats().counts.bd == 0);
+        CHECK(session->engine_->stats().counts.pr == 0);
+        const auto& replay = session->engine_->replay().events;
+        REQUIRE(replay.size() == 2);
+        CHECK(replay[0].sample == 48000);
+        CHECK(replay[0].state == input::InputState::Pressed);
+        CHECK(replay[1].sample == 96000);
+        CHECK(replay[1].state == input::InputState::Released);
+    }
+
+    static void check_shift_tuning_hotkeys(uint32_t key, bool held, bool paused) {
+        auto session = shift_lane_fixture(key);
+        session->config_.speed.hi_speed = 4.0;
+        if (held) queue_physical_edge(*session, key, input::InputState::Pressed, 48000);
+        if (paused) control(*session, 27);
+        control(*session, 116);
+        CHECK(session->config_.speed.hi_speed == 2.0);
+        control(*session, 117);
+        CHECK(session->config_.speed.hi_speed == 4.0);
+        control(*session, 119);
+        CHECK(session->config_.visual_offset_ms == 1.0);
+        input::InputEvent release{};
+        release.keycode = 119;
+        release.state = input::InputState::Released;
+        REQUIRE(session->handle_control_input(release));
+        CHECK_FALSE(session->visual_offset_increase_repeat_.held);
+        CHECK(session->engine_->replay().events.size() == (held ? 1 : 0));
+        if (held && !paused) {
+            CHECK(session->lane_binding_state_.pressed(1));
+            queue_physical_edge(*session, key, input::InputState::Released, 96000);
+            CHECK(session->engine_->stats().counts.pg == 2);
+            CHECK(session->engine_->stats().counts.bd == 0);
+        }
+    }
+
+    static void check_shift_pause_release(uint32_t key) {
+        auto session = shift_lane_fixture(key);
+        queue_physical_edge(*session, key, input::InputState::Pressed, 48000);
+        control(*session, 27);
+        REQUIRE(session->paused_.load());
+        const auto score_before = session->engine_->stats().raw_score;
+        input::InputEvent release{};
+        release.keycode = key;
+        release.state = input::InputState::Released;
+        REQUIRE(session->input_thread_.queue().push(release));
+        session->process_paused_input_queue();
+        CHECK(session->engine_->stats().raw_score == score_before);
+        CHECK(session->engine_->replay().events.size() == 1);
+        // No physical keys are polled in this deterministic fixture. The real
+        // resume path still resets every configured binding before syncing lanes.
+        session->polled_gameplay_keys_.clear();
+        session->rebaseline_gameplay_start_input_state(60000);
+        CHECK_FALSE(session->lane_binding_state_.pressed(1));
+        CHECK(session->lane_pressed_[0] == 0);
+        CHECK(session->engine_->stats().raw_score == score_before);
+        session->engine_->advance(100800);
+        CHECK(session->engine_->stats().counts.bd == 1);
+    }
+
+    static void check_shift_and_chat_polling() {
+        for (const bool rawinput : {false, true}) {
+            auto session = std::make_unique<GameSession>();
+            session->config_.input.rawinput = rawinput;
+            session->f11_keycode_ = 122;
+            session->key_to_lane_ = {{160, 1}, {161, 2}};
+            for (const bool fallback : {false, true}) {
+                session->rebuild_polled_gameplay_keys();
+                if (fallback) session->polled_gameplay_keys_.clear();
+                input::InputThreadConfig input_config;
+                session->rebuild_input_thread_config(input_config);
+                for (const uint32_t key : {160u, 161u, 122u}) {
+                    CHECK(std::count(input_config.polling_keys.begin(), input_config.polling_keys.end(), key) == 1);
+                }
+                CHECK(input_config.rawinput_polling_shadow == rawinput);
+            }
+            session->key_to_lane_.clear();
+            session->rebuild_polled_gameplay_keys();
+            input::InputThreadConfig input_config;
+            session->rebuild_input_thread_config(input_config);
+            CHECK(std::count(input_config.polling_keys.begin(), input_config.polling_keys.end(), 122u) == 1);
+            CHECK(std::count(input_config.polling_keys.begin(), input_config.polling_keys.end(), 160u) == 0);
+            CHECK(std::count(input_config.polling_keys.begin(), input_config.polling_keys.end(), 161u) == 0);
+        }
     }
 
     static void check_hud_playback_anchor(int sample_rate) {
@@ -1214,6 +1387,38 @@ TEST_CASE("production input queue preserves a charge hold through primary to sec
     tenriff::app::GameSessionAudioTestAccess::check_secondary_binding_input_queue();
 }
 
+TEST_CASE("mapped left and right Shift score note heads and LN releases through both gameplay queues") {
+    for (const uint32_t key : {160u, 161u})
+        for (const bool hold : {false, true})
+            for (const bool future_queue : {false, true})
+                tenriff::app::GameSessionAudioTestAccess::check_shift_lane_edges(key, hold, future_queue);
+}
+
+TEST_CASE("Shift bindings share secondary LN state without premature release") {
+    for (const uint32_t key : {160u, 161u}) {
+        tenriff::app::GameSessionAudioTestAccess::check_secondary_binding_input_queue(key, 32);
+        tenriff::app::GameSessionAudioTestAccess::check_secondary_binding_input_queue(32, key);
+    }
+    tenriff::app::GameSessionAudioTestAccess::check_secondary_binding_input_queue(160, 161);
+    tenriff::app::GameSessionAudioTestAccess::check_secondary_binding_input_queue(161, 160);
+}
+
+TEST_CASE("F5 F6 and F8 tuning work with or without a held Shift lane during play and pause") {
+    for (const uint32_t key : {160u, 161u})
+        for (const bool held : {false, true})
+            for (const bool paused : {false, true})
+                tenriff::app::GameSessionAudioTestAccess::check_shift_tuning_hotkeys(key, held, paused);
+}
+
+TEST_CASE("releasing Shift while paused rebaselines the held lane without scoring paused input") {
+    for (const uint32_t key : {160u, 161u})
+        tenriff::app::GameSessionAudioTestAccess::check_shift_pause_release(key);
+}
+
+TEST_CASE("gameplay polls assigned Shift bindings and F11 chat without reserving unbound Shift") {
+    tenriff::app::GameSessionAudioTestAccess::check_shift_and_chat_polling();
+}
+
 TEST_CASE("gameplay HUD follows the audible device position as queued buffers grow") {
     for (int sample_rate : {44100, 48000})
         tenriff::app::GameSessionAudioTestAccess::check_hud_playback_anchor(sample_rate);
@@ -1321,4 +1526,8 @@ TEST_CASE("Auto Scratch exports explicit assisted custom zero scores rejected by
 
 TEST_CASE("R4 live player and ghost callbacks share exact modifier edges while R3 ghosts retain old timing") {
     tenriff::app::GameSessionAudioTestAccess::check_r4_player_and_ghost_boundaries();
+}
+
+TEST_CASE("whole chart riff map crosses the production HUD snapshot with unique song revisions") {
+    tenriff::app::GameSessionAudioTestAccess::check_riff_map_snapshot_lifecycle();
 }

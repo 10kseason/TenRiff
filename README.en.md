@@ -1,5 +1,7 @@
 # TenRiff
 
+**2026-10-08 · TenRiff 1.8.6:** Adds the Studio Deck HUD for Native solo play. Left and right Shift work as play keys; F5/F6 halve/double Hi-Speed and F11 opens chat. Classic HUD remains selectable. [1.8.6 release](docs/release-1.8.6-gate.md).
+
 **2026-10-06 · TenRiff 1.8.5:** Batches supported note images in drawing order during VSync-OFF gameplay to reduce CPU submission work. Unsupported skins/long notes and VSync-ON retain the existing path. Lobby/menu behavior and R1–R4 judgement/replay rules are preserved. [1.8.5 release](docs/release-1.8.5-gate.md).
 
 **2026-10-05 · TenRiff 1.8.42:** Fixes extra render waiting when a dense frame slightly exceeds its budget, and skips performance-history collection/sorting while the overlay is off. Note visuals/count and R1–R4 judgement/replay rules are preserved. [1.8.42 release](docs/release-1.8.42-gate.md).
@@ -16,13 +18,13 @@
 
 **Multiplayer Rate build:** the leader sets a shared Room Rate in the lobby. All participants must use this protocol v6 build; previous v5 clients cannot join. [Guide (Korean)](docs/multiplayer.md).
 
-This is the complete **1.8.5 Sites integrated** distribution. Extract to a new folder, run `launch_win.bat`, then press F10 and link your web account once. Eligible new plays upload score, detail score, accuracy, and detailed accuracy. New plays use ruleset-4 with a required timing profile for web submissions; ruleset-1/2/3 replays retain their original timing and LN behavior, and existing web records keep their IDs and scores. See the [connection guide](docs/sites-leaderboard.md) (Korean).
+This is the complete **1.8.6 Sites integrated** distribution. Extract to a new folder, run `launch_win.bat`, then press F10 and link your web account once. Eligible new plays upload score, detail score, accuracy, and detailed accuracy. New plays use ruleset-4 with a required timing profile for web submissions; ruleset-1/2/3 replays retain their original timing and LN behavior, and existing web records keep their IDs and scores. See the [connection guide](docs/sites-leaderboard.md) (Korean).
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The current project version is `1.8.5`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The current project version is `1.8.6`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-This README is an introduction that explains "what to look at first when you open the project." For current behavior, the `1.8.5` project state, the `1.5.1 fixed stable baseline` baseline, configuration, and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
+This README is an introduction that explains "what to look at first when you open the project." For current behavior, the `1.8.6` project state, the `1.5.1 fixed stable baseline` baseline, configuration, and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
 
 TenRiff should also be read as a `vibe coding` work: it was shaped through fast iteration and experimentation rather than only through a traditional long-form design-first process.
 

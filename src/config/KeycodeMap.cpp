@@ -508,6 +508,12 @@ std::string KeycodeMap::to_name(uint32_t keycode) {
 
 #ifdef _WIN32
 uint32_t KeycodeMap::normalize_windows_raw_keycode(uint32_t vkey, uint16_t make_code, uint16_t flags) {
+    // RawInput reports VK_SHIFT for both sides. Match the side-specific names
+    // saved by key capture and polled by GetAsyncKeyState on both make/break.
+    if (vkey == VK_SHIFT) {
+        if (make_code == 0x2Au) return VK_LSHIFT;
+        if (make_code == 0x36u) return VK_RSHIFT;
+    }
     const uint16_t scan_code = encode_scan_code(make_code, flags);
     const uint32_t resolved_vkey = recover_raw_vkey_from_scan_code(vkey, scan_code);
     return normalize_layout_sensitive_key(resolved_vkey, scan_code);

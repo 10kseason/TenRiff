@@ -79,11 +79,12 @@ enum class SkinSettingsRowId {
     TimingBarY,
     NoteFadeIn,
     NoteFadeOut,
+    HudLayout,
 };
 
 // The same order drives keyboard navigation, rendered rows and mouse hit targets.
 // Keep related controls adjacent instead of deriving positions from row labels.
-inline constexpr std::array<SkinSettingsRowId, 65> kSkinSettingsRowOrder = {
+inline constexpr std::array<SkinSettingsRowId, 66> kSkinSettingsRowOrder = {
     SkinSettingsRowId::KeyMode,
     SkinSettingsRowId::ScratchPosition,
     SkinSettingsRowId::SkinSource,
@@ -130,6 +131,7 @@ inline constexpr std::array<SkinSettingsRowId, 65> kSkinSettingsRowOrder = {
     SkinSettingsRowId::JudgementLineGlow,
     SkinSettingsRowId::HitBurstStyle,
     SkinSettingsRowId::KeyPulse,
+    SkinSettingsRowId::HudLayout,
     SkinSettingsRowId::LaneDividers,
     SkinSettingsRowId::JudgementLine,
     SkinSettingsRowId::GearBoundary,
@@ -185,6 +187,7 @@ enum class SkinSettingsCategory { Source, Geometry, Notes, LongNotes, Effects, H
         case SkinSettingsRowId::KeyBackdropHeight: case SkinSettingsRowId::JudgementLineGlow:
         case SkinSettingsRowId::HitBurstStyle: case SkinSettingsRowId::KeyPulse:
             return SkinSettingsCategory::Effects;
+        case SkinSettingsRowId::HudLayout:
         case SkinSettingsRowId::LaneDividers: case SkinSettingsRowId::JudgementLine:
         case SkinSettingsRowId::GearBoundary: case SkinSettingsRowId::KeyLabelPosition:
         case SkinSettingsRowId::TimingBar:

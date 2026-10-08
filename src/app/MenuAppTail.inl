@@ -47,6 +47,9 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     };
     target.current_sample = gameplay_hud_.current_sample;
     target.duration_samples = gameplay_hud_.duration_samples;
+    target.riff_map = gameplay_hud_.riff_map;
+    target.riff_map_count = gameplay_hud_.riff_map_count;
+    target.riff_map_revision = gameplay_hud_.riff_map_revision;
     target.sample_rate = gameplay_hud_.sample_rate;
     target.audio_sample_time_ns = gameplay_hud_.audio_sample_time_ns;
     target.audio_buffer_frames = gameplay_hud_.audio_buffer_frames;
@@ -72,7 +75,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.background_upscale_model_path = config_.graphics.background_upscale_model_path;
     target.background_upscale_prefer_npu = config_.graphics.background_upscale_prefer_npu;
     // While a chart is running the session owns F1/F2 and F7/F8 retuning;
-    // Shift+F8 opens chat, and F10 opens the account overlay.
+    // F11 opens chat, and F10 opens the account overlay.
     const double clamped_judgement_line_position = std::clamp(
         gameplay_hud_.active ? gameplay_hud_.judgement_line_position
                              : config_.skin.judgement_line_position,
@@ -184,6 +187,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.hit_burst_style = manifest_style && manifest_style->hit_burst_style.has_value()
                                  ? *manifest_style->hit_burst_style
                                  : config::normalize_skin_hit_burst_style_token(config_.skin.hit_burst_style);
+    target.hud_layout = config::normalize_skin_hud_layout_token(config_.skin.hud_layout);
     target.key_label_position = manifest_style && manifest_style->key_label_position.has_value()
                                     ? *manifest_style->key_label_position
                                     : config::normalize_skin_key_label_position_token(config_.skin.key_label_position);
@@ -2241,9 +2245,6 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     session.set_screenshot_callback([this]() {
         menu_window_.request_screenshot();
     });
-    gameplay_chat_left_shift_held_ = false;
-    gameplay_chat_right_shift_held_ = false;
-    gameplay_chat_f8_captured_ = false;
     session.set_control_input_callback([this](const input::InputEvent& event) {
         return queue_gameplay_chat_input(event);
     });
@@ -2320,6 +2321,9 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
                     gameplay_hud_.scratch_lanes.begin());
         gameplay_hud_.current_sample = hud.current_sample;
         gameplay_hud_.duration_samples = hud.duration_samples;
+        gameplay_hud_.riff_map = hud.riff_map;
+        gameplay_hud_.riff_map_count = hud.riff_map_count;
+        gameplay_hud_.riff_map_revision = hud.riff_map_revision;
         gameplay_hud_.sample_rate = hud.sample_rate;
         gameplay_hud_.audio_sample_time_ns = hud.audio_sample_time_ns;
         gameplay_hud_.hud_publish_time_ns = hud.hud_publish_time_ns;

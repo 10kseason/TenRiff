@@ -46,6 +46,25 @@ TEST_CASE("skin HUD font scales preserve legacy defaults and sanitize portable p
     CHECK(skin.judgement_font_scale == doctest::Approx(1.0));
 }
 
+TEST_CASE("skin HUD layout defaults to studio and normalizes portable settings") {
+    using namespace tenriff::config;
+    SkinConfig skin;
+    CHECK(skin.hud_layout == "studio");
+    CHECK(normalize_skin_hud_layout_token("CLASSIC") == "classic");
+    CHECK(normalize_skin_hud_layout_token("STUDIO") == "studio");
+    CHECK(normalize_skin_hud_layout_token("unknown") == "studio");
+    CHECK(normalize_skin_hud_layout_token("") == "studio");
+    REQUIRE(deserialize_skin_config("{}", skin));
+    CHECK(skin.hud_layout == "studio");
+    REQUIRE(deserialize_skin_config(R"({"hud_layout":"CLASSIC"})", skin));
+    CHECK(skin.hud_layout == "classic");
+    const auto preset = serialize_skin_config(skin);
+    REQUIRE(deserialize_skin_config(preset, skin));
+    CHECK(skin.hud_layout == "classic");
+    REQUIRE(deserialize_skin_config(R"({"hud_layout":"unknown"})", skin));
+    CHECK(skin.hud_layout == "studio");
+}
+
 namespace {
 
 struct TempDirGuard {
@@ -195,6 +214,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.skin.judgement_line_glow_enabled);
     CHECK(config.skin.key_pulse_enabled);
     CHECK(config.skin.hit_burst_style == "prism");
+    CHECK(config.skin.hud_layout == "studio");
     CHECK(config.skin.key_label_position == "bottom");
     CHECK(config.skin.gameplay_field_offset_x ==
           doctest::Approx(tenriff::config::kGameplayFieldOffsetXDefault));
@@ -942,6 +962,31 @@ TEST_CASE("config save and load preserve lr2 resolution mode") {
     REQUIRE(result.success());
     CHECK(result.config.skin.source == "lr2");
     CHECK(result.config.skin.lr2_resolution_mode == "fhd");
+}
+
+TEST_CASE("skin HUD layout survives profile roundtrips and upgrades missing legacy keys") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE_FALSE(temp.path.empty());
+    CurrentPathGuard cwd;
+    std::error_code ec;
+    std::filesystem::current_path(temp.path, ec);
+    REQUIRE_FALSE(static_cast<bool>(ec));
+
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    std::string error;
+    for (const auto token : {"classic", "studio", "CLASSIC", "invalid"}) {
+        config.skin.hud_layout = token;
+        REQUIRE(loader.save_profile("profiles/test", config, &error));
+        const auto result = loader.load_profile("profiles/test");
+        REQUIRE(result.success());
+        CHECK(result.config.skin.hud_layout == tenriff::config::normalize_skin_hud_layout_token(token));
+    }
+    write_file("profiles/test/config.json", R"({"skin":{"hit_burst_style":"spark"}})");
+    const auto legacy = loader.load_profile("profiles/test");
+    REQUIRE(legacy.success());
+    CHECK(legacy.config.skin.hud_layout == "studio");
+    CHECK(legacy.config.skin.hit_burst_style == "spark");
 }
 
 TEST_CASE("config save and load preserve hit burst brightness") {

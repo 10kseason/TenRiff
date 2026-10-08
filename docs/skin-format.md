@@ -180,6 +180,8 @@ MySkin/
 독립적이다. `gameplay.renderer`가 없거나 `legacy`이면 기존 v1 스킨의 표시 경로를 유지한다.
 게임 시뮬레이션의 판정 시간, 입력, 오디오, 채보 규칙은 이 설정을 읽지 않는다.
 
+`gameplay.native.rects`의 기존 HUD 사각형(title, score, gauge 등)은 클래식 배치에만 적용한다. 프로필의 `skin.hud_layout=studio`는 Native 단독 플레이에서 스튜디오 덱 배치를 사용하며, 이미지 스킨·고스트 대전·멀티플레이는 기존 배치를 유지한다. 1단계에서는 스킨 JSON 스키마와 웹/오프라인 에디터의 슬롯을 추가하지 않는다.
+
 [웹 스킨 에디터](https://tenriff-skin-editor.lastestarcorp.chatgpt.site/)와 동봉
 `tools/skin_editor/index.html`에서 편집하고 사본을 저장할 수 있다. 전체 기본값은
 [`TenRiff_NativeEditable/skin.json`](../skins/TenRiff_NativeEditable/skin.json),

@@ -184,7 +184,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
             skin_preview_hud_cache_.text_revision = 0;
         skin_preview_scene->kind = MenuScreenKind::GameplayHud;
         skin_preview_scene->ui_language = data.ui_language;
-        skin_preview_scene->gameplay = make_skin_gameplay_preview(data.generic.skin_preview, render_now_ns);
+        skin_preview_scene->gameplay = make_skin_gameplay_preview(data.generic.skin_preview, render_now_ns, data.ui_language);
         if (!ensure_gameplay_note_sprites(skin_preview_scene->gameplay)) invalidate_gameplay_note_sprite_cache();
         if (!ensure_gameplay_background_bitmap(skin_preview_scene->gameplay)) invalidate_gameplay_background_cache();
         if (!ensure_gameplay_static_cache(skin_preview_scene->gameplay, false)) invalidate_gameplay_static_cache();
@@ -317,6 +317,16 @@ void MenuWindow::draw(const MenuRenderData& data) {
 
 
     if (data.kind == MenuScreenKind::GameplayHud) {
+        if (gameplay_studio_deck_enabled(data.gameplay.hud_layout,
+                normalize_gameplay_skin_source(data.gameplay.skin_source) != "native",
+                data.gameplay.ghost_visible, data.gameplay.peer_visible) &&
+            data.gameplay.skin_background_path.empty() && !d2d_->gameplay_background_base_bitmap &&
+            !d2d_->gameplay_background_overlay_bitmap) {
+            const auto saved = d2d_->note_fill_brush->GetColor();
+            d2d_->note_fill_brush->SetColor(D2D1::ColorF(0x050608));
+            ctx->FillRectangle(full_screen_rect, d2d_->note_fill_brush.Get());
+            d2d_->note_fill_brush->SetColor(saved);
+        }
         if (ID2D1Bitmap* bitmap = find_song_card_preview_bitmap(data.gameplay.skin_background_path)) {
             const D2D1_RECT_F source_rect =
                 centered_bitmap_source_rect(bitmap->GetSize(), full_screen_rect);
@@ -352,7 +362,11 @@ void MenuWindow::draw(const MenuRenderData& data) {
 
     const bool visible_gameplay_bga = data.kind == MenuScreenKind::GameplayHud &&
         (d2d_->gameplay_background_base_bitmap || d2d_->gameplay_background_overlay_bitmap);
-    if (d2d_->glow_brush && !modern_menu_screen && !visible_gameplay_bga) {
+    const bool studio_gameplay = data.kind == MenuScreenKind::GameplayHud &&
+        gameplay_studio_deck_enabled(data.gameplay.hud_layout,
+            normalize_gameplay_skin_source(data.gameplay.skin_source) != "native",
+            data.gameplay.ghost_visible, data.gameplay.peer_visible);
+    if (d2d_->glow_brush && !modern_menu_screen && !visible_gameplay_bga && !studio_gameplay) {
         const float saved_opacity = d2d_->glow_brush->GetOpacity();
         if (has_menu_scene) {
             d2d_->glow_brush->SetOpacity(data.kind == MenuScreenKind::TitleMenu ? 0.26f : 0.14f);

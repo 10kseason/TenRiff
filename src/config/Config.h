@@ -206,6 +206,8 @@ struct SkinConfig {
     double key_backdrop_height = kSkinKeyBackdropHeightDefault;
     // Built-in hit-burst material: prism | ring | spark.
     std::string hit_burst_style = "prism";
+    // Native solo HUD layout. Missing legacy-profile keys also select studio.
+    std::string hud_layout = "studio";
     std::string key_label_position = "bottom";
     // UI text font token: default | malgun | bahnschrift | consolas.
     std::string ui_font = "default";
@@ -340,6 +342,7 @@ void apply_skin_visual_preset(SkinConfig& skin, std::string_view token);
 [[nodiscard]] std::string skin_key_label_position_label(std::string_view token);
 [[nodiscard]] std::string normalize_skin_hit_burst_style_token(std::string_view token);
 [[nodiscard]] std::string skin_hit_burst_style_label(std::string_view token);
+[[nodiscard]] std::string normalize_skin_hud_layout_token(std::string_view token);
 [[nodiscard]] std::string normalize_skin_ui_font_token(std::string_view token);
 [[nodiscard]] std::string skin_ui_font_label(std::string_view token);
 [[nodiscard]] std::string normalize_skin_color_token(std::string_view token);

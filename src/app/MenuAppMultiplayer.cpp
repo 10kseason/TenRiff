@@ -397,8 +397,8 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
                           "글로벌 채팅을 사용하려면 F10으로 로그인하세요."));
     }
     render.generic.footer_notes.push_back(ui_text(
-        "F8 opens chat. Enter sends. Delete clears an edit field. Esc closes editing or leaves Multiplayer.",
-        "F8로 채팅을 엽니다. Enter로 전송합니다. Delete는 편집 칸을 지우고 Esc는 편집을 닫거나 멀티플레이를 나갑니다."));
+        "F11 opens chat. Enter sends. Delete clears an edit field. Esc closes editing or leaves Multiplayer.",
+        "F11로 채팅을 엽니다. Enter로 전송합니다. Delete는 편집 칸을 지우고 Esc는 편집을 닫거나 멀티플레이를 나갑니다."));
 }
 
 bool MenuApp::open_multiplayer_chat_shortcut() {
@@ -518,8 +518,8 @@ void MenuApp::populate_multiplayer_chat_overlay(render::ChatOverlayData& target)
                        ? multiplayer_menu_.chat_input + " _"
                        : ui_text("Press F10 to log in or register",
                                  "F10으로 로그인 또는 회원가입");
-    target.hint = ui_text("/np now playing   ENTER send   ESC/F8 close",
-                          "/np 현재 곡   ENTER 전송   ESC/F8 닫기");
+    target.hint = ui_text("/np now playing   ENTER send   ESC/F11 close",
+                          "/np 현재 곡   ENTER 전송   ESC/F11 닫기");
 
     const std::size_t begin = chat.messages.size() > 5
                                   ? chat.messages.size() - 5
@@ -547,32 +547,14 @@ void MenuApp::populate_multiplayer_chat_overlay(render::ChatOverlayData& target)
 }
 
 bool MenuApp::queue_gameplay_chat_input(const input::InputEvent& event) {
-    static const uint32_t left_shift = config::KeycodeMap::to_keycode("LShift").value_or(0);
-    static const uint32_t right_shift = config::KeycodeMap::to_keycode("RShift").value_or(0);
-    if (left_shift != 0 && event.keycode == left_shift) {
-        gameplay_chat_left_shift_held_ = event.state == input::InputState::Pressed;
-        return false;
-    }
-    if (right_shift != 0 && event.keycode == right_shift) {
-        gameplay_chat_right_shift_held_ = event.state == input::InputState::Pressed;
-        return false;
-    }
-    if (key_f8_ != 0 && event.keycode == key_f8_) {
-        // Preserve press ownership through key-up even if Shift or the overlay
-        // was released first. An ordinary F8 release must stop latency repeat.
-        if (event.state == input::InputState::Released) {
-            const bool captured = gameplay_chat_f8_captured_;
-            gameplay_chat_f8_captured_ = false;
-            return captured;
-        }
+    if (key_f11_ != 0 && event.keycode == key_f11_) {
+        // F11 owns both edges even when the overlay closes before key-up.
+        // Shift remains an ordinary gameplay binding; F8 retains calibration.
         if (event.state == input::InputState::Pressed) {
             const bool overlay_active = gameplay_overlay_capture_active_.load(std::memory_order_acquire);
-            if (!overlay_active && !gameplay_chat_left_shift_held_ && !gameplay_chat_right_shift_held_)
-                return false;
-            gameplay_chat_f8_captured_ = true;
             gameplay_overlay_capture_active_.store(true, std::memory_order_release);
             std::lock_guard<std::mutex> lock(gameplay_chat_control_mutex_);
-            // Inside any active overlay F8 is close-only, like Esc; it must not
+            // Inside any active overlay F11 is close-only, like Esc; it must not
             // change calibration or open another overlay over the current one.
             gameplay_chat_control_actions_.push_back(
                 GameplayChatControlAction{overlay_active ? GameplayOverlayActionKind::Input

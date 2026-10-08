@@ -122,10 +122,11 @@ client 側の設定は Discord の [公式 Game Overlay guide](https://support.d
 - Session Mix のプレイ中は Esc を無視します。曲間の結果画面の終了操作と multiplayer の Esc 中止は維持します。
 - `F3`: Hi-Speed を下げる
 - `F4`: Hi-Speed を上げる
-- `Shift+F5`: Hi-Speedを半分にする
-- `Shift+F6`: Hi-Speedを2倍にする
+- `F5`: Hi-Speedを半分にする
+- `F6`: Hi-Speedを2倍にする
 - `F7` / `F8`: 表示レイテンシーを減らす / 増やす
-- `Shift+F8`: ゲーム中のチャットを開く / 閉じる（メニューではF8）
+- `F11`: ゲーム中のチャットを開く / 閉じる（メニューもF11）
+- 左右の `LShift` / `RShift` をプレイキーに設定できます。上記ショートカットにShiftは不要です。
 - `F9`: 現在画面のスクリーンショット保存
 
 ポーズの再開・再試行・終了と設定−/+ボタンもマウスで操作できます。調整行の文字・空白は選択のみで、値を変えません。

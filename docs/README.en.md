@@ -1,5 +1,7 @@
 # TenRiff Docs Map
 
+**2026-10-08 · TenRiff 1.8.6:** Adds the Studio Deck HUD for Native solo play. Left and right Shift work as play keys; F5/F6 halve/double Hi-Speed and F11 opens chat. Classic HUD remains selectable. [1.8.6 release](release-1.8.6-gate.md).
+
 **2026-10-06 · TenRiff 1.8.5:** Batches supported note images in drawing order during VSync-OFF gameplay to reduce CPU submission work. Unsupported skins/long notes and VSync-ON retain the existing path. Lobby/menu behavior and R1–R4 judgement/replay rules are preserved. [1.8.5 release](release-1.8.5-gate.md).
 
 **2026-10-05 · TenRiff 1.8.42:** Fixes extra render waiting when a dense frame slightly exceeds its budget, and skips performance-history collection/sorting while the overlay is off. Note visuals/count and R1–R4 judgement/replay rules are preserved. [1.8.42 release](release-1.8.42-gate.md).

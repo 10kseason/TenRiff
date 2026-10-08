@@ -207,6 +207,15 @@ inline GameplayProgressTrackLayout compute_gameplay_progress_track_layout(
     return best;
 }
 
+// The solo title/status column ends before the playfield; the long status line
+// used to run across the first lanes. A field dragged hard left leaves no usable
+// column, so that case keeps the original span rather than a sliver.
+inline float gameplay_solo_header_right(float header_left, float header_right, float player_field_left) {
+    const float field_edge = player_field_left - 32.0f;
+    const float legacy_right = header_right * 0.60f;
+    return field_edge - header_left >= 240.0f ? std::min(legacy_right, field_edge) : legacy_right;
+}
+
 // Battle cards keep complete rows instead of squeezing the final judgement
 // counts into the old eight-pixel strip. Reserve the authored HUD positions even
 // before a hit, so the card never jumps when feedback appears or disappears.

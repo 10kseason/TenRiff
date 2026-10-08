@@ -287,6 +287,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst の明るさ。0 で無効。 |
 | `key_pulse_enabled` | bool; `true` | 旧版 ON/OFF 互換。false または明るさ 0 で無効。 |
 | `hit_burst_style` | `prism`, `ring`, `spark`; `prism` | 内蔵 Hit Burst の形。 |
+| `hud_layout` | `classic`, `studio`; `studio` | Native のソロプレイ用 HUD。キーのない既存プロファイルも既定値 `studio` を使い、Options › Skins で Classic に戻せます。画像スキン・ゴースト対戦・マルチプレイは従来の配置を維持。不明な値は `studio`。 |
 | `ui_font` | `default`, `malgun`, `bahnschrift`, `consolas`; `default` | メニューの書体。default は Segoe UI。ロゴ・ランク・コンボ専用書体は維持。 |
 | `key_label_position` | `bottom`, `top`, `off`; `bottom` | レーンのキー名表示位置。 |
 | `judgement_line_position` | double: `0..1`; `0.82` | 判定線の縦位置比率。 |
