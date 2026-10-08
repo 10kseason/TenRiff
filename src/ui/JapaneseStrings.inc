@@ -44,7 +44,7 @@
 {" items", " 件"},
 {" more help lines", "行表示"},
 {"(typing)", "(入力中)"},
-{"/np now playing   ENTER send   ESC/F8 close", "/np 再生中の曲   ENTER 送信   ESC/F8 閉じる"},
+{"/np now playing   ENTER send   ESC/F11 close", "/np 再生中の曲   ENTER 送信   ESC/F11 閉じる"},
 {"1. Sign in on the website and copy connection information.", "1. Webサイトにログインし、接続情報をコピーします。"},
 {"10K Revive", "10K Revive"},
 {"16K Center Gap", "16K 中央間隔"},
