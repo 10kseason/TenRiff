@@ -647,6 +647,7 @@ struct GameSessionAudioTestAccess {
         auto session = shift_lane_fixture(key, hold);
         queue_physical_edge(*session, key, input::InputState::Pressed, 48000, future_queue);
         REQUIRE(session->engine_->stats().counts.pg == 1);
+        CHECK(session->engine_->is_finished() == !hold);
         CHECK(session->lane_pressed_[0] == 1);
         CHECK(session->lane_binding_state_.pressed(1));
         queue_physical_edge(*session, key, input::InputState::Released, 96000, future_queue);
@@ -657,11 +658,17 @@ struct GameSessionAudioTestAccess {
         CHECK(session->engine_->stats().counts.bd == 0);
         CHECK(session->engine_->stats().counts.pr == 0);
         const auto& replay = session->engine_->replay().events;
-        REQUIRE(replay.size() == 2);
+        // A final tap finishes the engine at its head, so its later physical
+        // release clears the binding/HUD but is intentionally not replayed.
+        // An LN stays active until release, which must reach the engine at the
+        // exact sample and remain in the replay as its second scored edge.
+        REQUIRE(replay.size() == (hold ? 2 : 1));
         CHECK(replay[0].sample == 48000);
         CHECK(replay[0].state == input::InputState::Pressed);
-        CHECK(replay[1].sample == 96000);
-        CHECK(replay[1].state == input::InputState::Released);
+        if (hold) {
+            CHECK(replay[1].sample == 96000);
+            CHECK(replay[1].state == input::InputState::Released);
+        }
     }
 
     static void check_shift_tuning_hotkeys(uint32_t key, bool held, bool paused) {
