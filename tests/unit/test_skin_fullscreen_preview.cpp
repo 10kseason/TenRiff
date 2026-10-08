@@ -2,6 +2,7 @@
 
 #ifdef _WIN32
 #include <array>
+#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -218,6 +219,76 @@ TEST_CASE("skin fullscreen preview cannot survive a navigation reset") {
 #ifdef _WIN32
 namespace tenriff::app {
 struct MenuAppFeedbackTestAccess {
+    static void check_shift_capture_profile() {
+        struct TempProfile {
+            std::filesystem::path path;
+            ~TempProfile() {
+                if (path.empty()) return;
+                std::error_code ec;
+                std::filesystem::remove(path / "keymap.json", ec);
+                std::filesystem::remove(path, ec);
+            }
+        } profile;
+        const auto temp_root = std::filesystem::temp_directory_path();
+        for (int attempt = 0; attempt < 32 && profile.path.empty(); ++attempt) {
+            const auto candidate = temp_root / ("tenriff_shift_capture_" +
+                std::to_string(timing::HighResClock::now_ns()) + "_" + std::to_string(attempt));
+            std::error_code ec;
+            if (std::filesystem::create_directory(candidate, ec)) profile.path = candidate;
+        }
+        REQUIRE_FALSE(profile.path.empty());
+
+        config::KeymapManager manager;
+        for (bool secondary : {false, true}) {
+            for (const char* shift : {"LShift", "RShift"}) {
+                auto menu = std::make_unique<MenuApp>();
+                menu->config_.audio_ui.background_sound_enabled = false;
+                menu->profile_dir_ = profile.path.u8string();
+                menu->working_keymap_ = manager.default_keymap();
+                menu->working_keymap_.mode_bindings["4k"]["lane3"] = "VK_10";
+                menu->keymap_ = menu->working_keymap_;
+                REQUIRE(manager.save_profile(menu->profile_dir_, menu->keymap_));
+                menu->reset_screen(MenuApp::Screen::Keymap);
+                menu->keymap_settings_controller_.reset(4, "4k");
+
+                render::MenuClickEvent click{};
+                click.kind = render::MenuHitTargetKind::SettingsRow;
+                click.index = 1;
+                click.part = secondary ? render::MenuHitPart::Increment : render::MenuHitPart::Activate;
+                menu->handle_menu_click(click);
+                REQUIRE(menu->keymap_settings_controller_.capture_active());
+                const auto deadline = menu->keymap_settings_controller_.capture_deadline_ns();
+                const auto original = manager.bindings_for_mode(menu->working_keymap_, "4k").at("lane1");
+
+                // Reproduce the actual empty-scope polling order, not just the
+                // separate menu health-probe key list.
+                MenuAppSkinPreviewTestAccess::key(*menu, 0x10u, input::InputState::Pressed);
+                CHECK(menu->keymap_settings_controller_.capture_active());
+                CHECK(menu->keymap_settings_controller_.capture_deadline_ns() == deadline);
+                auto saved = manager.load_profile(menu->profile_dir_);
+                REQUIRE(saved.success());
+                CHECK(manager.bindings_for_mode(saved.keymap, "4k").at("lane1") == original);
+                CHECK(manager.secondary_bindings_for_mode(saved.keymap, "4k").empty());
+
+                const auto side_keycode = config::KeycodeMap::to_keycode(shift).value();
+                MenuAppSkinPreviewTestAccess::key(*menu, side_keycode, input::InputState::Pressed);
+                CHECK_FALSE(menu->keymap_settings_controller_.capture_active());
+                saved = manager.load_profile(menu->profile_dir_);
+                REQUIRE(saved.success());
+                for (const auto* keymap : {&saved.keymap, &menu->working_keymap_, &menu->keymap_}) {
+                    const auto bindings = secondary ? manager.secondary_bindings_for_mode(*keymap, "4k")
+                                                    : manager.bindings_for_mode(*keymap, "4k");
+                    REQUIRE(bindings.count("lane1") == 1);
+                    CHECK(bindings.at("lane1") == shift);
+                    CHECK(manager.bindings_for_mode(*keymap, "4k").at("lane3") == "VK_10");
+                }
+                MenuAppSkinPreviewTestAccess::key(*menu, side_keycode, input::InputState::Released);
+                MenuAppSkinPreviewTestAccess::key(*menu, 0x10u, input::InputState::Released);
+                CHECK(menu->pressed_keys_.empty());
+            }
+        }
+    }
+
     static std::unique_ptr<MenuApp> result_fixture(bool ready = true, bool multiplayer = false) {
         auto menu = std::make_unique<MenuApp>();
         menu->config_ = config::ConfigLoader{}.defaults();
@@ -466,6 +537,9 @@ TEST_CASE("feedback settings pointer row bodies only select and disabled rows ca
 }
 TEST_CASE("F11 chat preserves Shift gameplay bindings and F8 calibration edge ownership") {
     tenriff::app::MenuAppFeedbackTestAccess::check_gameplay_chat_latency_routing();
+}
+TEST_CASE("menu Shift capture ignores generic polling event and saves the physical side to the profile") {
+    tenriff::app::MenuAppFeedbackTestAccess::check_shift_capture_profile();
 }
 TEST_CASE("result pointer Continue activates without generic settings rows and returns to its lobby") {
     tenriff::app::MenuAppFeedbackTestAccess::check_result_continue();

@@ -166,6 +166,13 @@ void MenuApp::update_keymap_capture_timeout() {
 }
 
 void MenuApp::apply_keymap_capture(uint32_t keycode) {
+#ifdef _WIN32
+    // Polling reports VK_SHIFT before LShift/RShift. Keep capture open for the
+    // following side-specific event instead of saving an ambiguous VK_10.
+    if (keycode == 0x10u) {
+        return;
+    }
+#endif
     const auto selected_lane = keymap_settings_controller_.selected_lane();
     if (!selected_lane.has_value()) {
         apply_keymap_settings_effects(keymap_settings_controller_.cancel_capture());
