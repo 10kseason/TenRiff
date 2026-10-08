@@ -128,10 +128,11 @@ If this is not the layout you want, you can change it in `Options > Keymap`.
 - Session Mix ignores Esc during play; its between-stage result exits remain available. Multiplayer retains its Esc abort behavior.
 - `F3`: decrease Hi-Speed
 - `F4`: increase Hi-Speed
-- `Shift+F5`: halve Hi-Speed
-- `Shift+F6`: double Hi-Speed
+- `F5`: halve Hi-Speed
+- `F6`: double Hi-Speed
 - `F7` / `F8`: decrease / increase visual latency
-- `Shift+F8`: open / close in-game chat (F8 in menus)
+- `F11`: open / close in-game chat (also F11 in menus)
+- Left/right `LShift` / `RShift` can be assigned as play keys. The shortcuts above do not require Shift.
 - `F9`: save a screenshot of the current screen
 
 Pause Continue, Restart, Exit and setting −/+ buttons also support mouse clicks. Text or blank space in adjustable settings rows only selects the row without changing its value.

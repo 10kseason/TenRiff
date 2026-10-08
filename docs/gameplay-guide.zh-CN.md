@@ -128,10 +128,11 @@ Discord 客户端的设置方法请参考[官方 Game Overlay 指南](https://su
 - Session Mix 游玩中忽略 Esc；保留曲间结果画面的退出操作和多人模式的 Esc 中止操作。
 - `F3`：降低 Hi-Speed
 - `F4`：提高 Hi-Speed
-- `Shift+F5`: Hi-Speed减半
-- `Shift+F6`: Hi-Speed加倍
+- `F5`: Hi-Speed减半
+- `F6`: Hi-Speed加倍
 - `F7` / `F8`: 减少 / 增加视觉延迟
-- `Shift+F8`: 打开 / 关闭游戏内聊天（菜单中仍为F8）
+- `F11`: 打开 / 关闭游戏内聊天（菜单中也是F11）
+- 左右 `LShift` / `RShift` 可绑定为游玩按键。上述快捷键无需Shift组合。
 - `F9`：保存当前画面的截图
 
 暂停的继续、重试、退出及设置−/+按钮也支持鼠标。调整项的文字或空白只选择该项，不改变数值。

@@ -618,8 +618,8 @@ TEST_CASE("TenRiff skin import includes assets referenced only by another key mo
 TEST_CASE("Skin settings stable row ids account for the optional LR2 row") {
     const tenriff::app::SkinSettingsRows native_rows{false};
     const tenriff::app::SkinSettingsRows lr2_rows{true};
-    CHECK(native_rows.count() == 64);
-    CHECK(lr2_rows.count() == 65);
+    CHECK(native_rows.count() == 65);
+    CHECK(lr2_rows.count() == 66);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::KeyMode) == 0);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::ScratchPosition) == 1);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::SkinSource) == 2);
@@ -629,18 +629,20 @@ TEST_CASE("Skin settings stable row ids account for the optional LR2 row") {
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::OpenSkinEditor) == 11);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::KeyBackdropBrightness) == 40);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::KeyBackdropHeight) == 41);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::ComboFontSize) == 59);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::JudgementFontSize) == 60);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 63);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::HudLayout) == 45);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::ComboFontSize) == 60);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::JudgementFontSize) == 61);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 64);
     CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::VisualLatency) == 4);
     CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::Lr2Resolution) == 5);
     CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::ImportSkin) == 6);
     CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::OpenSkinEditor) == 12);
     CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::KeyBackdropBrightness) == 41);
     CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::KeyBackdropHeight) == 42);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::ComboFontSize) == 60);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::JudgementFontSize) == 61);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 64);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::HudLayout) == 46);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::ComboFontSize) == 61);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::JudgementFontSize) == 62);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 65);
 }
 
 TEST_CASE("7+1 presentation moves only the visual scratch lane") {

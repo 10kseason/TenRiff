@@ -178,6 +178,9 @@ private:
         std::array<int, kGameplayHudMaxLanes> scratch_lanes{};
         int64_t current_sample = 0;
         int64_t duration_samples = 0;
+        std::array<uint8_t, kGameplayRiffMapBins> riff_map{};
+        std::size_t riff_map_count = 0;
+        uint64_t riff_map_revision = 0;
         int sample_rate = 48000;
         int64_t audio_sample_time_ns = 0;
         int64_t hud_publish_time_ns = 0;
@@ -806,10 +809,6 @@ private:
     std::mutex gameplay_chat_control_mutex_{};
     std::vector<GameplayChatControlAction> gameplay_chat_control_actions_{};
     std::atomic_bool gameplay_overlay_capture_active_{false};
-    // Session input callback owns these edge states; reset before each session.
-    bool gameplay_chat_left_shift_held_ = false;
-    bool gameplay_chat_right_shift_held_ = false;
-    bool gameplay_chat_f8_captured_ = false;
     bool chat_overlay_visible_ = false;
     bool ranked_account_overlay_visible_ = false;
     bool ranked_account_register_mode_ = false;
@@ -913,6 +912,7 @@ private:
     uint32_t key_f8_ = 0;
     uint32_t key_f9_ = 0;
     uint32_t key_f10_ = 0;
+    uint32_t key_f11_ = 0;
     uint32_t key_minus_ = 0;
     uint32_t key_plus_ = 0;
     int bms_editor_view_measures_ = 8;

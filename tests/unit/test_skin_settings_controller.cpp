@@ -43,6 +43,27 @@ TEST_CASE("skin stable identifiers map across the optional LR2 row") {
     CHECK_FALSE(tenriff::app::menu::settings::skin_setting_index(SkinSettingsRowId::Lr2Resolution, false).has_value());
 }
 
+TEST_CASE("skin HUD layout switches both directions and persists through the standard settings path") {
+    tenriff::config::RuntimeConfig runtime;
+    SkinSettingsController controller;
+    controller.reset("10k");
+    CHECK(runtime.skin.hud_layout == "studio");
+    auto effects = controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames,
+                                     SkinSettingsRowId::HudLayout);
+    CHECK(runtime.skin.hud_layout == "classic");
+    CHECK(effects.menu.render_changed);
+    CHECK(controller.dirty());
+    effects = controller.handle(MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames,
+                                SkinSettingsRowId::HudLayout);
+    CHECK(runtime.skin.hud_layout == "studio");
+    static_cast<void>(controller.handle(MenuAction::activate(), runtime, kLr2Names, kTenRiffNames,
+                                       SkinSettingsRowId::HudLayout));
+    CHECK(runtime.skin.hud_layout == "classic");
+    effects = controller.handle(MenuAction::back(), runtime, kLr2Names, kTenRiffNames);
+    CHECK(effects.menu.persist_config);
+    CHECK(effects.menu.navigate_back);
+}
+
 TEST_CASE("skin preset actions use the same keyboard and mouse controller path") {
     tenriff::config::RuntimeConfig runtime;
     SkinSettingsController controller;

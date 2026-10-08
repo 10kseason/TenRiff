@@ -153,7 +153,7 @@ bool fetch_json_impl(const std::string& base_url,
     while (!path.empty() && path.back() == L'/') path.pop_back();
     path += utf8_to_wide(endpoint);
 
-    InternetHandle session(WinHttpOpen(L"TenRiff/1.8.5 records",
+    InternetHandle session(WinHttpOpen(L"TenRiff/1.8.6 records",
                                        WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
                                        WINHTTP_NO_PROXY_NAME,
                                        WINHTTP_NO_PROXY_BYPASS, 0));

@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.8.6] - 2026-10-08
+
+- Add the default Studio Deck HUD for Native solo play: chart-wide density map, side gauge rails, score/accuracy panel and compact judgement feedback. Classic remains selectable; external image skins, ghost and multiplayer retain the classic layout.
+- Make left/right Shift usable as play keys across RawInput and polling. F5/F6 now halve/double Hi-Speed without a modifier, and F11 opens chat in menus and gameplay. F7/F8 visual timing, F9 screenshots and F10 account controls retain their roles.
+- Include gameplay presentation polish, pause/resume guidance and preview refresh fixes. Preserve note batching, scoring, gauge calculations and R1–R4 judgement/replay contracts. See [release scope and verification](docs/release-1.8.6-gate.md).
+
 ## [1.8.5] - 2026-10-06
 
 - Batch supported note bitmaps in their original drawing order during VSync-OFF gameplay, reducing repeated CPU draw submission without dropping notes or changing timing.

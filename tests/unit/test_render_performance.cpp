@@ -508,6 +508,17 @@ TEST_CASE("gameplay progress track stays outside the note fields") {
     CHECK(wide_ghost.left == doctest::Approx(84.0f));
     CHECK(wide_ghost.right == doctest::Approx(122.0f));
 }
+TEST_CASE("solo gameplay header column stops before the playfield") {
+    using tenriff::render::gameplay_solo_header_right;
+
+    // Default 8K field at x=470: the column ends 32px short of the field.
+    CHECK(gameplay_solo_header_right(84.0f, 1836.0f, 470.0f) == doctest::Approx(438.0f));
+    // A field far to the right never widens the column past the legacy span.
+    CHECK(gameplay_solo_header_right(84.0f, 1836.0f, 1400.0f) == doctest::Approx(1101.6f).epsilon(1e-3));
+    // No usable column left of a field dragged hard left: keep the legacy span.
+    CHECK(gameplay_solo_header_right(84.0f, 1836.0f, 300.0f) == doctest::Approx(1101.6f).epsilon(1e-3));
+    CHECK(gameplay_solo_header_right(84.0f, 1836.0f, 356.0f) == doctest::Approx(324.0f));
+}
 TEST_CASE("ghost battle summaries retain every row in narrow and wide skin fields") {
     using tenriff::render::compute_gameplay_battle_summary_layout;
     for (const float width : {280.0f, 560.0f, 784.0f}) {
@@ -819,6 +830,38 @@ TEST_CASE("group headings preserve selected row visibility and do not become inp
             height += 66 + (tenriff::render::settings_category_heading(rows, i, window.start) ? 28 : 0);
         CHECK(height <= 300);
     }
+}
+
+TEST_CASE("skin preview refreshes cached HUD text for style settings and language without per-frame churn") {
+    using tenriff::render::make_skin_gameplay_preview;
+    using tenriff::ui::Language;
+    tenriff::render::SkinPreviewData preview;
+    preview.lane_count = 8;
+    preview.mode_label = "8K";
+    preview.selected_lane = 1;
+    preview.hud_layout = "classic";
+    const auto classic = make_skin_gameplay_preview(preview, 900'000'000LL, Language::English);
+    preview.hud_layout = "studio";
+    const auto studio = make_skin_gameplay_preview(preview, 900'000'000LL, Language::English);
+    CHECK(studio.hud_layout == "studio");
+    CHECK(studio.text_revision != classic.text_revision);
+    CHECK(studio.text_revision != 0);
+    preview.judgement_line_position = 0.64;
+    const auto line = make_skin_gameplay_preview(preview, 900'000'000LL, Language::English);
+    CHECK(line.judgement_line_position == 0.64);
+    CHECK(line.text_revision != studio.text_revision);
+    const auto korean = make_skin_gameplay_preview(preview, 900'000'000LL, Language::Korean);
+    CHECK(korean.text_revision != line.text_revision);
+    preview.mode_label = "7+1";
+    const auto relabeled = make_skin_gameplay_preview(preview, 900'000'000LL, Language::Korean);
+    CHECK(relabeled.text_revision != korean.text_revision);
+
+    preview.gameplay_field_offset_x = -240;
+    preview.combo_font_scale = 1.5;
+    preview.show_timing_feedback = false;
+    const auto animated = make_skin_gameplay_preview(preview, 1'400'000'000LL, Language::Korean);
+    CHECK(animated.text_revision == relabeled.text_revision);
+    CHECK(animated.lane_pressed[0] != relabeled.lane_pressed[0]);
 }
 
 TEST_CASE("skin preview carries independent timing switches and positions") {

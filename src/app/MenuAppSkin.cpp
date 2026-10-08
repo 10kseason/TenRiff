@@ -894,6 +894,10 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     append_menu_row(render.generic, ui_text("Hit Burst Style", "키 폭발 모양"),
                     config::skin_hit_burst_style_label(config_.skin.hit_burst_style),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::HitBurstStyle), false, true);
+    append_menu_row(render.generic, ui_text("HUD Style", "HUD 스타일"),
+                    config::normalize_skin_hud_layout_token(config_.skin.hud_layout) == "classic"
+                        ? ui_text("Classic", "클래식") : ui_text("Studio Deck", "스튜디오 덱"),
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::HudLayout), false, true);
     append_menu_row(render.generic, ui_text("Hit Burst Brightness", "키 폭발 밝기"),
                     format_percent(config_.skin.key_pulse_brightness),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::KeyPulse), false, true);
@@ -1030,6 +1034,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     }
 
     render.generic.skin_preview.visible = true;
+    render.generic.skin_preview.hud_layout = config::normalize_skin_hud_layout_token(config_.skin.hud_layout);
     render.generic.skin_preview.mode_label = skin_mode_label;
     render.generic.skin_preview.selected_color_label =
         manifest_style && !manifest_style->lane_colors.empty()

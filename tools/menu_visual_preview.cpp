@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cctype>
 #include <cmath>
 #include <iostream>
 #include <string>
@@ -133,6 +134,7 @@ struct MenuAppVisualTestAccess {
         skin.key_backdrop_brightness = preview.key_backdrop_brightness;
         skin.key_backdrop_height = preview.key_backdrop_height;
         skin.hit_burst_style = preview.hit_burst_style;
+        skin.hud_layout = preview.hud_layout;
         skin.key_label_position = preview.key_label_position;
         skin.note_border_enabled = preview.note_border_enabled;
         skin.note_shape = preview.note_shape;
@@ -402,6 +404,13 @@ int main(int argc, char** argv) {
     bool ghost_paused = false;
     bool auto_scratch_hidden = false;
     bool pacemaker_fixture = false;
+    std::string hud_style = "studio";
+    std::string fixture_gauge = "NORMAL";
+    double fixture_gauge_value = 75.0;
+    std::string fixture_pacemaker_mode;
+    double fixture_pacemaker_delta = 240.0;
+    double fixture_progress = -1.0;
+    bool studio_stats = false;
     int disabled_setting = -1;
     double fixture_hold_opacity = -1;
     bool resume_countdown = false;
@@ -515,6 +524,31 @@ int main(int argc, char** argv) {
         else if (arg == "--disabled-setting" && i + 1 < argc) disabled_setting = std::stoi(argv[++i]);
         else if (arg == "--auto-scratch-hidden") auto_scratch_hidden = true;
         else if (arg == "--pacemaker-deficit") pacemaker_fixture = true;
+        else if (arg == "--hud-style" && i + 1 < argc) {
+            hud_style = argv[++i];
+            if (hud_style != "classic" && hud_style != "studio") {
+                std::cerr << "--hud-style must be classic or studio.\n";
+                return 2;
+            }
+        }
+        else if (arg == "--gauge" && i + 1 < argc) {
+            fixture_gauge = argv[++i];
+            std::transform(fixture_gauge.begin(), fixture_gauge.end(), fixture_gauge.begin(),
+                [](unsigned char ch) { return static_cast<char>(std::toupper(ch)); });
+            if (fixture_gauge != "NORMAL" && fixture_gauge != "HARD" &&
+                fixture_gauge != "EASY" && fixture_gauge != "EX-HARD") return 2;
+        }
+        else if (arg == "--gauge-value" && i + 1 < argc)
+            fixture_gauge_value = std::clamp(std::stod(argv[++i]), 0.0, 100.0);
+        else if (arg == "--pacemaker" && i + 1 < argc) {
+            fixture_pacemaker_mode = argv[++i];
+            if (fixture_pacemaker_mode != "off" && fixture_pacemaker_mode != "score" &&
+                fixture_pacemaker_mode != "accuracy") return 2;
+        }
+        else if (arg == "--pace-delta" && i + 1 < argc) fixture_pacemaker_delta = std::stod(argv[++i]);
+        else if (arg == "--progress" && i + 1 < argc)
+            fixture_progress = std::clamp(std::stod(argv[++i]), 0.0, 1.0);
+        else if (arg == "--studio-stats") studio_stats = true;
         else if (arg == "--paused") ghost_paused = gameplay = true;
         else if (arg == "--seven-plus-one") { seven_plus_one = keys_explicit = true; preview_keys = 8; }
         else if (arg == "--scratch-right") scratch_right = true;
@@ -1004,8 +1038,15 @@ int main(int argc, char** argv) {
             hud.judgement_position = 0.4; hud.judgement_offset_x = -120;
             hud.combo_position = 0.5; hud.combo_offset_x = 120;
         }
-        hud.lane_count = preview_keys; hud.black_playfield_enabled = true; hud.gauge = 75; hud.gauge_label = "NORMAL";
+        hud.lane_count = preview_keys; hud.black_playfield_enabled = true;
+        hud.gauge = fixture_gauge_value; hud.gauge_label = fixture_gauge;
         hud.lookahead_samples = 48000; hud.past_samples = 4800; hud.duration_samples = 48000 * 600;
+        // A fixed whole-song pattern exercises both high-density orange bars and
+        // ordinary bars independently of the visible note fixture and time.
+        hud.riff_map_count = hud.riff_map.size();
+        hud.riff_map_revision = 1;
+        for (std::size_t bin = 0; bin < hud.riff_map.size(); ++bin)
+            hud.riff_map[bin] = static_cast<uint8_t>(32 + (bin * 73 + (bin / 8) * 31) % 224);
         hud.lane_activity_count = hud.lane_pressed_count = static_cast<std::size_t>(preview_keys);
         hud.lane_color_count = hud.key_label_count = static_cast<std::size_t>(preview_keys);
         const auto palette = tenriff::config::default_skin_lane_colors(std::to_string(preview_keys) + "k");
@@ -1086,6 +1127,7 @@ int main(int argc, char** argv) {
             data.lobby_skin.layout_rects[item.first] = {r.left, r.top, r.right, r.bottom};
         }
     }
+    data.gameplay.hud_layout = data.generic.skin_preview.hud_layout = hud_style;
     data.gameplay.combo_font_scale = data.generic.skin_preview.combo_font_scale = combo_font_scale;
     data.gameplay.note_width_scale = data.generic.skin_preview.note_width_scale = preview_note_width;
     if (fixture_hold_opacity >= 0)
@@ -1100,6 +1142,11 @@ int main(int argc, char** argv) {
         data.gameplay.pacemaker_mode = "accuracy";
         data.gameplay.pacemaker_target = 96;
         data.gameplay.pacemaker_delta = -2.3;
+    }
+    if (!fixture_pacemaker_mode.empty()) {
+        data.gameplay.pacemaker_mode = fixture_pacemaker_mode;
+        data.gameplay.pacemaker_target = fixture_pacemaker_mode == "accuracy" ? 96.0 : 9260.0;
+        data.gameplay.pacemaker_delta = fixture_pacemaker_delta;
     }
     data.gameplay.judgement_font_scale = data.generic.skin_preview.judgement_font_scale = judgement_font_scale;
     if (backdrop_off) data.gameplay.key_backdrop_enabled = false;
@@ -1272,6 +1319,15 @@ int main(int argc, char** argv) {
             hud.combo = 123 + hit; hud.pg = hit + 1;
             hud.current_sample = static_cast<int64_t>(seconds * 48000);
             hud.current_visual_position = seconds;
+            if (fixture_progress >= 0.0) {
+                hud.current_sample = static_cast<int64_t>(fixture_progress * hud.duration_samples);
+                hud.current_visual_position = static_cast<double>(hud.current_sample) / hud.sample_rate;
+            }
+            if (studio_stats) {
+                hud.pg = 847; hud.gr = 42; hud.gd = 8; hud.bd = 2; hud.pr = 1;
+                hud.max_combo = 456;
+                hud.accuracy = 98.76; hud.detailed_accuracy = 97.65;
+            }
             hud.audio_sample_time_ns = hud.activity_publish_time_ns = tenriff::timing::HighResClock::now_ns();
             // Frozen screenshots must not extrapolate by the variable setup time
             // between this fixture update and the renderer's playhead query.
@@ -1541,6 +1597,9 @@ int main(int argc, char** argv) {
             {"vsync", JsonValue(config.vsync)}, {"ghost", JsonValue(ghost)},
             {"keys", JsonValue(static_cast<double>(preview_keys))}, {"note_width", JsonValue(preview_note_width)},
             {"fixture_time", JsonValue(fixture_seconds)},
+            {"hud_style", JsonValue(hud_style)},
+            {"riff_map_count", JsonValue(static_cast<double>(data.gameplay.riff_map_count))},
+            {"riff_map_revision", JsonValue(static_cast<double>(data.gameplay.riff_map_revision))},
             {"dense_notes", JsonValue(static_cast<double>(dense_notes))},
             {"dense_holds", JsonValue(dense_holds)}, {"tapered_holds", JsonValue(tapered_holds)},
             {"player_note_count", JsonValue(static_cast<double>(data.gameplay.note_count))},

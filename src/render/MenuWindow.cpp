@@ -3,6 +3,7 @@
 #include "render/GameplaySpriteBatch.h"
 #include "config/BuiltinDifficultyTables.h"
 #include "render/GameplayFeedbackText.h"
+#include "render/GameplayStudioDeck.h"
 #include "render/NativeMenuAssets.h"
 #include "render/NativeMenuPalette.h"
 #include "render/LumaKeysAssets.h"
@@ -46,6 +47,7 @@
 #include <d3d11.h>
 #include <d3dcompiler.h>
 #include <dwrite.h>
+#include <dwrite_1.h>
 #include <dxgi1_5.h>
 #include <wincodec.h>
 #include <wrl/client.h>
@@ -2309,6 +2311,9 @@ struct MenuWindow::D2DResources {
     struct PreviewFonts {
         Microsoft::WRL::ComPtr<IDWriteTextFormat> title_format, body_format, header_format,
             hud_format, rank_format, gameplay_combo_format;
+        Microsoft::WRL::ComPtr<IDWriteTextFormat> studio_title, studio_body, studio_label,
+            studio_score, studio_accuracy, studio_judgement, studio_timing, studio_combo;
+        std::array<Microsoft::WRL::ComPtr<IDWriteTextFormat>, 6> studio_numbers;
     } preview_fonts;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> title_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> option_format;
@@ -2321,6 +2326,7 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<IDWriteTextFormat> gameplay_combo_format;
     std::unordered_map<std::string, Microsoft::WRL::ComPtr<IDWriteTextFormat>> native_gameplay_formats;
     struct ReadableTextLayout {
+        float spacing = 0.0f;
         std::wstring text;
         Microsoft::WRL::ComPtr<IDWriteTextFormat> format;
         Microsoft::WRL::ComPtr<IDWriteTextLayout> layout;
@@ -2336,6 +2342,15 @@ struct MenuWindow::D2DResources {
     // Draw order slots keep outline layouts bounded and reusable between frames.
     std::array<ReadableTextLayout, 96> gameplay_readable_text{};
     std::array<ReadableTextLayout, 96> preview_readable_text{};
+    // Natural widths of the solo header strings, measured once per text change so
+    // fitting never shrinks a line that already fits.
+    struct MeasuredTextWidth {
+        std::wstring text;
+        Microsoft::WRL::ComPtr<IDWriteTextFormat> format;
+        float width = 0.0f;
+    };
+    std::array<MeasuredTextWidth, 4> gameplay_measured_text{};
+    std::array<MeasuredTextWidth, 4> preview_measured_text{};
     std::array<ReadableTextLayout, 384> menu_readable_text{};
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_logo_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_nav_format;
@@ -2381,6 +2396,10 @@ struct MenuWindow::D2DResources {
         lane_native_note_brushes{};
     std::array<Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush>, kGameplayHudMaxLanes>
         lane_native_hold_brushes{};
+    // Pressed-lane light, keyed by its final RGB so brightness edits rebuild it.
+    std::array<Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush>, kGameplayHudMaxLanes>
+        key_backdrop_brushes{};
+    std::array<std::uint32_t, kGameplayHudMaxLanes> key_backdrop_brush_rgb{};
     std::array<Microsoft::WRL::ComPtr<ID2D1Bitmap>, kGameplayHudMaxLanes> lane_key_idle_bitmaps{};
     std::array<D2D1_RECT_F, kGameplayHudMaxLanes> lane_key_idle_source_rects{};
     std::array<Microsoft::WRL::ComPtr<ID2D1Bitmap>, kGameplayHudMaxLanes> lane_key_pressed_bitmaps{};
@@ -3681,6 +3700,16 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
     GameplayStaticCache desired{};
     desired.hidden_scratch_mask = gameplay_hidden_scratch_mask(data);
     desired.native_instrument = normalize_gameplay_skin_source(data.skin_source) == "native";
+    desired.studio = gameplay_studio_deck_enabled(data.hud_layout, !desired.native_instrument,
+                                                 data.ghost_visible, data.peer_visible);
+    if (desired.studio) {
+        desired.riff_map_revision = data.riff_map_revision;
+        desired.riff_map_count = data.riff_map_count;
+        desired.riff_map = data.riff_map;
+        desired.gauge_label = data.gauge_label;
+        const auto accent = d2d_->accent_brush->GetColor();
+        desired.accent = {accent.r, accent.g, accent.b, accent.a};
+    }
     desired.native_skin = data.resolved_tenriff_skin;
     const auto& native_style = native_gameplay_style(data.resolved_tenriff_skin,desired.native_instrument);
     desired.lane_count = std::clamp(data.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
@@ -3745,7 +3774,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
     desired.show_gear_boundary_line = data.show_gear_boundary_line;
     desired.judgement_line_glow_enabled = data.judgement_line_glow_enabled;
     desired.lane_background_opacity = std::clamp(data.lane_background_opacity, 0.0, 0.45);
-    desired.black_playfield_enabled = data.black_playfield_enabled;
+    desired.black_playfield_enabled = desired.studio || data.black_playfield_enabled;
     desired.visual_opacity = std::clamp(data.visual_opacity, 0.20, 1.0);
     desired.ghost_visible = data.ghost_visible;
     desired.lane_color_count = std::min(data.lane_color_count, desired.lane_colors.size());
@@ -3762,6 +3791,12 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
 
     const bool cache_matches =
         d2d_->gameplay_static_command_list &&
+        gameplay_static_cache_.studio == desired.studio &&
+        gameplay_static_cache_.riff_map_revision == desired.riff_map_revision &&
+        gameplay_static_cache_.riff_map_count == desired.riff_map_count &&
+        gameplay_static_cache_.riff_map == desired.riff_map &&
+        gameplay_static_cache_.accent == desired.accent &&
+        gameplay_static_cache_.gauge_label == desired.gauge_label &&
         gameplay_static_cache_.lane_count == desired.lane_count &&
         gameplay_static_cache_.hidden_scratch_mask == desired.hidden_scratch_mask &&
         gameplay_static_cache_.native_instrument == desired.native_instrument &&
@@ -3848,7 +3883,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
             d2d_->gameplay_gauge_grid_geometries[index] = std::move(geometry);
         }
     };
-    build_gauge_grid(0, surface_layout.player_gauge_left);
+    if (!desired.studio) build_gauge_grid(0, surface_layout.player_gauge_left);
     if (surface_layout.ghost_visible) {
         build_gauge_grid(1, surface_layout.ghost_gauge_left);
     }
@@ -3894,7 +3929,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
                     d2d_->note_fill_brush.Get());
             }
         }
-        if (d2d_->button_border_brush) {
+        if (!desired.studio && d2d_->button_border_brush) {
             d2d_->d2d_context->DrawRoundedRectangle(D2D1::RoundedRect(field_rect, 16.0f, 16.0f),
                                                     d2d_->button_border_brush.Get(),
                                                     1.4f);
@@ -3902,7 +3937,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
 
         if (desired.show_lane_dividers && d2d_->lane_divider_brush) {
             const float divider_opacity = d2d_->lane_divider_brush->GetOpacity();
-            if (desired.native_instrument) d2d_->lane_divider_brush->SetOpacity(divider_opacity * native_gameplay_number(native_style,"lane_divider_opacity"));
+            if (desired.native_instrument) d2d_->lane_divider_brush->SetOpacity(desired.studio ? 0.05f : divider_opacity * native_gameplay_number(native_style,"lane_divider_opacity"));
             for (std::size_t divider = 0; divider < desired.lane_divider_width_count; ++divider) {
                 if (desired.hidden_scratch_mask & (uint32_t{1} << divider)) continue;
                 if (gameplay_is_center_gap_divider(field_layout, divider)) {
@@ -3929,12 +3964,42 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
             const float key_top = native_key_bounds(field_layout.left, field_layout.right,
                 field_layout.top, field_layout.bottom,
                 gameplay_osu_gear_top(field_layout, hit_line_y, note_height_scale), native_style).top;
-            fill->SetColor(native_gameplay_d2d_color(native_style,"chassis",color_from_rgb(0x142332, static_cast<float>(desired.visual_opacity))));
+            fill->SetColor(native_gameplay_d2d_color(native_style,"chassis",color_from_rgb(desired.studio ? 0x0A1119 : 0x142332, static_cast<float>(desired.visual_opacity))));
             d2d_->d2d_context->FillRectangle(D2D1::RectF(field_layout.left + 2.0f, key_top - 2.0f,
                 field_layout.right - 2.0f, field_layout.bottom - 1.0f), fill);
             if (desired.show_judgement_line) {
                 const float y = std::clamp(hit_line_y, field_layout.top + 2.0f, field_layout.bottom - 2.0f);
                 if (desired.judgement_line_glow_enabled) {
+                    // Recorded once into the static layer: a faint light pooling above
+                    // the contact line and two edge rails converging on it give the
+                    // black field depth without touching notes or per-frame cost.
+                    const D2D1_COLOR_F glow = native_gameplay_d2d_color(native_style, "judgement_glow",
+                        color_from_rgb(0x70EED6, 0.10f * static_cast<float>(desired.visual_opacity)));
+                    const D2D1_COLOR_F line = native_gameplay_d2d_color(native_style, "judgement_line",
+                        color_from_rgb(0xBCFFF0, static_cast<float>(desired.visual_opacity)));
+                    auto fill_vertical_fade = [&](const D2D1_RECT_F& rect, D2D1_COLOR_F color, float peak_alpha) {
+                        if (rect.bottom - rect.top < 1.0f || rect.right <= rect.left || peak_alpha <= 0.002f) return;
+                        D2D1_COLOR_F clear = color;
+                        clear.a = 0.0f;
+                        color.a = std::min(1.0f, peak_alpha);
+                        const D2D1_GRADIENT_STOP stops[] = {{0.0f, clear}, {1.0f, color}};
+                        Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> collection;
+                        Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> brush;
+                        if (FAILED(d2d_->d2d_context->CreateGradientStopCollection(stops, 2, collection.GetAddressOf())) ||
+                            FAILED(d2d_->d2d_context->CreateLinearGradientBrush(
+                                D2D1::LinearGradientBrushProperties(D2D1::Point2F(0.0f, rect.top),
+                                                                    D2D1::Point2F(0.0f, rect.bottom)),
+                                collection.Get(), brush.GetAddressOf()))) return;
+                        d2d_->d2d_context->FillRectangle(rect, brush.Get());
+                    };
+                    const float zone_height = std::min(desired.studio ? 112.0f : 132.0f, std::max(0.0f, y - field_layout.top - 4.0f));
+                    fill_vertical_fade(D2D1::RectF(field_layout.left + 3.0f, y - zone_height,
+                                                   field_layout.right - 3.0f, y),
+                                       glow, glow.a * (desired.studio ? 1.2f : 1.7f));
+                    const float rail_top = field_layout.top + 18.0f;
+                    if (!desired.studio) for (const float x : {field_layout.left + 1.0f, field_layout.right - 3.0f}) {
+                        fill_vertical_fade(D2D1::RectF(x, rail_top, x + 2.0f, y), line, 0.42f * line.a);
+                    }
                     fill->SetColor(native_gameplay_d2d_color(native_style,"judgement_glow",color_from_rgb(0x70EED6, 0.10f * static_cast<float>(desired.visual_opacity))));
                     d2d_->d2d_context->FillRectangle(D2D1::RectF(field_layout.left + 3.0f, std::max(field_layout.top, y - native_gameplay_number(native_style,"judgement_glow_height")*.5f),
                         field_layout.right - 3.0f, std::min(field_layout.bottom, y + native_gameplay_number(native_style,"judgement_glow_height")*.5f)), fill);
@@ -4021,7 +4086,39 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
     };
 
     draw_field_panel(surface_layout.player_field);
-    draw_gauge_frame(surface_layout.player_gauge_left);
+    if (!desired.studio) draw_gauge_frame(surface_layout.player_gauge_left);
+    if (desired.studio) {
+        auto* ctx = d2d_->d2d_context.Get();
+        auto* fill = d2d_->note_fill_brush.Get();
+        const auto saved = fill->GetColor();
+        const auto& field = surface_layout.player_field;
+        const auto deck = compute_gameplay_studio_deck_layout(field.left, field.right);
+        const float hit_y = gameplay_field_y(field.top, field.height, desired.judgement_line_position);
+        fill->SetColor(D2D1::ColorF(0x12161E));
+        for (float x : {field.left - 6.0f, field.right + 2.0f})
+            ctx->FillRectangle(D2D1::RectF(x, 0, x + 4.0f, hit_y), fill);
+        if (deck.map_visible) {
+            for (std::size_t i = 0; i < std::min<std::size_t>(64, data.riff_map_count); ++i) {
+                const float density = data.riff_map[i] / 255.0f;
+                if (density <= 0) continue;
+                auto color = d2d_->accent_brush->GetColor(); color.a *= 0.70f;
+                fill->SetColor(density >= 0.8f ? D2D1::ColorF(0xFF9F43) : color);
+                const float y = 60.0f + static_cast<float>(i) * 15.0f;
+                ctx->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(
+                    deck.map_x + 56.0f - density * 56.0f, y, deck.map_x + 56.0f, y + 10.0f), 1, 1), fill);
+            }
+        }
+        // Cards are fixed geometry; six rounded paths are recorded only on invalidation.
+        const float cell_width = (deck.left_width - 12.0f) / 3.0f;
+        for (int i = 0; i < 6; ++i) {
+            const float x = deck.left_x + (i % 3) * (cell_width + 6.0f);
+            const float y = 128.0f + (i / 3) * 62.0f;
+            const auto card = D2D1::RoundedRect(D2D1::RectF(x, y, x + cell_width, y + 56.0f), 8, 8);
+            fill->SetColor(D2D1::ColorF(0x0A0D12)); ctx->FillRoundedRectangle(card, fill);
+            fill->SetColor(D2D1::ColorF(0x1A202A)); ctx->DrawRoundedRectangle(card, fill, 1);
+        }
+        fill->SetColor(saved);
+    }
     if (surface_layout.ghost_visible) {
         draw_field_panel(surface_layout.ghost_field);
         draw_gauge_frame(surface_layout.ghost_gauge_left);
@@ -5064,8 +5161,23 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family, const app::Native
     d2d_->menu_ellipsis_signs.clear();
     d2d_->generic_help_layout.Reset();
     for (auto& text : d2d_->menu_readable_text) text = {};
+    auto& sf = d2d_->preview_fonts;
+    if (!create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 24, &sf.studio_title, true) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 14, &sf.studio_body, true) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 11, &sf.studio_label, true) ||
+        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 40, &sf.studio_score, true) ||
+        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 26, &sf.studio_accuracy, true) ||
+        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_BOLD, 30, &sf.studio_judgement, true) ||
+        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 18, &sf.studio_timing, true) ||
+        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 70, &sf.studio_combo, true)) return false;
+    constexpr float studio_sizes[] = {11, 12, 13, 14, 16, 18};
+    for (std::size_t i = 0; i < sf.studio_numbers.size(); ++i)
+        if (!create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD,
+                                studio_sizes[i], &sf.studio_numbers[i], true)) return false;
     for (auto& text : d2d_->gameplay_readable_text) text = {};
     for (auto& text : d2d_->preview_readable_text) text = {};
+    for (auto& text : d2d_->gameplay_measured_text) text = {};
+    for (auto& text : d2d_->preview_measured_text) text = {};
     return true;
 }
 

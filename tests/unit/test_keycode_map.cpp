@@ -1,6 +1,7 @@
 #include "doctest/doctest.h"
 
 #include "config/KeycodeMap.h"
+#include <utility>
 
 #if defined(_WIN32)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -45,6 +46,21 @@ TEST_CASE("keycode map canonicalizes legacy OEM tokens and punctuation aliases")
 }
 
 #if defined(_WIN32)
+TEST_CASE("raw Shift edges resolve to the same side-specific keys as polling and saved bindings") {
+    using tenriff::config::KeycodeMap;
+    for (const auto& item : {std::pair<uint16_t, uint32_t>{0x2Au, VK_LSHIFT},
+                             std::pair<uint16_t, uint32_t>{0x36u, VK_RSHIFT}}) {
+        for (const uint16_t flags : {uint16_t{0}, uint16_t{RI_KEY_BREAK}}) {
+            const auto raw = KeycodeMap::normalize_windows_raw_keycode(VK_SHIFT, item.first, flags);
+            CHECK(raw == item.second);
+            CHECK(raw == KeycodeMap::normalize_windows_polling_keycode(item.second));
+            CHECK(KeycodeMap::to_keycode(KeycodeMap::to_name(raw)).value() == item.second);
+            CHECK(KeycodeMap::polling_vk_for_keycode(raw).value() == item.second);
+        }
+    }
+    CHECK(KeycodeMap::normalize_windows_raw_keycode(VK_SHIFT, 0, 0) == VK_SHIFT);
+}
+
 TEST_CASE("keycode map uses physical scan aliases for layout-sensitive OEM keys") {
     const auto lbracket = tenriff::config::KeycodeMap::to_keycode("LBracket");
     REQUIRE(lbracket.has_value());

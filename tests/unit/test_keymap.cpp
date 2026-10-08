@@ -192,6 +192,26 @@ TEST_CASE("menu probe keycodes include active keymap bindings on keymap screens"
                     tenriff::config::KeycodeMap::to_keycode("Semicolon").value()) != keycodes.end());
 }
 
+#ifdef _WIN32
+TEST_CASE("Windows key capture preserves Shift sides without changing stored generic Shift bindings") {
+    tenriff::config::KeymapManager manager;
+    auto keymap = manager.default_keymap();
+    keymap.mode_bindings["4k"]["lane1"] = "VK_10";
+
+    const auto capture_keycodes = tenriff::app::build_menu_probe_keycodes(
+        {}, keymap, "4k", true, true);
+    CHECK(std::find(capture_keycodes.begin(), capture_keycodes.end(), 0x10u) == capture_keycodes.end());
+    for (const char* shift : {"LShift", "RShift"}) {
+        CHECK(std::find(capture_keycodes.begin(), capture_keycodes.end(),
+                        tenriff::config::KeycodeMap::to_keycode(shift).value()) != capture_keycodes.end());
+    }
+
+    const auto bound_keycodes = tenriff::app::build_menu_probe_keycodes(
+        {}, keymap, "4k", true, false);
+    CHECK(std::find(bound_keycodes.begin(), bound_keycodes.end(), 0x10u) != bound_keycodes.end());
+}
+#endif
+
 TEST_CASE("menu probe keycodes expand to full polling range during key capture") {
     tenriff::config::KeymapManager manager;
     const auto keymap = manager.default_keymap();

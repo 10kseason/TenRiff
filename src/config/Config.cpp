@@ -188,6 +188,7 @@ void sanitize_skin_config(SkinConfig& skin) {
     skin.key_backdrop_height = clamp_finite(skin.key_backdrop_height,
         kSkinKeyBackdropHeightMin, kSkinKeyBackdropHeightMax, kSkinKeyBackdropHeightDefault);
     skin.hit_burst_style = normalize_skin_hit_burst_style_token(skin.hit_burst_style);
+    skin.hud_layout = normalize_skin_hud_layout_token(skin.hud_layout);
     skin.single_color = normalize_skin_single_color_token(skin.single_color);
     skin.note_outline_opacity = clamp_finite(
         skin.note_outline_opacity,
@@ -858,6 +859,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             kSkinKeyPulseBrightnessMin, kSkinKeyPulseBrightnessMax);
         config.skin.hit_burst_style = normalize_skin_hit_burst_style_token(
             get_string(*skin, "hit_burst_style", config.skin.hit_burst_style));
+        config.skin.hud_layout = normalize_skin_hud_layout_token(
+            get_string(*skin, "hud_layout", config.skin.hud_layout));
         config.skin.ui_font = normalize_skin_ui_font_token(
             get_string(*skin, "ui_font", config.skin.ui_font));
         config.skin.key_label_position = normalize_skin_key_label_position_token(
@@ -1309,6 +1312,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("key_backdrop_height", JsonValue{config.skin.key_backdrop_height});
     skin.emplace("hit_burst_style",
                  JsonValue{normalize_skin_hit_burst_style_token(config.skin.hit_burst_style)});
+    skin.emplace("hud_layout", JsonValue{normalize_skin_hud_layout_token(config.skin.hud_layout)});
     skin.emplace("key_label_position",
                  JsonValue{normalize_skin_key_label_position_token(config.skin.key_label_position)});
     skin.emplace("ui_font", JsonValue{normalize_skin_ui_font_token(config.skin.ui_font)});
@@ -1694,6 +1698,10 @@ std::string normalize_skin_key_label_position_token(std::string_view token) {
         return "off";
     }
     return "bottom";
+}
+
+std::string normalize_skin_hud_layout_token(std::string_view token) {
+    return to_lower_ascii(std::string(token)) == "classic" ? "classic" : "studio";
 }
 
 std::string normalize_skin_hit_burst_style_token(std::string_view token) {

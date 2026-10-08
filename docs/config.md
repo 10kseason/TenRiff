@@ -287,6 +287,7 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst 밝기. 0이면 끔. |
 | `key_pulse_enabled` | bool; `true` | 구버전 ON/OFF 호환. false 또는 밝기 0이면 끔. |
 | `hit_burst_style` | `prism`, `ring`, `spark`; `prism` | 내장 Hit Burst 모양. |
+| `hud_layout` | `classic`, `studio`; `studio` | Native 단독 플레이의 HUD 스타일. 키가 없는 기존 프로필도 기본값 `studio`를 사용하며, Options › Skins에서 클래식으로 바꿀 수 있음. 이미지 스킨·고스트 대전·멀티플레이는 기존 배치를 유지. 알 수 없는 값은 `studio`. |
 | `ui_font` | `default`, `malgun`, `bahnschrift`, `consolas`; `default` | 메뉴 글꼴. default는 Segoe UI; 로고·랭크·콤보 전용 글꼴은 유지. |
 | `key_label_position` | `bottom`, `top`, `off`; `bottom` | 레인 키 이름 위치. |
 | `judgement_line_position` | double: `0..1`; `0.82` | 판정선 세로 위치 비율. |

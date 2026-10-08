@@ -285,6 +285,7 @@ These are profile `config.json` skin settings. For a skin package's `skin.json` 
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst brightness; zero disables it. |
 | `key_pulse_enabled` | bool; `true` | Legacy ON/OFF mirror; false or zero brightness disables the burst. |
 | `hit_burst_style` | `prism`, `ring`, `spark`; `prism` | Built-in Hit Burst material. |
+| `hud_layout` | `classic`, `studio`; `studio` | HUD style for native solo play. Existing profiles without the key also default to `studio`; choose Classic in Options › Skins to restore the previous layout. Image skins, ghost battles and multiplayer retain the classic layout. Unknown values use `studio`. |
 | `ui_font` | `default`, `malgun`, `bahnschrift`, `consolas`; `default` | Menu font; default is Segoe UI. Logo, rank and combo keep their dedicated fonts. |
 | `key_label_position` | `bottom`, `top`, `off`; `bottom` | Lane key-label position. |
 | `judgement_line_position` | double: `0..1`; `0.82` | Vertical judgement-line position ratio. |

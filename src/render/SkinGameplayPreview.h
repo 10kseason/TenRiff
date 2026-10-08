@@ -2,22 +2,39 @@
 
 #include <algorithm>
 #include <cmath>
-#include <limits>
+#include <functional>
 
 #include "render/MenuWindow.h"
 
 namespace tenriff::render {
 
+inline uint64_t skin_gameplay_preview_text_revision(const SkinPreviewData& preview,
+                                                    ui::Language language) {
+    // The preview has no session publisher to increment text_revision. Hash only
+    // inputs used by cached HUD strings, so settings/language changes refresh
+    // them without rebuilding text layouts for every animated key frame.
+    uint64_t revision = 14695981039346656037ULL;
+    const auto mix = [&](uint64_t value) { revision = (revision ^ value) * 1099511628211ULL; };
+    for (const unsigned char ch : preview.mode_label) mix(ch);
+    mix(0xFF);
+    for (const unsigned char ch : preview.hud_layout) mix(ch);
+    mix(static_cast<uint64_t>(std::clamp(preview.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes))));
+    mix(static_cast<uint64_t>(language));
+    mix(static_cast<uint64_t>(std::hash<double>{}(preview.judgement_line_position)));
+    return revision | (uint64_t{1} << 63);  // Zero remains the cache's invalid sentinel.
+}
+
 // Only the sample chart is synthetic. Every visual setting travels through the
 // gameplay renderer, including imported lane geometry, gear art and font roles.
-inline GameplayHudData make_skin_gameplay_preview(const SkinPreviewData& preview, int64_t now_ns = 0) {
+inline GameplayHudData make_skin_gameplay_preview(const SkinPreviewData& preview, int64_t now_ns = 0,
+                                                   ui::Language language = ui::Language::English) {
     GameplayHudData hud;
     hud.active = true;
     hud.show_cursor_in_gameplay = true;
     hud.lane_count = std::clamp(preview.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
     hud.title = preview.mode_label;
     hud.artist = "TenRiff";
-    hud.text_revision = std::numeric_limits<uint64_t>::max() - hud.lane_count;
+    hud.text_revision = skin_gameplay_preview_text_revision(preview, language);
     hud.current_sample = hud.sample_rate;
     hud.duration_samples = hud.sample_rate * 120;
     hud.current_visual_position = 1.0;
@@ -73,6 +90,7 @@ inline GameplayHudData make_skin_gameplay_preview(const SkinPreviewData& preview
     hud.key_backdrop_brightness = preview.key_backdrop_brightness;
     hud.key_backdrop_height = preview.key_backdrop_height;
     hud.hit_burst_style = preview.hit_burst_style;
+    hud.hud_layout = preview.hud_layout;
     hud.key_label_position = preview.key_label_position;
     hud.note_border_enabled = preview.note_border_enabled;
     hud.note_shape = preview.note_shape;

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.8.5 LANGUAGES C CXX)
+project(TenRiff VERSION 1.8.6 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -158,6 +158,7 @@ add_library(tenriff_core
     src/config/KeycodeMap.cpp
     src/input/KeyStateTracker.cpp
     src/gameplay/GameplayChart.cpp
+    src/gameplay/RiffMap.cpp
     src/gameplay/GameplayEngine.cpp
     src/gameplay/KeyModeConverter.cpp
     src/gameplay/Nk2KeyModeAdapter.cpp
@@ -784,6 +785,8 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_text_fit.cpp
         tests/unit/test_difficulty_table.cpp
         tests/unit/test_game_session_hud.cpp
+        tests/unit/test_riff_map.cpp
+        tests/unit/test_gameplay_studio_deck.cpp
         tests/unit/test_graphics_timing.cpp
         tests/unit/test_render_performance.cpp
         tests/unit/test_bga_image_loader.cpp

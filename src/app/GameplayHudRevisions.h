@@ -42,6 +42,7 @@ struct GameplayHudRevisionInput {
     std::array<int, kGameplayHudMaxLanes> scratch_lanes{};
     int64_t current_sample = 0;
     int64_t duration_samples = 0;
+    uint64_t riff_map_revision = 0;
     int sample_rate = 48000;
     int64_t audio_sample_time_ns = 0;
     uint32_t audio_buffer_frames = 0;
@@ -279,6 +280,7 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
                     next.scratch_lanes.begin()) ||
         previous.current_sample != next.current_sample ||
         previous.duration_samples != next.duration_samples ||
+        previous.riff_map_revision != next.riff_map_revision ||
         previous.sample_rate != next.sample_rate ||
         previous.audio_sample_time_ns != next.audio_sample_time_ns ||
         previous.audio_buffer_frames != next.audio_buffer_frames ||

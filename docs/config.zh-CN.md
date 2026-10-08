@@ -287,6 +287,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst 亮度；0 为关闭。 |
 | `key_pulse_enabled` | bool; `true` | 旧版开关兼容；false 或亮度为 0 时关闭。 |
 | `hit_burst_style` | `prism`, `ring`, `spark`; `prism` | 内置 Hit Burst 样式。 |
+| `hud_layout` | `classic`, `studio`; `studio` | Native 单人游戏的 HUD 样式。缺少此键的旧配置也默认使用 `studio`，可在 Options › Skins 选择 Classic。图像皮肤、幽灵对战和多人游戏保持原有布局。未知值使用 `studio`。 |
 | `ui_font` | `default`, `malgun`, `bahnschrift`, `consolas`; `default` | 菜单字体；default 为 Segoe UI，标志、等级与连击保留专用字体。 |
 | `key_label_position` | `bottom`, `top`, `off`; `bottom` | 轨道按键名称位置。 |
 | `judgement_line_position` | double: `0..1`; `0.82` | 判定线纵向位置比例。 |

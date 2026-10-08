@@ -478,6 +478,10 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
         case SkinSettingsRowId::HitBurstStyle:
             runtime.skin.hit_burst_style = cycle_hit_burst_style(runtime.skin.hit_burst_style, direction);
             return mark_changed();
+        case SkinSettingsRowId::HudLayout:
+            runtime.skin.hud_layout = config::normalize_skin_hud_layout_token(runtime.skin.hud_layout) == "studio"
+                ? "classic" : "studio";
+            return mark_changed();
         case SkinSettingsRowId::KeyPulse:
             runtime.skin.key_pulse_brightness = clamp_step_value(
                 runtime.skin.key_pulse_brightness + direction * kSkinOpacityStep,

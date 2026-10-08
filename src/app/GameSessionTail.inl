@@ -78,8 +78,7 @@ void GameSession::rebuild_input_thread_config(input::InputThreadConfig& input_co
         append_unique_key(f8_keycode_);
         append_unique_key(f9_keycode_);
         append_unique_key(f10_keycode_);
-        append_unique_key(lshift_keycode_);
-        append_unique_key(rshift_keycode_);
+        append_unique_key(f11_keycode_);
     }
 }
 
@@ -89,7 +88,7 @@ void GameSession::note_runtime_input_event_source(const input::InputEvent& event
 
 void GameSession::rebuild_polled_gameplay_keys() {
     polled_gameplay_keys_.clear();
-    polled_gameplay_keys_.reserve(key_to_lane_.size() + 11);
+    polled_gameplay_keys_.reserve(key_to_lane_.size() + 15);
 
     auto append_unique_key = [this](uint32_t keycode) {
         if (keycode == 0) {
@@ -121,11 +120,20 @@ void GameSession::rebuild_polled_gameplay_keys() {
     append_unique_key(f8_keycode_);
     append_unique_key(f9_keycode_);
     append_unique_key(f10_keycode_);
-    append_unique_key(lshift_keycode_);
-    append_unique_key(rshift_keycode_);
+    append_unique_key(f11_keycode_);
 }
 
 GameSession::GameSession() = default;
+
+void GameSession::prepare_riff_map() {
+    const auto map = gameplay::build_riff_map(chart_);
+    riff_map_ = map.values;
+    riff_map_count_ = map.count;
+    // A new GameSession is created for each song. A process-wide generation
+    // prevents the renderer from reusing another song's static density map.
+    static std::atomic<uint64_t> next_revision{0};
+    riff_map_revision_ = next_revision.fetch_add(1, std::memory_order_relaxed) + 1;
+}
 
 GameSession::~GameSession() {
     shutdown();
@@ -224,6 +232,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     ghost_hud_past_hold_indices_.clear();
     hud_scan_cutoff_sample_ = (std::numeric_limits<int64_t>::min)();
     chart_ = {};
+    riff_map_.fill(0);
+    riff_map_count_ = 0;
     chart_base_bpm_ = 0.0;
     lane_activity_.clear();
     ghost_lane_activity_.clear();
@@ -341,10 +351,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     f8_keycode_ = config::KeycodeMap::to_keycode("F8").value_or(0);
     f9_keycode_ = config::KeycodeMap::to_keycode("F9").value_or(0);
     f10_keycode_ = config::KeycodeMap::to_keycode("F10").value_or(0);
-    lshift_keycode_ = config::KeycodeMap::to_keycode("LShift").value_or(0);
-    rshift_keycode_ = config::KeycodeMap::to_keycode("RShift").value_or(0);
-    lshift_held_ = false;
-    rshift_held_ = false;
+    f11_keycode_ = config::KeycodeMap::to_keycode("F11").value_or(0);
 
     if (!options.replay_path.empty()) {
         auto replay_load = gameplay::load_replay_json(options.replay_path);
@@ -821,6 +828,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     ghost_lane_pressed_.assign(static_cast<std::size_t>(std::max(1, chart_.lane_count)), 0);
 
     engine_ = std::make_unique<gameplay::GameplayEngine>(chart_, gameplay_config);
+    prepare_riff_map();
     if (ghost_replay_enabled_) {
         gameplay::GameplayConfig ghost_config = gameplay_config;
         const auto ghost_base_judge = is_supported_canonical_replay_ruleset(ghost_replay_source_.ruleset_id)
@@ -1110,6 +1118,9 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
                     snapshot.scratch_lane_count,
                     snapshot.scratch_lanes.begin());
         snapshot.duration_samples = engine_->duration_samples();
+        snapshot.riff_map = riff_map_;
+        snapshot.riff_map_count = riff_map_count_;
+        snapshot.riff_map_revision = riff_map_revision_;
 
         if (snapshot.current_sample < last_visual_cue_sample_) {
             // Playback can be rebased independently of the monotonic mixer/write
@@ -2430,6 +2441,8 @@ void GameSession::shutdown() {
     chart_audio_steady_state_logged_ = false;
     synthetic_tones_enabled_.store(true, std::memory_order_release);
     chart_ = {};
+    riff_map_.fill(0);
+    riff_map_count_ = 0;
     chart_base_bpm_ = 0.0;
     next_visual_cue_index_ = 0;
     last_visual_cue_sample_ = -1;
@@ -2821,16 +2834,6 @@ void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
 }
 
 bool GameSession::handle_control_input(const input::InputEvent& event) {
-    if (lshift_keycode_ != 0 && event.keycode == lshift_keycode_) {
-        lshift_held_ = event.state == input::InputState::Pressed;
-        if (control_input_callback_) static_cast<void>(control_input_callback_(event));
-        return true;
-    }
-    if (rshift_keycode_ != 0 && event.keycode == rshift_keycode_) {
-        rshift_held_ = event.state == input::InputState::Pressed;
-        if (control_input_callback_) static_cast<void>(control_input_callback_(event));
-        return true;
-    }
     if (control_input_callback_ && control_input_callback_(event)) {
         reset_tuning_repeats();
         return true;
@@ -2885,11 +2888,11 @@ bool GameSession::handle_control_input(const input::InputEvent& event) {
             return true;
         }
         if (f5_keycode_ != 0 && event.keycode == f5_keycode_) {
-            if (lshift_held_ || rshift_held_) adjust_hispeed(-config_.speed.hi_speed * 0.5);
+            adjust_hispeed(-config_.speed.hi_speed * 0.5);
             return true;
         }
         if (f6_keycode_ != 0 && event.keycode == f6_keycode_) {
-            if (lshift_held_ || rshift_held_) adjust_hispeed(config_.speed.hi_speed);
+            adjust_hispeed(config_.speed.hi_speed);
             return true;
         }
         if (f7_keycode_ != 0 && event.keycode == f7_keycode_) {
@@ -2941,11 +2944,11 @@ bool GameSession::handle_control_input(const input::InputEvent& event) {
     }
     if (event.state == input::InputState::Pressed) {
         if (f5_keycode_ != 0 && event.keycode == f5_keycode_) {
-            if (lshift_held_ || rshift_held_) adjust_hispeed(-config_.speed.hi_speed * 0.5);
+            adjust_hispeed(-config_.speed.hi_speed * 0.5);
             return true;
         }
         if (f6_keycode_ != 0 && event.keycode == f6_keycode_) {
-            if (lshift_held_ || rshift_held_) adjust_hispeed(config_.speed.hi_speed);
+            adjust_hispeed(config_.speed.hi_speed);
             return true;
         }
         if (f9_keycode_ != 0 && event.keycode == f9_keycode_) {
