@@ -218,6 +218,9 @@ private:
         bool has_feedback = false;
         game::Judgement feedback = game::Judgement::BD;
         double feedback_delta_ms = 0.0;
+        bool has_non_pg_feedback = false;
+        bool has_timing_feedback = false;
+        double timing_feedback_delta_ms = 0.0;
         uint64_t peer_revision = 0;
         std::size_t timing_history_count = 0;
         std::array<double, kGameplayTimingHistoryMaxEntries> timing_history_delta_ms{};
@@ -245,6 +248,9 @@ private:
         bool ghost_has_feedback = false;
         game::Judgement ghost_feedback = game::Judgement::BD;
         double ghost_feedback_delta_ms = 0.0;
+        bool ghost_has_non_pg_feedback = false;
+        bool ghost_has_timing_feedback = false;
+        double ghost_timing_feedback_delta_ms = 0.0;
         std::size_t ghost_timing_history_count = 0;
         std::array<double, kGameplayTimingHistoryMaxEntries> ghost_timing_history_delta_ms{};
         bool ghost_finished = false;
@@ -795,7 +801,7 @@ private:
     render::MenuWindow menu_window_{};
 
     std::mutex snapshot_mutex_{};
-    std::mutex gameplay_hud_mutex_{};
+    mutable std::mutex gameplay_hud_mutex_{};
     enum class GameplayOverlayActionKind {
         Input,
         ChatVisibility,

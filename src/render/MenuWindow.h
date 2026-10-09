@@ -492,6 +492,7 @@ struct GameplayHudData {
     bool show_gear_boundary_line = false;
     bool show_timing_feedback = true;
     bool show_timing_bar = true;
+    bool timing_bar_always_visible = false;
     double timing_text_offset_x = 0.0;
     double note_fade_in = 0.0;
     double note_fade_out = 0.0;
@@ -510,6 +511,7 @@ struct GameplayHudData {
     double key_backdrop_height = 1.0;
     std::string hit_burst_style = "prism";
     std::string hud_layout = "studio";
+    bool hud_riff_map_visible = true;
     std::string key_label_position = "bottom";
     bool note_border_enabled = true;
     std::string note_shape = "rect";
@@ -558,6 +560,9 @@ struct GameplayHudData {
     bool has_feedback = false;
     std::string feedback;
     double feedback_delta_ms = 0.0;
+    bool has_non_pg_feedback = false;
+    bool has_timing_feedback = false;
+    double timing_feedback_delta_ms = 0.0;
     std::size_t timing_history_count = 0;
     std::array<double, kGameplayTimingHistoryMaxEntries> timing_history_delta_ms{};
 
@@ -616,6 +621,9 @@ struct GameplayHudData {
     bool ghost_has_feedback = false;
     std::string ghost_feedback;
     double ghost_feedback_delta_ms = 0.0;
+    bool ghost_has_non_pg_feedback = false;
+    bool ghost_has_timing_feedback = false;
+    double ghost_timing_feedback_delta_ms = 0.0;
     std::size_t ghost_timing_history_count = 0;
     std::array<double, kGameplayTimingHistoryMaxEntries> ghost_timing_history_delta_ms{};
     bool ghost_finished = false;
@@ -652,6 +660,7 @@ struct SkinPreviewData {
     bool fullscreen = false;
     bool show_timing_feedback = true;
     bool show_timing_bar = true;
+    bool timing_bar_always_visible = false;
     double timing_text_offset_x = 0.0;
     double note_fade_in = 0.0;
     double note_fade_out = 0.0;
@@ -698,6 +707,7 @@ struct SkinPreviewData {
     double key_backdrop_height = 1.0;
     std::string hit_burst_style = "prism";
     std::string hud_layout = "studio";
+    bool hud_riff_map_visible = true;
     std::string key_label_position = "bottom";
     bool note_border_enabled = true;
     std::string note_shape = "rect";
@@ -964,6 +974,13 @@ private:
     // Developer preview friend only; disabled in the game, with no extra clock
     // reads unless a synchronous render benchmark explicitly opts in.
     bool benchmark_timings_enabled_ = false;
+    struct SongTitleDiagnostics {
+        float left = 0, top = 0, right = 0, bottom = 0;
+        float field_left = 0, field_right = 0;
+        float font_size = 0, text_width = 0, text_height = 0;
+        uint32_t characters = 0, line_count = 0;
+        uint64_t layout_builds = 0;
+    } benchmark_song_title_;
     int64_t benchmark_present_started_ns_ = 0;
     int64_t benchmark_present_ended_ns_ = 0;
     bool gameplay_sprite_batch_enabled_ = true;
@@ -1094,6 +1111,7 @@ private:
 
     struct GameplayStaticCache {
         bool studio = false;
+        bool hud_riff_map_visible = false;
         uint64_t riff_map_revision = 0;
         std::size_t riff_map_count = 0;
         std::array<uint8_t, 64> riff_map{};

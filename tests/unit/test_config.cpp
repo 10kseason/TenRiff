@@ -65,6 +65,18 @@ TEST_CASE("skin HUD layout defaults to studio and normalizes portable settings")
     CHECK(skin.hud_layout == "studio");
 }
 
+TEST_CASE("Studio riff map toggle defaults on and survives portable settings") {
+    using namespace tenriff::config;
+    SkinConfig skin;
+    REQUIRE(deserialize_skin_config("{}", skin));
+    CHECK(skin.hud_riff_map_visible);
+    REQUIRE(deserialize_skin_config(R"({"hud_riff_map_visible":false})", skin));
+    CHECK_FALSE(skin.hud_riff_map_visible);
+    const auto preset = serialize_skin_config(skin);
+    REQUIRE(deserialize_skin_config(preset, skin));
+    CHECK_FALSE(skin.hud_riff_map_visible);
+}
+
 namespace {
 
 struct TempDirGuard {
@@ -977,15 +989,18 @@ TEST_CASE("skin HUD layout survives profile roundtrips and upgrades missing lega
     std::string error;
     for (const auto token : {"classic", "studio", "CLASSIC", "invalid"}) {
         config.skin.hud_layout = token;
+        config.skin.hud_riff_map_visible = !config.skin.hud_riff_map_visible;
         REQUIRE(loader.save_profile("profiles/test", config, &error));
         const auto result = loader.load_profile("profiles/test");
         REQUIRE(result.success());
         CHECK(result.config.skin.hud_layout == tenriff::config::normalize_skin_hud_layout_token(token));
+        CHECK(result.config.skin.hud_riff_map_visible == config.skin.hud_riff_map_visible);
     }
     write_file("profiles/test/config.json", R"({"skin":{"hit_burst_style":"spark"}})");
     const auto legacy = loader.load_profile("profiles/test");
     REQUIRE(legacy.success());
     CHECK(legacy.config.skin.hud_layout == "studio");
+    CHECK(legacy.config.skin.hud_riff_map_visible);
     CHECK(legacy.config.skin.hit_burst_style == "spark");
 }
 
@@ -2353,6 +2368,7 @@ TEST_CASE("timing controls survive profile file save and reload") {
     auto config = loader.defaults();
     config.skin.show_timing_feedback = false;
     config.skin.show_timing_bar = true;
+    config.skin.timing_bar_always_visible = true;
     config.skin.timing_feedback_override = true;
     config.skin.timing_text_offset_x = -120;
     config.skin.timing_text_offset_y = 90;
@@ -2363,6 +2379,7 @@ TEST_CASE("timing controls survive profile file save and reload") {
     REQUIRE(loaded.success());
     CHECK_FALSE(loaded.config.skin.show_timing_feedback);
     CHECK(loaded.config.skin.show_timing_bar);
+    CHECK(loaded.config.skin.timing_bar_always_visible);
     CHECK(loaded.config.skin.timing_feedback_override);
     CHECK(loaded.config.skin.timing_text_offset_x == -120);
     CHECK(loaded.config.skin.timing_text_offset_y == 90);

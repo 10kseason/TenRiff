@@ -822,6 +822,7 @@ void parse_gameplay_style(const config::JsonObject& gameplay,
     style.show_judgement_line = optional_bool(gameplay, "show_judgement_line", definition, "gameplay.");
     style.show_timing_feedback = optional_bool(gameplay, "show_timing_feedback", definition, "gameplay.");
     style.show_timing_bar = optional_bool(gameplay, "show_timing_bar", definition, "gameplay.");
+    style.timing_bar_always_visible = optional_bool(gameplay, "timing_bar_always_visible", definition, "gameplay.");
     style.show_gear_boundary_line = optional_bool(gameplay, "show_gear_boundary_line", definition, "gameplay.");
     style.show_hold_tail = optional_bool(gameplay, "show_hold_tail", definition, "gameplay.");
     style.hold_tail_taper_enabled = optional_bool(gameplay, "hold_tail_taper", definition, "gameplay.");
@@ -928,7 +929,7 @@ bool has_gameplay_presentation(const TenRiffSkinDefinition& definition) {
     const auto& style = definition.gameplay_style;
     // Presence matters: explicitly false/zero still overrides a player setting.
     return style.show_lane_dividers.has_value() || style.show_judgement_line.has_value() ||
-        style.show_timing_feedback.has_value() || style.show_timing_bar.has_value() || style.show_gear_boundary_line.has_value() ||
+        style.show_timing_feedback.has_value() || style.show_timing_bar.has_value() || style.timing_bar_always_visible.has_value() || style.show_gear_boundary_line.has_value() ||
         style.show_hold_tail.has_value() || style.hold_tail_taper_enabled.has_value() ||
         style.judgement_line_glow_enabled.has_value() || style.key_pulse_enabled.has_value() ||
         style.key_backdrop_enabled.has_value() || style.key_backdrop_opacity.has_value() ||
@@ -1104,13 +1105,13 @@ TenRiffSkinDefinition load_tenriff_skin_folder(std::string_view folder_utf8,
     if (const auto* gameplay_manifest = child_object(*manifest, "gameplay")) {
         config::JsonObject gameplay = effective_gameplay_object(
             *gameplay_manifest, definition.gameplay.keys, gameplay_mode, definition);
-        static constexpr std::array<std::string_view, 47> kGameplayKeys = {
+        static constexpr std::array<std::string_view, 48> kGameplayKeys = {
             "renderer", "native",
             "background", "background_opacity", "gear", "note", "hold_head", "hold_body",
             "hold_tail", "key_idle", "key_pressed", "note_width_ratio", "note_height_ratio",
             "note_aspect", "note_rotations", "key_rotations", "judgement_line_position",
             "full_lane_receptors", "column_widths", "column_spacings", "lane_map",
-            "show_lane_dividers", "show_judgement_line", "show_timing_feedback", "show_timing_bar",
+            "show_lane_dividers", "show_judgement_line", "show_timing_feedback", "show_timing_bar", "timing_bar_always_visible",
             "show_gear_boundary_line", "show_hold_tail", "hold_tail_taper", "judgement_line_glow",
             "key_pulse", "key_pulse_brightness", "hit_burst_style", "key_label_position",
             "key_backdrop", "key_backdrop_opacity", "key_backdrop_brightness", "key_backdrop_height",

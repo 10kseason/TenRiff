@@ -7,7 +7,7 @@
 - 홈: `Play / Multiplayer / Options / Exit`. 곡이 없으면 첫 버튼은 `Add Songs Folder`입니다.
 - 선곡: 상단 `Songs / Sources / Records / Session Mix / Options`, 중앙 하단 `Search / Sort·Filter / Difficulty Table`을 사용합니다. 예전 좌측 KEY/메뉴 레일 안내는 현재 화면과 다릅니다.
 - 난이도표 카드: 이름·URL 영역은 URL 편집창, `File`은 로컬 JSON 선택, `Reset`은 기본 LV 복귀입니다. `Enter` 적용, `Esc` 취소이며 잘못된 주소는 기존 표를 유지합니다. Filters의 난이도표 행도 같은 가져오기 경로를 사용합니다.
-- 옵션: 5열×2행의 10개 카드입니다. Key Mode, Keymap, Skins, Graphics, Audio, Input, Calibration, Profile Setup, Mods, Key Test로 이동합니다.
+- 옵션: 4열×2행의 8개 카드입니다. 키 모드 설정, 키 설정, 스킨, 그래픽, 오디오, 입력, 레이턴시, 프로필로 이동합니다. 모드 관리자는 키 모드 설정의 `모드` 항목에서, 키 입력 테스트는 키 설정의 `NKRO Test` 버튼에서 엽니다. 기존 세부 옵션과 테스트 기능은 그대로 사용할 수 있습니다.
 - 공통 설정: 방향키로 선택·조절하고 `Enter`는 선택 항목의 동작을 실행합니다. `Esc / Backspace`는 뒤로 이동합니다. 긴 사용 안내는 페이지 버튼으로 읽습니다. 스킨 설정은 실시간 미리보기를 유지합니다.
 - 키맵: 4K–10K, 12K, 14K, 16K를 지원하며 성공한 바인딩은 즉시 저장합니다.
 - 결과: 싱글 결과 연출 중 `Space`로 건너뜁니다. 준비 후 `R / Left` 재시도, `F1` 리플레이, `Enter / Esc / Backspace` 복귀입니다. Session Mix의 Enter는 다음 곡, Esc/Backspace는 세션 종료입니다. 멀티 결과는 로비로 복귀합니다.

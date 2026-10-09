@@ -70,6 +70,7 @@ struct TenRiffSkinGameplayStyle {
     std::optional<bool> show_judgement_line;
     std::optional<bool> show_timing_feedback;
     std::optional<bool> show_timing_bar;
+    std::optional<bool> timing_bar_always_visible;
     std::optional<bool> show_gear_boundary_line;
     std::optional<bool> show_hold_tail;
     std::optional<bool> hold_tail_taper_enabled;

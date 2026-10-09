@@ -279,6 +279,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | `show_gear_boundary_line` | bool; `false` | ギア境界線を表示。 |
 | `show_timing_feedback` | bool; `true` | バーとは別にFAST/SLOW文字を表示。 |
 | `show_timing_bar` | bool; `true` | タイミングバーを表示。旧設定で省略時は文字のスイッチを継承。 |
+| `timing_bar_always_visible` | bool; `false` | `true`で目盛りを常時表示、`false`でPG以外の判定後0.75秒間表示。文字・現在の誤差は直後のPGでも消えず0.75秒維持。バーのオン・オフは`show_timing_bar`で設定。 |
 | `timing_feedback_override` | bool; `false` | ユーザーが表示を変更した後はプロファイルの設定をスキンより優先。 |
 | `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | 文字とバーの独立X移動。従来の判定周辺配置に加える1920x1080基準ピクセル。 |
 | `timing_text_offset_y`, `timing_bar_offset_y` | double: `-400..400`; `0` | 文字とバーの独立Y移動。正は下、負は上。 |
@@ -287,7 +288,8 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst の明るさ。0 で無効。 |
 | `key_pulse_enabled` | bool; `true` | 旧版 ON/OFF 互換。false または明るさ 0 で無効。 |
 | `hit_burst_style` | `prism`, `ring`, `spark`; `prism` | 内蔵 Hit Burst の形。 |
-| `hud_layout` | `classic`, `studio`; `studio` | Native のソロプレイ用 HUD。キーのない既存プロファイルも既定値 `studio` を使い、Options › Skins で Classic に戻せます。画像スキン・ゴースト対戦・マルチプレイは従来の配置を維持。不明な値は `studio`。 |
+| `hud_layout` | `classic`, `studio`; `studio` | Native・取り込んだ LR2 スキンのソロプレイ用 HUD。LR2 のノート・キー・ギア画像と比率は維持します。キーのない既存プロファイルも既定値 `studio` を使い、Options › Skins で Classic に戻せます。他の画像スキン・ゴースト対戦・マルチプレイは従来の配置を維持。不明な値は `studio`。 |
+| `hud_riff_map_visible` | bool; `true` | スタジオデッキのフィールド左側のノート密度グラフと時計を表示します。Options › Skins › Studio Riff Map で変更し、プロファイル・スキンプリセットに保存します。クラシック HUD には影響しません。 |
 | `ui_font` | `default`, `malgun`, `bahnschrift`, `consolas`; `default` | メニューの書体。default は Segoe UI。ロゴ・ランク・コンボ専用書体は維持。 |
 | `key_label_position` | `bottom`, `top`, `off`; `bottom` | レーンのキー名表示位置。 |
 | `judgement_line_position` | double: `0..1`; `0.82` | 判定線の縦位置比率。 |

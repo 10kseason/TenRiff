@@ -7,7 +7,7 @@ Current behavior below targets client 1.7.2. The collapsed early blueprint is no
 - Home: `Play / Multiplayer / Options / Exit`; the first action becomes `Add Songs Folder` when no charts are indexed.
 - Song Select: top tabs `Songs / Sources / Records / Session Mix / Options`, with `Search / Sort·Filter / Difficulty Table` below the center panel. The old left-side KEY/menu rail is no longer the native layout.
 - Difficulty-table card: the name/URL area opens an editor; `File` selects local JSON; `Reset` restores native LV. Enter applies, Esc cancels, and invalid addresses preserve the current table. The Filters row shares the same import path.
-- Options: ten cards in five columns and two rows: Key Mode, Keymap, Skins, Graphics, Audio, Input, Calibration, Profile Setup, Mods and Key Test.
+- Options: eight cards in four columns and two rows: Key Mode Settings, Keymap, Skins, Graphics, Audio, Input, Calibration and Profile Setup. Open the full Mod Manager from Mods inside Key Mode Settings, and the key input test from NKRO Test inside Keymap. All detailed settings and test functions remain available.
 - Shared settings: arrows select/adjust; Enter activates the selected item; Esc/Backspace goes back. Long help uses page buttons, while Skin Settings keeps a live preview.
 - Keymap: supports 4K–10K, 12K, 14K and 16K; successful binding changes save immediately.
 - Results: Space skips the single-player reveal. Once ready, R/Left retries, F1 opens replay, and Enter/Esc/Backspace returns. In Session Mix, Enter advances and Esc/Backspace ends the session. Multiplayer results return to the lobby.

@@ -499,3 +499,23 @@ TEST_CASE("gameplay hud revisions refresh motion for held lane state") {
     CHECK(diff.motion_changed);
     CHECK_FALSE(diff.text_changed);
 }
+
+TEST_CASE("retained timing expiry invalidates HUD text independently of unchanged PG feedback") {
+    tenriff::app::GameplayHudRevisionInput before;
+    before.has_feedback = true;
+    before.feedback = tenriff::game::Judgement::PG;
+    before.has_timing_feedback = before.has_non_pg_feedback = true;
+    before.timing_feedback_delta_ms = -25.0;
+    auto after = before;
+    after.has_timing_feedback = after.has_non_pg_feedback = false;
+    after.timing_feedback_delta_ms = 0.0;
+    const auto changed = tenriff::app::diff_gameplay_hud_revisions(before, after);
+    CHECK(changed.text_changed);
+    CHECK(changed.motion_changed);
+    before = after;
+    after.ghost_has_timing_feedback = after.ghost_has_non_pg_feedback = true;
+    after.ghost_timing_feedback_delta_ms = 40.0;
+    const auto ghost = tenriff::app::diff_gameplay_hud_revisions(before, after);
+    CHECK(ghost.text_changed);
+    CHECK(ghost.motion_changed);
+}

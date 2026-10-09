@@ -23,7 +23,7 @@ constexpr std::array<MenuScreenDescriptor, 21> kDescriptors{{
     {Screen::SettingsSkins, "Skin Settings", "스킨 설정", "settings_skins", "settings", Snapshot::Generic, Generic::SkinSettings, true, true},
     {Screen::SettingsInput, "Input Settings", "입력 설정", "settings_input", "settings", Snapshot::Generic, Generic::InputSettings, true, true},
     {Screen::SettingsCalibration, "Calibration Wizard", "캘리브레이션 위저드", "settings_calibration", "settings", Snapshot::Generic, Generic::CalibrationSettings, true, true},
-    {Screen::ModeSelect, "Mode Select", "모드 설정", "mode_select", "", Snapshot::Generic, Generic::ModeSettings, true, true},
+    {Screen::ModeSelect, "Key Mode Settings", "키 모드 설정", "mode_select", "", Snapshot::Generic, Generic::ModeSettings, true, true},
     {Screen::ModeMods, "Mod Manager", "모드 관리자", "mode_mods", "", Snapshot::Generic, Generic::ModManager, true, true},
     {Screen::Keymap, "Keymap", "키 설정", "keymap", "", Snapshot::Generic, Generic::Keymap, true, false},
     {Screen::KeymapConfirm, "Keymap Confirm", "키 설정 확인", "keymap_confirm", "", Snapshot::Generic, Generic::KeymapConfirm, true, true},

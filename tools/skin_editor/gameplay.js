@@ -174,18 +174,23 @@
     const life=animate?Math.max(0,1-phase*500/motion.combo_duration_ms):0,scale=1+(motion.combo_scale-1)*life;
     ctx.save();ctx.translate(960,324);ctx.scale(scale,scale);ctx.translate(-960,-324);
     label('combo','147',[920,290+motion.combo_lift*life,1080,348+motion.combo_lift*life]);ctx.restore();
-    // Independent switches retain legacy single-switch behavior when bar is absent.
-    const errorMs=grade%2?-28:24;
-    if(grade!==0&&judgementAlpha>0){
-      if(style.show_timing_feedback!==false) label('timing_label',(errorMs<0?'FAST ':'SLOW ')+Math.abs(errorMs)+' ms',[858,258,1150,280],'body',errorMs<0?c.timing_fast:c.timing_slow,judgementAlpha);
-      if((style.show_timing_bar??style.show_timing_feedback)!==false){
+    // Half-second sample hits use the same 0.75s guidance lifetime as the client.
+    // The last non-PG survives the first PG at the next grade transition.
+    const hitTime=animate?Math.floor(tick*2)/2:0;
+    const currentNonPg=grade!==0;
+    const lastNonPgTime=currentNonPg?hitTime:Math.floor(tick/15)*15-.5;
+    const timingVisible=animate&&lastNonPgTime>=0&&tick-lastNonPgTime<=.75;
+    const timingGrade=currentNonPg?grade:4;
+    const errorMs=timingGrade%2?-28:24;
+    if(timingVisible&&style.show_timing_feedback!==false)
+      label('timing_label',(errorMs<0?'FAST ':'SLOW ')+Math.abs(errorMs)+' ms',[858,242,1150,268],'body',errorMs<0?c.timing_fast:c.timing_slow,1);
+    if((style.show_timing_bar??style.show_timing_feedback)!==false&&(style.timing_bar_always_visible===true||timingVisible)){
       const timing=adjusted([960-m.timing_half_width,275,960+m.timing_half_width,275+m.timing_height],native.rects.timing);
       const center=(timing[0]+timing[2])/2,half=(timing[2]-timing[0])/2;
       box(timing,c.timing,.25);box([center-1,timing[1]-4,center+1,timing[3]+4],c.timing);
-      for(const ms of [-27,-12,8,19]){const x=center+clamp(ms/m.timing_range_ms,-1,1)*half;
+      if(timingVisible)for(const ms of [-27,-12,8,errorMs]){const x=center+clamp(ms/m.timing_range_ms,-1,1)*half;
         box([x-1,timing[1]-2,x+1,timing[3]+2],ms<0?c.timing_fast:c.timing_slow,.8);
       }
-    }
     }
     if(style.gear)art(style.gear,[left,0,right,bottom],opacity);
   }

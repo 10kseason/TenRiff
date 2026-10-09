@@ -7,7 +7,7 @@
 - ホーム: `Play / Multiplayer / Options / Exit`。譜面がなければ先頭は `Add Songs Folder`。
 - 選曲: 上部 `Songs / Sources / Records / Session Mix / Options`、中央下部 `Search / Sort·Filter / Difficulty Table`。旧左側 KEY/メニューレールは現在の標準配置ではありません。
 - 難易度表カード: 名前・URL 部分で編集、File でローカル JSON、Reset で標準 LV。Enter で適用、Esc で取消。不正な URL では現在の表を保持します。Filters の行も同じ取込経路を使用。
-- Options: 5列×2行の10カード。Key Mode、Keymap、Skins、Graphics、Audio、Input、Calibration、Profile Setup、Mods、Key Test。
+- Options: 4列×2行の8カード。キーモード設定、Keymap、Skins、Graphics、Audio、Input、Calibration、Profile Setup。モード管理はキーモード設定のModsから、入力テストはKeymapのNKRO Testから開きます。詳細設定とテスト機能は維持されます。
 - 共通設定: 方向キーで選択・調整、Enter で項目の操作、Esc/Backspace で戻る。長い案内はページボタンを使用し、スキン設定ではライブプレビューを維持。
 - キーマップ: 4K–10K、12K、14K、16K。割当成功時に即保存。
 - 結果: 単人の表示演出は Space でスキップ。操作可能後は R/Left で再試行、F1 でリプレイ、Enter/Esc/Backspace で戻る。Session Mix は Enter で次曲、Esc/Backspace で終了。マルチ結果はロビーへ戻ります。

@@ -27,15 +27,15 @@
                 native_menu_assets::kLatency, native_menu_assets::kProfile, native_menu_assets::kSliders,
                 native_menu_assets::kKeytest};
             const float gap = native_metric("options_grid.gap", 22.0f);
-            const float width = (right - left - gap * 4.0f) / 5.0f;
+            const float width = (right - left - gap * 3.0f) / 4.0f;
             const float height = native_metric("options_grid.height", 270.0f);
             const float radius = std::clamp(native_metric("options_grid.radius", 12.0f), 0.0f, 32.0f);
             std::size_t selected = 0;
             for (std::size_t i = 0; i < data.generic.rows.size(); ++i) {
                 const auto& row = data.generic.rows[i];
                 if (row.selected) selected = i;
-                const float x = left + static_cast<float>(i % 5) * (width + gap);
-                const float y = top + 40.0f + static_cast<float>(i / 5) * (height + gap);
+                const float x = left + static_cast<float>(i % 4) * (width + gap);
+                const float y = top + 40.0f + static_cast<float>(i / 4) * (height + gap);
                 const D2D1_RECT_F rect = native_rect("options_grid.rect.001", D2D1::RectF(x, y, x + width, y + height));
                 const auto rr = D2D1::RoundedRect(rect, radius, radius);
                 const auto saved = d2d_->card_brush->GetColor();

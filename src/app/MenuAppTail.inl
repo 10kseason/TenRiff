@@ -151,9 +151,11 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         config_.skin.show_gear_boundary_line);
     const auto timing_visibility = resolve_timing_feedback_visibility(config_.skin,
         manifest_style ? manifest_style->show_timing_feedback : std::optional<bool>{},
-        manifest_style ? manifest_style->show_timing_bar : std::optional<bool>{});
+        manifest_style ? manifest_style->show_timing_bar : std::optional<bool>{},
+        manifest_style ? manifest_style->timing_bar_always_visible : std::optional<bool>{});
     target.show_timing_feedback = timing_visibility.text;
     target.show_timing_bar = timing_visibility.bar;
+    target.timing_bar_always_visible = timing_visibility.always_visible;
     target.note_fade_in = config_.skin.note_fade_in;
     target.note_fade_out = config_.skin.note_fade_out;
     target.timing_text_offset_x = config_.skin.timing_text_offset_x;
@@ -188,6 +190,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
                                  ? *manifest_style->hit_burst_style
                                  : config::normalize_skin_hit_burst_style_token(config_.skin.hit_burst_style);
     target.hud_layout = config::normalize_skin_hud_layout_token(config_.skin.hud_layout);
+    target.hud_riff_map_visible = config_.skin.hud_riff_map_visible;
     target.key_label_position = manifest_style && manifest_style->key_label_position.has_value()
                                     ? *manifest_style->key_label_position
                                     : config::normalize_skin_key_label_position_token(config_.skin.key_label_position);
@@ -264,6 +267,9 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.has_feedback = gameplay_hud_.has_feedback;
     target.feedback = judgement_label(gameplay_hud_.feedback);
     target.feedback_delta_ms = gameplay_hud_.feedback_delta_ms;
+    target.has_non_pg_feedback = gameplay_hud_.has_non_pg_feedback;
+    target.has_timing_feedback = gameplay_hud_.has_timing_feedback;
+    target.timing_feedback_delta_ms = gameplay_hud_.timing_feedback_delta_ms;
     target.timing_history_count = gameplay_hud_.timing_history_count;
     target.timing_history_delta_ms.fill(0.0);
     std::copy_n(gameplay_hud_.timing_history_delta_ms.begin(),
@@ -451,6 +457,8 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         target.gauge = target.peer_gauge;
         target.gauge_label = ui_text("OPPONENT", "\uC0C1\uB300");
         target.has_feedback = false;
+        target.has_non_pg_feedback = false;
+        target.has_timing_feedback = false;
         target.timing_history_count = 0;
         target.lane_activity_count = 0;
         target.lane_pressed_count = 0;
@@ -483,6 +491,9 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.ghost_has_feedback = gameplay_hud_.ghost_has_feedback;
     target.ghost_feedback = judgement_label(gameplay_hud_.ghost_feedback);
     target.ghost_feedback_delta_ms = gameplay_hud_.ghost_feedback_delta_ms;
+    target.ghost_has_non_pg_feedback = gameplay_hud_.ghost_has_non_pg_feedback;
+    target.ghost_has_timing_feedback = gameplay_hud_.ghost_has_timing_feedback;
+    target.ghost_timing_feedback_delta_ms = gameplay_hud_.ghost_timing_feedback_delta_ms;
     target.ghost_timing_history_count = gameplay_hud_.ghost_timing_history_count;
     target.ghost_timing_history_delta_ms.fill(0.0);
     std::copy_n(gameplay_hud_.ghost_timing_history_delta_ms.begin(),
@@ -548,6 +559,7 @@ void MenuApp::update_gameplay_loading_state(int percent, std::string_view stage)
         const GameplayHudRevisionFlags diff = diff_gameplay_hud_revisions(previous, next);
         advance_gameplay_hud_revisions(gameplay_hud_, diff.motion_changed, false);
     }
+    render_thread_.update_config(current_render_config());
     publish_snapshot();
 }
 
@@ -1542,7 +1554,7 @@ void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render
     } else if (generic_view == menu::GenericViewKind::OptionsHub) {
         render.generic.card_grid = true;
         const auto selected_option = options_hub_controller_.cursor();
-        append_menu_row(render.generic, ui_text("KEY MODE", "키 모드"),
+        append_menu_row(render.generic, ui_text("KEY MODE SETTINGS", "키 모드 설정"),
                         ui_key_mode_label(config_.mode.key_mode),
                         selected_option == menu::OptionsItemId::KeyMode,
                         render::MenuHitTargetKind::OptionsItem,
@@ -1582,15 +1594,9 @@ void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render
                         selected_option == menu::OptionsItemId::ProfileSetup,
                         render::MenuHitTargetKind::OptionsItem,
                         static_cast<int>(menu::OptionsItemId::ProfileSetup), true, false);
-        append_menu_row(render.generic, ui_text("MODS", "모드 설정"), ui_text("Configure", "설정"),
-                        selected_option == menu::OptionsItemId::Mods, render::MenuHitTargetKind::OptionsItem,
-                        static_cast<int>(menu::OptionsItemId::Mods), true, false);
-        append_menu_row(render.generic, ui_text("KEY TEST", "키 입력 테스트"), ui_text("Test", "테스트"),
-                        selected_option == menu::OptionsItemId::KeyTest, render::MenuHitTargetKind::OptionsItem,
-                        static_cast<int>(menu::OptionsItemId::KeyTest), true, false);
         render.generic.card_descriptions = {
-            ui_text("Choose the play key mode. The current mode is shown prominently on this first card.",
-                    "플레이 키 모드를 선택합니다. 현재 모드는 첫 카드에 크게 표시됩니다."),
+            ui_text("Set key mode, conversion and gameplay modifiers together. Open Mods here for every modifier category.",
+                    "키 모드, 변환, 플레이 옵션을 함께 설정합니다. 안쪽의 모드 항목에서 모든 모드 종류를 조절합니다."),
             ui_text("Assign gameplay keys and test the current mapping.",
                     "게임 키를 지정하고 현재 키 배치를 테스트합니다."),
             ui_text("Import and tune TenRiff or LR2 skins, notes, LN colour, and hit bursts.",
@@ -1605,8 +1611,6 @@ void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render
                     "오디오·비주얼 타이밍을 보정합니다. 비주얼 레이턴시는 1ms씩 조절됩니다."),
             ui_text("Change profile name, avatar, and device setup.",
                     "프로필 이름, 아바타, 장치 설정을 변경합니다."),
-            ui_text("Choose gameplay modifiers and review the score multiplier.", "플레이 모드와 점수 배율을 확인합니다."),
-            ui_text("Check simultaneous key presses with the current key mapping.", "현재 키 배치로 동시 입력을 확인합니다."),
         };
     } else {
         switch (generic_view) {
@@ -2197,7 +2201,6 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     reset_screen(Screen::Gameplay);
     last_gameplay_input_backend_state_ =
         input_backend_fallback_policy_.runtime_state(config_.input.rawinput);
-    apply_runtime_graphics_config();
     {
         std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
         reset_gameplay_hud_state(gameplay_hud_);
@@ -2205,6 +2208,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.loading_percent = 0;
         gameplay_hud_.loading_stage = "Preparing gameplay";
     }
+    apply_runtime_graphics_config();
     publish_snapshot();
 
     input_thread_.stop();
@@ -2293,6 +2297,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
             peer_revision = peer_session_.snapshot().revision;
         }
         std::unique_lock<std::mutex> lock(gameplay_hud_mutex_);
+        const bool was_loading = gameplay_hud_.loading;
         const GameplayHudRevisionInput previous = gameplay_hud_revision_input(gameplay_hud_);
 
 
@@ -2355,6 +2360,9 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.has_feedback = hud.has_feedback;
         gameplay_hud_.feedback = hud.feedback_judgement;
         gameplay_hud_.feedback_delta_ms = hud.feedback_delta_ms;
+        gameplay_hud_.has_non_pg_feedback = hud.has_non_pg_feedback;
+        gameplay_hud_.has_timing_feedback = hud.has_timing_feedback;
+        gameplay_hud_.timing_feedback_delta_ms = hud.timing_feedback_delta_ms;
         gameplay_hud_.peer_revision = peer_revision;
         gameplay_hud_.timing_history_count = hud.timing_history_count;
         gameplay_hud_.timing_history_delta_ms.fill(0.0);
@@ -2397,6 +2405,9 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.ghost_has_feedback = hud.ghost_has_feedback;
         gameplay_hud_.ghost_feedback = hud.ghost_feedback_judgement;
         gameplay_hud_.ghost_feedback_delta_ms = hud.ghost_feedback_delta_ms;
+        gameplay_hud_.ghost_has_non_pg_feedback = hud.ghost_has_non_pg_feedback;
+        gameplay_hud_.ghost_has_timing_feedback = hud.ghost_has_timing_feedback;
+        gameplay_hud_.ghost_timing_feedback_delta_ms = hud.ghost_timing_feedback_delta_ms;
         gameplay_hud_.ghost_timing_history_count = hud.ghost_timing_history_count;
         gameplay_hud_.ghost_timing_history_delta_ms.fill(0.0);
         std::copy_n(hud.ghost_timing_history_delta_ms.begin(),
@@ -2432,6 +2443,11 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         const GameplayHudRevisionFlags diff = diff_gameplay_hud_revisions(previous, next);
         advance_gameplay_hud_revisions(gameplay_hud_, diff.motion_changed, diff.text_changed);
         lock.unlock();
+        if (was_loading) {
+            // Restore the selected pacing before countdown/play; never persist
+            // the temporary loading cap or change the display/present mode.
+            render_thread_.update_config(current_render_config());
+        }
 
         drain_gameplay_chat_input();
 
@@ -3003,7 +3019,7 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                                     "변경 사항은 즉시 저장되므로 다음 플레이에도 같은 보정값이 적용됩니다.");
             return;
         case Screen::ModeSelect:
-            target.title = ui_text("Mode Settings", "모드 설정");
+            target.title = ui_text("Key Mode Settings", "키 모드 설정");
             target.lines = {
                 ui_text("Up / Down or the mouse wheel selects a row. Long lists show a clickable scrollbar on the right.",
                         "위 / 아래 키 또는 마우스 휠로 행을 선택합니다. 긴 목록은 오른쪽의 클릭 가능한 스크롤바를 표시합니다."),
@@ -3033,8 +3049,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                 ui_text("Final score uses the lowest multiplier between the current Rate and all active mods.",
                         "최종 점수는 현재 Rate와 활성 모드 중 가장 낮은 배율을 사용합니다."),
             };
-            target.footer = ui_text("Enter, Esc, or Backspace returns to Mode Settings.",
-                                    "Enter, Esc, Backspace로 모드 설정으로 돌아갑니다.");
+            target.footer = ui_text("Enter, Esc, or Backspace returns to Key Mode Settings.",
+                                    "Enter, Esc, Backspace로 키 모드 설정으로 돌아갑니다.");
             return;
         case Screen::Keymap:
             target.title = ui_text("Keymap Help", "키 설정 도움말");
@@ -3048,8 +3064,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                 ui_text("When you opened Keymap from Song Select, the editor defaults to the selected chart's key mode.",
                         "Song Select에서 Keymap을 열면 선택한 차트의 키 모드가 기본 편집 대상으로 잡힙니다."),
             };
-            target.footer = ui_text("Duplicate lane bindings are allowed. Esc or Backspace returns.",
-                                    "같은 키를 여러 레인에 중복으로 배치할 수 있습니다. Esc 또는 Backspace로 돌아갑니다.");
+            target.footer = ui_text("An assigned key moves to its new slot. Esc or Backspace returns.",
+                                    "이미 지정한 키는 새 위치로 옮겨집니다. Esc 또는 Backspace로 돌아갑니다.");
             return;
         case Screen::KeymapTest:
             target.title = "NKRO Test";

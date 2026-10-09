@@ -279,6 +279,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `show_gear_boundary_line` | bool; `false` | 显示轨道面板边界线。 |
 | `show_timing_feedback` | bool; `true` | 独立显示 FAST/SLOW 文字。 |
 | `show_timing_bar` | bool; `true` | 显示时机条；旧配置缺少此字段时继承文字开关。 |
+| `timing_bar_always_visible` | bool; `false` | `true`始终显示刻度，`false`在非PG判定后显示0.75秒。文字和当前误差标记保留0.75秒，之后的PG不会清除。`show_timing_bar`仍单独控制开关。 |
 | `timing_feedback_override` | bool; `false` | 用户修改开关后，配置中的显示选项优先于皮肤。 |
 | `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | 文字和条的独立 X 偏移，叠加于原判定布局，以 1920x1080 像素为基准。 |
 | `timing_text_offset_y`, `timing_bar_offset_y` | double: `-400..400`; `0` | 文字和条的独立 Y 偏移；正值向下。 |
@@ -287,7 +288,8 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst 亮度；0 为关闭。 |
 | `key_pulse_enabled` | bool; `true` | 旧版开关兼容；false 或亮度为 0 时关闭。 |
 | `hit_burst_style` | `prism`, `ring`, `spark`; `prism` | 内置 Hit Burst 样式。 |
-| `hud_layout` | `classic`, `studio`; `studio` | Native 单人游戏的 HUD 样式。缺少此键的旧配置也默认使用 `studio`，可在 Options › Skins 选择 Classic。图像皮肤、幽灵对战和多人游戏保持原有布局。未知值使用 `studio`。 |
+| `hud_layout` | `classic`, `studio`; `studio` | Native 或导入 LR2 皮肤的单人游戏 HUD 样式。保留 LR2 音符、按键、边框图像和比例。缺少此键的旧配置也默认使用 `studio`，可在 Options › Skins 选择 Classic。其他图像皮肤、幽灵对战和多人游戏保持原有布局。未知值使用 `studio`。 |
+| `hud_riff_map_visible` | bool; `true` | 显示 Studio Deck 场地左侧的音符密度图和时钟。在 Options › Skins › Studio Riff Map 中修改，并保存到配置和皮肤预设。Classic HUD 不受影响。 |
 | `ui_font` | `default`, `malgun`, `bahnschrift`, `consolas`; `default` | 菜单字体；default 为 Segoe UI，标志、等级与连击保留专用字体。 |
 | `key_label_position` | `bottom`, `top`, `off`; `bottom` | 轨道按键名称位置。 |
 | `judgement_line_position` | double: `0..1`; `0.82` | 判定线纵向位置比例。 |

@@ -45,12 +45,16 @@ inline GameplayHudData make_skin_gameplay_preview(const SkinPreviewData& preview
     hud.has_feedback = true;
     hud.feedback = "GR";
     hud.feedback_delta_ms = -18.0;
+    hud.has_non_pg_feedback = true;
+    hud.has_timing_feedback = true;
+    hud.timing_feedback_delta_ms = -18.0;
     hud.timing_history_count = 3;
     hud.timing_history_delta_ms = {-24.0, 12.0, -18.0};
     hud.gauge = 75.0;
     hud.gauge_label = "NORMAL";
     hud.show_timing_feedback = preview.show_timing_feedback;
     hud.show_timing_bar = preview.show_timing_bar;
+    hud.timing_bar_always_visible = preview.timing_bar_always_visible;
     hud.note_fade_in = preview.note_fade_in;
     hud.note_fade_out = preview.note_fade_out;
     hud.timing_text_offset_x = preview.timing_text_offset_x;
@@ -91,6 +95,7 @@ inline GameplayHudData make_skin_gameplay_preview(const SkinPreviewData& preview
     hud.key_backdrop_height = preview.key_backdrop_height;
     hud.hit_burst_style = preview.hit_burst_style;
     hud.hud_layout = preview.hud_layout;
+    hud.hud_riff_map_visible = preview.hud_riff_map_visible;
     hud.key_label_position = preview.key_label_position;
     hud.note_border_enabled = preview.note_border_enabled;
     hud.note_shape = preview.note_shape;

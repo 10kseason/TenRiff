@@ -5,6 +5,7 @@
 #include "timing/HighResClock.h"
 #include "app/PeerBattleRuntimeRules.h"
 #include "app/TenRiffSkin.h"
+#include "app/Lr2Skin.h"
 #include "app/MenuApp.h"
 #include "config/Config.h"
 #include "config/GraphicsResolution.h"
@@ -24,6 +25,7 @@
 #include <cctype>
 #include <cmath>
 #include <iostream>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -112,6 +114,7 @@ struct MenuAppVisualTestAccess {
         skin.judgement_offset_x = preview.judgement_offset_x;
         skin.show_timing_feedback = preview.show_timing_feedback;
         skin.show_timing_bar = preview.show_timing_bar;
+        skin.timing_bar_always_visible = preview.timing_bar_always_visible;
         skin.timing_feedback_override = true;
         skin.timing_text_offset_x = preview.timing_text_offset_x;
         skin.note_fade_in = preview.note_fade_in;
@@ -135,6 +138,7 @@ struct MenuAppVisualTestAccess {
         skin.key_backdrop_height = preview.key_backdrop_height;
         skin.hit_burst_style = preview.hit_burst_style;
         skin.hud_layout = preview.hud_layout;
+        skin.hud_riff_map_visible = preview.hud_riff_map_visible;
         skin.key_label_position = preview.key_label_position;
         skin.note_border_enabled = preview.note_border_enabled;
         skin.note_shape = preview.note_shape;
@@ -152,13 +156,19 @@ struct MenuAppVisualTestAccess {
             const auto index = static_cast<std::size_t>(preview.lane_count - 1);
             app->active_tenriff_skin_modes_[index] = *imported;
             app->active_tenriff_gameplay_modes_[index] = preview.resolved_tenriff_skin;
+        } else if (preview.skin_source == "lr2") {
+            skin.source = "lr2";
+            skin.lr2_skin_name = preview.external_skin_name;
+            app->available_lr2_skin_names_ = {skin.lr2_skin_name};
+            app->available_lr2_skin_root_ = preview.external_skin_root;
         }
         config::KeymapManager keymap_manager;
         app->keymap_ = keymap_manager.default_keymap();
         app->skin_settings_controller_.reset(mode);
         if (selected_row >= 0) {
-            if (const auto id = menu::settings::skin_setting_id_at(static_cast<std::size_t>(selected_row), false))
-                static_cast<void>(app->skin_settings_controller_.select(*id, false));
+            const bool lr2_source = skin.source == "lr2";
+            if (const auto id = menu::settings::skin_setting_id_at(static_cast<std::size_t>(selected_row), lr2_source))
+                static_cast<void>(app->skin_settings_controller_.select(*id, lr2_source));
         }
         render::MenuRenderData actual;
         actual.ui_language = source.ui_language;
@@ -184,6 +194,21 @@ struct MenuWindowVisualTestAccess {
     }
     static void benchmark(MenuWindow& window, bool enabled) { window.benchmark_timings_enabled_ = enabled; }
     static bool fullscreen(const MenuWindow& window) { return window.fullscreen_; }
+    static std::array<bool, 2> studio_hud_flags(const MenuWindow& window) {
+        return {window.gameplay_static_cache_.studio, window.gameplay_static_cache_.hud_riff_map_visible};
+    }
+    static config::JsonValue song_title_stats(const MenuWindow& window) {
+        using namespace config;
+        const auto& t = window.benchmark_song_title_;
+        return JsonValue(JsonObject{
+            {"left", JsonValue(t.left)}, {"top", JsonValue(t.top)},
+            {"right", JsonValue(t.right)}, {"bottom", JsonValue(t.bottom)},
+            {"field_left", JsonValue(t.field_left)}, {"field_right", JsonValue(t.field_right)},
+            {"font_size", JsonValue(t.font_size)}, {"text_width", JsonValue(t.text_width)},
+            {"text_height", JsonValue(t.text_height)}, {"characters", JsonValue(static_cast<double>(t.characters))},
+            {"line_count", JsonValue(static_cast<double>(t.line_count))},
+            {"layout_builds", JsonValue(static_cast<double>(t.layout_builds))}});
+    }
     static std::array<int64_t, 2> present_times(const MenuWindow& window) {
         return {window.benchmark_present_started_ns_, window.benchmark_present_ended_ns_};
     }
@@ -201,7 +226,7 @@ struct MenuWindowVisualTestAccess {
         const bool skin_fixture = source.kind == MenuScreenKind::GenericList &&
             source.generic.heading == ui::text(source.ui_language, "Skin Settings", "스킨 설정");
         const bool inner_settings_fixture = source.kind == MenuScreenKind::GenericList &&
-            (source.generic.heading == ui::text(source.ui_language, "Mode Settings", "모드 설정") ||
+            (source.generic.heading == ui::text(source.ui_language, "Key Mode Settings", "키 모드 설정") ||
              source.generic.heading == ui::text(source.ui_language, "Graphics Settings", "그래픽 설정"));
         const bool song_fixture = source.kind == MenuScreenKind::SongSelect;
         const bool result_fixture = source.kind == MenuScreenKind::ResultScreen && !source.result.peer_battle;
@@ -405,6 +430,8 @@ int main(int argc, char** argv) {
     bool auto_scratch_hidden = false;
     bool pacemaker_fixture = false;
     std::string hud_style = "studio";
+    bool riff_map_visible = true;
+    int toggle_riff_map_frame = -1;
     std::string fixture_gauge = "NORMAL";
     double fixture_gauge_value = 75.0;
     std::string fixture_pacemaker_mode;
@@ -416,6 +443,7 @@ int main(int argc, char** argv) {
     bool resume_countdown = false;
     bool no_feedback = false;
     bool timing_text_off = false, timing_bar_off = false;
+    bool timing_bar_always = false;
     double timing_text_x = 0, timing_text_y = 0, timing_bar_x = 0, timing_bar_y = 0;
     bool search_active = false;
     std::string search_query;
@@ -425,6 +453,8 @@ int main(int argc, char** argv) {
     std::string preview_note_shape, preview_hit_burst;
     double fade_in = 0.0, fade_out = 0.0;
     double field_offset = 0;
+    std::string song_title_file;
+    std::optional<std::array<double, 2>> next_field_layout;
     int players = 0;
     int preview_fps = 144;
     int benchmark_frames = 0;
@@ -457,6 +487,7 @@ int main(int argc, char** argv) {
     double fixture_seconds = -1.0;
     bool fixture_idle = false;
     int fixed_grade = -1;
+    std::string timing_feedback_case;
     bool moved_labels = false;
     bool empty = false;
     bool failed = false;
@@ -500,6 +531,7 @@ int main(int argc, char** argv) {
     bool cycle_selection = false;
     std::vector<int> capture_frames;
     std::string skin_folder;
+    std::string lr2_skin_folder;
     std::optional<tenriff::app::TenRiffSkinDefinition> fixture_skin;
     std::string avatar_path;
     MenuRenderData data;
@@ -523,6 +555,8 @@ int main(int argc, char** argv) {
         else if (arg == "--hold-opacity" && i + 1 < argc) fixture_hold_opacity = std::clamp(std::stod(argv[++i]), 0.0, 1.0);
         else if (arg == "--disabled-setting" && i + 1 < argc) disabled_setting = std::stoi(argv[++i]);
         else if (arg == "--auto-scratch-hidden") auto_scratch_hidden = true;
+        else if (arg == "--riff-map-off") riff_map_visible = false;
+        else if (arg == "--toggle-riff-map-frame" && i + 1 < argc) toggle_riff_map_frame = std::stoi(argv[++i]);
         else if (arg == "--pacemaker-deficit") pacemaker_fixture = true;
         else if (arg == "--hud-style" && i + 1 < argc) {
             hud_style = argv[++i];
@@ -558,6 +592,14 @@ int main(int argc, char** argv) {
         else if (arg == "--hit-burst" && i + 1 < argc) preview_hit_burst = argv[++i];
         else if (arg == "--timing-text-off") timing_text_off = true;
         else if (arg == "--timing-bar-off") timing_bar_off = true;
+        else if (arg == "--timing-bar-always") timing_bar_always = true;
+        else if (arg == "--timing-feedback-case" && i + 1 < argc) {
+            timing_feedback_case = argv[++i];
+            if (timing_feedback_case != "retained-pg" && timing_feedback_case != "expired" &&
+                timing_feedback_case != "poor" && timing_feedback_case != "always-pg") {
+                std::cerr << "Unknown timing feedback fixture.\n"; return 2;
+            }
+        }
         else if (arg == "--timing-text-x" && i + 1 < argc) timing_text_x = std::stod(argv[++i]);
         else if (arg == "--timing-text-y" && i + 1 < argc) timing_text_y = std::stod(argv[++i]);
         else if (arg == "--timing-bar-x" && i + 1 < argc) timing_bar_x = std::stod(argv[++i]);
@@ -602,6 +644,7 @@ int main(int argc, char** argv) {
         else if (arg == "--cycle-selection") cycle_selection = true;
         else if (arg == "--frames" && i + 1 < argc) frame_limit = std::stoi(argv[++i]);
         else if (arg == "--skin" && i + 1 < argc) skin_folder = argv[++i];
+        else if (arg == "--lr2-skin" && i + 1 < argc) lr2_skin_folder = argv[++i];
         else if (arg == "--font-size" && i + 1 < argc)
             data.ui_text_scale = tenriff::config::menu_text_scale(argv[++i]);
         else if (arg == "--avatar" && i + 1 < argc) avatar_path = argv[++i];
@@ -651,6 +694,13 @@ int main(int argc, char** argv) {
         else if (arg == "--graphics-settings") settings = graphics_settings = true;
         else if (arg == "--skin-scene") { settings = skin_settings = skin_scene = true; }
         else if (arg == "--field-offset" && i + 1 < argc) field_offset = std::stod(argv[++i]);
+        else if (arg == "--song-title-file" && i + 1 < argc) song_title_file = argv[++i];
+        else if (arg == "--field-next" && i + 2 < argc) {
+            const double next_offset = std::stod(argv[++i]);
+            const double next_width = std::stod(argv[++i]);
+            if (!std::isfinite(next_offset) || !std::isfinite(next_width) || next_width < 0.5 || next_width > 2.0) return 2;
+            next_field_layout = std::array<double, 2>{next_offset, next_width};
+        }
         else if (arg == "--skin-settings") { settings = true; skin_settings = true; }
         else if (arg == "--empty") empty = true;
         else if (arg == "--failed") failed = true;
@@ -705,7 +755,7 @@ int main(int argc, char** argv) {
     if (settings) {
         data.kind = MenuScreenKind::GenericList;
         data.generic.heading = skin_settings ? loc("Skin Settings", "스킨 설정")
-                                             : loc("Mode Settings", "모드 설정");
+                                             : loc("Key Mode Settings", "키 모드 설정");
         data.generic.footer_notes = {preview_backend,
             loc("VIEW ONLY", "보기 전용") + " / " + loc("OFFLINE", "오프라인")};
         auto& preview = data.generic.skin_preview;
@@ -753,7 +803,7 @@ int main(int argc, char** argv) {
     }
     if (mode_settings || graphics_settings) {
         data.generic.heading = graphics_settings ? loc("Graphics Settings", "그래픽 설정")
-                                                : loc("Mode Settings", "모드 설정");
+                                                : loc("Key Mode Settings", "키 모드 설정");
         tenriff::app::MenuAppVisualTestAccess::populate_inner_settings(data, graphics_settings, selected_setting);
     }
     if (keymap_settings) {
@@ -977,18 +1027,16 @@ int main(int argc, char** argv) {
         data.generic = {};
         data.generic.heading = loc("Options", "옵션");
         data.generic.card_grid = true;
-        const std::array<std::string, 10> labels{
-            loc("KEY MODE", "키 모드"), loc("KEYMAP", "키 설정"), loc("SKINS", "스킨"),
+        const std::array<std::string, 8> labels{
+            loc("KEY MODE SETTINGS", "키 모드 설정"), loc("KEYMAP", "키 설정"), loc("SKINS", "스킨"),
             loc("GRAPHICS", "그래픽"), loc("AUDIO", "오디오"), loc("INPUT", "입력"),
-            loc("CALIBRATION", "레이턴시"), loc("PROFILE", "프로필"),
-            loc("MODS", "모드 설정"), loc("KEY TEST", "키 입력 테스트")};
-        const std::array<std::string, 10> values{
+            loc("CALIBRATION", "레이턴시"), loc("PROFILE", "프로필")};
+        const std::array<std::string, 8> values{
             "4K", loc("Configure", "설정"), "LR2", loc("Borderless", "테두리 없음"),
-            loc("High", "고성능"), "RawInput", "-43.0 ms", "default",
-            loc("Configure", "설정"), loc("Test", "테스트")};
-        const std::array<std::string, 10> descriptions{
-            loc("Choose the play key mode. The current mode is shown prominently on this first card.",
-                "플레이 키 모드를 선택합니다. 현재 모드는 첫 카드에 크게 표시됩니다."),
+            loc("High", "고성능"), "RawInput", "-43.0 ms", "default"};
+        const std::array<std::string, 8> descriptions{
+            loc("Set key mode, conversion and gameplay modifiers together. Open Mods here for every modifier category.",
+                "키 모드, 변환, 플레이 옵션을 함께 설정합니다. 안쪽의 모드 항목에서 모든 모드 종류를 조절합니다."),
             loc("Assign gameplay keys and test the current mapping.", "게임 키를 지정하고 현재 키 배치를 테스트합니다."),
             loc("Import and tune TenRiff or LR2 skins, notes, LN colour, and hit bursts.",
                 "TenRiff·LR2 스킨과 노트, 롱노트 색, 키 폭발을 설정합니다."),
@@ -999,10 +1047,8 @@ int main(int argc, char** argv) {
                 "입력 백엔드, 폴링, 판정 주기, 디바운스를 설정합니다."),
             loc("Calibrate audio and visual timing. Visual latency changes in 1 ms steps.",
                 "오디오·비주얼 타이밍을 보정합니다. 비주얼 레이턴시는 1ms씩 조절됩니다."),
-            loc("Change profile name, avatar, and device setup.", "프로필 이름, 아바타, 장치 설정을 변경합니다."),
-            loc("Choose gameplay modifiers and review the score multiplier.", "플레이 모드와 점수 배율을 확인합니다."),
-            loc("Check simultaneous key presses with the current key mapping.", "현재 키 배치로 동시 입력을 확인합니다.")};
-        for (int i = 0; i < 10; ++i) {
+            loc("Change profile name, avatar, and device setup.", "프로필 이름, 아바타, 장치 설정을 변경합니다.")};
+        for (int i = 0; i < 8; ++i) {
             MenuRowData row;
             row.label = labels[i]; row.value = values[i]; row.row_index = i;
             row.selected = i == 0; row.activatable = true; row.target_kind = MenuHitTargetKind::OptionsItem;
@@ -1032,6 +1078,11 @@ int main(int argc, char** argv) {
         hud.note_height_scale = preview_note_height;
         hud.gameplay_field_offset_x = field_offset;
         hud.active = true; hud.title = loc("Gameplay", "게임플레이") + " / " + loc("LIVE PREVIEW", "미리보기");
+        if (!song_title_file.empty()) {
+            std::ifstream file(std::filesystem::u8path(song_title_file), std::ios::binary);
+            if (!file) { std::cerr << "Cannot read the song title fixture.\n"; return 2; }
+            hud.title.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+        }
         hud.artist = loc("VIEW ONLY", "보기 전용") + " / " + loc("OFFLINE", "오프라인");
         hud.visual_velocity = 1.0 / 48000.0;
         if (moved_labels) {
@@ -1063,6 +1114,27 @@ int main(int argc, char** argv) {
         hud.versus_score_difference = lead.difference; hud.versus_score_position = lead.position;
         hud.timing_history_count = 3;
         hud.timing_history_delta_ms[0] = -12; hud.timing_history_delta_ms[1] = 9; hud.timing_history_delta_ms[2] = 28;
+    }
+    if (!lr2_skin_folder.empty()) {
+        if (!skin_folder.empty()) {
+            std::cerr << "Choose either --skin or --lr2-skin.\n";
+            return 2;
+        }
+        const auto folder = std::filesystem::absolute(std::filesystem::u8path(lr2_skin_folder));
+        const auto root = folder.parent_path().u8string();
+        const auto name = folder.filename().u8string();
+        if (!tenriff::app::resolve_lr2_play_skin(root, name, preview_keys).found) {
+            std::cerr << "LR2 fixture could not be resolved.\n";
+            return 3;
+        }
+        auto apply_lr2_skin = [&](auto& hud) {
+            hud.skin_source = "lr2";
+            hud.skin_revision = 1;
+            hud.external_skin_root = root;
+            hud.external_skin_name = name;
+        };
+        apply_lr2_skin(data.gameplay);
+        apply_lr2_skin(data.generic.skin_preview);
     }
     if (!skin_folder.empty()) {
         const auto skin = tenriff::app::load_tenriff_skin_folder(skin_folder, preview_keys);
@@ -1128,6 +1200,7 @@ int main(int argc, char** argv) {
         }
     }
     data.gameplay.hud_layout = data.generic.skin_preview.hud_layout = hud_style;
+    data.gameplay.hud_riff_map_visible = data.generic.skin_preview.hud_riff_map_visible = riff_map_visible;
     data.gameplay.combo_font_scale = data.generic.skin_preview.combo_font_scale = combo_font_scale;
     data.gameplay.note_width_scale = data.generic.skin_preview.note_width_scale = preview_note_width;
     if (fixture_hold_opacity >= 0)
@@ -1159,6 +1232,7 @@ int main(int argc, char** argv) {
     if (backdrop_height >= 0.0) data.generic.skin_preview.key_backdrop_height = backdrop_height;
     data.gameplay.show_timing_feedback = data.generic.skin_preview.show_timing_feedback = !timing_text_off;
     data.gameplay.show_timing_bar = data.generic.skin_preview.show_timing_bar = !timing_bar_off;
+    data.gameplay.timing_bar_always_visible = data.generic.skin_preview.timing_bar_always_visible = timing_bar_always;
     data.gameplay.timing_text_offset_x = data.generic.skin_preview.timing_text_offset_x = timing_text_x;
     data.gameplay.timing_text_offset_y = data.generic.skin_preview.timing_text_offset_y = timing_text_y;
     data.gameplay.timing_bar_offset_x = data.generic.skin_preview.timing_bar_offset_x = timing_bar_x;
@@ -1314,6 +1388,20 @@ int main(int argc, char** argv) {
             const int grade = fixed_grade >= 0 ? fixed_grade : (hit / 4) % 3;
             hud.feedback = grade == 0 ? "PG" : grade == 1 ? "GR" : "G";
             hud.feedback_delta_ms = hit % 2 == 0 ? -28.0 : 28.0;
+            hud.has_non_pg_feedback = hud.has_feedback && hud.feedback != "PG";
+            hud.has_timing_feedback = hud.has_non_pg_feedback;
+            hud.timing_feedback_delta_ms = hud.feedback_delta_ms;
+            if (!timing_feedback_case.empty()) {
+                const bool retained = timing_feedback_case == "retained-pg";
+                const bool poor = timing_feedback_case == "poor";
+                hud.has_feedback = true;
+                hud.feedback = poor ? "POOR" : "PG";
+                hud.feedback_delta_ms = 0;
+                hud.has_non_pg_feedback = retained || poor;
+                hud.has_timing_feedback = retained;
+                hud.timing_feedback_delta_ms = retained ? -28.0 : 0.0;
+                if (timing_feedback_case == "always-pg") hud.timing_bar_always_visible = true;
+            }
             hud.text_revision = static_cast<uint64_t>(hit + 1);
             hud.motion_revision++;
             hud.combo = 123 + hit; hud.pg = hit + 1;
@@ -1399,6 +1487,9 @@ int main(int argc, char** argv) {
                 hud.ghost_has_feedback = !no_feedback;
                 hud.ghost_feedback = hud.feedback;
                 hud.ghost_feedback_delta_ms = hud.feedback_delta_ms;
+                hud.ghost_has_non_pg_feedback = hud.has_non_pg_feedback;
+                hud.ghost_has_timing_feedback = hud.has_timing_feedback;
+                hud.ghost_timing_feedback_delta_ms = hud.timing_feedback_delta_ms;
                 hud.ghost_timing_history_count = hud.timing_history_count;
                 hud.ghost_timing_history_delta_ms = hud.timing_history_delta_ms;
                 hud.ghost_lane_activity_count = hud.lane_activity_count;
@@ -1417,6 +1508,14 @@ int main(int argc, char** argv) {
         if (cycle_font_scale && rendered_frames == 40) data.ui_text_scale = 1.4f;
         if (rendered_frames == 35 && !bga_next_path.empty())
             data.gameplay.background_base_path = bga_next_path;
+        if (rendered_frames == toggle_riff_map_frame) {
+            data.gameplay.hud_riff_map_visible = !data.gameplay.hud_riff_map_visible;
+            data.generic.skin_preview.hud_riff_map_visible = !data.generic.skin_preview.hud_riff_map_visible;
+        }
+        if (rendered_frames == 35 && next_field_layout) {
+            data.gameplay.gameplay_field_offset_x = (*next_field_layout)[0];
+            data.gameplay.note_width_scale = (*next_field_layout)[1];
+        }
         if (avatar_refresh_frame > 0 && rendered_frames == avatar_refresh_frame) ++data.profile_avatar_revision;
         if (cycle_selection) {
             const int selection = (rendered_frames / 45);
@@ -1598,8 +1697,12 @@ int main(int argc, char** argv) {
             {"keys", JsonValue(static_cast<double>(preview_keys))}, {"note_width", JsonValue(preview_note_width)},
             {"fixture_time", JsonValue(fixture_seconds)},
             {"hud_style", JsonValue(hud_style)},
+            {"skin_source", JsonValue(data.gameplay.skin_source)},
+            {"studio_hud_active", JsonValue(MenuWindowVisualTestAccess::studio_hud_flags(window)[0])},
+            {"riff_map_cached_visible", JsonValue(MenuWindowVisualTestAccess::studio_hud_flags(window)[1])},
             {"riff_map_count", JsonValue(static_cast<double>(data.gameplay.riff_map_count))},
             {"riff_map_revision", JsonValue(static_cast<double>(data.gameplay.riff_map_revision))},
+            {"song_title", MenuWindowVisualTestAccess::song_title_stats(window)},
             {"dense_notes", JsonValue(static_cast<double>(dense_notes))},
             {"dense_holds", JsonValue(dense_holds)}, {"tapered_holds", JsonValue(tapered_holds)},
             {"player_note_count", JsonValue(static_cast<double>(data.gameplay.note_count))},

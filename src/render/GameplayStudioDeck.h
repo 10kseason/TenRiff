@@ -26,14 +26,18 @@ struct GameplayStudioDeckLayout {
 };
 
 inline bool gameplay_studio_deck_enabled(std::string_view hud_layout,
-                                         bool use_imported_metrics,
+                                         std::string_view skin_source,
                                          bool ghost_visible,
                                          bool peer_visible) {
-    return hud_layout == "studio" && !use_imported_metrics && !ghost_visible && !peer_visible;
+    // LR2 imports keep their note/key/gear assets and geometry; only the HUD
+    // adopts the deck. Other image skins and shared battle HUDs remain classic.
+    return hud_layout == "studio" && (skin_source == "native" || skin_source == "lr2") &&
+           !ghost_visible && !peer_visible;
 }
 
 inline GameplayStudioDeckLayout compute_gameplay_studio_deck_layout(
-    float field_left, float field_right, float header_safe_right = 1856.0f) {
+    float field_left, float field_right, float header_safe_right = 1856.0f,
+    bool riff_map_visible = true) {
     GameplayStudioDeckLayout layout;
     layout.map_x = field_left - 80.0f;
     layout.left_width = std::max(260.0f, layout.map_x - layout.left_x - 70.0f);
@@ -43,7 +47,7 @@ inline GameplayStudioDeckLayout compute_gameplay_studio_deck_layout(
     // draw beneath the performance overlay after its safe edge moves left.
     layout.right_width = std::max(0.0f, std::min(1856.0f, header_safe_right) - layout.right_x);
     layout.right_hud_visible = layout.right_width >= 200.0f;
-    layout.map_visible = layout.map_x >= layout.left_x + 220.0f;
+    layout.map_visible = riff_map_visible && layout.map_x >= layout.left_x + 220.0f;
     layout.map_times_visible = layout.map_visible && layout.map_x - 58.0f >= layout.left_x + 220.0f;
     return layout;
 }

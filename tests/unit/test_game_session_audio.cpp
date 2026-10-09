@@ -3,6 +3,7 @@
 #include "app/ModeManager.h"
 #include "app/ReplayVerifier.h"
 #include "app/SitesLeaderboardClient.h"
+#include "timing/HighResClock.h"
 #include "../support/MockAsioDriver.h"
 
 #include <algorithm>
@@ -15,6 +16,7 @@
 #include <limits>
 #include <cstdlib>
 #include <iostream>
+#include <stdexcept>
 
 namespace tenriff::app {
 
@@ -31,6 +33,335 @@ struct CompletionTestDirectory {
 // Exercise the production input-to-voice-to-mixer path without starting a device,
 // input thread, decoder, profile or record writer.
 struct GameSessionAudioTestAccess {
+    static void check_callback_timestamp_pair_delays() {
+        constexpr int64_t playback_sample = 48000;
+        constexpr uint32_t frames = 480;
+        const int64_t paired_time_ns = timing::HighResClock::now_ns();
+        for (const int delay_ms : {0, 1, 3, 9}) {
+            auto session = shift_lane_fixture(32, false);
+            session->chart_.notes.push_back({1, 150000, std::nullopt});
+            session->chart_.duration_samples = 200000;
+            gameplay::GameplayConfig config;
+            config.sample_rate = 48000;
+            config.practice_no_fail_enabled = true;
+            session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+            session->audio_timing_diagnostics_logged_ = true;
+            session->config_.audio_ui.mute_when_inactive = false;
+            // The fit is deliberately live: the real callback supplies its
+            // second point. Using delivery-time QPC would shift this input.
+            session->clock_sync_.add_sample(paired_time_ns - 1'000'000'000LL, 0);
+            REQUIRE(session->input_thread_.queue().push(
+                {32, input::InputState::Pressed, paired_time_ns}));
+            session->audio_thread_.callback_ = [&](float* output, uint32_t count,
+                                                   int64_t start, int64_t playback) {
+                CHECK(session->audio_thread_.callback_playback_time_ns() == paired_time_ns);
+                session->audio_callback(output, count, start, playback);
+            };
+            std::array<float, frames * 2> output{};
+            // Inject only additional delivery latency. Every case deliberately
+            // receives the same observed sample/QPC pair; elapsed wall time is
+            // not an assertion, so scheduler oversleep cannot make this flaky.
+            std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+            session->audio_thread_.invoke_callback(
+                output.data(), frames, playback_sample, playback_sample, paired_time_ns);
+            CHECK(session->audio_thread_.callback_playback_time_ns() == 0);
+            const auto timing_state = session->last_audio_timing_.load();
+            CHECK(timing_state.playback_sample == playback_sample);
+            CHECK(timing_state.time_ns == paired_time_ns);
+            CHECK(session->startup_input_timing_anchor_.callback_time_ns == paired_time_ns);
+            CHECK(session->clock_sync_.input_to_audio_samples(paired_time_ns) == playback_sample);
+            const auto hud = session->hud_snapshot();
+            CHECK(hud.current_sample == playback_sample);
+            CHECK(hud.audio_sample_time_ns == paired_time_ns);
+            REQUIRE(session->engine_->replay().events.size() == 1);
+            CHECK(session->engine_->replay().events.front().sample == playback_sample);
+            REQUIRE(session->engine_->live_feedback().has_value);
+            CHECK(session->engine_->live_feedback().delta_ms == doctest::Approx(0.0));
+            std::cout << "[callback-timestamp-pair] additional_delay_ms=" << delay_ms
+                      << " replay_sample=" << session->engine_->replay().events.front().sample
+                      << " feedback_delta_ms=" << session->engine_->live_feedback().delta_ms
+                      << " hud_pair_time_matches=" << (hud.audio_sample_time_ns == paired_time_ns)
+                      << '\n';
+        }
+    }
+
+    static void check_callback_timestamp_lifetime_and_fallback() {
+        auto session = shift_lane_fixture(32);
+        session->audio_timing_diagnostics_logged_ = true;
+        session->config_.audio_ui.mute_when_inactive = false;
+        constexpr uint32_t frames = 480;
+        std::array<float, frames * 2> output{};
+        const int64_t old_pair_ns = timing::HighResClock::now_ns() - 1'000'000'000LL;
+        session->audio_thread_.callback_ = [&](float*, uint32_t, int64_t, int64_t) {
+            CHECK(session->audio_thread_.callback_playback_time_ns() == old_pair_ns);
+            throw std::runtime_error("callback timestamp cleanup fixture");
+        };
+        bool caught_runtime_error = false;
+        try {
+            session->audio_thread_.invoke_callback(
+                output.data(), frames, 48000, 48000, old_pair_ns);
+        } catch (const std::runtime_error&) {
+            caught_runtime_error = true;
+        }
+        CHECK(caught_runtime_error);
+        CHECK(session->audio_thread_.callback_playback_time_ns() == 0);
+
+        // A direct callback after the throwing callback must use its own QPC,
+        // never inherit the previous WASAPI observation.
+        const int64_t before_ns = timing::HighResClock::now_ns();
+        session->audio_callback(output.data(), frames, 48000, 48000);
+        const int64_t after_ns = timing::HighResClock::now_ns();
+        const auto state = session->last_audio_timing_.load();
+        CHECK(state.time_ns >= before_ns);
+        CHECK(state.time_ns <= after_ns);
+        CHECK(session->hud_snapshot().audio_sample_time_ns == state.time_ns);
+        session->audio_thread_.stop();
+        CHECK(session->audio_thread_.callback_playback_time_ns() == 0);
+        session->audio_thread_.shutdown();
+        CHECK(session->audio_thread_.callback_playback_time_ns() == 0);
+    }
+
+    static void check_asio_callback_timestamp_fallback() {
+        auto session = shift_lane_fixture(32);
+        session->audio_timing_diagnostics_logged_ = true;
+        session->config_.audio_ui.mute_when_inactive = false;
+        auto driver = std::make_shared<tenriff::tests::MockState>();
+        session->audio_thread_.asio_backend_ = std::make_unique<audio::AsioBackend>(
+            tenriff::tests::mock_factory(driver));
+        audio::AudioConfig config;
+        config.backend = audio::AudioBackend::ASIO;
+        int callbacks = 0;
+        REQUIRE(session->audio_thread_.asio_backend_->initialize(config,
+            [&](float* output, uint32_t frames, int64_t start, int64_t playback) {
+                ++callbacks;
+                CHECK(session->audio_thread_.callback_playback_time_ns() == 0);
+                const int64_t before_ns = timing::HighResClock::now_ns();
+                session->audio_callback(output, frames, start, playback);
+                const int64_t after_ns = timing::HighResClock::now_ns();
+                const auto state = session->last_audio_timing_.load();
+                CHECK(state.playback_sample == playback);
+                CHECK(state.time_ns >= before_ns);
+                CHECK(state.time_ns <= after_ns);
+                CHECK(session->hud_snapshot().audio_sample_time_ns == state.time_ns);
+            }) == audio::AudioResult::Success);
+        REQUIRE(session->audio_thread_.start() == audio::AudioResult::Success);
+        driver->tick();
+        driver->tick(1, true);
+        CHECK(callbacks == 2);
+        session->audio_thread_.stop();
+        CHECK(session->audio_thread_.callback_playback_time_ns() == 0);
+        session->audio_thread_.shutdown();
+        CHECK(session->audio_thread_.callback_playback_time_ns() == 0);
+        CHECK(driver->correct_owner);
+    }
+
+    static void check_input_offset_callback_phase(int offset_ms) {
+        constexpr int sample_rate = 48000;
+        constexpr int64_t note_sample = 48000;
+        constexpr uint32_t callback_frames = 480;
+        constexpr std::array<int64_t, 4> phases{{0, 120, 240, 360}};
+        const int64_t event_time_ns = timing::HighResClock::now_ns();
+        const int64_t offset_samples = offset_ms * 48;
+        std::array<int64_t, phases.size()> recorded_samples{};
+        std::array<double, phases.size()> feedback_deltas{};
+        std::array<int64_t, phases.size()> keysound_samples{};
+        std::array<bool, phases.size()> keysound_mixed{};
+
+        for (std::size_t i = 0; i < phases.size(); ++i) {
+            auto session = std::make_unique<GameSession>();
+            session->sample_rate_ = sample_rate;
+            session->chart_.lane_count = 1;
+            session->chart_.duration_samples = 200000;
+            session->chart_.notes = {{1, note_sample, std::nullopt}, {1, 150000, std::nullopt}};
+            session->chart_.notes[0].note_id = 0;
+            session->chart_.notes[0].audio_asset_id = 0;
+            session->chart_.notes[1].note_id = 1;
+            gameplay::GameplayConfig config;
+            config.sample_rate = sample_rate;
+            config.practice_no_fail_enabled = true;
+            session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+            session->lane_activity_.assign(1, 0.0f);
+            session->lane_pressed_.assign(1, 0);
+            session->hidden_hit_note_ids_.assign(2, 0);
+            session->synthetic_tones_enabled_ = false;
+            session->audio_timing_diagnostics_logged_ = true;
+            session->config_.audio_ui.mute_when_inactive = false;
+            session->config_.audio_ui.normalize_audio = false;
+            session->chart_audio_assets_.resize(1);
+            session->chart_audio_assets_[0].clip.samples =
+                std::make_shared<const std::vector<float>>(1920, 0.25f);
+            session->input_offset_samples_ = offset_samples;
+            session->key_to_lane_ = {{32, 1}};
+            session->lane_binding_state_.configure(session->key_to_lane_);
+
+            // Freeze only the learned clock fit so each callback consumes the
+            // exact same stamped input at note_sample. Varying callback phase
+            // must not quantize the user's constant input offset. This tests
+            // production queue/judgement/mixer code, not a physical device clock.
+            timing::ClockSyncConfig fit;
+            fit.ema_alpha = 0.0;
+            session->clock_sync_ = timing::ClockSync(fit);
+            session->clock_sync_.add_sample(event_time_ns - 1'000'000'000LL, 0);
+            session->clock_sync_.add_sample(event_time_ns, note_sample);
+            REQUIRE(session->clock_sync_.input_to_audio_samples(event_time_ns) == note_sample);
+            REQUIRE(session->input_thread_.queue().push(
+                {32, input::InputState::Pressed, event_time_ns}));
+            std::vector<float> audio(callback_frames * 2);
+            const int64_t buffer_start = note_sample + phases[i];
+            session->audio_callback(audio.data(), callback_frames, buffer_start, buffer_start);
+            REQUIRE(session->engine_->replay().events.size() == 1);
+            recorded_samples[i] = session->engine_->replay().events.front().sample;
+            REQUIRE(session->engine_->live_feedback().has_value);
+            feedback_deltas[i] = session->engine_->live_feedback().delta_ms;
+            REQUIRE(session->chart_audio_voices_.size() == 1);
+            keysound_samples[i] = session->chart_audio_voices_[0].start_sample;
+            keysound_mixed[i] = std::any_of(audio.begin(), audio.end(),
+                [](float value) { return value != 0.0f; });
+        }
+
+        bool exact_offset = true;
+        for (std::size_t i = 0; i < phases.size(); ++i) {
+            std::cout << "[input-offset-phase] offset_ms=" << offset_ms
+                      << " callback_phase_samples=" << phases[i]
+                      << " replay_sample=" << recorded_samples[i]
+                      << " feedback_delta_ms=" << feedback_deltas[i]
+                      << " keysound_sample=" << keysound_samples[i]
+                      << " keysound_in_first_callback=" << keysound_mixed[i] << '\n';
+            exact_offset &= recorded_samples[i] == note_sample + offset_samples;
+            exact_offset &= std::abs(feedback_deltas[i] - offset_ms) < 1e-9;
+            exact_offset &= keysound_samples[i] == note_sample + phases[i];
+            exact_offset &= keysound_mixed[i];
+        }
+        CHECK(exact_offset);
+    }
+
+    static void check_input_offset_future_clock_guard() {
+        constexpr int64_t raw_sample = 48000;
+        constexpr int64_t buffer_start = 47040;
+        constexpr int64_t buffer_end = 47520;
+        constexpr int64_t lookahead = 192;
+        constexpr int64_t event_time_ns = 1'000'000'000LL;
+        for (const int offset_ms : {-200, -20, 0, 20, 200}) {
+            auto session = shift_lane_fixture(32, false);
+            session->chart_.notes.push_back({1, 200000, std::nullopt});
+            session->chart_.duration_samples = 240000;
+            gameplay::GameplayConfig config;
+            config.practice_no_fail_enabled = true;
+            session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+            session->input_offset_samples_ = offset_ms * 48;
+            // Both clock sources agree on a raw event ahead of the write
+            // buffer. The safety bound must apply even when a negative user
+            // offset would otherwise disguise that implausible timestamp.
+            session->startup_input_timing_anchor_ = {raw_sample, event_time_ns, true};
+            session->current_playback_sample_ = raw_sample;
+            REQUIRE(session->input_thread_.queue().push(
+                {32, input::InputState::Pressed, event_time_ns}));
+            session->process_input_queue(buffer_start, buffer_end, lookahead);
+            REQUIRE(session->engine_->replay().events.size() == 1);
+            CHECK(session->engine_->replay().events[0].sample ==
+                buffer_end + session->input_offset_samples_);
+            CHECK(session->future_events_.empty());
+        }
+    }
+
+    static void check_input_offset_order_and_live_audio() {
+        constexpr int64_t event_time_ns = 1'000'000'000LL;
+        constexpr std::array<int64_t, 4> samples{{48000, 48048, 48096, 48144}};
+        for (const int offset_ms : {-200, 0, 200}) {
+            auto session = shift_lane_fixture(32);
+            // Keep the session alive after an early LN release so all four
+            // physical edges must remain visible in the recorded input order.
+            session->chart_.notes.push_back({1, 200000, std::nullopt});
+            session->chart_.duration_samples = 240000;
+            gameplay::GameplayConfig config;
+            config.practice_no_fail_enabled = true;
+            session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+            session->input_offset_samples_ = offset_ms * 48;
+            session->synthetic_tones_enabled_ = true;
+            session->startup_input_timing_anchor_ = {samples.back(),
+                event_time_ns + 3'000'000LL, true};
+            session->current_playback_sample_ = samples.back();
+            for (std::size_t i = 0; i < samples.size(); ++i) {
+                REQUIRE(session->input_thread_.queue().push({32,
+                    i % 2 ? input::InputState::Released : input::InputState::Pressed,
+                    event_time_ns + static_cast<int64_t>(i) * 1'000'000LL}));
+            }
+            session->process_input_queue(48000, 48480, 192);
+            const auto& replay = session->engine_->replay().events;
+            REQUIRE(replay.size() == samples.size());
+            for (std::size_t i = 0; i < samples.size(); ++i) {
+                CHECK(replay[i].sample == samples[i] + session->input_offset_samples_);
+                CHECK(replay[i].state ==
+                    (i % 2 ? input::InputState::Released : input::InputState::Pressed));
+            }
+            // Immediate physical feedback uses the uncalibrated timestamp;
+            // no new deferred queue or delayed synthetic key tone is introduced.
+            REQUIRE(session->tone_voices_.size() == 2);
+            CHECK(session->tone_voices_[0].start_sample == samples[0]);
+            CHECK(session->tone_voices_[1].start_sample == samples[2]);
+            CHECK(session->input_thread_.queue().empty());
+            CHECK(session->future_events_.empty());
+        }
+    }
+
+    static void check_input_offset_recorded_audio_unchanged() {
+        constexpr int64_t recorded_sample = 48144;
+        for (const auto ruleset : {kLegacyReplayRulesetId, kPreviousReplayRulesetId,
+                                   kRuleset3ReplayRulesetId, kCanonicalReplayRulesetId}) {
+            auto session = shift_lane_fixture(32);
+            session->input_offset_samples_ = 9600;
+            session->synthetic_tones_enabled_ = true;
+            session->replay_playback_enabled_ = true;
+            session->replay_source_.ruleset_id = std::string(ruleset);
+            session->replay_source_.trace.sample_rate = 48000;
+            session->replay_source_.trace.events =
+                {{1, input::InputState::Pressed, recorded_sample}};
+            session->process_input_queue(48000, 48480, 192);
+            REQUIRE(session->engine_->replay().events.size() == 1);
+            CHECK(session->engine_->replay().events[0].sample == recorded_sample);
+            REQUIRE(session->tone_voices_.size() == 1);
+            CHECK(session->tone_voices_[0].start_sample == recorded_sample);
+        }
+        auto autoplay = shift_lane_fixture(32);
+        autoplay->input_offset_samples_ = 9600;
+        autoplay->synthetic_tones_enabled_ = true;
+        autoplay->autoplay_enabled_ = true;
+        autoplay->autoplay_events_ = {{1, input::InputState::Pressed, recorded_sample}};
+        autoplay->process_autoplay_queue(48000, 48480, 192);
+        REQUIRE(autoplay->engine_->replay().events.size() == 1);
+        CHECK(autoplay->engine_->replay().events[0].sample == recorded_sample);
+        REQUIRE(autoplay->tone_voices_.size() == 1);
+        CHECK(autoplay->tone_voices_[0].start_sample == recorded_sample);
+    }
+
+    static void check_loading_does_not_open_audio(bool cancel_parse) {
+        CompletionTestDirectory directory;
+        config::ConfigLoader loader;
+        auto config = loader.defaults();
+        // A nonexistent driver makes an accidental early device open fail
+        // deterministically, without claiming or reconfiguring real hardware.
+        config.audio.backend = audio::AudioBackend::ASIO;
+        config.audio.asio_driver = "invalid-loading-regression-driver";
+        REQUIRE(loader.save_profile(directory.path.u8string(), config));
+        CommandLineOptions options;
+        options.profile = directory.path.u8string();
+        options.chart_path = (directory.path / "missing.bms").u8string();
+        auto session = std::make_unique<GameSession>();
+        bool parsing = false;
+        session->set_loading_progress_callback([&](const GameSession::LoadingProgress& progress) {
+            if (progress.stage == "Parsing chart") {
+                parsing = true;
+                CHECK(session->audio_thread_.sample_rate() == 0);
+            }
+        });
+        session->set_loading_cancel_callback([&] { return cancel_parse && parsing; });
+        CHECK_FALSE(session->initialize(options));
+        CHECK(parsing);
+        CHECK(session->audio_error().empty());
+        CHECK(session->was_user_aborted() == cancel_parse);
+        CHECK(session->audio_thread_.sample_rate() == 0);
+    }
+
     static void check_riff_map_snapshot_lifecycle() {
         const auto prepare = [](GameSession& session) {
             session.chart_.lane_count = 1;
@@ -1373,6 +1704,47 @@ struct GameSessionAudioTestAccess {
 };
 
 } // namespace tenriff::app
+
+TEST_CASE("WASAPI sample timestamp pair survives delayed delivery to input judgement and HUD") {
+    tenriff::app::GameSessionAudioTestAccess::check_callback_timestamp_pair_delays();
+}
+TEST_CASE("WASAPI callback timestamp expires on exceptions and direct callbacks use their own QPC") {
+    tenriff::app::GameSessionAudioTestAccess::check_callback_timestamp_lifetime_and_fallback();
+}
+TEST_CASE("ASIO callbacks retain the existing QPC timestamp fallback") {
+    tenriff::app::GameSessionAudioTestAccess::check_asio_callback_timestamp_fallback();
+}
+
+TEST_CASE("zero input offset keeps the same judgement across audio callback phases") {
+    tenriff::app::GameSessionAudioTestAccess::check_input_offset_callback_phase(0);
+}
+TEST_CASE("positive input offset keeps the same judgement across audio callback phases") {
+    tenriff::app::GameSessionAudioTestAccess::check_input_offset_callback_phase(20);
+}
+TEST_CASE("negative input offset keeps the same judgement across audio callback phases") {
+    tenriff::app::GameSessionAudioTestAccess::check_input_offset_callback_phase(-20);
+}
+TEST_CASE("large input offsets preserve judgement and immediate keysounds across callback phases") {
+    tenriff::app::GameSessionAudioTestAccess::check_input_offset_callback_phase(-200);
+    tenriff::app::GameSessionAudioTestAccess::check_input_offset_callback_phase(200);
+}
+TEST_CASE("future clock safety clamps raw input before either sign of calibration") {
+    tenriff::app::GameSessionAudioTestAccess::check_input_offset_future_clock_guard();
+}
+TEST_CASE("input calibration preserves physical edge order and live tone timestamps") {
+    tenriff::app::GameSessionAudioTestAccess::check_input_offset_order_and_live_audio();
+}
+TEST_CASE("live input calibration does not shift R1 R2 R3 R4 replay or autoplay audio") {
+    tenriff::app::GameSessionAudioTestAccess::check_input_offset_recorded_audio_unchanged();
+}
+
+TEST_CASE("chart loading cancellation does not open an audio device") {
+    tenriff::app::GameSessionAudioTestAccess::check_loading_does_not_open_audio(true);
+}
+
+TEST_CASE("chart loading failure does not open an audio device") {
+    tenriff::app::GameSessionAudioTestAccess::check_loading_does_not_open_audio(false);
+}
 
 TEST_CASE("normalization OFF bypasses prior automatic gain and focus mute restores saved volume") {
     tenriff::app::GameSessionAudioTestAccess::check_normalize_and_focus_output();

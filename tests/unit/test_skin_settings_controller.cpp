@@ -64,6 +64,27 @@ TEST_CASE("skin HUD layout switches both directions and persists through the sta
     CHECK(effects.menu.navigate_back);
 }
 
+TEST_CASE("Studio riff map toggle follows keyboard and pointer settings routing for Native and LR2") {
+    for (const auto source : {"native", "lr2"}) {
+        tenriff::config::RuntimeConfig runtime;
+        runtime.skin.source = source;
+        SkinSettingsController controller;
+        controller.reset("10k");
+        REQUIRE(runtime.skin.hud_riff_map_visible);
+        auto effects = controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames,
+                                         SkinSettingsRowId::HudRiffMapVisible);
+        CHECK_FALSE(runtime.skin.hud_riff_map_visible);
+        CHECK(effects.menu.render_changed);
+        CHECK(controller.dirty());
+        static_cast<void>(controller.handle(MenuAction::activate(), runtime, kLr2Names, kTenRiffNames,
+                                             SkinSettingsRowId::HudRiffMapVisible));
+        CHECK(runtime.skin.hud_riff_map_visible);
+        effects = controller.handle(MenuAction::back(), runtime, kLr2Names, kTenRiffNames);
+        CHECK(effects.menu.persist_config);
+        CHECK(effects.menu.navigate_back);
+    }
+}
+
 TEST_CASE("skin preset actions use the same keyboard and mouse controller path") {
     tenriff::config::RuntimeConfig runtime;
     SkinSettingsController controller;
@@ -587,4 +608,23 @@ TEST_CASE("note fog controls change separately in five percent steps and save") 
     CHECK(runtime.skin.note_fade_out == 0.0);
     CHECK(runtime.skin.note_fade_in == doctest::Approx(0.35));
     CHECK(controller.handle(MenuAction::back(), runtime, kLr2Names, kTenRiffNames).menu.persist_config);
+}
+
+TEST_CASE("timing bar display mode adopts skin defaults without changing its visibility switch") {
+    SkinSettingsController controller;
+    tenriff::config::RuntimeConfig runtime;
+    controller.reset("10k");
+    controller.set_timing_defaults(false, false, true);
+    const auto before = tenriff::app::resolve_timing_feedback_visibility(runtime.skin, false, false, true);
+    CHECK(before.always_visible);
+    static_cast<void>(controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames,
+                                       SkinSettingsRowId::TimingBarMode));
+    CHECK(runtime.skin.timing_feedback_override);
+    CHECK_FALSE(runtime.skin.show_timing_feedback);
+    CHECK_FALSE(runtime.skin.show_timing_bar);
+    CHECK_FALSE(runtime.skin.timing_bar_always_visible);
+    static_cast<void>(controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames,
+                                       SkinSettingsRowId::TimingBarMode));
+    CHECK(runtime.skin.timing_bar_always_visible);
+    CHECK_FALSE(runtime.skin.show_timing_bar);
 }

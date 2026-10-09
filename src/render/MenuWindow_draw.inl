@@ -318,7 +318,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
 
     if (data.kind == MenuScreenKind::GameplayHud) {
         if (gameplay_studio_deck_enabled(data.gameplay.hud_layout,
-                normalize_gameplay_skin_source(data.gameplay.skin_source) != "native",
+                normalize_gameplay_skin_source(data.gameplay.skin_source),
                 data.gameplay.ghost_visible, data.gameplay.peer_visible) &&
             data.gameplay.skin_background_path.empty() && !d2d_->gameplay_background_base_bitmap &&
             !d2d_->gameplay_background_overlay_bitmap) {
@@ -364,7 +364,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
         (d2d_->gameplay_background_base_bitmap || d2d_->gameplay_background_overlay_bitmap);
     const bool studio_gameplay = data.kind == MenuScreenKind::GameplayHud &&
         gameplay_studio_deck_enabled(data.gameplay.hud_layout,
-            normalize_gameplay_skin_source(data.gameplay.skin_source) != "native",
+            normalize_gameplay_skin_source(data.gameplay.skin_source),
             data.gameplay.ghost_visible, data.gameplay.peer_visible);
     if (d2d_->glow_brush && !modern_menu_screen && !visible_gameplay_bga && !studio_gameplay) {
         const float saved_opacity = d2d_->glow_brush->GetOpacity();

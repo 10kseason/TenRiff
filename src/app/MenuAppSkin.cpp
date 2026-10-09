@@ -736,8 +736,9 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
         manifest_style ? manifest_style->key_backdrop_opacity : std::optional<float>{};
     const auto timing_default_text = manifest_style ? manifest_style->show_timing_feedback : std::optional<bool>{};
     const auto timing_default_bar = manifest_style ? manifest_style->show_timing_bar : std::optional<bool>{};
-    skin_settings_controller_.set_timing_defaults(timing_default_text, timing_default_bar);
-    const auto timing_visibility = resolve_timing_feedback_visibility(config_.skin, timing_default_text, timing_default_bar);
+    const auto timing_default_always = manifest_style ? manifest_style->timing_bar_always_visible : std::optional<bool>{};
+    skin_settings_controller_.set_timing_defaults(timing_default_text, timing_default_bar, timing_default_always);
+    const auto timing_visibility = resolve_timing_feedback_visibility(config_.skin, timing_default_text, timing_default_bar, timing_default_always);
     const auto backdrop_default_brightness = manifest_style ? manifest_style->key_backdrop_brightness : std::optional<float>{};
     const auto backdrop_default_height = manifest_style ? manifest_style->key_backdrop_height : std::optional<float>{};
     skin_settings_controller_.set_backdrop_defaults(backdrop_default_enabled, backdrop_default_opacity,
@@ -898,6 +899,9 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     config::normalize_skin_hud_layout_token(config_.skin.hud_layout) == "classic"
                         ? ui_text("Classic", "클래식") : ui_text("Studio Deck", "스튜디오 덱"),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::HudLayout), false, true);
+    append_menu_row(render.generic, ui_text("Studio Riff Map", "스튜디오 리프 맵"),
+                    ui_on_off(config_.skin.hud_riff_map_visible),
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::HudRiffMapVisible), false, true);
     append_menu_row(render.generic, ui_text("Hit Burst Brightness", "키 폭발 밝기"),
                     format_percent(config_.skin.key_pulse_brightness),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::KeyPulse), false, true);
@@ -957,6 +961,9 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     true);
     append_menu_row(render.generic, ui_text("FAST/SLOW Bar", "FAST/SLOW 막대"), ui_on_off(timing_visibility.bar),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TimingBar), false, true);
+    append_menu_row(render.generic, ui_text("FAST/SLOW Bar Display", "FAST/SLOW 막대 표시 방식"),
+                    timing_visibility.always_visible ? ui_text("Always", "항상") : ui_text("After non-PG", "피그렛 외 판정 후"),
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TimingBarMode), false, true);
     append_menu_row(render.generic, ui_text("FAST/SLOW Indicator X", "FAST/SLOW 인디케이터 X"), std::to_string(static_cast<int>(config_.skin.timing_text_offset_x)) + " px",
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TimingTextX), false, true);
     append_menu_row(render.generic, ui_text("FAST/SLOW Indicator Y", "FAST/SLOW 인디케이터 Y"), std::to_string(static_cast<int>(config_.skin.timing_text_offset_y)) + " px",
@@ -1035,6 +1042,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
 
     render.generic.skin_preview.visible = true;
     render.generic.skin_preview.hud_layout = config::normalize_skin_hud_layout_token(config_.skin.hud_layout);
+    render.generic.skin_preview.hud_riff_map_visible = config_.skin.hud_riff_map_visible;
     render.generic.skin_preview.mode_label = skin_mode_label;
     render.generic.skin_preview.selected_color_label =
         manifest_style && !manifest_style->lane_colors.empty()
@@ -1062,6 +1070,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.skin_preview.judgement_position = config_.skin.judgement_position;
     render.generic.skin_preview.show_timing_feedback = timing_visibility.text;
     render.generic.skin_preview.show_timing_bar = timing_visibility.bar;
+    render.generic.skin_preview.timing_bar_always_visible = timing_visibility.always_visible;
     render.generic.skin_preview.note_fade_in = config_.skin.note_fade_in;
     render.generic.skin_preview.note_fade_out = config_.skin.note_fade_out;
     render.generic.skin_preview.timing_text_offset_x = config_.skin.timing_text_offset_x;

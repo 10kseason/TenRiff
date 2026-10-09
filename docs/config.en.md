@@ -277,6 +277,7 @@ These are profile `config.json` skin settings. For a skin package's `skin.json` 
 | `show_gear_boundary_line` | bool; `false` | Show the gear boundary line. |
 | `show_timing_feedback` | bool; `true` | Show FAST/SLOW text independently of the bar. |
 | `show_timing_bar` | bool; `true` | Show the timing bar; older profiles/skins without this field inherit the text switch. |
+| `timing_bar_always_visible` | bool; `false` | Keep the timing scale visible (`true`) or show it for 0.75 seconds after a non-PG judgement (`false`). Text/live error markers retain the last valid non-PG error for 0.75 seconds even after PG. `show_timing_bar` remains the independent off switch. |
 | `timing_feedback_override` | bool; `false` | After the user edits a switch, profile visibility choices take priority over the skin manifest. |
 | `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | Independent text/bar X offsets added to the existing judgement-area layout, in 1920x1080 base pixels. |
 | `timing_text_offset_y`, `timing_bar_offset_y` | double: `-400..400`; `0` | Independent text/bar Y offsets in base pixels; positive moves down. |
@@ -285,7 +286,8 @@ These are profile `config.json` skin settings. For a skin package's `skin.json` 
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst brightness; zero disables it. |
 | `key_pulse_enabled` | bool; `true` | Legacy ON/OFF mirror; false or zero brightness disables the burst. |
 | `hit_burst_style` | `prism`, `ring`, `spark`; `prism` | Built-in Hit Burst material. |
-| `hud_layout` | `classic`, `studio`; `studio` | HUD style for native solo play. Existing profiles without the key also default to `studio`; choose Classic in Options › Skins to restore the previous layout. Image skins, ghost battles and multiplayer retain the classic layout. Unknown values use `studio`. |
+| `hud_layout` | `classic`, `studio`; `studio` | HUD style for Native or imported LR2 solo play. LR2 note/key/gear images and geometry are preserved. Existing profiles without the key also default to `studio`; choose Classic in Options › Skins to restore the previous layout. Other image skins, ghost battles and multiplayer retain the classic layout. Unknown values use `studio`. |
+| `hud_riff_map_visible` | bool; `true` | Show the note-density graph and clock to the left of the Studio Deck field. Options › Skins › Studio Riff Map saves this in profiles and skin presets. Classic HUD is unchanged. |
 | `ui_font` | `default`, `malgun`, `bahnschrift`, `consolas`; `default` | Menu font; default is Segoe UI. Logo, rank and combo keep their dedicated fonts. |
 | `key_label_position` | `bottom`, `top`, `off`; `bottom` | Lane key-label position. |
 | `judgement_line_position` | double: `0..1`; `0.82` | Vertical judgement-line position ratio. |

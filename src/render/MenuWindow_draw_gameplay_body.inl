@@ -1,6 +1,6 @@
         auto& scene_hud_cache = is_skin_preview ? skin_preview_hud_cache_ : gameplay_hud_cache_;
         const bool studio = gameplay_studio_deck_enabled(data.gameplay.hud_layout,
-            normalize_gameplay_skin_source(data.gameplay.skin_source) != "native",
+            normalize_gameplay_skin_source(data.gameplay.skin_source),
             data.gameplay.ghost_visible, data.gameplay.peer_visible);
         const auto& scene_title_format = d2d_->preview_fonts.title_format;
         const auto& scene_body_format = d2d_->preview_fonts.body_format;
@@ -101,6 +101,55 @@
                 rect.top -= extra*0.5f; rect.bottom += extra*0.5f;
             }
             return rect;
+        };
+        auto draw_full_song_title = [&](IDWriteTextFormat* format, const D2D1_RECT_F& rect,
+                                        ID2D1Brush* brush, bool plain = false) {
+            const auto& text = scene_hud_cache.title_text;
+            if (!format || !brush || text.empty()) return;
+            auto& title = is_skin_preview ? d2d_->preview_song_title : d2d_->gameplay_song_title;
+            if (!title.layout || title.text != text || title.format.Get() != format) {
+                title.layout.Reset();
+                if (FAILED(d2d_->dwrite_factory->CreateTextLayout(text.c_str(), static_cast<UINT32>(text.size()),
+                    format, 1000000.0f, 100000.0f, title.layout.ReleaseAndGetAddressOf()))) return;
+                title.layout->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+                title.layout->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+                title.layout->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+                const DWRITE_TRIMMING trimming{DWRITE_TRIMMING_GRANULARITY_NONE, 0, 0};
+                title.layout->SetTrimming(&trimming, nullptr);
+                DWRITE_TEXT_METRICS metrics{};
+                if (FAILED(title.layout->GetMetrics(&metrics))) { title.layout.Reset(); return; }
+                // Tight layout bounds let overhang account for italic/fallback
+                // glyphs, rather than measuring against the wide temporary box.
+                title.layout->SetMaxWidth(std::max(1.0f, metrics.widthIncludingTrailingWhitespace + 2.0f));
+                title.layout->SetMaxHeight(std::max(1.0f, metrics.height + 2.0f));
+                DWRITE_OVERHANG_METRICS overhang{};
+                if (FAILED(title.layout->GetOverhangMetrics(&overhang))) { title.layout.Reset(); return; }
+                title.inset_x = std::max(0.0f, overhang.left);
+                title.inset_y = std::max(0.0f, overhang.top);
+                title.width = title.layout->GetMaxWidth() + title.inset_x + std::max(0.0f, overhang.right);
+                title.height = title.layout->GetMaxHeight() + title.inset_y + std::max(0.0f, overhang.bottom);
+                title.line_count = metrics.lineCount;
+                title.text = text; title.format = format; ++title.builds;
+            }
+            const float scale = gameplay_song_title_fit_scale(title.width, title.height,
+                rect.right - rect.left, rect.bottom - rect.top);
+            if (scale <= 0) return;
+            D2D1_MATRIX_3X2_F saved{}; ctx->GetTransform(&saved);
+            ctx->SetTransform(D2D1::Matrix3x2F::Scale(scale, scale, D2D1::Point2F(rect.left, rect.top)) * saved);
+            const auto origin = D2D1::Point2F(rect.left + title.inset_x, rect.top + title.inset_y);
+            if (plain) ctx->DrawTextLayout(origin, title.layout.Get(), brush);
+            else draw_text_layout_readable(origin, title.layout.Get(), brush);
+            ctx->SetTransform(saved);
+            if (benchmark_timings_enabled_) {
+                benchmark_song_title_.left = rect.left; benchmark_song_title_.top = rect.top;
+                benchmark_song_title_.right = rect.right; benchmark_song_title_.bottom = rect.bottom;
+                benchmark_song_title_.font_size = format->GetFontSize() * scale;
+                benchmark_song_title_.text_width = title.width * scale;
+                benchmark_song_title_.text_height = title.height * scale;
+                benchmark_song_title_.characters = static_cast<uint32_t>(text.size());
+                benchmark_song_title_.line_count = title.line_count;
+                benchmark_song_title_.layout_builds = title.builds;
+            }
         };
         // Single-line layouts are top-anchored; buttons and rows taller than one
         // line need their text box centred on the row instead.
@@ -400,7 +449,20 @@
         const float solo_header_right =
             gameplay_solo_header_right(header_left, header_right, surface_layout.player_field.left);
         const auto studio_deck = compute_gameplay_studio_deck_layout(surface_layout.player_field.left,
-            surface_layout.player_field.right, data.performance.visible ? header_safe_right : 1856.0f);
+            surface_layout.player_field.right, data.performance.visible ? header_safe_right : 1856.0f,
+            data.gameplay.hud_riff_map_visible);
+        const float title_safe_right = studio && studio_deck.map_visible
+            ? std::min(studio_deck.left_x + studio_deck.left_width,
+                studio_deck.map_x - (studio_deck.map_times_visible ? 64.0f : 8.0f) - 8.0f)
+            : surface_layout.player_field.left - 32.0f;
+        const auto song_title_layout = compute_gameplay_song_title_layout(surface_layout.player_field.left,
+            surface_layout.player_field.right, title_safe_right, studio);
+        const auto song_title_rect = D2D1::RectF(song_title_layout.left, song_title_layout.top,
+            song_title_layout.right, song_title_layout.bottom);
+        if (benchmark_timings_enabled_) {
+            benchmark_song_title_.field_left = surface_layout.player_field.left;
+            benchmark_song_title_.field_right = surface_layout.player_field.right;
+        }
 
         auto draw_timing_indicator = [&](float indicator_left,
                                          float indicator_right,
@@ -412,12 +474,6 @@
             if (!scene_body_format || !d2d_->text_brush) {
                 return;
             }
-            // History is context for a live FAST/SLOW result, not a persistent
-            // bar after PG, centered timing, or expired feedback.
-            if (!has_live_feedback) {
-                return;
-            }
-
             D2D1_MATRIX_3X2_F timing_transform{};
             ctx->GetTransform(&timing_transform);
             const auto base_indicator=D2D1::RectF(indicator_left,combo_anchor_y,indicator_right,combo_anchor_y+48.0f);
@@ -469,7 +525,7 @@
                                            feedback_center_x + 1.0f, indicator_rect.bottom + 3.0f),
                                d2d_->text_brush.Get());
 
-            for (std::size_t i = 0; i < timing_history_count; ++i) {
+            for (std::size_t i = 0; has_live_feedback && i < timing_history_count; ++i) {
                 const double delta_ms = timing_history[i];
                 const float history_weight =
                     static_cast<float>(i + 1) / static_cast<float>(std::max<std::size_t>(1, timing_history_count));
@@ -642,8 +698,8 @@
             if (studio) { /* The deck owns the left header. */ }
             else if (battle_column) {
                 const float left = battle_column->left, right = battle_column->right;
-                draw_fitted_readable_text(scene_hud_cache.title_text, ng_font("title", scene_title_format.Get()),
-                    D2D1::RectF(left, 72.0f, right, 114.0f), d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING);
+                draw_full_song_title(ng_font("title", scene_title_format.Get()),
+                    D2D1::RectF(left, 72.0f, right, 114.0f), d2d_->text_brush.Get());
                 draw_fitted_readable_text(scene_hud_cache.artist_text, ng_font("body", scene_body_format.Get()),
                     D2D1::RectF(left, 118.0f, right, 146.0f), d2d_->muted_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING);
                 // The long solo status line cannot cross either battle card.
@@ -657,12 +713,11 @@
             } else {
                 // Long titles shrink to the column instead of sliding under the field.
                 if (scene_title_format && d2d_->text_brush) {
-                    const D2D1_RECT_F title_rect = ng_rect("title",D2D1::RectF(header_left, header_top, solo_header_right, header_top + 52.0f));
+                    const D2D1_RECT_F title_rect = ng_rect("title", data.gameplay.peer_visible
+                        ? D2D1::RectF(header_left, header_top, solo_header_right, header_top + 52.0f)
+                        : song_title_rect);
                     IDWriteTextFormat* title_format = ng_font("title",scene_title_format.Get());
-                    draw_scaled_readable_text(scene_hud_cache.title_text, title_format, title_rect,
-                        d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING,
-                        measured_text_scale(0, scene_hud_cache.title_text, title_format,
-                                            title_rect.right - title_rect.left, 0.60f));
+                    draw_full_song_title(title_format, title_rect, d2d_->text_brush.Get());
                 }
                 if (scene_body_format && d2d_->muted_brush) {
                     const D2D1_RECT_F artist_rect = ng_rect("artist",D2D1::RectF(header_left, header_top + 46.0f, solo_header_right, header_top + 84.0f));
@@ -913,25 +968,14 @@
 
             // Cache semantic feedback independently of display toggles. The skin
             // preview can toggle either element without changing text_revision.
-            if (data.gameplay.has_feedback) {
-                scene_hud_cache.feedback_text = gameplay_feedback_overlay_text(data.gameplay.feedback);
-                scene_hud_cache.feedback_timing_text =
-                    gameplay_timing_feedback_text(data.gameplay.feedback_delta_ms,
-                                                  data.gameplay.feedback);
-            } else {
-                scene_hud_cache.feedback_text.clear();
-                scene_hud_cache.feedback_timing_text.clear();
-            }
-            if (data.gameplay.ghost_has_feedback) {
-                scene_hud_cache.ghost_feedback_text =
-                    gameplay_feedback_overlay_text(data.gameplay.ghost_feedback);
-                scene_hud_cache.ghost_feedback_timing_text =
-                    gameplay_timing_feedback_text(data.gameplay.ghost_feedback_delta_ms,
-                                                  data.gameplay.ghost_feedback);
-            } else {
-                scene_hud_cache.ghost_feedback_text.clear();
-                scene_hud_cache.ghost_feedback_timing_text.clear();
-            }
+            scene_hud_cache.feedback_text = data.gameplay.has_feedback
+                ? gameplay_feedback_overlay_text(data.gameplay.feedback) : std::wstring{};
+            scene_hud_cache.feedback_timing_text = data.gameplay.has_timing_feedback
+                ? gameplay_timing_feedback_text(data.gameplay.timing_feedback_delta_ms) : std::wstring{};
+            scene_hud_cache.ghost_feedback_text = data.gameplay.ghost_has_feedback
+                ? gameplay_feedback_overlay_text(data.gameplay.ghost_feedback) : std::wstring{};
+            scene_hud_cache.ghost_feedback_timing_text = data.gameplay.ghost_has_timing_feedback
+                ? gameplay_timing_feedback_text(data.gameplay.ghost_timing_feedback_delta_ms) : std::wstring{};
             scene_hud_cache.text_revision = data.gameplay.text_revision;
         }
         if (studio && scene_hud_cache.studio_text_revision != data.gameplay.text_revision) {
@@ -1937,6 +1981,8 @@
                                          bool has_feedback,
                                          const std::string& feedback,
                                          double feedback_delta_ms,
+                                         bool has_non_pg_feedback,
+                                         bool has_timing_feedback,
                                          const std::wstring& feedback_text,
                                          const std::wstring& feedback_timing_text,
                                          const std::array<double, kGameplayTimingHistoryMaxEntries>& timing_history,
@@ -1944,14 +1990,16 @@
                                          const GameplayTextPopAnimation& feedback_animation,
                                          int64_t feedback_started_ns) {
             if (studio) { draw_studio_feedback(feedback_field, has_feedback, feedback, feedback_delta_ms,
-                                               feedback_text, feedback_animation); return; }
+                                               has_non_pg_feedback, has_timing_feedback, feedback_text,
+                                               feedback_timing_text, feedback_animation); return; }
             const bool show_feedback_overlay = has_feedback && !feedback_text.empty();
-            const bool show_timing_feedback = data.gameplay.show_timing_feedback && has_feedback &&
+            const bool show_timing_feedback = data.gameplay.show_timing_feedback && has_timing_feedback &&
                 !feedback_timing_text.empty();
             const float combo_anchor_y =
                 gameplay_combo_anchor_y(feedback_field, data.gameplay.judgement_position, 74.0f, 82.0f);
-            const bool show_timing_bar = data.gameplay.show_timing_bar && has_feedback &&
-                !feedback_timing_text.empty();
+            const float timing_anchor_y = gameplay_combo_anchor_y(feedback_field, 0.24, 74.0f, 82.0f);
+            const bool show_timing_bar = data.gameplay.show_timing_bar &&
+                (data.gameplay.timing_bar_always_visible || has_non_pg_feedback);
             if ((show_feedback_overlay || show_timing_feedback || show_timing_bar) && d2d_->text_brush) {
                 if (show_feedback_overlay && scene_header_format) {
                     D2D1_RECT_F feedback_rect =
@@ -2004,19 +2052,16 @@
                 // Text gets its own position outside the judgement pop transform;
                 // changing the bar or judgement font size cannot drag it around.
                 if (show_timing_feedback && scene_body_format) {
-                    auto grade_rect = gameplay_centered_overlay_rect(feedback_field, combo_anchor_y - 34.0f, 48.0f, -24.0f);
-                    grade_rect.left += static_cast<float>(data.gameplay.judgement_offset_x);
-                    grade_rect.right += static_cast<float>(data.gameplay.judgement_offset_x);
-                    grade_rect = readable_text_rect(ng_rect("judgement", grade_rect), ng_font("judgement", scene_header_format.Get()));
-                    auto text_rect = ng_rect("timing_label", D2D1::RectF(grade_rect.left, grade_rect.top + 54.0f,
-                                                                       grade_rect.right, grade_rect.bottom + 8.0f));
+                    // Use the stable field anchor, never the judgement's XY or rect.
+                    const auto base_text = gameplay_centered_overlay_rect(feedback_field, timing_anchor_y - 5.0f, 13.0f, -24.0f);
+                    auto text_rect = ng_rect("timing_label", base_text);
                     text_rect.left += static_cast<float>(data.gameplay.timing_text_offset_x);
                     text_rect.right += static_cast<float>(data.gameplay.timing_text_offset_x);
                     text_rect.top += static_cast<float>(data.gameplay.timing_text_offset_y);
                     text_rect.bottom += static_cast<float>(data.gameplay.timing_text_offset_y);
                     const auto color = d2d_->text_brush->GetColor();
                     const auto opacity = d2d_->text_brush->GetOpacity();
-                    d2d_->text_brush->SetOpacity(opacity * feedback_animation.opacity);
+                    d2d_->text_brush->SetOpacity(opacity);
                     d2d_->text_brush->SetColor(feedback_delta_ms < 0.0
                         ? ng_color("timing_fast", D2D1::ColorF(0x5DA9FF, 0.98f))
                         : ng_color("timing_slow", D2D1::ColorF(0xFF5A6B, 0.98f)));
@@ -2026,19 +2071,20 @@
                     d2d_->text_brush->SetOpacity(opacity);
                 }
                 if (show_timing_bar) {
-                    draw_timing_indicator(feedback_field.left + static_cast<float>(data.gameplay.judgement_offset_x),
-                                          feedback_field.right + static_cast<float>(data.gameplay.judgement_offset_x),
-                                          combo_anchor_y,
+                    draw_timing_indicator(feedback_field.left,
+                                          feedback_field.right,
+                                          timing_anchor_y,
                                           timing_history,
                                           timing_history_count,
-                                          true,
+                                          has_timing_feedback,
                                           feedback_delta_ms);
                 }
             }
 
         };
         draw_feedback_overlay(field_layout, data.gameplay.has_feedback, data.gameplay.feedback,
-                              data.gameplay.feedback_delta_ms, scene_hud_cache.feedback_text,
+                              data.gameplay.timing_feedback_delta_ms, data.gameplay.has_non_pg_feedback,
+                              data.gameplay.has_timing_feedback, scene_hud_cache.feedback_text,
                               scene_hud_cache.feedback_timing_text, data.gameplay.timing_history_delta_ms,
                               data.gameplay.timing_history_count, judgement_text_animation,
                               scene_hud_cache.judgement_animation_started_ns);
@@ -2584,7 +2630,8 @@
             ctx->SetAntialiasMode(ghost_saved_antialias);
 
             draw_feedback_overlay(ghost_field_layout, data.gameplay.ghost_has_feedback,
-                                  data.gameplay.ghost_feedback, data.gameplay.ghost_feedback_delta_ms,
+                                  data.gameplay.ghost_feedback, data.gameplay.ghost_timing_feedback_delta_ms,
+                                  data.gameplay.ghost_has_non_pg_feedback, data.gameplay.ghost_has_timing_feedback,
                                   scene_hud_cache.ghost_feedback_text, scene_hud_cache.ghost_feedback_timing_text,
                                   data.gameplay.ghost_timing_history_delta_ms, data.gameplay.ghost_timing_history_count,
                                   ghost_judgement_text_animation, scene_hud_cache.ghost_judgement_animation_started_ns);
@@ -2687,9 +2734,9 @@
                     d2d_->text_brush->SetColor(ng_color("title", text_color));
                     d2d_->muted_brush->SetColor(ng_color("body", muted_color));
                     const float left = columns.metadata_left + 14.0f, right = columns.metadata_right - 6.0f;
-                    draw_fitted_readable_text(scene_hud_cache.title_text, ng_font("title", scene_title_format.Get()),
+                    draw_full_song_title(ng_font("title", scene_title_format.Get()),
                         D2D1::RectF(left, summary.row_edges[0], right, summary.row_edges[1]),
-                        d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING);
+                        d2d_->text_brush.Get());
                     draw_fitted_readable_text(scene_hud_cache.artist_text, ng_font("body", scene_body_format.Get()),
                         D2D1::RectF(left, summary.row_edges[1], right, summary.row_edges[2]),
                         d2d_->muted_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING);
@@ -2794,6 +2841,9 @@
             const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
             const float saved_text_opacity = d2d_->text_brush->GetOpacity();
 
+            // Pause controls must not inherit a fading gameplay text brush.
+            // Their opaque card already supplies contrast over bright BGA.
+            d2d_->text_brush->SetOpacity(1.0f);
             d2d_->panel_brush->SetOpacity(0.76f);
             ctx->FillRectangle(screen_overlay, d2d_->panel_brush.Get());
             d2d_->card_brush->SetOpacity(0.98f);
@@ -2848,7 +2898,7 @@
                                               selected ? 2.0f : 1.0f);
                 }
                 d2d_->text_brush->SetColor(
-                    selected ? D2D1::ColorF(0xFFFFFF, 1.0f) : D2D1::ColorF(0xAAB7C4, 0.92f));
+                    selected ? D2D1::ColorF(0xFFFFFF, 1.0f) : D2D1::ColorF(0xDFE7F0, 1.0f));
                 draw_readable_text_aligned(kPauseLabels[static_cast<std::size_t>(row)],
                                           scene_body_format.Get(),
                                           vcenter_text_rect(row_rect, scene_body_format.Get()),
@@ -2899,7 +2949,7 @@
                         if (!is_skin_preview) register_hit(button, MenuHitTargetKind::GameplayPauseAdjust,
                             static_cast<int>(row), direction == 0 ? MenuHitPart::Decrement : MenuHitPart::Increment);
                     }
-                    d2d_->text_brush->SetColor(D2D1::ColorF(0xAAB7C4, 0.92f));
+                    d2d_->text_brush->SetColor(D2D1::ColorF(0xDFE7F0, 1.0f));
                     draw_readable_text_aligned(std::wstring(tuning_rows[row].label),
                                               scene_body_format.Get(),
                                               vcenter_text_rect(line_rect, scene_body_format.Get()),
@@ -2913,7 +2963,7 @@
                                                                 scene_body_format.Get()),
                                               d2d_->text_brush.Get(),
                                               DWRITE_TEXT_ALIGNMENT_TRAILING);
-                    d2d_->text_brush->SetColor(D2D1::ColorF(0x7F8C9B, 0.92f));
+                    d2d_->text_brush->SetColor(D2D1::ColorF(0xB7C6D8, 1.0f));
                     draw_readable_text_aligned(std::wstring(tuning_rows[row].keys),
                                               scene_hud_format.Get(),
                                               vcenter_text_rect(line_rect, scene_hud_format.Get()),
@@ -2922,7 +2972,7 @@
                 }
             }
 
-            d2d_->text_brush->SetColor(D2D1::ColorF(0x94A3B8, 0.92f));
+            d2d_->text_brush->SetColor(D2D1::ColorF(0xB7C6D8, 1.0f));
             draw_readable_text_aligned(L"\u2191\u2193 \uC120\uD0DD   ENTER \uD655\uC778   ESC \uACC4\uC18D",
                                       scene_body_format.Get(),
                                       D2D1::RectF(pause_panel.left + 30.0f,

@@ -1013,6 +1013,9 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
     input.has_feedback = state.has_feedback;
     input.feedback = state.feedback;
     input.feedback_delta_ms = state.feedback_delta_ms;
+    input.has_non_pg_feedback = state.has_non_pg_feedback;
+    input.has_timing_feedback = state.has_timing_feedback;
+    input.timing_feedback_delta_ms = state.timing_feedback_delta_ms;
     input.peer_revision = state.peer_revision;
     input.timing_history_count = state.timing_history_count;
     std::copy_n(state.timing_history_delta_ms.begin(),
@@ -1048,6 +1051,9 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
     input.ghost_has_feedback = state.ghost_has_feedback;
     input.ghost_feedback = state.ghost_feedback;
     input.ghost_feedback_delta_ms = state.ghost_feedback_delta_ms;
+    input.ghost_has_non_pg_feedback = state.ghost_has_non_pg_feedback;
+    input.ghost_has_timing_feedback = state.ghost_has_timing_feedback;
+    input.ghost_timing_feedback_delta_ms = state.ghost_timing_feedback_delta_ms;
     input.ghost_timing_history_count = state.ghost_timing_history_count;
     std::copy_n(state.ghost_timing_history_delta_ms.begin(),
                 state.ghost_timing_history_count,
@@ -1805,6 +1811,14 @@ render::RenderConfig MenuApp::current_render_config() const {
     render::RenderConfig render_config;
     render_config.vsync = config_.graphics.vsync;
     render_config.fps_limit = effective_render_fps_limit();
+    if (current_screen() == Screen::Gameplay) {
+        std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
+        if (gameplay_hud_.loading && !gameplay_hud_.active) {
+            // A static load/wait card must not compete with parsing, decoding,
+            // or desktop audio at the gameplay cap (up to 1500 FPS).
+            render_config.fps_limit = std::min(render_config.fps_limit, 60);
+        }
+    }
     return render_config;
 }
 
@@ -3704,15 +3718,8 @@ void MenuApp::handle_options_hub_input(uint32_t keycode) {
                 settings_cursor_ = 0;
                 break;
             case menu::OptionsItemId::Mods:
-                mode_settings_controller_.reset();
-                push_screen(destination);
-                settings_cursor_ = 0;
-                break;
             case menu::OptionsItemId::KeyTest:
-                working_keymap_ = keymap_;
-                keymap_settings_controller_.reset(std::nullopt, config_.mode.key_mode);
-                push_screen(destination);
-                refresh_menu_input_polling_scope();
+                // Reserved old card IDs cannot be selected by the Options controller.
                 break;
             case menu::OptionsItemId::ProfileSetup:
                 push_screen(destination);

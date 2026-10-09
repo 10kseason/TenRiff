@@ -196,12 +196,11 @@ void MenuApp::apply_keymap_capture(uint32_t keycode) {
     const std::string edit_mode(keymap_settings_controller_.edit_mode());
     config::KeymapManager manager;
     config::Keymap pending = working_keymap_;
-    if (secondary_slot) {
-        if (clear_secondary) pending.secondary_mode_bindings[edit_mode].erase(lane);
-        else pending.secondary_mode_bindings[edit_mode][lane] = key_name;
-    } else pending.mode_bindings[edit_mode][lane] = key_name;
-    if (!secondary_slot && edit_mode == "10k") {
-        pending.bindings = pending.mode_bindings[edit_mode];
+    if (clear_secondary) {
+        pending.secondary_mode_bindings[edit_mode].erase(lane);
+    } else if (!manager.assign_binding(pending, edit_mode, lane, key_name, secondary_slot)) {
+        apply_keymap_settings_effects(keymap_settings_controller_.cancel_capture());
+        return;
     }
 
     std::string error;

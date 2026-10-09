@@ -113,8 +113,8 @@ KeymapSettingsViewModel KeymapSettingsView::build(
             "키를 누르세요. Delete는 보조 키를 해제하거나 기본 키 입력 대기를 취소합니다."));
         view.footer_notes.push_back(localized(
             language,
-            "Duplicate lane bindings are allowed.",
-            "같은 키를 여러 레인에 중복으로 배치할 수 있습니다."));
+            "An assigned key moves here and clears its previous primary or secondary slot in this mode.",
+            "이미 지정한 키는 이곳으로 옮겨지며, 현재 모드의 이전 기본·보조 키 지정은 해제됩니다."));
     }
 
     view.rows.push_back(KeymapViewRow{

@@ -39,6 +39,9 @@ public:
                                                                                   std::string_view key_mode) const;
     [[nodiscard]] std::unordered_map<std::string, std::string> secondary_bindings_for_mode(
         const Keymap& keymap, std::string_view key_mode) const;
+    // A physical key belongs to one slot in a mode; assigning it moves its old binding.
+    bool assign_binding(Keymap& keymap, std::string_view key_mode, std::string_view lane,
+                        std::string_view key_name, bool secondary_slot) const;
     void reset_mode_bindings(Keymap& keymap, std::string_view key_mode) const;
 
     [[nodiscard]] KeymapLoadResult load_profile(std::string_view profile_dir) const;

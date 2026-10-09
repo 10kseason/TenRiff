@@ -421,22 +421,22 @@
     const song=r('song_panel');text('SAMPLE TRACK',song[0]+28,song[1]+126,34,p.text,song[2]-song[0]-56);text('AAA',710,340,140,p.accent);text('987,654',650,500,74,p.text);text('98.76%',725,608,45,p.muted);
     const analysis=r('analysis_panel');ctx.strokeStyle=p.accent;ctx.lineWidth=4;ctx.beginPath();for(let i=0;i<28;i++){const x=analysis[0]+28+(analysis[2]-analysis[0]-56)*i/27,y=analysis[3]-60-(analysis[3]-analysis[1]-170)*(.25+i/40+.06*Math.sin(i));if(!i)ctx.moveTo(x,y);else ctx.lineTo(x,y);}ctx.stroke();
   }
-  const optionRoles=['key_mode','keymap','skin','graphics','audio','input','latency','profile','mode','key_test'];
-  const optionAssets=['keys','keymap','skin','display','audio','input','latency','profile','sliders','keytest'];
+  const optionRoles=['key_mode','keymap','skin','graphics','audio','input','latency','profile'];
+  const optionAssets=['keys','keymap','skin','display','audio','input','latency','profile'];
   function optionMetric(key,low,high){
     const value=doc().native?.metrics?.[key]??nativeCatalog.metrics[key];
     return Math.max(low,Math.min(high,value));
   }
   function optionRect(index){
     const r=effectiveRect('options','content'),gap=optionMetric('options_grid.gap',0,200),height=optionMetric('options_grid.height',1,800);
-    const width=(r[2]-r[0]-gap*4)/5,x=r[0]+index%5*(width+gap),y=r[1]+40+Math.floor(index/5)*(height+gap);
+    const width=(r[2]-r[0]-gap*3)/4,x=r[0]+index%4*(width+gap),y=r[1]+40+Math.floor(index/4)*(height+gap);
     return G.adjusted([x,y,x+width,y+height],doc().native?.rects?.['options_grid.rect.001']);
   }
   function drawOptions(){
     const p=palette(),colors=Object.fromEntries(Object.entries({...nativeCatalog.colors,...doc().native?.colors})
       .map(([key,value])=>[key,'#'+String(value).replace(/^#/,'')]));
-    const labels=['optionKeys','keymap','settings_skins','settings_graphics','settings_audio','settings_input','settings_calibration','profile','mode_mods','keymap_test'];
-    const values=[previewMode.toUpperCase(),t('keymap'),'Native','1920 × 1080','WASAPI','RawInput','0.0 ms','default','MOD',t('keymap_test')];
+    const labels=['optionKeys','keymap','settings_skins','settings_graphics','settings_audio','settings_input','settings_calibration','profile'];
+    const values=[previewMode.toUpperCase(),t('keymap'),'Native','1920 × 1080','WASAPI','RawInput','0.0 ms','default'];
     box([0,0,1920,126],p.panel,p.border,0);text('TENRIFF',64,64,44,p.text);text(t('options'),430,54,30,p.text);
     optionRoles.forEach((role,index)=>{
       const r=optionRect(index),chosen=index===selectedOption,ink=colors['options.icon.'+role],accent=colors['options.'+role];

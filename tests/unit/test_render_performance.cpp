@@ -864,10 +864,29 @@ TEST_CASE("skin preview refreshes cached HUD text for style settings and languag
     CHECK(animated.lane_pressed[0] != relabeled.lane_pressed[0]);
 }
 
+TEST_CASE("skin preview carries the LR2 Studio HUD and riff map visibility independently") {
+    tenriff::render::SkinPreviewData preview;
+    preview.hud_layout = "studio";
+    preview.skin_source = "lr2";
+    preview.hud_riff_map_visible = true;
+    const auto visible = tenriff::render::make_skin_gameplay_preview(preview);
+    CHECK(visible.skin_source == "lr2");
+    CHECK(visible.hud_layout == "studio");
+    CHECK(visible.hud_riff_map_visible);
+    preview.hud_riff_map_visible = false;
+    const auto hidden = tenriff::render::make_skin_gameplay_preview(preview);
+    CHECK_FALSE(hidden.hud_riff_map_visible);
+    // Graph visibility invalidates static geometry, not unchanged score strings.
+    CHECK(hidden.text_revision == visible.text_revision);
+    CHECK(hidden.lane_count == visible.lane_count);
+    CHECK(hidden.note_width_scale == visible.note_width_scale);
+}
+
 TEST_CASE("skin preview carries independent timing switches and positions") {
     tenriff::render::SkinPreviewData preview;
     preview.show_timing_feedback = false;
     preview.show_timing_bar = true;
+    preview.timing_bar_always_visible = true;
     preview.timing_text_offset_x = 120;
     preview.timing_text_offset_y = -70;
     preview.timing_bar_offset_x = -80;
@@ -875,6 +894,9 @@ TEST_CASE("skin preview carries independent timing switches and positions") {
     auto hud = tenriff::render::make_skin_gameplay_preview(preview);
     CHECK_FALSE(hud.show_timing_feedback);
     CHECK(hud.show_timing_bar);
+    CHECK(hud.timing_bar_always_visible);
+    CHECK(hud.has_timing_feedback);
+    CHECK(hud.timing_feedback_delta_ms == -18.0);
     CHECK(hud.feedback == "GR");
     CHECK(hud.feedback_delta_ms != 0);
     CHECK(hud.timing_text_offset_x == 120);
