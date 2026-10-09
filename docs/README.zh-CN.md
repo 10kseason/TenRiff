@@ -1,5 +1,7 @@
 # TenRiff 文档地图
 
+**2026-10-09 · TenRiff 1.8.7:** 改善输入校准和谱面加载音频，支持LR2单人Studio Deck、750ms FAST/SLOW保留、按键重新分配、选项整合及完整曲名自动缩放。 [1.8.7 release](release-1.8.7-gate.md).
+
 **2026-10-08 · TenRiff 1.8.6:** 为Native单人游玩新增Studio Deck HUD。左右Shift可绑定为游玩按键；F5/F6将Hi-Speed减半/加倍，F11打开聊天。仍可选择经典HUD。 [1.8.6 release](release-1.8.6-gate.md).
 
 **2026-10-06 · TenRiff 1.8.5:** 在关闭VSync的游玩中按绘制顺序批量提交受支持的音符图像，以减少CPU绘制调用。不兼容的皮肤、长音符和开启VSync时保留原有路径。大厅、菜单以及R1–R4判定和回放规则保持不变。 [1.8.5 release](release-1.8.5-gate.md).

@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased] - local feedback test, 2026-10-09
+## [1.8.7] - 2026-10-09
 
 - Keep positive input calibration intact across audio callback phases, and pair WASAPI playback samples with their observation time before buffer acquisition. Preserve the existing sample baseline, ASIO fallback and R1–R4 judgement windows. See [input timing](docs/input-offset-timing.ko.md) and [callback timing](docs/audio-callback-timestamp.ko.md) for compatibility limits.
 - Parse charts and select their sample rate before opening gameplay audio; cap only the loading card at 60 FPS and restore gameplay pacing on the first active HUD.
@@ -8,7 +8,7 @@
 - Automatically fit the full in-game song title to the space outside the resized/moved field. When the left side is too narrow, show it below the right HUD; reuse the measured title layout when field geometry changes. See [title fitting](docs/gameplay-title-fit.ko.md).
 - Retain FAST/SLOW for 750ms across subsequent PG judgements, separate timing coordinates from judgement coordinates and add an always-visible timing-bar mode.
 - Move an assigned key from its previous primary/secondary slot when rebinding, retaining explicit unbound primary slots after saving.
-- Consolidate Options to eight cards: access Mods from Key Mode Settings and NKRO Test from Keymap. See the [local test notes](docs/local-feedback-test.ko.md).
+- Consolidate Options to eight cards: access Mods from Key Mode Settings and NKRO Test from Keymap. See the [release scope and verification](docs/release-1.8.7-gate.md).
 
 ## [1.8.6] - 2026-10-08
 

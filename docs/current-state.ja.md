@@ -1,5 +1,7 @@
 # TenRiff Current State
 
+**2026-10-09 · TenRiff 1.8.7:** 入力補正と読み込み時の音声処理を改善し、LR2ソロのスタジオデッキ、750msのFAST/SLOW表示、キー再割り当て、設定統合と曲名の自動サイズ調整を追加します。 [1.8.7 release](release-1.8.7-gate.md).
+
 **2026-10-08 · TenRiff 1.8.6:** Nativeソロプレイ用のスタジオデッキHUDを追加。左右のShiftをプレイキーに設定でき、F5/F6でHi-Speedを半分/2倍、F11でチャットを開きます。クラシックHUDも選択できます。 [1.8.6 release](release-1.8.6-gate.md).
 
 **2026-10-06 · TenRiff 1.8.5:** VSync OFFのプレイ中に対応ノート画像を描画順にまとめ、CPUの描画呼び出しを削減します。非対応スキン・ロングノートとVSync ONは従来の経路を維持し、ロビー・メニューとR1～R4の判定・リプレイルールを保持します。 [1.8.5 release](release-1.8.5-gate.md).
@@ -19,14 +21,14 @@
 - 1.7.10 は ALL SONG の削除済みキャッシュ項目、統合進捗、完了状態の通知を改善します。[検証と未再現の症状](release-1.7.10-gate.md)。
 - 1.7.8 は新しい標準メニュー、4〜16キー対応 Luma Keys、日本語 UI とウェブ/オフラインスキン編集を追加します。メニューとゲームプレイの設定は `native` と `gameplay.native` に分けます。[検証範囲](release-1.7.8-gate.md)。
 
-現在のプロジェクト版は **1.8.6** です。Audioの曲終了方式で**最後まで聴く**（既定）か**後奏スキップ**を選べ、正常終了した結果は追加入力なしで保存・送信します。新しいプレイはBMS RANK対応のR4判定とウェブ送信用の判定プロファイルを使い、既存のR1/R2/R3記録は維持します。既定の出力はWASAPIです。変更内容と進行中のリリース検証は[1.8.6リリース案内](release-1.8.6-gate.md)を参照してください。
+現在のプロジェクト版は **1.8.7** です。Audioの曲終了方式で**最後まで聴く**（既定）か**後奏スキップ**を選べ、正常終了した結果は追加入力なしで保存・送信します。新しいプレイはBMS RANK対応のR4判定とウェブ送信用の判定プロファイルを使い、既存のR1/R2/R3記録は維持します。既定の出力はWASAPIです。変更内容と進行中のリリース検証は[1.8.7リリース案内](release-1.8.7-gate.md)を参照してください。
 
 [ローカル 1.7.1 r2 レポート](local-1.7.1-r2.ko.md)の 749/739 件は以前のビルドの記録です。新リリースの結果として再利用しません。[曲管理](library-management.md)、[基準 BPM](reference-bpm.md)、[スキンプリセット](skin-presets.md)、[ASIO](asio-audio.md)を参照してください。
 
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- 現在の project version は `1.8.6`
+- 現在の project version は `1.8.7`
 - 1.7.1 は最大8人の HUD・結果、同点順位・スコア待機状態、P-GREAT 専用演出、判定・コンボの独立位置、10個の設定カード、音量ノーマライズ、選曲の難易度表カードを提供します。[変更詳細](gameplay-polish-followup.md)と[検証範囲](release-1.7.1-gate.md)を参照。
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
 - 基本結果画面はスコア・ランク・精度を中心に表示し、プリズム演出はカスタムスキン側に残します。既存の2.2秒の表示演出、Spaceによるスキップ、操作解禁条件を維持します。
@@ -124,7 +126,7 @@
   - ゲーム内 Mode Settings の `Key Converter` で `Krrcream`、内蔵の決定論的 `KeyWeaver nK2`、または `KeyWeaver NK3 ONNX` を選択し、設定と replay metadata に保存
   - 個別の `Conversion Note Add` 設定は削除。Krrcream は元 note の再配置のみを行い、nK2 は key count 拡張時に変換後の target layout へ安全な support note を直接生成する。
   - nK2 preset は既定の `Native (12%)`、`Transform (35%)`、`Remaster (65%)` から選択する。`Remaster` は budget を上げつつ anchor を固定して原曲の配置を残し、LN 区間を同じ長さの LN で埋める。3 つとも上限であり、実際の追加量は原曲の密度と safety window で決まる。Krrcream では row を lock し、standalone converter GUI の Krrcream Max/Min/Speed/Seed も変更不可。
-  - 1.8.6 公式 build/Windows ZIP は standalone BMS key-converter CLI/GUI を build・同梱しない。top-level CMake option は既定 `OFF` で、source は開発 regression 用のみ維持
+  - 1.8.7 公式 build/Windows ZIP は standalone BMS key-converter CLI/GUI を build・同梱しない。top-level CMake option は既定 `OFF` で、source は開発 regression 用のみ維持
   - NK3 は同梱 P64 と host beam32 を常に組み合わせる。10K 以外の source を 10K に変換するときだけ generalized pattern MLP を追加し、10K→10K とその他すべての target は P64 のみを使う。既定の `AUTO` backend は ncnn Vulkan で P64 と MLP を AMD/NVIDIA GPU 上に実行し、任意の OpenVINO compatibility path を fallback として維持する。`TENRIFF_NK3_BACKEND` と `TENRIFF_NK3_VULKAN_DEVICE` で強制選択できる。
   - `mode.key_mode=none` は元のキー数と基本パターンレイアウトを維持
 - Native difficulty:
@@ -242,7 +244,7 @@
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- 現在の P2P 配布対象は `TenRiff 1.8.6`
+- 現在の P2P 配布対象は `TenRiff 1.8.7`
 - distribution package には `Songs` を含めない
 - distribution package には `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` の `Mainmusic/` scene slot を含め、各 `Name.mp3` と `Name 2.mp3`～`Name 64.mp3` を自動検出して scene 再入場ごとに循環する
 - distribution 更新には built artifact と必要な runtime asset だけを含める
