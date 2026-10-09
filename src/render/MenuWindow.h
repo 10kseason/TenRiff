@@ -974,6 +974,13 @@ private:
     // Developer preview friend only; disabled in the game, with no extra clock
     // reads unless a synchronous render benchmark explicitly opts in.
     bool benchmark_timings_enabled_ = false;
+    struct SongTitleDiagnostics {
+        float left = 0, top = 0, right = 0, bottom = 0;
+        float field_left = 0, field_right = 0;
+        float font_size = 0, text_width = 0, text_height = 0;
+        uint32_t characters = 0, line_count = 0;
+        uint64_t layout_builds = 0;
+    } benchmark_song_title_;
     int64_t benchmark_present_started_ns_ = 0;
     int64_t benchmark_present_ended_ns_ = 0;
     bool gameplay_sprite_batch_enabled_ = true;

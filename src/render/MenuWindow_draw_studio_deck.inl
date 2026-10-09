@@ -40,8 +40,10 @@
             const auto& deck = studio_deck;
             const auto& c = scene_hud_cache;
             const auto muted = D2D1::ColorF(0x8290A2);
-            studio_text(c.title_text, studio_fonts.studio_title.Get(),
-                D2D1::RectF(deck.left_x, 52, deck.left_x + deck.left_width, 86), ng_color("title", D2D1::ColorF(0xF4F7FB)));
+            const auto saved_title_color = d2d_->text_brush->GetColor();
+            d2d_->text_brush->SetColor(ng_color("title", D2D1::ColorF(0xF4F7FB)));
+            draw_full_song_title(studio_fonts.studio_title.Get(), song_title_rect, d2d_->text_brush.Get(), true);
+            d2d_->text_brush->SetColor(saved_title_color);
             studio_text(c.artist_text, studio_fonts.studio_body.Get(),
                 D2D1::RectF(deck.left_x, 90, deck.left_x + deck.left_width, 111), ng_color("body", D2D1::ColorF(0x7C889B)));
             const float cell_width = (deck.left_width - 12.0f) / 3.0f;

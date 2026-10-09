@@ -102,6 +102,55 @@
             }
             return rect;
         };
+        auto draw_full_song_title = [&](IDWriteTextFormat* format, const D2D1_RECT_F& rect,
+                                        ID2D1Brush* brush, bool plain = false) {
+            const auto& text = scene_hud_cache.title_text;
+            if (!format || !brush || text.empty()) return;
+            auto& title = is_skin_preview ? d2d_->preview_song_title : d2d_->gameplay_song_title;
+            if (!title.layout || title.text != text || title.format.Get() != format) {
+                title.layout.Reset();
+                if (FAILED(d2d_->dwrite_factory->CreateTextLayout(text.c_str(), static_cast<UINT32>(text.size()),
+                    format, 1000000.0f, 100000.0f, title.layout.ReleaseAndGetAddressOf()))) return;
+                title.layout->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+                title.layout->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+                title.layout->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+                const DWRITE_TRIMMING trimming{DWRITE_TRIMMING_GRANULARITY_NONE, 0, 0};
+                title.layout->SetTrimming(&trimming, nullptr);
+                DWRITE_TEXT_METRICS metrics{};
+                if (FAILED(title.layout->GetMetrics(&metrics))) { title.layout.Reset(); return; }
+                // Tight layout bounds let overhang account for italic/fallback
+                // glyphs, rather than measuring against the wide temporary box.
+                title.layout->SetMaxWidth(std::max(1.0f, metrics.widthIncludingTrailingWhitespace + 2.0f));
+                title.layout->SetMaxHeight(std::max(1.0f, metrics.height + 2.0f));
+                DWRITE_OVERHANG_METRICS overhang{};
+                if (FAILED(title.layout->GetOverhangMetrics(&overhang))) { title.layout.Reset(); return; }
+                title.inset_x = std::max(0.0f, overhang.left);
+                title.inset_y = std::max(0.0f, overhang.top);
+                title.width = title.layout->GetMaxWidth() + title.inset_x + std::max(0.0f, overhang.right);
+                title.height = title.layout->GetMaxHeight() + title.inset_y + std::max(0.0f, overhang.bottom);
+                title.line_count = metrics.lineCount;
+                title.text = text; title.format = format; ++title.builds;
+            }
+            const float scale = gameplay_song_title_fit_scale(title.width, title.height,
+                rect.right - rect.left, rect.bottom - rect.top);
+            if (scale <= 0) return;
+            D2D1_MATRIX_3X2_F saved{}; ctx->GetTransform(&saved);
+            ctx->SetTransform(D2D1::Matrix3x2F::Scale(scale, scale, D2D1::Point2F(rect.left, rect.top)) * saved);
+            const auto origin = D2D1::Point2F(rect.left + title.inset_x, rect.top + title.inset_y);
+            if (plain) ctx->DrawTextLayout(origin, title.layout.Get(), brush);
+            else draw_text_layout_readable(origin, title.layout.Get(), brush);
+            ctx->SetTransform(saved);
+            if (benchmark_timings_enabled_) {
+                benchmark_song_title_.left = rect.left; benchmark_song_title_.top = rect.top;
+                benchmark_song_title_.right = rect.right; benchmark_song_title_.bottom = rect.bottom;
+                benchmark_song_title_.font_size = format->GetFontSize() * scale;
+                benchmark_song_title_.text_width = title.width * scale;
+                benchmark_song_title_.text_height = title.height * scale;
+                benchmark_song_title_.characters = static_cast<uint32_t>(text.size());
+                benchmark_song_title_.line_count = title.line_count;
+                benchmark_song_title_.layout_builds = title.builds;
+            }
+        };
         // Single-line layouts are top-anchored; buttons and rows taller than one
         // line need their text box centred on the row instead.
         auto vcenter_text_rect = [](D2D1_RECT_F rect, IDWriteTextFormat* format) {
@@ -402,6 +451,18 @@
         const auto studio_deck = compute_gameplay_studio_deck_layout(surface_layout.player_field.left,
             surface_layout.player_field.right, data.performance.visible ? header_safe_right : 1856.0f,
             data.gameplay.hud_riff_map_visible);
+        const float title_safe_right = studio && studio_deck.map_visible
+            ? std::min(studio_deck.left_x + studio_deck.left_width,
+                studio_deck.map_x - (studio_deck.map_times_visible ? 64.0f : 8.0f) - 8.0f)
+            : surface_layout.player_field.left - 32.0f;
+        const auto song_title_layout = compute_gameplay_song_title_layout(surface_layout.player_field.left,
+            surface_layout.player_field.right, title_safe_right, studio);
+        const auto song_title_rect = D2D1::RectF(song_title_layout.left, song_title_layout.top,
+            song_title_layout.right, song_title_layout.bottom);
+        if (benchmark_timings_enabled_) {
+            benchmark_song_title_.field_left = surface_layout.player_field.left;
+            benchmark_song_title_.field_right = surface_layout.player_field.right;
+        }
 
         auto draw_timing_indicator = [&](float indicator_left,
                                          float indicator_right,
@@ -637,8 +698,8 @@
             if (studio) { /* The deck owns the left header. */ }
             else if (battle_column) {
                 const float left = battle_column->left, right = battle_column->right;
-                draw_fitted_readable_text(scene_hud_cache.title_text, ng_font("title", scene_title_format.Get()),
-                    D2D1::RectF(left, 72.0f, right, 114.0f), d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING);
+                draw_full_song_title(ng_font("title", scene_title_format.Get()),
+                    D2D1::RectF(left, 72.0f, right, 114.0f), d2d_->text_brush.Get());
                 draw_fitted_readable_text(scene_hud_cache.artist_text, ng_font("body", scene_body_format.Get()),
                     D2D1::RectF(left, 118.0f, right, 146.0f), d2d_->muted_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING);
                 // The long solo status line cannot cross either battle card.
@@ -652,12 +713,11 @@
             } else {
                 // Long titles shrink to the column instead of sliding under the field.
                 if (scene_title_format && d2d_->text_brush) {
-                    const D2D1_RECT_F title_rect = ng_rect("title",D2D1::RectF(header_left, header_top, solo_header_right, header_top + 52.0f));
+                    const D2D1_RECT_F title_rect = ng_rect("title", data.gameplay.peer_visible
+                        ? D2D1::RectF(header_left, header_top, solo_header_right, header_top + 52.0f)
+                        : song_title_rect);
                     IDWriteTextFormat* title_format = ng_font("title",scene_title_format.Get());
-                    draw_scaled_readable_text(scene_hud_cache.title_text, title_format, title_rect,
-                        d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING,
-                        measured_text_scale(0, scene_hud_cache.title_text, title_format,
-                                            title_rect.right - title_rect.left, 0.60f));
+                    draw_full_song_title(title_format, title_rect, d2d_->text_brush.Get());
                 }
                 if (scene_body_format && d2d_->muted_brush) {
                     const D2D1_RECT_F artist_rect = ng_rect("artist",D2D1::RectF(header_left, header_top + 46.0f, solo_header_right, header_top + 84.0f));
@@ -2674,9 +2734,9 @@
                     d2d_->text_brush->SetColor(ng_color("title", text_color));
                     d2d_->muted_brush->SetColor(ng_color("body", muted_color));
                     const float left = columns.metadata_left + 14.0f, right = columns.metadata_right - 6.0f;
-                    draw_fitted_readable_text(scene_hud_cache.title_text, ng_font("title", scene_title_format.Get()),
+                    draw_full_song_title(ng_font("title", scene_title_format.Get()),
                         D2D1::RectF(left, summary.row_edges[0], right, summary.row_edges[1]),
-                        d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING);
+                        d2d_->text_brush.Get());
                     draw_fitted_readable_text(scene_hud_cache.artist_text, ng_font("body", scene_body_format.Get()),
                         D2D1::RectF(left, summary.row_edges[1], right, summary.row_edges[2]),
                         d2d_->muted_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING);

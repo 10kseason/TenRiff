@@ -25,6 +25,7 @@
 #include <cctype>
 #include <cmath>
 #include <iostream>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -195,6 +196,18 @@ struct MenuWindowVisualTestAccess {
     static bool fullscreen(const MenuWindow& window) { return window.fullscreen_; }
     static std::array<bool, 2> studio_hud_flags(const MenuWindow& window) {
         return {window.gameplay_static_cache_.studio, window.gameplay_static_cache_.hud_riff_map_visible};
+    }
+    static config::JsonValue song_title_stats(const MenuWindow& window) {
+        using namespace config;
+        const auto& t = window.benchmark_song_title_;
+        return JsonValue(JsonObject{
+            {"left", JsonValue(t.left)}, {"top", JsonValue(t.top)},
+            {"right", JsonValue(t.right)}, {"bottom", JsonValue(t.bottom)},
+            {"field_left", JsonValue(t.field_left)}, {"field_right", JsonValue(t.field_right)},
+            {"font_size", JsonValue(t.font_size)}, {"text_width", JsonValue(t.text_width)},
+            {"text_height", JsonValue(t.text_height)}, {"characters", JsonValue(static_cast<double>(t.characters))},
+            {"line_count", JsonValue(static_cast<double>(t.line_count))},
+            {"layout_builds", JsonValue(static_cast<double>(t.layout_builds))}});
     }
     static std::array<int64_t, 2> present_times(const MenuWindow& window) {
         return {window.benchmark_present_started_ns_, window.benchmark_present_ended_ns_};
@@ -440,6 +453,8 @@ int main(int argc, char** argv) {
     std::string preview_note_shape, preview_hit_burst;
     double fade_in = 0.0, fade_out = 0.0;
     double field_offset = 0;
+    std::string song_title_file;
+    std::optional<std::array<double, 2>> next_field_layout;
     int players = 0;
     int preview_fps = 144;
     int benchmark_frames = 0;
@@ -679,6 +694,13 @@ int main(int argc, char** argv) {
         else if (arg == "--graphics-settings") settings = graphics_settings = true;
         else if (arg == "--skin-scene") { settings = skin_settings = skin_scene = true; }
         else if (arg == "--field-offset" && i + 1 < argc) field_offset = std::stod(argv[++i]);
+        else if (arg == "--song-title-file" && i + 1 < argc) song_title_file = argv[++i];
+        else if (arg == "--field-next" && i + 2 < argc) {
+            const double next_offset = std::stod(argv[++i]);
+            const double next_width = std::stod(argv[++i]);
+            if (!std::isfinite(next_offset) || !std::isfinite(next_width) || next_width < 0.5 || next_width > 2.0) return 2;
+            next_field_layout = std::array<double, 2>{next_offset, next_width};
+        }
         else if (arg == "--skin-settings") { settings = true; skin_settings = true; }
         else if (arg == "--empty") empty = true;
         else if (arg == "--failed") failed = true;
@@ -1056,6 +1078,11 @@ int main(int argc, char** argv) {
         hud.note_height_scale = preview_note_height;
         hud.gameplay_field_offset_x = field_offset;
         hud.active = true; hud.title = loc("Gameplay", "게임플레이") + " / " + loc("LIVE PREVIEW", "미리보기");
+        if (!song_title_file.empty()) {
+            std::ifstream file(std::filesystem::u8path(song_title_file), std::ios::binary);
+            if (!file) { std::cerr << "Cannot read the song title fixture.\n"; return 2; }
+            hud.title.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+        }
         hud.artist = loc("VIEW ONLY", "보기 전용") + " / " + loc("OFFLINE", "오프라인");
         hud.visual_velocity = 1.0 / 48000.0;
         if (moved_labels) {
@@ -1485,6 +1512,10 @@ int main(int argc, char** argv) {
             data.gameplay.hud_riff_map_visible = !data.gameplay.hud_riff_map_visible;
             data.generic.skin_preview.hud_riff_map_visible = !data.generic.skin_preview.hud_riff_map_visible;
         }
+        if (rendered_frames == 35 && next_field_layout) {
+            data.gameplay.gameplay_field_offset_x = (*next_field_layout)[0];
+            data.gameplay.note_width_scale = (*next_field_layout)[1];
+        }
         if (avatar_refresh_frame > 0 && rendered_frames == avatar_refresh_frame) ++data.profile_avatar_revision;
         if (cycle_selection) {
             const int selection = (rendered_frames / 45);
@@ -1671,6 +1702,7 @@ int main(int argc, char** argv) {
             {"riff_map_cached_visible", JsonValue(MenuWindowVisualTestAccess::studio_hud_flags(window)[1])},
             {"riff_map_count", JsonValue(static_cast<double>(data.gameplay.riff_map_count))},
             {"riff_map_revision", JsonValue(static_cast<double>(data.gameplay.riff_map_revision))},
+            {"song_title", MenuWindowVisualTestAccess::song_title_stats(window)},
             {"dense_notes", JsonValue(static_cast<double>(dense_notes))},
             {"dense_holds", JsonValue(dense_holds)}, {"tapered_holds", JsonValue(tapered_holds)},
             {"player_note_count", JsonValue(static_cast<double>(data.gameplay.note_count))},

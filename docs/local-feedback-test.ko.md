@@ -3,6 +3,7 @@
 `TenRiff-1.8.6-feedback-test`는 공개 1.8.6에서 출발한 로컬 수정본이다.
 프로젝트/게임 표시 버전은 1.8.6이고 패키지 이름으로 시험본을 구별한다.
 전체 변경은 [보완 설명](feedback-followup.ko.md)과 CHANGELOG의 Unreleased 항목에 기록했다.
+후속 `TenRiff-1.8.6-title-fit-test`에는 같은 피드백 수정과 [곡 제목 자동 맞춤](gameplay-title-fit.ko.md)이 포함된다.
 
 ## 사용과 확인
 

@@ -4,6 +4,7 @@
 #include "config/BuiltinDifficultyTables.h"
 #include "render/GameplayFeedbackText.h"
 #include "render/GameplayStudioDeck.h"
+#include "render/GameplaySongTitle.h"
 #include "render/NativeMenuAssets.h"
 #include "render/NativeMenuPalette.h"
 #include "render/LumaKeysAssets.h"
@@ -2351,6 +2352,14 @@ struct MenuWindow::D2DResources {
     };
     std::array<MeasuredTextWidth, 4> gameplay_measured_text{};
     std::array<MeasuredTextWidth, 4> preview_measured_text{};
+    struct SongTitleText {
+        std::wstring text;
+        Microsoft::WRL::ComPtr<IDWriteTextFormat> format;
+        Microsoft::WRL::ComPtr<IDWriteTextLayout> layout;
+        float width = 0.0f, height = 0.0f, inset_x = 0.0f, inset_y = 0.0f;
+        uint32_t line_count = 0;
+        uint64_t builds = 0;
+    } gameplay_song_title, preview_song_title;
     std::array<ReadableTextLayout, 384> menu_readable_text{};
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_logo_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_nav_format;
@@ -4104,6 +4113,15 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
         fill->SetColor(D2D1::ColorF(0x050608, 0.92f));
         ctx->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(
             deck.left_x - 12.0f, 40.0f, deck.left_x + deck.left_width + 12.0f, 258.0f), 10, 10), fill);
+        const float title_safe_right = deck.map_visible
+            ? std::min(deck.left_x + deck.left_width,
+                deck.map_x - (deck.map_times_visible ? 64.0f : 8.0f) - 8.0f)
+            : field.left - 32.0f;
+        const auto title = compute_gameplay_song_title_layout(field.left, field.right, title_safe_right, true);
+        if (title.top >= 400.0f || title.left < deck.left_x || title.right > deck.left_x + deck.left_width) {
+            ctx->FillRectangle(D2D1::RectF(title.left - 8.0f, title.top - 6.0f,
+                                          title.right + 8.0f, title.bottom + 6.0f), fill);
+        }
         if (deck.right_hud_visible) {
             ctx->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(
                 deck.right_x - 12.0f, 36.0f, deck.right_x + deck.right_width + 12.0f, 390.0f), 10, 10), fill);
@@ -5198,6 +5216,8 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family, const app::Native
     for (auto& text : d2d_->preview_readable_text) text = {};
     for (auto& text : d2d_->gameplay_measured_text) text = {};
     for (auto& text : d2d_->preview_measured_text) text = {};
+    d2d_->gameplay_song_title = {};
+    d2d_->preview_song_title = {};
     return true;
 }
 
