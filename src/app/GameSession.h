@@ -113,6 +113,9 @@ public:
         bool has_feedback = false;
         game::Judgement feedback_judgement = game::Judgement::BD;
         double feedback_delta_ms = 0.0;
+        bool has_non_pg_feedback = false;
+        bool has_timing_feedback = false;
+        double timing_feedback_delta_ms = 0.0;
         std::size_t timing_history_count = 0;
         std::array<double, kGameplayTimingHistoryMaxEntries> timing_history_delta_ms{};
 
@@ -137,6 +140,9 @@ public:
         bool ghost_has_feedback = false;
         game::Judgement ghost_feedback_judgement = game::Judgement::BD;
         double ghost_feedback_delta_ms = 0.0;
+        bool ghost_has_non_pg_feedback = false;
+        bool ghost_has_timing_feedback = false;
+        double ghost_timing_feedback_delta_ms = 0.0;
         std::size_t ghost_timing_history_count = 0;
         std::array<double, kGameplayTimingHistoryMaxEntries> ghost_timing_history_delta_ms{};
         bool ghost_finished = false;
@@ -322,6 +328,7 @@ private:
         int lane = 1;
         input::InputState state = input::InputState::Released;
         int64_t sample = 0;
+        int64_t audio_sample = 0;
     };
 
     struct PolledGameplayKey {
@@ -385,7 +392,8 @@ private:
     void dispatch_lane_input(int lane,
                              input::InputState state,
                              int64_t sample,
-                             int64_t audio_buffer_start_sample);
+                             int64_t audio_buffer_start_sample,
+                             std::optional<int64_t> physical_input_sample = std::nullopt);
     void catch_up_lane_input(int lane, input::InputState state, int64_t sample);
     void schedule_note_guides(int64_t buffer_start_samples, int64_t buffer_end_samples);
     void schedule_note_keysound(const gameplay::NoteEvent& note, int64_t sample);

@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased] - local feedback test, 2026-10-09
+
+- Keep positive input calibration intact across audio callback phases, and pair WASAPI playback samples with their observation time before buffer acquisition. Preserve the existing sample baseline, ASIO fallback and R1–R4 judgement windows. See [input timing](docs/input-offset-timing.ko.md) and [callback timing](docs/audio-callback-timestamp.ko.md) for compatibility limits.
+- Parse charts and select their sample rate before opening gameplay audio; cap only the loading card at 60 FPS and restore gameplay pacing on the first active HUD.
+- Support Studio Deck for imported LR2 solo skins, add a riff-map visibility control and dark cached HUD backings for bright backgrounds.
+- Retain FAST/SLOW for 750ms across subsequent PG judgements, separate timing coordinates from judgement coordinates and add an always-visible timing-bar mode.
+- Move an assigned key from its previous primary/secondary slot when rebinding, retaining explicit unbound primary slots after saving.
+- Consolidate Options to eight cards: access Mods from Key Mode Settings and NKRO Test from Keymap. See the [local test notes](docs/local-feedback-test.ko.md).
+
 ## [1.8.6] - 2026-10-08
 
 - Add the default Studio Deck HUD for Native solo play: chart-wide density map, side gauge rails, score/accuracy panel and compact judgement feedback. Classic remains selectable; external image skins, ghost and multiplayer retain the classic layout.

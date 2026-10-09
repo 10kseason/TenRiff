@@ -255,9 +255,9 @@ test('backdrop brightness and height roundtrip with per-mode overrides and match
   assert.equal(G.backdropOpacity({key_backdrop_brightness:2,key_backdrop_height:.25,key_backdrop_opacity:.4},true),.4);
 });
 
-test('native preview only paints timing history while FAST/SLOW feedback is visible',()=>{
+test('native preview retains timing through the short judgement animation',()=>{
   const G=require('./gameplay.js');
-  for(const [now,animate,enabled,visible] of [[0,false,true,false],[100,true,true,false],[3100,true,true,true],[6100,true,true,true],[3499,true,true,false],[3100,true,false,false]]){
+  for(const [now,animate,enabled,visible] of [[0,false,true,false],[100,true,true,false],[3100,true,true,true],[6100,true,true,true],[3499,true,true,true],[3100,true,false,false]]){
     const bars=[],labels=[];
     const ctx=new Proxy({createLinearGradient(){return {addColorStop(){}};},fillRect(){if(this.fillStyle==='#123456')bars.push(true);},fillText(value){labels.push(value);}},
       {get(target,key){return key in target?target[key]:()=>{};}});
@@ -303,4 +303,23 @@ test('native and bitmap LN bodies use linear configured alpha',()=>{
     assert.ok(bitmapAlphas.length>0);
     bitmapAlphas.forEach(value=>assert.equal(value,opacity));
   }
+});
+
+test('always timing bar remains visible on PG and text survives only 750ms after the last non PG',()=>{
+  const G=require('./gameplay.js');
+  for(const [now,always,bar,text] of [[0,true,true,false],[0,false,false,false],[15100,false,true,true],[15400,false,false,false],[15400,true,true,false]]){
+    const bars=[],labels=[];
+    const ctx=new Proxy({createLinearGradient(){return {addColorStop(){}};},fillRect(){if(this.fillStyle==='#123456')bars.push(true);},fillText(value){labels.push(value);}},
+      {get(target,key){return key in target?target[key]:()=>{};}});
+    const style=C.clone(catalog.native.gameplay);
+    style.show_timing_feedback=true;style.show_timing_bar=true;style.timing_bar_always_visible=always;style.native.colors.timing='#123456';
+    G.paint(ctx,style,catalog.gameplayNative,'4k',now,true,()=>false);
+    assert.equal(bars.length>0,bar,JSON.stringify({now,always}));
+    assert.equal(labels.some(value=>/^(FAST|SLOW) /.test(value)),text,JSON.stringify({now,always}));
+  }
+  const doc={...basic(),gameplay:{timing_bar_always_visible:true,modes:{'4k':{timing_bar_always_visible:false}}}};
+  assert.deepEqual(errors(doc),[]);
+  assert.deepEqual(C.parse(C.serialize(doc)),doc);
+  assert.equal(C.gameplay(doc,'4k').timing_bar_always_visible,false);
+  assert.equal(C.gameplay(doc,'10k').timing_bar_always_visible,true);
 });

@@ -80,9 +80,11 @@ TEST_CASE("skin preset native settings round trip only appearance in Unicode pat
     skin.note_height_scales["7k"] = 1.35;
     skin.lane_colors["5k"] = {"rose", "azure", "ice", "azure", "rose"};
     skin.judgement_position = 0.6;
+    skin.hud_riff_map_visible = false;
     skin.judgement_offset_x = 42;
     skin.show_timing_feedback = false;
     skin.show_timing_bar = true;
+    skin.timing_bar_always_visible = true;
     skin.timing_feedback_override = true;
     skin.timing_text_offset_x = 180;
     skin.timing_text_offset_y = -100;
@@ -107,9 +109,11 @@ TEST_CASE("skin preset native settings round trip only appearance in Unicode pat
     const auto imported = tenriff::app::import_skin_preset(file.u8string(), (dir.path / fs::u8path(u8"다른 PC")).u8string());
     require_preset_success(imported);
     CHECK(imported.skin.judgement_position == doctest::Approx(0.6));
+    CHECK_FALSE(imported.skin.hud_riff_map_visible);
     CHECK(imported.skin.judgement_offset_x == 42);
     CHECK_FALSE(imported.skin.show_timing_feedback);
     CHECK(imported.skin.show_timing_bar);
+    CHECK(imported.skin.timing_bar_always_visible);
     CHECK(imported.skin.timing_feedback_override);
     CHECK(imported.skin.timing_text_offset_x == 180);
     CHECK(imported.skin.timing_text_offset_y == -100);

@@ -7,7 +7,7 @@
 - 主页：`Play / Multiplayer / Options / Exit`；未索引谱面时第一项为 `Add Songs Folder`。
 - 选曲：顶部 `Songs / Sources / Records / Session Mix / Options`，中央底部 `Search / Sort·Filter / Difficulty Table`。旧版左侧 KEY/菜单栏不再是当前默认布局。
 - 难度表卡片：名称与 URL 区域打开编辑器，File 选择本地 JSON，Reset 恢复原生 LV。Enter 应用，Esc 取消；无效地址保留当前难度表。Filters 中的项目使用相同导入路径。
-- Options：5列×2行共10张卡片：Key Mode、Keymap、Skins、Graphics、Audio、Input、Calibration、Profile Setup、Mods、Key Test。
+- Options：4列×2行共8张卡片：Key Mode Settings、Keymap、Skins、Graphics、Audio、Input、Calibration、Profile Setup。完整模式管理器位于Key Mode Settings的Mods中；按键测试位于Keymap的NKRO Test中。详细设置和测试功能全部保留。
 - 共用设置：方向键选择、调整；Enter 执行所选操作，Esc/Backspace 返回。长说明使用分页按钮，皮肤设置保留实时预览。
 - 键位：支持 4K–10K、12K、14K、16K，成功绑定后立即保存。
 - 结果：Space 跳过单人展示动画。可操作后 R/Left 重试、F1 回放、Enter/Esc/Backspace 返回。Session Mix 中 Enter 进入下一曲，Esc/Backspace 结束；多人结果返回大厅。

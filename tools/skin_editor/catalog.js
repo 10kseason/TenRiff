@@ -707,6 +707,9 @@
           "show_timing_bar": {
             "type": "boolean"
           },
+          "timing_bar_always_visible": {
+            "type": "boolean"
+          },
           "show_gear_boundary_line": {
             "type": "boolean"
           },
@@ -1279,6 +1282,9 @@
             "type": "boolean"
           },
           "show_timing_bar": {
+            "type": "boolean"
+          },
+          "timing_bar_always_visible": {
             "type": "boolean"
           },
           "show_gear_boundary_line": {

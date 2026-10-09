@@ -1941,3 +1941,50 @@ TEST_CASE("initial released-key synchronization does not invalidate a native rep
     replay.chart_format = "bms";
     CHECK(tenriff::gameplay::validate_replay_evidence(replay).success());
 }
+
+TEST_CASE("timing guidance survives a following PG and expires after 750 milliseconds") {
+    GameplayChart chart;
+    chart.lane_count = 2;
+    chart.duration_samples = 5000;
+    chart.notes = {{1, 1000, std::nullopt}, {2, 1100, std::nullopt}, {1, 3000, std::nullopt}};
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 30.0;
+    config.judge.gd_ms = 70.0;
+    config.judge.bd_ms = 100.0;
+    GameplayEngine engine(chart, config);
+    (void)engine.handle_input(1, InputState::Pressed, 980);
+    REQUIRE(engine.live_feedback().judgement == Judgement::GR);
+    (void)engine.handle_input(2, InputState::Pressed, 1100);
+    CHECK(engine.live_feedback().judgement == Judgement::PG);
+    CHECK(engine.stats().counts.gr == 1);
+    CHECK(engine.stats().counts.pg == 1);
+    const auto timing = engine.timing_feedback();
+    CHECK(timing.judgement == Judgement::GR);
+    CHECK(timing.delta_ms == doctest::Approx(-20));
+    CHECK(timing.sample == 980);
+    CHECK(tenriff::gameplay::timing_feedback_visible(timing, 1730, 1000));
+    CHECK_FALSE(tenriff::gameplay::timing_feedback_visible(timing, 1731, 1000));
+    (void)engine.handle_input(1, InputState::Released, 2800);
+    (void)engine.handle_input(1, InputState::Pressed, 3025);
+    CHECK(engine.timing_feedback().delta_ms == doctest::Approx(25));
+    CHECK(engine.timing_feedback().sample == 3025);
+}
+
+TEST_CASE("a missed BAD shows the non PG bar without inventing a timing error") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 5000;
+    chart.notes = {{1, 1000, std::nullopt}, {1, 3000, std::nullopt}};
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.judge.indirect_miss_ms = 0.0;
+    config.judge.bd_ms = 100.0;
+    GameplayEngine engine(chart, config);
+    engine.advance(1101);
+    CHECK(engine.non_pg_feedback().has_value);
+    CHECK(engine.non_pg_feedback().judgement == Judgement::BD);
+    CHECK_FALSE(engine.timing_feedback().has_value);
+    CHECK(tenriff::gameplay::timing_feedback_visible(engine.non_pg_feedback(), 1101, 1000));
+}

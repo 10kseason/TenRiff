@@ -375,6 +375,121 @@ TEST_CASE("invalid optional secondary binding is removed instead of becoming a d
     CHECK(manager.bindings_for_mode(loaded.keymap, "5k").at("lane2") == "F");
 }
 
+TEST_CASE("assigning a physical key transfers primary and secondary slots only in the edited mode") {
+    tenriff::config::KeymapManager manager;
+    for (const auto& mode : manager.supported_mode_tokens()) {
+        for (bool source_secondary : {false, true}) {
+            for (bool target_secondary : {false, true}) {
+                auto keymap = manager.default_keymap();
+                const auto other_modes = keymap.mode_bindings;
+                if (source_secondary) keymap.secondary_mode_bindings[mode]["lane1"] = "F12";
+                else keymap.mode_bindings[mode]["lane1"] = "F12";
+                keymap.secondary_mode_bindings["7k"]["lane7"] = "F11";
+                REQUIRE(manager.assign_binding(keymap, mode, "lane2", "F12", target_secondary));
+                const auto primary = manager.bindings_for_mode(keymap, mode);
+                const auto secondary = manager.secondary_bindings_for_mode(keymap, mode);
+                CHECK((target_secondary ? secondary : primary).at("lane2") == "F12");
+                if (source_secondary) CHECK(secondary.count("lane1") == 0);
+                else CHECK(primary.at("lane1").empty());
+                CHECK(manager.validate_unique_bindings(keymap).empty());
+                for (const auto& [other_mode, bindings] : other_modes) {
+                    if (other_mode != mode) CHECK(keymap.mode_bindings.at(other_mode) == bindings);
+                }
+                CHECK(keymap.secondary_mode_bindings.at("7k").at("lane7") == "F11");
+                CHECK(keymap.bindings == keymap.mode_bindings.at("10k"));
+            }
+        }
+    }
+}
+
+TEST_CASE("key transfer compares physical aliases and moves a same-lane primary to secondary") {
+    tenriff::config::KeymapManager manager;
+    auto keymap = manager.default_keymap();
+    keymap.mode_bindings["4k"]["lane1"] = "VK_OEM_1";
+    keymap.secondary_mode_bindings["4k"]["lane2"] = ";";
+    keymap.secondary_mode_bindings["4k"]["lane3"] = "LShift";
+    REQUIRE_FALSE(manager.validate_unique_bindings(keymap).empty());
+    REQUIRE(manager.assign_binding(keymap, "4k", "lane4", ";", true));
+    CHECK(keymap.mode_bindings.at("4k").at("lane1").empty());
+    CHECK(keymap.mode_bindings.at("4k").at("lane4").empty());
+    CHECK(keymap.secondary_mode_bindings.at("4k").count("lane2") == 0);
+    CHECK(keymap.secondary_mode_bindings.at("4k").at("lane4") == "Semicolon");
+    CHECK(keymap.secondary_mode_bindings.at("4k").at("lane3") == "LShift");
+    CHECK(manager.validate_unique_bindings(keymap).empty());
+    REQUIRE(manager.assign_binding(keymap, "4k", "lane4", "Semicolon", false));
+    CHECK(keymap.mode_bindings.at("4k").at("lane4") == "Semicolon");
+    CHECK(keymap.secondary_mode_bindings.at("4k").count("lane4") == 0);
+}
+
+TEST_CASE("Shift side assignments move independently and reject invalid capture targets") {
+    tenriff::config::KeymapManager manager;
+    auto keymap = manager.default_keymap();
+    REQUIRE(manager.assign_binding(keymap, "10k", "lane1", "LShift", false));
+    REQUIRE(manager.assign_binding(keymap, "10k", "lane2", "RShift", false));
+    REQUIRE(manager.assign_binding(keymap, "10k", "lane3", "LShift", true));
+    CHECK(keymap.mode_bindings.at("10k").at("lane1").empty());
+    CHECK(keymap.mode_bindings.at("10k").at("lane2") == "RShift");
+    CHECK(keymap.secondary_mode_bindings.at("10k").at("lane3") == "LShift");
+    CHECK(keymap.bindings.at("lane1").empty());
+    const auto before = keymap;
+    CHECK_FALSE(manager.assign_binding(keymap, "10k", "lane99", "RShift", false));
+    CHECK_FALSE(manager.assign_binding(keymap, "10k", "lane1", "BogusKey", false));
+    CHECK(keymap.mode_bindings == before.mode_bindings);
+    CHECK(keymap.secondary_mode_bindings == before.secondary_mode_bindings);
+    CHECK(keymap.bindings == before.bindings);
+}
+
+TEST_CASE("transferred primary remains unassigned after save and load including legacy 10K mirror") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    tenriff::config::KeymapManager manager;
+    auto keymap = manager.default_keymap();
+    REQUIRE(manager.assign_binding(keymap, "4k", "lane2", "D", false));
+    REQUIRE(manager.assign_binding(keymap, "10k", "lane2", "Q", true));
+    REQUIRE(manager.save_profile(temp.path.u8string(), keymap));
+    const auto loaded = manager.load_profile(temp.path.u8string());
+    REQUIRE(loaded.success());
+    CHECK_FALSE(loaded.rewritten());
+    CHECK(loaded.keymap.mode_bindings.at("4k").at("lane1").empty());
+    CHECK(loaded.keymap.mode_bindings.at("4k").at("lane2") == "D");
+    CHECK(loaded.keymap.mode_bindings.at("10k").at("lane1").empty());
+    CHECK(loaded.keymap.bindings.at("lane1").empty());
+    CHECK(loaded.keymap.secondary_mode_bindings.at("10k").at("lane2") == "Q");
+    CHECK(manager.validate_unique_bindings(loaded.keymap).empty());
+}
+
+TEST_CASE("explicit unassigned primary is preserved while missing and invalid keys still use defaults") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    write_file(temp.path / "keymap.json",
+               R"({"modes":{"4k":{"lane1":"","lane2":"BogusKey"}}})");
+    tenriff::config::KeymapManager manager;
+    const auto loaded = manager.load_profile(temp.path.u8string());
+    REQUIRE(loaded.success());
+    CHECK(loaded.repaired_binding_count == 1);
+    CHECK(loaded.keymap.mode_bindings.at("4k").at("lane1").empty());
+    CHECK(loaded.keymap.mode_bindings.at("4k").at("lane2") == "F");
+    CHECK(loaded.keymap.mode_bindings.at("4k").at("lane3") == "L");
+    auto reset = loaded.keymap;
+    manager.reset_mode_bindings(reset, "4k");
+    CHECK(reset.mode_bindings.at("4k").at("lane1") == "D");
+}
+
+TEST_CASE("unique binding validation rejects same-slot aliases but keeps left and right Shift distinct") {
+    tenriff::config::KeymapManager manager;
+    auto keymap = manager.default_keymap();
+    keymap.secondary_mode_bindings["4k"]["lane4"] = "VK_OEM_1";
+    const auto duplicates = manager.validate_unique_bindings(keymap);
+    REQUIRE(duplicates.size() == 1);
+    CHECK(duplicates.front() == "4k:Semicolon");
+    keymap.secondary_mode_bindings["4k"].clear();
+    keymap.mode_bindings["4k"]["lane1"] = "LShift";
+    keymap.secondary_mode_bindings["4k"]["lane1"] = "RShift";
+    CHECK(manager.validate_unique_bindings(keymap).empty());
+}
+
 TEST_CASE("alternate physical key releases preserve a held logical key and long note") {
     using tenriff::input::InputState;
     tenriff::input::LaneBindingState state;

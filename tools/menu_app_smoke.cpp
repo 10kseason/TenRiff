@@ -42,6 +42,27 @@ struct Report {
     }
 };
 
+// MenuWindow's timestamp is a per-render result: the next render clears it to
+// zero before doing any work. Read it on that same render thread immediately
+// after render_tick, then publish a cumulative observation for slow test polls.
+// This instrumentation exists only in the smoke executable, not the product.
+struct PresentProbe {
+    std::atomic<std::uint64_t> successful_presents{0};
+    std::atomic<std::uint64_t> callbacks_without_present{0};
+    std::atomic<std::uint64_t> raw_zero_reads_after_progress{0};
+    std::atomic<std::int64_t> last_completion_ns{0};
+
+    void record(std::int64_t completed_ns) {
+        if (completed_ns <= 0) {
+            callbacks_without_present.fetch_add(1, std::memory_order_relaxed);
+            return;
+        }
+        last_completion_ns.store(completed_ns, std::memory_order_release);
+        successful_presents.fetch_add(1, std::memory_order_release);
+    }
+};
+PresentProbe present_probe;
+
 // Little-endian, mono 16-bit PCM containing silence. The fixture exercises the
 // real decoder and audio clock without playing a sound or using external media.
 void write_silent_wave(const std::filesystem::path& path) {
@@ -73,6 +94,19 @@ namespace tenriff::app {
 // These existing test friends are defined only in this executable. Menu actions
 // run on their owner thread; the observer reads only mutex-protected HUD data.
 struct MenuAppVisualTestAccess {
+    static void attach_present_probe(MenuApp& app) {
+        // Replacing a running callback is a data race. Join it first and use
+        // the same window/config/shutdown setup as restart_render_thread. The
+        // fixture recreates its window once before any transition checks.
+        app.render_thread_.shutdown();
+        app.menu_window_.set_config(app.current_window_config());
+        if (!app.render_thread_.initialize(app.current_render_config(), [&app]() {
+                app.render_tick();
+                present_probe.record(app.menu_window_.last_present_completion_ns());
+            }, [&app]() { app.menu_window_.shutdown(); }) || !app.render_thread_.start()) {
+            throw std::runtime_error("Cannot attach smoke Present observer");
+        }
+    }
     static Screen screen(const MenuApp& app) { return app.current_screen(); }
     static void key(MenuApp& app, const char* name) {
         const auto code = config::KeycodeMap::to_keycode(name);
@@ -119,16 +153,34 @@ struct MenuAppVisualTestAccess {
         }
         return app.visible_song_count() == 1;
     }
-    static bool present(MenuApp& app) {
-        const auto prior = app.menu_window_.last_present_completion_ns();
+    static bool present(MenuApp& app, std::string& detail) {
+        const auto prior = present_probe.successful_presents.load(std::memory_order_acquire);
+        const auto prior_without_present = present_probe.callbacks_without_present.load(std::memory_order_acquire);
         const auto deadline = Clock::now() + std::chrono::seconds(3);
         // Let render_tick consume the newly published snapshot. This verifies
         // presentation liveness, not pixels/hit geometry (a separate fixture).
         std::this_thread::sleep_for(std::chrono::milliseconds(80));
         while (Clock::now() < deadline) {
-            if (app.menu_window_.last_present_completion_ns() > prior) return true;
+            const auto completed = present_probe.successful_presents.load(std::memory_order_acquire);
+            // Keep the old asynchronous sample as diagnostic evidence only.
+            // Zero alongside successful progress demonstrates why that sample
+            // cannot decide whether the renderer is alive.
+            const auto raw = app.menu_window_.last_present_completion_ns();
+            const bool progressed = completed > prior;
+            if (progressed && raw == 0)
+                present_probe.raw_zero_reads_after_progress.fetch_add(1, std::memory_order_relaxed);
+            detail = "Successful Presents=" + std::to_string(completed - prior) +
+                "; callbacks without Present=" + std::to_string(
+                    present_probe.callbacks_without_present.load(std::memory_order_acquire) - prior_without_present) +
+                "; polled per-render timestamp=" + std::to_string(raw);
+            if (app.menu_window_.had_fatal_error() || app.menu_window_.should_close()) {
+                detail += "; window reports fatal error or close";
+                return false;
+            }
+            if (progressed) return true;
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
         }
+        detail += "; no successful Present within 3 seconds";
         return false;
     }
     static std::size_t rows(MenuApp& app) {
@@ -137,6 +189,33 @@ struct MenuAppVisualTestAccess {
     }
     static const config::RuntimeConfig& config(const MenuApp& app) { return app.config_; }
     static bool result(const MenuApp& app) { return app.has_result_; }
+    static void check_loading_pacing(MenuApp& app, Report& report) {
+        const auto saved_refresh = app.config_.graphics.refresh_hz;
+        app.config_.graphics.refresh_hz = 0;
+        app.reset_screen(Screen::Gameplay);
+        {
+            std::lock_guard<std::mutex> lock(app.gameplay_hud_mutex_);
+            app.reset_gameplay_hud_state(app.gameplay_hud_);
+        }
+        app.update_gameplay_loading_state(56, "Parsing chart");
+        report.check("loading.render_cap_60", app.current_render_config().fps_limit == 60);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        const auto previous = present_probe.successful_presents.load(std::memory_order_acquire);
+        const auto deadline = Clock::now() + std::chrono::milliseconds(600);
+        std::this_thread::sleep_until(deadline);
+        const auto presents = present_probe.successful_presents.load(std::memory_order_acquire) - previous;
+        report.check("loading.bounded_actual_presents", presents >= 10 && presents <= 42,
+                     "Render-thread successful Presents over 600 ms=" + std::to_string(presents));
+        app.reset_screen(Screen::SongSelect);
+        app.config_.graphics.refresh_hz = saved_refresh;
+        {
+            std::lock_guard<std::mutex> lock(app.gameplay_hud_mutex_);
+            app.reset_gameplay_hud_state(app.gameplay_hud_);
+        }
+        app.apply_runtime_graphics_config();
+        app.publish_snapshot();
+        report.check("loading.lobby_pacing_restored", app.current_render_config().fps_limit > 60);
+    }
     struct Observation {
         bool loading = false, countdown = false, playing = false;
         int64_t sample = 0;
@@ -147,7 +226,7 @@ struct MenuAppVisualTestAccess {
         const auto& hud = app.gameplay_hud_;
         return {hud.loading, hud.countdown_active,
                 hud.active && !hud.loading && !hud.countdown_active && hud.current_sample > 0,
-                hud.current_sample, app.menu_window_.last_present_completion_ns()};
+                hud.current_sample, present_probe.last_completion_ns.load(std::memory_order_acquire)};
     }
 };
 
@@ -182,8 +261,12 @@ using Access = tenriff::app::MenuAppVisualTestAccess;
 void expect_screen(tenriff::app::MenuApp& app, Report& report,
                    const std::string& name, Screen expected) {
     const bool matched = Access::screen(app) == expected;
-    report.check(name + ".screen", matched);
-    report.check(name + ".present", Access::present(app));
+    report.check(name + ".screen", matched,
+        "expected=" + std::to_string(static_cast<int>(expected)) +
+        "; actual=" + std::to_string(static_cast<int>(Access::screen(app))));
+    std::string present_detail;
+    const bool presented = Access::present(app, present_detail);
+    report.check(name + ".present", presented, std::move(present_detail));
     if (!matched) throw std::runtime_error(name + " screen transition failed");
 }
 
@@ -200,17 +283,35 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
 
     Access::click(app, Kind::TitleButton, 2);
     expect_screen(app, report, "options", Screen::OptionsHub);
+    report.check("options.eight_consolidated_entries", Access::rows(app) == 8);
     struct Page { int index; const char* name; Screen screen; };
     const Page pages[] = {
         {0, "mode", Screen::ModeSelect}, {1, "keymap", Screen::Keymap},
         {2, "skins", Screen::SettingsSkins}, {3, "graphics", Screen::SettingsGraphics},
         {4, "audio", Screen::SettingsAudio}, {5, "input", Screen::SettingsInput},
-        {6, "calibration", Screen::SettingsCalibration}, {7, "profile", Screen::QuickSetup},
-        {8, "mods", Screen::ModeMods}, {9, "key_test", Screen::KeymapTest}};
+        {6, "calibration", Screen::SettingsCalibration}, {7, "profile", Screen::QuickSetup}};
     for (const auto& page : pages) {
         Access::click(app, Kind::OptionsItem, page.index);
         expect_screen(app, report, page.name, page.screen);
-        if (page.index == 3) {
+        if (page.index == 0) {
+            Access::click(app, Kind::SettingsRow,
+                static_cast<int>(tenriff::app::menu::settings::ModeSettingId::Mods), Part::SelectOnly);
+            Access::key(app, "Enter");
+            expect_screen(app, report, "mode.nested_mods", Screen::ModeMods);
+            Access::key(app, "Esc");
+            expect_screen(app, report, "mode.nested_mods.back", Screen::ModeSelect);
+            Access::click(app, Kind::SettingsRow,
+                static_cast<int>(tenriff::app::menu::settings::ModeSettingId::Mods));
+            expect_screen(app, report, "mode.nested_mods.pointer", Screen::ModeMods);
+            Access::key(app, "Esc");
+            expect_screen(app, report, "mode.nested_mods.pointer.back", Screen::ModeSelect);
+        } else if (page.index == 1) {
+            Access::click(app, Kind::KeymapButton,
+                static_cast<int>(tenriff::app::menu::settings::KeymapActionId::NkroTest));
+            expect_screen(app, report, "keymap.nested_test", Screen::KeymapTest);
+            Access::key(app, "Esc");
+            expect_screen(app, report, "keymap.nested_test.back", Screen::Keymap);
+        } else if (page.index == 3) {
             Access::click(app, Kind::SettingsRow,
                 static_cast<int>(tenriff::app::menu::settings::GraphicsSettingId::Bga), Part::Increment);
             report.check("graphics.bga_toggle", !Access::config(app).graphics.bga_enabled);
@@ -230,6 +331,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
     expect_screen(app, report, "options.back", Screen::Title);
     Access::click(app, Kind::TitleButton, 0);
     expect_screen(app, report, "lobby", Screen::SongSelect);
+    Access::check_loading_pacing(app, report);
 
     std::atomic<bool> observing{true};
     bool loading = false, countdown = false, playing = false, gameplay_present = false;
@@ -387,7 +489,10 @@ int wmain(int argc, wchar_t** argv) {
             const bool initialized = app->initialize(options);
             report.check("menu.initialize", initialized);
             try {
-                if (initialized) menu_flow(*app, report);
+                if (initialized) {
+                    Access::attach_present_probe(*app);
+                    menu_flow(*app, report);
+                }
             } catch (const std::exception& exception) {
                 report.check("menu.flow_exception", false, exception.what());
             }
@@ -409,6 +514,11 @@ int wmain(int argc, wchar_t** argv) {
         {"elapsed_seconds", JsonValue(std::chrono::duration<double>(Clock::now() - began).count())},
         {"scope", JsonValue("Actual MenuApp initialize/index/controller/launch/GameSession/result/return with real window, renderer and muted shared audio; owner-thread internal input dispatch, not MenuApp::run main-loop or physical OS input.")},
         {"pause_scope", JsonValue("Separate real GameSession, serialized internal Escape and public pause actions; its physical input producer is stopped. No claim of full MenuApp pause-overlay integration.")},
+        {"present_observer", JsonValue(JsonObject{
+            {"method", JsonValue("Smoke-only render callback wraps unchanged MenuApp::render_tick and accumulates its successful Present result before the next render clears it. One fixture window restart installs the callback before transition checks; FPS, VSync and overlay settings are unchanged by the observer.")},
+            {"successful_presents", JsonValue(double(present_probe.successful_presents.load(std::memory_order_acquire)))},
+            {"callbacks_without_present", JsonValue(double(present_probe.callbacks_without_present.load(std::memory_order_acquire)))},
+            {"raw_zero_reads_after_progress", JsonValue(double(present_probe.raw_zero_reads_after_progress.load(std::memory_order_acquire)))}})},
         {"limits", JsonValue("Synthetic library only. Presents mean liveness, not screenshot equality. No physical latency, device input, online, account, multiplayer, native file dialog, long-session or multi-PC coverage. External runner should impose a 90-second process timeout for driver hangs.")},
         {"checks", JsonValue(std::move(report.checks))}};
     std::ofstream output(sandbox / "smoke-report.json", std::ios::binary);

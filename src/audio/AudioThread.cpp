@@ -1,4 +1,5 @@
 #include "audio/AudioThread.h"
+#include "timing/HighResClock.h"
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -36,7 +37,10 @@ AudioResult AudioThread::initialize(const AudioConfig& config, Callback callback
 }
 
 AudioResult AudioThread::start() {
-    if (asio_backend_) return asio_backend_->start();
+    if (asio_backend_) {
+        callback_playback_time_ns_.store(0, std::memory_order_release);
+        return asio_backend_->start();
+    }
     if (!backend_ || !backend_->is_initialized()) {
         return AudioResult::InitializationFailed;
     }
@@ -45,6 +49,7 @@ AudioResult AudioThread::start() {
         return AudioResult::Success;  // Already running.
     }
 
+    callback_playback_time_ns_.store(0, std::memory_order_release);
     should_stop_.store(false, std::memory_order_release);
 
     // Start the backend.
@@ -61,8 +66,13 @@ AudioResult AudioThread::start() {
 }
 
 void AudioThread::stop() {
-    if (asio_backend_) { asio_backend_->stop(); return; }
+    if (asio_backend_) {
+        asio_backend_->stop();
+        callback_playback_time_ns_.store(0, std::memory_order_release);
+        return;
+    }
     if (!is_running_.load(std::memory_order_acquire)) {
+        callback_playback_time_ns_.store(0, std::memory_order_release);
         return;
     }
 
@@ -82,6 +92,7 @@ void AudioThread::stop() {
     }
 
     is_running_.store(false, std::memory_order_release);
+    callback_playback_time_ns_.store(0, std::memory_order_release);
 }
 
 void AudioThread::shutdown() {
@@ -173,6 +184,11 @@ void AudioThread::process_buffer() {
 
     // Calculate available frames.
     uint32_t padding = backend_->get_padding();
+    // Preserve the existing write-minus-padding sample domain, but stamp that
+    // observation before GetBuffer or a preemption can delay callback delivery.
+    // The API exposes no QPC pair; use its return time instead of inventing a
+    // midpoint or changing to IAudioClock's different device-position baseline.
+    const int64_t playback_time_ns = timing::HighResClock::now_ns();
     uint32_t buffer_size = backend_->buffer_frames();
     
     if (padding >= buffer_size) {
@@ -212,7 +228,7 @@ void AudioThread::process_buffer() {
 
     // Invoke the callback.
     if (callback_) {
-        callback_(buffer, frames_obtained, buffer_start_samples, playback_sample);
+        invoke_callback(buffer, frames_obtained, buffer_start_samples, playback_sample, playback_time_ns);
     } else {
         // Silent fill if no callback.
         std::memset(buffer, 0, frames_obtained * 2 * sizeof(float));
@@ -227,6 +243,19 @@ void AudioThread::process_buffer() {
 
     // Release buffer and update sample count.
     backend_->add_samples_played(frames_obtained);
+}
+
+void AudioThread::invoke_callback(float* output, uint32_t frames, int64_t buffer_start_samples,
+                                  int64_t playback_sample, int64_t playback_time_ns) {
+    // Only the current synchronous callback may observe this timestamp. Clearing
+    // it on normal return and exception prevents a later/direct/ASIO callback
+    // from accidentally pairing its samples with this buffer's earlier time.
+    struct ClearTimestamp {
+        std::atomic<int64_t>& value;
+        ~ClearTimestamp() { value.store(0, std::memory_order_release); }
+    } clear{callback_playback_time_ns_};
+    callback_playback_time_ns_.store(playback_time_ns, std::memory_order_release);
+    if (callback_) callback_(output, frames, buffer_start_samples, playback_sample);
 }
 
 std::string AudioThread::error_message() const {

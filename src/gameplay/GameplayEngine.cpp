@@ -322,6 +322,12 @@ void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms,
     live_feedback_.judgement = judgement;
     live_feedback_.delta_ms = std::isfinite(delta_ms) ? delta_ms : 0.0;
     live_feedback_.sample = sample;
+    if (judgement != game::Judgement::PG) {
+        non_pg_feedback_ = live_feedback_;
+        if (std::isfinite(delta_ms) && std::llround(delta_ms) != 0) {
+            timing_feedback_ = live_feedback_;
+        }
+    }
     if (std::isfinite(delta_ms)) {
         push_recent_timing_delta(delta_ms);
     }

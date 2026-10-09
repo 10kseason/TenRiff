@@ -618,8 +618,8 @@ TEST_CASE("TenRiff skin import includes assets referenced only by another key mo
 TEST_CASE("Skin settings stable row ids account for the optional LR2 row") {
     const tenriff::app::SkinSettingsRows native_rows{false};
     const tenriff::app::SkinSettingsRows lr2_rows{true};
-    CHECK(native_rows.count() == 65);
-    CHECK(lr2_rows.count() == 66);
+    CHECK(native_rows.count() == 67);
+    CHECK(lr2_rows.count() == 68);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::KeyMode) == 0);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::ScratchPosition) == 1);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::SkinSource) == 2);
@@ -630,9 +630,11 @@ TEST_CASE("Skin settings stable row ids account for the optional LR2 row") {
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::KeyBackdropBrightness) == 40);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::KeyBackdropHeight) == 41);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::HudLayout) == 45);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::ComboFontSize) == 60);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::JudgementFontSize) == 61);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 64);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::HudRiffMapVisible) == 46);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::TimingBarMode) == 53);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::ComboFontSize) == 62);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::JudgementFontSize) == 63);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 66);
     CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::VisualLatency) == 4);
     CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::Lr2Resolution) == 5);
     CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::ImportSkin) == 6);
@@ -640,9 +642,11 @@ TEST_CASE("Skin settings stable row ids account for the optional LR2 row") {
     CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::KeyBackdropBrightness) == 41);
     CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::KeyBackdropHeight) == 42);
     CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::HudLayout) == 46);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::ComboFontSize) == 61);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::JudgementFontSize) == 62);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 65);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::HudRiffMapVisible) == 47);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::TimingBarMode) == 54);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::ComboFontSize) == 63);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::JudgementFontSize) == 64);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 67);
 }
 
 TEST_CASE("7+1 presentation moves only the visual scratch lane") {
@@ -875,15 +879,16 @@ TEST_CASE("skin timing text and bar overrides load independently including modes
     TempDirGuard temp{make_temp_dir()};
     REQUIRE_FALSE(temp.path.empty());
     write_file(temp.path / "skin.json", R"({"format":"tenriff-skin","version":1,"name":"Timing",
-      "gameplay":{"renderer":"native","show_timing_feedback":false,"show_timing_bar":true,
+      "gameplay":{"renderer":"native","show_timing_feedback":false,"show_timing_bar":true,"timing_bar_always_visible":true,
       "native":{"rects":{"timing_label":[100,-20,0,0],"timing":[-80,60,0,0]}},
-      "modes":{"4k":{"show_timing_feedback":true,"show_timing_bar":false}}}})");
+      "modes":{"4k":{"show_timing_feedback":true,"show_timing_bar":false,"timing_bar_always_visible":false}}}})");
     for (int lanes : {4, 10}) {
         const auto skin = tenriff::app::load_tenriff_skin_folder(temp.path.u8string(), lanes);
         REQUIRE(skin.found);
         CHECK(skin.warnings.empty());
         CHECK(skin.gameplay_style.show_timing_feedback.value() == (lanes == 4));
         CHECK(skin.gameplay_style.show_timing_bar.value() == (lanes != 4));
+        CHECK(skin.gameplay_style.timing_bar_always_visible.value() == (lanes != 4));
         CHECK(skin.gameplay.native.rects.at("timing_label")[0] == 100);
     }
 }

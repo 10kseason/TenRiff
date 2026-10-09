@@ -14,6 +14,31 @@
 namespace tenriff::app {
 
 struct MenuAppSkinPreviewTestAccess {
+    static void check_loading_render_cap() {
+        auto menu = std::make_unique<MenuApp>();
+        menu->config_.graphics.refresh_hz = 0;
+        for (bool vsync : {false, true}) {
+            menu->config_.graphics.vsync = vsync;
+            menu->reset_screen(MenuApp::Screen::Gameplay);
+            menu->gameplay_hud_.loading = false;
+            menu->gameplay_hud_.active = true;
+            const auto playing = menu->current_render_config();
+            REQUIRE(playing.fps_limit > 60);
+            menu->gameplay_hud_.loading = true;
+            menu->gameplay_hud_.active = false;
+            CHECK(menu->current_render_config().fps_limit == 60);
+            CHECK(menu->current_render_config().vsync == vsync);
+            menu->gameplay_hud_.loading = false;
+            menu->gameplay_hud_.active = true;
+            CHECK(menu->current_render_config().fps_limit == playing.fps_limit);
+            menu->reset_screen(MenuApp::Screen::SongSelect);
+            const auto lobby = menu->current_render_config();
+            menu->gameplay_hud_.loading = true;
+            CHECK(menu->current_render_config().fps_limit == lobby.fps_limit);
+            CHECK(menu->config_.graphics.refresh_hz == 0);
+        }
+    }
+
     static std::unique_ptr<MenuApp> fixture(const char* display_mode = "windowed") {
         auto menu = std::make_unique<MenuApp>();
         menu->key_left_ = 37;
@@ -199,6 +224,10 @@ struct MenuAppSkinPreviewTestAccess {
 
 }  // namespace tenriff::app
 
+TEST_CASE("chart loading caps rendering without changing gameplay or saved graphics settings") {
+    tenriff::app::MenuAppSkinPreviewTestAccess::check_loading_render_cap();
+}
+
 TEST_CASE("skin fullscreen preview restores display mode and retains skin editing state") {
     tenriff::app::MenuAppSkinPreviewTestAccess::check_entry_and_exit();
 }
@@ -219,6 +248,76 @@ TEST_CASE("skin fullscreen preview cannot survive a navigation reset") {
 #ifdef _WIN32
 namespace tenriff::app {
 struct MenuAppFeedbackTestAccess {
+    static void check_key_transfer_capture_profile() {
+        struct TempProfile {
+            std::filesystem::path path;
+            ~TempProfile() {
+                if (path.empty()) return;
+                std::error_code ec;
+                std::filesystem::remove(path / "keymap.json", ec);
+                std::filesystem::remove(path, ec);
+            }
+        } profile;
+        const auto temp_root = std::filesystem::temp_directory_path();
+        for (int attempt = 0; attempt < 32 && profile.path.empty(); ++attempt) {
+            const auto candidate = temp_root / ("tenriff_key_transfer_" +
+                std::to_string(timing::HighResClock::now_ns()) + "_" + std::to_string(attempt));
+            std::error_code ec;
+            if (std::filesystem::create_directory(candidate, ec)) profile.path = candidate;
+        }
+        REQUIRE_FALSE(profile.path.empty());
+        config::KeymapManager manager;
+        for (int key_count : {4, 10}) {
+            const auto mode = std::to_string(key_count) + "k";
+            for (bool source_secondary : {false, true}) {
+                for (bool target_secondary : {false, true}) {
+                    for (int target_lane : {1, 2}) {
+                        auto menu = std::make_unique<MenuApp>();
+                        menu->config_.audio_ui.background_sound_enabled = false;
+                        menu->profile_dir_ = profile.path.u8string();
+                        menu->working_keymap_ = manager.default_keymap();
+                        const auto key_name = source_secondary ? std::string("LShift")
+                            : menu->working_keymap_.mode_bindings.at(mode).at("lane1");
+                        if (source_secondary)
+                            menu->working_keymap_.secondary_mode_bindings[mode]["lane1"] = key_name;
+                        menu->keymap_ = menu->working_keymap_;
+                        const auto before = menu->keymap_;
+                        REQUIRE(manager.save_profile(menu->profile_dir_, menu->keymap_));
+                        menu->reset_screen(MenuApp::Screen::Keymap);
+                        menu->keymap_settings_controller_.reset(key_count, mode);
+
+                        render::MenuClickEvent click{};
+                        click.kind = render::MenuHitTargetKind::SettingsRow;
+                        click.index = target_lane;
+                        click.part = target_secondary ? render::MenuHitPart::Increment : render::MenuHitPart::Activate;
+                        menu->handle_menu_click(click);
+                        REQUIRE(menu->keymap_settings_controller_.capture_active());
+                        MenuAppSkinPreviewTestAccess::tap(*menu, config::KeycodeMap::to_keycode(key_name).value());
+                        CHECK_FALSE(menu->keymap_settings_controller_.capture_active());
+                        auto saved = manager.load_profile(menu->profile_dir_);
+                        REQUIRE(saved.success());
+                        CHECK_FALSE(saved.rewritten());
+                        for (const auto* keymap : {&saved.keymap, &menu->working_keymap_, &menu->keymap_}) {
+                            const auto primary = manager.bindings_for_mode(*keymap, mode);
+                            const auto secondary = manager.secondary_bindings_for_mode(*keymap, mode);
+                            CHECK((target_secondary ? secondary : primary).at("lane" + std::to_string(target_lane)) == key_name);
+                            if (target_lane != 1 || source_secondary != target_secondary) {
+                                if (source_secondary) CHECK(secondary.count("lane1") == 0);
+                                else CHECK(primary.at("lane1").empty());
+                            }
+                            CHECK(manager.validate_unique_bindings(*keymap).empty());
+                            CHECK(keymap->bindings == keymap->mode_bindings.at("10k"));
+                            for (const auto& [other_mode, bindings] : before.mode_bindings) {
+                                if (other_mode != mode) CHECK(keymap->mode_bindings.at(other_mode) == bindings);
+                            }
+                        }
+                        CHECK(menu->pressed_keys_.empty());
+                    }
+                }
+            }
+        }
+    }
+
     static void check_shift_capture_profile() {
         struct TempProfile {
             std::filesystem::path path;
@@ -540,6 +639,9 @@ TEST_CASE("F11 chat preserves Shift gameplay bindings and F8 calibration edge ow
 }
 TEST_CASE("menu Shift capture ignores generic polling event and saves the physical side to the profile") {
     tenriff::app::MenuAppFeedbackTestAccess::check_shift_capture_profile();
+}
+TEST_CASE("menu key capture moves primary and secondary assignments and persists the emptied slot") {
+    tenriff::app::MenuAppFeedbackTestAccess::check_key_transfer_capture_profile();
 }
 TEST_CASE("result pointer Continue activates without generic settings rows and returns to its lobby") {
     tenriff::app::MenuAppFeedbackTestAccess::check_result_continue();

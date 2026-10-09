@@ -141,9 +141,11 @@ SkinSettingsEffects SkinSettingsController::select(
     return effects;
 }
 
-void SkinSettingsController::set_timing_defaults(std::optional<bool> text, std::optional<bool> bar) noexcept {
+void SkinSettingsController::set_timing_defaults(std::optional<bool> text, std::optional<bool> bar,
+                                                   std::optional<bool> always_visible) noexcept {
     timing_default_text_ = text;
     timing_default_bar_ = bar;
+    timing_default_always_visible_ = always_visible;
 }
 
 void SkinSettingsController::set_backdrop_defaults(
@@ -222,10 +224,12 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
     const bool is_adjust = action.kind == MenuActionKind::Adjust && action.direction != 0;
     const bool is_activate = action.kind == MenuActionKind::Activate;
     if ((is_adjust || is_activate) &&
-        (selected_id_ == SkinSettingsRowId::TimingFeedback || selected_id_ == SkinSettingsRowId::TimingBar)) {
-        const auto visible = resolve_timing_feedback_visibility(runtime.skin, timing_default_text_, timing_default_bar_);
+        (selected_id_ == SkinSettingsRowId::TimingFeedback || selected_id_ == SkinSettingsRowId::TimingBar ||
+         selected_id_ == SkinSettingsRowId::TimingBarMode)) {
+        const auto visible = resolve_timing_feedback_visibility(runtime.skin, timing_default_text_, timing_default_bar_, timing_default_always_visible_);
         runtime.skin.show_timing_feedback = visible.text;
         runtime.skin.show_timing_bar = visible.bar;
+        runtime.skin.timing_bar_always_visible = visible.always_visible;
         runtime.skin.timing_feedback_override = true;
     }
     const bool backdrop_slider = selected_id_ == SkinSettingsRowId::KeyBackdropOpacity ||
@@ -482,6 +486,9 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
             runtime.skin.hud_layout = config::normalize_skin_hud_layout_token(runtime.skin.hud_layout) == "studio"
                 ? "classic" : "studio";
             return mark_changed();
+        case SkinSettingsRowId::HudRiffMapVisible:
+            runtime.skin.hud_riff_map_visible = !runtime.skin.hud_riff_map_visible;
+            return mark_changed();
         case SkinSettingsRowId::KeyPulse:
             runtime.skin.key_pulse_brightness = clamp_step_value(
                 runtime.skin.key_pulse_brightness + direction * kSkinOpacityStep,
@@ -636,6 +643,9 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
             return mark_changed();
         case SkinSettingsRowId::TimingBar:
             runtime.skin.show_timing_bar = !runtime.skin.show_timing_bar;
+            return mark_changed();
+        case SkinSettingsRowId::TimingBarMode:
+            runtime.skin.timing_bar_always_visible = !runtime.skin.timing_bar_always_visible;
             return mark_changed();
         case SkinSettingsRowId::TimingTextX:
             runtime.skin.timing_text_offset_x = std::clamp(runtime.skin.timing_text_offset_x + direction * 10.0, -600.0, 600.0);

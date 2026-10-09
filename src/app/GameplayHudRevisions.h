@@ -71,6 +71,9 @@ struct GameplayHudRevisionInput {
     bool has_feedback = false;
     game::Judgement feedback = game::Judgement::BD;
     double feedback_delta_ms = 0.0;
+    bool has_non_pg_feedback = false;
+    bool has_timing_feedback = false;
+    double timing_feedback_delta_ms = 0.0;
     std::uint64_t peer_revision = 0;
     std::size_t timing_history_count = 0;
     std::array<double, kGameplayTimingHistoryMaxEntries> timing_history_delta_ms{};
@@ -94,6 +97,9 @@ struct GameplayHudRevisionInput {
     bool ghost_has_feedback = false;
     game::Judgement ghost_feedback = game::Judgement::BD;
     double ghost_feedback_delta_ms = 0.0;
+    bool ghost_has_non_pg_feedback = false;
+    bool ghost_has_timing_feedback = false;
+    double ghost_timing_feedback_delta_ms = 0.0;
     std::size_t ghost_timing_history_count = 0;
     std::array<double, kGameplayTimingHistoryMaxEntries> ghost_timing_history_delta_ms{};
     bool ghost_finished = false;
@@ -239,6 +245,9 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.has_feedback != next.has_feedback ||
         previous.feedback != next.feedback ||
         previous.feedback_delta_ms != next.feedback_delta_ms ||
+        previous.has_non_pg_feedback != next.has_non_pg_feedback ||
+        previous.has_timing_feedback != next.has_timing_feedback ||
+        previous.timing_feedback_delta_ms != next.timing_feedback_delta_ms ||
         previous.paused != next.paused ||
         previous.pause_menu_cursor != next.pause_menu_cursor ||
         previous.spectating_peer != next.spectating_peer ||
@@ -258,7 +267,10 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.ghost_gauge_type != next.ghost_gauge_type ||
         previous.ghost_has_feedback != next.ghost_has_feedback ||
         previous.ghost_feedback != next.ghost_feedback ||
-        previous.ghost_feedback_delta_ms != next.ghost_feedback_delta_ms;
+        previous.ghost_feedback_delta_ms != next.ghost_feedback_delta_ms ||
+        previous.ghost_has_non_pg_feedback != next.ghost_has_non_pg_feedback ||
+        previous.ghost_has_timing_feedback != next.ghost_has_timing_feedback ||
+        previous.ghost_timing_feedback_delta_ms != next.ghost_timing_feedback_delta_ms;
 
     flags.motion_changed =
         previous.active != next.active ||
@@ -291,6 +303,9 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.future_visual_span != next.future_visual_span ||
         previous.past_visual_span != next.past_visual_span ||
         previous.feedback_delta_ms != next.feedback_delta_ms ||
+        previous.has_non_pg_feedback != next.has_non_pg_feedback ||
+        previous.has_timing_feedback != next.has_timing_feedback ||
+        previous.timing_feedback_delta_ms != next.timing_feedback_delta_ms ||
         !gameplay_hud_timing_history_equal(previous, next) ||
         !gameplay_hud_lane_activity_equal(previous, next) ||
         !gameplay_hud_lane_pressed_equal(previous, next) ||
@@ -298,6 +313,9 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.ghost_finished != next.ghost_finished ||
         previous.ghost_game_over != next.ghost_game_over ||
         previous.ghost_feedback_delta_ms != next.ghost_feedback_delta_ms ||
+        previous.ghost_has_non_pg_feedback != next.ghost_has_non_pg_feedback ||
+        previous.ghost_has_timing_feedback != next.ghost_has_timing_feedback ||
+        previous.ghost_timing_feedback_delta_ms != next.ghost_timing_feedback_delta_ms ||
         !gameplay_hud_ghost_timing_history_equal(previous, next) ||
         !gameplay_hud_ghost_lane_activity_equal(previous, next) ||
         !gameplay_hud_ghost_lane_pressed_equal(previous, next) ||

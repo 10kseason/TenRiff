@@ -828,6 +828,7 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_bool(*skin, "show_timing_feedback", config.skin.show_timing_feedback);
         // Older profiles used one switch for both text and bar.
         config.skin.show_timing_bar = get_bool(*skin, "show_timing_bar", config.skin.show_timing_feedback);
+        config.skin.timing_bar_always_visible = get_bool(*skin, "timing_bar_always_visible", false);
         config.skin.timing_feedback_override = get_bool(*skin, "timing_feedback_override", false);
         config.skin.note_fade_in = get_number(*skin, "note_fade_in", 0.0);
         config.skin.note_fade_out = get_number(*skin, "note_fade_out", 0.0);
@@ -861,6 +862,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_string(*skin, "hit_burst_style", config.skin.hit_burst_style));
         config.skin.hud_layout = normalize_skin_hud_layout_token(
             get_string(*skin, "hud_layout", config.skin.hud_layout));
+        config.skin.hud_riff_map_visible =
+            get_bool(*skin, "hud_riff_map_visible", config.skin.hud_riff_map_visible);
         config.skin.ui_font = normalize_skin_ui_font_token(
             get_string(*skin, "ui_font", config.skin.ui_font));
         config.skin.key_label_position = normalize_skin_key_label_position_token(
@@ -1288,6 +1291,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("show_gear_boundary_line", JsonValue{config.skin.show_gear_boundary_line});
     skin.emplace("show_timing_feedback", JsonValue{config.skin.show_timing_feedback});
     skin.emplace("show_timing_bar", JsonValue{config.skin.show_timing_bar});
+    skin.emplace("timing_bar_always_visible", JsonValue{config.skin.timing_bar_always_visible});
     skin.emplace("timing_feedback_override", JsonValue{config.skin.timing_feedback_override});
     skin.emplace("note_fade_in", JsonValue{config.skin.note_fade_in});
     skin.emplace("note_fade_out", JsonValue{config.skin.note_fade_out});
@@ -1313,6 +1317,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("hit_burst_style",
                  JsonValue{normalize_skin_hit_burst_style_token(config.skin.hit_burst_style)});
     skin.emplace("hud_layout", JsonValue{normalize_skin_hud_layout_token(config.skin.hud_layout)});
+    skin.emplace("hud_riff_map_visible", JsonValue{config.skin.hud_riff_map_visible});
     skin.emplace("key_label_position",
                  JsonValue{normalize_skin_key_label_position_token(config.skin.key_label_position)});
     skin.emplace("ui_font", JsonValue{normalize_skin_ui_font_token(config.skin.ui_font)});

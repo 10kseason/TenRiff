@@ -82,6 +82,12 @@ void canonicalize_mode_bindings(const KeymapManager& manager,
     auto& bindings = keymap.mode_bindings[normalized_mode];
 
     for (const auto& lane : lane_ids) {
+        // Empty is an explicit unassigned slot after a key is moved elsewhere.
+        // Missing lanes still keep the defaults populated by load_profile.
+        if (const auto binding = bindings.find(lane);
+            binding != bindings.end() && binding->second.empty()) {
+            continue;
+        }
         const std::string original = [&]() -> std::string {
             auto it = bindings.find(lane);
             if (it == bindings.end()) {
@@ -200,6 +206,35 @@ std::unordered_map<std::string, std::string> KeymapManager::secondary_bindings_f
     return found == keymap.secondary_mode_bindings.end()
         ? std::unordered_map<std::string, std::string>{}
         : found->second;
+}
+
+bool KeymapManager::assign_binding(Keymap& keymap, std::string_view key_mode, std::string_view lane,
+                                   std::string_view key_name, bool secondary_slot) const {
+    const std::string normalized = normalize_mode_token(key_mode);
+    const auto lanes = lane_ids_for_mode(normalized);
+    const auto code = KeycodeMap::to_keycode(key_name);
+    if (!code || std::find(lanes.begin(), lanes.end(), lane) == lanes.end()) {
+        return false;
+    }
+
+    auto primary = bindings_for_mode(keymap, normalized);
+    auto secondary = secondary_bindings_for_mode(keymap, normalized);
+    for (auto& [bound_lane, key] : primary) {
+        if (KeycodeMap::to_keycode(key) == code) {
+            // Keep an explicit empty string so profile reload cannot restore a
+            // default key that was just transferred to a different slot.
+            key.clear();
+        }
+    }
+    for (auto it = secondary.begin(); it != secondary.end();) {
+        if (KeycodeMap::to_keycode(it->second) == code) it = secondary.erase(it);
+        else ++it;
+    }
+    (secondary_slot ? secondary : primary)[std::string(lane)] = KeycodeMap::to_name(*code);
+    keymap.mode_bindings[normalized] = std::move(primary);
+    keymap.secondary_mode_bindings[normalized] = std::move(secondary);
+    if (normalized == "10k") keymap.bindings = keymap.mode_bindings[normalized];
+    return true;
 }
 
 void KeymapManager::reset_mode_bindings(Keymap& keymap, std::string_view key_mode) const {
@@ -357,27 +392,16 @@ bool KeymapManager::save_profile(std::string_view profile_dir, const Keymap& key
 
 std::vector<std::string> KeymapManager::validate_unique_bindings(const Keymap& keymap) const {
     std::vector<std::string> duplicates;
-    std::unordered_map<std::string, std::string> used;
+    std::unordered_set<uint32_t> used;
 
     for (const auto& mode : supported_mode_tokens()) {
         used.clear();
-        for (const auto& [lane, key] : bindings_for_mode(keymap, mode)) {
-            if (key.empty()) {
-                continue;
+        for (const auto& bindings : {bindings_for_mode(keymap, mode), secondary_bindings_for_mode(keymap, mode)}) {
+            for (const auto& [lane, key] : bindings) {
+                if (const auto code = KeycodeMap::to_keycode(key); code && !used.insert(*code).second) {
+                    duplicates.push_back(mode + ":" + KeycodeMap::to_name(*code));
+                }
             }
-            auto it = used.find(key);
-            if (it != used.end()) {
-                duplicates.push_back(mode + ":" + key);
-            } else {
-                used.emplace(key, lane);
-            }
-        }
-        for (const auto& [lane, key] : secondary_bindings_for_mode(keymap, mode)) {
-            if (key.empty()) continue;
-            const auto found = used.find(key);
-            // The same primary/secondary key on one logical key is harmless.
-            if (found != used.end() && found->second != lane) duplicates.push_back(mode + ":" + key);
-            else used.emplace(key, lane);
         }
     }
 

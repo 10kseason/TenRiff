@@ -185,7 +185,7 @@
             }
         };
 
-        if (data.generic.card_grid && data.generic.rows.size() == 10) {
+        if (data.generic.card_grid && data.generic.rows.size() == 8) {
 #include "MenuWindow_draw_options_grid.inl"
             return;
         }

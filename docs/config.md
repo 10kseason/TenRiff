@@ -279,6 +279,7 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `show_gear_boundary_line` | bool; `false` | 기어 경계선 표시. |
 | `show_timing_feedback` | bool; `true` | FAST/SLOW 글자 표시. 타이밍 막대는 별도 설정. |
 | `show_timing_bar` | bool; `true` | 타이밍 막대 표시. 값이 없는 이전 프로필/스킨은 기존 글자 표시 값을 상속. |
+| `timing_bar_always_visible` | bool; `false` | 막대를 피그렛 외 판정 뒤 0.75초 동안만 표시(`false`)하거나 항상 표시(`true`). 글자·현재 오차 마커는 유효한 최근 비PG 오차 뒤 0.75초 동안 유지되며 뒤이은 피그렛으로 지워지지 않음. 막대 끄기는 `show_timing_bar`로 별도 설정. |
 | `timing_feedback_override` | bool; `false` | 사용자가 표시 설정을 바꾼 후 스킨 매니페스트보다 프로필의 두 표시 값을 우선. |
 | `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | 글자/막대의 독립 X 이동. 기존 판정 주변 배치에 더하는 1920×1080 기준 픽셀. |
 | `timing_text_offset_y`, `timing_bar_offset_y` | double: `-400..400`; `0` | 글자/막대의 독립 Y 이동. 양수는 아래, 음수는 위. 기준 픽셀. |
@@ -287,7 +288,8 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst 밝기. 0이면 끔. |
 | `key_pulse_enabled` | bool; `true` | 구버전 ON/OFF 호환. false 또는 밝기 0이면 끔. |
 | `hit_burst_style` | `prism`, `ring`, `spark`; `prism` | 내장 Hit Burst 모양. |
-| `hud_layout` | `classic`, `studio`; `studio` | Native 단독 플레이의 HUD 스타일. 키가 없는 기존 프로필도 기본값 `studio`를 사용하며, Options › Skins에서 클래식으로 바꿀 수 있음. 이미지 스킨·고스트 대전·멀티플레이는 기존 배치를 유지. 알 수 없는 값은 `studio`. |
+| `hud_layout` | `classic`, `studio`; `studio` | Native·가져온 LR2 스킨의 단독 플레이 HUD 스타일. LR2 노트·건반·기어 이미지와 비율은 유지함. 키가 없는 기존 프로필도 기본값 `studio`를 사용하며, Options › Skins에서 클래식으로 바꿀 수 있음. 다른 이미지 스킨·고스트 대전·멀티플레이는 기존 배치를 유지. 알 수 없는 값은 `studio`. |
+| `hud_riff_map_visible` | bool; `true` | 스튜디오 덱 필드 왼쪽 노트 밀도 그래프와 시계 표시. Options › Skins › 스튜디오 리프 맵에서 변경하며 프로필·스킨 프리셋에 저장됨. 클래식 HUD에는 영향 없음. |
 | `ui_font` | `default`, `malgun`, `bahnschrift`, `consolas`; `default` | 메뉴 글꼴. default는 Segoe UI; 로고·랭크·콤보 전용 글꼴은 유지. |
 | `key_label_position` | `bottom`, `top`, `off`; `bottom` | 레인 키 이름 위치. |
 | `judgement_line_position` | double: `0..1`; `0.82` | 판정선 세로 위치 비율. |
@@ -346,6 +348,8 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 - old single-layout keymaps는 런타임에서 10K map으로 마이그레이션됩니다.
 - runtime은 최종 차트 lane count 기준으로 해당 mode binding을 선택합니다.
 - key rebinding은 성공 즉시 `keymap.json`에 저장되고 별도의 최종 저장 단계를 요구하지 않습니다.
+- 같은 모드에서는 하나의 물리 키를 기본·보조 슬롯 중 한 곳에만 새로 지정합니다. 이미 지정된 키를 입력하면 이전 슬롯은 미할당으로 비우고 선택한 슬롯으로 옮깁니다. 다른 키 모드는 바꾸지 않습니다.
+- 기본 키의 명시적인 빈 문자열은 미할당으로 저장·복원합니다. 재할당으로 비운 슬롯이 재시작 후 기본 키로 돌아오지 않도록 하기 위한 동작입니다. 과거 파일의 빈 문자열도 미할당으로 취급하며, 누락한 항목이나 잘못된 비어 있지 않은 키 이름은 기존처럼 기본값을 사용합니다. `Reset`으로 해당 모드의 기본 배치를 복원할 수 있습니다.
 - Song Select에서 키맵 편집을 열면 현재 선택된 차트의 lane count를 우선 사용하고, 그 다음 `mode.key_mode`, 마지막으로 `10k`를 기본 편집 대상으로 삼습니다.
 
 ## Runtime Migration Notes

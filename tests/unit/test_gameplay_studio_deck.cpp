@@ -6,12 +6,28 @@
 
 using namespace tenriff::render;
 
-TEST_CASE("Studio deck applies only to native solo gameplay") {
-    CHECK(gameplay_studio_deck_enabled("studio", false, false, false));
-    CHECK_FALSE(gameplay_studio_deck_enabled("classic", false, false, false));
-    CHECK_FALSE(gameplay_studio_deck_enabled("studio", true, false, false));
-    CHECK_FALSE(gameplay_studio_deck_enabled("studio", false, true, false));
-    CHECK_FALSE(gameplay_studio_deck_enabled("studio", false, false, true));
+TEST_CASE("Studio deck supports native and imported LR2 solo HUDs without changing battle fallback") {
+    for (const auto source : {"native", "lr2"}) {
+        CHECK(gameplay_studio_deck_enabled("studio", source, false, false));
+        CHECK_FALSE(gameplay_studio_deck_enabled("classic", source, false, false));
+        CHECK_FALSE(gameplay_studio_deck_enabled("studio", source, true, false));
+        CHECK_FALSE(gameplay_studio_deck_enabled("studio", source, false, true));
+    }
+    CHECK_FALSE(gameplay_studio_deck_enabled("studio", "tenriff", false, false));
+}
+
+TEST_CASE("Studio riff map switch hides bars and clocks without moving the remaining HUD") {
+    const auto visible = compute_gameplay_studio_deck_layout(470.0f, 1450.0f);
+    const auto hidden = compute_gameplay_studio_deck_layout(470.0f, 1450.0f, 1856.0f, false);
+    REQUIRE(visible.map_visible);
+    REQUIRE(visible.map_times_visible);
+    CHECK_FALSE(hidden.map_visible);
+    CHECK_FALSE(hidden.map_times_visible);
+    CHECK(hidden.left_x == visible.left_x);
+    CHECK(hidden.left_width == visible.left_width);
+    CHECK(hidden.right_x == visible.right_x);
+    CHECK(hidden.right_width == visible.right_width);
+    CHECK(hidden.right_hud_visible == visible.right_hud_visible);
 }
 
 TEST_CASE("Studio deck columns are anchored to the field") {

@@ -58,6 +58,13 @@ public:
     /// Get the current playback position in samples (thread-safe).
     [[nodiscard]] int64_t playback_samples() const;
 
+    /// Timestamp paired with this synchronous WASAPI callback's playback_sample.
+    /// Valid only inside that callback; zero outside it and for ASIO callbacks.
+    /// Consumers must copy the pair together, never reuse it for the next callback.
+    [[nodiscard]] int64_t callback_playback_time_ns() const {
+        return callback_playback_time_ns_.load(std::memory_order_acquire);
+    }
+
     /// Get the backend's sample rate.
     [[nodiscard]] uint32_t sample_rate() const;
 
@@ -74,6 +81,8 @@ private:
     friend struct tenriff::app::GameSessionAudioTestAccess;
     void thread_main();
     void process_buffer();
+    void invoke_callback(float* output, uint32_t frames, int64_t buffer_start_samples,
+                         int64_t playback_sample, int64_t playback_time_ns);
 
     std::unique_ptr<WasapiBackend> backend_;
     std::unique_ptr<AsioBackend> asio_backend_;
@@ -83,6 +92,7 @@ private:
     std::thread thread_;
     std::atomic<bool> is_running_{false};
     std::atomic<bool> should_stop_{false};
+    std::atomic<int64_t> callback_playback_time_ns_{0};
 
     // MMCSS task handle (stored as void* to avoid Windows.h in header).
     void* mmcss_handle_ = nullptr;

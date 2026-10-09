@@ -448,7 +448,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         return false;
     }
     chart_path_ = chart_path;
-    report_loading_progress(42, "Opening audio device");
+    report_loading_progress(42, "Resolving chart");
     if (loading_cancel_requested()) {
         return false;
     }
@@ -489,14 +489,11 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         return out_result.success();
     };
 
+    // Discover assets and the chart's preferred rate before claiming a device.
+    // Opening at the profile rate first held an idle (possibly exclusive)
+    // stream throughout parsing, then reopened it for many 48 kHz charts.
     const uint32_t initial_requested_rate = config_.audio.sample_rate;
-    if (!initialize_audio_session(initial_requested_rate)) {
-        return false;
-    }
-    if (loading_cancel_requested()) {
-        return false;
-    }
-
+    sample_rate_ = static_cast<int>(initial_requested_rate);
     report_loading_progress(56, "Parsing chart");
     if (loading_cancel_requested()) {
         return false;
@@ -520,32 +517,46 @@ bool GameSession::initialize(const CommandLineOptions& options) {
                                                                    &preferred_rate_diagnostic);
     // An ASIO device stays at the user's chosen rate; chart audio is resampled
     // by the existing decoder instead of reconfiguring the driver for each song.
-    if (config_.audio.backend != audio::AudioBackend::ASIO &&
-        preferred_rate.has_value() && *preferred_rate != sample_rate_) {
-        const int previous_actual_rate = sample_rate_;
-        std::cerr << "[info] Detected chart audio sample rate " << *preferred_rate
-                  << " Hz. Reinitializing gameplay audio for this chart." << std::endl;
-        if (!initialize_audio_session(static_cast<uint32_t>(*preferred_rate))) {
-            std::cerr << "[warn] Failed to switch gameplay audio to " << *preferred_rate
-                      << " Hz. Falling back to " << previous_actual_rate << " Hz." << std::endl;
-            if (!initialize_audio_session(initial_requested_rate)) {
-                return false;
-            }
-        } else {
-            const uint32_t device_mix_rate = audio_thread_.device_mix_sample_rate();
-            if (!audio_thread_.is_exclusive() && device_mix_rate > 0 &&
-                device_mix_rate != static_cast<uint32_t>(sample_rate_)) {
-                std::cerr << "[info] Gameplay audio stream running at " << sample_rate_
-                          << " Hz (shared-mode device mix " << device_mix_rate << " Hz)." << std::endl;
-            } else {
-                std::cerr << "[info] Gameplay audio stream running at " << sample_rate_ << " Hz." << std::endl;
-            }
-            if (sample_rate_ != previous_actual_rate && !load_chart_for_session_rate(chart_result)) {
-                return false;
-            }
-        }
+    uint32_t requested_rate = initial_requested_rate;
+    if (config_.audio.backend != audio::AudioBackend::ASIO && preferred_rate.has_value()) {
+        requested_rate = static_cast<uint32_t>(*preferred_rate);
     } else if (!preferred_rate.has_value() && !preferred_rate_diagnostic.empty()) {
         std::cerr << "[warn] " << preferred_rate_diagnostic << std::endl;
+    }
+    if (requested_rate != static_cast<uint32_t>(sample_rate_)) {
+        sample_rate_ = static_cast<int>(requested_rate);
+        // Rebuild with the original sample-rounding rules, still without an
+        // open device. Scaling already-rounded timestamps would alter replays.
+        if (!load_chart_for_session_rate(chart_result)) {
+            return false;
+        }
+    }
+    const int chart_sample_rate = sample_rate_;
+    report_loading_progress(72, "Opening audio device");
+    if (loading_cancel_requested()) {
+        return false;
+    }
+    if (!initialize_audio_session(requested_rate)) {
+        if (requested_rate == initial_requested_rate) {
+            return false;
+        }
+        std::cerr << "[warn] Could not open chart-rate audio at " << requested_rate
+                  << " Hz. Falling back to the configured " << initial_requested_rate
+                  << " Hz." << std::endl;
+        requested_rate = initial_requested_rate;
+        if (!initialize_audio_session(requested_rate)) {
+            return false;
+        }
+    }
+    std::cerr << "[info] Gameplay audio opened requested=" << requested_rate
+              << " actual=" << sample_rate_
+              << " mode=" << (config_.audio.backend == audio::AudioBackend::ASIO ? "asio" :
+                              audio_thread_.is_exclusive() ? "exclusive" : "shared")
+              << " device_mix=" << audio_thread_.device_mix_sample_rate() << std::endl;
+    // Driver negotiation/fallback can choose a different rate. Always build
+    // the final chart in the actual device clock's sample domain.
+    if (sample_rate_ != chart_sample_rate && !load_chart_for_session_rate(chart_result)) {
+        return false;
     }
     if (loading_cancel_requested()) {
         return false;
@@ -1184,6 +1195,12 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         snapshot.has_feedback = feedback.has_value && feedback_age_samples <= feedback_display_samples;
         snapshot.feedback_judgement = feedback.judgement;
         snapshot.feedback_delta_ms = snapshot.has_feedback ? feedback.delta_ms : 0.0;
+        const auto& timing = engine_->timing_feedback();
+        snapshot.has_timing_feedback = gameplay::timing_feedback_visible(
+            timing, snapshot.current_sample, sample_rate_);
+        snapshot.timing_feedback_delta_ms = snapshot.has_timing_feedback ? timing.delta_ms : 0.0;
+        snapshot.has_non_pg_feedback = gameplay::timing_feedback_visible(
+            engine_->non_pg_feedback(), snapshot.current_sample, sample_rate_);
         engine_->collect_recent_timing_deltas(snapshot.timing_history_delta_ms, &snapshot.timing_history_count);
         engine_->collect_active_holds(active_holds_buffer_);
         if (!process_owns_foreground_window()) {
@@ -1224,6 +1241,12 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             snapshot.ghost_feedback_judgement = ghost_feedback.judgement;
             snapshot.ghost_feedback_delta_ms =
                 snapshot.ghost_has_feedback ? ghost_feedback.delta_ms : 0.0;
+            const auto& ghost_timing = ghost_engine_->timing_feedback();
+            snapshot.ghost_has_timing_feedback = gameplay::timing_feedback_visible(
+                ghost_timing, snapshot.current_sample, sample_rate_);
+            snapshot.ghost_timing_feedback_delta_ms = snapshot.ghost_has_timing_feedback ? ghost_timing.delta_ms : 0.0;
+            snapshot.ghost_has_non_pg_feedback = gameplay::timing_feedback_visible(
+                ghost_engine_->non_pg_feedback(), snapshot.current_sample, sample_rate_);
             ghost_engine_->collect_recent_timing_deltas(snapshot.ghost_timing_history_delta_ms,
                                                         &snapshot.ghost_timing_history_count);
             ghost_engine_->collect_active_holds(ghost_active_holds_buffer_);
@@ -2485,7 +2508,12 @@ void GameSession::audio_callback(float* output,
                                  uint32_t frames,
                                  int64_t physical_buffer_start_samples,
                                  int64_t physical_playback_sample) {
-    const int64_t callback_time_ns = timing::HighResClock::now_ns();
+    // WASAPI supplies the QPC captured with its padding-derived playback sample,
+    // not the potentially delayed time at which this callback finally runs.
+    // ASIO and direct/synthetic callbacks retain their existing QPC fallback.
+    const int64_t paired_time_ns = audio_thread_.callback_playback_time_ns();
+    const int64_t callback_time_ns = paired_time_ns > 0
+        ? paired_time_ns : timing::HighResClock::now_ns();
     if (output && frames > 0) {
         std::fill(output, output + frames * 2, 0.0f);
     }
@@ -3004,10 +3032,13 @@ void GameSession::trigger_lane_hit_effect(int lane) {
 void GameSession::dispatch_lane_input(int lane,
                                       input::InputState state,
                                       int64_t sample,
-                                      int64_t audio_buffer_start_sample) {
+                                      int64_t audio_buffer_start_sample,
+                                      std::optional<int64_t> physical_input_sample) {
     update_lane_feedback(lane, state);
-    const int64_t audible_sample = pin_realtime_audio_start_sample(sample,
-                                                                   audio_buffer_start_sample);
+    // Live calibration changes judgement, not when a physical press sounds.
+    // Replay/autoplay callers retain their recorded/scheduled audio timestamp.
+    const int64_t audible_sample = pin_realtime_audio_start_sample(
+        physical_input_sample.value_or(sample), audio_buffer_start_sample);
     if (state == input::InputState::Pressed) {
         schedule_tone(lane, audible_sample, false);
     }
@@ -3120,7 +3151,13 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
             event_is_stale,
             stale_window_ms,
             sample_rate_);
-        int64_t sample = resolved_sample + input_offset_samples_;
+        // Guard an implausible clock mapping before adding intentional input
+        // calibration. Clamping the calibrated sample to this buffer quantizes
+        // positive offsets according to the callback phase (per-note jitter).
+        if (resolved_sample > buffer_end_samples + lookahead_samples) {
+            resolved_sample = buffer_end_samples;
+        }
+        const int64_t sample = resolved_sample + input_offset_samples_;
         auto lane = lane_from_keycode(event.keycode);
         if (!lane.has_value()) {
             continue;
@@ -3137,10 +3174,6 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
             finished_.store(true, std::memory_order_release);
             return;
         }
-        if (sample > buffer_end_samples + lookahead_samples) {
-            sample = buffer_end_samples;
-        }
-
         const int lane_index = lane.value() - 1;
         if (lane_index < 0 || lane_index >= static_cast<int>(kGameplayHudMaxLanes)) {
             continue;
@@ -3153,7 +3186,8 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
                 lane.value(), *logical_state, sample};
             continue;
         }
-        pending_input_events_.push_back(BufferedLaneInput{lane.value(), *logical_state, sample});
+        pending_input_events_.push_back(
+            BufferedLaneInput{lane.value(), *logical_state, sample, resolved_sample});
     }
 
     for (std::size_t lane_index = 0; lane_index < stale_lane_present.size(); ++lane_index) {
@@ -3171,7 +3205,8 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
         dispatch_lane_input(buffered.lane,
                             buffered.state,
                             buffered.sample,
-                            buffer_start_samples);
+                            buffer_start_samples,
+                            buffered.audio_sample);
     }
 }
 

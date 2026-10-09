@@ -48,7 +48,8 @@ public:
     [[nodiscard]] bool dirty() const noexcept;
 
     void reset(std::string_view runtime_key_mode);
-    void set_timing_defaults(std::optional<bool> text, std::optional<bool> bar) noexcept;
+    void set_timing_defaults(std::optional<bool> text, std::optional<bool> bar,
+                             std::optional<bool> always_visible = std::nullopt) noexcept;
     void set_backdrop_defaults(std::optional<bool> enabled, std::optional<float> opacity,
                                std::optional<float> brightness = std::nullopt,
                                std::optional<float> height = std::nullopt) noexcept;
@@ -82,7 +83,7 @@ private:
     int edit_lane_ = 0;
     int edit_gap_ = 0;
     bool dirty_ = false;
-    std::optional<bool> timing_default_text_, timing_default_bar_;
+    std::optional<bool> timing_default_text_, timing_default_bar_, timing_default_always_visible_;
     std::optional<bool> backdrop_default_enabled_;
     std::optional<float> backdrop_default_opacity_;
     std::optional<float> backdrop_default_brightness_;

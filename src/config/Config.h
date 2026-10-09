@@ -185,6 +185,7 @@ struct SkinConfig {
     bool show_gear_boundary_line = false;
     bool show_timing_feedback = true;
     bool show_timing_bar = true;
+    bool timing_bar_always_visible = false;
     double timing_text_offset_x = 0.0;
     double timing_text_offset_y = 0.0;
     double timing_bar_offset_x = 0.0;
@@ -206,8 +207,9 @@ struct SkinConfig {
     double key_backdrop_height = kSkinKeyBackdropHeightDefault;
     // Built-in hit-burst material: prism | ring | spark.
     std::string hit_burst_style = "prism";
-    // Native solo HUD layout. Missing legacy-profile keys also select studio.
+    // Native/LR2 solo HUD layout. Missing legacy-profile keys also select studio.
     std::string hud_layout = "studio";
+    bool hud_riff_map_visible = true;
     std::string key_label_position = "bottom";
     // UI text font token: default | malgun | bahnschrift | consolas.
     std::string ui_font = "default";
