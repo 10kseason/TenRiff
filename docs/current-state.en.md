@@ -1,5 +1,7 @@
 # TenRiff Current State
 
+**Fixed baseline: [1.8.7](baseline-1.8.7.en.md)** (2026-10-10). Use Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`; do not advance it automatically with `latest` or a new release.
+
 **2026-10-09 · TenRiff 1.8.7:** Improves input calibration and chart-loading audio, adds LR2 solo Studio Deck, 750ms FAST/SLOW retention, key reassignment, consolidated Options and complete song-title fitting. [1.8.7 release](release-1.8.7-gate.md).
 
 **2026-10-08 · TenRiff 1.8.6:** Adds the Studio Deck HUD for Native solo play. Left and right Shift work as play keys; F5/F6 halve/double Hi-Speed and F11 opens chat. Classic HUD remains selectable. [1.8.6 release](release-1.8.6-gate.md).
@@ -21,7 +23,7 @@
 - 1.7.10 hardens ALL SONG against deleted cached entries and adds merge progress and consistent completion-state publication. [Verification and unreproduced symptom](release-1.7.10-gate.md).
 - 1.7.8 adds modern native menus, Luma Keys digital keyboard skins for every 4K–16K layout, Japanese UI, and web/offline skin editing. Menu and gameplay visual controls are stored separately in `native` and `gameplay.native`. [Validation](release-1.7.8-gate.md).
 
-The current project version is **1.8.7**. Audio → Song Ending offers **Listen** (default) or **Skip Outro**; completed plays save and submit without another key. New plays use R4 timing based on BMS RANK and a timing profile for web submissions; existing R1/R2/R3 records are preserved. WASAPI remains the default. See the [1.8.7 release gate](release-1.8.7-gate.md) for changes and pending release checks.
+The current project version is **1.8.7**. Audio → Song Ending offers **Listen** (default) or **Skip Outro**; completed plays save and submit without another key. New plays use R4 timing based on BMS RANK and a timing profile for web submissions; existing R1/R2/R3 records are preserved. WASAPI remains the default. See the [1.8.7 release gate](release-1.8.7-gate.md) for changes, completed release checks and remaining limits.
 
 The 749/739 checks in the [local 1.7.1 r2 report](local-1.7.1-r2.ko.md) are historical, not the new release's results. See [library management](library-management.md), [reference BPM](reference-bpm.md), [skin presets](skin-presets.md) and [ASIO](asio-audio.md).
 
@@ -52,7 +54,7 @@ This is the document that the next agent or any new contributor should read firs
 - `1.2.92` adds selectable default Krrcream and deterministic `nK2 Native 50/50` paths to the standalone BMS key converter.
 - `1.2.93` adds an in-game `Key Converter` row for `Krrcream`/`KeyWeaver nK2`, persists the choice in config/replay metadata, and applies it to runtime key-mode conversion.
 - `1.2.95` briefly restored 4K-10K osu!mania `.osu` indexing and play through `OSU Charts`; that path is removed again in 1.3.1.
-- Baseline companion document for follow-up work: `docs/baseline-1.5.1.en.md`
+- Baseline companion document for follow-up work: [`docs/baseline-1.8.7.en.md`](baseline-1.8.7.en.md)
 - Windows GUI build is the main target
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`
 - The supported chart surface is limited to the BMS family (`.bms/.bme/.bml/.pms`)

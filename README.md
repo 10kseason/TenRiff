@@ -1,5 +1,7 @@
 # TenRiff
 
+**고정 기준선: [1.8.7](docs/baseline-1.8.7.md)** (2026-10-10). Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`을 사용하며 `latest`나 새 릴리스로 자동 변경하지 않습니다.
+
 **2026-10-09 · TenRiff 1.8.7:** 입력 보정과 로딩 오디오 경로를 보완하고 LR2 단독 플레이 스튜디오 덱, 750ms FAST/SLOW 유지, 키 재할당, 옵션 통합과 곡 제목 자동 맞춤을 제공합니다. [1.8.7 release](docs/release-1.8.7-gate.md).
 
 
@@ -25,7 +27,7 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
 
 TenRiff는 Windows GUI 기반 BMS 리듬게임 런타임/런처 프로젝트입니다. 현재 프로젝트 버전은 `1.8.7`이며, 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용입니다. Graphics Settings에서 권리 정리된 외부 ONNX 모델을 선택해 BGA/BGI 확대에 사용할 수 있습니다. 공개 패키지에는 BGA 업스케일러 모델을 넣지 않으며, 키 모드 변환용 NK3 P64 결정 모델과 일반화 패턴 MLP만 포함합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
 
-이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.8.7` 프로젝트 상태, `1.5.1 fixed stable baseline` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
+이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.8.7` 프로젝트 상태, `1.8.7 fixed stable baseline` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
 
 TenRiff 코드는 전통적인 장기 설계 문서 중심 개발만으로 쌓인 프로젝트가 아니라, 빠른 반복과 실험을 중시한 `vibe coding` 성격이 강한 작품이라는 점을 명시합니다.
 
@@ -242,8 +244,8 @@ README는 입문 설명만 담당합니다. 세부 내용은 아래 순서로 �
    - 전체 문서 맵
 2. [`docs/current-state.md`](docs/current-state.md)
    - 지금 실제로 무엇이 동작하는지
-3. [`docs/baseline-1.5.1.md`](docs/baseline-1.5.1.md)
-   - 후속 작업이 기준으로 삼아야 하는 `1.5.1 fixed stable baseline` 베이스 문서
+3. [`docs/baseline-1.8.7.md`](docs/baseline-1.8.7.md)
+   - 후속 작업이 기준으로 삼아야 하는 `1.8.7 fixed stable baseline` 베이스 문서
 4. [`docs/gameplay-guide.md`](docs/gameplay-guide.md)
    - 실제 플레이 기준의 시작 방법, 기본 조작, HUD/판정/결과 화면 설명
 5. [`docs/config.md`](docs/config.md)

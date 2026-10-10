@@ -1,5 +1,7 @@
 # TenRiff Docs Map
 
+**Fixed baseline: [1.8.7](baseline-1.8.7.en.md)** (2026-10-10). Use Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`; do not advance it automatically with `latest` or a new release.
+
 **2026-10-09 · TenRiff 1.8.7:** Improves input calibration and chart-loading audio, adds LR2 solo Studio Deck, 750ms FAST/SLOW retention, key reassignment, consolidated Options and complete song-title fitting. [1.8.7 release](release-1.8.7-gate.md).
 
 **2026-10-08 · TenRiff 1.8.6:** Adds the Studio Deck HUD for Native solo play. Left and right Shift work as play keys; F5/F6 halve/double Hi-Speed and F11 opens chat. Classic HUD remains selectable. [1.8.6 release](release-1.8.6-gate.md).
@@ -42,8 +44,8 @@ When current-behavior descriptions conflict, check **implementation and regressi
 ## Recommended Reading Order
 1. `docs/current-state.en.md`
    - Current product state, core subsystems, validated commands, and remaining manual verification items
-2. `docs/baseline-1.5.1.en.md`
-   - The `1.5.1 fixed stable baseline` baseline document that defines what the current work should be stacked on top of
+2. [`docs/baseline-1.8.7.en.md`](baseline-1.8.7.en.md)
+   - The `1.8.7 fixed stable baseline` baseline document that defines what the current work should be stacked on top of
 3. `docs/gameplay-guide.en.md`
    - How to start playing, choose songs, handle controls, and understand the HUD, judgements, and result screen from a practical player perspective
 4. `docs/config.en.md`
@@ -62,8 +64,8 @@ When current-behavior descriptions conflict, check **implementation and regressi
 ## Which Docs Are Source Of Truth
 - `docs/current-state.en.md`
   - Summary of the current implementation state
-- `docs/baseline-1.5.1.en.md`
-  - The `1.5.1 fixed stable baseline` baseline document that follow-up work should preserve
+- [`docs/baseline-1.8.7.en.md`](baseline-1.8.7.en.md)
+  - The `1.8.7 fixed stable baseline` baseline document that follow-up work should preserve
 - `docs/config.en.md`
   - Based on the actual `config/config.json`, `profiles/<name>/config.json`, and `keymap.json`
 
@@ -89,7 +91,7 @@ When current-behavior descriptions conflict, check **implementation and regressi
 
 ## Practical Rule
 - When checking current behavior, start with `docs/current-state.en.md`.
-- When deciding what baseline to build on, read `docs/baseline-1.5.1.en.md` together with it.
+- When deciding what baseline to build on, read [`docs/baseline-1.8.7.en.md`](baseline-1.8.7.en.md) together with it.
 - Older design documents and current code can differ, so if there is a conflict, interpret things in the order of current code, then `docs/current-state.en.md`, then `docs/config.en.md`.
 
 ## Audio and Play Settings

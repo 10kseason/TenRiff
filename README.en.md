@@ -1,5 +1,7 @@
 # TenRiff
 
+**Fixed baseline: [1.8.7](docs/baseline-1.8.7.en.md)** (2026-10-10). Use Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`; do not advance it automatically with `latest` or a new release.
+
 **2026-10-09 · TenRiff 1.8.7:** Improves input calibration and chart-loading audio, adds LR2 solo Studio Deck, 750ms FAST/SLOW retention, key reassignment, consolidated Options and complete song-title fitting. [1.8.7 release](docs/release-1.8.7-gate.md).
 
 **2026-10-08 · TenRiff 1.8.6:** Adds the Studio Deck HUD for Native solo play. Left and right Shift work as play keys; F5/F6 halve/double Hi-Speed and F11 opens chat. Classic HUD remains selectable. [1.8.6 release](docs/release-1.8.6-gate.md).
@@ -26,7 +28,7 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 
 TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The current project version is `1.8.7`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-This README is an introduction that explains "what to look at first when you open the project." For current behavior, the `1.8.7` project state, the `1.5.1 fixed stable baseline` baseline, configuration, and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
+This README is an introduction that explains "what to look at first when you open the project." For current behavior, the `1.8.7` project state, the `1.8.7 fixed stable baseline` baseline, configuration, and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
 
 TenRiff should also be read as a `vibe coding` work: it was shaped through fast iteration and experimentation rather than only through a traditional long-form design-first process.
 
@@ -232,8 +234,8 @@ This README only covers the introduction. For the details, the most efficient re
    - Full documentation map
 2. [`docs/current-state.en.md`](docs/current-state.en.md)
    - What actually works right now
-3. [`docs/baseline-1.5.1.en.md`](docs/baseline-1.5.1.en.md)
-   - The `1.5.1 fixed stable baseline` baseline document that follow-up work should use as a reference
+3. [`docs/baseline-1.8.7.en.md`](docs/baseline-1.8.7.en.md)
+   - The `1.8.7 fixed stable baseline` baseline document that follow-up work should use as a reference
 4. [`docs/gameplay-guide.en.md`](docs/gameplay-guide.en.md)
    - How to start playing, basic controls, HUD/judgement/result screen explanation from a practical player perspective
 5. [`docs/config.en.md`](docs/config.en.md)

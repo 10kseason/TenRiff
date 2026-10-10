@@ -1,5 +1,7 @@
 # TenRiff
 
+**固定基准：[1.8.7](docs/baseline-1.8.7.zh-CN.md)**（2026-10-10）。使用 Git tag `1.8.7`、commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`，不随 `latest` 或新版本自动更新。
+
 **2026-10-09 · TenRiff 1.8.7:** 改善输入校准和谱面加载音频，支持LR2单人Studio Deck、750ms FAST/SLOW保留、按键重新分配、选项整合及完整曲名自动缩放。 [1.8.7 release](docs/release-1.8.7-gate.md).
 
 **2026-10-08 · TenRiff 1.8.6:** 为Native单人游玩新增Studio Deck HUD。左右Shift可绑定为游玩按键；F5/F6将Hi-Speed减半/加倍，F11打开聊天。仍可选择经典HUD。 [1.8.6 release](docs/release-1.8.6-gate.md).
@@ -26,7 +28,7 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 
 TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。当前项目版本为 `1.8.7`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
 
-这份 README 是入门文档。关于当前行为、`1.8.7` 项目状态、`1.5.1 fixed stable baseline` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
+这份 README 是入门文档。关于当前行为、`1.8.7` 项目状态、`1.8.7 fixed stable baseline` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
 
 TenRiff 也明确属于一种 `vibe coding` 作品：它更多是在快速迭代和实验中成形，而不是只按照传统的长篇设计先行流程推进。
 
@@ -232,8 +234,8 @@ README 只负责入门说明。更详细的内容建议按以下顺序阅读：
    - 文档总索引
 2. [`docs/current-state.zh-CN.md`](docs/current-state.zh-CN.md)
    - 当前实际可用功能
-3. [`docs/baseline-1.5.1.zh-CN.md`](docs/baseline-1.5.1.zh-CN.md)
-   - 后续工作应保持的 `1.5.1 fixed stable baseline` 基准文档
+3. [`docs/baseline-1.8.7.zh-CN.md`](docs/baseline-1.8.7.zh-CN.md)
+   - 后续工作应保持的 `1.8.7 fixed stable baseline` 基准文档
 4. [`docs/gameplay-guide.zh-CN.md`](docs/gameplay-guide.zh-CN.md)
    - 实际开始游玩、基本操作、HUD、判定、结果说明
 5. [`docs/config.zh-CN.md`](docs/config.zh-CN.md)

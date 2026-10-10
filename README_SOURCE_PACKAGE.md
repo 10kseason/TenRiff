@@ -1,5 +1,7 @@
 TenRiff source package notes (`1.8.7`)
 
+- Fixed baseline: [1.8.7](docs/baseline-1.8.7.en.md), tag `1.8.7` at `6b060ad47b950ad9e0dbc516fbb40189e8e21347`. Later documentation commits do not replace the published source ZIP or move the release tag.
+
 - This is the 1.8.7 source line. It includes calibrated input/callback timestamps, chart loading before audio startup, LR2 solo Studio Deck, independent retained timing feedback, unique key reassignment, consolidated Options and complete title fitting. It retains the Studio Deck solo HUD and assignable left/right Shift keys with modifier-free F5/F6 speed and F11 chat shortcuts. It retains ordered GPU batching for supported note images while VSync is off, with the existing path retained for unsupported cases. Earlier frame-pacing fixes are included. Judgement rules remain unchanged from 1.8.42. New records use R4: retuned Hard PG/GR/GD and fixed Hard225ms/Easy210ms BAD across every RANK. Canonical R1/R2/R3 replays retain their original rules. The 1.8.4 feedback, profile-transfer and ghost-response improvements are included. See `docs/release-1.8.7-gate.md` for release validation and its physical-input limitations.
 - This folder is the public 1.8.7 source distribution. It is suitable for inspection and a standalone Windows build.
 - It intentionally excludes local build trees, packaged binaries, caches, user profiles, logs, and private working notes.

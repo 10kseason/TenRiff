@@ -1,5 +1,7 @@
 # TenRiff 当前状态
 
+**固定基准：[1.8.7](baseline-1.8.7.zh-CN.md)**（2026-10-10）。使用 Git tag `1.8.7`、commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`，不随 `latest` 或新版本自动更新。
+
 **2026-10-09 · TenRiff 1.8.7:** 改善输入校准和谱面加载音频，支持LR2单人Studio Deck、750ms FAST/SLOW保留、按键重新分配、选项整合及完整曲名自动缩放。 [1.8.7 release](release-1.8.7-gate.md).
 
 **2026-10-08 · TenRiff 1.8.6:** 为Native单人游玩新增Studio Deck HUD。左右Shift可绑定为游玩按键；F5/F6将Hi-Speed减半/加倍，F11打开聊天。仍可选择经典HUD。 [1.8.6 release](release-1.8.6-gate.md).
@@ -21,7 +23,7 @@
 - 1.7.10 改善 ALL SONG 的已删除缓存项处理、合并进度和完成状态通知。[验证及未复现症状](release-1.7.10-gate.md)。
 - 1.7.8 新增默认菜单动画、4 至 16 键 Luma Keys、日语界面及网页/离线皮肤编辑。菜单与游戏内视觉设置分别保存在 `native` 和 `gameplay.native`。[验证范围](release-1.7.8-gate.md)。
 
-当前项目版本为 **1.8.7**。Audio的歌曲结束方式可选**听到结束**（默认）或**跳过尾奏**；正常完成的结果无需再次按键即可保存并提交。新游玩采用支持BMS RANK的R4判定及网页提交所需的判定配置，保留现有R1/R2/R3记录。默认输出仍为WASAPI。变更与正在进行的发布检查见[1.8.7发布说明](release-1.8.7-gate.md)。
+当前项目版本为 **1.8.7**。Audio的歌曲结束方式可选**听到结束**（默认）或**跳过尾奏**；正常完成的结果无需再次按键即可保存并提交。新游玩采用支持BMS RANK的R4判定及网页提交所需的判定配置，保留现有R1/R2/R3记录。默认输出仍为WASAPI。变更、已完成的发布检查及剩余限制见[1.8.7发布说明](release-1.8.7-gate.md)。
 
 [本地 1.7.1 r2 报告](local-1.7.1-r2.ko.md)中的 749/739 项是旧构建的记录，不作为新版本的结果。参见[曲库管理](library-management.md)、[基准 BPM](reference-bpm.md)、[皮肤预设](skin-presets.md)和 [ASIO](asio-audio.md)。
 
@@ -52,7 +54,7 @@
 - `1.2.92` 为 standalone BMS key converter 加入默认 Krrcream 与确定性 `nK2 Native 50/50` 选择。
 - `1.2.93` 在游戏内 Mode Settings 加入 `Key Converter`，将 `Krrcream`/`KeyWeaver nK2` 选择保存到设置与 replay metadata，并用于 runtime key-mode 变换。
 - `1.2.95` 曾通过 `OSU Charts` 暂时恢复 osu!mania 4K～10K `.osu` 的索引与游玩；该路径在 1.3.1 中再次移除。
-- 后续工作的基准文档是 [`docs/baseline-1.5.1.zh-CN.md`](baseline-1.5.1.zh-CN.md)
+- 后续工作的基准文档是 [`docs/baseline-1.8.7.zh-CN.md`](baseline-1.8.7.zh-CN.md)
 - Windows GUI 构建是主目标
 - Linux 仅存在 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 级别的 preview
 - 支持的 chart surface 仅限 BMS family（`.bms/.bme/.bml/.pms`）

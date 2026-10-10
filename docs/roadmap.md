@@ -1,5 +1,7 @@
 # TenRiff Development Roadmap (staged)
 
+**고정 기준선: [1.8.7](baseline-1.8.7.md)** (2026-10-10). Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`을 사용하며 `latest`나 새 릴리스로 자동 변경하지 않습니다.
+
 > 문서 성격: 초기 설계·개선 방향과 당시 분석을 포함합니다. 미완료 제안이나 과거 수치는 현재 동작·기본값·성능 보장이 아닙니다. 현재 기준은 [현재 상태](current-state.md)와 [설정](config.md)을 확인하세요.
 
 This roadmap captures the recommended high-level order for building out the game loop while avoiding scope creep. Each stage locks in direction before layering extra features.

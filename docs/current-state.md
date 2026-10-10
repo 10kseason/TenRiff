@@ -1,5 +1,7 @@
 # TenRiff Current State
 
+**고정 기준선: [1.8.7](baseline-1.8.7.md)** (2026-10-10). Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`을 사용하며 `latest`나 새 릴리스로 자동 변경하지 않습니다.
+
 **2026-10-09 · TenRiff 1.8.7:** 입력 보정과 로딩 오디오 경로를 보완하고 LR2 단독 플레이 스튜디오 덱, 750ms FAST/SLOW 유지, 키 재할당, 옵션 통합과 곡 제목 자동 맞춤을 제공합니다. [1.8.7 release](release-1.8.7-gate.md).
 
 **2026-10-08 · TenRiff 1.8.6:** Native 단독 플레이에 스튜디오 덱 HUD를 추가합니다. 좌우 Shift를 플레이 키로 사용할 수 있으며, F5/F6은 배속 절반/두 배, F11은 채팅입니다. 클래식 HUD도 선택할 수 있습니다. [1.8.6 release](release-1.8.6-gate.md).
@@ -21,7 +23,7 @@
 - 1.7.10: ALL SONG의 삭제된 캐시 항목 건너뛰기, 캐시 통합 진행률과 완료 상태 전달을 보강했습니다. [검증 범위 및 미재현 증상](release-1.7.10-gate.md).
 - 1.7.8: 새 기본 메뉴 에셋·애니메이션, 4~16키 Luma Keys 디지털 건반, 일본어 UI와 웹/오프라인 스킨 에디터를 제공합니다. 메뉴는 `native`, 인게임은 `gameplay.native`에서 도형·색·위치·글꼴·모션을 편집합니다. [검증 범위](release-1.7.8-gate.md).
 
-현재 프로젝트 버전은 **1.8.7**입니다. Audio의 곡 종료 방식에서 **끝까지 듣기**(기본) 또는 **후주 스킵**을 선택하며, 정상 완료한 결과는 추가 입력 없이 저장·제출합니다. 새 플레이는 BMS RANK를 반영하는 R4와 웹 제출용 판정 프로파일을 사용하고 기존 R1/R2/R3 기록은 유지합니다. WASAPI가 기본 출력입니다. 변경 내용과 진행 중인 릴리스 검증 범위는 [1.8.7 릴리스 안내](release-1.8.7-gate.md)를 참고하세요.
+현재 프로젝트 버전은 **1.8.7**입니다. Audio의 곡 종료 방식에서 **끝까지 듣기**(기본) 또는 **후주 스킵**을 선택하며, 정상 완료한 결과는 추가 입력 없이 저장·제출합니다. 새 플레이는 BMS RANK를 반영하는 R4와 웹 제출용 판정 프로파일을 사용하고 기존 R1/R2/R3 기록은 유지합니다. WASAPI가 기본 출력입니다. 변경 내용과 완료된 릴리스 검증 범위 및 남은 한계는 [1.8.7 릴리스 안내](release-1.8.7-gate.md)를 참고하세요.
 
 [로컬 1.7.1 r2 보고서](local-1.7.1-r2.ko.md)의 749/739 검사 횟수는 이전 빌드의 기록입니다. 현재 릴리스 검사 횟수로 재사용하지 않습니다. 기능별 안내는 [곡 소스와 난이도표](library-management.md), [대표 BPM](reference-bpm.md), [스킨 프리셋](skin-presets.md), [ASIO](asio-audio.md)를 참고하세요.
 
@@ -58,7 +60,7 @@
 - `1.2.92`는 standalone BMS key converter에 기본 Krrcream과 결정론적 `nK2 Native 50/50` 선택을 추가.
 - `1.2.93`은 게임 내 Mode Settings의 `Key Converter`에서 `Krrcream`/`KeyWeaver nK2`를 선택하고 설정·리플레이에 저장해 실제 key-mode 변환에 적용.
 - `1.2.95`에서 Mode Settings의 `OSU Charts`로 osu!mania 4K~10K `.osu` 인덱싱·플레이를 잠시 복구했으나, 이 경로는 1.3.1에서 다시 제거되었습니다.
-- 후속 작업의 기준선 문서는 `docs/baseline-1.5.1.md`
+- 후속 작업의 기준선 문서는 [`docs/baseline-1.8.7.md`](baseline-1.8.7.md)
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
 - 지원 차트 표면은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용

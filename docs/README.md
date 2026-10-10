@@ -1,5 +1,7 @@
 # TenRiff Docs Map
 
+**고정 기준선: [1.8.7](baseline-1.8.7.md)** (2026-10-10). Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`을 사용하며 `latest`나 새 릴리스로 자동 변경하지 않습니다.
+
 **2026-10-09 · TenRiff 1.8.7:** 입력 보정과 로딩 오디오 경로를 보완하고 LR2 단독 플레이 스튜디오 덱, 750ms FAST/SLOW 유지, 키 재할당, 옵션 통합과 곡 제목 자동 맞춤을 제공합니다. [1.8.7 release](release-1.8.7-gate.md).
 
 **2026-10-08 · TenRiff 1.8.6:** Native 단독 플레이에 스튜디오 덱 HUD를 추가합니다. 좌우 Shift를 플레이 키로 사용할 수 있으며, F5/F6은 배속 절반/두 배, F11은 채팅입니다. 클래식 HUD도 선택할 수 있습니다. [1.8.6 release](release-1.8.6-gate.md).
@@ -44,8 +46,8 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
    - 현재 제품 상태, 핵심 서브시스템, 검증된 명령, 남은 수동 검증 항목
 2. `docs/ui-audit-checklist.md`
    - renderer layout 변경 뒤 반드시 다시 돌려야 하는 UI 수동 검증 매트릭스
-3. `docs/baseline-1.5.1.md`
-   - 현재 작업을 어디서부터 쌓아야 하는지 정하는 `1.5.1 fixed stable baseline` 기준선 문서
+3. [`docs/baseline-1.8.7.md`](baseline-1.8.7.md)
+   - 현재 작업을 어디서부터 쌓아야 하는지 정하는 `1.8.7 fixed stable baseline` 기준선 문서
 4. `docs/gameplay-guide.md`
    - 실제 플레이 기준의 시작 방법, 곡 선택, 조작, HUD, 판정, 결과 화면 안내
 5. `docs/multiplayer.md`
@@ -68,8 +70,8 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
 ## Which Docs Are Source Of Truth
 - `docs/current-state.md`
   - 현재 구현 상태의 요약 문서
-- `docs/baseline-1.5.1.md`
-  - 후속 작업이 유지해야 하는 `1.5.1 fixed stable baseline` 기준선 문서
+- [`docs/baseline-1.8.7.md`](baseline-1.8.7.md)
+  - 후속 작업이 유지해야 하는 `1.8.7 fixed stable baseline` 기준선 문서
 - `docs/config.md`
   - 실제 `config/config.json`, `profiles/<name>/config.json`, `keymap.json` 기준
 
@@ -95,7 +97,7 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
 
 ## Practical Rule
 - 현재 동작을 확인할 때는 `docs/current-state.md`를 우선 봅니다.
-- 어떤 기준선 위에서 작업을 쌓는지 정할 때는 `docs/baseline-1.5.1.md`를 같이 봅니다.
+- 어떤 기준선 위에서 작업을 쌓는지 정할 때는 [`docs/baseline-1.8.7.md`](baseline-1.8.7.md)를 같이 봅니다.
 - 오래된 설계와 현재 코드가 다를 수 있으므로, 충돌하면 구현 코드·회귀 테스트를 먼저 확인하고 `docs/current-state.md`, `docs/config.md`를 정정합니다.
 
 ## Skin Customization
@@ -112,4 +114,4 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
 
 [네이티브 ASIO](asio-audio.md), [대표 BPM](reference-bpm.md), [휴대용 스킨 프리셋](skin-presets.md), [곡 소스와 난이도표](library-management.md), [LR2 게이지 비교](lr2-gauge-audit.ko.md)를 참고하세요.
 
-1.7.8 클라이언트의 Sites 계정 연결, 네 가지 기록 지표, 동점 비교 규칙은 [sites-leaderboard.md](sites-leaderboard.md)를 참고하세요. 이 문서는 공개 클라이언트 프로토콜 설명이며 서버 소스·운영 설정·연결 비밀값을 포함하지 않습니다.
+1.8.7 클라이언트의 Sites 계정 연결, 네 가지 기록 지표, 동점 비교 규칙은 [sites-leaderboard.md](sites-leaderboard.md)를 참고하세요. 이 문서는 공개 클라이언트 프로토콜 설명이며 서버 소스·운영 설정·연결 비밀값을 포함하지 않습니다.

@@ -1,5 +1,7 @@
 # TenRiff Docs Map
 
+**固定基準: [1.8.7](baseline-1.8.7.ja.md)**（2026-10-10）。Git tag `1.8.7`、commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347` を使い、`latest` や新しいリリースに合わせて自動変更しません。
+
 **2026-10-09 · TenRiff 1.8.7:** 入力補正と読み込み時の音声処理を改善し、LR2ソロのスタジオデッキ、750msのFAST/SLOW表示、キー再割り当て、設定統合と曲名の自動サイズ調整を追加します。 [1.8.7 release](release-1.8.7-gate.md).
 
 **2026-10-08 · TenRiff 1.8.6:** Nativeソロプレイ用のスタジオデッキHUDを追加。左右のShiftをプレイキーに設定でき、F5/F6でHi-Speedを半分/2倍、F11でチャットを開きます。クラシックHUDも選択できます。 [1.8.6 release](release-1.8.6-gate.md).
@@ -42,8 +44,8 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 ## Recommended Reading Order
 1. `docs/current-state.ja.md`
    - 現在の製品状態、主要サブシステム、確認済みコマンド、残る手動検証項目
-2. `docs/baseline-1.5.1.ja.md`
-   - 現在の作業をどの基準の上に積み重ねるべきかを定義する `1.5.1 fixed stable baseline` ベースライン文書
+2. [`docs/baseline-1.8.7.ja.md`](baseline-1.8.7.ja.md)
+   - 現在の作業をどの基準の上に積み重ねるべきかを定義する `1.8.7 fixed stable baseline` ベースライン文書
 3. `docs/gameplay-guide.ja.md`
    - プレイ開始方法、曲選択、操作、HUD、判定、結果画面を実際の利用者視点で説明する文書
 4. `docs/config.ja.md`
@@ -62,8 +64,8 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 ## Which Docs Are Source Of Truth
 - `docs/current-state.ja.md`
   - 現在の実装状態の要約
-- `docs/baseline-1.5.1.ja.md`
-  - 後続作業が維持すべき `1.5.1 fixed stable baseline` ベースライン文書
+- [`docs/baseline-1.8.7.ja.md`](baseline-1.8.7.ja.md)
+  - 後続作業が維持すべき `1.8.7 fixed stable baseline` ベースライン文書
 - `docs/config.ja.md`
   - 実際の `config/config.json`、`profiles/<name>/config.json`、`keymap.json` に基づく文書
 
@@ -89,7 +91,7 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 
 ## Practical Rule
 - 現在の挙動を確認するときは `docs/current-state.ja.md` から見始めます。
-- どの基準の上に作業を積み上げるか判断するときは `docs/baseline-1.5.1.ja.md` を一緒に読みます。
+- どの基準の上に作業を積み上げるか判断するときは [`docs/baseline-1.8.7.ja.md`](baseline-1.8.7.ja.md) を一緒に読みます。
 - 古い設計文書と現在のコードは食い違うことがあるため、衝突したら現在のコード、`docs/current-state.ja.md`、`docs/config.ja.md` の順で解釈します。
 
 ## オーディオとプレイ設定
