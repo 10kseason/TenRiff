@@ -1,5 +1,7 @@
 # TenRiff 1.1.2 Final Stable Baseline
 
+> **Historical / superseded:** The text below records its named version. The current fixed baseline is [1.8.7](baseline-1.8.7.en.md); references below to current or future work apply only to that historical version.
+
 This document defines the `1.1.2 final stable` baseline that future TenRiff work should build on. The goal is to lock down what counts as the current stable contract, what must be preserved, and what boundaries new work should respect.
 
 ## Release Identity

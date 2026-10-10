@@ -1,5 +1,7 @@
 # TenRiff Current State
 
+**固定基準: [1.8.7](baseline-1.8.7.ja.md)**（2026-10-10）。Git tag `1.8.7`、commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347` を使い、`latest` や新しいリリースに合わせて自動変更しません。
+
 **2026-10-09 · TenRiff 1.8.7:** 入力補正と読み込み時の音声処理を改善し、LR2ソロのスタジオデッキ、750msのFAST/SLOW表示、キー再割り当て、設定統合と曲名の自動サイズ調整を追加します。 [1.8.7 release](release-1.8.7-gate.md).
 
 **2026-10-08 · TenRiff 1.8.6:** Nativeソロプレイ用のスタジオデッキHUDを追加。左右のShiftをプレイキーに設定でき、F5/F6でHi-Speedを半分/2倍、F11でチャットを開きます。クラシックHUDも選択できます。 [1.8.6 release](release-1.8.6-gate.md).
@@ -21,7 +23,7 @@
 - 1.7.10 は ALL SONG の削除済みキャッシュ項目、統合進捗、完了状態の通知を改善します。[検証と未再現の症状](release-1.7.10-gate.md)。
 - 1.7.8 は新しい標準メニュー、4〜16キー対応 Luma Keys、日本語 UI とウェブ/オフラインスキン編集を追加します。メニューとゲームプレイの設定は `native` と `gameplay.native` に分けます。[検証範囲](release-1.7.8-gate.md)。
 
-現在のプロジェクト版は **1.8.7** です。Audioの曲終了方式で**最後まで聴く**（既定）か**後奏スキップ**を選べ、正常終了した結果は追加入力なしで保存・送信します。新しいプレイはBMS RANK対応のR4判定とウェブ送信用の判定プロファイルを使い、既存のR1/R2/R3記録は維持します。既定の出力はWASAPIです。変更内容と進行中のリリース検証は[1.8.7リリース案内](release-1.8.7-gate.md)を参照してください。
+現在のプロジェクト版は **1.8.7** です。Audioの曲終了方式で**最後まで聴く**（既定）か**後奏スキップ**を選べ、正常終了した結果は追加入力なしで保存・送信します。新しいプレイはBMS RANK対応のR4判定とウェブ送信用の判定プロファイルを使い、既存のR1/R2/R3記録は維持します。既定の出力はWASAPIです。変更内容、完了したリリース検証と残る制限は[1.8.7リリース案内](release-1.8.7-gate.md)を参照してください。
 
 [ローカル 1.7.1 r2 レポート](local-1.7.1-r2.ko.md)の 749/739 件は以前のビルドの記録です。新リリースの結果として再利用しません。[曲管理](library-management.md)、[基準 BPM](reference-bpm.md)、[スキンプリセット](skin-presets.md)、[ASIO](asio-audio.md)を参照してください。
 
@@ -52,7 +54,7 @@
 - `1.2.92` は standalone BMS key converter に既定の Krrcream と決定論的 `nK2 Native 50/50` の選択を追加。
 - `1.2.93` はゲーム内 Mode Settings に `Key Converter` を追加し、`Krrcream`/`KeyWeaver nK2` の選択を設定・replay metadata に保存して runtime key-mode 変換へ適用。
 - `1.2.95` では `OSU Charts` で osu!mania 4K～10K `.osu` の index/play を一時的に復元しましたが、この経路は 1.3.1 で再び削除されました。
-- 後続作業の基準文書は `docs/baseline-1.5.1.ja.md`
+- 後続作業の基準文書は [`docs/baseline-1.8.7.ja.md`](baseline-1.8.7.ja.md)
 - Windows GUI ビルドが主対象
 - Linux は `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` レベルの preview のみ
 - 対応 chart surface は BMS family（`.bms/.bme/.bml/.pms`）専用

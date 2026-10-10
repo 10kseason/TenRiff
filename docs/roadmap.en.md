@@ -1,5 +1,7 @@
 # TenRiff Development Roadmap (staged)
 
+**Fixed baseline: [1.8.7](baseline-1.8.7.en.md)** (2026-10-10). Use Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`; do not advance it automatically with `latest` or a new release.
+
 > Document scope: includes early designs, improvement proposals and dated analysis. Uncompleted proposals and historical measurements are not current behavior, defaults or performance guarantees. See [current state](current-state.en.md) and [configuration](config.en.md).
 
 This roadmap captures the recommended high-level order for building out the game loop while avoiding scope creep. Each stage locks in direction before layering extra features.

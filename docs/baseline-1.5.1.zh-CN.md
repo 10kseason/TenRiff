@@ -1,5 +1,7 @@
 # TenRiff 1.5.1 Fixed Stable Baseline
 
+> **历史记录 / 已替代：** 下文记录对应版本。当前固定基准为 [1.8.7](baseline-1.8.7.zh-CN.md)，下文的“当前/后续工作”仅适用于当时的版本。
+
 本文档把 TenRiff 的稳定契约固定在 `1.5.1`。后续工作不得在没有明确兼容性变更与 migration 的情况下破坏这些规则。旧基准文档继续作为历史记录保留，但当前判断以本文档、实际代码和 `docs/current-state.zh-CN.md` 为准。
 
 ## Release Identity

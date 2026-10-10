@@ -1,5 +1,7 @@
 # TenRiff 1.5.1 Fixed Stable Baseline
 
+> **履歴 / 置換済み:** 以下は当該バージョンの記録です。現在の固定基準は [1.8.7](baseline-1.8.7.ja.md) で、以下の「現在・後続作業」は当時の版についての記述です。
+
 この文書は `1.5.1` release で TenRiff の stable contract を固定する。後続作業は明示的な互換性変更と migration なしに以下を破壊しない。旧 baseline 文書は履歴として残すが、現在の判断ではこの文書、実コード、`docs/current-state.ja.md` を優先する。
 
 ## Release Identity

@@ -1,5 +1,7 @@
 # TenRiff 1.0.0 Baseline
 
+> **Historical / superseded:** The text below records its named version. The current fixed baseline is [1.8.7](baseline-1.8.7.en.md); references below to current or future work apply only to that historical version.
+
 This document is the `1.0.0` baseline that should be used as the reference point for future TenRiff work. Its purpose is to quickly pin down "what should be treated as the current default, what must be preserved, and what scope future work should be stacked within."
 
 ## Release Identity

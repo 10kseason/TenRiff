@@ -1,5 +1,7 @@
 # TenRiff
 
+**固定基準: [1.8.7](docs/baseline-1.8.7.ja.md)**（2026-10-10）。Git tag `1.8.7`、commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347` を使い、`latest` や新しいリリースに合わせて自動変更しません。
+
 **2026-10-09 · TenRiff 1.8.7:** 入力補正と読み込み時の音声処理を改善し、LR2ソロのスタジオデッキ、750msのFAST/SLOW表示、キー再割り当て、設定統合と曲名の自動サイズ調整を追加します。 [1.8.7 release](docs/release-1.8.7-gate.md).
 
 **2026-10-08 · TenRiff 1.8.6:** Nativeソロプレイ用のスタジオデッキHUDを追加。左右のShiftをプレイキーに設定でき、F5/F6でHi-Speedを半分/2倍、F11でチャットを開きます。クラシックHUDも選択できます。 [1.8.6 release](docs/release-1.8.6-gate.md).
@@ -26,7 +28,7 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 
 TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。現在のプロジェクト版は `1.8.7` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
 
-この README は導入文書です。現在の挙動、`1.8.7` project state、`1.5.1 fixed stable baseline` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
+この README は導入文書です。現在の挙動、`1.8.7` project state、`1.8.7 fixed stable baseline` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
 
 TenRiff のコードベースは、伝統的な長文設計書主導だけで積み上がったものではなく、高速な反復と実験を重視した `vibe coding` 的な性格を持つ作品でもあります。
 
@@ -232,8 +234,8 @@ README は導入だけを担当します。詳細は次の順で読むのが効�
    - 文書マップ全体
 2. [`docs/current-state.ja.md`](docs/current-state.ja.md)
    - 現在実際に動いていること
-3. [`docs/baseline-1.5.1.ja.md`](docs/baseline-1.5.1.ja.md)
-   - 後続作業が参照すべき `1.5.1 fixed stable baseline` ベースライン文書
+3. [`docs/baseline-1.8.7.ja.md`](docs/baseline-1.8.7.ja.md)
+   - 後続作業が参照すべき `1.8.7 fixed stable baseline` ベースライン文書
 4. [`docs/gameplay-guide.ja.md`](docs/gameplay-guide.ja.md)
    - 実際のプレイ開始方法、基本操作、HUD/判定/結果画面の説明
 5. [`docs/config.ja.md`](docs/config.ja.md)

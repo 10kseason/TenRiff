@@ -14,7 +14,23 @@
 
 ## 확인 범위
 
-로컬 릴리스 빌드, CTest 전체 및 통합 테스트, 스킨 편집기, 실제 MenuApp/Session 검사, 렌더 캡처, 두 HUD의 GPU 배칭 검사, 1.8.5와의 고정 렌더 비용 비교, 패키지 CRC·SHA-256·개인정보 검사와 독립 추출 소스 빌드를 릴리스 절차에서 확인합니다. GitHub CI와 공개 파일 내려받기 검증도 별도로 기록합니다.
+2026-10-09에 PR #81을 `6b060ad47b950ad9e0dbc516fbb40189e8e21347`로 병합하고 tag `1.8.7`을 공개했습니다. 2026-10-10에는 이 릴리스를 [고정 기준선](baseline-1.8.7.md)으로 지정했습니다. 아래는 릴리스 당시 결과이며 문서 고정 작업에서 다시 실행한 게임 검사가 아닙니다.
+
+| 검사 | 릴리스 당시 결과 |
+|---|---|
+| Release / 독립 추출 동등 소스 CTest | 각각 3/3, 1,045 cases, 통합 생략 0 |
+| 소스 / 독립 추출 소스 에디터 | 각각 33/33 |
+| 실제 app/session / 무음 공유 WASAPI | 84/84 / 23/23 |
+| Studio / Classic GPU 배칭 | 각각 7/7 |
+| 네이티브 메뉴 / 4개 presentation mode | 17개·939 hit / 각각 180/180 Presents |
+| 곡 제목 | 28개 사례·2,520 측정 Presents |
+| 1.8.5 대비 고정 화면 A/B | 6회, p50 +0.03ms 이하 및 p95/p99 게이트 통과 |
+| PR / main ASan·OpenVINO CI | 통과 |
+| 패키지 / 공개 전달 | ZIP CRC, 클라이언트 573개·소스 1,057개 해시, 개인정보 검출 0, 공개 자산 3개 재다운로드 비교 통과 |
+
+최종 소스 ZIP의 1,057개 파일은 병합 Git blob과 정확히 같고 독립 빌드한 후보와 같은 트리입니다. 최종 ZIP 자체를 다시 독립 빌드한 것은 아닙니다. 선택적 외부 Python 참조 구현 비교는 실행하지 못했습니다.
+
+작업 공간에 보관한 상세 증거는 `1.8.7-release/evidence/VERIFICATION.ko.md`, `summary.json`, `source-commit-dist.json`, `release-public-readback.json`입니다. 이 경로는 개발 작업 공간의 자료이며 공개 소스 ZIP에 포함된다는 뜻이 아닙니다. 배포 파일 식별자는 [기준선 자산 표](baseline-1.8.7.md#release-identity)를 사용합니다.
 
 ## 남은 경계
 

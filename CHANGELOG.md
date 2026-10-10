@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+
+- Pin the fixed stable baseline to the published 1.8.7 tag, commit and asset hashes. Synchronize Korean, English, Japanese and Simplified Chinese entry documents; mark earlier baselines as historical. This documentation-only follow-up leaves the released runtime and archives unchanged.
+
 ## [1.8.7] - 2026-10-09
 
 - Keep positive input calibration intact across audio callback phases, and pair WASAPI playback samples with their observation time before buffer acquisition. Preserve the existing sample baseline, ASIO fallback and R1–R4 judgement windows. See [input timing](docs/input-offset-timing.ko.md) and [callback timing](docs/audio-callback-timestamp.ko.md) for compatibility limits.
