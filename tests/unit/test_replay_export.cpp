@@ -809,6 +809,71 @@ TEST_CASE("LN Mix conversion version round-trips with absent legacy default and 
     std::filesystem::remove(result_path);
 }
 
+TEST_CASE("feedback regression key conversion version round-trips with absent legacy default and rejects unknown evidence") {
+    const std::filesystem::path replay_path = "key_convert_version_replay_test.json";
+    const std::filesystem::path result_path = "key_convert_version_result_test.json";
+    ReplayFile replay;
+    replay.replay_format_version = 0;
+    replay.chart_path = "fixture.bms";
+    replay.mods = {};
+    replay.sample_rate = replay.trace.sample_rate = 1000;
+    replay.trace.lane_count = 1;
+    replay.trace.duration_samples = 10000;
+    ResultFile result;
+    result.chart_path = "fixture.bms";
+    result.mods = replay.mods;
+    result.stats.total_notes = 10;
+    for (int version : {1, 2}) {
+        replay.mode.key_conversion_version = version;
+        result.key_conversion_version = version;
+        REQUIRE(save_replay_json(replay_path.string(), replay).success());
+        REQUIRE(save_result_json(result_path.string(), result).success());
+        const auto loaded = load_replay_json(replay_path.string());
+        REQUIRE(loaded.success());
+        CHECK(loaded.replay->mode.key_conversion_version == version);
+        std::string error;
+        const auto history_replay = tenriff::app::menu_records::parse_replay_file(replay_path, &error);
+        const auto history_result = tenriff::app::menu_records::parse_result_file(result_path, &error);
+        REQUIRE(history_replay.has_value());
+        REQUIRE(history_result.has_value());
+        CHECK(history_replay->key_conversion_version == version);
+        CHECK(history_result->key_conversion_version == version);
+        if (version == 1) {
+            CHECK(read_file(replay_path).find("key_conversion_version") == std::string::npos);
+            CHECK(read_file(result_path).find("key_conversion_version") == std::string::npos);
+        }
+    }
+    const std::vector<tenriff::config::JsonValue> invalid = {
+        tenriff::config::JsonValue{0.0}, tenriff::config::JsonValue{3.0},
+        tenriff::config::JsonValue{1.5}, tenriff::config::JsonValue{"2"},
+        tenriff::config::JsonValue{true}, tenriff::config::JsonValue{},
+    };
+    const auto replay_json = parse_json(read_file(replay_path));
+    const auto result_json = parse_json(read_file(result_path));
+    REQUIRE(replay_json.success());
+    REQUIRE(result_json.success());
+    for (const auto& bad : invalid) {
+        auto root = *replay_json.root->as_object();
+        auto mode = *root.at("mode").as_object();
+        mode["key_conversion_version"] = bad;
+        root["mode"] = tenriff::config::JsonValue{std::move(mode)};
+        write_file(replay_path, tenriff::config::json_stringify(tenriff::config::JsonValue{std::move(root)}));
+        CHECK_FALSE(load_replay_json(replay_path.string()).success());
+        auto result_root = *result_json.root->as_object();
+        result_root["key_conversion_version"] = bad;
+        write_file(result_path, tenriff::config::json_stringify(tenriff::config::JsonValue{std::move(result_root)}));
+        std::string error;
+        CHECK_FALSE(tenriff::app::menu_records::parse_result_file(result_path, &error).has_value());
+    }
+    replay.mode.key_conversion_version = 99;
+    CHECK_FALSE(tenriff::gameplay::validate_replay_evidence(replay).success());
+    CHECK_FALSE(save_replay_json(replay_path.string(), replay).success());
+    result.key_conversion_version = 99;
+    CHECK_FALSE(save_result_json(result_path.string(), result).success());
+    std::filesystem::remove(replay_path);
+    std::filesystem::remove(result_path);
+}
+
 TEST_CASE("replay verifier reconstructs both LN Mix conversions without changing R1 through R4 judgement rules") {
     tenriff::gameplay::GameplayChart source;
     source.lane_count = 1;

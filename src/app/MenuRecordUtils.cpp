@@ -479,6 +479,13 @@ std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path&
         }
         out.long_note_mix_version = static_cast<int>(version->as_number());
     }
+    if (const auto* version = find_json_value(*root, "key_conversion_version")) {
+        if (!version->is_number() || (version->as_number() != 1.0 && version->as_number() != 2.0)) {
+            if (error) *error = "Unsupported key conversion version.";
+            return std::nullopt;
+        }
+        out.key_conversion_version = static_cast<int>(version->as_number());
+    }
     out.rate_multiplier = read_json_number(*root, "rate_multiplier", 1.0);
     out.score_multiplier = read_json_number(*root, "score_multiplier", 1.0);
     out.pause_used = read_json_bool(*root, "pause_used", false);
@@ -566,6 +573,7 @@ std::optional<ParsedReplayRecord> parse_replay_file(const std::filesystem::path&
     out.input_offset_ms = replay.input_offset_ms;
     out.mods = replay.mods;
     out.long_note_mix_version = replay.mode.long_note_mix_version;
+    out.key_conversion_version = replay.mode.key_conversion_version;
     out.rate_multiplier = replay.rate_multiplier;
     out.score_multiplier = replay.score_multiplier;
     out.pause_used = replay.pause_used;

@@ -18,6 +18,13 @@
 #include <iostream>
 #include <numeric>
 
+TEST_CASE("feedback regression indicator backing visibility reaches fullscreen skin preview") {
+    tenriff::render::SkinPreviewData preview;
+    preview.indicator_background_visible = false;
+    const auto hud = tenriff::render::make_skin_gameplay_preview(preview);
+    CHECK_FALSE(hud.indicator_background_visible);
+}
+
 #ifdef _WIN32
 namespace tenriff::render {
 struct MenuWindowResolutionTestAccess {
@@ -998,7 +1005,7 @@ TEST_CASE("ghost battle reserves solo physical player width before fitting the g
                 tenriff::render::compute_gameplay_playfield_width(980.0f, scale) / keys));
             CHECK(widths.ghost <= widths.player);
             CHECK(widths.ghost >= 160);
-            CHECK(widths.player + widths.ghost + 220 <= 1920.01f);
+            CHECK(widths.player + widths.ghost + tenriff::render::kGameplayBattleReservedWidth <= 1920.01f);
         }
     }
 }

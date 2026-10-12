@@ -2070,12 +2070,15 @@ void MenuApp::switch_song_source(const std::string& new_songs_path, bool force_r
 
 void MenuApp::handle_input_event(const input::InputEvent& event) {
     note_runtime_input_event_source(event);
+    const bool duplicate_capture_press = current_screen() == Screen::Keymap &&
+        keymap_settings_controller_.capture_active() && event.state == input::InputState::Pressed &&
+        pressed_keys_.count(event.keycode) != 0;
     const bool duplicate_adjustment_press = event.state == input::InputState::Pressed &&
         (event.keycode == key_left_ || event.keycode == key_right_ ||
          (difficulty_table_url_editing_ && event.keycode == key_backspace_)) &&
         event.keycode == song_select_repeat_key_ && pressed_keys_.count(event.keycode) != 0;
     update_pressed_keys(event);
-    if (duplicate_adjustment_press) return;
+    if (duplicate_adjustment_press || duplicate_capture_press) return;
     // Key capture owns reserved keys too, so F9/F10/F11 cannot open an overlay
     // or take a screenshot instead of reporting a binding conflict.
     if (current_screen() == Screen::QuickSetup && profile_restart_key_capture_active_) {
@@ -2271,7 +2274,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
         toggle_skin_fullscreen_preview();
         return;
     }
-    if (skin_preview_fullscreen_) return;
+    if (skin_preview_fullscreen_ && event.kind != render::MenuHitTargetKind::GameplayFieldDrag) return;
     // Pointer selection takes ownership immediately, even if it changes the row
     // and then returns before the next repeat tick.
     reset_song_select_repeat();
@@ -2338,6 +2341,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
         return;
     }
     if (event.kind == render::MenuHitTargetKind::GameplayFieldDrag) {
+        if (current_screen() != Screen::Gameplay && current_screen() != Screen::SettingsSkins) return;
         const double requested_offset =
             std::isfinite(event.value) ? event.value : config::kGameplayFieldOffsetXDefault;
         const double clamped_offset = std::clamp(

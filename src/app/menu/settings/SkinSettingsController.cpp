@@ -496,6 +496,9 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
             runtime.skin.hud_layout = config::normalize_skin_hud_layout_token(runtime.skin.hud_layout) == "studio"
                 ? "classic" : "studio";
             return mark_changed();
+        case SkinSettingsRowId::IndicatorBackground:
+            runtime.skin.indicator_background_visible = !runtime.skin.indicator_background_visible;
+            return mark_changed();
         case SkinSettingsRowId::HudRiffMapVisible:
             runtime.skin.hud_riff_map_visible = !runtime.skin.hud_riff_map_visible;
             return mark_changed();

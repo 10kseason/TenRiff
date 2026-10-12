@@ -226,7 +226,8 @@ ReplayVerificationResult verify_replay_against_chart(
                                                    replay.rate,
                                                    base_bpm,
                                                    replay.sample_rate,
-                                                   static_cast<LongNoteMixVersion>(replay.mode.long_note_mix_version));
+                                                   static_cast<LongNoteMixVersion>(replay.mode.long_note_mix_version),
+                                                   replay.mode.key_conversion_version);
     if (!equivalent_mode_mod_tokens(managed.active_mods, replay.mods)) {
         return invalid_result("Replay mods do not normalize to the recorded mode set.");
     }

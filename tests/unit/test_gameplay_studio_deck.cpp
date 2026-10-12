@@ -31,7 +31,7 @@ TEST_CASE("Studio title stays in the upper information card as side space change
     CHECK(left.left >= 1100);
     CHECK(left.top == 52);
     const auto restored = gameplay_studio_song_title_layout(compute_gameplay_studio_deck_layout(470, 1450));
-    CHECK(restored.left == 1558);
+    CHECK(restored.left == 1582);
     CHECK(restored.top == 52);
     CHECK(restored.right == 1856);
     const auto wide = gameplay_studio_song_title_layout(compute_gameplay_studio_deck_layout(250, 1622));
@@ -85,37 +85,37 @@ TEST_CASE("Studio riff map switch hides bars and clocks without moving the remai
 
 TEST_CASE("Studio deck places information upper right score lower left and a horizontal map lower right") {
     const auto wide = compute_gameplay_studio_deck_layout(470.0f, 1450.0f);
-    CHECK(wide.info_x == 1558);
+    CHECK(wide.info_x == 1582);
     CHECK(wide.info_y == 52);
-    CHECK(wide.info_width == 298);
+    CHECK(wide.info_width == 274);
     CHECK(wide.score_x == 24);
     CHECK(wide.score_y == 576);
     CHECK(wide.score_width == 414);
     CHECK(wide.map_x == wide.info_x);
     CHECK(wide.map_width > wide.map_height);
-    CHECK(wide.map_scale == 1);
-    CHECK(wide.map_height == 96);
-    CHECK(wide.map_top == 924);
+    CHECK(wide.map_scale == doctest::Approx(274.0 / 280.0));
+    CHECK(wide.map_height == doctest::Approx(96.0 * 274.0 / 280.0).epsilon(1e-5));
+    CHECK(wide.map_top + wide.map_height == doctest::Approx(1020));
     CHECK(wide.map_visible);
     CHECK(wide.map_times_visible);
     CHECK(wide.score_visible);
     // A narrow 4K field opens both columns without depending on lane count.
     const auto narrow = compute_gameplay_studio_deck_layout(660.0f, 1260.0f);
-    CHECK(narrow.info_x == 1368);
+    CHECK(narrow.info_x == 1392);
     CHECK(narrow.score_width == 600);
     CHECK(narrow.info_width > wide.info_width);
 }
 
 TEST_CASE("Studio map clocks stay full size in ordinary gaps and scale within narrow gaps") {
     for (const float width : {280.0f, 298.0f, 414.0f}) {
-        const auto deck = compute_gameplay_studio_deck_layout(100, 1748.0f - width);
+        const auto deck = compute_gameplay_studio_deck_layout(100, 1724.0f - width);
         REQUIRE(deck.map_width == width);
         CHECK(deck.map_scale == 1);
         CHECK(deck.map_height == 96);
         CHECK(deck.map_top == 924);
     }
     for (const float width : {279.0f, 220.0f, 160.0f, 140.0f}) {
-        const auto deck = compute_gameplay_studio_deck_layout(100, 1748.0f - width);
+        const auto deck = compute_gameplay_studio_deck_layout(100, 1724.0f - width);
         REQUIRE(deck.map_width == width);
         CHECK(deck.map_scale == doctest::Approx(width / 280.0f));
         CHECK(deck.map_scale < 1);
@@ -140,7 +140,7 @@ TEST_CASE("Studio deck keeps cards outside moved fields and separates shared fal
                     // consume both upper side gaps. Never cover the note field.
                     CHECK(performance);
                     CHECK(left <= 56);
-                    CHECK(right + 108 >= gameplay_studio_header_safe_right(true));
+                    CHECK(right + 132 >= gameplay_studio_header_safe_right(true));
                 }
                 REQUIRE(deck.score_visible);
                 REQUIRE(deck.map_visible);
@@ -165,7 +165,7 @@ TEST_CASE("Studio deck keeps cards outside moved fields and separates shared fal
         }
     }
     const auto far_right = compute_gameplay_studio_deck_layout(900, 1880);
-    CHECK(far_right.gauge_marker_x + 86 < 900);
+    CHECK(far_right.gauge_marker_x + 96 < 900);
     CHECK(far_right.info_x + far_right.info_width < far_right.gauge_marker_x);
     CHECK_FALSE(compute_gameplay_studio_deck_layout(0, 0).info_visible);
     CHECK_FALSE(compute_gameplay_studio_deck_layout(std::numeric_limits<float>::quiet_NaN(), 980).map_visible);
@@ -186,13 +186,13 @@ TEST_CASE("Studio performance overlay moves only the upper information card and 
 }
 
 TEST_CASE("Studio gauge marker stays inside its authored vertical limits") {
-    CHECK(gameplay_studio_gauge_marker_y(900.0f, 0.0) == doctest::Approx(846.0f).epsilon(1e-3));
-    CHECK(gameplay_studio_gauge_marker_y(900.0f, 0.5) == doctest::Approx(434.0f).epsilon(1e-3));
+    CHECK(gameplay_studio_gauge_marker_y(900.0f, 0.0) == doctest::Approx(834.0f).epsilon(1e-3));
+    CHECK(gameplay_studio_gauge_marker_y(900.0f, 0.5) == doctest::Approx(430.0f).epsilon(1e-3));
     CHECK(gameplay_studio_gauge_marker_y(900.0f, 1.0) == doctest::Approx(8.0f).epsilon(1e-3));
-    CHECK(gameplay_studio_gauge_marker_y(900.0f, -1.0) == 846.0f);
+    CHECK(gameplay_studio_gauge_marker_y(900.0f, -1.0) == 834.0f);
     CHECK(gameplay_studio_gauge_marker_y(900.0f, 2.0) == 8.0f);
     CHECK(gameplay_studio_gauge_marker_y(20.0f, 0.5) == 8.0f);
-    CHECK(gameplay_studio_gauge_marker_y(900.0f, std::numeric_limits<double>::quiet_NaN()) == 846.0f);
+    CHECK(gameplay_studio_gauge_marker_y(900.0f, std::numeric_limits<double>::quiet_NaN()) == 834.0f);
 }
 
 TEST_CASE("Studio score counter retains grouping and grows beyond native maximum") {

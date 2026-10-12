@@ -158,9 +158,12 @@ inline float compute_gameplay_playfield_width(float baseline_width, double note_
 // Keep the player's solo geometry in battle. Only the spectator field consumes
 // the remaining horizontal budget; both retain the full vertical scroll span.
 struct GameplayBattleWidths { float player; float ghost; };
+// Two 60px gauges, outer field gaps 16/18px, the 96px field gap and
+// 12px canvas margins on both sides must fit without cropping the rails.
+inline constexpr float kGameplayBattleReservedWidth = 274.0f;
 inline GameplayBattleWidths compute_gameplay_battle_widths(double note_width_scale) {
     const float player = compute_gameplay_playfield_width(980.0f, note_width_scale);
-    return {player, std::min(player, std::max(160.0f, 1920.0f - 220.0f - player))};
+    return {player, std::min(player, std::max(160.0f, 1920.0f - kGameplayBattleReservedWidth - player))};
 }
 
 inline float gameplay_hold_body_alpha(double opacity, double visual_opacity) {

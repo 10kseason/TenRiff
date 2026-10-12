@@ -97,7 +97,7 @@ constexpr float kGameplayFieldDragHandleHeight = 42.0f;
 constexpr float kGameplayFieldDragHandleTop = 16.0f;
 constexpr float kGameplayFieldDragCanvasMargin = 12.0f;
 constexpr float kGameplayHoldTailTaperRatio = 0.55f;
-constexpr float kGameplayGaugeWidth = 46.0f;
+constexpr float kGameplayGaugeWidth = 60.0f;
 constexpr double kGameplayJudgementLineMin = config::kJudgementLinePositionMin;
 constexpr double kGameplayJudgementLineMax = config::kJudgementLinePositionMax;
 constexpr double kGameplayJudgementLineDefault = config::kJudgementLinePositionDefault;
@@ -921,7 +921,7 @@ GameplaySurfaceLayout build_gameplay_surface_layout(int lane_count,
                                                          lane_center_gap_scale,
                                                          note_divider_gap_px);
         layout.player_gauge_left =
-            layout.player_field.left - 62.0f;
+            layout.player_field.left - 76.0f;
         layout.ghost_gauge_left =
             layout.ghost_field.right + 18.0f;
     } else {
@@ -944,7 +944,7 @@ GameplaySurfaceLayout build_gameplay_surface_layout(int lane_count,
 
     hide_gameplay_scratch_lanes(layout.player_field, hidden_scratch_mask);
     if (ghost_visible) hide_gameplay_scratch_lanes(layout.ghost_field, hidden_scratch_mask);
-    layout.player_gauge_left = ghost_visible ? layout.player_field.left - 62.0f : layout.player_field.right + 60.0f;
+    layout.player_gauge_left = ghost_visible ? layout.player_field.left - 76.0f : layout.player_field.right + 60.0f;
     if (ghost_visible) layout.ghost_gauge_left = layout.ghost_field.right + 18.0f;
     float surface_left = std::min(layout.player_field.left, layout.player_gauge_left);
     float surface_right = std::max(
@@ -4183,8 +4183,8 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
         }
         const float hit_y = gameplay_field_y(field.top, field.height, desired.judgement_line_position);
         fill->SetColor(D2D1::ColorF(0x12161E));
-        for (float x : {field.left - 8.0f, field.right + 2.0f})
-            ctx->FillRectangle(D2D1::RectF(x, 0, x + 6.0f, hit_y), fill);
+        for (float x : {field.left - 12.0f, field.right + 2.0f})
+            ctx->FillRectangle(D2D1::RectF(x, 0, x + 10.0f, hit_y), fill);
         if (deck.map_visible) {
             const float step = deck.map_width / 64.0f;
             const float gap = std::min(2.0f, step * 0.30f);
@@ -4482,7 +4482,8 @@ void MenuWindow::on_mouse_click(int window_x, int window_y, bool double_click) {
         float y = 0.0f;
         static_cast<void>(translate_window_point(window_x, window_y, &x, &y));
         const double requested_offset = gameplay_field_drag_state_.drag_start_offset_x +
-                                        static_cast<double>(x - gameplay_field_drag_state_.drag_start_x);
+                                        static_cast<double>(x - gameplay_field_drag_state_.drag_start_x) /
+                                            gameplay_field_drag_state_.scene_scale;
         gameplay_field_drag_state_.offset_x = std::clamp(
             std::round(requested_offset),
             gameplay_field_drag_state_.min_offset_x,
@@ -4504,6 +4505,7 @@ void MenuWindow::on_mouse_click(int window_x, int window_y, bool double_click) {
             ReleaseCapture();
         }
         update_cursor_visibility(
+            gameplay_field_drag_state_.context == FieldDragContext::Gameplay &&
             gameplay_field_drag_state_.visible && !gameplay_field_drag_state_.hovered);
         if (gameplay_field_drag_state_.hovered) {
             SetCursor(LoadCursor(nullptr, IDC_SIZEWE));
@@ -4609,7 +4611,8 @@ void MenuWindow::on_mouse_move(int window_x, int window_y) {
 
     if (gameplay_field_drag_state_.active) {
         const double requested_offset = gameplay_field_drag_state_.drag_start_offset_x +
-                                        static_cast<double>(x - gameplay_field_drag_state_.drag_start_x);
+                                        static_cast<double>(x - gameplay_field_drag_state_.drag_start_x) /
+                                            gameplay_field_drag_state_.scene_scale;
         gameplay_field_drag_state_.offset_x = std::clamp(
             std::round(requested_offset),
             gameplay_field_drag_state_.min_offset_x,
@@ -4625,11 +4628,12 @@ void MenuWindow::on_mouse_move(int window_x, int window_y) {
         gameplay_field_drag_state_.hovered =
             x >= gameplay_field_drag_state_.left && x <= gameplay_field_drag_state_.right &&
             y >= gameplay_field_drag_state_.top && y <= gameplay_field_drag_state_.bottom;
-        update_cursor_visibility(!gameplay_field_drag_state_.hovered);
+        update_cursor_visibility(gameplay_field_drag_state_.context == FieldDragContext::Gameplay &&
+            !gameplay_field_drag_state_.hovered);
         if (gameplay_field_drag_state_.hovered) {
             SetCursor(LoadCursor(nullptr, IDC_SIZEWE));
         }
-        return;
+        if (gameplay_field_drag_state_.context == FieldDragContext::Gameplay || gameplay_field_drag_state_.hovered) return;
     }
 
     if (value_slider_drag_state_.active) {
@@ -4843,6 +4847,21 @@ void MenuWindow::push_text_input(std::string text) {
 }
 
 void MenuWindow::render(const MenuRenderData& data) {
+    // Cancel before mode changes or queued mouse-up/capture messages can commit
+    // a drag belonging to the previous preview screen.
+    const auto drag_context = data.generic.skin_preview.visible
+        ? (data.generic.skin_preview.fullscreen ? FieldDragContext::FullscreenPreview : FieldDragContext::EmbeddedPreview)
+        : (data.kind == MenuScreenKind::GameplayHud ? FieldDragContext::Gameplay : FieldDragContext::None);
+    if (gameplay_field_drag_state_.context != drag_context) {
+        // Leaving a preview mid-drag cancels its unsaved local override and
+        // capture; it must never leak into another screen or a real game.
+        const bool cancel_capture = gameplay_field_drag_state_.active;
+        gameplay_field_drag_state_.active = false;
+        if (cancel_capture && hwnd_ && GetCapture() == static_cast<HWND>(hwnd_)) ReleaseCapture();
+        if (cancel_capture) suppress_next_left_button_up_ = false;
+        gameplay_field_drag_state_ = GameplayFieldDragState{};
+        gameplay_field_drag_state_.context = drag_context;
+    }
     last_present_completion_ns_.store(0, std::memory_order_release);
     apply_pending_config();
     update_cursor_visibility(data.kind == MenuScreenKind::GameplayHud &&

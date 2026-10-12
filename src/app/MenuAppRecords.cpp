@@ -84,10 +84,12 @@ bool live_result_claims_match(const menu_records::ParsedResultRecord& parsed,
                               std::string_view final_gauge,
                               double rate_multiplier,
                               double score_multiplier,
-                              int long_note_mix_version) {
+                              int long_note_mix_version,
+                              int key_conversion_version) {
     const auto& stored = parsed.stats;
     return parsed.final_score == final_score &&
            parsed.long_note_mix_version == long_note_mix_version &&
+           parsed.key_conversion_version == key_conversion_version &&
            parsed.game_over == game_over &&
            parsed.clear_status == clear_status &&
            parsed.final_gauge == final_gauge &&
@@ -164,6 +166,7 @@ void MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
     record.game_over = effective_game_over;
     record.mods = parsed.mods;
     record.long_note_mix_version = parsed.long_note_mix_version;
+    record.key_conversion_version = parsed.key_conversion_version;
     record.rate_multiplier = parsed.rate_multiplier;
     record.score_multiplier = parsed.score_multiplier;
     record.pause_used = parsed.pause_used;
@@ -394,7 +397,8 @@ void MenuApp::cache_current_session_result(const std::string& chart_path,
                                                            last_final_gauge_,
                                                            last_result_rate_multiplier_,
                                                            last_result_score_multiplier_,
-                                                           last_result_long_note_mix_version_);
+                                                           last_result_long_note_mix_version_,
+                                                           last_result_key_conversion_version_);
         if (!evidence_matches || !claims_match) {
             verification.status = ReplayVerificationStatus::Invalid;
             verification.detail = !evidence_matches
@@ -526,6 +530,7 @@ const MenuApp::ReplaySummary* MenuApp::replay_summary_for_path(const std::string
             summary.input_offset_ms = parsed->input_offset_ms;
             summary.mods = parsed->mods;
             summary.long_note_mix_version = parsed->long_note_mix_version;
+            summary.key_conversion_version = parsed->key_conversion_version;
             summary.rate_multiplier = parsed->rate_multiplier;
             summary.score_multiplier = parsed->score_multiplier;
             summary.pause_used = parsed->pause_used;
@@ -575,6 +580,7 @@ bool MenuApp::open_result_record(const std::string& result_path,
     has_result_ = true;
     last_result_mods_ = parsed->mods;
     last_result_long_note_mix_version_ = parsed->long_note_mix_version;
+    last_result_key_conversion_version_ = parsed->key_conversion_version;
     last_result_rate_multiplier_ = parsed->rate_multiplier;
     last_result_score_multiplier_ = parsed->score_multiplier;
     last_result_final_score_ = parsed->final_score;

@@ -1,5 +1,7 @@
 # TenRiff
 
+**Local feedback patch, 2026-10-13:** Based on the user-selected 1.8.9, with sequential key binding, converter keysound/hold preservation, indicator backings, larger gauges, preview gear dragging and text-only judgements. [Behavior and replay compatibility (Korean)](docs/feedback-conversion-20261013.ko.md). Published releases and the fixed baseline are unchanged.
+
 **Fixed baseline: [1.8.7](docs/baseline-1.8.7.en.md)** (2026-10-10). Use Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`; do not advance it automatically with `latest` or a new release.
 
 **2026-10-12 · 1.8.9:** Adds larger lobby BEST numbers, key-mode colors and a white shared frame; Studio information at the upper right, score at the lower left and a horizontal riff map at the lower right; and larger result text, analysis tabs and centered actions. S+ color/font are preserved. Judge Easy/Hard selections now reach new sessions. See [behavior, verification and remaining scope](docs/release-1.8.9-gate.md) and [Judge cause and compatibility](docs/judge-session-handoff-1.8.9.ko.md) (Korean).

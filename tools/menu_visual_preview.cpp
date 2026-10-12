@@ -151,6 +151,7 @@ struct MenuAppVisualTestAccess {
         skin.hit_burst_style = preview.hit_burst_style;
         skin.hud_layout = preview.hud_layout;
         skin.hud_riff_map_visible = preview.hud_riff_map_visible;
+        skin.indicator_background_visible = preview.indicator_background_visible;
         skin.key_label_position = preview.key_label_position;
         skin.note_border_enabled = preview.note_border_enabled;
         skin.note_shape = preview.note_shape;
@@ -199,6 +200,71 @@ namespace tenriff::render {
 // geometry resolver. Native dispatch is checked only while its own window has
 // foreground focus; no desktop pointer or keyboard is synthesized.
 struct MenuWindowVisualTestAccess {
+    static config::JsonValue verify_preview_drag(MenuWindow& window, const MenuRenderData& source,
+                                                 config::JsonArray& failures) {
+        using namespace config;
+        JsonArray movements;
+        auto fixture = source;
+        const auto hwnd = static_cast<HWND>(window.hwnd_);
+        const auto send = [&](UINT message, int x, int y) {
+            SendMessage(hwnd, message, message == WM_LBUTTONUP ? 0 : MK_LBUTTON, MAKELPARAM(x, y));
+        };
+        auto point = [&] {
+            const auto& drag = window.gameplay_field_drag_state_;
+            return std::array<int, 2>{
+                static_cast<int>(std::lround(window.offset_x_ + (drag.left + drag.right) * .5f * window.scale_)),
+                static_cast<int>(std::lround(window.offset_y_ + (drag.top + drag.bottom) * .5f * window.scale_))};
+        };
+        window.render(fixture);
+        const double scene_scale = window.gameplay_field_drag_state_.scene_scale;
+        bool passed = window.gameplay_field_drag_state_.visible && scene_scale > 0;
+        for (double distance : {120.0, -240.0, 10000.0, -10000.0}) {
+            const auto before = window.gameplay_field_drag_state_;
+            const auto start = point();
+            const int finish = start[0] + static_cast<int>(std::lround(distance * before.scene_scale * window.scale_));
+            const double expected = std::clamp(std::round(before.offset_x +
+                (finish - start[0]) / (window.scale_ * before.scene_scale)), before.min_offset_x, before.max_offset_x);
+            while (window.poll_click_event()) {}
+            send(WM_LBUTTONDOWN, start[0], start[1]);
+            const bool captured = window.gameplay_field_drag_state_.active && GetCapture() == hwnd;
+            send(WM_MOUSEMOVE, finish, start[1]);
+            // Draw the dispatched position before pumping unrelated physical
+            // mouse moves synthesized by Windows when capture changes.
+            window.draw(fixture);
+            const double local_offset = window.gameplay_static_cache_.gameplay_field_offset_x;
+            send(WM_LBUTTONUP, finish, start[1]);
+            const auto event = window.poll_click_event();
+            const bool movement_ok = captured && event && event->kind == MenuHitTargetKind::GameplayFieldDrag &&
+                event->part == MenuHitPart::Activate && std::abs(event->value - expected) <= 1.0 &&
+                std::abs(local_offset - expected) <= 1.0 && GetCapture() != hwnd && !window.poll_click_event();
+            passed = passed && movement_ok;
+            if (event) {
+                fixture.generic.skin_preview.gameplay_field_offset_x = event->value;
+                fixture.gameplay.gameplay_field_offset_x = event->value;
+            }
+            window.render(fixture);
+            const bool acknowledged = !window.gameplay_field_drag_state_.has_local_override;
+            passed = passed && acknowledged;
+            movements.emplace_back(JsonObject{{"distance", JsonValue(distance)}, {"expected", JsonValue(expected)},
+                {"static_offset_during_drag", JsonValue(local_offset)}, {"passed", JsonValue(movement_ok && acknowledged)}});
+        }
+        // Leaving preview mid-drag must cancel capture without committing a
+        // stale offset into a newly opened screen, including the other preview.
+        const auto start = point();
+        send(WM_LBUTTONDOWN, start[0], start[1]);
+        send(WM_MOUSEMOVE, start[0] + 20, start[1]);
+        auto next = source;
+        next.generic.skin_preview.fullscreen = !source.generic.skin_preview.fullscreen;
+        next.kind = next.generic.skin_preview.fullscreen ? MenuScreenKind::GameplayHud : MenuScreenKind::GenericList;
+        window.render(next);
+        const bool cancelled = !window.gameplay_field_drag_state_.active &&
+            !window.gameplay_field_drag_state_.has_local_override && GetCapture() != hwnd && !window.poll_click_event();
+        passed = passed && cancelled;
+        window.render(source);
+        if (!passed) failures.emplace_back("preview gear native drag, scaled geometry, acknowledgement or context cancellation failed");
+        return JsonValue(JsonObject{{"passed", JsonValue(passed)}, {"scene_scale", JsonValue(scene_scale)},
+            {"context_cancelled", JsonValue(cancelled)}, {"movements", JsonValue(std::move(movements))}});
+    }
     static void gpu_sprites(MenuWindow& window, bool enabled) { window.gameplay_sprite_batch_enabled_ = enabled; }
     static std::array<uint64_t, 6> gpu_sprite_stats(const MenuWindow& window) {
         const auto& stats = window.benchmark_gpu_sprite_stats_;
@@ -397,6 +463,9 @@ struct MenuWindowVisualTestAccess {
             }
         }
         window.render(source);
+        JsonValue preview_drag;
+        if (verify && foreground && source.generic.skin_preview.visible)
+            preview_drag = verify_preview_drag(window, source, failures);
         JsonArray rows;
         for (const auto& row : source.generic.rows) rows.emplace_back(JsonObject{
             {"id", JsonValue(static_cast<double>(row.row_index))}, {"label", JsonValue(row.label)},
@@ -406,6 +475,7 @@ struct MenuWindowVisualTestAccess {
         JsonArray notes;
         for (const auto& note : source.generic.notes) notes.emplace_back(note);
         JsonObject report{
+            {"preview_drag", std::move(preview_drag)},
             {"notes", JsonValue(std::move(notes))},
             {"selected_song_difficulty", JsonValue(source.song_select.selected_song_difficulty)},
             {"width", JsonValue(static_cast<double>(window.width_))}, {"height", JsonValue(static_cast<double>(window.height_))},
@@ -486,6 +556,7 @@ int main(int argc, char** argv) {
     bool resume_countdown = false;
     bool no_feedback = false;
     bool timing_text_off = false, timing_bar_off = false;
+    bool indicator_background_off = false;
     bool timing_bar_always = false;
     double timing_text_x = 0, timing_text_y = 0, timing_bar_x = 0, timing_bar_y = 0;
     bool search_active = false;
@@ -584,6 +655,7 @@ int main(int argc, char** argv) {
     data.ui_language = tenriff::ui::Language::Korean;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
+        if (arg == "--indicator-background-off") { indicator_background_off = true; continue; }
         if (arg == "--gauge-ramp") { result = gauge_ramp = true; continue; }
         if (arg == "--result-grade" && i + 1 < argc) { result_grade = argv[++i]; continue; }
         // Keep new fixture switches out of the long legacy else-if chain:
@@ -1326,6 +1398,7 @@ int main(int argc, char** argv) {
     if (backdrop_brightness >= 0.0) data.generic.skin_preview.key_backdrop_brightness = backdrop_brightness;
     if (backdrop_height >= 0.0) data.generic.skin_preview.key_backdrop_height = backdrop_height;
     data.gameplay.show_timing_feedback = data.generic.skin_preview.show_timing_feedback = !timing_text_off;
+    data.gameplay.indicator_background_visible = data.generic.skin_preview.indicator_background_visible = !indicator_background_off;
     data.gameplay.show_timing_bar = data.generic.skin_preview.show_timing_bar = !timing_bar_off;
     data.gameplay.timing_bar_always_visible = data.generic.skin_preview.timing_bar_always_visible = timing_bar_always;
     data.gameplay.timing_text_offset_x = data.generic.skin_preview.timing_text_offset_x = timing_text_x;

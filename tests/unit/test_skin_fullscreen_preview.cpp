@@ -14,6 +14,54 @@
 namespace tenriff::app {
 
 struct MenuAppSkinPreviewTestAccess {
+    static void check_preview_drag() {
+        struct TempProfile {
+            std::filesystem::path path;
+            ~TempProfile() {
+                if (path.empty()) return;
+                std::error_code ec;
+                std::filesystem::remove(path / "config.json", ec);
+                std::filesystem::remove(path, ec);
+            }
+        } profile;
+        for (int attempt = 0; attempt < 32 && profile.path.empty(); ++attempt) {
+            const auto candidate = std::filesystem::temp_directory_path() /
+                ("tenriff_preview_drag_" + std::to_string(timing::HighResClock::now_ns()) + "_" + std::to_string(attempt));
+            std::error_code ec;
+            if (std::filesystem::create_directory(candidate, ec)) profile.path = candidate;
+        }
+        REQUIRE(!profile.path.empty());
+        auto menu = fixture();
+        menu->profile_dir_ = profile.path.u8string();
+        config::ConfigLoader loader;
+        for (bool fullscreen : {false, true}) {
+            if (fullscreen) click_preview(*menu);
+            REQUIRE(menu->skin_preview_fullscreen_ == fullscreen);
+            for (double requested : {120.0, -240.0, 100000.0}) {
+                render::MenuClickEvent drag{};
+                drag.kind = render::MenuHitTargetKind::GameplayFieldDrag;
+                drag.part = render::MenuHitPart::Activate;
+                drag.value = requested;
+                menu->handle_menu_click(drag);
+                const double expected = std::clamp(requested, config::kGameplayFieldOffsetXMin, config::kGameplayFieldOffsetXMax);
+                CHECK(menu->config_.skin.gameplay_field_offset_x == expected);
+                CHECK(menu->snapshot_.render.generic.skin_preview.gameplay_field_offset_x == expected);
+                if (fullscreen) CHECK(menu->snapshot_.render.gameplay.gameplay_field_offset_x == expected);
+                const auto saved = loader.load_profile(menu->profile_dir_);
+                REQUIRE(saved.success());
+                CHECK(saved.config.skin.gameplay_field_offset_x == expected);
+                check_config_and_selection(*menu);
+            }
+        }
+        tap(*menu, menu->key_escape_);
+        CHECK(menu->snapshot_.render.generic.skin_preview.gameplay_field_offset_x == config::kGameplayFieldOffsetXMax);
+        menu->reset_screen(MenuApp::Screen::Title);
+        render::MenuClickEvent stale{};
+        stale.kind = render::MenuHitTargetKind::GameplayFieldDrag;
+        stale.value = 0;
+        menu->handle_menu_click(stale);
+        CHECK(menu->config_.skin.gameplay_field_offset_x == config::kGameplayFieldOffsetXMax);
+    }
     static void check_loading_render_cap() {
         auto menu = std::make_unique<MenuApp>();
         menu->config_.graphics.refresh_hz = 0;
@@ -354,6 +402,10 @@ TEST_CASE("chart loading caps rendering without changing gameplay or saved graph
     tenriff::app::MenuAppSkinPreviewTestAccess::check_loading_render_cap();
 }
 
+TEST_CASE("feedback regression preview gear drag saves embedded and fullscreen offsets without changing skin selection") {
+    tenriff::app::MenuAppSkinPreviewTestAccess::check_preview_drag();
+}
+
 TEST_CASE("skin fullscreen preview restores display mode and retains skin editing state") {
     tenriff::app::MenuAppSkinPreviewTestAccess::check_entry_and_exit();
 }
@@ -425,7 +477,9 @@ struct MenuAppFeedbackTestAccess {
                         menu->handle_menu_click(click);
                         REQUIRE(menu->keymap_settings_controller_.capture_active());
                         MenuAppSkinPreviewTestAccess::tap(*menu, config::KeycodeMap::to_keycode(key_name).value());
-                        CHECK_FALSE(menu->keymap_settings_controller_.capture_active());
+                        CHECK(menu->keymap_settings_controller_.capture_active());
+                        CHECK(menu->keymap_settings_controller_.selected_row() == target_lane + 1);
+                        CHECK(menu->keymap_settings_controller_.secondary_selected() == target_secondary);
                         auto saved = manager.load_profile(menu->profile_dir_);
                         REQUIRE(saved.success());
                         CHECK_FALSE(saved.rewritten());
@@ -503,7 +557,8 @@ struct MenuAppFeedbackTestAccess {
 
                 const auto side_keycode = config::KeycodeMap::to_keycode(shift).value();
                 MenuAppSkinPreviewTestAccess::key(*menu, side_keycode, input::InputState::Pressed);
-                CHECK_FALSE(menu->keymap_settings_controller_.capture_active());
+                CHECK(menu->keymap_settings_controller_.capture_active());
+                CHECK(menu->keymap_settings_controller_.selected_row() == 2);
                 saved = manager.load_profile(menu->profile_dir_);
                 REQUIRE(saved.success());
                 for (const auto* keymap : {&saved.keymap, &menu->working_keymap_, &menu->keymap_}) {

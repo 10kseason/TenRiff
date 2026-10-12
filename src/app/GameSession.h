@@ -189,6 +189,7 @@ public:
         gameplay::ResultStats stats;
         std::vector<std::string> mods;
         int long_note_mix_version = 1;
+        int key_conversion_version = 2;
         double rate_multiplier = 1.0;
         double score_multiplier = 1.0;
         int64_t final_score = 0;
@@ -465,6 +466,7 @@ private:
     std::vector<std::string> active_mods_{};
     std::vector<std::string> session_mode_mods_{};
     int long_note_mix_version_ = 2;
+    int key_conversion_version_ = 2;
     double rate_multiplier_ = 1.0;
     double score_multiplier_ = 1.0;
     gameplay::ReplayFile replay_source_{};

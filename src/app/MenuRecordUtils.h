@@ -25,6 +25,7 @@ struct ParsedResultRecord {
     std::string final_gauge;
     std::vector<std::string> mods;
     int long_note_mix_version = 1;
+    int key_conversion_version = 1;
     double rate_multiplier = 1.0;
     double score_multiplier = 1.0;
     int64_t final_score = 0;
@@ -47,6 +48,7 @@ struct ParsedReplayRecord {
     double input_offset_ms = 0.0;
     std::vector<std::string> mods;
     int long_note_mix_version = 1;
+    int key_conversion_version = 1;
     double rate_multiplier = 1.0;
     double score_multiplier = 1.0;
     int64_t final_score = 0;

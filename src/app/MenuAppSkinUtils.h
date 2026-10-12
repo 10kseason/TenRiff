@@ -82,11 +82,12 @@ enum class SkinSettingsRowId {
     HudLayout,
     TimingBarMode,
     HudRiffMapVisible,
+    IndicatorBackground,
 };
 
 // The same order drives keyboard navigation, rendered rows and mouse hit targets.
 // Keep related controls adjacent instead of deriving positions from row labels.
-inline constexpr std::array<SkinSettingsRowId, 68> kSkinSettingsRowOrder = {
+inline constexpr std::array<SkinSettingsRowId, 69> kSkinSettingsRowOrder = {
     SkinSettingsRowId::KeyMode,
     SkinSettingsRowId::ScratchPosition,
     SkinSettingsRowId::SkinSource,
@@ -142,6 +143,7 @@ inline constexpr std::array<SkinSettingsRowId, 68> kSkinSettingsRowOrder = {
     SkinSettingsRowId::TimingFeedback,
     SkinSettingsRowId::TimingBar,
     SkinSettingsRowId::TimingBarMode,
+    SkinSettingsRowId::IndicatorBackground,
     SkinSettingsRowId::TimingTextX,
     SkinSettingsRowId::TimingTextY,
     SkinSettingsRowId::TimingBarX,
@@ -197,6 +199,7 @@ enum class SkinSettingsCategory { Source, Geometry, Notes, LongNotes, Effects, H
         case SkinSettingsRowId::GearBoundary: case SkinSettingsRowId::KeyLabelPosition:
         case SkinSettingsRowId::TimingBar:
         case SkinSettingsRowId::TimingBarMode:
+        case SkinSettingsRowId::IndicatorBackground:
         case SkinSettingsRowId::TimingTextX:
         case SkinSettingsRowId::TimingTextY:
         case SkinSettingsRowId::TimingBarX:

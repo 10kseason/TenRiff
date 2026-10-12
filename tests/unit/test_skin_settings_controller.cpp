@@ -111,6 +111,21 @@ TEST_CASE("Studio riff map toggle follows keyboard and pointer settings routing 
     }
 }
 
+TEST_CASE("feedback regression indicator background toggle persists for every skin source") {
+    for (const auto source : {"native", "lr2", "tenriff"}) {
+        tenriff::config::RuntimeConfig runtime;
+        runtime.skin.source = source;
+        SkinSettingsController controller;
+        controller.reset("10k");
+        const auto changed = controller.handle(MenuAction::activate(), runtime, kLr2Names, kTenRiffNames,
+                                                SkinSettingsRowId::IndicatorBackground);
+        CHECK_FALSE(runtime.skin.indicator_background_visible);
+        CHECK(changed.menu.render_changed);
+        CHECK(controller.dirty());
+        CHECK(controller.handle(MenuAction::back(), runtime, kLr2Names, kTenRiffNames).menu.persist_config);
+    }
+}
+
 TEST_CASE("skin preset actions use the same keyboard and mouse controller path") {
     tenriff::config::RuntimeConfig runtime;
     SkinSettingsController controller;

@@ -109,8 +109,8 @@ KeymapSettingsViewModel KeymapSettingsView::build(
             std::to_string(remaining_ns / 1'000'000) + "ms");
         view.footer_notes.push_back(localized(
             language,
-            "Press a key. Delete clears a secondary binding or cancels primary capture.",
-            "키를 누르세요. Delete는 보조 키를 해제하거나 기본 키 입력 대기를 취소합니다."));
+            "Press a key to save and continue to the next lane. Delete clears secondary or cancels primary capture.",
+            "키를 누르면 저장 후 다음 레인으로 이동합니다. Delete는 보조 키 해제 또는 기본 키 입력 취소입니다."));
         view.footer_notes.push_back(localized(
             language,
             "An assigned key moves here and clears its previous primary or secondary slot in this mode.",

@@ -864,7 +864,8 @@ ModeManagerResult manage_modes(const gameplay::GameplayChart& chart,
                                double rate,
                                double base_bpm,
                                int sample_rate,
-                               LongNoteMixVersion long_note_mix_version) {
+                               LongNoteMixVersion long_note_mix_version,
+                               int key_conversion_version) {
     ModeManagerResult result;
     result.chart = chart;
     result.judge = judge;
@@ -876,7 +877,7 @@ ModeManagerResult manage_modes(const gameplay::GameplayChart& chart,
     result.active_mods = normalize_mode_mod_tokens(config.mods, &result.warnings);
     result.settings.dp_flip = has_mod_token(result.active_mods, "dp_flip");
 
-    const auto applied = gameplay::apply_mode_settings(result.chart, result.settings, {base_bpm, sample_rate});
+    const auto applied = gameplay::apply_mode_settings(result.chart, result.settings, {base_bpm, sample_rate, key_conversion_version});
     result.chart = applied.chart;
     result.warnings.insert(result.warnings.end(), applied.warnings.begin(), applied.warnings.end());
 

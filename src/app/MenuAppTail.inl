@@ -191,6 +191,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
                                  : config::normalize_skin_hit_burst_style_token(config_.skin.hit_burst_style);
     target.hud_layout = config::normalize_skin_hud_layout_token(config_.skin.hud_layout);
     target.hud_riff_map_visible = config_.skin.hud_riff_map_visible;
+    target.indicator_background_visible = config_.skin.indicator_background_visible;
     target.key_label_position = manifest_style && manifest_style->key_label_position.has_value()
                                     ? *manifest_style->key_label_position
                                     : config::normalize_skin_key_label_position_token(config_.skin.key_label_position);
@@ -2775,6 +2776,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         has_result_ = true;
         last_result_mods_ = result.mods;
         last_result_long_note_mix_version_ = result.long_note_mix_version;
+        last_result_key_conversion_version_ = result.key_conversion_version;
         last_result_rate_multiplier_ = result.rate_multiplier;
         last_result_score_multiplier_ = result.score_multiplier;
         last_result_final_score_ = result.final_score;

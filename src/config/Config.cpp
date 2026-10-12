@@ -865,6 +865,7 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_string(*skin, "hit_burst_style", config.skin.hit_burst_style));
         config.skin.hud_layout = normalize_skin_hud_layout_token(
             get_string(*skin, "hud_layout", config.skin.hud_layout));
+        config.skin.indicator_background_visible = get_bool(*skin, "indicator_background_visible", true);
         config.skin.hud_riff_map_visible =
             get_bool(*skin, "hud_riff_map_visible", config.skin.hud_riff_map_visible);
         config.skin.ui_font = normalize_skin_ui_font_token(
@@ -1323,6 +1324,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
                  JsonValue{normalize_skin_hit_burst_style_token(config.skin.hit_burst_style)});
     skin.emplace("hud_layout", JsonValue{normalize_skin_hud_layout_token(config.skin.hud_layout)});
     skin.emplace("hud_riff_map_visible", JsonValue{config.skin.hud_riff_map_visible});
+    skin.emplace("indicator_background_visible", JsonValue{config.skin.indicator_background_visible});
     skin.emplace("key_label_position",
                  JsonValue{normalize_skin_key_label_position_token(config.skin.key_label_position)});
     skin.emplace("ui_font", JsonValue{normalize_skin_ui_font_token(config.skin.ui_font)});

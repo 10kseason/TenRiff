@@ -94,12 +94,15 @@ int main(int argc, char** argv) {
     int shard_count = 1;
     bool skip_windows_runtime_integration = false;
     bool skip_nk3_openvino_integration = false;
+    std::string name_filter;
     constexpr std::string_view kShardIndexPrefix = "--shard-index=";
     constexpr std::string_view kShardCountPrefix = "--shard-count=";
     for (int index = 1; index < argc; ++index) {
         const std::string_view argument(argv[index]);
         try {
-            if (argument.rfind(kShardIndexPrefix, 0) == 0) {
+            if (argument.rfind("--filter=", 0) == 0) {
+                name_filter = std::string(argument.substr(9));
+            } else if (argument.rfind(kShardIndexPrefix, 0) == 0) {
                 shard_index = std::stoi(std::string(argument.substr(kShardIndexPrefix.size())));
             } else if (argument.rfind(kShardCountPrefix, 0) == 0) {
                 shard_count = std::stoi(std::string(argument.substr(kShardCountPrefix.size())));
@@ -133,7 +136,7 @@ int main(int argc, char** argv) {
             registry_index % static_cast<std::size_t>(shard_count) ==
             static_cast<std::size_t>(shard_index);
         ++registry_index;
-        if (!selected) {
+        if (!selected || (!name_filter.empty() && test.name.find(name_filter) == std::string::npos)) {
             continue;
         }
         ++selected_tests;

@@ -159,13 +159,13 @@
             if (token == "EX-HARD" && rgb == 0x292C31) rgb = 0xC9CED6;
             const auto color = color_from_rgb(rgb, 1);
             auto* fill = d2d_->note_fill_brush.Get(); const auto saved = fill->GetColor(); fill->SetColor(color);
-            if (ratio > 0) for (float x : {field.left - 8, field.right + 2})
-                ctx->FillRectangle(D2D1::RectF(x, hit * (1 - ratio), x + 6, hit), fill);
+            if (ratio > 0) for (float x : {field.left - 12, field.right + 2})
+                ctx->FillRectangle(D2D1::RectF(x, hit * (1 - ratio), x + 10, hit), fill);
             const float x = studio_deck.gauge_marker_x, y = gameplay_studio_gauge_marker_y(hit, ratio);
-            ctx->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(x, y, x + 76, y + 32), 7, 7), fill);
+            ctx->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(x, y, x + 96, y + 40), 7, 7), fill);
             fill->SetColor(saved);
-            studio_text(scene_hud_cache.gauge_value_text, studio_fonts.studio_numbers[4].Get(), D2D1::RectF(x + 4, y + 2, x + 72, y + 30), D2D1::ColorF(0x0A0C10), DWRITE_TEXT_ALIGNMENT_CENTER);
-            studio_text(scene_hud_cache.studio_gauge_name, studio_fonts.studio_numbers[0].Get(), D2D1::RectF(x, y + 35, x + 86, y + 53), color, DWRITE_TEXT_ALIGNMENT_LEADING, 2);
+            studio_text(scene_hud_cache.gauge_value_text, studio_fonts.studio_numbers[4].Get(), D2D1::RectF(x + 4, y + 4, x + 92, y + 36), D2D1::ColorF(0x0A0C10), DWRITE_TEXT_ALIGNMENT_CENTER);
+            studio_text(scene_hud_cache.studio_gauge_name, studio_fonts.studio_numbers[0].Get(), D2D1::RectF(x, y + 43, x + 96, y + 65), color, DWRITE_TEXT_ALIGNMENT_LEADING, 2);
         };
         auto draw_studio_combo = [&](const GameplayFieldLayout& field, const std::wstring& value,
                                      const GameplayTextPopAnimation& animation, float top, float bottom, float offset) {
@@ -201,10 +201,8 @@
                 ctx->SetTransform(D2D1::Matrix3x2F::Scale(scale, scale, D2D1::Point2F(center_x, y + 23)) *
                     D2D1::Matrix3x2F::Translation(0, animation.offset_y) * saved);
                 auto color = ng_judge_color(feedback); color.a *= animation.opacity;
-                const auto pill = D2D1::RoundedRect(D2D1::RectF(x, y, x + width, y + 46), 23, 23);
-                // Opaque dark backing keeps judgement text readable over bright BGA.
-                fill->SetColor(D2D1::ColorF(0x10151D, .94f * animation.opacity));
-                ctx->FillRoundedRectangle(pill, fill); fill->SetColor(color); ctx->DrawRoundedRectangle(pill, fill, 1.5f);
+                // Judgement is text-only; the separate background preference
+                // controls FAST/SLOW and timing, never a judgement capsule.
                 studio_text(text, studio_fonts.studio_judgement.Get(), D2D1::RectF(x + 18, y + 2, x + 18 + name_width, y + 44), color, DWRITE_TEXT_ALIGNMENT_CENTER, 3);
                 ctx->SetTransform(saved);
             }
@@ -220,7 +218,8 @@
                 text_rect.top += static_cast<float>(data.gameplay.timing_text_offset_y);
                 text_rect.bottom += static_cast<float>(data.gameplay.timing_text_offset_y);
                 fill->SetColor(D2D1::ColorF(0x10151D, .94f));
-                ctx->FillRectangle(D2D1::RectF(text_rect.left - 4, text_rect.top, text_rect.right + 4, text_rect.bottom), fill);
+                if (data.gameplay.indicator_background_visible)
+                    ctx->FillRectangle(D2D1::RectF(text_rect.left - 4, text_rect.top, text_rect.right + 4, text_rect.bottom), fill);
                 studio_text(timing_text, ng_font("timing", studio_fonts.studio_timing.Get()), text_rect, timing_color, DWRITE_TEXT_ALIGNMENT_CENTER);
             }
             if (data.gameplay.show_timing_bar && (data.gameplay.timing_bar_always_visible || has_non_pg_feedback)) {
@@ -228,7 +227,9 @@
                 const float cx = (timing_rect.left + timing_rect.right) * .5f + static_cast<float>(data.gameplay.timing_bar_offset_x);
                 const float by = timing_rect.top + static_cast<float>(data.gameplay.timing_bar_offset_y);
                 const float half_width = std::max(1.0f, (timing_rect.right - timing_rect.left) * .5f);
-                fill->SetColor(D2D1::ColorF(0x10151D, .94f)); ctx->FillRectangle(D2D1::RectF(cx - half_width - 4, by - 8, cx + half_width + 4, by + 10), fill);
+                fill->SetColor(D2D1::ColorF(0x10151D, .94f));
+                if (data.gameplay.indicator_background_visible)
+                    ctx->FillRectangle(D2D1::RectF(cx - half_width - 4, by - 8, cx + half_width + 4, by + 10), fill);
                 fill->SetColor(D2D1::ColorF(0x6E7A8C)); ctx->FillRectangle(D2D1::RectF(cx - half_width, by, cx + half_width, by + 2), fill);
                 fill->SetColor(D2D1::ColorF(0xC9CED6)); ctx->FillRectangle(D2D1::RectF(cx - 1, by - 5, cx + 1, by + 7), fill);
                 if (has_timing_feedback) {

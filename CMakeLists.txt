@@ -815,6 +815,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_online_records_client.cpp
         tests/unit/test_sites_leaderboard.cpp
         tests/unit/test_bms_key_converter.cpp
+        tests/unit/test_conversion_feedback.cpp
         tests/unit/test_bms_editor.cpp
         tests/unit/test_bms_editor_preview.cpp
         tests/unit/test_utf8_compat.cpp

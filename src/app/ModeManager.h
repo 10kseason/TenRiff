@@ -67,6 +67,7 @@ struct ModeManagerResult {
                                              double rate,
                                              double base_bpm = 0.0,
                                              int sample_rate = 0,
-                                             LongNoteMixVersion long_note_mix_version = LongNoteMixVersion::Musical);
+                                             LongNoteMixVersion long_note_mix_version = LongNoteMixVersion::Musical,
+                                             int key_conversion_version = 2);
 
 }  // namespace tenriff::app

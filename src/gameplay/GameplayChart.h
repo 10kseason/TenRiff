@@ -109,6 +109,9 @@ struct GameplayChart {
 [[nodiscard]] std::size_t note_audio_asset_count(const NoteEvent& note);
 [[nodiscard]] std::size_t note_audio_asset_at(const NoteEvent& note, std::size_t index);
 
+// Preserve omitted note heads at authored times without doubling retained/BGM sounds.
+void preserve_chart_keysounds(const GameplayChart& source, GameplayChart& converted);
+
 void offset_gameplay_chart_samples(GameplayChart& chart, int64_t sample_offset);
 void trim_gameplay_chart_before_sample(GameplayChart& chart, int64_t sample);
 

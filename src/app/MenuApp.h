@@ -580,6 +580,7 @@ private:
         bool game_over = true;
         std::vector<std::string> mods;
         int long_note_mix_version = 1;
+        int key_conversion_version = 1;
         double rate_multiplier = 1.0;
         double score_multiplier = 1.0;
         bool pause_used = false;
@@ -616,6 +617,7 @@ private:
         double input_offset_ms = 0.0;
         std::vector<std::string> mods;
         int long_note_mix_version = 1;
+        int key_conversion_version = 1;
         double rate_multiplier = 1.0;
         double score_multiplier = 1.0;
         bool pause_used = false;
@@ -653,6 +655,7 @@ private:
     std::vector<std::string> last_export_warnings_;
     std::vector<std::string> last_result_mods_{};
     int last_result_long_note_mix_version_ = 1;
+    int last_result_key_conversion_version_ = 1;
     double last_result_rate_multiplier_ = 1.0;
     double last_result_score_multiplier_ = 1.0;
     int64_t last_result_final_score_ = 0;

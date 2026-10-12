@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
+#include <set>
 
 #include "app/BmsKeyConverter.h"
 #include "app/ChartLoader.h"
@@ -71,6 +73,67 @@ void write_minimal_wav(const std::filesystem::path& path, int sample_rate) {
 }
 
 }  // namespace
+
+TEST_CASE("feedback regression exported BMS keeps dropped chord sounds and full LNOBJ spans") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    const auto input = temp.path / "heads.bms";
+    const std::string tokens[] = {"01", "02", "03", "04", "05", "06", "07", "08", "09", "0A", "0B", "0C", "0D", "0E"};
+    {
+        std::ofstream out(input);
+        out << "#TITLE Sound and LN fixture\n#BPM 120\n#LNOBJ ZZ\n";
+        for (const auto& token : tokens) {
+            write_minimal_wav(temp.path / (token + ".wav"), 44100);
+            out << "#WAV" << token << ' ' << token << ".wav\n";
+        }
+        out << "#00001:0B\n#00011:010000ZZ\n#00012:020000ZZ\n"
+               "#00013:03040506\n#00014:0708090A\n#00015:0B0C0D0E\n";
+    }
+    tenriff::app::ChartLoader loader;
+    const auto original = loader.load(input.u8string(), 44100, 1, "follow");
+    REQUIRE(original.success());
+    const auto sounds = [](const auto& chart) {
+        std::set<std::pair<int64_t, std::string>> result;
+        for (const auto& n : chart.notes)
+            for (std::size_t i = 0; i < tenriff::gameplay::note_audio_asset_count(n); ++i)
+                result.emplace(n.start_sample, *chart.audio_asset_path(tenriff::gameplay::note_audio_asset_at(n, i)));
+        for (const auto& c : chart.audio_cues) result.emplace(c.start_sample, *chart.audio_asset_path(c.asset_id));
+        return result;
+    };
+    const auto expected = sounds(original.chart);
+    REQUIRE(expected.size() == 14);
+    for (const auto algorithm : {"krrcream", "nk2", "nk3"}) {
+        for (const int target : {4, 10, 16}) {
+            const auto output = temp.path / (std::string(algorithm) + std::to_string(target) + ".bms");
+            tenriff::app::BmsKeyConverterOptions options;
+            options.input_path = input.u8string(); options.output_path = output.u8string();
+            options.target_lane_count = target; options.conversion_algorithm = algorithm; options.seed = 42;
+            options.sample_rate = 44100;
+            const auto converted = tenriff::app::convert_bms_chart_file(options);
+            REQUIRE(converted.success);
+            const auto reloaded = loader.load(output.u8string(), 44100, 1, "follow");
+            REQUIRE(reloaded.success());
+            const auto actual = sounds(reloaded.chart);
+            // Expansion may author additional heads at new times. Every source
+            // sound must remain; generated heads are not a loss regression.
+            std::cout << "BMS export " << algorithm << " target=" << target << " sounds=" << actual.size() << '\n';
+            CHECK(std::includes(actual.begin(), actual.end(), expected.begin(), expected.end()));
+            std::vector<int64_t> occupied(target + 1, -1);
+            for (const auto& n : reloaded.chart.notes) {
+                CHECK(n.start_sample > occupied[n.lane]);
+                occupied[n.lane] = n.end_sample.value_or(n.start_sample);
+            }
+            for (const auto& hold : original.chart.notes) {
+                if (!hold.end_sample) continue;
+                CHECK(std::any_of(reloaded.chart.notes.begin(), reloaded.chart.notes.end(), [&](const auto& n) {
+                    return n.start_sample == hold.start_sample && n.end_sample == hold.end_sample &&
+                        *reloaded.chart.audio_asset_path(n.audio_asset_id) == *original.chart.audio_asset_path(hold.audio_asset_id);
+                }));
+            }
+        }
+    }
+}
 
 TEST_CASE("bms key converter writes a reparsable converted chart") {
     TempDirGuard temp;

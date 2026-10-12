@@ -59,7 +59,8 @@ public:
         std::int64_t now_ns) noexcept;
     [[nodiscard]] KeymapSettingsEffects finish_capture(
         std::string status_message,
-        std::int64_t now_ns);
+        std::int64_t now_ns,
+        bool advance = false);
     void show_status(std::string message, std::int64_t now_ns);
     void clear_status() noexcept;
     [[nodiscard]] KeymapSettingsEffects adjust_test_key_count(int direction);
