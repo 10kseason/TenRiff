@@ -87,7 +87,7 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Create a new editable skin template in the skin folder.", "스킨 폴더에 편집 가능한 새 스킨 템플릿을 만듭니다.", "編集できる新しいスキンの雛形を作成します。"},
         {"Open the active TenRiff skin folder. First use Create New Skin, or import a skin.json folder and select Skin Source: TenRiff plus its installed skin.", "현재 TenRiff 스킨 폴더를 엽니다. 먼저 새 스킨 만들기를 실행하거나 skin.json 폴더를 가져온 뒤, 스킨 소스를 TenRiff로 바꾸고 가져온 스킨을 선택하세요.", "TenRiffスキンのフォルダーを開きます。新規作成するかskin.jsonフォルダーを取り込み、ソースをTenRiffにして対象スキンを選んでください。"},
         {"Reload an active imported TenRiff skin after editing (F5). Create or import a skin first, then select Skin Source: TenRiff and the installed skin.", "사용 중인 TenRiff 스킨 파일을 다시 읽습니다 (F5). 새 스킨을 만들거나 가져온 뒤 스킨 소스 TenRiff와 해당 스킨을 선택하면 사용할 수 있습니다.", "使用中のTenRiffスキンを再読み込みします（F5）。作成・取り込み後、ソースをTenRiffにして対象スキンを選択してください。"},
-        {"Select the lane whose color and width you want to change.", "색상과 폭을 바꿀 레인을 선택합니다.", "色と幅を変更するレーンを選びます。"},
+        {"Select a lane from left to right: 1-9, 0=10, Shift+1-6=11-16. Arrows still cycle lanes.", "왼쪽부터 레인 선택: 1-9, 0=10, Shift+1-6=11-16. 방향키로도 순환합니다.", "左からレーンを選択: 1-9、0=10、Shift+1-6=11-16。矢印キーでも切り替えます。"},
         {"Select the gap between lanes to adjust.", "간격을 조절할 두 레인 사이의 위치를 선택합니다.", "幅を調整するレーン間の位置を選びます。"},
         {"Set the selected lane's note color. Single Color can override this palette.", "선택한 레인의 노트 색상을 바꿉니다. 단색 모드를 켜면 해당 색이 우선할 수 있습니다.", "選択レーンのノート色です。単色モードの設定が優先される場合があります。"},
         {"Use one shared note color across lanes, or turn this off to use lane colors.", "모든 레인에 같은 노트 색을 쓰거나, 꺼서 레인별 색을 사용합니다.", "全レーンを共通色にするか、オフでレーンごとの色を使います。"},
@@ -157,6 +157,8 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Remove the profile image selection. The original image file is kept.", "프로필 사진 지정을 해제합니다. 원본 이미지 파일은 삭제하지 않습니다.", "プロフィール画像の指定を解除します。元の画像ファイルは残ります。"},
         {"Save key bindings, audio/input settings and the active skin to one .trprofile file for the next version. Accounts and library/history paths are excluded.", "키 배치·오디오·입력 설정과 현재 스킨을 .trprofile 파일 하나로 저장해 다음 버전으로 옮깁니다. 계정과 곡 목록·기록 경로는 포함하지 않습니다.", "キー配置・音声・入力設定と現在のスキンを.trprofileに保存し、次版へ移せます。アカウントやライブラリ・履歴のパスは含みません。"},
         {"Apply a .trprofile settings file. Existing config/keymap files are backed up under settings-backups before import.", ".trprofile 설정 파일을 적용합니다. 적용 전 현재 config/keymap 파일을 settings-backups 폴더에 자동 백업합니다.", ".trprofileを適用します。適用前に現在のconfig/keymapをsettings-backupsへ自動保存します。"},
+        {"Skip the opening 3, 2, 1 in solo play. Resume and multiplayer keep 3 seconds; the chart lead-in stays unchanged.", "단독 플레이의 시작 3, 2, 1을 생략합니다. 재개와 멀티는 3초를 유지하며, 채보의 시작 여백은 바뀌지 않습니다.", "ソロの開始3、2、1を省略します。再開とマルチは3秒を維持し、譜面の開始余白は変わりません。"},
+        {"Enter assigns an unused key. Esc cancels; Delete clears. Restart a solo song without the opening countdown; disabled in multiplayer and Session Mix. Release before using again.", "Enter로 빈 키를 지정합니다. Esc 취소, Delete 해제. 단독 곡을 시작 카운트 없이 재시작하며, 멀티와 세션 믹스에서는 작동하지 않습니다. 다시 쓰려면 키를 떼세요.", "Enterで未使用キーを指定、Escで取消、Deleteで解除。ソロ曲を開始カウントなしで再開します。マルチとセッションミックスでは無効。再使用前にキーを離してください。"},
         {"Finish setup and return. Your changes have already been saved.", "설정을 마치고 돌아갑니다. 변경한 값은 이미 저장되어 있습니다.", "設定を終えて戻ります。変更は保存済みです。"},
         {"Go to the title screen. You can reopen these settings from Options.", "타이틀 화면으로 이동합니다. 옵션에서 다시 설정할 수 있습니다.", "タイトルへ移動します。オプションから再度設定できます。"},
     };

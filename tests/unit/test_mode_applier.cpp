@@ -1134,3 +1134,197 @@ TEST_CASE("DP Flip swaps player fields without changing note timing") {
     CHECK(result.chart.notes[1].lane == 1);
     CHECK(result.chart.notes[1].start_sample == 200);
 }
+
+namespace {
+using KeysoundIdentity = std::pair<int64_t, std::size_t>;
+
+std::set<KeysoundIdentity> followed_sounds(const tenriff::gameplay::GameplayChart& chart) {
+    std::set<KeysoundIdentity> sounds;
+    for (const auto& note : chart.notes) {
+        for (std::size_t i = 0; i < tenriff::gameplay::note_audio_asset_count(note); ++i)
+            sounds.emplace(note.start_sample, tenriff::gameplay::note_audio_asset_at(note, i));
+    }
+    return sounds;
+}
+
+tenriff::gameplay::GameplayChart reduced_sound_fixture(double rate, bool grouped = false) {
+    using namespace tenriff::gameplay;
+    GameplayChart chart;
+    chart.lane_count = grouped ? 16 : 8;
+    chart.lane_group_size = grouped ? 8 : 0;
+    chart.bms_rank = 2;
+    chart.duration_samples = static_cast<int64_t>(144000 / rate);
+    for (int i = 0; i <= chart.lane_count; ++i)
+        (void)chart.intern_audio_asset("fixture-" + std::to_string(i) + ".wav");
+    // Authored duplicate BGM is intentional and must not be normalized away.
+    chart.audio_cues = {{0, static_cast<std::size_t>(chart.lane_count)},
+                        {0, static_cast<std::size_t>(chart.lane_count)}};
+    chart.visual_assets = {{"fixture.png"}};
+    chart.visual_cues = {{37, 0, VisualLayer::Overlay}};
+    for (int row = 0; row < 5; ++row) {
+        for (int lane = 1; lane <= chart.lane_count; ++lane) {
+            const auto head = static_cast<int64_t>((12000 + row * 24000) / rate);
+            append_note(chart, lane, head,
+                        row == 0 ? std::optional<int64_t>(head + static_cast<int64_t>(6000 / rate))
+                                 : std::nullopt,
+                        row == 0 && lane % 2 == 0);
+            chart.notes.back().add_audio_asset(static_cast<std::size_t>(lane - 1));
+            chart.notes.back().audio_gain = 0.2f + 0.04f * static_cast<float>(lane);
+        }
+    }
+    return chart;
+}
+
+void check_restored_sounds(const tenriff::gameplay::GameplayChart& source,
+                           const tenriff::gameplay::GameplayChart& converted) {
+    const auto source_sounds = followed_sounds(source);
+    const auto retained = followed_sounds(converted);
+    std::map<KeysoundIdentity, std::size_t> original_bgm;
+    std::map<KeysoundIdentity, std::size_t> actual_bgm;
+    for (const auto& cue : source.audio_cues) ++original_bgm[{cue.start_sample, cue.asset_id}];
+    for (const auto& cue : converted.audio_cues) ++actual_bgm[{cue.start_sample, cue.asset_id}];
+    std::size_t missing = 0;
+    for (const auto& sound : source_sounds) {
+        if (original_bgm.count(sound)) {
+            CHECK(actual_bgm[sound] == original_bgm[sound]);
+        } else if (retained.count(sound)) {
+            CHECK(actual_bgm[sound] == 0u); // A retained playable sound is never autoplayed too.
+        } else {
+            ++missing;
+            CHECK(actual_bgm[sound] == 1u);
+            const auto note = std::find_if(source.notes.begin(), source.notes.end(), [&](const auto& n) {
+                if (n.start_sample != sound.first) return false;
+                for (std::size_t i = 0; i < tenriff::gameplay::note_audio_asset_count(n); ++i)
+                    if (tenriff::gameplay::note_audio_asset_at(n, i) == sound.second) return true;
+                return false;
+            });
+            const auto cue = std::find_if(converted.audio_cues.begin(), converted.audio_cues.end(),
+                [&](const auto& c) { return KeysoundIdentity{c.start_sample, c.asset_id} == sound; });
+            REQUIRE(note != source.notes.end());
+            REQUIRE(cue != converted.audio_cues.end());
+            CHECK(cue->gain == note->audio_gain);
+        }
+    }
+    CHECK(converted.audio_cues.size() == source.audio_cues.size() + missing);
+    for (const auto& entry : original_bgm) CHECK(actual_bgm[entry.first] == entry.second);
+    CHECK(converted.audio_assets.size() == source.audio_assets.size());
+    CHECK(converted.duration_samples == source.duration_samples);
+    CHECK(converted.bms_rank == source.bms_rank);
+    REQUIRE(converted.visual_cues.size() == source.visual_cues.size());
+    CHECK(converted.visual_cues.front().start_sample == 37);
+    CHECK(converted.visual_cues.front().asset_id == 0u);
+    CHECK(converted.visual_cues.front().layer == tenriff::gameplay::VisualLayer::Overlay);
+    CHECK(converted.visual_assets.front().path == "fixture.png");
+}
+}
+
+TEST_CASE("reduced keysounds cover every selected converter preset at original rate-scaled head times") {
+    using namespace tenriff::gameplay;
+    for (const auto algorithm : {KeyModeConversionAlgorithm::Krrcream,
+                                  KeyModeConversionAlgorithm::NK2, KeyModeConversionAlgorithm::NK3}) {
+        for (const auto preset : {Nk2Preset::Native, Nk2Preset::Transform, Nk2Preset::Remaster}) {
+            if (algorithm == KeyModeConversionAlgorithm::Krrcream && preset != Nk2Preset::Native) continue;
+            for (const double rate : {0.5, 1.0, 2.0}) {
+                const auto source = reduced_sound_fixture(rate);
+                const auto source_signature = chart_signature(source);
+                ModeSettings settings;
+                settings.key_mode = KeyMode::Keys4;
+                settings.key_conversion_algorithm = algorithm;
+                settings.key_conversion_nk2_preset = preset;
+                settings.random_seed = 73;
+                const auto converted = apply_mode_settings(source, settings, {120.0 * rate, 48000});
+                REQUIRE(converted.chart.lane_count == 4);
+                REQUIRE(converted.chart.audio_cues.size() > source.audio_cues.size());
+                CHECK_FALSE(has_lane_overlap(converted.chart));
+                check_restored_sounds(source, converted.chart);
+                CHECK(chart_signature(source) == source_signature);
+                CHECK(source.audio_cues.size() == 2u);
+                // The raw converter remains the authority for playable notes.
+                // Audio restoration must not move, delete or synthesize a judgement.
+                KeyModeConverterOptions options;
+                options.target_lane_count = options.max_keys = options.min_keys = 4;
+                options.transform_speed_slot = 2;
+                options.seed = 73;
+                options.base_bpm = 120.0 * rate;
+                options.sample_rate = 48000;
+                options.algorithm = algorithm;
+                options.nk2_preset = preset;
+                const auto raw = convert_key_mode_chart(source, options);
+                if (raw.converted) CHECK(chart_signature(raw.chart) == chart_signature(converted.chart));
+            }
+        }
+    }
+}
+
+TEST_CASE("reduced keysounds preserve grouped DP omissions without duplicating original BGM") {
+    using namespace tenriff::gameplay;
+    auto source = reduced_sound_fixture(1.0, true);
+    // The lost/retained decision must account for original BGM at the same time.
+    source.audio_cues.push_back({source.notes.front().start_sample, 0});
+    source.audio_cues.push_back({source.notes.front().start_sample, 0});
+    for (const auto algorithm : {KeyModeConversionAlgorithm::Krrcream,
+                                  KeyModeConversionAlgorithm::NK2, KeyModeConversionAlgorithm::NK3}) {
+        ModeSettings settings;
+        settings.key_mode = KeyMode::Keys8;
+        settings.key_conversion_algorithm = algorithm;
+        settings.random_seed = 91;
+        const auto converted = apply_mode_settings(source, settings, {120.0, 48000});
+        REQUIRE(converted.chart.lane_count == 8);
+        check_restored_sounds(source, converted.chart);
+    }
+}
+
+TEST_CASE("reduced keysounds deduplicate identical tokens but keep distinct simultaneous sounds and LN heads") {
+    using namespace tenriff::gameplay;
+    auto source = reduced_sound_fixture(1.0);
+    source.scratch_lanes = {1, 2};
+    source.notes.clear();
+    append_note(source, 1, 12000, 36000, true);
+    source.notes.back().add_audio_asset(0);
+    source.notes.back().add_audio_asset(1); // Also present in a retained playable note.
+    source.notes.back().add_audio_asset(2); // A distinct simultaneous sound.
+    source.notes.back().audio_gain = 0.4f;
+    append_note(source, 2, 12000, 36000);
+    source.notes.back().add_audio_asset(0); // Same timestamp/token: one automatic voice.
+    source.notes.back().audio_gain = 0.4f;
+    append_note(source, 3, 12000);
+    source.notes.back().add_audio_asset(1);
+    ModeSettings settings;
+    settings.key_mode = KeyMode::Keys8; // Scratch extraction followed by upconversion.
+    settings.random_seed = 27;
+    const auto converted = apply_mode_settings(source, settings, {120.0, 48000});
+    check_restored_sounds(source, converted.chart);
+    REQUIRE(converted.chart.audio_cues.size() == 4u); // Two authored, two restored.
+    CHECK(std::none_of(converted.chart.audio_cues.begin(), converted.chart.audio_cues.end(),
+        [](const auto& cue) { return cue.start_sample == 36000; }));
+    // The common source token in every lane stays live when any retained note plays it.
+    auto duplicates = reduced_sound_fixture(1.0);
+    for (auto& note : duplicates.notes) { note.clear_audio_assets(); note.add_audio_asset(0); }
+    settings.key_mode = KeyMode::Keys4;
+    const auto duplicate_result = apply_mode_settings(duplicates, settings, {120.0, 48000});
+    check_restored_sounds(duplicates, duplicate_result.chart);
+    CHECK(duplicate_result.chart.audio_cues.size() == duplicates.audio_cues.size());
+}
+
+TEST_CASE("reduced keysounds leave native layouts and already autoplayed or ignored keysounds alone") {
+    using namespace tenriff::gameplay;
+    const auto source = reduced_sound_fixture(1.0);
+    ModeSettings settings;
+    for (const auto key_mode : {KeyMode::Auto, KeyMode::Keys8, KeyMode::Keys10}) {
+        settings.key_mode = key_mode;
+        const auto result = apply_mode_settings(source, settings, {120.0, 48000});
+        CHECK(result.chart.audio_cues.size() == source.audio_cues.size());
+    }
+    settings.key_mode = KeyMode::Keys4;
+    auto autoplay = source;
+    for (auto& note : autoplay.notes) {
+        autoplay.audio_cues.push_back({note.start_sample, note.audio_asset_id});
+        note.clear_audio_assets();
+    }
+    const auto autoplay_result = apply_mode_settings(autoplay, settings, {120.0, 48000});
+    CHECK(autoplay_result.chart.audio_cues.size() == autoplay.audio_cues.size());
+    auto ignored = source;
+    for (auto& note : ignored.notes) note.clear_audio_assets();
+    const auto ignored_result = apply_mode_settings(ignored, settings, {120.0, 48000});
+    CHECK(ignored_result.chart.audio_cues.size() == ignored.audio_cues.size());
+}

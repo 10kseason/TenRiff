@@ -4,6 +4,19 @@
 
 #include "util/Utf8Compat.h"
 
+TEST_CASE("UTF8 erase removes complete URL codepoints through mixed ASCII Hangul CJK and emoji") {
+    std::string text = u8"https://host/가漢😀";
+    tenriff::util::erase_last_utf8_codepoint(text);
+    CHECK(text == u8"https://host/가漢");
+    tenriff::util::erase_last_utf8_codepoint(text);
+    CHECK(text == u8"https://host/가");
+    tenriff::util::erase_last_utf8_codepoint(text);
+    CHECK(text == "https://host/");
+    while (!text.empty()) tenriff::util::erase_last_utf8_codepoint(text);
+    tenriff::util::erase_last_utf8_codepoint(text);
+    CHECK(text.empty());
+}
+
 TEST_CASE("utf8 compat preserves valid UTF-8 text") {
     const std::string text = u8"漢字 테스트";
 

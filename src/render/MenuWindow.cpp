@@ -46,6 +46,7 @@
 
 #include <d2d1_1.h>
 #include <d2d1helper.h>
+#include <d2d1effects.h>
 #include <d3d11.h>
 #include <d3dcompiler.h>
 #include <dwrite.h>
@@ -2394,6 +2395,18 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_artist_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> result_score_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> result_metric_format;
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> grade_format;
+    struct GradeBitmap {
+        std::wstring text;
+        Microsoft::WRL::ComPtr<IDWriteTextFormat> format;
+        Microsoft::WRL::ComPtr<ID2D1Bitmap1> bitmap;
+        D2D1_COLOR_F color{};
+        float width = 0, height = 0;
+        bool attempted = false;
+        DWRITE_TEXT_ALIGNMENT alignment = DWRITE_TEXT_ALIGNMENT_LEADING;
+    };
+    std::array<GradeBitmap, 3> grade_bitmaps{};
+    Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> result_gauge_gradient;
     Microsoft::WRL::ComPtr<IDWriteTextLayout> generic_help_layout;
     std::wstring generic_help_text;
     float generic_help_width = 0.0f;
@@ -5181,6 +5194,7 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family, const app::Native
                 {std::addressof(d2d_->song_record_value_format), "song_record_value"}, {std::addressof(d2d_->song_record_detail_format), "song_record_detail"},
                 {std::addressof(d2d_->song_title_format), "song_title"}, {std::addressof(d2d_->song_artist_format), "song_artist"},
                 {std::addressof(d2d_->result_score_format), "result_score"}, {std::addressof(d2d_->result_metric_format), "result_metric"},
+                {std::addressof(d2d_->grade_format), "grade"},
                 {std::addressof(d2d_->hud_format), "hud"}, {std::addressof(d2d_->rank_format), "rank"},
                 {std::addressof(d2d_->stats_label_format), "stats_label"}, {std::addressof(d2d_->stats_value_format), "stats_value"}};
             for (const auto& role : roles) {
@@ -5245,6 +5259,7 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family, const app::Native
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 18.0f, &d2d_->song_artist_format) ||
         !create_text_format(L"Bahnschrift", DWRITE_FONT_WEIGHT_SEMI_BOLD, 104.0f, &d2d_->result_score_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 32.0f, &d2d_->result_metric_format) ||
+        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_BOLD, 84.0f, &d2d_->grade_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 16.0f, &d2d_->hud_format) ||
         !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 128.0f, &d2d_->rank_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 16.0f, &d2d_->stats_label_format) ||
@@ -5264,16 +5279,17 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family, const app::Native
     d2d_->menu_ellipsis_signs.clear();
     d2d_->generic_help_layout.Reset();
     for (auto& text : d2d_->menu_readable_text) text = {};
+    for (auto& grade : d2d_->grade_bitmaps) grade = {};
     auto& sf = d2d_->preview_fonts;
-    if (!create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 24, &sf.studio_title, true) ||
-        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 14, &sf.studio_body, true) ||
-        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 11, &sf.studio_label, true) ||
-        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 40, &sf.studio_score, true) ||
-        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 26, &sf.studio_accuracy, true) ||
+    if (!create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 30, &sf.studio_title, true) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 18, &sf.studio_body, true) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 15, &sf.studio_label, true) ||
+        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 54, &sf.studio_score, true) ||
+        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 36, &sf.studio_accuracy, true) ||
         !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_BOLD, 30, &sf.studio_judgement, true) ||
         !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 18, &sf.studio_timing, true) ||
         !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 70, &sf.studio_combo, true)) return false;
-    constexpr float studio_sizes[] = {11, 12, 13, 14, 16, 18};
+    constexpr float studio_sizes[] = {14, 16, 17, 18, 22, 24};
     for (std::size_t i = 0; i < sf.studio_numbers.size(); ++i)
         if (!create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD,
                                 studio_sizes[i], &sf.studio_numbers[i], true)) return false;

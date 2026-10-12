@@ -438,6 +438,8 @@ int main(int argc, char** argv) {
     config.display_mode = "windowed";
     config.vsync = true;
     bool result = false;
+    bool gauge_ramp = false;
+    std::string result_grade;
     int analysis_page = 0;
     bool analysis_unavailable = false;
     bool analysis_no_samples = false;
@@ -560,6 +562,8 @@ int main(int argc, char** argv) {
     data.ui_language = tenriff::ui::Language::Korean;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
+        if (arg == "--gauge-ramp") { result = gauge_ramp = true; continue; }
+        if (arg == "--result-grade" && i + 1 < argc) { result_grade = argv[++i]; continue; }
         // Keep new fixture switches out of the long legacy else-if chain:
         // MSVC counts those branches against its nested-block limit.
         if (arg == "--analysis-page" && i + 1 < argc) {
@@ -883,26 +887,29 @@ int main(int argc, char** argv) {
         data.generic.heading = loc("Profile Setup", "프로필 설정");
         data.generic.profile_preview_visible = true;
         data.generic.profile_avatar_path = avatar_path;
-        const std::array<std::string, 12> labels{
+        const std::array<std::string, 16> labels{
             loc("Language", "언어"), loc("Menu Font Size", "메뉴 글자 크기"),
             loc("Songs Folder", "곡 폴더"), loc("Gauge", "게이지"), "Rate",
             loc("Visual Latency", "비주얼 레이턴시"), loc("Keysound", "키음"),
             loc("Input Backend", "입력 방식"), loc("Nickname", "닉네임"),
             loc("Avatar Image", "프로필 사진"), loc("Clear Avatar", "사진 지우기"),
+            loc("Export All Settings", "전체 설정 내보내기"), loc("Import All Settings", "전체 설정 가져오기"),
+            loc("Skip Start Countdown", "시작 카운트다운 생략"), loc("Instant Restart Key", "즉시 재시작 키"),
             loc("Done", "완료")};
-        const std::array<std::string, 12> values{
+        const std::array<std::string, 16> values{
             data.ui_language == tenriff::ui::Language::Japanese ? "日本語" : loc("English", "한국어"),
             data.ui_text_scale > 1.2f ? loc("Extra Large", "더 크게") :
                 data.ui_text_scale > 1.0f ? loc("Large", "크게") : loc("Normal", "보통"),
             "ALL SONG", "NORMAL", "1.00x", "0 ms", "Follow", "RawInput", "PLAYER",
             avatar_path.empty() ? loc("Not set", "설정 안 됨") : "preview-avatar.png",
-            loc("Clear", "지우기"), loc("Back", "돌아가기")};
+            loc("Clear", "지우기"), ".trprofile", ".trprofile", loc("Off", "꺼짐"), "F12", loc("Back", "돌아가기")};
         for (int i = 0; i < static_cast<int>(labels.size()); ++i) {
             MenuRowData row;
             row.label = labels[i]; row.value = values[i]; row.row_index = i;
             row.target_kind = MenuHitTargetKind::SettingsRow;
-            row.selected = i == 1; row.adjustable = i < 8;
-            row.increment_enabled = row.decrement_enabled = true;
+            row.selected = i == 1; row.adjustable = (i < 8 && i != 2) || i == 13;
+            row.activatable = !row.adjustable || i <= 1;
+            row.increment_enabled = row.decrement_enabled = row.adjustable;
             data.generic.rows.push_back(std::move(row));
         }
         data.generic.notes = {
@@ -969,7 +976,7 @@ int main(int argc, char** argv) {
     songs.result_available = !empty;
     songs.search_active = search_active;
     songs.search_query = search_query;
-    songs.rank = "AAA";
+    songs.rank = result_grade.empty() ? "S+" : result_grade;
     songs.best_score = 9452;
     songs.detail_score = 8901;
     songs.max_detail_score = 9120;
@@ -1027,7 +1034,7 @@ int main(int argc, char** argv) {
     score.key_count = menu_keys;
     score.level = 12;
     score.bpm = 180;
-    score.rank = failed ? "C" : "AAA";
+    score.rank = result_grade.empty() ? (failed ? "F" : "S+") : result_grade;
     score.status = failed ? "FAILED" : "CLEAR";
     score.cleared = !failed;
     score.score = failed ? 4230 : 9452;
@@ -1084,7 +1091,7 @@ int main(int argc, char** argv) {
                    preview_backend};
     for (int i = 0; i <= 80; ++i) {
         const float position = static_cast<float>(i) / 80.0f;
-        score.gauge_points.push_back({position, failed ? 0.7f * (1.0f - position)
+        score.gauge_points.push_back({position, gauge_ramp ? 1.0f - position : failed ? 0.7f * (1.0f - position)
             : 0.65f + 0.17f * std::sin(position * 18.0f)});
     }
     if (options_grid) {

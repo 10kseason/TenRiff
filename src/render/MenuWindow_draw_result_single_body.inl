@@ -13,6 +13,11 @@
             return ui::text(data.ui_language, english, korean);
         };
 
+        const auto semantic_brush = [&](uint32_t rgb) -> ID2D1Brush* {
+            d2d_->note_fill_brush->SetColor(D2D1::ColorF(rgb));
+            return d2d_->note_fill_brush.Get();
+        };
+
         auto draw_result_text = [&](const std::string& text,
                                     IDWriteTextFormat* format,
                                     const D2D1_RECT_F& rect,
@@ -119,7 +124,7 @@
                 const float height = static_cast<float>(static_cast<double>(dist.histogram[i]) /
                     static_cast<double>(maximum)) * (rect.bottom - rect.top);
                 if (dist.histogram[i] == 0) continue;
-                d2d_->accent_brush->SetColor(D2D1::ColorF(i < 21 ? 0x54E9FF : 0xA56BFF));
+                d2d_->accent_brush->SetColor(D2D1::ColorF(i < 21 ? 0x69A6FF : 0xFF7189));
                 d2d_->accent_brush->SetOpacity(alpha);
                 ctx->FillRectangle(D2D1::RectF(rect.left + width * static_cast<float>(i), rect.bottom - height,
                     rect.left + width * static_cast<float>(i + 1) - 1.0f, rect.bottom), d2d_->accent_brush.Get());
@@ -396,7 +401,7 @@
                 const float phase = static_cast<float>(presentation_seconds * (0.20 + ring * 0.07));
                 const float rx = 225.0f + ring * 38.0f;
                 const float ry = 34.0f + ring * 12.0f;
-                d2d_->accent_brush->SetColor((ring % 2 == 0) ? native_palette("palette.63e9ff", D2D1::ColorF(0x63E9FF))
+                d2d_->accent_brush->SetColor((ring % 2 == 0) ? D2D1::ColorF(0x63E9FF)
                                                              : native_palette("palette.9e65ff", D2D1::ColorF(0x9E65FF)));
                 d2d_->accent_brush->SetOpacity((0.16f - ring * 0.018f) * presentation.prism);
                 ctx->DrawEllipse(D2D1::Ellipse(D2D1::Point2F(prism_center.x, prism_bottom - 15.0f), rx, ry),
@@ -463,13 +468,8 @@
                              presentation.rank * presentation.chromatic * 0.45f,
                              DWRITE_TEXT_ALIGNMENT_CENTER);
         }
-        draw_result_text(rank_text,
-                         d2d_->rank_format.Get(),
-                         rank_rect,
-                         result_success ? static_cast<ID2D1Brush*>(d2d_->accent_brush.Get())
-                                        : static_cast<ID2D1Brush*>(d2d_->muted_brush.Get()),
-                         presentation.rank,
-                         DWRITE_TEXT_ALIGNMENT_CENTER);
+        draw_grade(0, to_wide(rank_text), d2d_->rank_format.Get(), rank_rect,
+                   presentation.rank, DWRITE_TEXT_ALIGNMENT_CENTER);
 
         if (result_success && presentation.shockwave > 0.0f && presentation.shockwave < 1.0f &&
             d2d_->accent_brush) {
@@ -603,16 +603,16 @@
             const D2D1_RECT_F slow_rect =
                 native_rect("result_single.rect.031", D2D1::RectF(center_x + 12.0f, timing_track.top + 8.0f,
                             timing_track.right - 12.0f, timing_track.top + 38.0f));
-            d2d_->accent_brush->SetColor(native_palette("palette.54e9ff", D2D1::ColorF(0x54E9FF)));
+            d2d_->accent_brush->SetColor(D2D1::ColorF(0x69A6FF));
             draw_result_text("FAST  " + std::to_string(data.result.fast_count),
-                             d2d_->hud_format.Get(),
+                             d2d_->song_title_format.Get(),
                              fast_rect,
                              d2d_->accent_brush.Get(),
                              presentation.graph,
                              DWRITE_TEXT_ALIGNMENT_LEADING);
-            d2d_->accent_brush->SetColor(native_palette("palette.a56bff", D2D1::ColorF(0xA56BFF)));
+            d2d_->accent_brush->SetColor(D2D1::ColorF(0xFF7189));
             draw_result_text("SLOW  " + std::to_string(data.result.slow_count),
-                             d2d_->hud_format.Get(),
+                             d2d_->song_title_format.Get(),
                              slow_rect,
                              d2d_->accent_brush.Get(),
                              presentation.graph,
@@ -683,8 +683,22 @@
             const float reveal_right = 0.5f + reveal_half;
             const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
             const float saved_opacity = d2d_->accent_brush->GetOpacity();
-            d2d_->accent_brush->SetColor(result_success ? native_palette("palette.68edf3", D2D1::ColorF(0x68EDF3))
-                                                        : native_palette("palette.827a98", D2D1::ColorF(0x827A98)));
+            // One vertical gradient colors even steep drops by actual gauge
+            // height, with no per-frame gradient or per-segment allocation.
+            if (!d2d_->result_gauge_gradient) {
+                const D2D1_GRADIENT_STOP stops[] = {{0, D2D1::ColorF(0x57E397)},
+                    {0.5f, D2D1::ColorF(0xF3D26A)}, {1, D2D1::ColorF(0xFF566D)}};
+                Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> collection;
+                if (SUCCEEDED(ctx->CreateGradientStopCollection(stops, 3, collection.GetAddressOf())))
+                    ctx->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(
+                        D2D1::Point2F(0, gauge_track.top), D2D1::Point2F(0, gauge_track.bottom)),
+                        collection.Get(), d2d_->result_gauge_gradient.GetAddressOf());
+            }
+            if (d2d_->result_gauge_gradient) {
+                d2d_->result_gauge_gradient->SetStartPoint(D2D1::Point2F(0, gauge_track.top));
+                d2d_->result_gauge_gradient->SetEndPoint(D2D1::Point2F(0, gauge_track.bottom));
+                d2d_->result_gauge_gradient->SetOpacity(presentation.graph);
+            }
             d2d_->accent_brush->SetOpacity(0.88f * presentation.graph);
             for (std::size_t index = 1; index < data.result.gauge_points.size(); ++index) {
                 const auto& previous = data.result.gauge_points[index - 1];
@@ -698,7 +712,9 @@
                 const D2D1_POINT_2F p1 = D2D1::Point2F(
                     gauge_track.left + current.position * (gauge_track.right - gauge_track.left),
                     gauge_track.bottom - current.value * (gauge_track.bottom - gauge_track.top));
-                ctx->DrawLine(p0, p1, d2d_->accent_brush.Get(), 2.2f);
+                ctx->DrawLine(p0, p1, d2d_->result_gauge_gradient
+                    ? static_cast<ID2D1Brush*>(d2d_->result_gauge_gradient.Get())
+                    : static_cast<ID2D1Brush*>(d2d_->accent_brush.Get()), 3.0f);
             }
             d2d_->accent_brush->SetColor(saved_color);
             d2d_->accent_brush->SetOpacity(saved_opacity);
@@ -719,15 +735,15 @@
                                   static_cast<double>(judged_total)) + "%";
         };
         const std::array<ResultStatistic, 7> result_statistics = {{
-            {"P-GREAT", std::to_string(data.result.perfect), percent_for(data.result.perfect), native_palette("palette.63e9ff", D2D1::ColorF(0x63E9FF))},
-            {"GREAT", std::to_string(data.result.great), percent_for(data.result.great), native_palette("palette.73ddf5", D2D1::ColorF(0x73DDF5))},
-            {"GOOD", std::to_string(data.result.good), percent_for(data.result.good), native_palette("palette.a8ea58", D2D1::ColorF(0xA8EA58))},
-            {"POOR", std::to_string(data.result.poor), percent_for(data.result.poor), native_palette("palette.ff6b7d", D2D1::ColorF(0xFF6B7D))},
-            {"FAIL", std::to_string(data.result.bad), percent_for(data.result.bad), native_palette("palette.f2b84b", D2D1::ColorF(0xF2B84B))},
+            {"P-GREAT", std::to_string(data.result.perfect), percent_for(data.result.perfect), D2D1::ColorF(0xFFE477)},
+            {"GREAT", std::to_string(data.result.great), percent_for(data.result.great), D2D1::ColorF(0x90E5F5)},
+            {"GOOD", std::to_string(data.result.good), percent_for(data.result.good), D2D1::ColorF(0xFFAA60)},
+            {"POOR", std::to_string(data.result.poor), percent_for(data.result.poor), D2D1::ColorF(0xFF647A)},
+            {"FAIL", std::to_string(data.result.bad), percent_for(data.result.bad), D2D1::ColorF(0xC399FF)},
             {result_loc("MAX COMBO", "최대 콤보"), format_int_with_commas(data.result.max_combo) + " COMBO",
              data.result.full_combo ? result_loc("FULL COMBO", "풀 콤보") : "/ " + std::to_string(data.result.total_notes), native_palette("palette.f7fafd", D2D1::ColorF(0xF7FAFD))},
             {result_loc("ACCURACY", "정확도"), format_decimal(data.result.accuracy) + "%",
-             result_loc("DETAIL", "상세") + " " + format_decimal(data.result.detailed_accuracy) + "%", native_palette("palette.63e9ff", D2D1::ColorF(0x63E9FF))},
+             result_loc("DETAIL", "상세") + " " + format_decimal(data.result.detailed_accuracy) + "%", D2D1::ColorF(0x63E9FF)},
         }};
         const float statistic_width = (stats_panel.right - stats_panel.left) /
                                       static_cast<float>(result_statistics.size());
@@ -748,12 +764,12 @@
             if (d2d_->accent_brush) {
                 const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
                 const float saved_opacity = d2d_->accent_brush->GetOpacity();
-                d2d_->accent_brush->SetColor(modern_library_screen && index >= 5 ? D2D1::ColorF(0xFFFFFF) : result_statistics[index].color);
+                d2d_->accent_brush->SetColor(result_statistics[index].color);
                 const float zero_scale =
                     (index < 5 && result_statistics[index].value == "0") ? 0.70f : 1.0f;
                 d2d_->accent_brush->SetOpacity(alpha * zero_scale);
                 draw_result_text(result_statistics[index].label,
-                                 d2d_->hud_format.Get(),
+                                 d2d_->body_format.Get(),
                                  native_rect("result_single.rect.040", D2D1::RectF(cell.left + 14.0f, cell.top + 28.0f + rise,
                                              cell.right - 14.0f, cell.top + 58.0f + rise)),
                                  d2d_->accent_brush.Get(),
@@ -763,16 +779,14 @@
                                  modern_library_screen ? d2d_->result_metric_format.Get() : d2d_->stats_value_format.Get(),
                                  native_rect("result_single.rect.041", D2D1::RectF(cell.left + 10.0f, cell.top + 76.0f + rise,
                                              cell.right - 10.0f, cell.top + 126.0f + rise)),
-                                 d2d_->text_brush.Get(),
+                                 d2d_->accent_brush.Get(),
                                  alpha * zero_scale,
                                  DWRITE_TEXT_ALIGNMENT_CENTER);
                 draw_result_text(result_statistics[index].detail,
                                  d2d_->hud_format.Get(),
                                  native_rect("result_single.rect.042", D2D1::RectF(cell.left + 10.0f, cell.top + 142.0f + rise,
                                              cell.right - 10.0f, cell.top + 174.0f + rise)),
-                                 (index == 5 && data.result.full_combo)
-                                     ? static_cast<ID2D1Brush*>(d2d_->accent_brush.Get())
-                                     : static_cast<ID2D1Brush*>(d2d_->muted_brush.Get()),
+                                 d2d_->accent_brush.Get(),
                                  alpha * zero_scale,
                                  DWRITE_TEXT_ALIGNMENT_CENTER);
                 d2d_->accent_brush->SetColor(saved_color);

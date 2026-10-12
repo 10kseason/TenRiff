@@ -9,6 +9,7 @@
 #include "app/GameSession.h"
 #include "app/MenuRecordUtils.h"
 #include "app/ReplayVerifier.h"
+#include "app/ProfileSetupFlow.h"
 #include "config/KeycodeMap.h"
 #include "config/SimpleJson.h"
 #include "timing/HighResClock.h"
@@ -247,6 +248,48 @@ struct MenuAppVisualTestAccess {
         report.check("graphics.explicit_size_wins_over_pending_resize", app.config_.graphics.resolution == "1500x1000");
         report.check("graphics.explicit_size_after_resize_present", present(app, detail), detail);
     }
+    static void check_start_controls(MenuApp& app, Report& report) {
+        click(app, Kind::SettingsRow, profile_setup::kSkipStartCountdownRow, Part::SelectOnly);
+        key(app, "Enter");
+        report.check("profile.skip_countdown_toggle", app.config_.ui.skip_start_countdown);
+        click(app, Kind::SettingsRow, profile_setup::kInstantRestartKeyRow);
+        report.check("profile.restart_key_capture", app.profile_restart_key_capture_active_);
+        key(app, "F9"); key(app, "F10"); key(app, "F11");
+        report.check("profile.restart_reserved_rejected", app.profile_restart_key_capture_active_ &&
+            !app.profile_restart_key_status_.empty() && !app.ranked_account_overlay_visible_ && !app.chat_overlay_visible_);
+        const auto bindings = config::KeymapManager{}.bindings_for_mode(app.keymap_, "10k");
+        if (!bindings.empty()) key(app, bindings.begin()->second.c_str());
+        report.check("profile.restart_lane_conflict", app.profile_restart_key_capture_active_ &&
+            !app.profile_restart_key_status_.empty());
+        for (const char* modifier : {"LControl", "LAlt"}) {
+            const auto code = config::KeycodeMap::to_keycode(modifier).value();
+            app.handle_input_event({code, input::InputState::Pressed, timing::HighResClock::now_ns()});
+            key(app, "F12");
+            report.check(std::string("profile.restart_rejects_chord_") + modifier,
+                app.profile_restart_key_capture_active_ && app.config_.ui.instant_restart_key.empty());
+            app.handle_input_event({code, input::InputState::Released, timing::HighResClock::now_ns()});
+        }
+        key(app, "F12");
+        report.check("profile.restart_key_assigned", !app.profile_restart_key_capture_active_ &&
+            app.config_.ui.instant_restart_key == "F12");
+        key(app, "Enter"); key(app, "Esc");
+        report.check("profile.restart_capture_cancel", !app.profile_restart_key_capture_active_ &&
+            app.config_.ui.instant_restart_key == "F12" && screen(app) == Screen::QuickSetup);
+        key(app, "Enter"); key(app, "Delete");
+        report.check("profile.restart_capture_clear", !app.profile_restart_key_capture_active_ &&
+            app.config_.ui.instant_restart_key.empty());
+        key(app, "Enter"); key(app, "F12");
+        const auto saved = config::ConfigLoader{}.load_profile(app.profile_dir_);
+        report.check("profile.start_controls_readback", saved.success() && saved.config.ui.skip_start_countdown &&
+            saved.config.ui.instant_restart_key == "F12");
+        // Preserve the existing ordinary-start countdown smoke below.
+        click(app, Kind::SettingsRow, profile_setup::kSkipStartCountdownRow, Part::Decrement);
+        report.check("profile.start_controls_restored", !app.config_.ui.skip_start_countdown);
+        click(app, Kind::SettingsRow, profile_setup::kInstantRestartKeyRow);
+        app.replace_screen(Screen::QuickSetup);
+        report.check("profile.capture_cleared_on_navigation", !app.profile_restart_key_capture_active_);
+        app.publish_snapshot();
+    }
     static bool resize_owned_window(int width, int height) {
         // Only the fixture's own window receives this native sizing sequence.
         // It verifies the WM_SIZE/drag-end mailbox and profile path, not physical dragging.
@@ -372,6 +415,71 @@ struct MenuAppVisualTestAccess {
         app.current_song_record_indices_ = saved_current;
         app.config_.mode.mods = saved_mods;
     }
+    static void check_table_input_and_filter(MenuApp& app, Report& report) {
+        const auto saved_url = app.difficulty_table_url_input_;
+        app.difficulty_table_url_editing_ = true;
+        app.difficulty_table_url_input_ = u8"https://fixture.invalid/가漢😀";
+        app.handle_input_event({app.key_backspace_, input::InputState::Pressed, timing::HighResClock::now_ns()});
+        const auto due = app.song_select_repeat_next_ns_;
+        const bool first = app.difficulty_table_url_input_ == u8"https://fixture.invalid/가漢";
+        app.service_song_select_repeat(due, true);
+        report.check("table.url_utf8_hold_repeat", first && app.difficulty_table_url_input_ == u8"https://fixture.invalid/가");
+        app.handle_input_event({app.key_backspace_, input::InputState::Released, timing::HighResClock::now_ns()});
+        app.service_song_select_repeat(due + 1'000'000'000LL, true);
+        report.check("table.url_release_stops", app.song_select_repeat_key_ == 0 && app.difficulty_table_url_input_ == u8"https://fixture.invalid/가");
+        key(app, "Esc");
+        report.check("table.url_cancel", !app.difficulty_table_url_editing_);
+        app.difficulty_table_url_input_ = saved_url;
+
+        if (!app.indexed_songs_.empty()) {
+            const auto saved_entry = app.indexed_songs_.front();
+            const auto saved_path = app.config_.ui.difficulty_table_path;
+            const int saved_min = app.song_level_min_filter_, saved_max = app.song_level_max_filter_;
+            auto& entry = app.indexed_songs_.front();
+            entry.level = 50;
+            entry.difficulty_table_level = "st12";
+            app.config_.ui.difficulty_table_path = "fixture-table-filter.json";
+            app.song_level_min_filter_ = 12;
+            app.song_level_max_filter_ = 12;
+            app.rebuild_visible_song_list();
+            report.check("table.filter_uses_prefixed_level", app.visible_song_count() == 1);
+            entry.difficulty_table_level = "st11";
+            app.rebuild_visible_song_list();
+            report.check("table.filter_excludes_lower_table_level", app.visible_song_count() == 0);
+            entry.difficulty_table_level = "?";
+            app.rebuild_visible_song_list();
+            report.check("table.filter_never_falls_back_to_native", app.visible_song_count() == 0);
+            app.config_.ui.difficulty_table_path.clear();
+            app.song_level_max_filter_ = 0;
+            app.rebuild_visible_song_list();
+            report.check("table.native_filter_restored", app.visible_song_count() == 1);
+            entry = saved_entry;
+            app.config_.ui.difficulty_table_path = saved_path;
+            app.song_level_min_filter_ = saved_min;
+            app.song_level_max_filter_ = saved_max;
+            app.rebuild_visible_song_list();
+        }
+        app.publish_snapshot();
+    }
+    static void check_lane_shortcuts(MenuApp& app, Report& report) {
+        const auto saved_controller = app.skin_settings_controller_;
+        app.skin_settings_controller_.reset("16k");
+        (void)app.skin_settings_controller_.select(SkinSettingsRowId::LaneWidth, false);
+        key(app, "0");
+        report.check("skin.lane_zero_selects_ten", app.skin_settings_controller_.edit_lane() == 9);
+        const auto shift = config::KeycodeMap::to_keycode("RShift").value();
+        app.handle_input_event({shift, input::InputState::Pressed, timing::HighResClock::now_ns()});
+        key(app, "6");
+        app.handle_input_event({shift, input::InputState::Released, timing::HighResClock::now_ns()});
+        report.check("skin.lane_shift_six_selects_sixteen", app.skin_settings_controller_.edit_lane() == 15 &&
+            app.skin_settings_controller_.selected_id() == SkinSettingsRowId::LaneWidth && !app.skin_settings_controller_.dirty());
+        key(app, "Numpad2");
+        report.check("skin.lane_numpad_selects_two", app.skin_settings_controller_.edit_lane() == 1);
+        std::string detail;
+        report.check("skin.lane_shortcut_present", present(app, detail), std::move(detail));
+        app.skin_settings_controller_ = saved_controller;
+        app.publish_snapshot();
+    }
     static void check_loading_pacing(MenuApp& app, Report& report) {
         const auto saved_refresh = app.config_.graphics.refresh_hz;
         app.config_.graphics.refresh_hz = 0;
@@ -414,6 +522,26 @@ struct MenuAppVisualTestAccess {
 };
 
 struct MenuAppFeedbackTestAccess {
+    static void restart_edge(GameSession& session, bool pressed, bool force_held = false) {
+        std::lock_guard<std::mutex> lock(session.engine_mutex_);
+        if (force_held) session.instant_restart_key_armed_ = false;
+        (void)session.handle_control_input({session.instant_restart_keycode_,
+            pressed ? input::InputState::Pressed : input::InputState::Released, timing::HighResClock::now_ns()});
+    }
+    static int64_t first_note(const GameSession& session) {
+        return session.chart_.notes.empty() ? -1 : session.chart_.notes.front().start_sample;
+    }
+    static bool fresh_start(const GameSession& session) {
+        return session.engine_ && session.engine_->stats().raw_score == 0 &&
+            session.engine_->replay().events.empty() && session.last_audio_sample_.load() == 0 &&
+            session.replay_event_index_ == 0 && session.ghost_replay_event_index_ == 0 &&
+            session.autoplay_event_index_ == 0 && session.next_chart_audio_event_ == 0 &&
+            session.chart_audio_voices_.empty();
+    }
+    static bool first_note_hit(GameSession& session) {
+        std::lock_guard<std::mutex> lock(session.engine_mutex_);
+        return session.engine_ && session.engine_->stats().counts.pg > 0;
+    }
     static void stop_physical_input(GameSession& session) {
         // This independent session tests control flow, not a physical device.
         // Stop its sole queue producer before playback to prevent external keys
@@ -494,6 +622,8 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
             expect_screen(app, report, "keymap.nested_test", Screen::KeymapTest);
             Access::key(app, "Esc");
             expect_screen(app, report, "keymap.nested_test.back", Screen::Keymap);
+        } else if (page.index == 2) {
+            Access::check_lane_shortcuts(app, report);
         } else if (page.index == 3) {
             Access::check_free_resolution(app, report);
             Access::click(app, Kind::SettingsRow,
@@ -503,6 +633,8 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
             Access::click(app, Kind::SettingsRow,
                 static_cast<int>(tenriff::app::menu::settings::AudioSettingId::Normalize), Part::Increment);
             report.check("audio.normalize_toggle", Access::config(app).audio_ui.normalize_audio);
+        } else if (page.index == 7) {
+            Access::check_start_controls(app, report);
         }
         Access::key(app, "Esc");
         expect_screen(app, report, std::string(page.name) + ".back", Screen::OptionsHub);
@@ -515,6 +647,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
     expect_screen(app, report, "options.back", Screen::Title);
     Access::click(app, Kind::TitleButton, 0);
     expect_screen(app, report, "lobby", Screen::SongSelect);
+    Access::check_table_input_and_filter(app, report);
     Access::check_loading_pacing(app, report);
 
     std::atomic<bool> observing{true};
@@ -641,6 +774,96 @@ void separate_pause_flow(const tenriff::app::CommandLineOptions& options, Report
     }
     session->shutdown();
 }
+
+void separate_restart_flow(tenriff::app::CommandLineOptions options, Report& report) {
+    using Session = tenriff::app::GameSession;
+    using SessionAccess = tenriff::app::MenuAppFeedbackTestAccess;
+    tenriff::config::ConfigLoader loader;
+    auto config = loader.load_profile("profiles/menu-smoke").config;
+    config.ui.skip_start_countdown = true;
+    config.ui.instant_restart_key = "F12";
+    config.mode.autoplay_enabled = true;
+    config.audio_ui.normalize_audio = false;
+    options.profile = "restart-smoke";
+    if (!loader.save_profile("profiles/restart-smoke", config) ||
+        !tenriff::config::KeymapManager{}.save_profile("profiles/restart-smoke", tenriff::config::KeymapManager{}.default_keymap()))
+        throw std::runtime_error("Cannot seed restart smoke profile");
+    int64_t original_first_note = -1;
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        // Attempt two proves the immediate-retry override independently of the
+        // user's ordinary-start preference; each uses a new production session.
+        if (attempt == 1) {
+            config.ui.skip_start_countdown = false;
+            if (!loader.save_profile("profiles/restart-smoke", config)) throw std::runtime_error("Cannot save start option");
+        }
+        auto session = std::make_unique<Session>();
+        session->set_instant_restart_start(attempt == 1);
+        if (attempt == 1) session->set_practice_start_seconds(4.0);
+        bool countdown = false, held_guard = false, first_hit = false, timed_out = false;
+        int phase = 0;
+        const auto deadline = Clock::now() + std::chrono::seconds(15);
+        session->set_hud_callback([&](const Session::HudSnapshot& hud) {
+            countdown |= hud.countdown_active;
+            if (Clock::now() > deadline) { timed_out = true; SessionAccess::timeout(*session); return; }
+            if (!session->did_start_gameplay() || hud.current_sample <= hud.sample_rate / 5) return;
+            if (phase == 0) {
+                SessionAccess::restart_edge(*session, true, true);
+                SessionAccess::restart_edge(*session, true);
+                held_guard = !session->was_restart_requested();
+                phase = 1;
+            }
+            if (phase == 1 && hud.current_sample > original_first_note + hud.sample_rate / 5) {
+                first_hit = SessionAccess::first_note_hit(*session);
+                SessionAccess::restart_edge(*session, false);
+                SessionAccess::restart_edge(*session, true);
+                phase = 2;
+            }
+        });
+        const std::string name = "restart.attempt" + std::to_string(attempt + 1);
+        const bool initialized = session->initialize(options);
+        report.check(name + ".initialize", initialized);
+        if (initialized) {
+            SessionAccess::stop_physical_input(*session);
+            const auto first_note = SessionAccess::first_note(*session);
+            if (attempt == 0) original_first_note = first_note;
+            report.check(name + ".zero_countdown_and_fresh_state", !session->hud_snapshot().countdown_active &&
+                SessionAccess::fresh_start(*session));
+            report.check(name + ".canonical_first_note_preserved", first_note == original_first_note &&
+                first_note == static_cast<int64_t>(session->hud_snapshot().sample_rate) * 3);
+            session->run();
+            report.check(name + ".started_without_countdown", session->did_start_gameplay() && !countdown);
+            report.check(name + ".held_key_requires_release", held_guard);
+            report.check(name + ".first_note_hit", first_hit);
+            report.check(name + ".instant_requested", phase == 2 && session->was_instant_restart_requested() &&
+                session->was_restart_requested() && session->was_user_aborted() && !session->was_exit_requested());
+            report.check(name + ".audio_and_deadline", !timed_out && session->audio_error().empty(), session->audio_error());
+        }
+        session->shutdown();
+        report.check(name + ".abandoned_attempt_not_exported", !session->result().has_value &&
+            session->result().result_path.empty() && session->result().replay_path.empty());
+    }
+    config.ui.skip_start_countdown = true;
+    loader.save_profile("profiles/restart-smoke", config);
+    auto multiplayer = std::make_unique<Session>();
+    multiplayer->set_peer_battle_mode(true);
+    multiplayer->set_instant_restart_start(true);
+    bool synchronized_countdown = false, restart_blocked = false;
+    multiplayer->set_hud_callback([&](const Session::HudSnapshot& hud) {
+        synchronized_countdown |= hud.countdown_active && hud.countdown_value == 3;
+        SessionAccess::restart_edge(*multiplayer, true);
+        restart_blocked = !multiplayer->was_restart_requested();
+        SessionAccess::timeout(*multiplayer);
+    });
+    const bool initialized = multiplayer->initialize(options);
+    report.check("restart.multiplayer_initialize", initialized);
+    if (initialized) {
+        SessionAccess::stop_physical_input(*multiplayer);
+        multiplayer->run();
+        report.check("restart.multiplayer_keeps_countdown_and_blocks_restart", synchronized_countdown && restart_blocked &&
+            !multiplayer->was_instant_restart_requested());
+    }
+    multiplayer->shutdown();
+}
 }  // namespace
 
 int wmain(int argc, wchar_t** argv) {
@@ -725,6 +948,7 @@ int wmain(int argc, wchar_t** argv) {
         }
         options.chart_path = "songs/fixture/smoke.bms";
         separate_pause_flow(options, report);
+        separate_restart_flow(options, report);
         report.check("sandbox.no_account_or_sites_connection",
             !std::filesystem::exists("config/sites-leaderboard.json") &&
             !std::filesystem::exists("config/sites-leaderboard.dpapi") &&

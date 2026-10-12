@@ -29,6 +29,7 @@
 #include "app/MenuSongUtils.h"
 #include "app/SkinPreset.h"
 #include "app/PortableFileDialog.h"
+#include "config/KeycodeMap.h"
 #include "util/Utf8Compat.h"
 
 namespace tenriff::app {
@@ -464,6 +465,35 @@ std::string MenuApp::active_external_skin_name() const {
 }
 
 void MenuApp::handle_skins_settings_input(uint32_t keycode) {
+#ifdef _WIN32
+    const auto vk = config::KeycodeMap::polling_vk_for_keycode(keycode);
+    if (vk && ((*vk >= '0' && *vk <= '9') || (*vk >= VK_NUMPAD0 && *vk <= VK_NUMPAD9))) {
+        // Only the visible editor owns this shortcut. Keep unrelated settings
+        // navigation unchanged even if another screen retained its search state.
+        if (current_screen() != Screen::SettingsSkins || skin_preview_fullscreen_ ||
+            help_overlay_visible_ || chat_overlay_visible_ || ranked_account_overlay_visible_ ||
+            chat_url_warning_visible_ || profile_nickname_edit_active_ || difficulty_table_url_editing_ ||
+            online_records_url_editing_ || keymap_settings_controller_.capture_active()) return;
+        const auto held = [this](int key) {
+            return pressed_keys_.count(static_cast<uint32_t>(key)) != 0 ||
+                   (GetAsyncKeyState(key) & 0x8000) != 0;
+        };
+        if (control_modifier_pressed() || held(VK_MENU) || held(VK_LMENU) || held(VK_RMENU) ||
+            held(VK_LWIN) || held(VK_RWIN)) return;
+        const bool shift = held(VK_SHIFT) || held(VK_LSHIFT) || held(VK_RSHIFT);
+        const int digit = static_cast<int>(*vk >= VK_NUMPAD0 ? *vk - VK_NUMPAD0 : *vk - '0');
+        if (shift && (digit < 1 || digit > 6)) return;
+        const int visual_lane = shift ? digit + 10 : (digit == 0 ? 10 : digit);
+        const bool seven_plus_one = skin_settings_controller_.edit_mode() == "7+1";
+        const int scratch_lane = 1;
+        const auto layout = resolve_lane_presentation_layout(
+            lane_count_for_skin_mode(std::string(skin_settings_controller_.edit_mode())),
+            seven_plus_one ? &scratch_lane : nullptr, seven_plus_one ? 1u : 0u,
+            config::normalize_skin_scratch_position_token(config_.skin.scratch_position));
+        apply_skin_settings_effects(skin_settings_controller_.select_lane(layout.source_lane_for_visual(visual_lane)));
+        return;
+    }
+#endif
     menu::settings::SkinSettingsEffects effects;
     if (keycode == key_f5_) {
         effects = skin_settings_controller_.request_reload();
@@ -1203,6 +1233,9 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                 : config::skin_color_rgb(visual_preview_lane_colors[lane_index]);
     }
 
+    render.generic.notes.push_back(ui_text(
+        "Select lanes from left to right: 1-9, 0=10, Shift+1-6=11-16. The current setting row stays selected.",
+        "왼쪽부터 레인을 선택합니다: 1-9, 0=10, Shift+1-6=11-16. 현재 설정 행은 그대로 유지됩니다."));
     render.generic.notes.push_back(ui_text(
         "Key backdrop has separate On/Off, opacity, brightness (0-200%) and maximum height (0-100%, from the field bottom). Hit-burst brightness is separate.",
         "키 배경색은 켬/끔, 농도, 밝기(0~200%), 최대 높이(필드 아래부터 0~100%)를 따로 조절합니다. 키 폭발 밝기는 별도입니다."));

@@ -42,6 +42,7 @@ struct NoteEvent {
 struct AudioCueEvent {
     int64_t start_sample = 0;
     std::size_t asset_id = kInvalidAudioAssetId;
+    float gain = 1.0f;
 };
 
 struct MineEvent {

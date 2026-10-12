@@ -145,6 +145,10 @@
             draw_text_clipped_aligned(wloc("Actual gameplay proportions", "실제 인게임 비율"), d2d_->body_format.Get(),
                                       D2D1::RectF(viewport.left, rect.bottom - 140.0f, viewport.right, rect.bottom - 110.0f),
                                       d2d_->muted_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+            draw_text_clipped_aligned(wloc("Lane: 1-9 / 0=10 / Shift+1-6=11-16", "레인: 1-9 / 0=10 / Shift+1-6=11-16"),
+                                      d2d_->body_format.Get(),
+                                      D2D1::RectF(viewport.left, rect.bottom - 114.0f, viewport.right, rect.bottom - 88.0f),
+                                      d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
             const float preview_visual_opacity = static_cast<float>(std::clamp(preview.visual_opacity, 0.20, 1.0));
             const float swatch_top = rect.bottom - 96.0f;
             const float swatch_height = native_metric("generic.swatch_height", 54.0f);

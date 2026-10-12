@@ -208,6 +208,132 @@ struct MenuAppSkinPreviewTestAccess {
         }
     }
 
+    static void check_table_url_repeat() {
+        for (const auto screen : {MenuApp::Screen::SongSelect, MenuApp::Screen::SongBrowser}) {
+            auto menu = fixture();
+            menu->reset_screen(screen);
+            menu->difficulty_table_url_editing_ = true;
+            menu->difficulty_table_url_input_ = u8"https://host/가漢😀";
+            key(*menu, menu->key_backspace_, input::InputState::Pressed);
+            CHECK(menu->difficulty_table_url_input_ == u8"https://host/가漢");
+            const auto first_due = menu->song_select_repeat_next_ns_;
+            REQUIRE(first_due > 0);
+            key(*menu, menu->key_backspace_, input::InputState::Pressed);
+            CHECK(menu->difficulty_table_url_input_ == u8"https://host/가漢");
+            menu->service_song_select_repeat(first_due - 1, true);
+            CHECK(menu->difficulty_table_url_input_ == u8"https://host/가漢");
+            menu->service_song_select_repeat(first_due, true);
+            CHECK(menu->difficulty_table_url_input_ == u8"https://host/가");
+            menu->service_song_select_repeat(menu->song_select_repeat_next_ns_, true);
+            CHECK(menu->difficulty_table_url_input_ == "https://host/");
+            key(*menu, menu->key_backspace_, input::InputState::Released);
+            CHECK(menu->song_select_repeat_key_ == 0);
+            menu->service_song_select_repeat(first_due + 1'000'000'000LL, true);
+            CHECK(menu->difficulty_table_url_input_ == "https://host/");
+
+            key(*menu, menu->key_backspace_, input::InputState::Pressed);
+            const auto after_press = menu->difficulty_table_url_input_;
+            menu->service_song_select_repeat(menu->song_select_repeat_next_ns_, false);
+            CHECK(menu->difficulty_table_url_input_ == after_press);
+            CHECK(menu->pressed_keys_.empty());
+            CHECK(menu->song_select_repeat_key_ == 0);
+            key(*menu, menu->key_backspace_, input::InputState::Pressed);
+            menu->help_overlay_visible_ = true;
+            const auto before_overlay = menu->difficulty_table_url_input_;
+            menu->service_song_select_repeat(menu->song_select_repeat_next_ns_, true);
+            CHECK(menu->difficulty_table_url_input_ == before_overlay);
+            CHECK(menu->song_select_repeat_key_ == 0);
+            menu->help_overlay_visible_ = false;
+            key(*menu, menu->key_backspace_, input::InputState::Released);
+            key(*menu, menu->key_backspace_, input::InputState::Pressed);
+            tap(*menu, menu->key_escape_);
+            CHECK_FALSE(menu->difficulty_table_url_editing_);
+            CHECK(menu->song_select_repeat_key_ == 0);
+            const auto cancelled = menu->difficulty_table_url_input_;
+            menu->service_song_select_repeat(first_due + 2'000'000'000LL, true);
+            CHECK(menu->difficulty_table_url_input_ == cancelled);
+
+            key(*menu, menu->key_backspace_, input::InputState::Released);
+            menu->difficulty_table_url_editing_ = true;
+            menu->difficulty_table_url_input_ = u8"가";
+            key(*menu, menu->key_backspace_, input::InputState::Pressed);
+            CHECK(menu->difficulty_table_url_input_.empty());
+            menu->service_song_select_repeat(menu->song_select_repeat_next_ns_, true);
+            CHECK(menu->song_select_repeat_key_ == 0);
+            key(*menu, menu->key_backspace_, input::InputState::Released);
+            menu->difficulty_table_url_input_ = std::string(510, 'x');
+            menu->handle_text_input(u8"가");
+            CHECK(menu->difficulty_table_url_input_ == std::string(510, 'x'));
+            menu->difficulty_table_url_input_ = std::string(509, 'x');
+            menu->handle_text_input(u8"가");
+            CHECK(menu->difficulty_table_url_input_ == std::string(509, 'x') + u8"가");
+            tap(*menu, menu->key_backspace_);
+            CHECK(menu->difficulty_table_url_input_ == std::string(509, 'x'));
+        }
+    }
+
+    static void check_lane_number_shortcuts() {
+        auto menu = fixture();
+        menu->skin_settings_controller_.reset("16k");
+        static_cast<void>(menu->skin_settings_controller_.select(SkinSettingsRowId::LaneWidth, false));
+        const auto digit = [](char value) { return config::KeycodeMap::to_keycode(std::string(1, value)).value(); };
+        const auto left_shift = config::KeycodeMap::to_keycode("LShift").value();
+        const auto left_control = config::KeycodeMap::to_keycode("LControl").value();
+        const auto left_alt = config::KeycodeMap::to_keycode("LAlt").value();
+        for (int lane = 1; lane <= 10; ++lane) {
+            tap(*menu, digit(lane == 10 ? '0' : static_cast<char>('0' + lane)));
+            CHECK(menu->skin_settings_controller_.edit_lane() == lane - 1);
+            CHECK(menu->skin_settings_controller_.selected_id() == SkinSettingsRowId::LaneWidth);
+            CHECK_FALSE(menu->skin_settings_controller_.dirty());
+        }
+        key(*menu, left_shift, input::InputState::Pressed);
+        for (int lane = 11; lane <= 16; ++lane) {
+            tap(*menu, digit(static_cast<char>('0' + lane - 10)));
+            CHECK(menu->skin_settings_controller_.edit_lane() == lane - 1);
+        }
+        tap(*menu, digit('0'));
+        CHECK(menu->skin_settings_controller_.edit_lane() == 15);
+        key(*menu, left_shift, input::InputState::Released);
+        tap(*menu, config::KeycodeMap::to_keycode("Numpad3").value());
+        CHECK(menu->skin_settings_controller_.edit_lane() == 2);
+        menu->help_overlay_visible_ = true;
+        tap(*menu, digit('1'));
+        CHECK(menu->skin_settings_controller_.edit_lane() == 2);
+        menu->help_overlay_visible_ = false;
+        menu->skin_preview_fullscreen_ = true;
+        tap(*menu, digit('1'));
+        CHECK(menu->skin_settings_controller_.edit_lane() == 2);
+        menu->skin_preview_fullscreen_ = false;
+        menu->key_lcontrol_ = left_control;
+        for (auto modifier : {left_control, left_alt}) {
+            key(*menu, modifier, input::InputState::Pressed);
+            tap(*menu, digit('1'));
+            CHECK(menu->skin_settings_controller_.edit_lane() == 2);
+            key(*menu, modifier, input::InputState::Released);
+        }
+        menu->difficulty_table_url_editing_ = true;
+        menu->handle_skins_settings_input(digit('1'));
+        CHECK(menu->skin_settings_controller_.edit_lane() == 2);
+        menu->difficulty_table_url_editing_ = false;
+        menu->skin_settings_controller_.reset("4k");
+        tap(*menu, digit('0'));
+        CHECK(menu->skin_settings_controller_.edit_lane() == 0);
+        menu->skin_settings_controller_.reset("7+1");
+        menu->config_.skin.scratch_position = "right";
+        tap(*menu, digit('1'));
+        CHECK(menu->skin_settings_controller_.edit_lane() == 1);
+        CHECK(menu->snapshot_.render.generic.skin_preview.selected_lane == 1);
+        tap(*menu, digit('8'));
+        CHECK(menu->skin_settings_controller_.edit_lane() == 0);
+        CHECK(menu->snapshot_.render.generic.skin_preview.selected_lane == 8);
+        const auto probes = menu->current_menu_probe_keycodes();
+        CHECK(std::find(probes.begin(), probes.end(), digit('1')) != probes.end());
+        CHECK(std::find(probes.begin(), probes.end(), left_shift) != probes.end());
+        menu->reset_screen(MenuApp::Screen::Title);
+        menu->handle_skins_settings_input(digit('2'));
+        CHECK(menu->skin_settings_controller_.edit_lane() == 0);
+    }
+
     static void check_navigation_reset() {
         auto menu = fixture();
         tap(*menu, menu->key_f6_);
@@ -242,6 +368,12 @@ TEST_CASE("skin fullscreen preview respects existing modal input ownership") {
 
 TEST_CASE("skin fullscreen preview cannot survive a navigation reset") {
     tenriff::app::MenuAppSkinPreviewTestAccess::check_navigation_reset();
+}
+TEST_CASE("difficulty table URL held Backspace repeats complete UTF8 characters only while focused") {
+    tenriff::app::MenuAppSkinPreviewTestAccess::check_table_url_repeat();
+}
+TEST_CASE("skin lane number shortcuts honor visible order bounds and modal ownership") {
+    tenriff::app::MenuAppSkinPreviewTestAccess::check_lane_number_shortcuts();
 }
 #endif
 

@@ -56,6 +56,7 @@
 #include "app/MultiplayerPresentation.h"
 #include "app/RankedRecordsClient.h"
 #include "app/ProfileSetupFlow.h"
+#include "app/GameplayStartPolicy.h"
 #include "app/ProfilePreset.h"
 #include "app/PortableFileDialog.h"
 #include "app/RuntimeConfigMigration.h"
@@ -716,24 +717,32 @@ std::string format_signed_ms(double value) {
 }  // namespace
 
 void MenuApp::reset_screen(Screen screen) noexcept {
+    profile_restart_key_capture_active_ = false;
+    profile_restart_key_status_.clear();
     close_skin_fullscreen_preview();
     reset_song_select_repeat();
     menu_navigator_.reset(screen);
 }
 
 void MenuApp::push_screen(Screen screen) {
+    profile_restart_key_capture_active_ = false;
+    profile_restart_key_status_.clear();
     close_skin_fullscreen_preview();
     reset_song_select_repeat();
     menu_navigator_.push(screen);
 }
 
 void MenuApp::replace_screen(Screen screen) noexcept {
+    profile_restart_key_capture_active_ = false;
+    profile_restart_key_status_.clear();
     close_skin_fullscreen_preview();
     reset_song_select_repeat();
     menu_navigator_.replace(screen);
 }
 
 bool MenuApp::pop_screen() noexcept {
+    profile_restart_key_capture_active_ = false;
+    profile_restart_key_status_.clear();
     close_skin_fullscreen_preview();
     reset_song_select_repeat();
     return menu_navigator_.back();
@@ -1619,10 +1628,20 @@ std::vector<uint32_t> MenuApp::current_menu_probe_keycodes() const {
     append_fixed_key(key_f6_);
     append_fixed_key(key_f7_);
 
+    if (current_screen() == Screen::SettingsSkins) {
+        for (const char* name : {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+                                 "Numpad0", "Numpad1", "Numpad2", "Numpad3", "Numpad4",
+                                 "Numpad5", "Numpad6", "Numpad7", "Numpad8", "Numpad9",
+                                 "LShift", "RShift", "LAlt", "RAlt"}) {
+            append_fixed_key(config::KeycodeMap::to_keycode(name).value_or(0));
+        }
+    }
+
     const bool include_keymap_bindings =
         current_screen() == Screen::Keymap || current_screen() == Screen::KeymapTest;
     const bool capture_all_keys =
-        current_screen() == Screen::Keymap && keymap_settings_controller_.capture_active();
+        (current_screen() == Screen::Keymap && keymap_settings_controller_.capture_active()) ||
+        (current_screen() == Screen::QuickSetup && profile_restart_key_capture_active_);
     return build_menu_probe_keycodes(fixed_menu_keys,
                                      working_keymap_,
                                      std::string(keymap_settings_controller_.edit_mode()),
@@ -2052,10 +2071,17 @@ void MenuApp::switch_song_source(const std::string& new_songs_path, bool force_r
 void MenuApp::handle_input_event(const input::InputEvent& event) {
     note_runtime_input_event_source(event);
     const bool duplicate_adjustment_press = event.state == input::InputState::Pressed &&
-        (event.keycode == key_left_ || event.keycode == key_right_) &&
+        (event.keycode == key_left_ || event.keycode == key_right_ ||
+         (difficulty_table_url_editing_ && event.keycode == key_backspace_)) &&
         event.keycode == song_select_repeat_key_ && pressed_keys_.count(event.keycode) != 0;
     update_pressed_keys(event);
     if (duplicate_adjustment_press) return;
+    // Key capture owns reserved keys too, so F9/F10/F11 cannot open an overlay
+    // or take a screenshot instead of reporting a binding conflict.
+    if (current_screen() == Screen::QuickSetup && profile_restart_key_capture_active_) {
+        if (event.state == input::InputState::Pressed) handle_quick_setup_input(event.keycode);
+        return;
+    }
     if (current_screen() == Screen::SettingsSkins &&
         (skin_preview_fullscreen_ || (key_f6_ != 0 && event.keycode == key_f6_))) {
         if (event.state == input::InputState::Pressed &&
@@ -2218,6 +2244,7 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
 }
 
 void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
+    if (current_screen() == Screen::QuickSetup && profile_restart_key_capture_active_) return;
     auto event = incoming;
     // Result buttons use render.result, not the generic settings-row snapshot.
     // Validate their own activation contract in the Result branch below.
@@ -3382,6 +3409,7 @@ void MenuApp::handle_title_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_text_input(std::string_view text) {
+    if (current_screen() == Screen::QuickSetup && profile_restart_key_capture_active_) return;
     if (ranked_account_overlay_visible_ && ranked_account_sites_mode_) return;
     if (ranked_account_overlay_visible_ &&
         ranked_account_signed_in_username_.empty() &&
@@ -3439,17 +3467,23 @@ void MenuApp::handle_text_input(std::string_view text) {
     }
 
     if ((difficulty_table_url_editing_ || online_records_url_editing_) && !text.empty()) {
+        if (difficulty_table_url_editing_) reset_song_select_repeat();
         std::string& target = online_records_url_editing_
                                   ? online_records_url_input_
                                   : difficulty_table_url_input_;
         const std::size_t maximum = online_records_url_editing_ ? 2048u : 512u;
         const std::string utf8 = util::ensure_utf8_text(text);
+        std::string filtered;
+        filtered.reserve(utf8.size());
         for (unsigned char ch : utf8) {
-            // URLs are ASCII; anything else would only break the request.
-            if (ch > 0x20u && ch != 0x7Fu && target.size() < maximum) {
-                target.push_back(static_cast<char>(ch));
-            }
+            if (ch > 0x20u && ch != 0x7Fu) filtered.push_back(static_cast<char>(ch));
         }
+        std::size_t count = std::min(filtered.size(), maximum - std::min(target.size(), maximum));
+        // A full field rejects the whole next codepoint, including Unicode URL
+        // path segments, instead of retaining an invalid UTF-8 prefix.
+        while (count > 0 && count < filtered.size() &&
+               (static_cast<unsigned char>(filtered[count]) & 0xC0u) == 0x80u) --count;
+        target.append(filtered, 0, count);
         publish_snapshot();
         return;
     }
@@ -3481,6 +3515,70 @@ bool MenuApp::control_modifier_pressed() const {
 void MenuApp::handle_quick_setup_input(uint32_t keycode) {
     const auto setup_entry = profile_setup::entry(first_run_profile_);
     const int item_count = profile_setup::row_count(setup_entry);
+    if (profile_restart_key_capture_active_) {
+        // This is one physical key, not a chord. In particular, returning from
+        // Alt+Tab or Ctrl shortcuts must not accidentally assign the next key.
+        bool modifier_held = false;
+        for (const char* name : {"LShift", "RShift", "LControl", "RControl", "LAlt", "RAlt"}) {
+            const auto modifier = config::KeycodeMap::to_keycode(name);
+            if (!modifier) continue;
+            modifier_held |= pressed_keys_.count(*modifier) != 0;
+#ifdef _WIN32
+            const auto vk = config::KeycodeMap::polling_vk_for_keycode(*modifier);
+            if (vk) modifier_held |= (GetAsyncKeyState(static_cast<int>(*vk)) & 0x8000) != 0;
+#endif
+        }
+        if (keycode == key_escape_) {
+            profile_restart_key_capture_active_ = false;
+            profile_restart_key_status_.clear();
+        } else if (keycode == key_delete_) {
+            config_.ui.instant_restart_key.clear();
+            profile_restart_key_capture_active_ = false;
+            profile_restart_key_status_.clear();
+            persist_runtime_config();
+        } else if (instant_restart_key_reserved(keycode) || modifier_held) {
+            profile_restart_key_status_ = ui_text("Reserved key. Choose an unused key, such as F12.",
+                                                  "예약된 키입니다. F12 등 사용하지 않는 키를 고르세요.");
+        } else {
+            const config::KeymapManager manager;
+            bool lane_conflict = false;
+            for (const auto& mode : manager.supported_mode_tokens()) {
+                for (const auto& bindings : {manager.bindings_for_mode(keymap_, mode),
+                                             manager.secondary_bindings_for_mode(keymap_, mode)}) {
+                    for (const auto& binding : bindings) {
+                        if (config::KeycodeMap::to_keycode(binding.second).value_or(0) == keycode)
+                            lane_conflict = true;
+                    }
+                }
+            }
+            if (lane_conflict) {
+                profile_restart_key_status_ = ui_text("This key is bound to a lane. Choose an unused key.",
+                                                      "레인에 지정된 키입니다. 사용하지 않는 키를 고르세요.");
+            } else {
+                config_.ui.instant_restart_key = config::KeycodeMap::to_name(keycode);
+                profile_restart_key_capture_active_ = false;
+                profile_restart_key_status_.clear();
+                persist_runtime_config();
+            }
+        }
+        reset_song_select_repeat();
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == profile_setup::kInstantRestartKeyRow && keycode == key_enter_) {
+        profile_restart_key_capture_active_ = true;
+        profile_restart_key_status_.clear();
+        reset_song_select_repeat();
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == profile_setup::kSkipStartCountdownRow &&
+        (keycode == key_enter_ || keycode == key_left_ || keycode == key_right_)) {
+        config_.ui.skip_start_countdown = !config_.ui.skip_start_countdown;
+        persist_runtime_config();
+        publish_snapshot();
+        return;
+    }
     if (profile_nickname_edit_active_) {
         if (keycode == key_enter_) {
             profile_nickname_edit_active_ = false;
@@ -4323,6 +4421,8 @@ bool MenuApp::apply_difficulty_table_url(std::string_view url) {
 }
 
 void MenuApp::handle_difficulty_table_input(uint32_t keycode) {
+    // Cancelling, applying, replacing or reopening the draft ends any held erase.
+    if (keycode != key_backspace_) reset_song_select_repeat();
     if (difficulty_table_url_editing_) {
         const auto f4 = config::KeycodeMap::to_keycode("F4").value_or(0);
         if (f4 != 0 && keycode == f4) {
@@ -4343,9 +4443,7 @@ void MenuApp::handle_difficulty_table_input(uint32_t keycode) {
             return;
         }
         if (keycode == key_backspace_) {
-            if (!difficulty_table_url_input_.empty()) {
-                difficulty_table_url_input_.pop_back();
-            }
+            util::erase_last_utf8_codepoint(difficulty_table_url_input_);
             publish_snapshot();
             return;
         }

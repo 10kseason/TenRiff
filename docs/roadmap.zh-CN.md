@@ -8,17 +8,17 @@
 
 ## 当前基线
 - Windows GUI/runtime 是主要受支持路径。
-- 固定公开版本为 `1.8.7`，本地开发目标为 `1.8.8`；公开包附带 NK3 P64 与 generalized pattern MLP inference 模型，但不附带 BGA upscaler 模型。选择兼容且权利已厘清的 upscaler ONNX 只会保存路径，BGA Upscaler 会一直保持 off，直到用户手动开启并确认 high-spec warning；不存在自动 benchmark gate。
+- 固定基准为 `1.8.7`，此源码版本为 `1.8.8`；公开包附带 NK3 P64 与 generalized pattern MLP inference 模型，但不附带 BGA upscaler 模型。选择兼容且权利已厘清的 upscaler ONNX 只会保存路径，BGA Upscaler 会一直保持 off，直到用户手动开启并确认 high-spec warning；不存在自动 benchmark gate。
 - 当前菜单/runtime 仅支持 BMS family（`.bms/.bme/.bml/.pms`），并支持 native、bundle/profile TenRiff `skin.json` 与 LR2 skin。
 - 关于当前已发布的行为，请先看 [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)；这份路线图主要讲方向和剩余工作。
 
 ## 1.8.8 分析与 1.9.0 稳定化计划（2026-10-12）
 
-本次范围是 **1.8.8 分析功能与以下计划的文档化**。插件运行环境、API 和 SDK 尚未实现，`1.9.0` 是未来的稳定化目标。当前固定基准 `1.8.7`、已有标签和发布文件保持不变。此计划规定后续开发优先级；下方早期阶段列表不会自动授权增加尚未完成的核心功能。
+当前源码为 **1.8.8**，包含分析、窗口大小、长LN Mix，以及显示、菜单、键音和开始操作的改进。验证与公开状态见[发布说明](release-1.8.8-gate.md)。插件运行环境、API 和 SDK 尚未实现，`1.9.0` 是未来的稳定化目标。当前固定基准 `1.8.7`、已有标签和发布文件保持不变。此计划规定后续开发优先级；下方早期阶段列表不会自动授权增加尚未完成的核心功能。
 
 | 阶段 | 完成条件 |
 | --- | --- |
-| 1.8.8 | 各轨道 FAST/SLOW、时间分段准确度、单键/LN 事件分析和样本数，并验证自由窗口大小、结果截图提示、多拍 LN Mix 的[追加条件（韩语）](release-conditions-1.8.8.ko.md) |
+| 1.8.8 | 按[发布条件](release-1.8.8-gate.md)验证轨道FAST/SLOW、分段准确度、单键/LN事件、分布及样本数、自由窗口、结果PNG、长LN Mix、显示、菜单输入、键音保留与单人开始/重试 |
 | 1.9.0 之前的试验版 | 通过有限的只读插件 API，在不修改核心源码的情况下完成并验证另一种结果分析界面和个人选曲过滤器 |
 | 1.9.0 稳定化之后 | 保持核心功能范围，以错误、安全、兼容性修复和插件扩展为主 |
 

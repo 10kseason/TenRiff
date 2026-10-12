@@ -8,17 +8,17 @@
 
 ## Current Baseline
 - Windows GUI / runtime が主なサポート経路です。
-- 固定公開版は `1.8.7`、ローカル開発の対象は `1.8.8`。公開 package は NK3 P64 と generalized pattern MLP inference model を同梱するが、BGA upscaler model は同梱しない。互換性と権利を確認済みの upscaler ONNX を選択しても path を保存するだけで、BGA Upscaler は user が有効化して high-spec warning を確認するまで off のまま。自動 benchmark gate はない。
+- 固定基準は `1.8.7`、このソースは `1.8.8`。公開 package は NK3 P64 と generalized pattern MLP inference model を同梱するが、BGA upscaler model は同梱しない。互換性と権利を確認済みの upscaler ONNX を選択しても path を保存するだけで、BGA Upscaler は user が有効化して high-spec warning を確認するまで off のまま。自動 benchmark gate はない。
 - 現行 menu / runtime は BMS family（`.bms/.bme/.bml/.pms`）専用で、native、bundle/profile の TenRiff `skin.json`、LR2 skin をサポート。
 - 現在出荷されている挙動は [`docs/current-state.ja.md`](current-state.ja.md) を先に見てください。この roadmap は方向と残作業を示す文書です。
 
 ## 1.8.8 分析と 1.9.0 安定化計画（2026-10-12）
 
-今回の範囲は **1.8.8 の分析機能と以下の計画の文書化**です。プラグイン実行環境・API・SDK は未実装で、`1.9.0` は将来の安定化目標です。現在の固定基準 `1.8.7`、既存タグと配布ファイルを維持します。この計画が今後の優先順位であり、後続の初期段階一覧が未完了の本体機能追加を自動的に承認するものではありません。
+現在のソースは **1.8.8**です。分析・ウィンドウサイズ・長いLN Mixと画面・メニュー・キー音・開始操作の改善を含み、検証・公開状況は[リリース案内](release-1.8.8-gate.md)を参照します。プラグイン実行環境・API・SDK は未実装で、`1.9.0` は将来の安定化目標です。現在の固定基準 `1.8.7`、既存タグと配布ファイルを維持します。この計画が今後の優先順位であり、後続の初期段階一覧が未完了の本体機能追加を自動的に承認するものではありません。
 
 | 段階 | 完了条件 |
 | --- | --- |
-| 1.8.8 | レーン別 FAST/SLOW・時間帯別精度・単ノート/LN イベント分析と標本数、および自由なウィンドウサイズ・結果のスクリーンショット案内・複数拍 LN Mix の[追加条件（韓国語）](release-conditions-1.8.8.ko.md)を検証 |
+| 1.8.8 | レーン別FAST/SLOW・時間帯精度・単ノート/LNイベント・分布と標本数、自由サイズ・結果PNG・長いLN Mix・表示・メニュー入力・キー音保全・ソロ開始/再試行を[リリース条件](release-1.8.8-gate.md)で検証 |
 | 1.9.0 より前の試験版 | 限定的な読み取り専用 API で、別の結果分析画面と個人用選曲フィルターを本体ソース変更なしに実装・検証 |
 | 1.9.0 安定化後 | 本体の機能範囲を維持し、バグ・セキュリティ・互換性修正とプラグイン拡張を中心に保守 |
 

@@ -2,9 +2,9 @@
 
 **고정 기준선: [1.8.7](docs/baseline-1.8.7.md)** (2026-10-10). Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`을 사용하며 `latest`나 새 릴리스로 자동 변경하지 않습니다.
 
-**1.8.8 추가 릴리스 조건:** 창 크기 자유 조절·가로/세로 직접 입력, 결과의 `F9` PNG 저장 안내, 여러 박 길이 LN과 다른 레인의 단노트·짧은 LN을 섞는 LN Mix를 포함합니다. 초기 분석 후보의 검증과 구분한 [추가 기능·최종 검증 상태](docs/release-conditions-1.8.8.ko.md)를 확인하세요. 기존 고정 기준은 1.8.7이며 아직 미배포입니다.
+**2026-10-12 · 1.8.8:** 결과 분석, 자유 해상도와 F9 PNG 안내, 긴 LN Mix에 더해 화면 가독성·난이도표 입력/필터·스킨 레인 단축키·키 수 축소 시 키음 보존·단독 시작/즉시 재시작 조작을 정리했습니다. 현재 검증·패키지·공개 상태는 [1.8.8 릴리스 안내](docs/release-1.8.8-gate.md)에서 확인하세요. 고정 기준은 1.8.7을 유지합니다.
 
-**2026-10-12 · 1.8.8 로컬 개발 후보(미배포):** 레인별 타이밍 분포, 곡 시간대별 정확도와 단노트/LN 시작·해제·유지 실패 분석을 추가합니다. 측정 불가 미스를 0ms 표본으로 넣지 않으며 판정·점수 규칙을 유지합니다. 플러그인과 1.9.0 안정화는 계획 단계입니다. [분석 구현 기준과 계획](docs/result-analysis-1.8.8.ko.md).
+**분석과 확장 계획:** 레인별 분포·시간대 정확도·단노트/LN 시작·해제·유지 실패를 구분하고 측정 불가 미스를 0ms 표본에 넣지 않습니다. 긴 LN Mix v2는 로컬 기록·리플레이만 허용하며 기존 BEST·Sites 업로드에서 제외합니다. 플러그인과 1.9.0 안정화는 계획입니다. [분석 기준](docs/result-analysis-1.8.8.ko.md), [화면·메뉴·키음 변경](docs/release-feedback-1.8.8.ko.md), [시작·재시작 조작](docs/gameplay-start-controls.ko.md).
 
 **2026-10-09 · TenRiff 1.8.7:** 입력 보정과 로딩 오디오 경로를 보완하고 LR2 단독 플레이 스튜디오 덱, 750ms FAST/SLOW 유지, 키 재할당, 옵션 통합과 곡 제목 자동 맞춤을 제공합니다. [1.8.7 release](docs/release-1.8.7-gate.md).
 
@@ -27,11 +27,13 @@
 
 **멀티 Rate 지원 빌드:** 로비 `대전 Rate`에서 리더가 공통 배속을 설정합니다. 참가자 모두 이 protocol v6 빌드를 사용해야 합니다. [사용 방법과 호환성](docs/multiplayer-rate-build.ko.md).
 
+배포 버전: [**1.8.8**](https://github.com/10kseason/TenRiff/releases/tag/1.8.8). 검증·전달 상태는 [릴리스 안내](docs/release-1.8.8-gate.md)를 확인하세요.
+
 Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff는 Windows GUI 기반 BMS 리듬게임 런타임/런처 프로젝트입니다. 공개 고정 기준은 `1.8.7`, 이 소스의 미배포 개발 버전은 `1.8.8`이며, 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용입니다. Graphics Settings에서 권리 정리된 외부 ONNX 모델을 선택해 BGA/BGI 확대에 사용할 수 있습니다. 공개 패키지에는 BGA 업스케일러 모델을 넣지 않으며, 키 모드 변환용 NK3 P64 결정 모델과 일반화 패턴 MLP만 포함합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
+TenRiff는 Windows GUI 기반 BMS 리듬게임 런타임/런처 프로젝트입니다. 고정 기준은 `1.8.7`, 이 소스의 버전은 `1.8.8`이며, 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용입니다. Graphics Settings에서 권리 정리된 외부 ONNX 모델을 선택해 BGA/BGI 확대에 사용할 수 있습니다. 공개 패키지에는 BGA 업스케일러 모델을 넣지 않으며, 키 모드 변환용 NK3 P64 결정 모델과 일반화 패턴 MLP만 포함합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
 
-이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, `1.8.8` 개발 상태와 공개 `1.8.7` 상태, `1.8.7 fixed stable baseline` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
+이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, `1.8.8` 버전과 고정 `1.8.7` 기준, `1.8.7 fixed stable baseline` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
 
 TenRiff 코드는 전통적인 장기 설계 문서 중심 개발만으로 쌓인 프로젝트가 아니라, 빠른 반복과 실험을 중시한 `vibe coding` 성격이 강한 작품이라는 점을 명시합니다.
 

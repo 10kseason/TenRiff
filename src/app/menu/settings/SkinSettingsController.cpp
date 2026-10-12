@@ -148,6 +148,16 @@ void SkinSettingsController::set_timing_defaults(std::optional<bool> text, std::
     timing_default_always_visible_ = always_visible;
 }
 
+SkinSettingsEffects SkinSettingsController::select_lane(int one_based_lane) noexcept {
+    if (one_based_lane < 1 || one_based_lane > lane_count_for_skin_mode(edit_mode_) ||
+        edit_lane_ == one_based_lane - 1) return {};
+    edit_lane_ = one_based_lane - 1;
+    // Selection only: keep the current color/width row and do not dirty the skin.
+    SkinSettingsEffects effects;
+    effects.menu.render_changed = true;
+    return effects;
+}
+
 void SkinSettingsController::set_backdrop_defaults(
     std::optional<bool> enabled, std::optional<float> opacity,
     std::optional<float> brightness, std::optional<float> height) noexcept {

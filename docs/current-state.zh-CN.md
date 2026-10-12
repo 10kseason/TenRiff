@@ -2,9 +2,9 @@
 
 **固定基准：[1.8.7](baseline-1.8.7.zh-CN.md)**（2026-10-10）。使用 Git tag `1.8.7`、commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`，不随 `latest` 或新版本自动更新。
 
-**1.8.8 追加发布条件：**包含自由调整窗口大小与直接输入宽高、结果页的 `F9` PNG 保存提示，以及多拍长 LN 与其他轨道单键/短 LN 混合的 LN Mix。请查看与初始分析候选版分开的[新增功能及最终验证状态（韩语）](release-conditions-1.8.8.ko.md)。固定基准仍为 1.8.7，此候选版尚未发布。
+**2026-10-12 · 1.8.8：**整合结果分析、自由窗口大小及F9 PNG提示、长LN Mix，并改善显示可读性、难度表URL与筛选、皮肤轨道快捷键、减少键数时的键音保留，以及单人开始和立即重试操作。当前验证、软件包及公开状态见[1.8.8发布说明](release-1.8.8-gate.md)。固定基准仍为1.8.7。
 
-**2026-10-12 · 1.8.8 本地开发候选版（未发布）：**新增各轨道时机分布、曲目时间分段准确度及单键/LN 起始、松键、保持失败的独立分析。无法测量的漏击不作为 0ms 样本，保留判定和计分规则。插件与 1.9.0 稳定化仍为计划。[分析标准与计划（韩语）](result-analysis-1.8.8.ko.md)。
+**分析与扩展计划：**区分各轨道分布、时间分段准确度和单键/LN起始、松键、保持失败，无法测量的漏击不作为0ms样本。长LN Mix v2仅保留本地记录与回放，不计入旧BEST或Sites上传。插件与1.9.0稳定化仍为计划。参见[分析标准](result-analysis-1.8.8.ko.md)、[显示/菜单/键音变更](release-feedback-1.8.8.ko.md)、[开始与重试操作](gameplay-start-controls.ko.md)（韩语）。
 
 **2026-10-09 · TenRiff 1.8.7:** 改善输入校准和谱面加载音频，支持LR2单人Studio Deck、750ms FAST/SLOW保留、按键重新分配、选项整合及完整曲名自动缩放。 [1.8.7 release](release-1.8.7-gate.md).
 
@@ -27,7 +27,7 @@
 - 1.7.10 改善 ALL SONG 的已删除缓存项处理、合并进度和完成状态通知。[验证及未复现症状](release-1.7.10-gate.md)。
 - 1.7.8 新增默认菜单动画、4 至 16 键 Luma Keys、日语界面及网页/离线皮肤编辑。菜单与游戏内视觉设置分别保存在 `native` 和 `gameplay.native`。[验证范围](release-1.7.8-gate.md)。
 
-固定公开版本为 **1.8.7**，此源码的未发布开发版本为 **1.8.8**。Audio的歌曲结束方式可选**听到结束**（默认）或**跳过尾奏**；正常完成的结果无需再次按键即可保存并提交。新游玩采用支持BMS RANK的R4判定及网页提交所需的判定配置，保留现有R1/R2/R3记录。默认输出仍为WASAPI。变更、已完成的发布检查及剩余限制见[1.8.7发布说明](release-1.8.7-gate.md)。
+固定基准为 **1.8.7**，此源码版本为 **1.8.8**。Audio的歌曲结束方式可选**听到结束**（默认）或**跳过尾奏**；正常完成的结果无需再次按键即可保存并提交。新游玩采用支持BMS RANK的R4判定及网页提交所需的判定配置，保留现有R1/R2/R3记录。默认输出仍为WASAPI。本次验证状态及剩余限制见[1.8.8发布说明](release-1.8.8-gate.md)。
 
 [本地 1.7.1 r2 报告](local-1.7.1-r2.ko.md)中的 749/739 项是旧构建的记录，不作为新版本的结果。参见[曲库管理](library-management.md)、[基准 BPM](reference-bpm.md)、[皮肤预设](skin-presets.md)和 [ASIO](asio-audio.md)。
 
@@ -139,7 +139,7 @@
   - BMS 的 LV/CR 计算仅将 long-note Head/Tail 的 miss-ms 按 0.5倍评估，使 `300ms`按`150ms`处理；实际 gameplay 判定范围保持不变
 - Lane transform：
   - Random 支持 `Off / Mirror / Random (Scratch Fixed) / SR`；普通 Random 固定皿键，每次游玩生成新的按键 lane 排列，并把实际 seed 写入 replay
-  - 新`LN Mix 10%～90%` v2以基础BPM×Rate为准，目标为长2/4拍60%、中1拍20%、短1/4或1/2拍20%。保留已有LN、原始起点和键音，与同轨道下一起点留50ms间隔，空间不足则逐级缩短，不合并连续单键。旧回放按v1重现；v2只保留本地记录/回放，不计入旧BEST或Sites上传。参见[追加条件和验证（韩语）](release-conditions-1.8.8.ko.md)
+  - 新`LN Mix 10%～90%` v2以基础BPM×Rate为准，目标为长2/4拍60%、中1拍20%、短1/4或1/2拍20%。保留已有LN、原始起点和键音，与同轨道下一起点留50ms间隔，空间不足则逐级缩短，不合并连续单键。旧回放按v1重现；v2只保留本地记录/回放，不计入旧BEST或Sites上传。参见[追加条件和验证（韩语）](release-1.8.8-gate.md)
 - Skins / Gameplay feel：
   - 标准 `10+2 DP` chart 会跳过两条 scratch lane，把 `10K` lane-color palette 依次应用到实际十个按键 lane，并与原生 12K palette 保持独立
   - `rect / triangle / pentagon / hexagon / circle` 音符形状；procedural 圆形/多边形在 100% 下使用与 rect 条相同的完整宽度
@@ -184,7 +184,7 @@
   - 当两把键盘同时按住同一个键时，逻辑 `Pressed` 状态会一直保持到最后一个输入源释放为止
 - Graphics：
   - 保留分辨率预设，增加宽/高直接输入（每轴320–8192）与自由拖动窗口边框；保持16:9内容比例、留边和点击映射，保存拖动结束尺寸。参见[操作与恢复条件](config.zh-CN.md#graphics)
-  - 单人结果概要、分析标签页和多人结果底部显示小型 `F9` PNG / `screenshots/` 提示。保存位置在当前工作目录下，新候选版的实际保存检查见[追加发布验证（韩语）](release-conditions-1.8.8.ko.md)
+  - 单人结果概要、分析标签页和多人结果底部显示小型 `F9` PNG / `screenshots/` 提示。保存位置在当前工作目录下，本次的实际保存检查见[追加发布验证（韩语）](release-1.8.8-gate.md)
   - `refresh_hz`（`-1` = `Match Display`，`0` = `Unlimited`，实际最高 1500 FPS）
   - VSync off：Match Display 跟随显示器 Hz；Unlimited 将 gameplay 限制为 1500 FPS，同时保留 menu 上限 `300`
   - VSync on：present refresh 跟随活动显示器 Hz，render pacing 目标为 `monitor_hz * 2`（上限 `1050`）

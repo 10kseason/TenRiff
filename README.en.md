@@ -2,9 +2,9 @@
 
 **Fixed baseline: [1.8.7](docs/baseline-1.8.7.en.md)** (2026-10-10). Use Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`; do not advance it automatically with `latest` or a new release.
 
-**Additional 1.8.8 release conditions:** Include freely resizable windows and direct width/height input, an `F9` PNG hint on results, and LN Mix combining multi-beat holds with taps/short holds on other lanes. See [added features and final verification status (Korean)](docs/release-conditions-1.8.8.ko.md), separate from the initial analysis candidate's checks. The fixed baseline remains 1.8.7; this candidate is unreleased.
+**2026-10-12 · 1.8.8:** Combines result analysis, free window sizing and F9 PNG hints, long LN Mix, readability updates, table URL/filter fixes, skin lane shortcuts, preserved keysounds during key-count reduction, and solo start/instant-retry controls. See the [1.8.8 release gate](docs/release-1.8.8-gate.md) for current validation, packages and publication status. The fixed baseline remains 1.8.7.
 
-**2026-10-12 · 1.8.8 local development candidate (unreleased):** Adds per-lane timing distributions, accuracy over song time, and separate tap/LN-head/release/hold-failure analysis. Unmeasurable misses never become zero-ms samples; judgement and scoring rules stay unchanged. Plugins and 1.9.0 stabilization remain planned. [Analysis criteria and plan (Korean)](docs/result-analysis-1.8.8.ko.md).
+**Analysis and extension plans:** Separate lane distributions, time-based accuracy and tap/LN-head/release/hold-failure events; unmeasurable misses are never zero-ms samples. Long LN Mix v2 keeps local history/replay only and is excluded from legacy BEST and Sites uploads. Plugins and 1.9.0 stabilization remain plans. [Analysis](docs/result-analysis-1.8.8.ko.md), [display/menu/keysound changes](docs/release-feedback-1.8.8.ko.md), [start/retry controls](docs/gameplay-start-controls.ko.md) (Korean).
 
 **2026-10-09 · TenRiff 1.8.7:** Improves input calibration and chart-loading audio, adds LR2 solo Studio Deck, 750ms FAST/SLOW retention, key reassignment, consolidated Options and complete song-title fitting. [1.8.7 release](docs/release-1.8.7-gate.md).
 
@@ -26,13 +26,13 @@
 
 **Multiplayer Rate build:** the leader sets a shared Room Rate in the lobby. All participants must use this protocol v6 build; previous v5 clients cannot join. [Guide (Korean)](docs/multiplayer.md).
 
-The fixed public distribution is **1.8.7 Sites integrated**; this source tree is an unreleased **1.8.8** development candidate. Extract to a new folder, run `launch_win.bat`, then press F10 and link your web account once. Eligible new plays upload score, detail score, accuracy, and detailed accuracy. New plays use ruleset-4 with a required timing profile for web submissions; ruleset-1/2/3 replays retain their original timing and LN behavior, and existing web records keep their IDs and scores. See the [connection guide](docs/sites-leaderboard.md) (Korean).
+The distribution version is [**1.8.8 Sites integrated**](https://github.com/10kseason/TenRiff/releases/tag/1.8.8); the fixed baseline remains 1.8.7. Extract to a new folder, run `launch_win.bat`, then press F10 and link your web account once. Eligible new plays upload score, detail score, accuracy, and detailed accuracy. New plays use ruleset-4 with a required timing profile for web submissions; ruleset-1/2/3 replays retain their original timing and LN behavior, and existing web records keep their IDs and scores. See the [connection guide](docs/sites-leaderboard.md) (Korean).
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The fixed public version is `1.8.7` and this unreleased development version is `1.8.8`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The fixed baseline is `1.8.7` and this source version is `1.8.8`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-This README is an introduction that explains "what to look at first when you open the project." For current behavior, the `1.8.8` development and public `1.8.7` states, the `1.8.7 fixed stable baseline` baseline, configuration, and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
+This README is an introduction that explains "what to look at first when you open the project." For current behavior, the `1.8.8` version and fixed `1.8.7` baseline, the `1.8.7 fixed stable baseline` baseline, configuration, and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
 
 TenRiff should also be read as a `vibe coding` work: it was shaped through fast iteration and experimentation rather than only through a traditional long-form design-first process.
 

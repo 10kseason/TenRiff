@@ -56,6 +56,7 @@ public:
     [[nodiscard]] SkinSettingsEffects select(
         SkinSettingsRowId target,
         bool lr2_source) noexcept;
+    [[nodiscard]] SkinSettingsEffects select_lane(int one_based_lane) noexcept;
     [[nodiscard]] SkinSettingsEffects handle(
         const MenuAction& action,
         config::RuntimeConfig& runtime,

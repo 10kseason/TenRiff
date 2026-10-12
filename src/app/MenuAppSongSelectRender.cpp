@@ -859,6 +859,12 @@ void MenuApp::populate_song_browser_render_data(render::MenuRenderData& render) 
         "Difficulty Table: copy an http(s) BMSTable link and press Enter, or use Ctrl+V while editing. Right selects local JSON; Left clears it.",
         "난이도표: http(s) BMSTable 링크를 복사하고 Enter를 누르거나 편집 중 Ctrl+V를 누르세요. 오른쪽은 로컬 JSON 선택, 왼쪽은 해제입니다."));
     render.generic.notes.push_back(ui_text(
+        "Hold Backspace to erase the table URL continuously. Delete clears the field; Esc cancels.",
+        "Backspace를 누르고 있으면 난이도표 URL을 연속으로 지웁니다. Delete는 전체 지우기, Esc는 취소입니다."));
+    render.generic.notes.push_back(ui_text(
+        "Table Min/Max uses the displayed numeric level: 12, st12 and 12+ count as 12. Non-numeric labels are hidden while a limit is active. Native LV uses the built-in level.",
+        "표 선택 중 최소/최대는 표시 레벨의 숫자를 사용합니다: 12, st12, 12+는 12입니다. 제한이 있으면 비숫자 표기는 숨기며, 기본 LV는 내장 레벨을 사용합니다."));
+    render.generic.notes.push_back(ui_text(
         "Online Records Server: Enter imports a copied http(s) address; Ctrl+V replaces it while editing.",
         "인랭 기록 서버: 주소를 복사하고 Enter를 누르거나, 편집 중 Ctrl+V로 교체하세요."));
     if (!song_browser_status_message_.empty()) {

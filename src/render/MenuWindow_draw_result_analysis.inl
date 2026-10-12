@@ -42,7 +42,10 @@
                     94, 720, 638);
             text_at(result_loc("Unmeasured misses", "측정 불가 미스") + "  " + std::to_string(total.unmeasured_miss_count),
                     94, 778, 638);
-            text_at("FAST " + std::to_string(total.fast_count) + " / SLOW " + std::to_string(total.slow_count), 94, 822, 638);
+            draw_result_text("FAST " + std::to_string(total.fast_count), d2d_->song_title_format.Get(),
+                D2D1::RectF(94, 822, 355, 860), semantic_brush(0x69A6FF), 1.0f);
+            draw_result_text("SLOW " + std::to_string(total.slow_count), d2d_->song_title_format.Get(),
+                D2D1::RectF(355, 822, 638, 860), semantic_brush(0xFF7189), 1.0f, DWRITE_TEXT_ALIGNMENT_TRAILING);
             text_at(result_loc("FAST/SLOW excludes P-GREAT; histogram includes it.", "FAST/SLOW는 P-GREAT 제외, 분포는 포함합니다."),
                     94, 868, 638, true, 48);
             text_at(result_loc("Mods: ", "모드: ") + data.result.analysis_mods, 94, 924, 638, true, 44);

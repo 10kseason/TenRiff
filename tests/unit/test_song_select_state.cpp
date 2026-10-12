@@ -187,8 +187,8 @@ TEST_CASE("difficulty-table metadata drives labels groups sorting and numeric fi
 
     CHECK(song_difficulty_label(table_low) == "sl2+");
     CHECK(song_group_level_key(table_low) < song_group_level_key(native));
-    CHECK(song_entry_matches_level_filter(table_low, 2, 2));
-    CHECK_FALSE(song_entry_matches_level_filter(table_low, 3, 50));
+    CHECK(song_entry_matches_level_filter(table_low, 2, 2, true));
+    CHECK_FALSE(song_entry_matches_level_filter(table_low, 3, 50, true));
 
     std::vector<SongEntry> ascending = {native, table_high, table_low};
     std::stable_sort(ascending.begin(), ascending.end(), song_entry_less_by_difficulty_asc);
@@ -228,6 +228,33 @@ TEST_CASE("difficulty table levels without level_order use natural numeric order
     CHECK(entries[0].difficulty_table_level == "st1");
     CHECK(entries[1].difficulty_table_level == "st2");
     CHECK(entries[2].difficulty_table_level == "st10");
+}
+
+TEST_CASE("selected table numeric bounds follow displayed labels and never fall back to native LV") {
+    SongEntry entry;
+    entry.level = 50;
+    entry.difficulty_table_symbol = "st";
+    for (const std::string label : {"12", "012", "12+", "st12", "sl12+", u8"★12", "  LV 12  "}) {
+        entry.difficulty_table_level = label;
+        CHECK(song_entry_matches_level_filter(entry, 12, 12, true));
+        CHECK_FALSE(song_entry_matches_level_filter(entry, 13, 0, true));
+        CHECK_FALSE(song_entry_matches_level_filter(entry, 0, 11, true));
+        CHECK(song_entry_matches_level_filter(entry, 50, 50, false));
+    }
+    for (const std::string label : {"", "?", "A", "EX", "12-13", "12/13", "12.5", "12A", "-12", u8"−12", "99999999999999"}) {
+        entry.difficulty_table_level = label;
+        CHECK_FALSE(song_entry_matches_level_filter(entry, 1, 99, true));
+        CHECK(song_entry_matches_level_filter(entry, 0, 0, true));
+        CHECK(song_entry_matches_level_filter(entry, 50, 50, false));
+    }
+    entry.difficulty_table_level = "st0";
+    CHECK(song_entry_matches_level_filter(entry, 0, 12, true));
+    CHECK_FALSE(song_entry_matches_level_filter(entry, 12, 0, true));
+    entry.difficulty_table_level = "st13";
+    CHECK(song_entry_matches_level_filter(entry, 12, 0, true));
+    CHECK_FALSE(song_entry_matches_level_filter(entry, 12, 12, true));
+    entry.level = 0;
+    CHECK_FALSE(song_entry_matches_level_filter(entry, 0, 12, false));
 }
 
 TEST_CASE("native LV restores cached labels filters and sorting after a difficulty table was selected") {

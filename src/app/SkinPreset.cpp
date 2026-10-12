@@ -569,6 +569,8 @@ config::RuntimeConfig portable_runtime(config::RuntimeConfig value) {
     ui.result_tail_ms = value.ui.result_tail_ms;
     ui.require_enter_to_exit = value.ui.require_enter_to_exit;
     ui.show_cursor_in_gameplay = value.ui.show_cursor_in_gameplay;
+    ui.skip_start_countdown = value.ui.skip_start_countdown;
+    ui.instant_restart_key = value.ui.instant_restart_key;
     value.ui = std::move(ui);
     value.graphics.background_upscale_model_path.clear();
     return value;
@@ -582,6 +584,8 @@ void restore_local_preferences(config::RuntimeConfig& loaded, const config::Runt
     loaded.ui.result_tail_ms = portable.result_tail_ms;
     loaded.ui.require_enter_to_exit = portable.require_enter_to_exit;
     loaded.ui.show_cursor_in_gameplay = portable.show_cursor_in_gameplay;
+    loaded.ui.skip_start_countdown = portable.skip_start_countdown;
+    loaded.ui.instant_restart_key = portable.instant_restart_key;
     loaded.graphics.background_upscale_model_path = current.graphics.background_upscale_model_path;
 }
 

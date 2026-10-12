@@ -8,17 +8,17 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current baseline
 - Windows GUI/runtime is the primary supported path.
-- The fixed public version is `1.8.7` and local development targets `1.8.8`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
+- The fixed baseline is `1.8.7` and this source targets `1.8.8`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
 - The active menu/runtime is BMS-family only (`.bms/.bme/.bml/.pms`) and supports native, bundled/profile TenRiff `skin.json`, and LR2 skins.
 - For current shipped behavior, read `docs/current-state.md` first; this roadmap is about direction and remaining work.
 
 ## 1.8.8 분석과 1.9.0 안정화 계획 (2026-10-12)
 
-현재 작업 범위는 **1.8.8 분석 기능과 아래 계획 문서화**입니다. 플러그인 실행 환경·API·SDK는 아직 구현하지 않았으며, `1.9.0`은 향후 안정화 목표입니다. 현재 고정 기준 `1.8.7`과 기존 태그·배포 파일은 그대로 유지합니다. 아래 계획이 이후 개발의 우선순위이며, 뒤의 초기 단계 목록이 미완료 본체 기능 추가를 자동으로 승인하지는 않습니다.
+현재 소스는 **1.8.8**입니다. 분석·해상도·긴 LN Mix와 화면·메뉴·키음·시작 조작 개선을 포함하며, 현재 검증·공개 상태는 [릴리스 안내](release-1.8.8-gate.md)를 따릅니다. 플러그인 실행 환경·API·SDK는 아직 구현하지 않았으며, `1.9.0`은 향후 안정화 목표입니다. 현재 고정 기준 `1.8.7`과 기존 태그·배포 파일은 그대로 유지합니다. 아래 계획이 이후 개발의 우선순위이며, 뒤의 초기 단계 목록이 미완료 본체 기능 추가를 자동으로 승인하지는 않습니다.
 
 | 단계 | 완료 조건 |
 | --- | --- |
-| 1.8.8 | 레인별 FAST/SLOW·시간대 정확도·단노트/LN 사건 분석과 표본 수를 제공하고, [추가 조건](release-conditions-1.8.8.ko.md)의 자유 해상도·결과 스크린샷 안내·여러 박 길이 LN Mix를 검증 |
+| 1.8.8 | 레인별 FAST/SLOW·시간대 정확도·단노트/LN 사건·분포와 표본 수, 자유 해상도·결과 PNG·긴 LN Mix, 화면 가독성·메뉴 입력·키음 보존·단독 시작/재시작을 [릴리스 조건](release-1.8.8-gate.md)에 따라 검증 |
 | 1.9.0 이전 시험판 | 제한된 읽기 전용 플러그인 API로 대체 결과 분석 화면과 개인 선곡 필터를 본체 코드 수정 없이 구현·검증 |
 | 1.9.0 안정화 이후 | 본체 기능 범위를 유지하고 버그·보안·호환성 수정과 플러그인 계열 확장을 중심으로 관리 |
 

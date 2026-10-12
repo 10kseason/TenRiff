@@ -8,17 +8,17 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current Baseline
 - Windows GUI / runtime is the primary supported path.
-- The fixed public version is `1.8.7` and local development targets `1.8.8`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
+- The fixed baseline is `1.8.7` and this source targets `1.8.8`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
 - The active menu / runtime is BMS-family only (`.bms/.bme/.bml/.pms`) and supports native, bundled/profile TenRiff `skin.json`, and LR2 skins.
 - For current shipped behavior, read `docs/current-state.en.md` first; this roadmap is about direction and remaining work.
 
 ## 1.8.8 Analysis and 1.9.0 Stabilization Plan (2026-10-12)
 
-The current scope is **1.8.8 analysis and documentation of this plan**. The plugin host, API and SDK are not implemented; `1.9.0` is a future stabilization target. The fixed `1.8.7` baseline, existing tags and release files remain preserved. This plan sets the next development priorities; the earlier stage list below does not automatically authorize additional unfinished core features.
+The current source scope is **1.8.8**, including analysis, window sizing, long LN Mix and display/menu/keysound/start-control improvements. See the [release gate](release-1.8.8-gate.md) for current validation and publication status. The plugin host, API and SDK are not implemented; `1.9.0` is a future stabilization target. The fixed `1.8.7` baseline, existing tags and release files remain preserved. This plan sets the next development priorities; the earlier stage list below does not automatically authorize additional unfinished core features.
 
 | Stage | Completion criteria |
 | --- | --- |
-| 1.8.8 | Per-lane FAST/SLOW, time-based accuracy, tap/LN-event analysis and sample counts; verify [additional conditions (Korean)](release-conditions-1.8.8.ko.md) for free window sizing, result screenshot hints and multi-beat LN Mix |
+| 1.8.8 | Validate lane FAST/SLOW, time accuracy, tap/LN events, distributions/sample counts, free window sizing, result PNGs, long LN Mix, readability, menu input, keysound preservation and solo start/retry against the [release gate](release-1.8.8-gate.md) |
 | Before 1.9.0 | A limited read-only plugin API demonstrated by an alternative result analysis view and a personal song filter, both built without core source edits |
 | After 1.9.0 stabilization | Maintain the core feature scope; focus on bug, security and compatibility fixes and plugin extensions |
 

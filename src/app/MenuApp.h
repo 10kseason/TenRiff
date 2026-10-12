@@ -760,6 +760,8 @@ private:
     uint64_t profile_avatar_revision_ = 0;
     bool profile_nickname_edit_active_ = false;
     std::string profile_nickname_before_edit_;
+    bool profile_restart_key_capture_active_ = false;
+    std::string profile_restart_key_status_;
     bool help_overlay_visible_ = false;
     std::string available_lr2_skin_root_;
     std::vector<std::string> available_lr2_skin_names_{};

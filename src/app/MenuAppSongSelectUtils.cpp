@@ -352,22 +352,28 @@ bool song_entry_matches_key_filter(const SongEntry& entry, int key_filter) {
     return key_filter <= 0 || entry.key_count == key_filter;
 }
 
-bool song_entry_matches_level_filter(const SongEntry& entry, int level_min, int level_max) {
+bool song_entry_matches_level_filter(const SongEntry& entry, int level_min, int level_max, bool table_active) {
     if (level_min <= 0 && level_max <= 0) {
         return true;
     }
     int effective_level = entry.level;
-    if (!entry.difficulty_table_level.empty()) {
-        const std::string& table_level = entry.difficulty_table_level;
-        int parsed_level = 0;
-        const auto parsed = std::from_chars(table_level.data(),
-                                            table_level.data() + table_level.size(),
-                                            parsed_level);
-        if (parsed.ec == std::errc{} && parsed.ptr != table_level.data()) {
-            effective_level = parsed_level;
-        }
-    }
-    if (effective_level <= 0) {
+    if (table_active) {
+        // A table label may carry its own prefix (st12, ★12) or a trailing +.
+        // Never substitute native LV for an unranked/non-numeric table label.
+        std::string_view label = entry.difficulty_table_level;
+        while (!label.empty() && std::isspace(static_cast<unsigned char>(label.front()))) label.remove_prefix(1);
+        while (!label.empty() && std::isspace(static_cast<unsigned char>(label.back()))) label.remove_suffix(1);
+        const auto first_digit = label.find_first_of("0123456789");
+        if (first_digit == std::string_view::npos) return false;
+        const auto prefix = label.substr(0, first_digit);
+        if (prefix.find_first_of("-+./") != std::string_view::npos || prefix.find(u8"−") != std::string_view::npos) return false;
+        const char* start = label.data() + first_digit;
+        const char* end = label.data() + label.size();
+        const auto parsed = std::from_chars(start, end, effective_level);
+        if (parsed.ec != std::errc{}) return false;
+        const std::string_view suffix(parsed.ptr, static_cast<std::size_t>(end - parsed.ptr));
+        if (!suffix.empty() && suffix != "+") return false;
+    } else if (effective_level <= 0) {
         return false;
     }
     if (level_min > 0 && effective_level < level_min) {

@@ -290,6 +290,41 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(tenriff::config::resolved_skin_lane_colors(config.skin, "16k").size() == 16u);
 }
 
+TEST_CASE("profile start controls retain legacy defaults and roundtrip without changing timing offsets") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    std::filesystem::create_directories(temp.path / "config");
+    std::filesystem::create_directories(temp.path / "profiles" / "test");
+    write_file(temp.path / "config" / "config.json", "{}");
+    write_file(temp.path / "profiles" / "test" / "config.json", "{}");
+    CurrentPathGuard cwd;
+    std::filesystem::current_path(temp.path);
+    ConfigLoader loader;
+    auto legacy = loader.load_profile("profiles/test");
+    REQUIRE(legacy.success());
+    CHECK_FALSE(legacy.config.ui.skip_start_countdown);
+    CHECK(legacy.config.ui.instant_restart_key.empty());
+    auto edited = legacy.config;
+    edited.ui.skip_start_countdown = true;
+    edited.ui.instant_restart_key = "F12";
+    edited.input_offset_ms = 12.5;
+    edited.sound_offset_ms = -8.0;
+    REQUIRE(loader.save_profile("profiles/test", edited));
+    const auto loaded = loader.load_profile("profiles/test");
+    REQUIRE(loaded.success());
+    CHECK(loaded.config.ui.skip_start_countdown);
+    CHECK(loaded.config.ui.instant_restart_key == "F12");
+    CHECK(loaded.config.input_offset_ms == doctest::Approx(12.5));
+    CHECK(loaded.config.sound_offset_ms == doctest::Approx(-8.0));
+    write_file(temp.path / "profiles" / "test" / "config.json",
+               R"({"ui":{"skip_start_countdown":"true","instant_restart_key":123}})");
+    const auto malformed = loader.load_profile("profiles/test");
+    REQUIRE(malformed.success());
+    CHECK_FALSE(malformed.config.ui.skip_start_countdown);
+    CHECK(malformed.config.ui.instant_restart_key.empty());
+}
+
 TEST_CASE("config save and load preserve favorites and collections") {
     TempDirGuard temp;
     temp.path = make_temp_dir();

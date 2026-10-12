@@ -1041,6 +1041,19 @@ void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
     append_menu_row(render.generic, ui_text("Import All Settings", "전체 설정 가져오기"), ".trprofile",
                     settings_cursor_ == profile_setup::kImportSettingsRow, render::MenuHitTargetKind::SettingsRow,
                     profile_setup::kImportSettingsRow, true, false);
+    append_menu_row(render.generic, ui_text("Skip Start Countdown", "시작 카운트다운 생략"),
+                    config_.ui.skip_start_countdown ? ui_text("On", "켜짐") : ui_text("Off", "꺼짐"),
+                    settings_cursor_ == profile_setup::kSkipStartCountdownRow, render::MenuHitTargetKind::SettingsRow,
+                    profile_setup::kSkipStartCountdownRow, false, true);
+    append_menu_row(render.generic, ui_text("Instant Restart Key", "즉시 재시작 키"),
+                    profile_restart_key_capture_active_
+                        ? (profile_restart_key_status_.empty()
+                            ? ui_text("Press a key (Esc cancels, Delete clears)", "키 입력 (Esc 취소, Delete 해제)")
+                            : profile_restart_key_status_)
+                        : (config_.ui.instant_restart_key.empty() ? ui_text("Unassigned", "미지정")
+                                                                  : config_.ui.instant_restart_key),
+                    settings_cursor_ == profile_setup::kInstantRestartKeyRow, render::MenuHitTargetKind::SettingsRow,
+                    profile_setup::kInstantRestartKeyRow, true, false);
     append_menu_row(render.generic,
                     first_run ? ui_text("Continue to Song Select", "곡 선택으로 계속")
                               : ui_text("Done", "완료"),
@@ -1995,7 +2008,8 @@ void MenuApp::update_pressed_keys(const input::InputEvent& event) {
     if (event.state == input::InputState::Pressed) {
         const bool new_press = pressed_keys_.insert(event.keycode).second;
         if (event.keycode != song_select_repeat_key_ &&
-            (song_select_repeat_key_ == key_left_ || song_select_repeat_key_ == key_right_)) {
+            (song_select_repeat_key_ == key_left_ || song_select_repeat_key_ == key_right_ ||
+             song_select_repeat_key_ == key_backspace_)) {
             reset_song_select_repeat();
         }
         if (new_press && is_song_select_repeat_key(event.keycode)) {
@@ -2148,12 +2162,17 @@ int MenuApp::selected_adjustment_repeat_row(uint32_t keycode) {
 bool MenuApp::is_song_select_repeat_key(uint32_t keycode) {
     if (skin_preview_fullscreen_) return false;
     if (help_overlay_visible_ || profile_nickname_edit_active_ ||
-        difficulty_table_url_editing_ || online_records_url_editing_ || song_select_search_active_ ||
+        online_records_url_editing_ || song_select_search_active_ ||
         chat_overlay_visible_ || ranked_account_overlay_visible_ || chat_url_warning_visible_ ||
         (current_screen() == Screen::Multiplayer && multiplayer_menu_.edit_field != MultiplayerEditField::None) ||
         (current_screen() == Screen::Keymap &&
          keymap_settings_controller_.capture_active())) {
         return false;
+    }
+
+    if (difficulty_table_url_editing_) {
+        return (current_screen() == Screen::SongSelect || current_screen() == Screen::SongBrowser) &&
+               keycode == key_backspace_ && !difficulty_table_url_input_.empty();
     }
 
     if (keycode == key_page_up_ || keycode == key_page_down_) {
@@ -2193,6 +2212,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
                               const std::string& replay_path,
                               GameplayLaunchKind launch_kind) {
     // Restart iteratively so each completed GameSession leaves the stack before relaunch.
+    bool instant_restart_start = false;
     for (;;) {
     const bool replay_playback = !replay_path.empty();
     // The caller owns the launch intent. Inferring it from lobby flags makes a
@@ -2230,6 +2250,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     stop_song_preview_audio();
 
     GameSession session;
+    session.set_instant_restart_start(instant_restart_start);
     if (!peer_battle && replay_path.empty() && bms_editor_practice_start_seconds_.has_value()) {
         session.set_practice_no_fail_override(true);
         session.set_practice_start_seconds(*bms_editor_practice_start_seconds_);
@@ -2612,6 +2633,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         persist_runtime_config();
     }
     const bool session_restart_requested = session.was_restart_requested();
+    const bool session_instant_restart_requested = session.was_instant_restart_requested();
     const bool session_exit_requested = session.was_exit_requested();
     session.shutdown();
     const bool session_aborted = session.was_user_aborted() || !session.audio_error().empty();
@@ -2639,6 +2661,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         persist_runtime_config();
     }
     if (session_restart_requested) {
+        instant_restart_start = session_instant_restart_requested;
         {
             std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
             reset_gameplay_hud_state(gameplay_hud_);
