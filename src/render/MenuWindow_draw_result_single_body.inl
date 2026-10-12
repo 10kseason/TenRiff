@@ -15,7 +15,15 @@
 
         const auto semantic_brush = [&](uint32_t rgb) -> ID2D1Brush* {
             d2d_->note_fill_brush->SetColor(D2D1::ColorF(rgb));
+            d2d_->note_fill_brush->SetOpacity(1.0f);
             return d2d_->note_fill_brush.Get();
+        };
+        const auto draw_result_outline = [&](const D2D1_RECT_F& rect, uint32_t rgb,
+                                            float width, float alpha, float radius = 12.0f) {
+            auto* brush = semantic_brush(rgb);
+            brush->SetOpacity(std::clamp(alpha, 0.0f, 1.0f));
+            ctx->DrawRoundedRectangle(D2D1::RoundedRect(rect, radius, radius), brush, width);
+            brush->SetOpacity(1.0f);
         };
 
         auto draw_result_text = [&](const std::string& text,
@@ -67,6 +75,74 @@
             }
         };
 
+        // Icons use geometry instead of a fallback font glyph. Measure and fit
+        // the complete icon/label group, then center both on the same baseline.
+        auto draw_result_action = [&](const std::string& text, const D2D1_RECT_F& rect,
+                                      bool retry, float alpha) {
+            auto& cache = d2d_->result_action_layouts[retry ? 1 : 0];
+            auto* format = d2d_->result_action_format.Get();
+            const auto wide = to_wide(text);
+            if (!cache.layout || cache.text != wide || cache.format.Get() != format) {
+                cache.layout.Reset(); cache.text = wide; cache.format = format;
+                if (FAILED(d2d_->dwrite_factory->CreateTextLayout(wide.c_str(), static_cast<UINT32>(wide.size()),
+                    format, 2048, 128, cache.layout.ReleaseAndGetAddressOf()))) return;
+                cache.layout->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+                cache.layout->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+                cache.layout->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+            }
+            DWRITE_TEXT_METRICS metrics{};
+            cache.layout->GetMetrics(&metrics);
+            const float icon = 24.0f, gap = 12.0f;
+            const float width = icon + gap + metrics.widthIncludingTrailingWhitespace;
+            const float height = std::max(icon, metrics.height);
+            const float fit = std::min({1.0f, std::max(1.0f, rect.right - rect.left - 32.0f) / width,
+                                      std::max(1.0f, rect.bottom - rect.top - 16.0f) / height});
+            D2D1_MATRIX_3X2_F saved;
+            ctx->GetTransform(&saved);
+            ctx->SetTransform(D2D1::Matrix3x2F::Scale(fit, fit) * D2D1::Matrix3x2F::Translation(
+                (rect.left + rect.right - width * fit) * 0.5f,
+                (rect.top + rect.bottom - height * fit) * 0.5f) * saved);
+            auto* brush = d2d_->text_brush.Get();
+            const auto opacity = brush->GetOpacity(); brush->SetOpacity(alpha);
+            const float cy = height * 0.5f;
+            const std::size_t icon_slot = retry ? 1 : 0;
+            auto& geometry = d2d_->result_action_icons[icon_slot];
+            if (!d2d_->result_action_icons_attempted[icon_slot]) {
+                d2d_->result_action_icons_attempted[icon_slot] = true;
+                Microsoft::WRL::ComPtr<ID2D1GeometrySink> sink;
+                if (SUCCEEDED(d2d_->d2d_factory->CreatePathGeometry(geometry.GetAddressOf())) &&
+                    SUCCEEDED(geometry->Open(sink.GetAddressOf()))) {
+                    if (retry) {
+                        sink->BeginFigure(D2D1::Point2F(20, -4), D2D1_FIGURE_BEGIN_HOLLOW);
+                        sink->AddArc(D2D1::ArcSegment(D2D1::Point2F(12, -9), D2D1::SizeF(9, 9),
+                            0, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_LARGE));
+                        sink->EndFigure(D2D1_FIGURE_END_OPEN);
+                        sink->BeginFigure(D2D1::Point2F(17, -5), D2D1_FIGURE_BEGIN_HOLLOW);
+                        sink->AddLine(D2D1::Point2F(21, -4));
+                        sink->AddLine(D2D1::Point2F(21, -10));
+                        sink->EndFigure(D2D1_FIGURE_END_OPEN);
+                    } else {
+                        sink->BeginFigure(D2D1::Point2F(3, -10), D2D1_FIGURE_BEGIN_FILLED);
+                        sink->AddLine(D2D1::Point2F(21, 0));
+                        sink->AddLine(D2D1::Point2F(3, 10));
+                        sink->EndFigure(D2D1_FIGURE_END_CLOSED);
+                    }
+                    if (FAILED(sink->Close())) geometry.Reset();
+                }
+            }
+            if (geometry) {
+                D2D1_MATRIX_3X2_F group_transform;
+                ctx->GetTransform(&group_transform);
+                ctx->SetTransform(D2D1::Matrix3x2F::Translation(0, cy) * group_transform);
+                if (retry) ctx->DrawGeometry(geometry.Get(), brush, 2.6f);
+                else ctx->FillGeometry(geometry.Get(), brush);
+                ctx->SetTransform(group_transform);
+            }
+            draw_text_layout_readable(D2D1::Point2F(icon + gap, (height - metrics.height) * 0.5f),
+                                      cache.layout.Get(), brush);
+            brush->SetOpacity(opacity); ctx->SetTransform(saved);
+        };
+
         // Secondary actions stay neutral in the native UI; the filled Continue
         // button owns the emphasis. Imported skins retain their accent wash.
         auto draw_action_button = [&](const D2D1_RECT_F& rect, float alpha, bool enabled) {
@@ -107,9 +183,12 @@
             for (int i = 0; i < 4; ++i) {
                 const auto rect = D2D1::RectF(674.0f + i * 176.0f, 44.0f,
                                              840.0f + i * 176.0f, 98.0f);
-                draw_result_panel(rect, 1.0f, data.result.analysis_page == i);
-                draw_result_control_text(labels[static_cast<std::size_t>(i)], d2d_->option_format.Get(),
-                    rect, data.result.analysis_page == i ? d2d_->text_brush.Get() : d2d_->muted_brush.Get(), 1.0f);
+                const bool active = data.result.analysis_page == i;
+                draw_result_panel(rect, 1.0f);
+                ctx->FillRoundedRectangle(D2D1::RoundedRect(rect, 9, 9), semantic_brush(active ? 0x253E60 : 0x111B2A));
+                ctx->DrawRoundedRectangle(D2D1::RoundedRect(rect, 9, 9), semantic_brush(active ? 0x79D7FF : 0x526AA0), active ? 2.8f : 2.0f);
+                draw_result_control_text(labels[static_cast<std::size_t>(i)], d2d_->result_action_format.Get(),
+                    rect, semantic_brush(active ? 0xB5EDFF : 0xCDD8EF), 1.0f);
                 if (presentation.interaction_ready) register_hit(rect, MenuHitTargetKind::SettingsRow, 3 + i);
             }
         };
@@ -194,7 +273,7 @@
                          d2d_->muted_brush.Get(),
                          presentation.background);
         draw_result_text(result_loc("AFTER PERFORMANCE", "플레이 결과"),
-                         d2d_->hud_format.Get(),
+                         d2d_->result_label_format.Get(),
                          native_rect("result_single.rect.005", D2D1::RectF(410.0f, 80.0f, 650.0f, 108.0f)),
                          d2d_->muted_brush.Get(),
                          presentation.background);
@@ -211,6 +290,7 @@
         const D2D1_RECT_F profile_rect = skin_layout_rect(
             data, "result.profile", native_rect("result_single.rect.006", D2D1::RectF(1400.0f, 28.0f, 1848.0f, 108.0f)));
         draw_result_panel(profile_rect, presentation.background, false);
+        if (presentation.background > 0.8f) draw_panel_glow(profile_rect, 12, 0x63DDEF, 1);
         const D2D1_RECT_F avatar_rect = skin_layout_rect(
             data, "result.avatar",
             native_rect("result_single.rect.007", D2D1::RectF(profile_rect.left + 15.0f, profile_rect.top + 9.0f,
@@ -241,7 +321,7 @@
                          d2d_->text_brush.Get(),
                          presentation.background);
         draw_result_text(result_loc("PERFORMANCE RESULT", "플레이 기록"),
-                         d2d_->hud_format.Get(),
+                         d2d_->result_label_format.Get(),
                          native_rect("result_single.rect.009", D2D1::RectF(profile_text_left, profile_rect.top + 44.0f,
                                      profile_rect.right - 23.0f, profile_rect.bottom - 9.0f)),
                          d2d_->muted_brush.Get(),
@@ -253,6 +333,7 @@
                              native_rect("result_single.rect.010", D2D1::RectF(70.0f, 154.0f, 590.0f, modern_library_screen ? 738.0f : 704.0f))),
             -information_slide, 0.0f);
         draw_result_panel(song_panel, presentation.information, true);
+        if (modern_library_screen) draw_result_outline(song_panel, 0xA9BAC6, 1.6f, presentation.information);
         const D2D1_RECT_F art_rect =
             native_rect("result_single.rect.011", D2D1::RectF(song_panel.left + 44.0f, song_panel.top + 42.0f,
                         song_panel.right - 44.0f, song_panel.top + 382.0f));
@@ -265,20 +346,20 @@
                             &source);
         }
         draw_result_text(result_loc("TRACK", "플레이한 곡"),
-                         d2d_->hud_format.Get(),
+                         d2d_->result_label_format.Get(),
                          native_rect("result_single.rect.012", D2D1::RectF(song_panel.left + 230.0f, song_panel.top + 14.0f,
                                      song_panel.right - 24.0f, song_panel.top + 38.0f)),
                          d2d_->accent_brush.Get(),
                          presentation.information,
                          DWRITE_TEXT_ALIGNMENT_TRAILING);
         draw_result_text(data.result.title.empty() ? std::string("Unknown Chart") : data.result.title,
-                         d2d_->song_title_format.Get(),
+                         d2d_->result_action_format.Get(),
                          native_rect("result_single.rect.013", D2D1::RectF(song_panel.left + 44.0f, song_panel.top + 402.0f,
                                      song_panel.right - 44.0f, song_panel.top + 455.0f)),
                          d2d_->text_brush.Get(),
                          presentation.information);
         draw_result_text(data.result.artist.empty() ? std::string("Unknown Artist") : data.result.artist,
-                         d2d_->body_format.Get(),
+                         d2d_->result_body_format.Get(),
                          native_rect("result_single.rect.014", D2D1::RectF(song_panel.left + 44.0f, song_panel.top + 455.0f,
                                      song_panel.right - 44.0f, song_panel.top + 488.0f)),
                          d2d_->muted_brush.Get(),
@@ -297,18 +378,18 @@
         for (std::size_t index = 0; index < chart_metadata.size(); ++index) {
             const float left = song_panel.left + 44.0f + metadata_width * static_cast<float>(index);
             draw_result_text(chart_metadata[index].first,
-                             d2d_->hud_format.Get(),
-                             native_rect("result_single.rect.015", D2D1::RectF(left, song_panel.top + 505.0f,
-                                         left + metadata_width - 8.0f, song_panel.top + 530.0f)),
+                             d2d_->result_label_format.Get(),
+                             native_rect("result_single.rect.015", D2D1::RectF(left, song_panel.top + 494.0f,
+                                         left + metadata_width - 8.0f, song_panel.top + 522.0f)),
                              d2d_->muted_brush.Get(),
-                             presentation.information);
+                             presentation.information, DWRITE_TEXT_ALIGNMENT_CENTER);
             draw_result_text(chart_metadata[index].second,
-                             d2d_->body_format.Get(),
-                             native_rect("result_single.rect.016", D2D1::RectF(left, song_panel.top + 530.0f,
-                                         left + metadata_width - 8.0f, song_panel.top + 558.0f)),
+                             d2d_->song_metadata_value_format.Get(),
+                             native_rect("result_single.rect.016", D2D1::RectF(left, song_panel.top + 522.0f,
+                                         left + metadata_width - 8.0f, song_panel.top + 568.0f)),
                              modern_library_screen && index == 1 ? key_count_brush(data.result.key_count)
                                                                   : d2d_->text_brush.Get(),
-                             presentation.information);
+                             presentation.information, DWRITE_TEXT_ALIGNMENT_CENTER);
         }
 
         const float prism_bottom = native_metric("result_single.prism_bottom", 715.0f);
@@ -432,7 +513,7 @@
                          score_alpha * pulse_scale,
                          DWRITE_TEXT_ALIGNMENT_CENTER);
         draw_result_text(result_loc("SCORE", "점수"),
-                         d2d_->hud_format.Get(),
+                         d2d_->result_label_format.Get(),
                          native_rect("result_single.rect.018", D2D1::RectF(prism_center.x - 120.0f, 132.0f,
                                      prism_center.x + 120.0f, 160.0f)),
                          modern_library_screen ? native_color(0xFFFFFF, 1) : d2d_->muted_brush.Get(),
@@ -441,7 +522,7 @@
         draw_result_text(result_loc("DETAIL SCORE", "상세 점수") + "  " +
                              format_int_with_commas(data.result.detail_score) + " / " +
                              format_int_with_commas(data.result.max_detail_score),
-                         d2d_->hud_format.Get(),
+                         d2d_->result_label_format.Get(),
                          native_rect("result_single.rect.019", D2D1::RectF(prism_center.x - 180.0f, 238.0f,
                                      prism_center.x + 180.0f, 268.0f)),
                          modern_library_screen ? native_color(0xFFFFFF, 1) : d2d_->accent_brush.Get(),
@@ -504,7 +585,7 @@
         }
         if (data.result.all_perfect) {
             draw_result_text(result_loc("ALL NOTES PERFECTED", "모든 노트 퍼펙트"),
-                             d2d_->hud_format.Get(),
+                             d2d_->result_label_format.Get(),
                              native_rect("result_single.rect.024", D2D1::RectF(prism_center.x - 210.0f, 590.0f,
                                          prism_center.x + 210.0f, 622.0f)),
                              d2d_->accent_brush.Get(),
@@ -512,7 +593,7 @@
                              DWRITE_TEXT_ALIGNMENT_CENTER);
         } else if (data.result.full_combo) {
             draw_result_text(result_loc("FULL COMBO", "풀 콤보"),
-                             d2d_->hud_format.Get(),
+                             d2d_->result_label_format.Get(),
                              native_rect("result_single.rect.025", D2D1::RectF(prism_center.x - 160.0f, 590.0f,
                                          prism_center.x + 160.0f, 622.0f)),
                              d2d_->accent_brush.Get(),
@@ -549,15 +630,16 @@
         const D2D1_RECT_F analysis_panel = skin_layout_rect(
             data, "result.analysis_panel", native_rect("result_single.rect.026", D2D1::RectF(1320.0f, 154.0f, 1848.0f, modern_library_screen ? 738.0f : 704.0f)));
         draw_result_panel(analysis_panel, presentation.graph, false);
+        draw_result_outline(analysis_panel, 0x28C76B, 3.0f, presentation.graph);
         draw_result_text(result_loc("PERFORMANCE", "플레이 분석"),
-                         d2d_->hud_format.Get(),
+                         d2d_->result_label_format.Get(),
                          native_rect("result_single.rect.027", D2D1::RectF(analysis_panel.left + 24.0f, analysis_panel.top + 18.0f,
                                      analysis_panel.right - 24.0f, analysis_panel.top + 48.0f)),
                          d2d_->accent_brush.Get(),
                          presentation.graph);
         draw_result_text(result_loc("MEASURED TIMING", "실측 타이밍 분포") +
                          "  N=" + (data.result.analysis.available ? std::to_string(data.result.analysis.total.measured_count) : "--"),
-                         d2d_->body_format.Get(),
+                         d2d_->result_body_format.Get(),
                          native_rect("result_single.rect.028", D2D1::RectF(analysis_panel.left + 26.0f, analysis_panel.top + 66.0f,
                                      analysis_panel.right - 26.0f, analysis_panel.top + 98.0f)),
                          d2d_->text_brush.Get(),
@@ -578,10 +660,10 @@
             const float saved_opacity = d2d_->accent_brush->GetOpacity();
             if (data.result.analysis.available) {
                 draw_measured_histogram(data.result.analysis.total, D2D1::RectF(timing_track.left + 12,
-                    timing_track.top + 40, timing_track.right - 12, timing_track.bottom - 12), presentation.graph);
+                    timing_track.top + 52, timing_track.right - 12, timing_track.bottom - 12), presentation.graph);
             } else {
                 draw_result_text(result_loc("Analysis unavailable for this record", "이 기록에는 분석 데이터가 없습니다"),
-                    d2d_->hud_format.Get(), timing_track, d2d_->muted_brush.Get(), presentation.graph,
+                    d2d_->result_label_format.Get(), timing_track, d2d_->muted_brush.Get(), presentation.graph,
                     DWRITE_TEXT_ALIGNMENT_CENTER);
             }
             d2d_->accent_brush->SetColor(native_palette("palette.f7fafd", D2D1::ColorF(0xF7FAFD)));
@@ -599,20 +681,20 @@
             const float saved_opacity = d2d_->accent_brush->GetOpacity();
             const D2D1_RECT_F fast_rect =
                 native_rect("result_single.rect.030", D2D1::RectF(timing_track.left + 12.0f, timing_track.top + 8.0f,
-                            center_x - 12.0f, timing_track.top + 38.0f));
+                            center_x - 12.0f, timing_track.top + 46.0f));
             const D2D1_RECT_F slow_rect =
                 native_rect("result_single.rect.031", D2D1::RectF(center_x + 12.0f, timing_track.top + 8.0f,
-                            timing_track.right - 12.0f, timing_track.top + 38.0f));
+                            timing_track.right - 12.0f, timing_track.top + 46.0f));
             d2d_->accent_brush->SetColor(D2D1::ColorF(0x69A6FF));
             draw_result_text("FAST  " + std::to_string(data.result.fast_count),
-                             d2d_->song_title_format.Get(),
+                             d2d_->result_action_format.Get(),
                              fast_rect,
                              d2d_->accent_brush.Get(),
                              presentation.graph,
                              DWRITE_TEXT_ALIGNMENT_LEADING);
             d2d_->accent_brush->SetColor(D2D1::ColorF(0xFF7189));
             draw_result_text("SLOW  " + std::to_string(data.result.slow_count),
-                             d2d_->song_title_format.Get(),
+                             d2d_->result_action_format.Get(),
                              slow_rect,
                              d2d_->accent_brush.Get(),
                              presentation.graph,
@@ -623,7 +705,7 @@
         draw_result_text(result_loc("MEAN", "평균") + "  " +
                          (data.result.analysis.available && data.result.analysis.total.measured_count > 0
                             ? format_signed_ms(data.result.mean_delta_ms) : std::string("--")),
-                         d2d_->hud_format.Get(),
+                         d2d_->result_label_format.Get(),
                          native_rect("result_single.rect.032", D2D1::RectF(timing_track.left, timing_track.bottom + 8.0f,
                                      center_x, timing_track.bottom + 36.0f)),
                          d2d_->muted_brush.Get(),
@@ -631,7 +713,7 @@
         draw_result_text(result_loc("STD. DEV.", "표준편차") + "  " +
                              (data.result.analysis.available && data.result.analysis.total.measured_count > 1
                                 ? format_decimal(data.result.stddev_delta_ms) + "ms" : std::string("--")),
-                         d2d_->hud_format.Get(),
+                         d2d_->result_label_format.Get(),
                          native_rect("result_single.rect.033", D2D1::RectF(center_x, timing_track.bottom + 8.0f,
                                      timing_track.right, timing_track.bottom + 36.0f)),
                          d2d_->muted_brush.Get(),
@@ -639,7 +721,7 @@
                          DWRITE_TEXT_ALIGNMENT_TRAILING);
 
         draw_result_text(result_loc("GAUGE CONSISTENCY", "게이지 변화"),
-                         d2d_->body_format.Get(),
+                         d2d_->result_body_format.Get(),
                          native_rect("result_single.rect.034", D2D1::RectF(analysis_panel.left + 26.0f, analysis_panel.top + 286.0f,
                                      analysis_panel.right - 26.0f, analysis_panel.top + 318.0f)),
                          d2d_->text_brush.Get(),
@@ -649,7 +731,7 @@
                         analysis_panel.right - 30.0f, analysis_panel.bottom - 36.0f));
         // Gridlines alone do not say what height means, so each one carries its
         // percentage and the plot keeps a left gutter for those labels.
-        const float gauge_axis_width = native_metric("result_single.gauge_axis_width", 46.0f);
+        const float gauge_axis_width = native_metric("result_single.gauge_axis_width", 62.0f);
         const D2D1_RECT_F gauge_track =
             native_rect("result_single.rect.036", D2D1::RectF(gauge_plot.left + gauge_axis_width, gauge_plot.top,
                         gauge_plot.right, gauge_plot.bottom));
@@ -664,9 +746,9 @@
                               D2D1::Point2F(gauge_track.right, y),
                               d2d_->button_border_brush.Get(), edge ? 1.1f : 0.8f);
                 draw_result_text(std::to_string(100 - line * 25) + "%",
-                                 d2d_->hud_format.Get(),
-                                 native_rect("result_single.rect.037", D2D1::RectF(gauge_plot.left, y - 13.0f,
-                                             gauge_track.left - 8.0f, y + 13.0f)),
+                                 d2d_->result_label_format.Get(),
+                                 native_rect("result_single.rect.037", D2D1::RectF(gauge_plot.left, y - 16.0f,
+                                             gauge_track.left - 8.0f, y + 16.0f)),
                                  d2d_->muted_brush.Get(),
                                  presentation.graph,
                                  DWRITE_TEXT_ALIGNMENT_TRAILING);
@@ -723,6 +805,18 @@
         const D2D1_RECT_F stats_panel = skin_layout_rect(
             data, "result.stats_panel", native_rect("result_single.rect.038", D2D1::RectF(70.0f, 770.0f, 1270.0f, 994.0f)));
         draw_result_panel(stats_panel, presentation.statistics.front(), true);
+        if (modern_library_screen) {
+            draw_result_outline(stats_panel, 0xA9BAC6, 1.6f, presentation.statistics.front());
+            // One outer frame joins the song, score and judgement areas. Resolve
+            // all actual skin rectangles so custom layouts keep their geometry.
+            const auto summary_bounds = native_rect("result_summary.rect.001", D2D1::RectF(620, 154, 1270, 738));
+            const auto group = D2D1::RectF(std::min({song_panel.left, summary_bounds.left, stats_panel.left}) - 7,
+                std::min({song_panel.top, summary_bounds.top, stats_panel.top}) - 7,
+                std::max({song_panel.right, summary_bounds.right, stats_panel.right}) + 7,
+                std::max({song_panel.bottom, summary_bounds.bottom, stats_panel.bottom}) + 7);
+            draw_result_outline(group, 0xD4E0E8, 2.4f,
+                std::min(presentation.information, presentation.statistics.front()), 16.0f);
+        }
         struct ResultStatistic {
             std::string label;
             std::string value;
@@ -740,17 +834,21 @@
             {"GOOD", std::to_string(data.result.good), percent_for(data.result.good), D2D1::ColorF(0xFFAA60)},
             {"POOR", std::to_string(data.result.poor), percent_for(data.result.poor), D2D1::ColorF(0xFF647A)},
             {"FAIL", std::to_string(data.result.bad), percent_for(data.result.bad), D2D1::ColorF(0xC399FF)},
-            {result_loc("MAX COMBO", "최대 콤보"), format_int_with_commas(data.result.max_combo) + " COMBO",
-             data.result.full_combo ? result_loc("FULL COMBO", "풀 콤보") : "/ " + std::to_string(data.result.total_notes), native_palette("palette.f7fafd", D2D1::ColorF(0xF7FAFD))},
+            {result_loc("MAX COMBO", "최대 콤보"), format_int_with_commas(data.result.max_combo),
+             data.result.full_combo ? result_loc("FULL COMBO", "풀 콤보") : "COMBO / " + std::to_string(data.result.total_notes), D2D1::ColorF(0xCBEF6B)},
             {result_loc("ACCURACY", "정확도"), format_decimal(data.result.accuracy) + "%",
              result_loc("DETAIL", "상세") + " " + format_decimal(data.result.detailed_accuracy) + "%", D2D1::ColorF(0x63E9FF)},
         }};
-        const float statistic_width = (stats_panel.right - stats_panel.left) /
-                                      static_cast<float>(result_statistics.size());
+        // Keep large percentages readable without shrinking all seven columns.
+        constexpr std::array<float, 7> statistic_weights = {1, 1, 1, 1, 1, 1.15f, 1.35f};
+        const float statistic_unit = (stats_panel.right - stats_panel.left) / 7.5f;
+        float statistic_left = stats_panel.left;
         for (std::size_t index = 0; index < result_statistics.size(); ++index) {
             const float alpha = presentation.statistics[index];
             const float rise = 18.0f * (1.0f - alpha);
-            const float left = stats_panel.left + statistic_width * static_cast<float>(index);
+            const float left = statistic_left;
+            const float statistic_width = statistic_unit * statistic_weights[index];
+            statistic_left += statistic_width;
             const D2D1_RECT_F cell =
                 native_rect("result_single.rect.039", D2D1::RectF(left, stats_panel.top, left + statistic_width, stats_panel.bottom));
             if (index > 0 && d2d_->button_border_brush) {
@@ -769,7 +867,7 @@
                     (index < 5 && result_statistics[index].value == "0") ? 0.70f : 1.0f;
                 d2d_->accent_brush->SetOpacity(alpha * zero_scale);
                 draw_result_text(result_statistics[index].label,
-                                 d2d_->body_format.Get(),
+                                 d2d_->result_body_format.Get(),
                                  native_rect("result_single.rect.040", D2D1::RectF(cell.left + 14.0f, cell.top + 28.0f + rise,
                                              cell.right - 14.0f, cell.top + 58.0f + rise)),
                                  d2d_->accent_brush.Get(),
@@ -777,15 +875,15 @@
                                  DWRITE_TEXT_ALIGNMENT_CENTER);
                 draw_result_text(result_statistics[index].value,
                                  modern_library_screen ? d2d_->result_metric_format.Get() : d2d_->stats_value_format.Get(),
-                                 native_rect("result_single.rect.041", D2D1::RectF(cell.left + 10.0f, cell.top + 76.0f + rise,
-                                             cell.right - 10.0f, cell.top + 126.0f + rise)),
+                                 native_rect("result_single.rect.041", D2D1::RectF(cell.left + 10.0f, cell.top + 70.0f + rise,
+                                             cell.right - 10.0f, cell.top + 138.0f + rise)),
                                  d2d_->accent_brush.Get(),
                                  alpha * zero_scale,
                                  DWRITE_TEXT_ALIGNMENT_CENTER);
                 draw_result_text(result_statistics[index].detail,
-                                 d2d_->hud_format.Get(),
-                                 native_rect("result_single.rect.042", D2D1::RectF(cell.left + 10.0f, cell.top + 142.0f + rise,
-                                             cell.right - 10.0f, cell.top + 174.0f + rise)),
+                                 d2d_->result_label_format.Get(),
+                                 native_rect("result_single.rect.042", D2D1::RectF(cell.left + 10.0f, cell.top + 153.0f + rise,
+                                             cell.right - 10.0f, cell.top + 190.0f + rise)),
                                  d2d_->accent_brush.Get(),
                                  alpha * zero_scale,
                                  DWRITE_TEXT_ALIGNMENT_CENTER);
@@ -832,12 +930,11 @@
                 register_hit(replay_rect, MenuHitTargetKind::SettingsRow, 1);
             }
         }
-        if (modern_library_screen && d2d_->accent_brush) {
-            const float saved = d2d_->accent_brush->GetOpacity();
-            d2d_->accent_brush->SetOpacity(controls_alpha);
-            ctx->FillRoundedRectangle(D2D1::RoundedRect(continue_rect, 12.0f, 12.0f),
-                                      d2d_->accent_brush.Get());
-            d2d_->accent_brush->SetOpacity(saved);
+        if (modern_library_screen) {
+            auto* fill = semantic_brush(0x79D7FF);
+            fill->SetOpacity(controls_alpha);
+            ctx->FillRoundedRectangle(D2D1::RoundedRect(continue_rect, 12, 12), fill);
+            fill->SetOpacity(1.0f);
         } else if (d2d_->play_brush) {
             const float saved = d2d_->play_brush->GetOpacity();
             set_brush_points(d2d_->play_brush.Get(), continue_rect);
@@ -861,25 +958,18 @@
         d2d_->text_brush->SetColor(saved_continue_text);
         draw_action_button(replay_rect, controls_alpha, data.result.replay_available);
         draw_action_button(retry_rect, controls_alpha, true);
-        draw_result_control_text(data.result.replay_available
-                             ? result_loc("\xE2\x96\xB6  WATCH REPLAY", "\xE2\x96\xB6  리플레이 보기")
-                             : result_loc("REPLAY UNAVAILABLE", "리플레이 없음"),
-                         d2d_->stats_value_format.Get(),
-                         replay_rect,
-                         data.result.replay_available
-                             ? static_cast<ID2D1Brush*>(d2d_->text_brush.Get())
-                             : static_cast<ID2D1Brush*>(d2d_->muted_brush.Get()),
-                         controls_alpha);
-        draw_result_control_text(result_loc("\xE2\x86\xBB  RETRY", "\xE2\x86\xBB  재도전"),
-                         d2d_->stats_value_format.Get(),
-                         retry_rect,
-                         d2d_->text_brush.Get(),
-                         controls_alpha);
+        if (data.result.replay_available) {
+            draw_result_action(result_loc("WATCH REPLAY", "리플레이 보기"), replay_rect, false, controls_alpha);
+        } else {
+            draw_result_control_text(result_loc("REPLAY UNAVAILABLE", "리플레이 없음"),
+                d2d_->result_action_format.Get(), replay_rect, d2d_->muted_brush.Get(), controls_alpha);
+        }
+        draw_result_action(result_loc("RETRY", "재도전"), retry_rect, true, controls_alpha);
         draw_result_text(presentation.interaction_ready
                              ? result_loc("ENTER / Continue    R / Retry    F1 / Replay",
                                           "ENTER / 계속    R / 재도전    F1 / 리플레이")
                              : result_loc("SPACE / Skip result reveal", "SPACE / 결과 연출 건너뛰기"),
-                         d2d_->hud_format.Get(),
+                         d2d_->result_label_format.Get(),
                          native_rect("result_single.rect.046", D2D1::RectF(1320.0f, 952.0f, 1848.0f, 982.0f)),
                          d2d_->muted_brush.Get(),
                          presentation.interaction_ready ? controls_alpha : presentation.background,
@@ -887,7 +977,7 @@
 
         draw_result_text(result_loc("F9 / Screenshot (PNG)  >  screenshots/",
                                     "F9 / 스크린샷 (PNG)  >  screenshots/"),
-                         d2d_->body_format.Get(),
+                         d2d_->result_body_format.Get(),
                          native_rect("result_single.rect.047", D2D1::RectF(620.0f, 1022.0f, 1300.0f, 1050.0f)),
                          d2d_->muted_brush.Get(),
                          0.82f * presentation.background,

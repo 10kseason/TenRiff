@@ -187,7 +187,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
         skin_preview_scene->gameplay = make_skin_gameplay_preview(data.generic.skin_preview, render_now_ns, data.ui_language);
         if (!ensure_gameplay_note_sprites(skin_preview_scene->gameplay)) invalidate_gameplay_note_sprite_cache();
         if (!ensure_gameplay_background_bitmap(skin_preview_scene->gameplay)) invalidate_gameplay_background_cache();
-        if (!ensure_gameplay_static_cache(skin_preview_scene->gameplay, false)) invalidate_gameplay_static_cache();
+        if (!ensure_gameplay_static_cache(skin_preview_scene->gameplay, false,
+                gameplay_studio_header_safe_right(skin_preview_scene->performance.visible))) invalidate_gameplay_static_cache();
         static_cast<void>(load_song_card_preview_bitmap(skin_preview_scene->gameplay.skin_background_path));
     } else if (data.kind == MenuScreenKind::GameplayHud) {
         if (!ensure_gameplay_note_sprites(data.gameplay)) {
@@ -196,7 +197,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
         if (!ensure_gameplay_background_bitmap(data.gameplay)) {
             invalidate_gameplay_background_cache();
         }
-        if (!ensure_gameplay_static_cache(data.gameplay)) {
+        if (!ensure_gameplay_static_cache(data.gameplay, true,
+                gameplay_studio_header_safe_right(data.performance.visible))) {
             invalidate_gameplay_static_cache();
         }
     } else if (data.kind == MenuScreenKind::SongSelect) {
@@ -533,6 +535,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
 
 #include "MenuWindow_draw_wordmark.inl"
 #include "MenuWindow_draw_grade.inl"
+#include "MenuWindow_draw_panel_glow.inl"
 
     auto loc = [&](std::string_view english, std::string_view korean) {
         return ui::text(data.ui_language, english, korean);

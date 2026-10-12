@@ -448,15 +448,13 @@
                 data.gameplay.note_divider_gap_px, hidden_scratch_mask);
         const float solo_header_right =
             gameplay_solo_header_right(header_left, header_right, surface_layout.player_field.left);
-        const auto studio_deck = compute_gameplay_studio_deck_layout(surface_layout.player_field.left,
-            surface_layout.player_field.right, data.performance.visible ? header_safe_right : 1856.0f,
-            data.gameplay.hud_riff_map_visible);
-        const float title_safe_right = studio && studio_deck.map_visible
-            ? std::min(studio_deck.left_x + studio_deck.left_width,
-                studio_deck.map_x - (studio_deck.map_times_visible ? 64.0f : 8.0f) - 8.0f)
-            : surface_layout.player_field.left - 32.0f;
-        const auto song_title_layout = compute_gameplay_song_title_layout(surface_layout.player_field.left,
-            surface_layout.player_field.right, title_safe_right, studio);
+        // Non-Studio paths do not consume this geometry.
+        const auto studio_deck = studio ? compute_gameplay_studio_deck_layout(surface_layout.player_field.left,
+            surface_layout.player_field.right, gameplay_studio_header_safe_right(data.performance.visible),
+            data.gameplay.hud_riff_map_visible) : GameplayStudioDeckLayout{};
+        const auto song_title_layout = studio ? gameplay_studio_song_title_layout(studio_deck)
+            : compute_gameplay_song_title_layout(surface_layout.player_field.left,
+                surface_layout.player_field.right, surface_layout.player_field.left - 32.0f, false);
         const auto song_title_rect = D2D1::RectF(song_title_layout.left, song_title_layout.top,
             song_title_layout.right, song_title_layout.bottom);
         if (benchmark_timings_enabled_) {
@@ -749,7 +747,7 @@
                 }
             }
             d2d_->text_brush->SetColor(ng_color("score",header_text_color));
-            if ((!studio || !studio_deck.right_hud_visible) && !data.gameplay.ghost_visible && scene_title_format && d2d_->text_brush) {
+            if ((!studio || !studio_deck.score_visible) && !data.gameplay.ghost_visible && scene_title_format && d2d_->text_brush) {
                 const D2D1_RECT_F score_rect = ng_rect("score",D2D1::RectF(std::max(header_left + 700.0f, header_safe_right - 610.0f),
                                 header_top,
                                 header_safe_right,
@@ -760,7 +758,7 @@
                                           d2d_->text_brush.Get(),
                                           DWRITE_TEXT_ALIGNMENT_TRAILING);
             }
-            if ((!studio || !studio_deck.right_hud_visible) && !data.gameplay.ghost_visible && scene_body_format && d2d_->text_brush) {
+            if ((!studio || !studio_deck.score_visible) && !data.gameplay.ghost_visible && scene_body_format && d2d_->text_brush) {
                 const D2D1_RECT_F combo_rect =
                     D2D1::RectF(std::max(header_left + 620.0f, header_safe_right - 690.0f),
                                 header_top + 52.0f,
@@ -772,7 +770,7 @@
                                           d2d_->text_brush.Get(),
                                           DWRITE_TEXT_ALIGNMENT_TRAILING);
             }
-            if ((!studio || !studio_deck.right_hud_visible) && !data.gameplay.ghost_visible && scene_hud_format && d2d_->muted_brush) {
+            if ((!studio || !studio_deck.score_visible) && !data.gameplay.ghost_visible && scene_hud_format && d2d_->muted_brush) {
                 const D2D1_RECT_F judge_stats_rect = ng_rect("stats",D2D1::RectF(std::max(header_left + 620.0f, header_safe_right - 690.0f),
                                 header_top + 82.0f,
                                 header_safe_right,
@@ -2777,7 +2775,7 @@
                                scene_hud_cache.ghost_score_text, scene_hud_cache.ghost_battle_summary_text, false);
             if (embed_battle_header) draw_gameplay_progress_bar(progress_track_rect);
         }
-        if ((!studio || !studio_deck.right_hud_visible) && data.gameplay.pacemaker_mode != "off" && !data.gameplay.pacemaker_mode.empty()) {
+        if ((!studio || !studio_deck.score_visible) && data.gameplay.pacemaker_mode != "off" && !data.gameplay.pacemaker_mode.empty()) {
             const bool accuracy_target = data.gameplay.pacemaker_mode == "accuracy";
             const std::string delta = (data.gameplay.pacemaker_delta >= 0 ? "+" : "") +
                 (accuracy_target ? format_decimal(data.gameplay.pacemaker_delta) :

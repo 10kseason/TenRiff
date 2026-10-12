@@ -37,6 +37,18 @@ config::RuntimeConfig build_persisted_runtime_config(const config::RuntimeConfig
     return persisted;
 }
 
+void apply_session_only_mode_mods(config::RuntimeConfig& config,
+                                 const std::vector<std::string>& selected_mods) {
+    // Normalize the source before editing config, including when it aliases
+    // config.mode.mods. A Normal selection explicitly removes an old choice.
+    const auto selected = normalize_mode_mod_tokens(selected_mods);
+    static_cast<void>(strip_session_only_mode_mods(config));
+    for (const auto& token : selected) {
+        if (is_session_only_mode_mod(token)) config.mode.mods.push_back(token);
+    }
+    config.mode.mods = normalize_mode_mod_tokens(config.mode.mods);
+}
+
 config::RuntimeConfig build_persisted_input_backend_config(const config::RuntimeConfig& persisted_base,
                                                            const config::RuntimeConfig& runtime_source) {
     config::RuntimeConfig persisted = build_persisted_runtime_config(persisted_base);

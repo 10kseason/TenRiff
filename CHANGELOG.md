@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.8.9] - 2026-10-12
+
+This entry covers the 1.8.9 release line. The [release gate](docs/release-1.8.9-gate.md) separates completed local checks, performance results and residual limits, and package/publication status. The fixed baseline stays at 1.8.7, and the published 1.8.8 tag and assets remain unchanged.
+
+- Give Song Select BEST columns larger standalone numbers and distinct score/accuracy/combo colors; separate maximum score and COMBO units. Fit chart metadata independently in a 2×2 layout with white note counts, group the list/art/BEST/filter panels in a white outer frame, add green information and cyan profile outlines with cached bloom, and distinguish 4K/5K/6K/8K/10K colors. Preserve the existing S+ color.
+- Move Native/LR2 solo Studio information to the upper right, score to the lower left and a horizontal 64-bin riff map to the lower right; enlarge the gauge and adapt to narrow side gaps. When an extreme field and the performance overlay leave no upper-side space, hide only the information card. Ghost, multiplayer and other image skins retain Classic.
+- Unify the single-result left frame, enlarge result score/accuracy/statistics and centered metadata, separate MAX COMBO numbers and units, center measured Replay/Retry icon-label groups, and distinguish sky-blue Start/Continue, blue outlined analysis tabs and the green analysis frame.
+- Read preview-tool command-line arguments through the Windows Unicode API so labels such as `⑤ LEVEL 18` survive fixture selection. Preserve the game's chart-level label selection.
+- Pass session-only Judge Easy/Hard selections from the menu into a new game session instead of losing them during profile reload. Preserve app-restart reset, replay/multiplayer precedence, R1–R4 timing, scores and old records. Existing web source already separates and displays `mods`; no web deployment is needed for this fix. [Cause and verification scope](docs/judge-session-handoff-1.8.9.ko.md).
+- Completed local build, CTest, editor, session, screenshot and sprite checks are recorded with their tested revision scope. Performance results and residual limits remain separate from package/publication evidence; no general performance gain or completed remote delivery is claimed.
+- Plugin runtime/API/SDK work and 1.9.0 stabilization remain future plans.
+
 ## [1.8.8] - 2026-10-12
 
 Version scope and validation: see the [1.8.8 release gate](docs/release-1.8.8-gate.md) for current verification and delivery status. The user-pinned baseline remains 1.8.7.

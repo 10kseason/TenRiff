@@ -8,6 +8,7 @@
 #include <string>
 
 #include "app/PersistedRuntimeConfig.h"
+#include "app/ModeManager.h"
 #include "app/RuntimeConfigMigration.h"
 #include "config/Config.h"
 #include "config/GraphicsResolution.h"
@@ -746,6 +747,25 @@ TEST_CASE("persisted runtime config strips session-only judge mods") {
     REQUIRE(persisted.mode.mods.size() == 2u);
     CHECK(persisted.mode.mods[0] == "full_long_notes");
     CHECK(persisted.mode.mods[1] == "no_ln_release");
+}
+
+TEST_CASE("live judge selection crosses a saved-profile reload without becoming a persistent mod") {
+    ConfigLoader loader;
+    auto menu = loader.defaults();
+    menu.mode.mods = {"judge_hard", "no_ln_release"};
+    auto session = tenriff::app::build_persisted_runtime_config(menu);
+    REQUIRE(session.mode.mods == std::vector<std::string>{"no_ln_release"});
+    tenriff::app::apply_session_only_mode_mods(session, menu.mode.mods);
+    CHECK(tenriff::app::equivalent_mode_mod_tokens(session.mode.mods, menu.mode.mods));
+    // A saved pattern remains authoritative; this handoff cannot inject other
+    // unsaved pattern choices or unknown tokens into the session.
+    tenriff::app::apply_session_only_mode_mods(session, {"Judge Easy", "full_long_notes", "unknown"});
+    CHECK(tenriff::app::equivalent_mode_mod_tokens(session.mode.mods, {"judge_easy", "no_ln_release"}));
+    tenriff::app::apply_session_only_mode_mods(session, {});
+    CHECK(session.mode.mods == std::vector<std::string>{"no_ln_release"});
+    tenriff::app::apply_session_only_mode_mods(session, {"judge_hard"});
+    const auto persisted = tenriff::app::build_persisted_runtime_config(session);
+    CHECK(persisted.mode.mods == std::vector<std::string>{"no_ln_release"});
 }
 
 TEST_CASE("persisted input backend config does not leak replay session mode changes") {

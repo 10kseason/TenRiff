@@ -2,6 +2,10 @@
 
 **固定基准：[1.8.7](baseline-1.8.7.zh-CN.md)**（2026-10-10）。使用 Git tag `1.8.7`、commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`，不随 `latest` 或新版本自动更新。
 
+**2026-10-12 · 1.8.9：**提供更大的大厅BEST数字、键数模式配色与白色共用外框，采用右上信息／左下分数／右下横向riff map的Studio HUD，并加大结果文字、突出分析标签及居中操作。保留S+颜色与字体，修正Judge Easy/Hard选择未传入新会话的问题。参见[行为、验证与剩余范围](release-1.8.9-gate.md)及[Judge原因与兼容性](judge-session-handoff-1.8.9.ko.md)（韩语）。
+
+**1.8.9性能范围：**最终6轮比较的p50差值在既有+0.03ms目标内，但ghost p95增加+0.05125ms（约+1.94%），未满足严格的尾部耗时不增加标准。这是合成CPU渲染调用测量，不代表物理延迟、GPU吞吐量或普遍性能提升。参见[数值、首次回退、诊断与限制](release-1.8.9-gate.md#성능-측정과-잔여-한계)（韩语）。
+
 **2026-10-12 · 1.8.8：**整合结果分析、自由窗口大小及F9 PNG提示、长LN Mix，并改善显示可读性、难度表URL与筛选、皮肤轨道快捷键、减少键数时的键音保留，以及单人开始和立即重试操作。当前验证、软件包及公开状态见[1.8.8发布说明](release-1.8.8-gate.md)。固定基准仍为1.8.7。
 
 **分析与扩展计划：**区分各轨道分布、时间分段准确度和单键/LN起始、松键、保持失败，无法测量的漏击不作为0ms样本。长LN Mix v2仅保留本地记录与回放，不计入旧BEST或Sites上传。插件与1.9.0稳定化仍为计划。参见[分析标准](result-analysis-1.8.8.ko.md)、[显示/菜单/键音变更](release-feedback-1.8.8.ko.md)、[开始与重试操作](gameplay-start-controls.ko.md)（韩语）。
@@ -27,14 +31,14 @@
 - 1.7.10 改善 ALL SONG 的已删除缓存项处理、合并进度和完成状态通知。[验证及未复现症状](release-1.7.10-gate.md)。
 - 1.7.8 新增默认菜单动画、4 至 16 键 Luma Keys、日语界面及网页/离线皮肤编辑。菜单与游戏内视觉设置分别保存在 `native` 和 `gameplay.native`。[验证范围](release-1.7.8-gate.md)。
 
-固定基准为 **1.8.7**，此源码版本为 **1.8.8**。Audio的歌曲结束方式可选**听到结束**（默认）或**跳过尾奏**；正常完成的结果无需再次按键即可保存并提交。新游玩采用支持BMS RANK的R4判定及网页提交所需的判定配置，保留现有R1/R2/R3记录。默认输出仍为WASAPI。本次验证状态及剩余限制见[1.8.8发布说明](release-1.8.8-gate.md)。
+固定基准为 **1.8.7**，此源码版本为 **1.8.9**。Audio的歌曲结束方式可选**听到结束**（默认）或**跳过尾奏**；正常完成的结果无需再次按键即可保存并提交。新游玩采用支持BMS RANK的R4判定及网页提交所需的判定配置，保留现有R1/R2/R3记录。默认输出仍为WASAPI。本次验证状态及剩余限制见[1.8.9发布说明](release-1.8.9-gate.md)。
 
 [本地 1.7.1 r2 报告](local-1.7.1-r2.ko.md)中的 749/739 项是旧构建的记录，不作为新版本的结果。参见[曲库管理](library-management.md)、[基准 BPM](reference-bpm.md)、[皮肤预设](skin-presets.md)和 [ASIO](asio-audio.md)。
 
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本为 `1.8.7`
+- 用户固定基准为 `1.8.7`，当前源码版本为 `1.8.9`
 - 1.7.1 提供最多8人的 HUD 与结果、并列名次与分数等待状态、P-GREAT 专属效果、判定与连击独立位置、10张选项卡、音量标准化及选曲难度表卡片。见[变更详情](gameplay-polish-followup.md)和[验证范围](release-1.7.1-gate.md)。
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
 - 默认结果页面突出分数、等级和准确率；棱镜演出保留在自定义皮肤中。保留现有2.2秒展示流程、Space跳过和按钮启用规则。
@@ -141,6 +145,7 @@
   - Random 支持 `Off / Mirror / Random (Scratch Fixed) / SR`；普通 Random 固定皿键，每次游玩生成新的按键 lane 排列，并把实际 seed 写入 replay
   - 新`LN Mix 10%～90%` v2以基础BPM×Rate为准，目标为长2/4拍60%、中1拍20%、短1/4或1/2拍20%。保留已有LN、原始起点和键音，与同轨道下一起点留50ms间隔，空间不足则逐级缩短，不合并连续单键。旧回放按v1重现；v2只保留本地记录/回放，不计入旧BEST或Sites上传。参见[追加条件和验证（韩语）](release-1.8.8-gate.md)
 - Skins / Gameplay feel：
+  - 1.8.9 Studio Deck在Native/LR2单人采用右上信息、左下分数、右下64段横向riff map及加大血条。外侧空间较窄时整体缩放或移至另一侧；极端场地与Performance HUD占满两侧上方时只隐藏顶部信息。幽灵、多人和其他图像皮肤保留Classic。[布局与验证结果与限制](release-1.8.9-gate.md)
   - 标准 `10+2 DP` chart 会跳过两条 scratch lane，把 `10K` lane-color palette 依次应用到实际十个按键 lane，并与原生 12K palette 保持独立
   - `rect / triangle / pentagon / hexagon / circle` 音符形状；procedural 圆形/多边形在 100% 下使用与 rect 条相同的完整宽度
   - note border 开关
@@ -160,6 +165,7 @@
   - future note 的上方进入 easing
   - 最后一个判定note后，按Audio的歌曲结束方式听到结束（默认）或在常规结果等待时间后自动跳过尾奏；听到结束模式仍支持lane key手动跳过
 - Judge：
+  - 1.8.9把会话专用Judge Easy/Hard从菜单传入新会话。不保存到配置，应用重启后回到Normal；保留回放原始规则、多人共同规则、历史记录和R1–R4数值。[原因、记录与网页显示范围](judge-session-handoff-1.8.9.ko.md)，运行验证另见发布记录
   - 默认 `PG / GR / GD` 判定窗为 `21ms / 65ms / 115ms` (BMS RANK EASY)
   - BMS `#RANK` EASY（含未指定）/NORMAL/HARD/VERYHARD的PG为`21/18/15/8ms`；NORMAL/HARD/VERYHARD对EASY的全部PG/GR/GD/BAD判定窗乘以`18/21`、`15/21`、`8/21`，自动漏键时限保持不变
   - [最新判定范围、RANK表与LN规则（韩语）](judgement-windows.md)
@@ -251,7 +257,7 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 当前 P2P 发布目标为 `TenRiff 1.8.7`
+- 本源码的P2P版本为`TenRiff 1.8.9`；兼容性检查及实际软件包／公开状态以[发布记录](release-1.8.9-gate.md)为准
 - 发布包不包含 `Songs`
 - 发布包包含 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 这些 `Mainmusic/` 场景槽位；每个 `Name.mp3` 及 `Name 2.mp3`～`Name 64.mp3` 会自动发现，并在重新进入场景时轮换
 - 发布更新只包含已构建产物和必要的运行时资源

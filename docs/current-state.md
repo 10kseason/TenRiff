@@ -2,6 +2,10 @@
 
 **고정 기준선: [1.8.7](baseline-1.8.7.md)** (2026-10-10). Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`을 사용하며 `latest`나 새 릴리스로 자동 변경하지 않습니다.
 
+**2026-10-12 · 1.8.9:** 로비의 큰 BEST 숫자·키 모드 색·흰 통합 외곽선, 오른쪽 위 정보·왼쪽 아래 점수·오른쪽 아래 가로 riff map의 Studio HUD, 큰 결과 글자·분석 탭·중앙 정렬한 조작을 제공합니다. S+ 색·글꼴을 유지하고, 메뉴의 Judge Easy/Hard가 새 세션에서 사라지던 전달 경로를 수정했습니다. [동작·검증·남은 범위](release-1.8.9-gate.md), [Judge 원인과 호환성](judge-session-handoff-1.8.9.ko.md)를 참고하세요.
+
+**1.8.9 성능 범위:** 최종 6회 비교의 p50은 기존 +0.03ms 목표 안이지만 ghost p95가 +0.05125ms(약 +1.94%) 증가해 엄격한 tail 비증가 기준은 충족하지 못했습니다. 측정은 합성 CPU 렌더 호출이며 물리 지연·GPU 처리량이나 일반적인 성능 개선을 뜻하지 않습니다. [수치·초기 회귀·진단과 한계](release-1.8.9-gate.md#성능-측정과-잔여-한계).
+
 **2026-10-12 · 1.8.8:** 결과 분석, 자유 해상도와 F9 PNG 안내, 긴 LN Mix에 더해 화면 가독성·난이도표 입력/필터·스킨 레인 단축키·키 수 축소 시 키음 보존·단독 시작/즉시 재시작 조작을 정리했습니다. 현재 검증·패키지·공개 상태는 [1.8.8 릴리스 안내](release-1.8.8-gate.md)에서 확인하세요. 고정 기준은 1.8.7을 유지합니다.
 
 **분석과 확장 계획:** 레인별 분포·시간대 정확도·단노트/LN 시작·해제·유지 실패를 구분하고 측정 불가 미스를 0ms 표본에 넣지 않습니다. 긴 LN Mix v2는 로컬 기록·리플레이만 허용하며 기존 BEST·Sites 업로드에서 제외합니다. 플러그인과 1.9.0 안정화는 계획입니다. [분석 기준](result-analysis-1.8.8.ko.md), [화면·메뉴·키음 변경](release-feedback-1.8.8.ko.md), [시작·재시작 조작](gameplay-start-controls.ko.md).
@@ -27,7 +31,7 @@
 - 1.7.10: ALL SONG의 삭제된 캐시 항목 건너뛰기, 캐시 통합 진행률과 완료 상태 전달을 보강했습니다. [검증 범위 및 미재현 증상](release-1.7.10-gate.md).
 - 1.7.8: 새 기본 메뉴 에셋·애니메이션, 4~16키 Luma Keys 디지털 건반, 일본어 UI와 웹/오프라인 스킨 에디터를 제공합니다. 메뉴는 `native`, 인게임은 `gameplay.native`에서 도형·색·위치·글꼴·모션을 편집합니다. [검증 범위](release-1.7.8-gate.md).
 
-고정 기준은 **1.8.7**, 이 소스의 버전은 **1.8.8**입니다. Audio의 곡 종료 방식에서 **끝까지 듣기**(기본) 또는 **후주 스킵**을 선택하며, 정상 완료한 결과는 추가 입력 없이 저장·제출합니다. 새 플레이는 BMS RANK를 반영하는 R4와 웹 제출용 판정 프로파일을 사용하고 기존 R1/R2/R3 기록은 유지합니다. WASAPI가 기본 출력입니다. 이번 릴리스의 검증 상태와 남은 한계는 [1.8.8 릴리스 안내](release-1.8.8-gate.md)를 참고하세요.
+고정 기준은 **1.8.7**, 이 소스의 버전은 **1.8.9**입니다. Audio의 곡 종료 방식에서 **끝까지 듣기**(기본) 또는 **후주 스킵**을 선택하며, 정상 완료한 결과는 추가 입력 없이 저장·제출합니다. 새 플레이는 BMS RANK를 반영하는 R4와 웹 제출용 판정 프로파일을 사용하고 기존 R1/R2/R3 기록은 유지합니다. WASAPI가 기본 출력입니다. 이번 릴리스의 검증 상태와 남은 한계는 [1.8.9 릴리스 안내](release-1.8.9-gate.md)를 참고하세요.
 
 [로컬 1.7.1 r2 보고서](local-1.7.1-r2.ko.md)의 749/739 검사 횟수는 이전 빌드의 기록입니다. 현재 릴리스 검사 횟수로 재사용하지 않습니다. 기능별 안내는 [곡 소스와 난이도표](library-management.md), [대표 BPM](reference-bpm.md), [스킨 프리셋](skin-presets.md), [ASIO](asio-audio.md)를 참고하세요.
 
@@ -38,7 +42,7 @@
 - BMS landmines (`D1-D9`, `E1-E9`) are playable, including `#WAV00`, base-36 damage tokens, `ZZ` instant fail, exact press/release boundary behavior, and lane-mod/key-converter remapping.
 - Results and local records expose fixed native score separately from detail score, and categorical native accuracy separately from continuous timing-based detailed accuracy.
 - 새 replay evidence v3는 차트 SHA-256, canonical ruleset, result-to-replay SHA-256을 저장하고 입력 trace를 headless 엔진으로 재실행합니다. 공식 로컬 best는 재계산된 verified 결과만 사용하며 legacy/custom/assist 기록은 히스토리에 `unverified`로 남습니다.
-- 현재 프로젝트 버전은 `1.8.7`
+- 사용자 고정 기준 버전은 `1.8.7`; 현재 소스는 `1.8.9`
 - 1.7.9 UI 개선: 프로필/첫 실행의 언어·3단계 글자 크기, 사진 미리보기/시작 메뉴 사진, ALL SONG 통합 소스, 선곡 경계와 디지털 탭, 정적인 TI와 홀로그램 TENRIFF. [사용 및 구현 안내](menu-profile-library-polish.ko.md).
 - 1.7.1은 최대 8인 HUD·결과, 동점 순위·점수 대기 상태, P-GREAT 전용 연출, 독립 판정·콤보 위치, 옵션 10개, 오디오 노멀라이즈와 선곡 난이도표 카드를 제공합니다. [변경 설명](gameplay-polish-followup.md), [검증 범위](release-1.7.1-gate.md) 참고.
 - 기본 선곡·싱글 결과 UI는 차분한 패널과 단색 주 동작 버튼을 사용하며, 결과는 큰 점수·등급·정확도 중심으로 표시한다. 사용자 TenRiff 스킨 경로를 유지하며, 1.7.1 대전 결과는 참가자 전원 순위를 표시한다. 구현/검증 안내는 `docs/menu-visual-polish.md`와 `docs/gameplay-polish-followup.md` 참고.
@@ -154,6 +158,7 @@
   - Random은 `Off / Mirror / Random (Scratch Fixed) / SR`를 지원한다. 일반 Random은 매 플레이 새 seed로 스크래치를 제외한 건반만 섞고 replay에는 실제 seed를 기록하며, Mirror는 key-mode 변환 뒤 최종 레인을 반전한다.
   - `LN Mix 10%~90%`의 새 v2는 base BPM×Rate 기준 긴 2·4박 60% / 중간 1박 20% / 짧은 1/4·1/2박 20%를 목표로 혼합. 기존 LN·원본 head·키음을 보존하고 같은 레인 다음 노트 전 50ms를 남기며 공간 부족 시 길이를 단계적으로 낮춤. 동일 레인 연타를 합치지 않음. 이전 리플레이는 v1로 재현하고 v2는 로컬 기록·리플레이에만 남겨 기존 BEST·Sites 업로드에서 제외. [추가 조건과 검증](release-1.8.8-gate.md) 참고
 - Skins / Gameplay feel:
+  - 1.8.9 Studio Deck은 Native/LR2 단독에서 오른쪽 위 정보·왼쪽 아래 점수·오른쪽 아래 64구간 가로 riff map과 확대 게이지를 사용. 좁은 여백에서는 전체 축소·반대쪽 이동을 적용하며 극단 필드와 Performance HUD가 양쪽 상단을 막으면 정보 카드만 숨김. 고스트·멀티·다른 이미지 스킨은 Classic 유지. [배치와 검증 결과와 한계](release-1.8.9-gate.md)
   - 표준 `10+2 DP` 차트는 스크래치 2개를 제외한 실제 10개 키에 `10K` lane color 팔레트를 순서대로 적용하며, native 12K 팔레트와는 독립적으로 유지
   - `Classic`, `Neon`, `Minimal`, `TenRiff` visual presets
   - `rect / triangle / pentagon / hexagon / circle` 노트 모양; procedural 원·다각형은 100%에서 rect 막대와 같은 전체 폭 사용
@@ -177,6 +182,7 @@
   - 미래 노트 상단 진입 easing
   - 마지막 판정 노트 뒤 Audio의 곡 종료 방식에 따라 끝까지 듣기(기본) 또는 기존 결과 대기 시간 후 후주 자동 스킵을 적용하며, 끝까지 듣기에서도 기존 레인 키 수동 스킵을 지원
 - Judge:
+  - 1.8.9는 메뉴의 세션 전용 Judge Easy/Hard를 새 게임 세션에 전달함. 프로필에는 저장하지 않아 앱 재시작 시 Normal로 돌아오며, 리플레이 원본·멀티 공통 규칙·과거 기록·R1–R4 수치는 유지. [원인과 기록·웹 표시 범위](judge-session-handoff-1.8.9.ko.md); 실행 검증은 릴리스 기록에서 별도 확인
   - 게이지 선택은 항상 켜지는 `Gauge Shift`의 시작 등급 `EX / Hard / Normal / Easy`를 지정함. EX는 Hard와 구분되는 짙은 흑회색으로 표시하며 내부 호환 토큰은 `ex_hard`를 유지
   - `Gauge Shift`는 선택한 시작 등급부터 Easy까지를 각각 100%에서 독립적으로 병렬 계산하고, 현재 tier가 0%로 탈락하면 같은 판정 이력을 누적한 다음 생존 tier를 선택하며 종료 시 가장 높은 생존 tier로 확정함
   - `Sudden Death (1 MISS)`는 첫 OD8 환산 객체 `MISS`에서 즉시 실패하며, 네이티브 `BAD`만으로는 발동하지 않고 빈 키 `POOR`도 무시하며 Practice No-Fail과 상호 배타적으로 동작
@@ -275,7 +281,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 P2P 배포 대상은 `TenRiff 1.8.7`
+- 이 소스의 P2P 버전은 `TenRiff 1.8.9`; 호환성 검사와 실제 공개·패키지 상태는 [릴리스 기록](release-1.8.9-gate.md)으로 확인
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 이름의 `Mainmusic/` 화면 슬롯을 포함하며, 각 `이름.mp3`와 번호가 붙은 `이름 2.mp3`~`이름 64.mp3`를 자동 수집해 화면 재진입마다 순환
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함

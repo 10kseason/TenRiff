@@ -2,7 +2,7 @@
         const auto& analysis = data.result.analysis;
         const auto text_at = [&](const std::string& text, float left, float top, float right,
                                  bool muted = false, float height = 32.0f) {
-            draw_result_text(text, muted ? d2d_->body_format.Get() : d2d_->option_format.Get(),
+            draw_result_text(text, muted ? d2d_->result_body_format.Get() : d2d_->result_label_format.Get(),
                 D2D1::RectF(left, top, right, top + height),
                 muted ? d2d_->muted_brush.Get() : d2d_->text_brush.Get(), 1.0f);
         };
@@ -11,6 +11,8 @@
         };
         draw_result_panel(D2D1::RectF(64, 148, 664, 978), 1.0f);
         draw_result_panel(D2D1::RectF(688, 148, 1856, 978), 1.0f);
+        ctx->DrawRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(64, 148, 664, 978), 12, 12), semantic_brush(0x28C76B), 3);
+        ctx->DrawRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(688, 148, 1856, 978), 12, 12), semantic_brush(0x28C76B), 3);
         draw_result_text(result_loc("RESULT ANALYSIS", "결과 분석"), d2d_->title_format.Get(),
             D2D1::RectF(72, 48, 640, 104), d2d_->text_brush.Get(), 1.0f);
         draw_analysis_tabs();
@@ -42,9 +44,9 @@
                     94, 720, 638);
             text_at(result_loc("Unmeasured misses", "측정 불가 미스") + "  " + std::to_string(total.unmeasured_miss_count),
                     94, 778, 638);
-            draw_result_text("FAST " + std::to_string(total.fast_count), d2d_->song_title_format.Get(),
+            draw_result_text("FAST " + std::to_string(total.fast_count), d2d_->result_action_format.Get(),
                 D2D1::RectF(94, 822, 355, 860), semantic_brush(0x69A6FF), 1.0f);
-            draw_result_text("SLOW " + std::to_string(total.slow_count), d2d_->song_title_format.Get(),
+            draw_result_text("SLOW " + std::to_string(total.slow_count), d2d_->result_action_format.Get(),
                 D2D1::RectF(355, 822, 638, 860), semantic_brush(0xFF7189), 1.0f, DWRITE_TEXT_ALIGNMENT_TRAILING);
             text_at(result_loc("FAST/SLOW excludes P-GREAT; histogram includes it.", "FAST/SLOW는 P-GREAT 제외, 분포는 포함합니다."),
                     94, 868, 638, true, 48);
@@ -58,7 +60,7 @@
                     draw_result_panel(bank, 1.0f, true);
                     draw_result_control_text(result_loc("Up/Down: lanes ", "위/아래: 레인 ") +
                         std::to_string(first + 1) + "-" + std::to_string((std::min)(first + 16, analysis.lane_count)),
-                        d2d_->hud_format.Get(), bank, d2d_->text_brush.Get(), 1.0f);
+                        d2d_->result_label_format.Get(), bank, d2d_->text_brush.Get(), 1.0f);
                     register_hit(bank, MenuHitTargetKind::SettingsRow, 7);
                 }
                 text_at(result_loc("Lane", "레인"), 718, 230, 810, true);
@@ -142,13 +144,14 @@
         const auto proceed = D2D1::RectF(1360, 996, 1848, 1050);
         draw_result_panel(back, 1.0f);
         draw_result_panel(proceed, 1.0f, true);
-        draw_result_control_text(result_loc("ESC / SUMMARY", "ESC / 요약"), d2d_->hud_format.Get(), back, d2d_->text_brush.Get(), 1.0f);
-        draw_result_control_text(result_loc("ENTER / CONTINUE", "ENTER / 계속"), d2d_->hud_format.Get(), proceed, d2d_->text_brush.Get(), 1.0f);
+        ctx->FillRoundedRectangle(D2D1::RoundedRect(proceed, 12, 12), semantic_brush(0x79D7FF));
+        draw_result_control_text(result_loc("ESC / SUMMARY", "ESC / 요약"), d2d_->result_label_format.Get(), back, d2d_->text_brush.Get(), 1.0f);
+        draw_result_control_text(result_loc("ENTER / CONTINUE", "ENTER / 계속"), d2d_->result_label_format.Get(), proceed, semantic_brush(0x0B1620), 1.0f);
         register_hit(back, MenuHitTargetKind::SettingsRow, 3);
         register_hit(proceed, MenuHitTargetKind::SettingsRow, 0);
         draw_result_text(result_loc("F2 / Next tab    R / Retry    F1 / Replay", "F2 / 다음 탭    R / 재도전    F1 / 리플레이"),
-            d2d_->body_format.Get(), D2D1::RectF(600, 992, 1340, 1020), d2d_->muted_brush.Get(),
+            d2d_->result_body_format.Get(), D2D1::RectF(600, 992, 1340, 1020), d2d_->muted_brush.Get(),
             1.0f, DWRITE_TEXT_ALIGNMENT_CENTER);
         draw_result_text(result_loc("F9 / Screenshot (PNG)  >  screenshots/", "F9 / 스크린샷 (PNG)  >  screenshots/"),
-            d2d_->body_format.Get(), D2D1::RectF(600, 1024, 1340, 1052), d2d_->muted_brush.Get(),
+            d2d_->result_body_format.Get(), D2D1::RectF(600, 1024, 1340, 1052), d2d_->muted_brush.Get(),
             1.0f, DWRITE_TEXT_ALIGNMENT_CENTER);

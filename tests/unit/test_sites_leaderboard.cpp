@@ -47,6 +47,25 @@ TEST_CASE("Sites payload preserves all four native metrics without display round
     CHECK(object->at("timing_profile").as_string() == "bms-easy");
 }
 
+TEST_CASE("Sites payload preserves active judge modifiers without relabeling normal records") {
+    for (const std::string mod : {"", "judge_easy", "judge_hard"}) {
+        auto replay = score_fixture();
+        if (!mod.empty()) replay.mods = {mod};
+        std::string payload, error;
+        REQUIRE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
+        const auto json = config::parse_json(payload);
+        REQUIRE(json.success());
+        const auto* root = json.root->as_object();
+        REQUIRE(root);
+        const auto* mods = root->at("mods").as_array();
+        REQUIRE(mods);
+        CHECK(mods->size() == (mod.empty() ? 0u : 1u));
+        if (!mod.empty()) CHECK(mods->front().as_string() == mod);
+        CHECK(root->at("ruleset_id").as_string() == app::kCanonicalReplayRulesetId);
+        CHECK(root->at("timing_profile").as_string() == "bms-easy");
+    }
+}
+
 TEST_CASE("Sites keeps musical LN Mix v2 out of unversioned legacy boards") {
     auto replay = score_fixture();
     replay.mods = {"ln_mix_30"};

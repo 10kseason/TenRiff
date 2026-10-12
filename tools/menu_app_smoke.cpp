@@ -9,6 +9,9 @@
 #include "app/GameSession.h"
 #include "app/MenuRecordUtils.h"
 #include "app/ReplayVerifier.h"
+#include "app/ModeManager.h"
+#include "app/PersistedRuntimeConfig.h"
+#include "app/SitesLeaderboardClient.h"
 #include "app/ProfileSetupFlow.h"
 #include "config/KeycodeMap.h"
 #include "config/SimpleJson.h"
@@ -100,6 +103,18 @@ namespace tenriff::app {
 // These existing test friends are defined only in this executable. Menu actions
 // run on their owner thread; the observer reads only mutex-protected HUD data.
 struct MenuAppVisualTestAccess {
+    static void select_hard_judge(MenuApp& app, Report& report) {
+        click(app, Kind::SettingsRow, 0, Part::Increment);
+        click(app, Kind::SettingsRow, 0, Part::Increment);
+        report.check("judge.menu_hard_selected", mode_mod_category_value("judge_window", app.config_.mode.mods) == "Judge Hard");
+        app.persist_runtime_config();
+        const auto saved = config::ConfigLoader{}.load_profile(app.profile_dir_);
+        report.check("judge.selection_stays_session_only", saved.success() &&
+            mode_mod_category_value("judge_window", saved.config.mode.mods) == "Off");
+    }
+    static bool last_result_hard_judge(const MenuApp& app) {
+        return mode_mod_category_value("judge_window", app.last_result_mods_) == "Judge Hard";
+    }
     static void attach_present_probe(MenuApp& app) {
         // Replacing a running callback is a data race. Join it first and use
         // the same window/config/shutdown setup as restart_render_thread. The
@@ -522,6 +537,19 @@ struct MenuAppVisualTestAccess {
 };
 
 struct MenuAppFeedbackTestAccess {
+    static void submit_judge_fixture_notes(GameSession& session, std::size_t& index, int64_t playback) {
+        std::lock_guard<std::mutex> lock(session.engine_mutex_);
+        while (index < session.chart_.notes.size()) {
+            const auto& note = session.chart_.notes[index];
+            if (playback < note.start_sample + session.sample_rate_ / 100) break;
+            // Script a precise sample-domain input through the production lane
+            // dispatcher. This checks rules, not physical keyboard latency.
+            const int64_t sample = note.start_sample + session.sample_rate_ / 50; // +20 ms
+            session.dispatch_lane_input(note.lane, input::InputState::Pressed, sample, sample);
+            session.dispatch_lane_input(note.lane, input::InputState::Released, sample + 1, sample);
+            ++index;
+        }
+    }
     static void restart_edge(GameSession& session, bool pressed, bool force_held = false) {
         std::lock_guard<std::mutex> lock(session.engine_mutex_);
         if (force_held) session.instant_restart_key_armed_ = false;
@@ -609,6 +637,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
                 static_cast<int>(tenriff::app::menu::settings::ModeSettingId::Mods), Part::SelectOnly);
             Access::key(app, "Enter");
             expect_screen(app, report, "mode.nested_mods", Screen::ModeMods);
+            Access::select_hard_judge(app, report);
             Access::key(app, "Esc");
             expect_screen(app, report, "mode.nested_mods.back", Screen::ModeSelect);
             Access::click(app, Kind::SettingsRow,
@@ -689,6 +718,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
         resized_profile.config.graphics.resolution == "1439x809");
     expect_screen(app, report, "natural_result", Screen::Result);
     report.check("natural_result.has_stats", Access::result(app));
+    report.check("judge.menu_launch_result_retains_hard", Access::last_result_hard_judge(app));
     Access::key(app, "Space");
     report.check("result.analysis_available", Access::analysis_available(app));
     Access::key(app, "F2");
@@ -864,6 +894,89 @@ void separate_restart_flow(tenriff::app::CommandLineOptions options, Report& rep
     }
     multiplayer->shutdown();
 }
+void separate_judge_flow(tenriff::app::CommandLineOptions options, Report& report) {
+    using namespace tenriff;
+    using Session = app::GameSession;
+    using SessionAccess = app::MenuAppFeedbackTestAccess;
+    std::filesystem::create_directories("judge-fixture");
+    write_silent_wave("judge-fixture/silence.wav");
+    {
+        std::ofstream chart("judge-fixture/judge.bms", std::ios::binary);
+        chart << "#PLAYER 1\n#TITLE Judge Boundary Fixture\n#BPM 600\n#RANK 3\n#4K\n"
+                 "#WAV01 silence.wav\n#00011:01\n#00112:01\n#00213:01\n#00314:01\n";
+        if (!chart) throw std::runtime_error("Cannot write judge fixture");
+    }
+    options.chart_path = "judge-fixture/judge.bms";
+    config::ConfigLoader loader;
+    for (const bool hard : {false, true}) {
+        const std::string name = hard ? "judge.hard" : "judge.normal";
+        options.profile = hard ? "judge-hard-smoke" : "judge-normal-smoke";
+        const std::string profile = "profiles/" + options.profile;
+        auto config = loader.load_profile("profiles/menu-smoke").config;
+        config.ui.skip_start_countdown = true;
+        config.mode.practice_no_fail_enabled = false;
+        config.mode.autoplay_enabled = false;
+        config.mode.one_miss_fail_enabled = false;
+        config.mode.mods = hard ? std::vector<std::string>{"judge_hard"} : std::vector<std::string>{};
+        config.mode.key_mode = "4k";
+        config.mode.random = "off";
+        config.mode.gauge = "normal";
+        config.mode.key_conversion_algorithm = "krrcream";
+        config.speed.rate = 1.0;
+        config.input_offset_ms = 0;
+        config.sound_offset_ms = 0;
+        if (!loader.save_profile(profile, app::build_persisted_runtime_config(config)) ||
+            !config::KeymapManager{}.save_profile(profile, config::KeymapManager{}.default_keymap()))
+            throw std::runtime_error("Cannot seed judge profile");
+        auto session = std::make_unique<Session>();
+        session->set_session_mode_mods(config.mode.mods);
+        std::size_t submitted = 0;
+        bool timed_out = false;
+        const auto deadline = Clock::now() + std::chrono::seconds(15);
+        session->set_hud_callback([&](const Session::HudSnapshot& hud) {
+            if (Clock::now() > deadline) { timed_out = true; SessionAccess::timeout(*session); return; }
+            if (session->did_start_gameplay()) SessionAccess::submit_judge_fixture_notes(*session, submitted, hud.current_sample);
+        });
+        const bool initialized = session->initialize(options);
+        report.check(name + ".initialize", initialized);
+        if (initialized) {
+            SessionAccess::stop_physical_input(*session);
+            session->run();
+            report.check(name + ".audio_and_deadline", !timed_out && session->audio_error().empty(), session->audio_error());
+        }
+        session->shutdown();
+        const auto& result = session->result();
+        report.check(name + ".twenty_ms_boundary", result.has_value && result.finished && submitted == 4 &&
+            result.stats.counts.pg == (hard ? 0 : 4) && result.stats.counts.gr == (hard ? 4 : 0) &&
+            result.stats.counts.gd == 0 && result.stats.counts.bd == 0 && result.stats.counts.pr == 0,
+            "BMS RANK 3, scripted +20 ms: Normal PG / Judge Hard GR");
+        report.check(name + ".result_mods", result.mods == config.mode.mods);
+        const auto replay = gameplay::load_replay_json(result.replay_path);
+        report.check(name + ".replay_mods", replay.success() && replay.replay->mods == config.mode.mods);
+        std::string error;
+        const auto local = app::menu_records::parse_result_file(std::filesystem::u8path(result.result_path), &error);
+        report.check(name + ".local_record_mods", local && local->mods == config.mode.mods &&
+            local->stats.counts.pg == result.stats.counts.pg && local->stats.counts.gr == result.stats.counts.gr, error);
+        if (replay.success()) {
+            const auto verified = app::verify_replay_file(std::filesystem::u8path(result.replay_path),
+                std::filesystem::u8path(options.chart_path), result.replay_sha256);
+            report.check(name + ".replay_verifies", verified.verified() && verified.claims_match, verified.detail);
+            std::string payload;
+            const bool built = app::build_sites_score_json(*replay.replay, result.replay_sha256,
+                "Judge Boundary Fixture", result.clear_status, payload, error);
+            const auto json = config::parse_json(payload);
+            bool same_mods = false;
+            if (json.success() && json.root->as_object()) {
+                const auto* mods = json.root->as_object()->at("mods").as_array();
+                same_mods = mods && mods->size() == config.mode.mods.size() &&
+                    (!hard || mods->front().as_string() == "judge_hard");
+            }
+            report.check(name + ".sites_payload_conditions", built && same_mods, error);
+        }
+        const auto saved = loader.load_profile(profile);
+        report.check(name + ".profile_stays_unmodified", saved.success() && saved.config.mode.mods.empty());
+    }
+}
 }  // namespace
 
 int wmain(int argc, wchar_t** argv) {
@@ -949,6 +1062,7 @@ int wmain(int argc, wchar_t** argv) {
         options.chart_path = "songs/fixture/smoke.bms";
         separate_pause_flow(options, report);
         separate_restart_flow(options, report);
+        separate_judge_flow(options, report);
         report.check("sandbox.no_account_or_sites_connection",
             !std::filesystem::exists("config/sites-leaderboard.json") &&
             !std::filesystem::exists("config/sites-leaderboard.dpapi") &&

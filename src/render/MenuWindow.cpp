@@ -2393,8 +2393,13 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_record_detail_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_title_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_artist_format;
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> song_metadata_value_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> result_score_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> result_metric_format;
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> result_accuracy_format;
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> result_label_format;
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> result_body_format;
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> result_action_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> grade_format;
     struct GradeBitmap {
         std::wstring text;
@@ -2406,6 +2411,16 @@ struct MenuWindow::D2DResources {
         DWRITE_TEXT_ALIGNMENT alignment = DWRITE_TEXT_ALIGNMENT_LEADING;
     };
     std::array<GradeBitmap, 3> grade_bitmaps{};
+    struct PanelGlowBitmap {
+        Microsoft::WRL::ComPtr<ID2D1Bitmap1> bitmap;
+        float width = 0, height = 0, radius = 0;
+        uint32_t rgb = 0;
+        bool attempted = false;
+    };
+    std::array<PanelGlowBitmap, 2> panel_glow_bitmaps{};
+    std::array<ReadableTextLayout, 2> result_action_layouts{};
+    std::array<Microsoft::WRL::ComPtr<ID2D1PathGeometry>, 2> result_action_icons{};
+    std::array<bool, 2> result_action_icons_attempted{};
     Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> result_gauge_gradient;
     Microsoft::WRL::ComPtr<IDWriteTextLayout> generic_help_layout;
     std::wstring generic_help_text;
@@ -3737,7 +3752,8 @@ void MenuWindow::invalidate_gameplay_static_cache() {
     }
 }
 
-bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool use_local_field_offset) {
+bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool use_local_field_offset,
+                                             float studio_safe_right) {
     if (!d2d_ || !d2d_->d2d_context || !d2d_->d2d_factory) {
         return false;
     }
@@ -3748,6 +3764,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
     desired.studio = gameplay_studio_deck_enabled(data.hud_layout, normalize_gameplay_skin_source(data.skin_source),
                                                  data.ghost_visible, data.peer_visible);
     if (desired.studio) {
+        desired.studio_safe_right = studio_safe_right;
         desired.hud_riff_map_visible = data.hud_riff_map_visible;
         if (desired.hud_riff_map_visible) {
             desired.riff_map_revision = data.riff_map_revision;
@@ -3840,6 +3857,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
     const bool cache_matches =
         d2d_->gameplay_static_command_list &&
         gameplay_static_cache_.studio == desired.studio &&
+        gameplay_static_cache_.studio_safe_right == desired.studio_safe_right &&
         gameplay_static_cache_.hud_riff_map_visible == desired.hud_riff_map_visible &&
         gameplay_static_cache_.riff_map_revision == desired.riff_map_revision &&
         gameplay_static_cache_.riff_map_count == desired.riff_map_count &&
@@ -4141,55 +4159,58 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
         auto* fill = d2d_->note_fill_brush.Get();
         const auto saved = fill->GetColor();
         const auto& field = surface_layout.player_field;
-        const auto deck = compute_gameplay_studio_deck_layout(field.left, field.right, 1856.0f,
+        const auto deck = compute_gameplay_studio_deck_layout(field.left, field.right, desired.studio_safe_right,
                                                               desired.hud_riff_map_visible);
         // Keep the low-contrast deck text readable over bright BGA frames.
         // These few backing paths are recorded once alongside the rail/map,
         // independent of score, clock and animated background frame updates.
         fill->SetColor(D2D1::ColorF(0x050608, 0.92f));
-        ctx->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(
-            deck.left_x - 12.0f, 40.0f, deck.left_x + deck.left_width + 12.0f, 258.0f), 10, 10), fill);
-        const float title_safe_right = deck.map_visible
-            ? std::min(deck.left_x + deck.left_width,
-                deck.map_x - (deck.map_times_visible ? 64.0f : 8.0f) - 8.0f)
-            : field.left - 32.0f;
-        const auto title = compute_gameplay_song_title_layout(field.left, field.right, title_safe_right, true);
-        if (title.top >= 400.0f || title.left < deck.left_x || title.right > deck.left_x + deck.left_width) {
-            ctx->FillRectangle(D2D1::RectF(title.left - 8.0f, title.top - 6.0f,
-                                          title.right + 8.0f, title.bottom + 6.0f), fill);
-        }
-        if (deck.right_hud_visible) {
+        if (deck.info_visible) {
             ctx->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(
-                deck.right_x - 12.0f, 36.0f, deck.right_x + deck.right_width + 12.0f, 390.0f), 10, 10), fill);
+                deck.info_x - 12.0f, deck.info_y - 12.0f, deck.info_x + deck.info_width + 12.0f,
+                deck.info_y + 210.0f * deck.info_scale), 10, 10), fill);
+        }
+        if (deck.score_visible) {
+            ctx->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(
+                deck.score_x - 12.0f, deck.score_y - 12.0f, deck.score_x + deck.score_width + 12.0f,
+                deck.score_y + 444.0f * deck.score_scale + 12.0f), 10, 10), fill);
         }
         if (deck.map_visible) {
             ctx->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(
-                deck.map_x - (deck.map_times_visible ? 64.0f : 8.0f), 38.0f,
-                deck.map_x + 64.0f, 1032.0f), 8, 8), fill);
+                deck.map_x - 12.0f, deck.map_top - 32.0f * deck.map_scale,
+                deck.map_x + deck.map_width + 12.0f,
+                deck.map_top + deck.map_height + 28.0f * deck.map_scale), 8, 8), fill);
         }
         const float hit_y = gameplay_field_y(field.top, field.height, desired.judgement_line_position);
         fill->SetColor(D2D1::ColorF(0x12161E));
-        for (float x : {field.left - 6.0f, field.right + 2.0f})
-            ctx->FillRectangle(D2D1::RectF(x, 0, x + 4.0f, hit_y), fill);
+        for (float x : {field.left - 8.0f, field.right + 2.0f})
+            ctx->FillRectangle(D2D1::RectF(x, 0, x + 6.0f, hit_y), fill);
         if (deck.map_visible) {
+            const float step = deck.map_width / 64.0f;
+            const float gap = std::min(2.0f, step * 0.30f);
+            const float bottom = deck.map_top + deck.map_height;
             for (std::size_t i = 0; i < std::min<std::size_t>(64, data.riff_map_count); ++i) {
                 const float density = data.riff_map[i] / 255.0f;
                 if (density <= 0) continue;
                 auto color = d2d_->accent_brush->GetColor(); color.a *= 0.70f;
                 fill->SetColor(density >= 0.8f ? D2D1::ColorF(0xFF9F43) : color);
-                const float y = 60.0f + static_cast<float>(i) * 15.0f;
+                const float x = deck.map_x + static_cast<float>(i) * step;
                 ctx->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(
-                    deck.map_x + 56.0f - density * 56.0f, y, deck.map_x + 56.0f, y + 10.0f), 1, 1), fill);
+                    x + gap * 0.5f, bottom - density * deck.map_height,
+                    x + step - gap * 0.5f, bottom), 1, 1), fill);
             }
         }
         // Cards are fixed geometry; six rounded paths are recorded only on invalidation.
-        const float cell_width = (deck.left_width - 12.0f) / 3.0f;
-        for (int i = 0; i < 6; ++i) {
-            const float x = deck.left_x + (i % 3) * (cell_width + 6.0f);
-            const float y = 128.0f + (i / 3) * 62.0f;
-            const auto card = D2D1::RoundedRect(D2D1::RectF(x, y, x + cell_width, y + 56.0f), 8, 8);
-            fill->SetColor(D2D1::ColorF(0x0A0D12)); ctx->FillRoundedRectangle(card, fill);
-            fill->SetColor(D2D1::ColorF(0x1A202A)); ctx->DrawRoundedRectangle(card, fill, 1);
+        if (deck.info_visible) {
+            const float cell_width = (deck.info_width - 12.0f * deck.info_scale) / 3.0f;
+            for (int i = 0; i < 6; ++i) {
+                const float x = deck.info_x + (i % 3) * (cell_width + 6.0f * deck.info_scale);
+                const float y = deck.info_y + (76.0f + (i / 3) * 62.0f) * deck.info_scale;
+                const auto card = D2D1::RoundedRect(D2D1::RectF(x, y, x + cell_width,
+                    y + 56.0f * deck.info_scale), 8, 8);
+                fill->SetColor(D2D1::ColorF(0x0A0D12)); ctx->FillRoundedRectangle(card, fill);
+                fill->SetColor(D2D1::ColorF(0x1A202A)); ctx->DrawRoundedRectangle(card, fill, 1);
+            }
         }
         fill->SetColor(saved);
     }
@@ -5193,7 +5214,11 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family, const app::Native
                 {std::addressof(d2d_->song_nav_format), "song_nav"}, {std::addressof(d2d_->song_record_label_format), "song_record_label"},
                 {std::addressof(d2d_->song_record_value_format), "song_record_value"}, {std::addressof(d2d_->song_record_detail_format), "song_record_detail"},
                 {std::addressof(d2d_->song_title_format), "song_title"}, {std::addressof(d2d_->song_artist_format), "song_artist"},
+                {std::addressof(d2d_->song_metadata_value_format), "song_metadata_value"},
                 {std::addressof(d2d_->result_score_format), "result_score"}, {std::addressof(d2d_->result_metric_format), "result_metric"},
+                {std::addressof(d2d_->result_accuracy_format), "result_accuracy"},
+                {std::addressof(d2d_->result_label_format), "result_label"}, {std::addressof(d2d_->result_body_format), "result_body"},
+                {std::addressof(d2d_->result_action_format), "result_action"},
                 {std::addressof(d2d_->grade_format), "grade"},
                 {std::addressof(d2d_->hud_format), "hud"}, {std::addressof(d2d_->rank_format), "rank"},
                 {std::addressof(d2d_->stats_label_format), "stats_label"}, {std::addressof(d2d_->stats_value_format), "stats_value"}};
@@ -5249,16 +5274,21 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family, const app::Native
                             &d2d_->song_logo_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 29.0f,
                             &d2d_->song_nav_format) ||
-        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_BOLD, 22.0f,
-                            &d2d_->song_record_label_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_BOLD, 24.0f,
+                            &d2d_->song_record_label_format) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_BOLD, 42.0f,
                             &d2d_->song_record_value_format) ||
-        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 18.0f,
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 22.0f,
                             &d2d_->song_record_detail_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 24.0f, &d2d_->song_title_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 18.0f, &d2d_->song_artist_format) ||
-        !create_text_format(L"Bahnschrift", DWRITE_FONT_WEIGHT_SEMI_BOLD, 104.0f, &d2d_->result_score_format) ||
-        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 32.0f, &d2d_->result_metric_format) ||
+        !create_text_format(L"Bahnschrift", DWRITE_FONT_WEIGHT_SEMI_BOLD, 116.0f, &d2d_->result_score_format) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 36.0f, &d2d_->song_metadata_value_format) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 52.0f, &d2d_->result_metric_format) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 64.0f, &d2d_->result_accuracy_format) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 24.0f, &d2d_->result_label_format) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 24.0f, &d2d_->result_body_format) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 30.0f, &d2d_->result_action_format) ||
         !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_BOLD, 84.0f, &d2d_->grade_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 16.0f, &d2d_->hud_format) ||
         !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 128.0f, &d2d_->rank_format) ||

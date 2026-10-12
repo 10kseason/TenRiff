@@ -8,17 +8,18 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current baseline
 - Windows GUI/runtime is the primary supported path.
-- The fixed baseline is `1.8.7` and this source targets `1.8.8`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
+- The fixed baseline is `1.8.7` and this source targets `1.8.9`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
 - The active menu/runtime is BMS-family only (`.bms/.bme/.bml/.pms`) and supports native, bundled/profile TenRiff `skin.json`, and LR2 skins.
 - For current shipped behavior, read `docs/current-state.md` first; this roadmap is about direction and remaining work.
 
-## 1.8.8 분석과 1.9.0 안정화 계획 (2026-10-12)
+## 1.8.8–1.8.9 분석과 1.9.0 안정화 계획 (2026-10-12)
 
-현재 소스는 **1.8.8**입니다. 분석·해상도·긴 LN Mix와 화면·메뉴·키음·시작 조작 개선을 포함하며, 현재 검증·공개 상태는 [릴리스 안내](release-1.8.8-gate.md)를 따릅니다. 플러그인 실행 환경·API·SDK는 아직 구현하지 않았으며, `1.9.0`은 향후 안정화 목표입니다. 현재 고정 기준 `1.8.7`과 기존 태그·배포 파일은 그대로 유지합니다. 아래 계획이 이후 개발의 우선순위이며, 뒤의 초기 단계 목록이 미완료 본체 기능 추가를 자동으로 승인하지는 않습니다.
+현재 소스는 **1.8.9 릴리스 라인**입니다. 1.8.8의 분석·해상도·LN Mix·키음·시작 조작 위에서 로비·HUD·결과 가독성을 개선하고, 메뉴의 Judge Easy/Hard 선택을 새 세션에 전달하는 수정을 소스에 반영했습니다. 완료한 로컬 검사·성능 측정 결과와 한계, 남은 패키지·CI·공개 단계를 구분합니다. 확정된 동작과 새 검증·공개 상태는 [1.8.9 릴리스 검증](release-1.8.9-gate.md)에 기록합니다. 플러그인 실행 환경·API·SDK는 아직 구현하지 않았으며 `1.9.0`은 향후 안정화 목표입니다. 고정 기준 `1.8.7`, 기존 태그·배포 파일과 1.8.8 기록은 그대로 유지합니다. 뒤의 초기 단계 목록이 미완료 본체 기능 추가를 자동으로 승인하지는 않습니다.
 
 | 단계 | 완료 조건 |
 | --- | --- |
 | 1.8.8 | 레인별 FAST/SLOW·시간대 정확도·단노트/LN 사건·분포와 표본 수, 자유 해상도·결과 PNG·긴 LN Mix, 화면 가독성·메뉴 입력·키음 보존·단독 시작/재시작을 [릴리스 조건](release-1.8.8-gate.md)에 따라 검증 |
+| 1.8.9 | S+ 색을 유지한 로비·Studio HUD·결과 UI와 Judge 세션 전달 수정은 소스에 반영. 극단 필드·성능 오버레이의 상단 정보 숨김을 포함한 [새 릴리스 조건](release-1.8.9-gate.md)의 완료한 로컬 검사·성능 한계와 남은 패키지·CI·공개 단계 구분 |
 | 1.9.0 이전 시험판 | 제한된 읽기 전용 플러그인 API로 대체 결과 분석 화면과 개인 선곡 필터를 본체 코드 수정 없이 구현·검증 |
 | 1.9.0 안정화 이후 | 본체 기능 범위를 유지하고 버그·보안·호환성 수정과 플러그인 계열 확장을 중심으로 관리 |
 

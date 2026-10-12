@@ -1,5 +1,7 @@
 #pragma once
 
+#include "render/GameplaySongTitle.h"
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -10,20 +12,31 @@
 namespace tenriff::render {
 
 struct GameplayStudioDeckLayout {
+    float info_x = 0.0f;
+    float info_y = 52.0f;
+    float info_width = 0.0f;
+    float info_scale = 1.0f;
+    float score_x = 0.0f;
+    float score_y = 0.0f;
+    float score_width = 0.0f;
+    float score_scale = 1.0f;
     float map_x = 0.0f;
-    float map_top = 60.0f;
-    float map_height = 960.0f;
-    float map_width = 56.0f;
-    float left_x = 84.0f;
-    float left_y = 52.0f;
-    float left_width = 260.0f;
-    float right_x = 0.0f;
-    float right_y = 48.0f;
-    float right_width = 0.0f;
+    float map_top = 924.0f;
+    float map_height = 96.0f;
+    float map_width = 0.0f;
+    float map_scale = 1.0f;
+    float gauge_marker_x = 0.0f;
+    bool info_visible = false;
+    bool score_visible = false;
     bool map_visible = false;
     bool map_times_visible = false;
-    bool right_hud_visible = false;
 };
+
+inline float gameplay_studio_header_safe_right(bool performance_visible) {
+    // The full gameplay/skin-preview performance panel begins at 1450.
+    // Share its 28px gap with static and dynamic deck layout invalidation.
+    return performance_visible ? 1422.0f : 1856.0f;
+}
 
 inline bool gameplay_studio_deck_enabled(std::string_view hud_layout,
                                          std::string_view skin_source,
@@ -39,24 +52,62 @@ inline GameplayStudioDeckLayout compute_gameplay_studio_deck_layout(
     float field_left, float field_right, float header_safe_right = 1856.0f,
     bool riff_map_visible = true) {
     GameplayStudioDeckLayout layout;
-    layout.map_x = field_left - 80.0f;
-    layout.left_width = std::max(260.0f, layout.map_x - layout.left_x - 70.0f);
-    layout.right_x = field_right + 100.0f;
-    // Measure remaining space before choosing the fallback. A 240 px minimum
-    // applied first would make the under-200 fallback unreachable, and could
-    // draw beneath the performance overlay after its safe edge moves left.
-    layout.right_width = std::max(0.0f, std::min(1856.0f, header_safe_right) - layout.right_x);
-    layout.right_hud_visible = layout.right_width >= 200.0f;
-    layout.map_visible = riff_map_visible && layout.map_x >= layout.left_x + 220.0f;
-    layout.map_times_visible = layout.map_visible && layout.map_x - 58.0f >= layout.left_x + 220.0f;
+    if (!std::isfinite(field_left) || !std::isfinite(field_right) || field_right <= field_left)
+        return layout;
+    const bool gauge_on_left = field_right + 90.0f > 1896.0f && field_left >= 114.0f;
+    layout.gauge_marker_x = gauge_on_left ? field_left - 90.0f : field_right + 14.0f;
+    const float left_end = std::clamp(field_left - (gauge_on_left ? 108.0f : 32.0f), 24.0f, 1856.0f);
+    const float right_start = std::clamp(field_right + (gauge_on_left ? 32.0f : 108.0f), 24.0f, 1856.0f);
+    const float safe_right = std::isfinite(header_safe_right)
+        ? std::clamp(header_safe_right, 24.0f, 1856.0f) : 1856.0f;
+    struct Span { float x; float width; };
+    const auto left_span = [&](float end) {
+        return Span{24.0f, std::min(600.0f, std::max(0.0f, std::min(left_end, end) - 24.0f))};
+    };
+    const auto right_span = [&](float end) {
+        const float width = std::min(600.0f, std::max(0.0f, end - right_start));
+        return Span{end - width, width};
+    };
+    const auto prefer = [](Span preferred, Span other) {
+        return preferred.width >= 220.0f || preferred.width >= other.width ? preferred : other;
+    };
+    const auto info = prefer(right_span(safe_right), left_span(safe_right));
+    const auto score = prefer(left_span(1856.0f), right_span(1856.0f));
+    const auto map = prefer(right_span(1856.0f), left_span(1856.0f));
+    layout.info_x = info.x; layout.info_width = info.width;
+    layout.score_x = score.x; layout.score_width = score.width;
+    layout.map_x = map.x; layout.map_width = map.width;
+    layout.info_visible = info.width > 0.0f;
+    layout.score_visible = score.width > 0.0f;
+    layout.map_visible = riff_map_visible && map.width > 0.0f;
+    layout.map_times_visible = layout.map_visible && map.width >= 160.0f;
+    // Fit the whole card/number group into narrow side gaps instead of letting
+    // individual glyphs spill into the field. The title keeps measured fitting.
+    layout.info_scale = std::min(1.0f, info.width / 300.0f);
+    layout.score_scale = std::min(1.0f, score.width / 320.0f);
+    // The map needs less width than the score card: its two 76px end clocks
+    // fit comfortably at 280px. Keep ordinary side gaps at native glyph size;
+    // only genuinely narrow maps need a fractional clock/bar transform.
+    layout.map_scale = std::min(1.0f, map.width / 280.0f);
+    layout.map_height = 96.0f * layout.map_scale;
+    layout.map_top = 1020.0f - layout.map_height;
+    const bool share_bottom_column = map.width > 0.0f &&
+        score.x < map.x + map.width && map.x < score.x + score.width;
+    const float score_bottom = share_bottom_column ? layout.map_top - 56.0f : 1020.0f;
+    layout.score_y = score_bottom - 444.0f * layout.score_scale;
     return layout;
+}
+
+inline GameplaySongTitleLayout gameplay_studio_song_title_layout(const GameplayStudioDeckLayout& deck) {
+    return {deck.info_x, deck.info_y, deck.info_x + deck.info_width,
+            deck.info_y + 34.0f * deck.info_scale};
 }
 
 inline float gameplay_studio_gauge_marker_y(float hit_y, double gauge_ratio) {
     const double ratio = std::isfinite(gauge_ratio) ? std::clamp(gauge_ratio, 0.0, 1.0) : 0.0;
     const float safe_hit_y = std::isfinite(hit_y) ? std::max(0.0f, hit_y) : 0.0f;
-    return std::clamp(safe_hit_y * (1.0f - static_cast<float>(ratio)) - 12.0f,
-                      8.0f, std::max(8.0f, safe_hit_y - 45.0f));
+    return std::clamp(safe_hit_y * (1.0f - static_cast<float>(ratio)) - 16.0f,
+                      8.0f, std::max(8.0f, safe_hit_y - 54.0f));
 }
 
 inline std::array<float, 5> gameplay_studio_judgement_ratios(const std::array<int, 5>& counts) {

@@ -40,6 +40,8 @@ The standard TenRiff play flow is:
 - `Esc`: quit
 
 ### Song Select
+
+The 1.8.9 lobby separates large BEST numbers from maximum score, COMBO units and detail rows. Note-count labels and values are white, and a white outer frame groups the list with the art/BEST/filter cards. Enabled Start uses the same sky blue as Continue on results. S+ color and font are unchanged.
 - `Up` / `Down`: move between songs
 - `PageUp` / `PageDown`: fast movement
 - Mouse wheel: move between songs
@@ -146,6 +148,10 @@ Reference BPM is the tempo with the longest accumulated running time; repeated s
 
 ## 8. How to Read the HUD
 
+**1.8.9 Studio Deck:** Use `Options > Skins` to choose Studio Deck/Classic and Studio Riff Map visibility for Native/LR2 solo play. Studio places song information and Rate/HS/BPM/Scroll/Line/Latency at the upper right, score/accuracy/judgement counts at the lower left, and a horizontal 64-bin density map at the lower right. The map progresses left to right with a current-position marker and elapsed/total time. The gauge rail and marker are larger.
+
+Cards scale as groups or move to the wider opposite side when space outside the field is narrow. If score and map share a side, score moves above the map; very narrow maps omit time labels. When an extreme field position/width and Performance HUD leave no upper-side space, only the upper information card is hidden. Hiding the map leaves other card positions unchanged. LR2 note/key/gear assets and Classic layouts for ghost, multiplayer and other image skins remain intact. [Runtime checks and limits](release-1.8.9-gate.md) (Korean).
+
 The in-game HUD usually shows:
 
 - Title / artist
@@ -171,6 +177,8 @@ If you enable `Graphics > Performance HUD`, you can also see the frame graph, av
 - `Options > Audio > Normalize Audio` applies RMS leveling to the gameplay mix and defaults to OFF; menu music and song previews are unaffected.
 
 ## 9. Judgement and Gauge
+
+The 1.8.9 source explicitly passes Judge Easy/Hard selected in `Options > Key Mode Settings > Mods` into a new session. This choice lasts only while the app runs and is not saved in the profile, so restarting the app returns it to Normal. Replays prioritize their recorded mods/ruleset; multiplayer uses shared rules. Old Normal records and R1–R4 values are unchanged. See [cause, records and web display scope](judge-session-handoff-1.8.9.ko.md) and [verification and limits](release-1.8.9-gate.md) (Korean).
 
 ### Judgement
 The current default judgement labels use the following abbreviations:
@@ -206,6 +214,8 @@ Legacy `shift` means an EX start. Practice retains separate completion rules. Pa
 `Sudden Death (1 MISS)` is not a gauge type: it forces the gauge to zero and ends the run on the first OD8-converted object `MISS`. Native `BAD` timing alone and empty-key `POOR` do not count, and it cannot be enabled together with Practice No-Fail.
 
 ## 10. Result Screen
+
+The 1.8.9 single-result screen switches between `SUMMARY / LANES / NOTE TYPES / TIMELINE` buttons. It distinguishes a green analysis frame, blue tabs and cyan Continue; Replay/Retry center their icon and text as one group. The left groups share an outer frame with inner dividers, and MAX COMBO numbers and units are separate. Larger text changes presentation, preserving score and analysis definitions. See the [release record](release-1.8.9-gate.md) for screen/control validation and limits.
 
 After play ends, the Result screen shows:
 
