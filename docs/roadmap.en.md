@@ -16,7 +16,7 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## 1.8.8–1.8.9 Analysis and 1.9.0 Stabilization Plan (2026-10-12)
 
-The current source is **the 1.8.9 release line**. It builds on 1.8.8 analysis, window sizing, LN Mix, keysounds and start controls with implemented lobby/HUD/result readability changes and explicit Judge Easy/Hard handoff into new sessions. Completed local checks and performance results/residual limits are separated from remaining package, CI and publication work. Confirmed behavior and new verification/publication status belong in the [1.8.9 release validation](release-1.8.9-gate.md). The plugin host, API and SDK are not implemented; `1.9.0` remains a future stabilization target. Preserve the fixed `1.8.7` baseline, existing tags/assets and 1.8.8 records. The earlier stage list below does not automatically authorize additional unfinished core features.
+As of 2026-10-12, the source was **the 1.8.9 release line**. It builds on 1.8.8 analysis, window sizing, LN Mix, keysounds and start controls with implemented lobby/HUD/result readability changes and explicit Judge Easy/Hard handoff into new sessions. Completed local checks and performance results/residual limits are separated from remaining package, CI and publication work. Confirmed behavior and new verification/publication status belong in the [1.8.9 release validation](release-1.8.9-gate.md). The plugin host, API and SDK are not implemented; `1.9.0` remains a future stabilization target. Preserve the fixed `1.8.7` baseline, existing tags/assets and 1.8.8 records. The earlier stage list below does not automatically authorize additional unfinished core features.
 
 | Stage | Completion criteria |
 | --- | --- |

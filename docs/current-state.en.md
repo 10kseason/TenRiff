@@ -40,7 +40,7 @@ The 749/739 checks in the [local 1.7.1 r2 report](local-1.7.1-r2.ko.md) are hist
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- User-pinned baseline version: `1.8.7`; current source targets `1.8.9`
+- User-pinned baseline version: `1.8.7`; current source targets `1.8.9.1`
 - 1.7.1 provides full-room HUD/results for up to eight players, tied ranks/missing-score states, P-GREAT-only effects, independent judgement/combo placement, ten Options cards, audio normalization and the Song Select difficulty-table card. See [follow-up details](gameplay-polish-followup.md) and [verification](release-1.7.1-gate.md).
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
 - Native Result now emphasizes score, grade and accuracy; the prism remains in custom skins. The existing 2.2-second reveal, Space skip and control readiness rules are preserved.

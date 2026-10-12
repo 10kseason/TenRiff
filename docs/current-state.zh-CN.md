@@ -40,7 +40,7 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 用户固定基准为 `1.8.7`，当前源码版本为 `1.8.9`
+- 用户固定基准为 `1.8.7`，当前源码版本为 `1.8.9.1`
 - 1.7.1 提供最多8人的 HUD 与结果、并列名次与分数等待状态、P-GREAT 专属效果、判定与连击独立位置、10张选项卡、音量标准化及选曲难度表卡片。见[变更详情](gameplay-polish-followup.md)和[验证范围](release-1.7.1-gate.md)。
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
 - 默认结果页面突出分数、等级和准确率；棱镜演出保留在自定义皮肤中。保留现有2.2秒展示流程、Space跳过和按钮启用规则。
