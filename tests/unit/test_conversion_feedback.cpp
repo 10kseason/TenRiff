@@ -65,14 +65,13 @@ std::size_t missing_sounds(const GameplayChart& source, const GameplayChart& out
 }
 }
 
-TEST_CASE("feedback regression converters preserve full source holds and every keysound") {
+static void check_feedback_matrix(const std::vector<KeyModeConversionAlgorithm>& algorithms) {
     std::size_t failures = 0;
     std::vector<std::pair<int, int>> matrix{{10, 4}};
     for (int source : {5, 16})
         for (int target : {4, 5, 6, 7, 8, 9, 10, 12, 14, 16})
             if (source != target) matrix.emplace_back(source, target);
-    for (auto algorithm : {KeyModeConversionAlgorithm::Krrcream, KeyModeConversionAlgorithm::NK2,
-                           KeyModeConversionAlgorithm::NK3}) {
+    for (auto algorithm : algorithms) {
         for (auto preset : {Nk2Preset::Native, Nk2Preset::Transform, Nk2Preset::Remaster}) {
             if (algorithm != KeyModeConversionAlgorithm::NK2 && preset != Nk2Preset::Native) continue;
             for (const auto counts : matrix) {
@@ -105,7 +104,7 @@ TEST_CASE("feedback regression converters preserve full source holds and every k
     CHECK(failures == 0);
 }
 
-TEST_CASE("feedback regression real BMS LNOBJ heads survive native load and key conversion") {
+static void check_feedback_bms(const std::vector<KeyModeConversionAlgorithm>& algorithms) {
     // A file supplied by a reporter can be exercised without bundling their chart/audio.
     // The default fixture covers the same adjacent-measure LNOBJ construction.
     std::string content = "#TITLE LNOBJ regression\n#BPM 173\n#LNTYPE 1\n#LNOBJ ZZ\n"
@@ -134,8 +133,7 @@ TEST_CASE("feedback regression real BMS LNOBJ heads survive native load and key 
     CHECK(holds == (external ? 21 : 5));
     std::cout << "BMS native notes=" << built.chart.notes.size() << " holds=" << holds << '\n';
     std::size_t failures = 0;
-    for (auto algorithm : {KeyModeConversionAlgorithm::Krrcream, KeyModeConversionAlgorithm::NK2,
-                           KeyModeConversionAlgorithm::NK3}) {
+    for (auto algorithm : algorithms) {
         for (int target : {4, 6, 7, 8, 9, 10, 12, 14, 16}) {
             std::cout << "algorithm=" << static_cast<int>(algorithm) << " target=" << target << '\n';
             KeyModeConverterOptions options;
@@ -162,7 +160,7 @@ TEST_CASE("feedback regression real BMS LNOBJ heads survive native load and key 
     CHECK(failures == 0);
 }
 
-TEST_CASE("feedback regression impossible chords preserve sound without cutting occupied holds") {
+static void check_feedback_chords(const std::vector<KeyModeConversionAlgorithm>& algorithms) {
     GameplayChart source;
     source.lane_count = 16;
     source.duration_samples = 44100;
@@ -174,8 +172,7 @@ TEST_CASE("feedback regression impossible chords preserve sound without cutting 
         note.audio_asset_id = source.intern_audio_asset(std::to_string(i));
         source.notes.push_back(note);
     }
-    for (auto algorithm : {KeyModeConversionAlgorithm::Krrcream, KeyModeConversionAlgorithm::NK2,
-                           KeyModeConversionAlgorithm::NK3}) {
+    for (auto algorithm : algorithms) {
         KeyModeConverterOptions options;
         options.target_lane_count = 4;
         options.algorithm = algorithm;
@@ -188,15 +185,17 @@ TEST_CASE("feedback regression impossible chords preserve sound without cutting 
     }
 }
 
-TEST_CASE("feedback regression replay verifier reproduces legacy and repaired key conversion") {
+static void check_feedback_replay(const std::vector<const char*>& algorithms) {
     const auto source = feedback_chart(10);
-    for (const auto algorithm : {"krrcream", "nk2", "nk3"}) {
+    for (const auto algorithm : algorithms) {
         for (int version : {1, 2}) {
             tenriff::config::ModeConfig mode;
             mode.key_mode = "4k"; mode.key_conversion_algorithm = algorithm; mode.random_seed = 42;
             mode.gauge = "normal";
             const auto managed = tenriff::app::manage_modes(source, tenriff::app::ChartFormat::Bms,
                 mode, {}, 1, 120, 44100, tenriff::app::LongNoteMixVersion::Musical, version);
+            // A failed model load must not turn this into a self-consistent native replay test.
+            REQUIRE(managed.chart.lane_count == 4);
             auto chart = managed.chart;
             offset_gameplay_chart_samples(chart, 132300);
             GameplayConfig config;
@@ -233,4 +232,36 @@ TEST_CASE("feedback regression replay verifier reproduces legacy and repaired ke
             CHECK(verified.claims_match);
         }
     }
+}
+
+TEST_CASE("feedback regression converters preserve full source holds and every keysound") {
+    check_feedback_matrix({KeyModeConversionAlgorithm::Krrcream, KeyModeConversionAlgorithm::NK2});
+}
+
+TEST_CASE("NK3 feedback regression converters preserve full source holds and every keysound") {
+    check_feedback_matrix({KeyModeConversionAlgorithm::NK3});
+}
+
+TEST_CASE("feedback regression real BMS LNOBJ heads survive native load and key conversion") {
+    check_feedback_bms({KeyModeConversionAlgorithm::Krrcream, KeyModeConversionAlgorithm::NK2});
+}
+
+TEST_CASE("NK3 feedback regression real BMS LNOBJ heads survive native load and key conversion") {
+    check_feedback_bms({KeyModeConversionAlgorithm::NK3});
+}
+
+TEST_CASE("feedback regression impossible chords preserve sound without cutting occupied holds") {
+    check_feedback_chords({KeyModeConversionAlgorithm::Krrcream, KeyModeConversionAlgorithm::NK2});
+}
+
+TEST_CASE("NK3 feedback regression impossible chords preserve sound without cutting occupied holds") {
+    check_feedback_chords({KeyModeConversionAlgorithm::NK3});
+}
+
+TEST_CASE("feedback regression replay verifier reproduces legacy and repaired key conversion") {
+    check_feedback_replay({"krrcream", "nk2"});
+}
+
+TEST_CASE("NK3 feedback regression replay verifier reproduces legacy and repaired key conversion") {
+    check_feedback_replay({"nk3"});
 }

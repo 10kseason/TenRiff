@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iostream>
 #include <set>
+#include <vector>
 
 #include "app/BmsKeyConverter.h"
 #include "app/ChartLoader.h"
@@ -74,7 +75,7 @@ void write_minimal_wav(const std::filesystem::path& path, int sample_rate) {
 
 }  // namespace
 
-TEST_CASE("feedback regression exported BMS keeps dropped chord sounds and full LNOBJ spans") {
+static void check_feedback_export(const std::vector<const char*>& algorithms) {
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
@@ -103,7 +104,7 @@ TEST_CASE("feedback regression exported BMS keeps dropped chord sounds and full 
     };
     const auto expected = sounds(original.chart);
     REQUIRE(expected.size() == 14);
-    for (const auto algorithm : {"krrcream", "nk2", "nk3"}) {
+    for (const auto algorithm : algorithms) {
         for (const int target : {4, 10, 16}) {
             const auto output = temp.path / (std::string(algorithm) + std::to_string(target) + ".bms");
             tenriff::app::BmsKeyConverterOptions options;
@@ -422,4 +423,12 @@ TEST_CASE("bms key converter writes reparsable nK2 output") {
     CHECK(load_result.success());
     CHECK(load_result.chart.lane_count == 8);
     CHECK_FALSE(load_result.chart.notes.empty());
+}
+
+TEST_CASE("feedback regression exported BMS keeps dropped chord sounds and full LNOBJ spans") {
+    check_feedback_export({"krrcream", "nk2"});
+}
+
+TEST_CASE("NK3 feedback regression exported BMS keeps dropped chord sounds and full LNOBJ spans") {
+    check_feedback_export({"nk3"});
 }
