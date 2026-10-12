@@ -3,6 +3,7 @@
 #include "app/ModeManager.h"
 #include "app/ReplayVerifier.h"
 #include "app/SitesLeaderboardClient.h"
+#include "app/PersistedRuntimeConfig.h"
 #include "gameplay/ModeApplier.h"
 #include "timing/HighResClock.h"
 #include "../support/MockAsioDriver.h"
@@ -361,6 +362,76 @@ struct GameSessionAudioTestAccess {
         CHECK(session->audio_error().empty());
         CHECK(session->was_user_aborted() == cancel_parse);
         CHECK(session->audio_thread_.sample_rate() == 0);
+    }
+
+    static void check_session_judge_handoff() {
+        CompletionTestDirectory directory;
+        config::ConfigLoader loader;
+        auto disk = loader.defaults();
+        disk.audio.backend = audio::AudioBackend::ASIO;
+        disk.audio.asio_driver = "invalid-loading-regression-driver";
+        // Stale disk evidence is never enough to enable a transient judge mod.
+        disk.mode.mods = {"judge_hard", "no_ln_release"};
+        for (int scenario = 0; scenario < 5; ++scenario) {
+            REQUIRE(loader.save_profile(directory.path.u8string(), disk));
+            auto session = std::make_unique<GameSession>();
+            if (scenario == 1 || scenario == 3)
+                session->set_session_mode_mods({"judge_hard"});
+            if (scenario == 2) session->set_session_mode_mods({"judge_easy"});
+            if (scenario == 3) session->set_peer_battle_mode(true);
+            if (scenario == 4) session->set_session_mode_mods({});
+            CommandLineOptions options;
+            options.profile = directory.path.u8string();
+            options.chart_path = (directory.path / "missing.bms").u8string();
+            bool parsing = false;
+            session->set_loading_progress_callback([&](const GameSession::LoadingProgress& progress) {
+                parsing |= progress.stage == "Parsing chart";
+            });
+            session->set_loading_cancel_callback([&] { return parsing; });
+            CHECK_FALSE(session->initialize(options));
+            CHECK(session->audio_thread_.sample_rate() == 0);
+            const auto expected = scenario == 1 ? "Judge Hard" : scenario == 2 ? "Judge Easy" : "Off";
+            CHECK(mode_mod_category_value("judge_window", session->config_.mode.mods) == expected);
+            if (scenario != 3)
+                CHECK(std::find(session->config_.mode.mods.begin(), session->config_.mode.mods.end(),
+                                "no_ln_release") != session->config_.mode.mods.end());
+            const auto persisted = loader.load_profile(directory.path.u8string());
+            REQUIRE(persisted.success());
+            CHECK(mode_mod_category_value("judge_window", persisted.config.mode.mods) == "Off");
+        }
+        for (const bool legacy : {true, false}) {
+            REQUIRE(loader.save_profile(directory.path.u8string(), disk));
+            gameplay::ReplayFile original;
+            original.replay_format_version = legacy ? 0 : gameplay::kReplayFormatVersion;
+            original.ruleset_id = legacy ? "tenriff-native-score-v2-ruleset-1"
+                                         : std::string(kCanonicalReplayRulesetId);
+            original.chart_sha256 = std::string(64, 'a');
+            original.sample_rate = original.trace.sample_rate = 48000;
+            original.trace.lane_count = 4;
+            original.trace.duration_samples = 48000;
+            if (!legacy) original.mods = {"judge_easy"};
+            const auto replay_path = (directory.path / "original-replay.json").u8string();
+            REQUIRE(gameplay::save_replay_json(replay_path, original).success());
+            auto session = std::make_unique<GameSession>();
+            session->set_session_mode_mods({"judge_hard"});
+            CommandLineOptions options;
+            options.profile = directory.path.u8string();
+            options.chart_path = (directory.path / "missing.bms").u8string();
+            options.replay_path = replay_path;
+            bool parsing = false;
+            session->set_loading_progress_callback([&](const GameSession::LoadingProgress& progress) {
+                parsing |= progress.stage == "Parsing chart";
+            });
+            session->set_loading_cancel_callback([&] { return parsing; });
+            CHECK_FALSE(session->initialize(options));
+            CHECK(parsing);
+            CHECK(session->replay_playback_enabled_);
+            CHECK(session->audio_thread_.sample_rate() == 0);
+            CHECK(session->replay_source_.ruleset_id == original.ruleset_id);
+            CHECK(session->replay_source_.mods == original.mods);
+            CHECK(mode_mod_category_value("judge_window", session->config_.mode.mods) ==
+                  (legacy ? "Off" : "Judge Easy"));
+        }
     }
 
     static void check_riff_map_snapshot_lifecycle() {
@@ -1964,6 +2035,10 @@ TEST_CASE("live input calibration does not shift R1 R2 R3 R4 replay or autoplay 
 
 TEST_CASE("chart loading cancellation does not open an audio device") {
     tenriff::app::GameSessionAudioTestAccess::check_loading_does_not_open_audio(true);
+}
+
+TEST_CASE("session initialization restores the menu judge choice but keeps direct replay and peer policies") {
+    tenriff::app::GameSessionAudioTestAccess::check_session_judge_handoff();
 }
 
 TEST_CASE("chart loading failure does not open an audio device") {

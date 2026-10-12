@@ -59,24 +59,33 @@
         }
         return brush;
     };
-    // Stable mode accents shared by the library and result metadata. The
-    // palette slots remain editable through the native skin catalog.
+    // Data categories retain their requested colors even when the native menu
+    // palette is monochrome. Consume this shared brush before requesting another color.
+    auto semantic_color = [&](uint32_t rgb, float alpha = 1.0f) -> ID2D1SolidColorBrush* {
+        auto* brush = d2d_->native_menu_brush.Get();
+        if (brush) {
+            brush->SetColor(D2D1::ColorF(rgb));
+            brush->SetOpacity(std::clamp(alpha, 0.0f, 1.0f));
+        }
+        return brush;
+    };
+    // Stable mode accents shared by the library and result metadata.
     auto key_count_brush = [&](int keys) -> ID2D1SolidColorBrush* {
         switch (keys) {
-            case 4: return native_color(0x7EE2A8, 1);
-            case 5: return native_color(0xFFD479, 1);
-            case 6: return native_color(0x8FB8FF, 1);
-            case 7: return native_color(0xC2A0FF, 1);
-            case 8: return native_color(0xFF9BC5, 1);
-            case 9: return native_color(0xA9DB72, 1);
-            case 10: return native_color(0x63E9F2, 1);
-            case 11: return native_color(0xDAC89A, 1);
-            case 12: return native_color(0xFFAB75, 1);
-            case 13: return native_color(0x9EA7F5, 1);
-            case 14: return native_color(0x81D5CF, 1);
-            case 15: return native_color(0xE4B4EF, 1);
-            case 16: return native_color(0xFF7F8C, 1);
-            default: return native_color(0xECF6FF, 1);
+            case 4: return semantic_color(0xFF9BC5);
+            case 5: return semantic_color(0x7EE2A8);
+            case 6: return semantic_color(0x8FB8FF);
+            case 7: return semantic_color(0xC2A0FF);
+            case 8: return semantic_color(0xFFD479);
+            case 9: return semantic_color(0xA9DB72);
+            case 10: return semantic_color(0x63E9F2);
+            case 11: return semantic_color(0xDAC89A);
+            case 12: return semantic_color(0xFFAB75);
+            case 13: return semantic_color(0x9EA7F5);
+            case 14: return semantic_color(0x81D5CF);
+            case 15: return semantic_color(0xE4B4EF);
+            case 16: return semantic_color(0xFF7F8C);
+            default: return semantic_color(0xECF6FF);
         }
     };
     auto draw_native_asset = [&](native_menu_assets::Asset asset, const D2D1_RECT_F& rect,

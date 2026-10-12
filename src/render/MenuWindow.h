@@ -955,7 +955,8 @@ private:
     void touch_song_card_preview_lru(std::string_view path);
     void trim_song_card_preview_cache();
     void invalidate_gameplay_static_cache();
-    [[nodiscard]] bool ensure_gameplay_static_cache(const GameplayHudData& data, bool use_local_field_offset = true);
+    [[nodiscard]] bool ensure_gameplay_static_cache(const GameplayHudData& data, bool use_local_field_offset = true,
+                                                   float studio_safe_right = 1856.0f);
     [[nodiscard]] bool create_text_formats(const wchar_t* ui_family,
         const app::NativeMenuSkinStyle* native_style = nullptr);
     [[nodiscard]] bool recreate_targets();
@@ -1134,6 +1135,7 @@ private:
 
     struct GameplayStaticCache {
         bool studio = false;
+        float studio_safe_right = 1856.0f;
         bool hud_riff_map_visible = false;
         uint64_t riff_map_revision = 0;
         std::size_t riff_map_count = 0;

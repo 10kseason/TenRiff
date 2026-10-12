@@ -85,6 +85,8 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - 既定値は `8ms`
 ### `judge`
 
+1.8.9ソースはメニューのJudge Easy/Hard選択を新しいセッションへ渡します。プロファイルには保存せず、アプリ再起動後はNormalへ戻ります。リプレイ原本とマルチ共通規則を優先し、過去の記録とR1–R4の数値を維持します。[原因・記録・ウェブの範囲](judge-session-handoff-1.8.9.ko.md)、[検証結果と制限](release-1.8.9-gate.md)（韓国語）を参照してください。
+
 [最新の判定幅・RANK表・LN規則（韓国語）](judgement-windows.md)
 
 - BMS `#RANK`: `3/EASY` PG21ms、`2/NORMAL` PG18ms、`1/HARD` PG15ms、`0/VERYHARD` PG8ms。EASYのGR/GD/BADは65/115/210msのまま、他の難度は18/21、15/21、8/21倍に縮小します。省略・未対応値はEASY。Judge Easy/Hard MODはその後に適用し、`hold_grace`・`hold_break`設定と自動ミス期限はRANKでは変更しません。終端PG/GR/GD判定にはRANKを適用します。
@@ -300,8 +302,8 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst の明るさ。0 で無効。 |
 | `key_pulse_enabled` | bool; `true` | 旧版 ON/OFF 互換。false または明るさ 0 で無効。 |
 | `hit_burst_style` | `prism`, `ring`, `spark`; `prism` | 内蔵 Hit Burst の形。 |
-| `hud_layout` | `classic`, `studio`; `studio` | Native・取り込んだ LR2 スキンのソロプレイ用 HUD。LR2 のノート・キー・ギア画像と比率は維持します。キーのない既存プロファイルも既定値 `studio` を使い、Options › Skins で Classic に戻せます。他の画像スキン・ゴースト対戦・マルチプレイは従来の配置を維持。不明な値は `studio`。 |
-| `hud_riff_map_visible` | bool; `true` | スタジオデッキのフィールド左側のノート密度グラフと時計を表示します。Options › Skins › Studio Riff Map で変更し、プロファイル・スキンプリセットに保存します。クラシック HUD には影響しません。 |
+| `hud_layout` | `classic`, `studio`; `studio` | Native・LR2ソロ用HUD。LR2ノート・キー・ギア画像と比率を維持。欠落・不明値は`studio`で、Options › SkinsでClassicへ変更できます。1.8.9は右上情報・左下点数・右下横向きマップを配置し、狭い余白では全体縮小・反対側移動。極端なフィールドとPerformance HUDが両側上部を塞ぐ場合は情報カードだけを非表示。他の画像スキン・ゴースト・マルチはClassic維持。[配置と検証範囲](release-1.8.9-gate.md)。 |
+| `hud_riff_map_visible` | bool; `true` | Studio Deckの64区間の横向き密度マップと経過／全体時間。基本位置は右下で、余白に応じて移動・縮小し、非常に狭い場合は時間文字を省略。Options › Skins › Studio Riff Mapで変更しプロファイル・スキンプリセットに保存。非表示でも他のカード位置とClassic HUDは維持。 |
 | `ui_font` | `default`, `malgun`, `bahnschrift`, `consolas`; `default` | メニューの書体。default は Segoe UI。ロゴ・ランク・コンボ専用書体は維持。 |
 | `key_label_position` | `bottom`, `top`, `off`; `bottom` | レーンのキー名表示位置。 |
 | `judgement_line_position` | double: `0..1`; `0.82` | 判定線の縦位置比率。 |

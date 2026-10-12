@@ -125,6 +125,13 @@ test('every catalog slot uses a valid native schema key and default value', () =
   assert.deepEqual(errors({...basic(),lobby:{renderer:'native'},native}),[]);
   assert.ok(Object.keys(native.rects).length > 100);
 });
+test('factored song metadata retains all editable slots and dedicated text roles', () => {
+  const data=JSON.parse(fs.readFileSync(path.join(__dirname,'native-catalog.json'),'utf8'));
+  for (const slot of ['069','070','071','072']) assert.ok(data.rects['songselect.rect.'+slot]);
+  for (const role of ['song_metadata_value','result_label','result_body','result_action']) {
+    assert.ok(data.fonts[role]); assert.ok(data.metrics['font.'+role+'.size'] >= 24);
+  }
+});
 test('move/resize keeps valid rectangles and rounds once per action', () => {
   assert.deepEqual(C.moveRect([10,20,110,120],13,19,false,8),[26,36,126,136]);
   assert.deepEqual(C.moveRect([10,20,110,120],-500,-500,true,1),[10,20,18,28]);

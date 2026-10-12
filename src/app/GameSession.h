@@ -217,6 +217,7 @@ public:
     void set_practice_no_fail_override(bool enabled) { practice_no_fail_override_ = enabled; }
     void set_practice_start_seconds(double seconds) { practice_start_seconds_ = std::max(0.0, seconds); }
     void set_instant_restart_start(bool enabled) { instant_restart_start_ = enabled; }
+    void set_session_mode_mods(const std::vector<std::string>& mods) { session_mode_mods_ = mods; }
     void set_peer_battle_mode(bool enabled, uint32_t rate_milli = 1000) {
         peer_battle_mode_ = enabled;
         peer_battle_rate_milli_ = rate_milli;
@@ -462,6 +463,7 @@ private:
     uint64_t riff_map_revision_ = 0;
     double chart_base_bpm_ = 0.0;
     std::vector<std::string> active_mods_{};
+    std::vector<std::string> session_mode_mods_{};
     int long_note_mix_version_ = 2;
     double rate_multiplier_ = 1.0;
     double score_multiplier_ = 1.0;

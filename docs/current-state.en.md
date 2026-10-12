@@ -2,6 +2,10 @@
 
 **Fixed baseline: [1.8.7](baseline-1.8.7.en.md)** (2026-10-10). Use Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`; do not advance it automatically with `latest` or a new release.
 
+**2026-10-12 · 1.8.9:** Adds larger lobby BEST numbers, key-mode colors and a white shared frame; Studio information at the upper right, score at the lower left and a horizontal riff map at the lower right; and larger result text, analysis tabs and centered actions. S+ color/font are preserved. Judge Easy/Hard selections now reach new sessions. See [behavior, verification and remaining scope](release-1.8.9-gate.md) and [Judge cause and compatibility](judge-session-handoff-1.8.9.ko.md) (Korean).
+
+**1.8.9 performance scope:** Final six-round p50 deltas remain within the historical +0.03ms target, but ghost p95 increased by +0.05125ms (about +1.94%), so the strict no-tail-increase criterion was not met. These are synthetic CPU render-call measurements, not physical latency, GPU throughput or a general performance gain. See [results, initial regression, diagnostics and limits](release-1.8.9-gate.md#성능-측정과-잔여-한계) (Korean).
+
 **2026-10-12 · 1.8.8:** Combines result analysis, free window sizing and F9 PNG hints, long LN Mix, readability updates, table URL/filter fixes, skin lane shortcuts, preserved keysounds during key-count reduction, and solo start/instant-retry controls. See the [1.8.8 release gate](release-1.8.8-gate.md) for current validation, packages and publication status. The fixed baseline remains 1.8.7.
 
 **Analysis and extension plans:** Separate lane distributions, time-based accuracy and tap/LN-head/release/hold-failure events; unmeasurable misses are never zero-ms samples. Long LN Mix v2 keeps local history/replay only and is excluded from legacy BEST and Sites uploads. Plugins and 1.9.0 stabilization remain plans. [Analysis](result-analysis-1.8.8.ko.md), [display/menu/keysound changes](release-feedback-1.8.8.ko.md), [start/retry controls](gameplay-start-controls.ko.md) (Korean).
@@ -27,14 +31,14 @@
 - 1.7.10 hardens ALL SONG against deleted cached entries and adds merge progress and consistent completion-state publication. [Verification and unreproduced symptom](release-1.7.10-gate.md).
 - 1.7.8 adds modern native menus, Luma Keys digital keyboard skins for every 4K–16K layout, Japanese UI, and web/offline skin editing. Menu and gameplay visual controls are stored separately in `native` and `gameplay.native`. [Validation](release-1.7.8-gate.md).
 
-The fixed baseline is **1.8.7**; this source version is **1.8.8**. Audio → Song Ending offers **Listen** (default) or **Skip Outro**; completed plays save and submit without another key. New plays use R4 timing based on BMS RANK and a timing profile for web submissions; existing R1/R2/R3 records are preserved. WASAPI remains the default. See the [1.8.8 release gate](release-1.8.8-gate.md) for this release's validation status and remaining limits.
+The fixed baseline is **1.8.7**; this source version is **1.8.9**. Audio → Song Ending offers **Listen** (default) or **Skip Outro**; completed plays save and submit without another key. New plays use R4 timing based on BMS RANK and a timing profile for web submissions; existing R1/R2/R3 records are preserved. WASAPI remains the default. See the [1.8.9 release gate](release-1.8.9-gate.md) for this release's validation status and remaining limits.
 
 The 749/739 checks in the [local 1.7.1 r2 report](local-1.7.1-r2.ko.md) are historical, not the new release's results. See [library management](library-management.md), [reference BPM](reference-bpm.md), [skin presets](skin-presets.md) and [ASIO](asio-audio.md).
 
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project version: `1.8.7`
+- User-pinned baseline version: `1.8.7`; current source targets `1.8.9`
 - 1.7.1 provides full-room HUD/results for up to eight players, tied ranks/missing-score states, P-GREAT-only effects, independent judgement/combo placement, ten Options cards, audio normalization and the Song Select difficulty-table card. See [follow-up details](gameplay-polish-followup.md) and [verification](release-1.7.1-gate.md).
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
 - Native Result now emphasizes score, grade and accuracy; the prism remains in custom skins. The existing 2.2-second reveal, Space skip and control readiness rules are preserved.
@@ -141,6 +145,7 @@ This is the document that the next agent or any new contributor should read firs
   - Random supports `Off / Mirror / Random (Scratch Fixed) / SR`; ordinary Random keeps scratch fixed, creates a fresh key-lane permutation per play, and records the actual seed in the replay
   - New `LN Mix 10%-90%` v2 targets 60% long 2/4-beat, 20% medium 1-beat and 20% short 1/4-/1/2-beat holds at base BPM × Rate. It preserves existing holds, original heads/keysounds and 50ms clearance before the next same-lane head, shortening targets when space is limited without merging repeated taps. Legacy replays keep v1; v2 keeps local history/replay but is excluded from legacy BEST and Sites upload. See [added conditions and checks (Korean)](release-1.8.8-gate.md)
 - Skins / gameplay feel:
+  - 1.8.9 Studio Deck places information upper right, score lower left and a horizontal 64-bin riff map lower right with a larger gauge for Native/LR2 solo play. Narrow margins scale groups or move them to the opposite side; extreme fields plus Performance HUD can hide only upper information when neither upper side has room. Ghost/multiplayer/other image skins retain Classic. [Placement and verification and limits](release-1.8.9-gate.md)
   - standard `10+2 DP` charts map the `10K` lane-color palette across the ten playable key lanes while leaving native 12K palettes independent
   - `rect / triangle / pentagon / hexagon / circle` note shapes; procedural circles and polygons use the full rect-bar width at 100%
   - note border on/off
@@ -160,13 +165,14 @@ This is the document that the next agent or any new contributor should read firs
   - eased future-note entry from above the field
   - after the last judged note, Audio → Song Ending either listens to the remaining audio (default) or skips the outro after the normal result delay; Listen also retains the lane-key manual skip
 - Judge:
+  - 1.8.9 passes session-only menu Judge Easy/Hard into new sessions. It remains absent from profiles and resets to Normal after app restart; recorded replay rules, shared multiplayer rules, old records and R1–R4 values are preserved. [Cause, records and web display scope](judge-session-handoff-1.8.9.ko.md); runtime verification is tracked separately in the release gate
   - default `PG / GR / GD` windows are `21ms / 65ms / 115ms` (BMS RANK EASY)
   - BMS `#RANK` EASY (including missing)/NORMAL/HARD/VERYHARD uses PG `21/18/15/8ms`; NORMAL/HARD/VERYHARD scales all EASY PG/GR/GD/BAD windows by `18/21`, `15/21`, `8/21`, leaving the automatic miss deadline unchanged
   - [Current timing windows, RANK tables and LN rules (Korean)](judgement-windows.md)
   - `Judge Easy` scales RANK-adjusted PG/GR/GD and hold tolerances by `1.35x`. EASY PG/GR/GD=`28.35/87.75/155.25ms`; BAD is fixed at `210ms` for every RANK; mask is unchanged
   - `Judge Hard` uses EASY PG/GR/GD=`17.5/55.714286/98.571429ms`: multiply PG by `17.5/21` and GR/GD by `18/21` after RANK. BAD is fixed at `225ms` for every RANK; hold tolerances are unchanged
   - default Normal/Easy/Hard automatically miss unplayed notes after `340ms`. A late press outside BAD misses the expired note and checks the next one, so the hit window does not expand to the automatic deadline
-  - New plays record `tenriff-native-score-v2-ruleset-4`. R3 retains its previous Easy/Hard windows and RANK/LN release behavior. R1/R2/R3 retain PG20ms, no RANK and older LN releases; R1 also keeps Easy1.25x/Hard BAD340ms/automatic miss=BAD. Custom timing remains unofficial.
+  - New plays record `tenriff-native-score-v2-ruleset-4`. R3 retains its previous Easy/Hard windows and RANK/LN release behavior. R1/R2 retain PG20ms, no RANK and older LN releases; R1 also keeps Easy1.25x/Hard BAD340ms/automatic miss=BAD. Custom timing remains unofficial.
   - if the pending same-lane note is already a `BAD` while the immediate next note is clearly `GOOD` or better, the pending note is recorded as a miss and the current press scores the next note instead of locking the stream into repeated `BAD`s
   - under `Judge Hard`, an unplayed object becomes a combo-breaking indirect `POOR` and OD8 `MISS`; other note-consuming failures stay `BAD`
   - very early non-consuming presses are handled as LR2-style `POOR` and are visible again in result / replay / UI paths
@@ -251,7 +257,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current P2P distribution target is `TenRiff 1.8.7`
+- This source uses P2P version `TenRiff 1.8.9`; see the [release record](release-1.8.9-gate.md) for compatibility checks and actual package/publication status
 - Distribution packages do not include `Songs`
 - Distribution packages include the `Mainmusic/` scene slots `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed`; each `Name.mp3` plus numbered `Name 2.mp3` through `Name 64.mp3` siblings is discovered automatically and rotates on scene re-entry
 - Distribution updates include only built artifacts and required runtime assets

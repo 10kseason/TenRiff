@@ -85,6 +85,8 @@ See [ASIO setup](asio-audio.md). ASIO holds the selected sample rate fixed and r
   - default value is `8ms`
 ### `judge`
 
+The 1.8.9 source explicitly passes menu Judge Easy/Hard choices into new sessions. They are not profile-persisted and return to Normal after app restart. Recorded replay rules and shared multiplayer rules take precedence; old records and R1–R4 values are preserved. See [cause, records and web scope](judge-session-handoff-1.8.9.ko.md) and [verification and limits](release-1.8.9-gate.md) (Korean).
+
 [Current timing windows, RANK tables and LN rules (Korean)](judgement-windows.md)
 
 - BMS `#RANK` selects chart timing: `3/EASY` PG21ms, `2/NORMAL` PG18ms, `1/HARD` PG15ms, `0/VERYHARD` PG8ms. EASY keeps GR/GD/BAD at 65/115/210ms; the other ranks scale these by 18/21, 15/21 and 8/21. Missing/unsupported headers use EASY. Judge Easy/Hard mods apply afterward. RANK does not change `hold_grace`/`hold_break` settings or automatic-miss deadlines; tail PG/GR/GD boundaries do follow RANK.
@@ -298,8 +300,8 @@ These are profile `config.json` skin settings. For a skin package's `skin.json` 
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst brightness; zero disables it. |
 | `key_pulse_enabled` | bool; `true` | Legacy ON/OFF mirror; false or zero brightness disables the burst. |
 | `hit_burst_style` | `prism`, `ring`, `spark`; `prism` | Built-in Hit Burst material. |
-| `hud_layout` | `classic`, `studio`; `studio` | HUD style for Native or imported LR2 solo play. LR2 note/key/gear images and geometry are preserved. Existing profiles without the key also default to `studio`; choose Classic in Options › Skins to restore the previous layout. Other image skins, ghost battles and multiplayer retain the classic layout. Unknown values use `studio`. |
-| `hud_riff_map_visible` | bool; `true` | Show the note-density graph and clock to the left of the Studio Deck field. Options › Skins › Studio Riff Map saves this in profiles and skin presets. Classic HUD is unchanged. |
+| `hud_layout` | `classic`, `studio`; `studio` | HUD style for Native or imported LR2 solo play; LR2 note/key/gear assets and geometry are preserved. Missing/unknown values use `studio`; select Classic in Options › Skins. In 1.8.9, information is upper right, score lower left and the horizontal map lower right; narrow margins scale groups or move them to the opposite side. Extreme fields plus Performance HUD can hide only the information card when neither upper side has room. Other image skins, ghost and multiplayer retain Classic. [Placement and verification scope](release-1.8.9-gate.md). |
+| `hud_riff_map_visible` | bool; `true` | Show Studio Deck's horizontal 64-bin density map and elapsed/total time. The default is lower right; narrow margins move/scale it, and very narrow maps omit time labels. Options › Skins › Studio Riff Map saves this in profiles and skin presets. Hiding it preserves other card positions and Classic HUD. |
 | `ui_font` | `default`, `malgun`, `bahnschrift`, `consolas`; `default` | Menu font; default is Segoe UI. Logo, rank and combo keep their dedicated fonts. |
 | `key_label_position` | `bottom`, `top`, `off`; `bottom` | Lane key-label position. |
 | `judgement_line_position` | double: `0..1`; `0.82` | Vertical judgement-line position ratio. |

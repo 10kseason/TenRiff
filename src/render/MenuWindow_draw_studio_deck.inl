@@ -40,29 +40,38 @@
             const auto& deck = studio_deck;
             const auto& c = scene_hud_cache;
             const auto muted = D2D1::ColorF(0x8290A2);
-            const auto saved_title_color = d2d_->text_brush->GetColor();
-            d2d_->text_brush->SetColor(ng_color("title", D2D1::ColorF(0xF4F7FB)));
-            draw_full_song_title(studio_fonts.studio_title.Get(), song_title_rect, d2d_->text_brush.Get(), true);
-            d2d_->text_brush->SetColor(saved_title_color);
-            studio_text(c.artist_text, studio_fonts.studio_body.Get(),
-                D2D1::RectF(deck.left_x, 94, deck.left_x + deck.left_width, 121), ng_color("body", D2D1::ColorF(0x7C889B)));
-            const float cell_width = (deck.left_width - 12.0f) / 3.0f;
-            for (int i = 0; i < 6; ++i) {
-                const float x = deck.left_x + (i % 3) * (cell_width + 6.0f) + 9.0f;
-                const float y = 135.0f + (i / 3) * 62.0f;
-                studio_text(c.studio_setting_labels[i], studio_fonts.studio_label.Get(),
-                    D2D1::RectF(x, y, x + cell_width - 18.0f, y + 21), muted);
-                studio_text(c.studio_setting_values[i], studio_fonts.studio_numbers[4].Get(),
-                    D2D1::RectF(x, y + 23, x + cell_width - 18.0f, y + 51), D2D1::ColorF(0xDDE3EB));
+            D2D1_MATRIX_3X2_F saved_transform{};
+            ctx->GetTransform(&saved_transform);
+            if (deck.info_visible) {
+                const auto saved_title_color = d2d_->text_brush->GetColor();
+                d2d_->text_brush->SetColor(ng_color("title", D2D1::ColorF(0xF4F7FB)));
+                draw_full_song_title(studio_fonts.studio_title.Get(), song_title_rect, d2d_->text_brush.Get(), true);
+                d2d_->text_brush->SetColor(saved_title_color);
+                ctx->SetTransform(D2D1::Matrix3x2F::Scale(deck.info_scale, deck.info_scale) *
+                    D2D1::Matrix3x2F::Translation(deck.info_x, deck.info_y) * saved_transform);
+                const float info_width = deck.info_width / deck.info_scale;
+                studio_text(c.artist_text, studio_fonts.studio_body.Get(),
+                    D2D1::RectF(0, 42, info_width, 69), ng_color("body", D2D1::ColorF(0x7C889B)));
+                const float cell_width = (info_width - 12.0f) / 3.0f;
+                for (int i = 0; i < 6; ++i) {
+                    const float x = (i % 3) * (cell_width + 6.0f) + 9.0f;
+                    const float y = 83.0f + (i / 3) * 62.0f;
+                    studio_text(c.studio_setting_labels[i], studio_fonts.studio_label.Get(),
+                        D2D1::RectF(x, y, x + cell_width - 18.0f, y + 21), muted);
+                    studio_text(c.studio_setting_values[i], studio_fonts.studio_numbers[4].Get(),
+                        D2D1::RectF(x, y + 23, x + cell_width - 18.0f, y + 51), D2D1::ColorF(0xDDE3EB));
+                }
+                ctx->SetTransform(saved_transform);
             }
             if (deck.map_visible) {
                 const float progress = data.gameplay.duration_samples > 0 ? static_cast<float>(std::clamp(
                     static_cast<double>(data.gameplay.current_sample) / data.gameplay.duration_samples, 0.0, 1.0)) : 0.0f;
-                const float y = 60.0f + 960.0f * progress;
+                const float x = deck.map_x + deck.map_width * progress;
+                const float bottom = deck.map_top + deck.map_height;
                 auto* fill = d2d_->note_fill_brush.Get(); const auto saved = fill->GetColor();
                 fill->SetColor(D2D1::ColorF(0x050608, 0.75f));
-                ctx->FillRectangle(D2D1::RectF(deck.map_x, 60, deck.map_x + 56, y), fill);
-                ctx->DrawLine(D2D1::Point2F(deck.map_x - 8, y), D2D1::Point2F(deck.map_x + 64, y), d2d_->accent_brush.Get(), 2);
+                ctx->FillRectangle(D2D1::RectF(deck.map_x, deck.map_top, x, bottom), fill);
+                ctx->DrawLine(D2D1::Point2F(x, deck.map_top - 4), D2D1::Point2F(x, bottom + 3), d2d_->accent_brush.Get(), 2);
                 fill->SetColor(saved);
                 // Only the clock's displayed second invalidates these strings/layouts.
                 const auto sample_rate = std::max(1, data.gameplay.sample_rate);
@@ -76,24 +85,31 @@
                     scene_hud_cache.studio_total_second = total;
                     scene_hud_cache.studio_total = to_wide(format_progress_clock(data.gameplay.duration_samples));
                 }
+                ctx->SetTransform(D2D1::Matrix3x2F::Scale(deck.map_scale, deck.map_scale) *
+                    D2D1::Matrix3x2F::Translation(deck.map_x, deck.map_top) * saved_transform);
+                const float map_width = deck.map_width / deck.map_scale;
+                const float clock_x = std::clamp(map_width * progress - 38.0f, 0.0f, map_width - 76.0f);
                 studio_text(c.studio_elapsed, studio_fonts.studio_numbers[2].Get(),
-                    D2D1::RectF(deck.map_x - 8, y - 22, deck.map_x + 56, y - 2), d2d_->accent_brush->GetColor(), DWRITE_TEXT_ALIGNMENT_TRAILING);
+                    D2D1::RectF(clock_x, -28, clock_x + 76, -6), d2d_->accent_brush->GetColor(), DWRITE_TEXT_ALIGNMENT_CENTER);
                 if (deck.map_times_visible) {
                     static const std::wstring zero = L"0:00";
                     studio_text(zero, studio_fonts.studio_numbers[1].Get(),
-                        D2D1::RectF(deck.map_x - 58, 56, deck.map_x - 10, 75), D2D1::ColorF(0x8A96A8), DWRITE_TEXT_ALIGNMENT_TRAILING);
+                        D2D1::RectF(0, 102, 76, 122), D2D1::ColorF(0x8A96A8));
                     studio_text(c.studio_total, studio_fonts.studio_numbers[1].Get(),
-                        D2D1::RectF(deck.map_x - 58, 1006, deck.map_x - 10, 1025), D2D1::ColorF(0x8A96A8), DWRITE_TEXT_ALIGNMENT_TRAILING);
+                        D2D1::RectF(map_width - 76, 102, map_width, 122), D2D1::ColorF(0x8A96A8), DWRITE_TEXT_ALIGNMENT_TRAILING);
                 }
+                ctx->SetTransform(saved_transform);
             }
-            if (!deck.right_hud_visible) return;
-            const float x = deck.right_x, right = x + deck.right_width;
+            if (!deck.score_visible) return;
+            ctx->SetTransform(D2D1::Matrix3x2F::Scale(deck.score_scale, deck.score_scale) *
+                D2D1::Matrix3x2F::Translation(deck.score_x, deck.score_y) * saved_transform);
+            const float x = 0.0f, right = deck.score_width / deck.score_scale;
             static const std::wstring score_label = L"SCORE";
-            studio_text(score_label, studio_fonts.studio_numbers[1].Get(), D2D1::RectF(x, 48, right, 68), muted, DWRITE_TEXT_ALIGNMENT_LEADING, 3);
-            const auto score_rect = D2D1::RectF(x, 70, right, 140);
+            studio_text(score_label, studio_fonts.studio_numbers[1].Get(), D2D1::RectF(x, 0, right, 20), muted, DWRITE_TEXT_ALIGNMENT_LEADING, 3);
+            const auto score_rect = D2D1::RectF(x, 22, right, 92);
             studio_text(c.studio_score_padded, studio_fonts.studio_score.Get(), score_rect, D2D1::ColorF(0x232A35), DWRITE_TEXT_ALIGNMENT_TRAILING);
             studio_text(c.studio_score_significant, studio_fonts.studio_score.Get(), score_rect, ng_color("score", D2D1::ColorF(0xF4F7FB)), DWRITE_TEXT_ALIGNMENT_TRAILING);
-            float y = 148;
+            float y = 100;
             if (data.gameplay.pacemaker_mode != "off" && !data.gameplay.pacemaker_mode.empty()) {
                 studio_text(c.studio_pace, studio_fonts.studio_numbers[3].Get(), D2D1::RectF(x, y, right, y + 27),
                     D2D1::ColorF(data.gameplay.pacemaker_delta < 0 ? 0xFF6B78 : 0x66E6B0));
@@ -111,7 +127,7 @@
             static const std::array<const char*, 5> tokens{"PG", "GR", "G", "BAD", "POOR"};
             float start = x;
             for (std::size_t i = 0; i < 5; ++i) {
-                const float end = start + deck.right_width * static_cast<float>(ratios[i]);
+                const float end = start + right * static_cast<float>(ratios[i]);
                 fill->SetColor(ng_judge_color(tokens[i]));
                 if (end > start) ctx->FillRectangle(D2D1::RectF(start, y, end, y + 8), fill);
                 start = end;
@@ -130,6 +146,7 @@
                 cursor += width;
             }
             studio_text(c.studio_max, studio_fonts.studio_numbers[2].Get(), D2D1::RectF(x, y + 36, right, y + 62), muted);
+            ctx->SetTransform(saved_transform);
         };
         auto draw_studio_rails = [&] {
             const auto& field = surface_layout.player_field;
@@ -142,13 +159,13 @@
             if (token == "EX-HARD" && rgb == 0x292C31) rgb = 0xC9CED6;
             const auto color = color_from_rgb(rgb, 1);
             auto* fill = d2d_->note_fill_brush.Get(); const auto saved = fill->GetColor(); fill->SetColor(color);
-            if (ratio > 0) for (float x : {field.left - 6, field.right + 2})
-                ctx->FillRectangle(D2D1::RectF(x, hit * (1 - ratio), x + 4, hit), fill);
-            const float x = field.right + 14, y = gameplay_studio_gauge_marker_y(hit, ratio);
-            ctx->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(x, y, x + 62, y + 27), 6, 6), fill);
+            if (ratio > 0) for (float x : {field.left - 8, field.right + 2})
+                ctx->FillRectangle(D2D1::RectF(x, hit * (1 - ratio), x + 6, hit), fill);
+            const float x = studio_deck.gauge_marker_x, y = gameplay_studio_gauge_marker_y(hit, ratio);
+            ctx->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(x, y, x + 76, y + 32), 7, 7), fill);
             fill->SetColor(saved);
-            studio_text(scene_hud_cache.gauge_value_text, studio_fonts.studio_numbers[4].Get(), D2D1::RectF(x + 4, y, x + 58, y + 27), D2D1::ColorF(0x0A0C10), DWRITE_TEXT_ALIGNMENT_CENTER);
-            studio_text(scene_hud_cache.studio_gauge_name, studio_fonts.studio_numbers[0].Get(), D2D1::RectF(x, y + 30, x + 86, y + 48), color, DWRITE_TEXT_ALIGNMENT_LEADING, 2);
+            studio_text(scene_hud_cache.gauge_value_text, studio_fonts.studio_numbers[4].Get(), D2D1::RectF(x + 4, y + 2, x + 72, y + 30), D2D1::ColorF(0x0A0C10), DWRITE_TEXT_ALIGNMENT_CENTER);
+            studio_text(scene_hud_cache.studio_gauge_name, studio_fonts.studio_numbers[0].Get(), D2D1::RectF(x, y + 35, x + 86, y + 53), color, DWRITE_TEXT_ALIGNMENT_LEADING, 2);
         };
         auto draw_studio_combo = [&](const GameplayFieldLayout& field, const std::wstring& value,
                                      const GameplayTextPopAnimation& animation, float top, float bottom, float offset) {

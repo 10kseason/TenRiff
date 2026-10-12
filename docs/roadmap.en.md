@@ -8,17 +8,18 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current Baseline
 - Windows GUI / runtime is the primary supported path.
-- The fixed baseline is `1.8.7` and this source targets `1.8.8`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
+- The fixed baseline is `1.8.7` and this source targets `1.8.9`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
 - The active menu / runtime is BMS-family only (`.bms/.bme/.bml/.pms`) and supports native, bundled/profile TenRiff `skin.json`, and LR2 skins.
 - For current shipped behavior, read `docs/current-state.en.md` first; this roadmap is about direction and remaining work.
 
-## 1.8.8 Analysis and 1.9.0 Stabilization Plan (2026-10-12)
+## 1.8.8–1.8.9 Analysis and 1.9.0 Stabilization Plan (2026-10-12)
 
-The current source scope is **1.8.8**, including analysis, window sizing, long LN Mix and display/menu/keysound/start-control improvements. See the [release gate](release-1.8.8-gate.md) for current validation and publication status. The plugin host, API and SDK are not implemented; `1.9.0` is a future stabilization target. The fixed `1.8.7` baseline, existing tags and release files remain preserved. This plan sets the next development priorities; the earlier stage list below does not automatically authorize additional unfinished core features.
+The current source is **the 1.8.9 release line**. It builds on 1.8.8 analysis, window sizing, LN Mix, keysounds and start controls with implemented lobby/HUD/result readability changes and explicit Judge Easy/Hard handoff into new sessions. Completed local checks and performance results/residual limits are separated from remaining package, CI and publication work. Confirmed behavior and new verification/publication status belong in the [1.8.9 release validation](release-1.8.9-gate.md). The plugin host, API and SDK are not implemented; `1.9.0` remains a future stabilization target. Preserve the fixed `1.8.7` baseline, existing tags/assets and 1.8.8 records. The earlier stage list below does not automatically authorize additional unfinished core features.
 
 | Stage | Completion criteria |
 | --- | --- |
 | 1.8.8 | Validate lane FAST/SLOW, time accuracy, tap/LN events, distributions/sample counts, free window sizing, result PNGs, long LN Mix, readability, menu input, keysound preservation and solo start/retry against the [release gate](release-1.8.8-gate.md) |
+| 1.8.9 | Lobby/Studio HUD/result UI with S+ preserved and Judge session handoff are implemented in source. Completed local checks, performance residuals and remaining package, CI and publication work are tracked under the [new release criteria](release-1.8.9-gate.md), including hidden upper information when extreme field/overlay geometry leaves no room |
 | Before 1.9.0 | A limited read-only plugin API demonstrated by an alternative result analysis view and a personal song filter, both built without core source edits |
 | After 1.9.0 stabilization | Maintain the core feature scope; focus on bug, security and compatibility fixes and plugin extensions |
 

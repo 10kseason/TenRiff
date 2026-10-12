@@ -85,6 +85,8 @@ ASIO 설정은 [장치 설정 안내](asio-audio.md)를 참고하세요. 선택 
   - 기본값은 `8ms`
 ### `judge`
 
+1.8.9는 메뉴의 Judge Easy/Hard를 새 세션에 명시 전달합니다. 프로필에는 저장하지 않아 앱 재시작 시 Normal로 돌아옵니다. 리플레이 원본과 멀티 공통 규칙이 우선하며 과거 기록·R1–R4 수치는 유지합니다. [원인과 기록·웹 범위](judge-session-handoff-1.8.9.ko.md), [검증 결과와 한계](release-1.8.9-gate.md).
+
 [최신 판정 범위·RANK별 표·롱노트 규칙](judgement-windows.md)
 
 - BMS `#RANK`는 기본 판정에 적용됩니다: `3/EASY` PG21ms, `2/NORMAL` PG18ms, `1/HARD` PG15ms, `0/VERYHARD` PG8ms. EASY의 GR/GD/BAD는 65/115/210ms로 유지하며 나머지 등급은 각각 18/21, 15/21, 8/21배로 줄입니다. 헤더 누락/미지원 값은 EASY입니다. `Judge Easy/Hard` 모드는 이 파일 판정에 추가 적용됩니다. `hold_grace`·`hold_break` 설정과 자동 미스 시점은 RANK로 변경하지 않습니다. 꼬리 PG/GR/GD 판정은 RANK를 반영합니다.
@@ -300,8 +302,8 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst 밝기. 0이면 끔. |
 | `key_pulse_enabled` | bool; `true` | 구버전 ON/OFF 호환. false 또는 밝기 0이면 끔. |
 | `hit_burst_style` | `prism`, `ring`, `spark`; `prism` | 내장 Hit Burst 모양. |
-| `hud_layout` | `classic`, `studio`; `studio` | Native·가져온 LR2 스킨의 단독 플레이 HUD 스타일. LR2 노트·건반·기어 이미지와 비율은 유지함. 키가 없는 기존 프로필도 기본값 `studio`를 사용하며, Options › Skins에서 클래식으로 바꿀 수 있음. 다른 이미지 스킨·고스트 대전·멀티플레이는 기존 배치를 유지. 알 수 없는 값은 `studio`. |
-| `hud_riff_map_visible` | bool; `true` | 스튜디오 덱 필드 왼쪽 노트 밀도 그래프와 시계 표시. Options › Skins › 스튜디오 리프 맵에서 변경하며 프로필·스킨 프리셋에 저장됨. 클래식 HUD에는 영향 없음. |
+| `hud_layout` | `classic`, `studio`; `studio` | Native·가져온 LR2 스킨의 단독 플레이 HUD 스타일. LR2 노트·건반·기어 이미지와 비율은 유지함. 키가 없는 기존 프로필도 기본값 `studio`를 사용하며 Options › Skins에서 Classic으로 변경. 1.8.9는 오른쪽 위 정보·왼쪽 아래 점수·오른쪽 아래 가로 맵을 배치하며 좁은 여백에서는 축소·반대쪽 이동. 극단 필드와 Performance HUD가 양쪽 상단을 막으면 정보 카드만 숨김. 다른 이미지 스킨·고스트·멀티는 Classic 유지. 알 수 없는 값은 `studio`. [배치와 검증 범위](release-1.8.9-gate.md). |
+| `hud_riff_map_visible` | bool; `true` | Studio Deck의 64구간 가로 노트 밀도 맵과 경과/전체 시간 표시. 기본 위치는 오른쪽 아래이며 여백에 따라 이동·축소하고 아주 좁으면 시간 글자를 생략함. Options › Skins › 스튜디오 리프 맵에서 변경하며 프로필·스킨 프리셋에 저장됨. 꺼도 다른 카드 위치와 Classic HUD는 유지. |
 | `ui_font` | `default`, `malgun`, `bahnschrift`, `consolas`; `default` | 메뉴 글꼴. default는 Segoe UI; 로고·랭크·콤보 전용 글꼴은 유지. |
 | `key_label_position` | `bottom`, `top`, `off`; `bottom` | 레인 키 이름 위치. |
 | `judgement_line_position` | double: `0..1`; `0.82` | 판정선 세로 위치 비율. |

@@ -85,6 +85,8 @@
   - 默认值为 `8ms`
 ### `judge`
 
+1.8.9源码会把菜单中的Judge Easy/Hard选择传入新会话。选择不保存到配置，重启应用后回到Normal。回放原始规则和多人共同规则优先，保留历史记录与R1–R4数值。参见[原因、记录与网页范围](judge-session-handoff-1.8.9.ko.md)、[验证结果与限制](release-1.8.9-gate.md)（韩语）。
+
 [最新判定范围、RANK表与LN规则（韩语）](judgement-windows.md)
 
 - BMS `#RANK`：`3/EASY` PG21ms、`2/NORMAL` PG18ms、`1/HARD` PG15ms、`0/VERYHARD` PG8ms。EASY的GR/GD/BAD保持65/115/210ms，其他难度分别缩小至18/21、15/21、8/21倍。缺失或不支持的值使用EASY。Judge Easy/Hard模组随后应用；RANK不改变 `hold_grace`/`hold_break` 设置与自动漏键时限；尾端PG/GR/GD判定会应用RANK。
@@ -300,8 +302,8 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst 亮度；0 为关闭。 |
 | `key_pulse_enabled` | bool; `true` | 旧版开关兼容；false 或亮度为 0 时关闭。 |
 | `hit_burst_style` | `prism`, `ring`, `spark`; `prism` | 内置 Hit Burst 样式。 |
-| `hud_layout` | `classic`, `studio`; `studio` | Native 或导入 LR2 皮肤的单人游戏 HUD 样式。保留 LR2 音符、按键、边框图像和比例。缺少此键的旧配置也默认使用 `studio`，可在 Options › Skins 选择 Classic。其他图像皮肤、幽灵对战和多人游戏保持原有布局。未知值使用 `studio`。 |
-| `hud_riff_map_visible` | bool; `true` | 显示 Studio Deck 场地左侧的音符密度图和时钟。在 Options › Skins › Studio Riff Map 中修改，并保存到配置和皮肤预设。Classic HUD 不受影响。 |
+| `hud_layout` | `classic`, `studio`; `studio` | Native／LR2单人HUD，保留LR2音符、按键、边框素材和比例。缺失或未知值使用`studio`，可在Options › Skins选择Classic。1.8.9采用右上信息、左下分数、右下横向地图，较窄外侧空间会触发整体缩放或移至另一侧。极端场地与Performance HUD占满两侧上方时只隐藏信息卡。其他图像皮肤、幽灵与多人保留Classic。[布局与验证范围](release-1.8.9-gate.md)。 |
+| `hud_riff_map_visible` | bool; `true` | 显示Studio Deck的64段横向密度图和已用／总时间。默认在右下，外侧空间不足时移动或缩小，极窄时省略时间文字。在Options › Skins › Studio Riff Map中修改并保存到配置和皮肤预设。隐藏后保留其他卡片位置和Classic HUD。 |
 | `ui_font` | `default`, `malgun`, `bahnschrift`, `consolas`; `default` | 菜单字体；default 为 Segoe UI，标志、等级与连击保留专用字体。 |
 | `key_label_position` | `bottom`, `top`, `off`; `bottom` | 轨道按键名称位置。 |
 | `judgement_line_position` | double: `0..1`; `0.82` | 判定线纵向位置比例。 |

@@ -2251,6 +2251,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
 
     GameSession session;
     session.set_instant_restart_start(instant_restart_start);
+    session.set_session_mode_mods(config_.mode.mods);
     if (!peer_battle && replay_path.empty() && bms_editor_practice_start_seconds_.has_value()) {
         session.set_practice_no_fail_override(true);
         session.set_practice_start_seconds(*bms_editor_practice_start_seconds_);

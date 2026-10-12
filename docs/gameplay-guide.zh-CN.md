@@ -40,6 +40,8 @@ TenRiff 的基础游玩流程如下：
 - `Esc`：退出
 
 ### Song Select
+
+1.8.9大厅把较大的BEST主数字与最大分数、COMBO单位及详细行分开。音符数标签和值为白色，列表与中间的封面/BEST/筛选卡共用白色外框。可用的Start按钮与结果页Continue使用相同天蓝色。保留S+颜色与字体。
 - `Up` / `Down`：移动歌曲
 - `PageUp` / `PageDown`：快速移动
 - 鼠标滚轮：移动歌曲
@@ -147,6 +149,10 @@ Rate 只改变歌曲播放速度和谱面时间轴；在相同 Hi-Speed 下，�
 
 ## 8. HUD 的读法
 
+**1.8.9 Studio Deck：**在`Options > Skins`中选择Native／LR2单人游戏的Studio Deck或Classic，以及Studio Riff Map显示。Studio把曲目信息和Rate/HS/BPM/Scroll/Line/Latency放在右上，分数／准确度／判定数放在左下，64段横向密度图放在右下。地图从左向右推进，显示当前位置和已用／总时间。血条轨道与标记也已加大。
+
+场地外侧空间较窄时，整张卡片按比例缩小或移到更宽的另一侧。分数和地图位于同侧时，分数移到地图上方；极窄地图省略时间文字。极端场地位置／宽度与Performance HUD占满两侧上方空间时，只隐藏顶部信息卡。隐藏地图不会改变其他卡片位置。保留LR2音符／按键／边框素材，以及幽灵对战、多人和其他图像皮肤的Classic布局。[运行验证与限制](release-1.8.9-gate.md)（韩语）。
+
 游戏内 HUD 一般会显示以下信息：
 
 - 标题 / 艺术家
@@ -172,6 +178,8 @@ Rate 只改变歌曲播放速度和谱面时间轴；在相同 Hi-Speed 下，�
 - `Options > Audio > Normalize Audio` 对游戏内混音进行 RMS 音量调整，默认 OFF；不改变菜单音乐或选曲试听。
 
 ## 9. 判定与 Gauge
+
+1.8.9源码会把`Options > Key Mode Settings > Mods`中选择的Judge Easy/Hard明确传入新会话。选择仅在本次应用运行期间有效，不保存到配置，重启应用后回到Normal。回放优先采用原始模组和ruleset，多人采用共同规则。不修改历史Normal记录和R1–R4数值。参见[原因、记录与网页显示范围](judge-session-handoff-1.8.9.ko.md)、[验证结果与限制](release-1.8.9-gate.md)（韩语）。
 
 ### 判定
 当前默认判定显示使用下列缩写：
@@ -207,6 +215,8 @@ Gauge Shift 始终启用。`EX / Hard / Normal / Easy` 选择起始档位，保�
 `Sudden Death (1 MISS)` 不是 gauge 类型，而是在首次 OD8 换算对象 `MISS` 时把 gauge 置零并立即结束的规则。仅原生 `BAD` timing 不会触发，空按产生的 `POOR` 也不计入，并且不能与 Practice No-Fail 同时启用。
 
 ## 10. Result 画面
+
+1.8.9单人结果页通过`SUMMARY / LANES / NOTE TYPES / TIMELINE`按钮切换分析。绿色分析边框、蓝色标签和天蓝色Continue用于区分区域，Replay/Retry图标与文字作为整体居中。左侧分组共用外框并有内部区分线，MAX COMBO数字和单位分开。文字放大仅改变显示，保留分数与分析定义。实际画面和操作验证状态见[发布记录](release-1.8.9-gate.md)。
 
 游玩结束后，可以在 Result 画面查看以下内容：
 

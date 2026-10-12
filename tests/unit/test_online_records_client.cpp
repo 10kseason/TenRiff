@@ -7,13 +7,14 @@
 #include "config/SimpleJson.h"
 
 namespace {
-std::string sites_timing_board_fixture(const tenriff::config::JsonValue* profile = nullptr) {
+std::string sites_timing_board_fixture(const tenriff::config::JsonValue* profile = nullptr,
+                                      std::string_view mod = "judge_easy") {
     using namespace tenriff::config;
     JsonObject conditions;
     conditions.emplace("ruleset", JsonValue{"tenriff-native-score-v2-ruleset-3"});
     conditions.emplace("gauge", JsonValue{"normal"});
     conditions.emplace("random", JsonValue{"off"});
-    conditions.emplace("mods", JsonValue{JsonArray{JsonValue{"judge_easy"}}});
+    conditions.emplace("mods", JsonValue{mod.empty() ? JsonArray{} : JsonArray{JsonValue{std::string(mod)}}});
     if (profile) conditions.emplace("timing_profile", *profile);
     JsonObject board;
     board.emplace("id", JsonValue{std::string(64, 'a')});
@@ -27,6 +28,22 @@ std::string sites_timing_board_fixture(const tenriff::config::JsonValue* profile
     return json_stringify(JsonValue{response});
 }
 }  // namespace
+
+TEST_CASE("Sites board display keeps judge Hard Easy and unmodified conditions distinct") {
+    std::set<std::string> labels;
+    const tenriff::config::JsonValue profile{"bms-easy"};
+    for (const std::string mod : {"", "judge_easy", "judge_hard"}) {
+        std::vector<tenriff::app::SitesRecordBoard> boards;
+        std::string error;
+        REQUIRE(tenriff::app::parse_sites_record_boards(sites_timing_board_fixture(&profile, mod),
+                                                     "Fixture", boards, error));
+        REQUIRE(boards.size() == 1);
+        if (!mod.empty()) CHECK(boards.front().conditions_label.find(mod) != std::string::npos);
+        else CHECK(boards.front().conditions_label.find("judge_") == std::string::npos);
+        labels.insert(boards.front().conditions_label);
+    }
+    CHECK(labels.size() == 3);
+}
 
 TEST_CASE("Sites board labels distinguish known timing profiles without claiming modified windows") {
     using namespace tenriff;

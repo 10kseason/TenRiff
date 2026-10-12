@@ -38,6 +38,8 @@ Windows では通常、次のどちらかで起動します。
 - `Esc`: 終了
 
 ### Song Select
+
+1.8.9のロビーはBESTの大きな主数値と最大点数・COMBO単位・詳細行を分けます。ノート数のラベルと値は白で、一覧と中央のアート/BEST/フィルターを白い外枠でまとめます。有効なStartは結果のContinueと同じ水色です。S+の色・書体は維持します。
 - `Up` / `Down`: 曲移動
 - `PageUp` / `PageDown`: 高速移動
 - マウスホイール: 曲移動
@@ -141,6 +143,10 @@ Rate は曲の再生速度と譜面スケジュールだけを変え、同じ Hi
 
 ## 8. HUD の見方
 
+**1.8.9 Studio Deck:** `Options > Skins`でNative・LR2ソロ用のStudio Deck/ClassicとStudio Riff Map表示を選びます。Studioでは曲情報とRate/HS/BPM/Scroll/Line/Latencyを右上、点数・精度・判定数を左下、64区間の横向き密度マップを右下に配置します。マップは左から右へ進み、現在位置と経過／全体時間を表示します。ゲージのレールとマーカーも拡大しました。
+
+フィールド外の余白が狭い場合はカード全体を縮小し、より広い反対側へ移動します。点数とマップが同じ側なら点数を上へ移し、非常に狭いマップでは時間文字を省略します。極端なフィールド位置・幅とPerformance HUDによって両側上部の余白がなくなる場合は、上部情報カードだけを非表示にします。マップを隠しても他のカード位置は変わりません。LR2のノート・キー・ギアと、ゴースト・マルチ・他の画像スキンのClassic配置は維持します。[実行検証と制限](release-1.8.9-gate.md)です（韓国語）。
+
 - Title / artist
 - BPM
 - 現在の `Rate`
@@ -164,6 +170,8 @@ Rate は曲の再生速度と譜面スケジュールだけを変え、同じ Hi
 - `Options > Audio > Normalize Audio` はゲーム内ミックスの RMS 音量調整で、既定は OFF。メニュー音楽・選曲プレビューは変更しません。
 
 ## 9. 判定とゲージ
+
+1.8.9ソースは`Options > Key Mode Settings > Mods`で選んだJudge Easy/Hardを新しいセッションへ明示的に渡します。選択はアプリ実行中のみ有効でプロファイルには保存せず、アプリ再起動後はNormalへ戻ります。リプレイは記録済みMOD・ruleset、マルチは共通規則を優先します。過去のNormal記録とR1–R4の数値は変更しません。[原因・記録・ウェブ表示の範囲](judge-session-handoff-1.8.9.ko.md)、[検証結果と制限](release-1.8.9-gate.md)（韓国語）を参照してください。
 
 ### Judgement
 - `PG`: Perfect Great
@@ -197,6 +205,8 @@ Gauge Shift は常に有効です。`EX / Hard / Normal / Easy` は開始段階�
 `Sudden Death (1 MISS)` は gauge type ではなく、最初の OD8 換算 object `MISS` で gauge を 0 にして即終了する rule です。native `BAD` timing だけでは発動せず、空打ちの `POOR` も対象外で、Practice No-Fail と同時には有効化できません。
 
 ## 10. Result 画面
+
+1.8.9のソロ結果は`SUMMARY / LANES / NOTE TYPES / TIMELINE`ボタンで分析を切り替えます。緑の分析枠、青いタブ、水色のContinueを区別し、Replay/Retryのアイコンと文字をまとめて中央に配置します。左側は共通外枠と内部区分を使い、MAX COMBOの数値と単位を分けます。文字拡大は表示の変更で、点数・分析の定義は維持します。実画面・操作の検証状況は[リリース記録](release-1.8.9-gate.md)を参照してください。
 
 - Clear / Game Over 状態
 - Rank

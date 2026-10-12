@@ -2,6 +2,10 @@
 
 **固定基準: [1.8.7](baseline-1.8.7.ja.md)**（2026-10-10）。Git tag `1.8.7`、commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347` を使い、`latest` や新しいリリースに合わせて自動変更しません。
 
+**2026-10-12 · 1.8.9:** ロビーの大きなBEST数値・キーモード色・白い共通外枠、右上情報・左下点数・右下横向きriff mapのStudio HUD、大きな結果文字・分析タブ・中央に揃えた操作を追加します。S+の色・書体を維持し、Judge Easy/Hardの選択を新しいセッションへ渡します。[動作・検証・残る範囲](release-1.8.9-gate.md)、[Judgeの原因と互換性](judge-session-handoff-1.8.9.ko.md)（韓国語）を参照してください。
+
+**1.8.9の性能範囲:** 最終6回比較のp50差は従来の+0.03ms目標内ですが、ghost p95が+0.05125ms（約+1.94%）増加し、厳格なtail非増加基準は満たしませんでした。合成CPU描画呼び出しの測定であり、物理遅延・GPU処理量や一般的な性能向上は示しません。[数値・初期回帰・診断と制限](release-1.8.9-gate.md#성능-측정과-잔여-한계)（韓国語）を参照してください。
+
 **2026-10-12 · 1.8.8:** 結果分析、自由なウィンドウサイズとF9 PNG案内、長いLN Mixに加え、表示の読みやすさ、難易度表URL・フィルター、スキンのレーンショートカット、キー数削減時のキー音保全、ソロ開始・即時再試行を改善します。現在の検証・パッケージ・公開状況は[1.8.8リリース案内](release-1.8.8-gate.md)を参照してください。固定基準は1.8.7を維持します。
 
 **分析と拡張計画:** レーン別分布・時間帯別精度・単ノート/LN開始・離鍵・維持失敗を区別し、測定不能のミスを0ms標本にしません。長いLN Mix v2はローカル記録・リプレイ専用で、従来BEST・Sites送信から除外します。プラグインと1.9.0安定化は計画です。[分析基準](result-analysis-1.8.8.ko.md)、[画面・メニュー・キー音](release-feedback-1.8.8.ko.md)、[開始・再試行操作](gameplay-start-controls.ko.md)（韓国語）。
@@ -27,14 +31,14 @@
 - 1.7.10 は ALL SONG の削除済みキャッシュ項目、統合進捗、完了状態の通知を改善します。[検証と未再現の症状](release-1.7.10-gate.md)。
 - 1.7.8 は新しい標準メニュー、4〜16キー対応 Luma Keys、日本語 UI とウェブ/オフラインスキン編集を追加します。メニューとゲームプレイの設定は `native` と `gameplay.native` に分けます。[検証範囲](release-1.7.8-gate.md)。
 
-固定基準は **1.8.7**、このソースのバージョンは **1.8.8** です。Audioの曲終了方式で**最後まで聴く**（既定）か**後奏スキップ**を選べ、正常終了した結果は追加入力なしで保存・送信します。新しいプレイはBMS RANK対応のR4判定とウェブ送信用の判定プロファイルを使い、既存のR1/R2/R3記録は維持します。既定の出力はWASAPIです。今回の検証状況と残る制限は[1.8.8リリース案内](release-1.8.8-gate.md)を参照してください。
+固定基準は **1.8.7**、このソースのバージョンは **1.8.9** です。Audioの曲終了方式で**最後まで聴く**（既定）か**後奏スキップ**を選べ、正常終了した結果は追加入力なしで保存・送信します。新しいプレイはBMS RANK対応のR4判定とウェブ送信用の判定プロファイルを使い、既存のR1/R2/R3記録は維持します。既定の出力はWASAPIです。今回の検証状況と残る制限は[1.8.9リリース案内](release-1.8.9-gate.md)を参照してください。
 
 [ローカル 1.7.1 r2 レポート](local-1.7.1-r2.ko.md)の 749/739 件は以前のビルドの記録です。新リリースの結果として再利用しません。[曲管理](library-management.md)、[基準 BPM](reference-bpm.md)、[スキンプリセット](skin-presets.md)、[ASIO](asio-audio.md)を参照してください。
 
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- 現在の project version は `1.8.7`
+- ユーザー固定基準は `1.8.7`、現在のソースは `1.8.9`
 - 1.7.1 は最大8人の HUD・結果、同点順位・スコア待機状態、P-GREAT 専用演出、判定・コンボの独立位置、10個の設定カード、音量ノーマライズ、選曲の難易度表カードを提供します。[変更詳細](gameplay-polish-followup.md)と[検証範囲](release-1.7.1-gate.md)を参照。
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
 - 基本結果画面はスコア・ランク・精度を中心に表示し、プリズム演出はカスタムスキン側に残します。既存の2.2秒の表示演出、Spaceによるスキップ、操作解禁条件を維持します。
@@ -141,6 +145,7 @@
   - Random は `Off / Mirror / Random (Scratch Fixed) / SR` に対応。通常 Random は scratch を固定し、play ごとに新しい key-lane 配置を生成して実際の seed を replay に記録
   - 新しい `LN Mix 10%～90%` v2はbase BPM×Rate基準で長い2・4拍60% / 中間1拍20% / 短い1/4・1/2拍20%を目標に混合。既存LN・元の開始位置とキー音を維持し、同一レーンの次の開始まで50msを確保。空間不足では長さを段階的に下げ、連打は結合しない。旧リプレイはv1で再現し、v2はローカル記録・リプレイのみで従来BEST・Sites送信から除外。[追加条件と検証（韓国語）](release-1.8.8-gate.md)を参照
 - Skins / gameplay feel:
+  - 1.8.9 Studio DeckはNative/LR2ソロで右上情報・左下点数・右下64区間横向きriff mapと拡大ゲージを使用。狭い余白では全体縮小・反対側移動を行い、極端なフィールドとPerformance HUDが両側上部を塞ぐ場合は上部情報だけを非表示。ゴースト・マルチ・他の画像スキンはClassic維持。[配置と検証範囲](release-1.8.9-gate.md)
   - 標準 `10+2 DP` chart は scratch 2 lane を除く実際の 10 key に `10K` lane-color palette を順番に適用し、native 12K palette とは独立して保持
   - `rect / triangle / pentagon / hexagon / circle` note shape。procedural 円・多角形は 100% で rect bar と同じ全幅を使用
   - note border on/off
@@ -160,6 +165,7 @@
   - フィールド上端からの future-note entry easing
   - 最後の判定ノート後はAudioの曲終了方式に従い、最後まで聴く（既定）か通常の結果待機時間後に後奏を自動スキップする。最後まで聴く場合もlane keyによる手動スキップを維持
 - Judge:
+  - 1.8.9はセッション専用Judge Easy/Hardをメニューから新しいセッションへ渡す。プロファイルには保存せずアプリ再起動でNormalへ戻り、リプレイ原本・マルチ共通規則・過去記録・R1–R4数値を維持。[原因・記録・ウェブ表示](judge-session-handoff-1.8.9.ko.md)。実行検証はリリース記録で別途確認
   - 既定の `PG / GR / GD` 判定幅は `21ms / 65ms / 115ms` (BMS RANK EASY)
   - BMS `#RANK` EASY（未指定を含む）/NORMAL/HARD/VERYHARDのPGは`21/18/15/8ms`。NORMAL/HARD/VERYHARDはEASYのPG/GR/GD/BAD全体に`18/21`、`15/21`、`8/21`を掛け、自動ミス時刻は維持する
   - [最新の判定幅・RANK表・LN規則（韓国語）](judgement-windows.md)
@@ -251,7 +257,7 @@
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- 現在の P2P 配布対象は `TenRiff 1.8.7`
+- このソースのP2P版は`TenRiff 1.8.9`。[リリース記録](release-1.8.9-gate.md)で互換性検査と実際のパッケージ・公開状況を確認
 - distribution package には `Songs` を含めない
 - distribution package には `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` の `Mainmusic/` scene slot を含め、各 `Name.mp3` と `Name 2.mp3`～`Name 64.mp3` を自動検出して scene 再入場ごとに循環する
 - distribution 更新には built artifact と必要な runtime asset だけを含める

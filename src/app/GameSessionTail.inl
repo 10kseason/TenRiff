@@ -279,6 +279,11 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         const config::RuntimeConfig persisted = build_persisted_runtime_config(config_);
         config_loader.save_profile(profile_dir_, persisted);
     }
+    // Judge Easy/Hard intentionally do not persist. Carry the menu's current
+    // selection across the profile reload, but never into replay or peer rules.
+    if (!peer_battle_mode_ && options.replay_path.empty()) {
+        apply_session_only_mode_mods(config_, session_mode_mods_);
+    }
     if (peer_battle_mode_ && !apply_peer_battle_rules(config_, peer_battle_rate_milli_)) {
         std::cerr << "[error] The negotiated multiplayer Rate is invalid." << std::endl;
         return false;

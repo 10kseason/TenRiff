@@ -110,7 +110,9 @@ def catalog():
         'enabled': 1, 'speed': 1, 'intensity': 1, 'entry_seconds': 0.42}, fonts={}, references={})
     for path in FILES:
         source = native_source(path.read_text(encoding='utf-8-sig'), path.name)
-        for match in re.finditer(r'native_rect\("([^"\n]+)",\s*D2D1::RectF\(', source):
+        # A named geometry helper is still an editable slot. Literal slot IDs
+        # must remain discoverable when their default rectangle is factored out.
+        for match in re.finditer(r'native_rect\("([^"\n]+)",\s*(?:D2D1::RectF\()?', source):
             # The legacy ternary arm and legacy-only header are declared outside
             # the unreachable blocks above. Keep the IDs stable in C++.
             if path.name == 'MenuWindow_draw_generic_body.inl' and match[1] in (

@@ -2,6 +2,8 @@
 
 **固定基准：[1.8.7](docs/baseline-1.8.7.zh-CN.md)**（2026-10-10）。使用 Git tag `1.8.7`、commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`，不随 `latest` 或新版本自动更新。
 
+**2026-10-12 · 1.8.9：**提供更大的大厅BEST数字、键数模式配色与白色共用外框，采用右上信息／左下分数／右下横向riff map的Studio HUD，并加大结果文字、突出分析标签及居中操作。保留S+颜色与字体，修正Judge Easy/Hard选择未传入新会话的问题。参见[行为、验证与剩余范围](docs/release-1.8.9-gate.md)及[Judge原因与兼容性](docs/judge-session-handoff-1.8.9.ko.md)（韩语）。
+
 **2026-10-12 · 1.8.8：**整合结果分析、自由窗口大小及F9 PNG提示、长LN Mix，并改善显示可读性、难度表URL与筛选、皮肤轨道快捷键、减少键数时的键音保留，以及单人开始和立即重试操作。当前验证、软件包及公开状态见[1.8.8发布说明](docs/release-1.8.8-gate.md)。固定基准仍为1.8.7。
 
 **分析与扩展计划：**区分各轨道分布、时间分段准确度和单键/LN起始、松键、保持失败，无法测量的漏击不作为0ms样本。长LN Mix v2仅保留本地记录与回放，不计入旧BEST或Sites上传。插件与1.9.0稳定化仍为计划。参见[分析标准](docs/result-analysis-1.8.8.ko.md)、[显示/菜单/键音变更](docs/release-feedback-1.8.8.ko.md)、[开始与重试操作](docs/gameplay-start-controls.ko.md)（韩语）。
@@ -26,13 +28,13 @@
 
 **多人Rate支持版本：**选曲者在大厅设置全员共用的Rate。所有玩家必须使用本protocol v6版本，不能与旧v5客户端连接。[指南](docs/multiplayer-rate-build.ko.md)（韩语）。
 
-发行版本为 [**1.8.8 Sites 集成版**](https://github.com/10kseason/TenRiff/releases/tag/1.8.8)；固定基准仍为1.8.7。解压到新文件夹，运行 `launch_win.bat`，然后按 F10 连接一次网页账号。符合条件的新游玩记录会上传分数、详细分数、准确率和详细准确率。新游玩使用 ruleset-4，网页提交必须包含判定配置。ruleset-1/2/3回放保留原判定与LN行为，现有网页记录保留ID和分数。请参阅[连接指南](docs/sites-leaderboard.md)（韩语）。
+版本与下载：[**1.8.9 Sites 集成版**](https://github.com/10kseason/TenRiff/releases/tag/1.8.9)；实际软件包／公开状态见[发布记录](docs/release-1.8.9-gate.md)，固定基准仍为1.8.7。解压到新文件夹，运行 `launch_win.bat`，然后按 F10 连接一次网页账号。符合条件的新游玩记录会上传分数、详细分数、准确率和详细准确率。新游玩使用 ruleset-4，网页提交必须包含判定配置。ruleset-1/2/3回放保留原判定与LN行为，现有网页记录保留ID和分数。请参阅[连接指南](docs/sites-leaderboard.md)（韩语）。
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。固定基准为 `1.8.7`，此源码版本为 `1.8.8`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
+TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。固定基准为 `1.8.7`，此源码版本为 `1.8.9`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
 
-这份 README 是入门文档。关于当前行为、`1.8.8` 版本和固定 `1.8.7` 基准、`1.8.7 fixed stable baseline` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
+这份 README 是入门文档。关于当前行为、`1.8.9` 发布分支和固定 `1.8.7` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
 
 TenRiff 也明确属于一种 `vibe coding` 作品：它更多是在快速迭代和实验中成形，而不是只按照传统的长篇设计先行流程推进。
 

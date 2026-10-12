@@ -19,6 +19,7 @@
 #include "app/menu/settings/SettingsHelp.h"
 
 #include <windows.h>
+#include <shellapi.h>
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -406,6 +407,7 @@ struct MenuWindowVisualTestAccess {
         for (const auto& note : source.generic.notes) notes.emplace_back(note);
         JsonObject report{
             {"notes", JsonValue(std::move(notes))},
+            {"selected_song_difficulty", JsonValue(source.song_select.selected_song_difficulty)},
             {"width", JsonValue(static_cast<double>(window.width_))}, {"height", JsonValue(static_cast<double>(window.height_))},
             {"scale", JsonValue(static_cast<double>(window.scale_))}, {"foreground", JsonValue(foreground)},
             {"geometry_resolver_verified", JsonValue(verify && checked > 0 && failures.empty())},
@@ -432,6 +434,25 @@ struct MenuWindowVisualTestAccess {
 
 // Synthetic scene data; real settings builders. No MenuApp initialization or record writes.
 int main(int argc, char** argv) {
+    // The renderer consumes UTF-8. Narrow Windows argv uses the machine ANSI
+    // code page and corrupts fixture labels such as the circled 5 in a table.
+    int wide_argc = 0;
+    auto** wide_argv = CommandLineToArgvW(GetCommandLineW(), &wide_argc);
+    if (!wide_argv) return 2;
+    std::vector<std::string> utf8_arguments;
+    utf8_arguments.reserve(static_cast<std::size_t>(wide_argc));
+    for (int i = 0; i < wide_argc; ++i) {
+        const int size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wide_argv[i], -1, nullptr, 0, nullptr, nullptr);
+        if (size <= 0) { LocalFree(wide_argv); return 2; }
+        std::string value(static_cast<std::size_t>(size), '\0');
+        WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wide_argv[i], -1, value.data(), size, nullptr, nullptr);
+        value.pop_back();
+        utf8_arguments.push_back(std::move(value));
+    }
+    LocalFree(wide_argv);
+    std::vector<char*> utf8_argv;
+    for (auto& value : utf8_arguments) utf8_argv.push_back(value.data());
+    argc = wide_argc; argv = utf8_argv.data();
     using namespace tenriff::render;
     MenuWindowConfig config;
     config.title = "TenRiff UI Preview - synthetic data";
@@ -526,6 +547,7 @@ int main(int argc, char** argv) {
     bool mute_inactive = false;
     std::string title_music_mode = "default";
     std::string sites_records_title;
+    std::string display_level = "12";
     bool backdrop_off = false;
     double backdrop_opacity = -1.0;
     double backdrop_brightness = -1.0;
@@ -570,6 +592,7 @@ int main(int argc, char** argv) {
             result = true; analysis_page = std::clamp(std::stoi(argv[++i]), 0, 3); continue;
         }
         if (arg == "--analysis-unavailable") { analysis_unavailable = true; continue; }
+        if (arg == "--display-level" && i + 1 < argc) { display_level = argv[++i]; continue; }
         if (arg == "--analysis-no-samples") { analysis_no_samples = true; continue; }
         if (arg == "--edit-resolution") { settings = graphics_settings = edit_resolution = true; continue; }
         if (arg == "--invalid-resolution") { settings = graphics_settings = edit_resolution = invalid_resolution = true; continue; }
@@ -949,7 +972,7 @@ int main(int argc, char** argv) {
     songs.selected_song_artist = "TenRiff UI Preview";
     songs.selected_song_key_count = menu_keys;
     songs.selected_song_layout = std::to_string(menu_keys) + " KEYS";
-    songs.selected_song_difficulty = "12";
+    songs.selected_song_difficulty = display_level;
     songs.selected_song_bpm = 180;
     songs.selected_song_note_count = 1824;
     songs.selected_song_nps_min = 3;
