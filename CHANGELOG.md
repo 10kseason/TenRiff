@@ -1,12 +1,12 @@
 # Changelog
 
-## Unreleased local feedback patch - 2026-10-13
+## [1.8.9.1] - 2026-10-13
 
 - Continue primary/secondary key assignment on the next lane after each successful save; ignore held-key repeats and stop at the last lane.
 - Repair all three key converters at their common boundary: reserve complete source long notes before other notes, relocate collisions and preserve removed keysounds at their original times. Export missing BMS heads as independent BGM rows. See [behavior and compatibility](docs/feedback-conversion-20261013.ko.md).
 - Add the profile/preset `skin.indicator_background_visible` option for FAST/SLOW/timing backings; enlarge Studio rails/badges and the default Classic gauge.
 - Enable the gear position handle in embedded and F6 fullscreen skin previews, with scaled dragging and profile persistence; show P GREAT/GREAT/GOOD judgement text without its rounded frame or backing.
-- Preserve historical replay/ghost conversion with optional `key_conversion_version` metadata (absent/1 = original, 2 = repaired). Judgement rules are unchanged. This is a local patch based on 1.8.9, not a published release or a change to the fixed 1.8.7 baseline.
+- Preserve historical replay/ghost conversion with optional `key_conversion_version` metadata (absent/1 = original, 2 = repaired). Judgement rules are unchanged. This release builds on 1.8.9 while keeping the fixed 1.8.7 baseline. See the [release gate](docs/release-1.8.9.1-gate.md) for validation scope and limits.
 
 ## [1.8.9] - 2026-10-12
 

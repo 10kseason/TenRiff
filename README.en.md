@@ -1,6 +1,6 @@
 # TenRiff
 
-**Local feedback patch, 2026-10-13:** Based on the user-selected 1.8.9, with sequential key binding, converter keysound/hold preservation, indicator backings, larger gauges, preview gear dragging and text-only judgements. [Behavior and replay compatibility (Korean)](docs/feedback-conversion-20261013.ko.md). Published releases and the fixed baseline are unchanged.
+**2026-10-13 · 1.8.9.1:** Adds sequential key binding, converter keysound/hold preservation, FAST/SLOW/timing backing controls, larger gauges, preview gear dragging and text-only judgements. Existing replays retain their original conversion. [Behavior, verification and compatibility limits (Korean)](docs/release-1.8.9.1-gate.md). The fixed baseline remains 1.8.7.
 
 **Fixed baseline: [1.8.7](docs/baseline-1.8.7.en.md)** (2026-10-10). Use Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`; do not advance it automatically with `latest` or a new release.
 

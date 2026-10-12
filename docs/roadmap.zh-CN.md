@@ -2,13 +2,15 @@
 
 **固定基准：[1.8.7](baseline-1.8.7.zh-CN.md)**（2026-10-10）。使用 Git tag `1.8.7`、commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`，不随 `latest` 或新版本自动更新。
 
+**2026-10-13 · 1.8.9.1：** 增加连续按键设置、全部转换器的键音及长键保留、FAST/SLOW和时间提示背景开关、更大的血条、预览中的轨道拖动及无边框背景的判定文字。旧回放保留原转换方式。[行为、验证与兼容限制（韩文）](release-1.8.9.1-gate.md)。固定基准仍为1.8.7。
+
 > 文档范围：包含早期设计、改进提案与当时分析。未完成的提案和历史测量值不代表当前行为、默认值或性能保证。请核对[当前状态](current-state.zh-CN.md)与[配置](config.zh-CN.md)。
 
 这份路线图记录了继续构建游戏循环时推荐的高层顺序，同时避免范围膨胀。每个阶段都会先固定方向，再往上叠加额外功能。
 
 ## 当前基线
 - Windows GUI/runtime 是主要受支持路径。
-- 固定基准为 `1.8.7`，此源码版本为 `1.8.9`；公开包附带 NK3 P64 与 generalized pattern MLP inference 模型，但不附带 BGA upscaler 模型。选择兼容且权利已厘清的 upscaler ONNX 只会保存路径，BGA Upscaler 会一直保持 off，直到用户手动开启并确认 high-spec warning；不存在自动 benchmark gate。
+- 固定基准为 `1.8.7`，此源码版本为 `1.8.9.1`；公开包附带 NK3 P64 与 generalized pattern MLP inference 模型，但不附带 BGA upscaler 模型。选择兼容且权利已厘清的 upscaler ONNX 只会保存路径，BGA Upscaler 会一直保持 off，直到用户手动开启并确认 high-spec warning；不存在自动 benchmark gate。
 - 当前菜单/runtime 仅支持 BMS family（`.bms/.bme/.bml/.pms`），并支持 native、bundle/profile TenRiff `skin.json` 与 LR2 skin。
 - 关于当前已发布的行为，请先看 [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)；这份路线图主要讲方向和剩余工作。
 

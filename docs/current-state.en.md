@@ -2,6 +2,8 @@
 
 **Fixed baseline: [1.8.7](baseline-1.8.7.en.md)** (2026-10-10). Use Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`; do not advance it automatically with `latest` or a new release.
 
+**2026-10-13 · 1.8.9.1:** Adds sequential key binding, converter keysound/hold preservation, FAST/SLOW/timing backing controls, larger gauges, preview gear dragging and text-only judgements. Existing replays retain their original conversion. [Behavior, verification and compatibility limits (Korean)](release-1.8.9.1-gate.md). The fixed baseline remains 1.8.7.
+
 **2026-10-12 · 1.8.9:** Adds larger lobby BEST numbers, key-mode colors and a white shared frame; Studio information at the upper right, score at the lower left and a horizontal riff map at the lower right; and larger result text, analysis tabs and centered actions. S+ color/font are preserved. Judge Easy/Hard selections now reach new sessions. See [behavior, verification and remaining scope](release-1.8.9-gate.md) and [Judge cause and compatibility](judge-session-handoff-1.8.9.ko.md) (Korean).
 
 **1.8.9 performance scope:** Final six-round p50 deltas remain within the historical +0.03ms target, but ghost p95 increased by +0.05125ms (about +1.94%), so the strict no-tail-increase criterion was not met. These are synthetic CPU render-call measurements, not physical latency, GPU throughput or a general performance gain. See [results, initial regression, diagnostics and limits](release-1.8.9-gate.md#성능-측정과-잔여-한계) (Korean).
