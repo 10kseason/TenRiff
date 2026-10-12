@@ -579,7 +579,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         return false;
     }
 
-    key_conversion_version_ = replay_playback_enabled_ ? replay_source_.mode.key_conversion_version : 2;
+    key_conversion_version_ = replay_playback_enabled_ ? replay_source_.mode.key_conversion_version : 3;
     long_note_mix_version_ = replay_playback_enabled_ ? replay_source_.mode.long_note_mix_version : 2;
     ModeManagerResult mode_result =
         manage_modes(chart_result.chart,
@@ -730,6 +730,15 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         if (ghost_compatible &&
             !equivalent_mode_mod_tokens(ghost_replay_source_.mods, active_mods_)) {
             ghost_compatible = false;
+        }
+        if (ghost_compatible && key_conversion_version_ == 3 && ghost_replay_source_.mode.key_conversion_version < 3) {
+            // A legacy ghost must not undo the new player's duplicate-head fix.
+            // Both fields currently share one chart, so exclude only affected charts.
+            auto corrected_source = chart_result.chart;
+            if (gameplay::coalesce_bms_long_note_heads(corrected_source) > 0) {
+                ghost_compatible = false;
+                std::cerr << "[warn] Legacy ghost disabled: this BMS needs duplicate long-note head correction." << std::endl;
+            }
         }
         if (!ghost_compatible) {
             std::cerr << "[warn] Ghost replay metadata does not match the current gameplay settings. "

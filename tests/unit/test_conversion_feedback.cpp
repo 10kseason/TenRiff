@@ -188,7 +188,7 @@ static void check_feedback_chords(const std::vector<KeyModeConversionAlgorithm>&
 static void check_feedback_replay(const std::vector<const char*>& algorithms) {
     const auto source = feedback_chart(10);
     for (const auto algorithm : algorithms) {
-        for (int version : {1, 2}) {
+        for (int version : {1, 2, 3}) {
             tenriff::config::ModeConfig mode;
             mode.key_mode = "4k"; mode.key_conversion_algorithm = algorithm; mode.random_seed = 42;
             mode.gauge = "normal";
@@ -264,4 +264,172 @@ TEST_CASE("feedback regression replay verifier reproduces legacy and repaired ke
 
 TEST_CASE("NK3 feedback regression replay verifier reproduces legacy and repaired key conversion") {
     check_feedback_replay({"nk3"});
+}
+
+TEST_CASE("DELTA native playback coalesces duplicated visible and long-note heads") {
+    std::string content = "#TITLE Duplicate LN heads\n#BPM 173\n#LNTYPE 1\n"
+        "#04211:GM\n#04213:LY\n#04215:FC\n#04251:GM0000GM\n"
+        "#04312:GN\n#04352:GN0000GN\n";
+    const char* external = std::getenv("TENRIFF_BMS_DELTA_CHART");
+    if (external) {
+        std::ifstream in(std::filesystem::u8path(external), std::ios::binary);
+        REQUIRE(in.good());
+        content.assign(std::istreambuf_iterator<char>(in), {});
+    }
+    const auto parsed = tenriff::chart::BmsParser{}.parse(content);
+    REQUIRE(parsed.success());
+    const auto normalized = tenriff::chart::BmsChartNormalizer{}.normalize(parsed.chart);
+    REQUIRE(normalized.success());
+    const auto timeline = tenriff::chart::BmsTimelineBuilder{}.build(normalized.chart, 44100);
+    REQUIRE(timeline.success());
+    const auto built = tenriff::app::build_bms_gameplay_chart(timeline.timeline, parsed.chart, 1.0);
+    REQUIRE(built.messages.empty());
+    const auto source_holds = std::count_if(built.chart.notes.begin(), built.chart.notes.end(),
+        [](const auto& n) { return n.end_sample.has_value(); });
+    tenriff::config::ModeConfig mode;
+    mode.key_mode = "native";
+    for (const int version : {1, 2, 3}) {
+        const auto managed = tenriff::app::manage_modes(built.chart, tenriff::app::ChartFormat::Bms,
+            mode, {}, 1.0, 173.0, 44100, tenriff::app::LongNoteMixVersion::Musical, version);
+        const auto& notes = managed.chart.notes;
+        const auto holds = std::count_if(notes.begin(), notes.end(), [](const auto& n) { return n.end_sample.has_value(); });
+        std::size_t duplicate_heads = 0;
+        for (const auto& n : notes) {
+            if (n.end_sample) continue;
+            duplicate_heads += std::any_of(notes.begin(), notes.end(), [&](const auto& hold) {
+                return hold.end_sample && hold.lane == n.lane && hold.start_sample == n.start_sample;
+            });
+        }
+        std::cout << "DELTA version=" << version << " source_notes=" << built.chart.notes.size()
+                  << " notes=" << notes.size() << " holds=" << holds << " duplicate_heads=" << duplicate_heads << '\n';
+        CHECK(holds == source_holds);
+        if (version < 3) {
+            CHECK(notes.size() == built.chart.notes.size());
+            CHECK(duplicate_heads == (external ? 35u : 2u));
+        } else {
+            CHECK(duplicate_heads == 0);
+            CHECK(notes.size() + (external ? 35u : 2u) == built.chart.notes.size());
+            for (const auto& hold : built.chart.notes) {
+                if (!hold.end_sample) continue;
+                CHECK(std::any_of(notes.begin(), notes.end(), [&](const auto& n) {
+                    return n.lane == hold.lane && n.start_sample == hold.start_sample && n.end_sample == hold.end_sample;
+                }));
+            }
+        }
+    }
+}
+
+TEST_CASE("DELTA correction keeps nearby notes other lanes tails and authored hold identity") {
+    GameplayChart source;
+    source.bms_rank = 3;
+    source.lane_count = 5;
+    source.notes = {{1, 1000, std::nullopt}, {1, 1000, 2000, true, kInvalidAudioAssetId, 71},
+                    {2, 1000, std::nullopt}, {1, 999, std::nullopt}, {1, 1001, std::nullopt},
+                    {1, 2000, std::nullopt}, {3, 3000, 3000}, {3, 3000, std::nullopt}};
+    auto fixed = source;
+    CHECK(coalesce_bms_long_note_heads(fixed) == 1);
+    REQUIRE(fixed.notes.size() == 7);
+    CHECK(fixed.notes.front().note_id == 71);
+    CHECK(fixed.notes.front().end_sample == 2000);
+    CHECK(fixed.notes.front().release_required);
+    CHECK(coalesce_bms_long_note_heads(fixed) == 0);
+    source.bms_rank.reset();
+    CHECK(coalesce_bms_long_note_heads(source) == 0);
+    CHECK(source.notes.size() == 8);
+}
+
+TEST_CASE("DELTA correction keeps distinct keysounds overflow and separate sound gains") {
+    GameplayChart source;
+    source.bms_rank = 3;
+    source.lane_count = 5;
+    for (int i = 0; i < 8; ++i) (void)source.intern_audio_asset(std::to_string(i));
+    source.notes.push_back({1, 1000, 2000, false, 0, 77});
+    for (int i = 0; i < 7; ++i) source.notes.push_back({1, 1000, std::nullopt, false, static_cast<std::size_t>(i), static_cast<std::size_t>(i)});
+    source.notes.push_back({1, 1000, std::nullopt, false, 7, 8, 0.25f});
+    auto fixed = source;
+    CHECK(coalesce_bms_long_note_heads(fixed) == 8);
+    REQUIRE(fixed.notes.size() == 1);
+    CHECK(fixed.notes.front().note_id == 77);
+    CHECK(note_audio_asset_count(fixed.notes.front()) == 4);
+    CHECK(missing_sounds(source, fixed) == 0);
+    CHECK(fixed.audio_cues.size() == 4);
+    CHECK(std::any_of(fixed.audio_cues.begin(), fixed.audio_cues.end(), [](const auto& cue) {
+        return cue.asset_id == 7 && cue.start_sample == 1000 && cue.gain == 0.25f;
+    }));
+}
+
+TEST_CASE("DELTA one input press starts the hold instead of consuming a duplicate tap") {
+    GameplayChart source;
+    source.bms_rank = 3;
+    source.lane_count = 5;
+    source.duration_samples = 3000;
+    source.notes = {{1, 1000, std::nullopt}, {1, 1000, 2000}};
+    tenriff::config::ModeConfig mode;
+    mode.key_mode = "native";
+    for (int version : {1, 2, 3}) {
+        auto fixed = tenriff::app::manage_modes(source, tenriff::app::ChartFormat::Bms, mode, {},
+            1, 173, 1000, tenriff::app::LongNoteMixVersion::Musical, version);
+        GameplayConfig config;
+        config.sample_rate = 1000;
+        config.judge = fixed.judge;
+        GameplayEngine engine(fixed.chart, config);
+        const auto head = engine.handle_input(1, tenriff::input::InputState::Pressed, 1000);
+        REQUIRE(head.has_value());
+        CHECK(head->end_sample.has_value() == (version == 3));
+        engine.advance(2000);
+        (void)engine.handle_input(1, tenriff::input::InputState::Released, 2001);
+        engine.advance(4000);
+        if (version == 3) {
+            CHECK(engine.stats().total_notes == 1);
+            CHECK(engine.stats().counts.bd == 0);
+            CHECK(engine.stats().counts.pr == 0);
+            CHECK(engine.stats().accuracy_percent() == doctest::Approx(100.0));
+        } else {
+            CHECK(engine.stats().total_notes == 2);
+            CHECK(engine.stats().counts.bd + engine.stats().counts.pr > 0);
+        }
+    }
+}
+
+static void check_delta_conversions(const std::vector<KeyModeConversionAlgorithm>& algorithms) {
+    // Sparse source: a duplicate head must not become an extra converted chord.
+    // IDs deliberately have gaps to catch provenance errors after coalescing.
+    GameplayChart source;
+    source.bms_rank = 3;
+    source.lane_count = 5;
+    source.duration_samples = 44100 * 4;
+    const auto sound = source.intern_audio_asset("hold.wav");
+    source.notes = {{1, 44100, std::nullopt, false, sound, 7},
+                    {1, 44100, 88200, false, sound, 99}};
+    for (auto algorithm : algorithms) {
+        for (int target : {4, 5, 6, 8, 10, 16}) {
+            KeyModeConverterOptions options;
+            options.algorithm = algorithm;
+            options.target_lane_count = target;
+            options.seed = 42;
+            options.conversion_version = 3;
+            auto normalized = source;
+            REQUIRE(coalesce_bms_long_note_heads(normalized) == 1);
+            const auto expected = convert_key_mode_chart(normalized, options);
+            const auto actual = convert_key_mode_chart(source, options);
+            CHECK(actual.converted == expected.converted);
+            if (target != source.lane_count) REQUIRE(actual.converted);
+            CHECK(actual.chart.notes.size() == expected.chart.notes.size());
+            CHECK(missing_sounds(source, actual.chart) == 0);
+            CHECK(std::any_of(actual.chart.notes.begin(), actual.chart.notes.end(), [](const auto& n) {
+                return n.note_id == 99 && n.start_sample == 44100 && n.end_sample == 88200;
+            }));
+            CHECK(std::none_of(actual.chart.notes.begin(), actual.chart.notes.end(), [](const auto& n) { return n.note_id == 7; }));
+            std::cout << "DELTA conversion algorithm=" << static_cast<int>(algorithm) << " target=" << target
+                      << " notes=" << actual.chart.notes.size() << " hold_id=99 sounds=preserved\n";
+        }
+    }
+}
+
+TEST_CASE("DELTA host conversions normalize duplicate heads before remapping") {
+    check_delta_conversions({KeyModeConversionAlgorithm::Krrcream, KeyModeConversionAlgorithm::NK2});
+}
+
+TEST_CASE("NK3 feedback regression DELTA converts corrected long-note heads") {
+    check_delta_conversions({KeyModeConversionAlgorithm::NK3});
 }

@@ -543,6 +543,10 @@ ModeApplyResult apply_mode_settings(const GameplayChart& chart,
     ModeApplyResult result;
     result.chart = chart;
     result.chart.lane_count = resolve_lane_count(chart);
+    if (context.key_conversion_version == 3) {
+        const auto merged = coalesce_bms_long_note_heads(result.chart);
+        if (merged > 0) result.warnings.push_back("Coalesced " + std::to_string(merged) + " duplicate BMS long-note head(s).");
+    }
 
     const int target_count = target_lane_count(settings.key_mode);
     ScratchExtraction extracted;
@@ -604,6 +608,7 @@ ModeApplyResult apply_mode_settings(const GameplayChart& chart,
             if (scratch_extracted) {
                 result.chart = chart;
                 result.chart.lane_count = resolve_lane_count(chart);
+                if (context.key_conversion_version == 3) coalesce_bms_long_note_heads(result.chart);
                 result.warnings.push_back(
                     "Scratch-aware key conversion could not remap the key lanes; the native scratch layout was kept.");
             } else {

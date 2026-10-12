@@ -333,7 +333,7 @@ ExportResult save_json_file(const std::string& path, const config::JsonValue& ro
 }  // namespace
 
 ExportResult save_replay_json(const std::string& path, const ReplayFile& replay, int indent) {
-    if (replay.mode.key_conversion_version != 1 && replay.mode.key_conversion_version != 2) {
+    if (replay.mode.key_conversion_version != 1 && replay.mode.key_conversion_version != 2 && replay.mode.key_conversion_version != 3) {
         ExportResult result;
         result.error = "Unsupported key conversion version.";
         return result;
@@ -381,7 +381,7 @@ ExportResult save_replay_json(const std::string& path, const ReplayFile& replay,
 }
 
 ExportResult save_result_json(const std::string& path, const ResultFile& result_file, int indent) {
-    if (result_file.key_conversion_version != 1 && result_file.key_conversion_version != 2) {
+    if (result_file.key_conversion_version != 1 && result_file.key_conversion_version != 2 && result_file.key_conversion_version != 3) {
         ExportResult result;
         result.error = "Unsupported key conversion version.";
         return result;
@@ -502,7 +502,7 @@ ReplayLoadResult load_replay_json(const std::string& path) {
 
     if (const auto* mode = find_json_object(*root, "mode")) {
         if (const auto* version = find_json_value(*mode, "key_conversion_version")) {
-            if (!version->is_number() || (version->as_number() != 1.0 && version->as_number() != 2.0)) {
+            if (!version->is_number() || (version->as_number() != 1.0 && version->as_number() != 2.0 && version->as_number() != 3.0)) {
                 result.error = "Unsupported key conversion version.";
                 return result;
             }
@@ -699,7 +699,7 @@ ReplayLoadResult load_replay_json(const std::string& path) {
 }
 
 ReplayValidationResult validate_replay_evidence(const ReplayFile& replay) {
-    if (replay.mode.key_conversion_version != 1 && replay.mode.key_conversion_version != 2)
+    if (replay.mode.key_conversion_version != 1 && replay.mode.key_conversion_version != 2 && replay.mode.key_conversion_version != 3)
         return {"Unsupported key conversion version."};
     ReplayValidationResult result;
     if (replay.mode.long_note_mix_version != 1 && replay.mode.long_note_mix_version != 2) {

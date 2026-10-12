@@ -112,6 +112,10 @@ struct GameplayChart {
 // Preserve omitted note heads at authored times without doubling retained/BGM sounds.
 void preserve_chart_keysounds(const GameplayChart& source, GameplayChart& converted);
 
+// BMS exporters can emit a visible tap and an explicit LN head at one cell.
+// Keep the complete hold and its sounds; never merge nearby or other-lane notes.
+std::size_t coalesce_bms_long_note_heads(GameplayChart& chart);
+
 void offset_gameplay_chart_samples(GameplayChart& chart, int64_t sample_offset);
 void trim_gameplay_chart_before_sample(GameplayChart& chart, int64_t sample);
 

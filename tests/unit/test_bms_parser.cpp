@@ -75,7 +75,7 @@ bool is_windows_runtime_integration_test(std::string_view name) {
 bool is_nk3_openvino_integration_test(std::string_view name) {
     // OpenVINO inference is covered by the dedicated non-ASan CPU smoke job.
     // Keep this list exact so the sanitizer suite still runs every pure host test.
-    static constexpr std::array<std::string_view, 7> kTests = {
+    static constexpr std::array<std::string_view, 8> kTests = {
         "runtime mode settings use the selected KeyWeaver NK3 converter",
         "runtime NK3 remasters a chart even when the target key count is unchanged",
         "NK3 feedback regression converters preserve full source holds and every keysound",
@@ -83,6 +83,7 @@ bool is_nk3_openvino_integration_test(std::string_view name) {
         "NK3 feedback regression impossible chords preserve sound without cutting occupied holds",
         "NK3 feedback regression replay verifier reproduces legacy and repaired key conversion",
         "NK3 feedback regression exported BMS keeps dropped chord sounds and full LNOBJ spans",
+        "NK3 feedback regression DELTA converts corrected long-note heads",
     };
     return std::find(kTests.begin(), kTests.end(), name) != kTests.end();
 }

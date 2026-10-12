@@ -823,7 +823,7 @@ TEST_CASE("feedback regression key conversion version round-trips with absent le
     result.chart_path = "fixture.bms";
     result.mods = replay.mods;
     result.stats.total_notes = 10;
-    for (int version : {1, 2}) {
+    for (int version : {1, 2, 3}) {
         replay.mode.key_conversion_version = version;
         result.key_conversion_version = version;
         REQUIRE(save_replay_json(replay_path.string(), replay).success());
@@ -844,7 +844,7 @@ TEST_CASE("feedback regression key conversion version round-trips with absent le
         }
     }
     const std::vector<tenriff::config::JsonValue> invalid = {
-        tenriff::config::JsonValue{0.0}, tenriff::config::JsonValue{3.0},
+        tenriff::config::JsonValue{0.0}, tenriff::config::JsonValue{4.0},
         tenriff::config::JsonValue{1.5}, tenriff::config::JsonValue{"2"},
         tenriff::config::JsonValue{true}, tenriff::config::JsonValue{},
     };

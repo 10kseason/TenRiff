@@ -570,6 +570,32 @@ struct MenuAppVisualTestAccess {
 };
 
 struct MenuAppFeedbackTestAccess {
+    static bool corrected_without_legacy_ghost(const GameSession& session) {
+        return session.key_conversion_version_ == 3 && !session.ghost_replay_enabled_ &&
+               !session.ghost_engine_ && session.chart_.notes.size() == 4;
+    }
+    static std::vector<gameplay::ReplayEvent> delta_inputs(GameSession& session, Report& report) {
+        report.check("delta.session_version", session.key_conversion_version_ == 3);
+        report.check("delta.session_note_count", session.chart_.notes.size() == 4 && session.engine_->stats().total_notes == 4);
+        const auto holds = std::count_if(session.chart_.notes.begin(), session.chart_.notes.end(),
+            [](const auto& n) { return n.end_sample.has_value(); });
+        report.check("delta.session_hold_count", holds == 2);
+        std::vector<gameplay::ReplayEvent> events;
+        for (const auto& note : session.chart_.notes) {
+            events.push_back({note.lane, input::InputState::Pressed, note.start_sample});
+            events.push_back({note.lane, input::InputState::Released, note.end_sample.value_or(note.start_sample) + 1});
+        }
+        std::stable_sort(events.begin(), events.end(), [](const auto& a, const auto& b) { return a.sample < b.sample; });
+        return events;
+    }
+    static void submit_delta_inputs(GameSession& session, const std::vector<gameplay::ReplayEvent>& events,
+                                    std::size_t& index, int64_t playback) {
+        std::lock_guard<std::mutex> lock(session.engine_mutex_);
+        while (index < events.size() && playback >= events[index].sample) {
+            const auto& event = events[index++];
+            session.dispatch_lane_input(event.lane, event.state, event.sample, playback);
+        }
+    }
     static void submit_judge_fixture_notes(GameSession& session, std::size_t& index, int64_t playback) {
         std::lock_guard<std::mutex> lock(session.engine_mutex_);
         while (index < session.chart_.notes.size()) {
@@ -1011,6 +1037,95 @@ void separate_judge_flow(tenriff::app::CommandLineOptions options, Report& repor
         report.check(name + ".profile_stays_unmodified", saved.success() && saved.config.mode.mods.empty());
     }
 }
+
+void separate_delta_flow(tenriff::app::CommandLineOptions options, Report& report) {
+    using namespace tenriff;
+    using SessionAccess = app::MenuAppFeedbackTestAccess;
+    std::filesystem::create_directories("delta-fixture");
+    write_silent_wave("delta-fixture/silence.wav");
+    {
+        std::ofstream chart("delta-fixture/duplicate.bms", std::ios::binary);
+        chart << "#PLAYER 1\n#TITLE Duplicate LN Fixture\n#BPM 600\n#RANK 3\n#LNTYPE 1\n"
+                 "#WAV01 silence.wav\n#00011:01\n#00051:0101\n#00013:01\n"
+                 "#00112:01\n#00152:0101\n#00115:01\n";
+    }
+    options.chart_path = "delta-fixture/duplicate.bms";
+    options.profile = "delta-smoke";
+    config::ConfigLoader loader;
+    auto config = loader.load_profile("profiles/menu-smoke").config;
+    config.ui.skip_start_countdown = true;
+    config.mode.practice_no_fail_enabled = false;
+    config.mode.autoplay_enabled = false;
+    config.mode.mods.clear();
+    config.mode.key_mode = "native";
+    config.mode.random = "off";
+    config.mode.gauge = "normal";
+    config.speed.rate = 1.0;
+    config.input_offset_ms = config.sound_offset_ms = 0;
+    const std::string profile = "profiles/" + options.profile;
+    if (!loader.save_profile(profile, app::build_persisted_runtime_config(config)) ||
+        !config::KeymapManager{}.save_profile(profile, config::KeymapManager{}.default_keymap()))
+        throw std::runtime_error("Cannot seed duplicate LN profile");
+    auto session = std::make_unique<app::GameSession>();
+    std::vector<gameplay::ReplayEvent> events;
+    std::size_t submitted = 0;
+    bool timed_out = false;
+    const auto deadline = Clock::now() + std::chrono::seconds(15);
+    session->set_hud_callback([&](const app::GameSession::HudSnapshot& hud) {
+        if (Clock::now() > deadline) { timed_out = true; SessionAccess::timeout(*session); return; }
+        if (session->did_start_gameplay()) SessionAccess::submit_delta_inputs(*session, events, submitted, hud.current_sample);
+    });
+    const bool initialized = session->initialize(options);
+    report.check("delta.initialize", initialized);
+    if (initialized) {
+        events = SessionAccess::delta_inputs(*session, report);
+        SessionAccess::stop_physical_input(*session);
+        session->run();
+        report.check("delta.audio_and_deadline", !timed_out && session->audio_error().empty(), session->audio_error());
+    }
+    session->shutdown();
+    const auto& result = session->result();
+    report.check("delta.single_press_holds_finish", result.has_value && result.finished && submitted == 8 &&
+        result.stats.total_notes == 4 && result.stats.counts.bd == 0 && result.stats.counts.pr == 0);
+    report.check("delta.result_version", result.key_conversion_version == 3);
+    const auto replay = gameplay::load_replay_json(result.replay_path);
+    report.check("delta.replay_version", replay.success() && replay.replay->mode.key_conversion_version == 3);
+    std::string error;
+    const auto saved = app::menu_records::parse_result_file(std::filesystem::u8path(result.result_path), &error);
+    report.check("delta.local_result_version", saved && saved->key_conversion_version == 3 && saved->stats.total_notes == 4, error);
+    if (replay.success()) {
+        const auto verified = app::verify_replay_file(std::filesystem::u8path(result.replay_path),
+            std::filesystem::u8path(options.chart_path), result.replay_sha256);
+        report.check("delta.replay_verifies", verified.verified() && verified.claims_match, verified.detail);
+        // Keep files for comparison with the previously released verifier too.
+        // The same single-press trace has six objects under the old policy and
+        // four under v3; replay metadata must select the original policy.
+        const auto loaded = app::ChartLoader{}.load(options.chart_path, replay.replay->sample_rate, 1.0);
+        report.check("delta.legacy_source_loaded", loaded.success() && loaded.chart.notes.size() == 6);
+        for (int version : {1, 2}) {
+            auto legacy = *replay.replay;
+            legacy.mode.key_conversion_version = version;
+            const auto old = app::verify_replay_against_chart(legacy, loaded.chart, loaded.format, loaded.base_bpm);
+            report.check("delta.legacy_policy_" + std::to_string(version), old.stats.total_notes == 6 &&
+                old.stats.counts.bd + old.stats.counts.pr > 0 && !old.claims_match);
+            legacy.stats = old.stats;
+            legacy.final_score = old.final_score;
+            const auto path = std::filesystem::absolute("delta-fixture/legacy-" + std::to_string(version) + ".json").u8string();
+            const auto exported = gameplay::save_replay_json(path, legacy);
+            report.check("delta.legacy_export_" + std::to_string(version), exported.success());
+            const auto checked = app::verify_replay_file(std::filesystem::u8path(path),
+                std::filesystem::u8path(options.chart_path));
+            report.check("delta.legacy_verifies_" + std::to_string(version), checked.verified() && checked.claims_match, checked.detail);
+            auto ghost_options = options;
+            ghost_options.ghost_replay_path = path;
+            auto ghost_session = std::make_unique<app::GameSession>();
+            const bool ghost_initialized = ghost_session->initialize(ghost_options);
+            report.check("delta.legacy_ghost_excluded_" + std::to_string(version), ghost_initialized &&
+                SessionAccess::corrected_without_legacy_ghost(*ghost_session));
+            ghost_session->shutdown();
+        }
+    }
+}
 }  // namespace
 
 int wmain(int argc, wchar_t** argv) {
@@ -1097,6 +1212,7 @@ int wmain(int argc, wchar_t** argv) {
         separate_pause_flow(options, report);
         separate_restart_flow(options, report);
         separate_judge_flow(options, report);
+        separate_delta_flow(options, report);
         report.check("sandbox.no_account_or_sites_connection",
             !std::filesystem::exists("config/sites-leaderboard.json") &&
             !std::filesystem::exists("config/sites-leaderboard.dpapi") &&

@@ -480,7 +480,7 @@ std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path&
         out.long_note_mix_version = static_cast<int>(version->as_number());
     }
     if (const auto* version = find_json_value(*root, "key_conversion_version")) {
-        if (!version->is_number() || (version->as_number() != 1.0 && version->as_number() != 2.0)) {
+        if (!version->is_number() || (version->as_number() != 1.0 && version->as_number() != 2.0 && version->as_number() != 3.0)) {
             if (error) *error = "Unsupported key conversion version.";
             return std::nullopt;
         }
