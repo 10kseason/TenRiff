@@ -1,6 +1,6 @@
 # TenRiff Config Schema (current)
 
-**Additional 1.8.8 release conditions:** Include freely resizable windows and direct width/height input, an `F9` PNG hint on results, and LN Mix combining multi-beat holds with taps/short holds on other lanes. See [added features and final verification status (Korean)](release-conditions-1.8.8.ko.md), separate from the initial analysis candidate's checks. The fixed baseline remains 1.8.7; this candidate is unreleased.
+**1.8.8:** Includes result analysis, freely resizable windows and direct width/height entry, result `F9` PNG hints, long LN Mix, and menu, keysound and start-control improvements. See the [release guide (Korean)](release-1.8.8-gate.md) for current verification and delivery status. The user-pinned baseline remains 1.8.7; its existing tag and release files are preserved.
 
 Reference: [Config.h](../src/config/Config.h), [Config.cpp](../src/config/Config.cpp), [default JSON](../config/config.json), and [keymaps](../src/config/Keymap.cpp). Missing values use code defaults; bounds below describe load/save normalization.
 
@@ -231,6 +231,10 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
 
 ### `ui`
 
+`ui.skip_start_countdown` and `ui.instant_restart_key` are built-in controls saved in the profile and `.trprofile` exports. Only the initial `3 / 2 / 1` display after loading is skipped; audio preparation, the existing three-second chart lead-in and judgement timing remain unchanged. Resuming from pause always retains its three-second countdown. Multiplayer forces the initial countdown and blocks instant restart; Session Mix also blocks instant restart. Instant restart does not fire while paused or during the initial countdown, and the key must be released before it can trigger again. See [start/restart controls (Korean)](gameplay-start-controls.ko.md) for lane/reserved-key conflicts and editor-practice start positions.
+
+These controls do not change Sites submission policy. Long LN Mix v2 exclusion from legacy BEST and Sites is a separate conversion policy; the [plugin runtime, API and SDK remain future plans (Korean)](result-analysis-1.8.8.ko.md).
+
 `last_played_chart_path` is the local path of the most recent chart whose gameplay started; empty by default. Replay and editor practice do not update it. Used by `title_music=last_played` across restarts.
 
 | Field | Type, range, default | Behavior |
@@ -239,6 +243,8 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
 | `profile_avatar_path` | string; UTF-8 ≤2048 bytes | Local PNG/JPG avatar path. |
 | `language` | `en`, `ko`, `ja`; `en` | UI language; invalid values normalize to en. |
 | `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | Profile and first-run menu text at 100%, 115%, or 130%. Gameplay fonts remain skin-controlled. |
+| `skip_start_countdown` | bool; `false` | Skip the initial `3 / 2 / 1` display in solo play, including normal starts, menu restarts and result retries. |
+| `instant_restart_key` | string; `""` (unassigned) | Key name for restarting an active solo chart from the beginning. The new attempt always skips the initial countdown; the interrupted attempt saves no result or replay. |
 | `all_song_sources` | bool; `false` | Restore ALL SONG, combining registered folder caches and deduplicating identical chart paths. |
 | `result_tail_ms` | double; `500` ms | Extra result-transition delay after judgement completion; the chart audio end is also considered when `audio.play_to_end=true`. |
 | `require_enter_to_exit` | bool; `true` | Retained for read/write compatibility; the current Windows result-input path does not use it to auto-exit. |
@@ -250,7 +256,7 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
 | `collections` | object: name → string[] | Chart keys grouped by collection name. |
 | `song_collection_filter` | string; `all` | All/favorites/collection filter; saved immediately. |
 | `song_key_filter` | int: `0..16`; `0` | Key-count filter; zero means all. UI choices are 4K–10K, 12K, 14K and 16K. |
-| `song_level_min_filter`, `song_level_max_filter` | int: `0..50`; `0` | Level bounds; zero disables the corresponding bound. |
+| `song_level_min_filter`, `song_level_max_filter` | int: `0..50`; `0` | Level bounds; zero disables the corresponding bound. With an external table selected, use its displayed numeric level and exclude nonnumeric labels while bounds are active. Native LV keeps the existing built-in level. See [number/prefix handling (Korean)](release-feedback-1.8.8.ko.md#선택한-난이도표-기준의-최소최대-필터). |
 | `difficulty_table_path` | string | Local header JSON or downloaded profile-cache header. Selecting a table switches to safe indexing; Native LV clears it and removes table metadata from a valid cache. |
 | `difficulty_table_url` | string | Original HTTP(S) BMSTable page/header URL. Resolves bmstable metadata and caches header/data; local JSON selection clears it. |
 | `online_records_server_url` | string | Records/ranking/chat API URL; failures do not block local play or records. |

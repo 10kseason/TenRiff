@@ -1,6 +1,6 @@
 # TenRiff 配置模式（当前）
 
-**1.8.8 追加发布条件：**包含自由调整窗口大小与直接输入宽高、结果页的 `F9` PNG 保存提示，以及多拍长 LN 与其他轨道单键/短 LN 混合的 LN Mix。请查看与初始分析候选版分开的[新增功能及最终验证状态（韩语）](release-conditions-1.8.8.ko.md)。固定基准仍为 1.8.7，此候选版尚未发布。
+**1.8.8：**包含结果分析、自由调整窗口大小与直接输入宽高、结果页的 `F9` PNG 保存提示、长 LN Mix，以及菜单、键音和开始操作改进。当前验证与交付状态见[发布说明（韩语）](release-1.8.8-gate.md)。用户固定基准仍为 1.8.7，保留其现有标签和发布文件。
 
 依据：[Config.h](../src/config/Config.h)、[Config.cpp](../src/config/Config.cpp)、[默认 JSON](../config/config.json) 与[键位](../src/config/Keymap.cpp)。省略字段使用代码默认值；以下范围描述加载、保存时的规范化规则。
 
@@ -233,6 +233,10 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 
 ### `ui`
 
+`ui.skip_start_countdown` 和 `ui.instant_restart_key` 是本体功能，保存在配置档及 `.trprofile` 导出文件中。跳过的仅是加载后的初始 `3 / 2 / 1` 显示；音频准备、原有谱面开头的3秒空白及判定时间保持不变。从暂停继续时始终保留3秒恢复倒计时。多人游戏强制保留初始倒计时并禁用即时重新开始；Session Mix 也禁用即时重新开始。暂停或初始倒计时期间不会触发，必须松开按键后才能再次触发。轨道键、保留键冲突和编辑器练习起点等细节见[开始与重新开始说明（韩语）](gameplay-start-controls.ko.md)。
+
+这些设置不会改变 Sites 记录提交规则。长 LN Mix v2 不计入旧 BEST 或 Sites 是独立的变换规则；[插件运行环境、API 和 SDK 仍是未来计划（韩语）](result-analysis-1.8.8.ko.md)。
+
 `last_played_chart_path` 保存最近一次开始游玩的谱面本地路径，默认空字符串。回放和编辑器练习不会更新；重启后可供 `title_music=last_played` 使用。
 
 | 字段 | 类型、范围、默认值 | 行为 |
@@ -241,6 +245,8 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `profile_avatar_path` | string; UTF-8 ≤2048 bytes | 本地 PNG/JPG 头像路径。 |
 | `language` | `en`, `ko`, `ja`; `en` | UI 语言；无效值规范化为 en。 |
 | `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | 配置档和首次设置中的菜单字号：100%、115%、130%。游戏内字体继续由皮肤控制。 |
+| `skip_start_countdown` | bool; `false` | 跳过单人游玩开始时的 `3 / 2 / 1` 显示；适用于正常开始、菜单重新开始及结果页重试。 |
+| `instant_restart_key` | string; `""`（未分配） | 从头重新开始正在进行的单人谱面的键名。新一轮始终跳过初始倒计时；中断的尝试不保存结果或回放。 |
 | `all_song_sources` | bool; `false` | 恢复 ALL SONG，合并已登记文件夹的缓存并去除相同谱面路径的重复项。 |
 | `result_tail_ms` | double; `500` ms | 判定完成后结果切换的额外等待时间。`audio.play_to_end=true` 时同时考虑谱面音频结束时刻。 |
 | `require_enter_to_exit` | bool; `true` | 为读写兼容保留；当前 Windows 结果输入路径不使用此值自动退出。 |
@@ -252,7 +258,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `collections` | object: name → string[] | 按集合名称分组的谱面键列表。 |
 | `song_collection_filter` | string; `all` | 全部、收藏或集合筛选；即时保存。 |
 | `song_key_filter` | int: `0..16`; `0` | 键数筛选；0 为全部。UI 可选 4K–10K、12K、14K、16K。 |
-| `song_level_min_filter`, `song_level_max_filter` | int: `0..50`; `0` | 难度边界；0 表示不启用对应边界。 |
+| `song_level_min_filter`, `song_level_max_filter` | int: `0..50`; `0` | 难度边界；0 表示不启用对应边界。选择外部难度表时使用表中显示的数字等级，启用边界时排除非数字标签。原生 LV 继续使用现有内置等级。见[数字及前缀处理（韩语）](release-feedback-1.8.8.ko.md#선택한-난이도표-기준의-최소최대-필터)。 |
 | `difficulty_table_path` | string | 本地 header JSON 或下载的缓存；选表切换至 safe 索引。原生 LV 清空路径及有效缓存中的表信息。 |
 | `difficulty_table_url` | string | 原始 HTTP(S) BMSTable 页面或 header URL；解析 meta 并缓存 header/data，选择本地 JSON 时清空。 |
 | `online_records_server_url` | string | 记录、排名与聊天 API URL；失败不阻止本地游玩或记录。 |

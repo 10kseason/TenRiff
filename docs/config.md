@@ -1,6 +1,6 @@
 # TenRiff Config Schema (current)
 
-**1.8.8 추가 릴리스 조건:** 창 크기 자유 조절·가로/세로 직접 입력, 결과의 `F9` PNG 저장 안내, 여러 박 길이 LN과 다른 레인의 단노트·짧은 LN을 섞는 LN Mix를 포함합니다. 초기 분석 후보의 검증과 구분한 [추가 기능·최종 검증 상태](release-conditions-1.8.8.ko.md)를 확인하세요. 기존 고정 기준은 1.8.7이며 아직 미배포입니다.
+**1.8.8:** 결과 분석, 자유 해상도와 가로·세로 직접 입력, 결과의 `F9` PNG 저장 안내, 긴 LN Mix, 메뉴·키음·시작 조작 개선을 포함합니다. 현재 검증·배포 상태는 [릴리스 안내](release-1.8.8-gate.md)를 따릅니다. 사용자 고정 기준은 계속 1.8.7이며 기존 태그·배포 파일은 유지합니다.
 
 확인 기준: [Config.h](../src/config/Config.h), [Config.cpp](../src/config/Config.cpp), [기본 JSON](../config/config.json), [키맵](../src/config/Keymap.cpp). 생략된 값은 코드 기본값을 사용하며, 아래 범위는 로드·저장 시 정규화 규칙입니다.
 
@@ -233,6 +233,10 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 
 ### `ui`
 
+`ui.skip_start_countdown`과 `ui.instant_restart_key`는 프로필 설정과 `.trprofile` 내보내기에 저장되는 본체 기능입니다. 생략하는 것은 로딩 뒤의 초기 `3 / 2 / 1` 표시뿐이며, 오디오 준비와 기존 채보 앞 3초 여백·판정 시각은 유지합니다. 일시정지에서 계속할 때의 3초 재개 카운트다운은 항상 유지합니다. 멀티에서는 초기 카운트다운을 강제하고 즉시 재시작을 차단하며, 세션 믹스에서도 즉시 재시작을 차단합니다. 즉시 재시작은 일시정지·초기 카운트다운 중에는 작동하지 않고, 다시 사용하려면 키를 떼었다 눌러야 합니다. 레인·예약 키 충돌과 편집기 연습의 시작 위치 등은 [시작·재시작 안내](gameplay-start-controls.ko.md)를 참고하세요.
+
+이 설정은 Sites 기록 제출 정책을 바꾸지 않습니다. 긴 LN Mix v2의 기존 BEST·Sites 제외는 별도 변환 정책이며, [플러그인 실행 환경·API·SDK는 향후 계획](result-analysis-1.8.8.ko.md)입니다.
+
 `last_played_chart_path`는 마지막으로 실제 플레이를 시작한 차트의 로컬 경로입니다. 기본값은 빈 문자열이며 리플레이·편집기 연습은 갱신하지 않습니다. `title_music=last_played`에서 재사용합니다.
 
 | 항목 | 형식·범위·기본값 | 동작 |
@@ -241,6 +245,8 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `profile_avatar_path` | string; UTF-8 ≤2048 bytes | 로컬 PNG/JPG 아바타 경로. |
 | `language` | `en`, `ko`, `ja`; `en` | UI 언어. 다른 값은 en으로 정규화. |
 | `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | 프로필/첫 실행에서 보통·크게·더 크게 선택. 메뉴 글자 100%·115%·130%, 게임플레이 스킨 글자는 별도 유지. |
+| `skip_start_countdown` | bool; `false` | 단독 플레이의 초기 `3 / 2 / 1` 표시 생략. 일반 곡 시작과 메뉴 재시작·결과 재시도에 적용. |
+| `instant_restart_key` | string; `""` (미지정) | 진행 중인 단독 곡을 처음부터 다시 시작할 키 이름. 새 시도의 초기 카운트다운은 항상 생략하며, 중단한 시도는 결과·리플레이로 저장하지 않음. |
 | `all_song_sources` | bool; `false` | `ALL SONG` 통합 목록을 다음 실행에서도 복원. 등록된 폴더 캐시를 순서대로 읽고 경로가 같은 차트는 한 번만 표시. |
 | `result_tail_ms` | double; `500` ms | 판정 완료 후 결과 전환 시 추가 대기 시간. `audio.play_to_end=true`이면 차트 오디오 종료 시점도 함께 고려합니다. |
 | `require_enter_to_exit` | bool; `true` | 읽기·저장 호환 필드. 현재 Windows 결과 입력 경로는 이 값으로 자동 종료하지 않습니다. |
@@ -252,7 +258,7 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `collections` | object: name → string[] | 이름 있는 컬렉션별 차트 키 목록. |
 | `song_collection_filter` | string; `all` | 전체·즐겨찾기·컬렉션 필터. 변경 즉시 저장. |
 | `song_key_filter` | int: `0..16`; `0` | 키 수 필터. 0은 전체. UI 선택은 4K–10K, 12K, 14K, 16K. |
-| `song_level_min_filter`, `song_level_max_filter` | int: `0..50`; `0` | 난이도 경계. 0이면 해당 경계를 사용하지 않음. |
+| `song_level_min_filter`, `song_level_max_filter` | int: `0..50`; `0` | 난이도 경계. 0이면 해당 경계를 사용하지 않음. 외부 표 선택 중에는 표시된 표의 숫자 레벨을 사용하며, 제한이 있으면 비숫자 항목을 제외. 기본 LV는 기존 내장 레벨 사용. [숫자·접두사 처리](release-feedback-1.8.8.ko.md#선택한-난이도표-기준의-최소최대-필터) 참고. |
 | `difficulty_table_path` | string | 로컬 header JSON 또는 다운로드한 프로필 캐시 header. 표 선택 시 safe 인덱스로 전환. 기본 LV 선택 시 비우고 정상 캐시에서 외부 표 정보만 제거. |
 | `difficulty_table_url` | string | 원본 HTTP(S) BMSTable 페이지/header URL. bmstable meta를 해석해 header/data를 캐시하고 로컬 JSON 선택 시 비움. |
 | `online_records_server_url` | string | 기록·랭킹·채팅 API URL. 실패해도 로컬 플레이·기록은 유지. |
