@@ -1308,6 +1308,7 @@ void MenuApp::play_speed_adjustment_if_changed(const config::SpeedConfig& previo
 
 void MenuApp::run() {
     while (!exit_requested_.load(std::memory_order_acquire)) {
+        if (service_window_size_change()) publish_snapshot();
         if (menu_window_.should_close()) {
             exit_requested_.store(true, std::memory_order_release);
             break;
@@ -1874,6 +1875,8 @@ void MenuApp::refresh_graphics_resolutions() {
     MONITORINFOEXW info{};
     info.cbSize = sizeof(info);
     if (GetMonitorInfoW(monitor, &info)) {
+        graphics_settings_controller_.set_native_resolution(info.rcMonitor.right - info.rcMonitor.left,
+                                                            info.rcMonitor.bottom - info.rcMonitor.top);
         for (DWORD index = 0;; ++index) {
             DEVMODEW mode{};
             mode.dmSize = sizeof(mode);
@@ -1883,6 +1886,23 @@ void MenuApp::refresh_graphics_resolutions() {
     }
 #endif
     graphics_settings_controller_.set_display_resolutions(modes);
+}
+
+bool MenuApp::service_window_size_change() {
+    const auto change = menu_window_.poll_window_size_change();
+    if (!change || (!change->fullscreen_fallback && config_.graphics.display_mode != "windowed")) return false;
+    if (!config::valid_graphics_dimensions(change->width, change->height)) return false;
+    config_.graphics.resolution = config::normalize_graphics_resolution(
+        std::to_string(change->width) + "x" + std::to_string(change->height));
+    if (change->fullscreen_fallback) {
+        config_.graphics.display_mode = "windowed";
+        graphics_resolution_status_ = ui_text("Exclusive mode unavailable for this size; switched to Windowed.",
+                                             "이 크기는 독점 전체 화면에서 사용할 수 없어 창 모드로 전환했습니다.");
+    } else {
+        graphics_resolution_status_.clear();
+    }
+    persist_runtime_config();
+    return true;
 }
 
 void MenuApp::toggle_skin_fullscreen_preview() {
@@ -2071,6 +2091,12 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
         return;
     }
 
+    if (current_screen() == Screen::SettingsGraphics && graphics_settings_controller_.editing_resolution() &&
+        !chat_url_warning_visible_ && !ranked_account_overlay_visible_ && !chat_overlay_visible_) {
+        if (event.state == input::InputState::Pressed) handle_graphics_settings_input(event.keycode);
+        return;
+    }
+
     if (event.state == input::InputState::Pressed &&
         key_f10_ != 0 && event.keycode == key_f10_) {
         toggle_ranked_account_overlay();
@@ -2206,8 +2232,10 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
         if (row == rows.end()) return;
         // Pointer bodies select/help only. Activation belongs to action rows;
         // keyboard Enter retains its existing, separately dispatched behavior.
+        const bool resolution_value = current_screen() == Screen::SettingsGraphics &&
+            event.index == static_cast<int>(menu::settings::GraphicsSettingId::Resolution) && row->value_activatable;
         if (!row->enabled || (event.part == render::MenuHitPart::Activate &&
-                              (row->adjustable || row->slider || !row->activatable))) {
+                              ((!resolution_value && row->adjustable) || row->slider || !row->activatable))) {
             event.part = render::MenuHitPart::SelectOnly;
         }
     }
@@ -2965,6 +2993,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
                 return;
             }
         case Screen::SettingsGraphics:
+            (void)service_window_size_change();
             if (event.index < 0) {
                 return;
             }
@@ -3400,6 +3429,12 @@ void MenuApp::handle_text_input(std::string_view text) {
                 multiplayer_menu_.chat_input, printable)) {
             publish_snapshot();
         }
+        return;
+    }
+
+    if (current_screen() == Screen::SettingsGraphics && graphics_settings_controller_.editing_resolution()) {
+        // Digits and editing commands share the ordered input queue. WM_CHAR
+        // arrives on the renderer thread and must not duplicate or reorder them.
         return;
     }
 

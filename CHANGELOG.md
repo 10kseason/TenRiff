@@ -4,6 +4,8 @@
 
 ### 1.8.8 local development candidate
 
+- Extend the candidate scope with freely resizable windows/direct width-height input, a small result-screen F9 PNG/save-directory hint, and multi-beat LN Mix holds alongside taps/short holds on other lanes. Same-lane repeated taps are not merged. See [additional release conditions, local verification and remaining limits](docs/release-conditions-1.8.8.ko.md); the initial analysis candidate's validation does not cover this follow-up.
+- Version the long LN Mix transform separately: absent metadata retains legacy v1; v2 keeps local history/replay but is excluded from legacy chart-wide BEST and Sites upload until records can distinguish the transformed charts. No ranking backend deployment is included.
 - Add result analysis for lane timing distributions, tap/LN-head/release/hold-failure events and accuracy across 12 equal song-time segments. Show measured sample counts, mean absolute error and sample spread alongside signed means; unmeasurable misses and automatic LN completion never create zero-ms timing samples.
 - Add result analysis pages while keeping judgement, scoring, combo, gauge and replay rules unchanged. Keep older records readable and show analysis as unavailable when the extra data is absent. This is local development, not a published 1.8.8 release; see [analysis semantics and verification criteria](docs/result-analysis-1.8.8.ko.md).
 - Document the limited read-only plugin boundary, core-enforced multiplayer defaults, separate permission/runtime limits, two sample-plugin acceptance gates, SDK and future 1.9.0 stabilization policy. The plugin runtime/API/SDK are not implemented in this change.

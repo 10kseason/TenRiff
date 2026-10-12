@@ -42,13 +42,24 @@ namespace tenriff::app {
 // Seed only in-memory state, then use the production settings builders.
 // MenuApp is never initialized: no profiles, indexing, services or input start.
 struct MenuAppVisualTestAccess {
-    static void populate_inner_settings(render::MenuRenderData& source, bool graphics, int selected) {
+    static void populate_inner_settings(render::MenuRenderData& source, bool graphics, int selected,
+                                        bool edit_resolution = false, bool invalid_resolution = false) {
         auto app = std::make_unique<MenuApp>();
         app->config_.ui.language = ui::language_token(source.ui_language);
         source.generic.rows.clear();
         source.generic.notes.clear();
         if (graphics) {
-            if (selected >= 0) {
+            if (edit_resolution) {
+                using namespace menu::settings;
+                auto& controller = app->graphics_settings_controller_;
+                controller.reset(GraphicsSettingId::Resolution);
+                (void)controller.handle(menu::MenuAction::activate(), app->config_);
+                (void)controller.resolution_text(invalid_resolution ? "12x" : "1377");
+                (void)controller.handle(menu::MenuAction::move(1), app->config_);
+                (void)controller.resolution_text("777");
+                if (invalid_resolution) (void)controller.handle(menu::MenuAction::activate(), app->config_);
+            }
+            if (selected >= 0 && !edit_resolution) {
                 if (const auto id = menu::settings::graphics_setting_id_at(static_cast<std::size_t>(selected)))
                     app->graphics_settings_controller_.reset(*id);
             }
@@ -229,7 +240,7 @@ struct MenuWindowVisualTestAccess {
             (source.generic.heading == ui::text(source.ui_language, "Key Mode Settings", "키 모드 설정") ||
              source.generic.heading == ui::text(source.ui_language, "Graphics Settings", "그래픽 설정"));
         const bool song_fixture = source.kind == MenuScreenKind::SongSelect;
-        const bool result_fixture = source.kind == MenuScreenKind::ResultScreen && !source.result.peer_battle;
+        const bool result_fixture = source.kind == MenuScreenKind::ResultScreen;
         // Sample before the verification render: crossing the reveal boundary
         // during that draw must not falsely require buttons from an earlier frame.
         const bool result_controls_expected = result_fixture && result_presentation_frame(
@@ -322,6 +333,7 @@ struct MenuWindowVisualTestAccess {
         if (verify && result_fixture) {
             if (result_controls_expected) {
                 for (const int id : {0, 2, 1, 3, 4, 5, 6}) {
+                    if (source.result.peer_battle && id != 0) continue;
                     if (source.result.analysis_page != 0 && (id == 1 || id == 2)) continue;
                     if (id == 1 && !source.result.replay_available) continue;
                     if (!verified_result_targets.count(id))
@@ -376,6 +388,10 @@ struct MenuWindowVisualTestAccess {
                     require_part(MenuHitPart::SelectOnly);
                     if (row.decrement_enabled) require_part(MenuHitPart::Decrement);
                     if (row.increment_enabled) require_part(MenuHitPart::Increment);
+                    if (row.value_activatable ||
+                        (source.generic.heading == ui::text(source.ui_language, "Graphics Settings", "그래픽 설정") &&
+                         row.row_index == static_cast<int>(app::menu::settings::GraphicsSettingId::Resolution)))
+                        require_part(MenuHitPart::Activate);
                 } else if (row.activatable) require_part(MenuHitPart::Activate);
             }
         }
@@ -499,6 +515,8 @@ int main(int argc, char** argv) {
     bool settings = false;
     bool mode_settings = false;
     bool graphics_settings = false;
+    bool edit_resolution = false;
+    bool invalid_resolution = false;
     bool skin_settings = false;
     bool keymap_settings = false;
     bool keymap_test = false;
@@ -549,6 +567,8 @@ int main(int argc, char** argv) {
         }
         if (arg == "--analysis-unavailable") { analysis_unavailable = true; continue; }
         if (arg == "--analysis-no-samples") { analysis_no_samples = true; continue; }
+        if (arg == "--edit-resolution") { settings = graphics_settings = edit_resolution = true; continue; }
+        if (arg == "--invalid-resolution") { settings = graphics_settings = edit_resolution = invalid_resolution = true; continue; }
         if (arg == "--fullscreen-preview") fullscreen_skin_preview = settings = skin_settings = true;
         else if (arg == "--no-vsync") config.vsync = false;
         else if (arg == "--menu-roundtrip") menu_roundtrip = true;
@@ -815,7 +835,8 @@ int main(int argc, char** argv) {
     if (mode_settings || graphics_settings) {
         data.generic.heading = graphics_settings ? loc("Graphics Settings", "그래픽 설정")
                                                 : loc("Key Mode Settings", "키 모드 설정");
-        tenriff::app::MenuAppVisualTestAccess::populate_inner_settings(data, graphics_settings, selected_setting);
+        tenriff::app::MenuAppVisualTestAccess::populate_inner_settings(data, graphics_settings, selected_setting,
+            edit_resolution, invalid_resolution);
     }
     if (keymap_settings) {
         using namespace tenriff::app::menu::settings;

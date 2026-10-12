@@ -201,6 +201,75 @@ TEST_CASE("graphics keyboard and pointer adjustments have parity") {
     CHECK(keyboard_runtime.graphics.resolution == pointer_runtime.graphics.resolution);
 }
 
+TEST_CASE("graphics direct size draft applies both fields only after valid confirmation") {
+    tenriff::config::RuntimeConfig runtime;
+    GraphicsSettingsController controller;
+    runtime.graphics.resolution = "native";
+    controller.set_native_resolution(1920, 1080);
+    auto effects = controller.handle(MenuAction::activate(), runtime, GraphicsSettingId::Resolution);
+    REQUIRE(controller.editing_resolution());
+    CHECK_FALSE(effects.apply_runtime_graphics);
+    CHECK(controller.resolution_fields()[0] == "1920");
+    CHECK(controller.resolution_fields()[1] == "1080");
+    static_cast<void>(controller.resolution_text("1500"));
+    static_cast<void>(controller.handle(MenuAction::move(1), runtime));
+    static_cast<void>(controller.resolution_text("1000"));
+    CHECK(runtime.graphics.resolution == "native");
+    effects = controller.handle(MenuAction::activate(), runtime);
+    CHECK_FALSE(controller.editing_resolution());
+    CHECK(runtime.graphics.resolution == "1500x1000");
+    CHECK(effects.apply_runtime_graphics);
+    CHECK(controller.dirty());
+    const auto back = controller.handle(MenuAction::back(), runtime);
+    CHECK(back.menu.persist_config);
+    CHECK(back.menu.navigate_back);
+}
+
+TEST_CASE("graphics invalid direct input stays editable and cancel preserves the previous size") {
+    tenriff::config::RuntimeConfig runtime;
+    runtime.graphics.resolution = "720p";
+    GraphicsSettingsController controller;
+    static_cast<void>(controller.handle(MenuAction::activate(), runtime, GraphicsSettingId::Resolution));
+    static_cast<void>(controller.resolution_text("8193"));
+    auto effects = controller.handle(MenuAction::activate(), runtime);
+    CHECK(controller.editing_resolution());
+    CHECK(controller.resolution_error());
+    CHECK_FALSE(effects.apply_runtime_graphics);
+    CHECK_FALSE(controller.dirty());
+    CHECK(runtime.graphics.resolution == "720p");
+    const auto invalid = GraphicsSettingsView::build(controller, runtime, tenriff::ui::Language::English);
+    CHECK(invalid.rows[1].value.find("[8193]") != std::string::npos);
+    CHECK(invalid.notes.front().find("Invalid size") == 0);
+    static_cast<void>(controller.resolution_erase(true));
+    static_cast<void>(controller.resolution_text("12x"));
+    effects = controller.handle(MenuAction::activate(), runtime);
+    CHECK(controller.resolution_error());
+    effects = controller.handle(MenuAction::back(), runtime);
+    CHECK_FALSE(controller.editing_resolution());
+    CHECK_FALSE(effects.menu.navigate_back);
+    CHECK(runtime.graphics.resolution == "720p");
+    CHECK_FALSE(controller.dirty());
+}
+
+TEST_CASE("graphics direct entry supports portrait sizes and preserves preset adjustment") {
+    tenriff::config::RuntimeConfig runtime;
+    GraphicsSettingsController controller;
+    static_cast<void>(controller.handle(MenuAction::activate(), runtime, GraphicsSettingId::Resolution));
+    static_cast<void>(controller.resolution_text("900"));
+    static_cast<void>(controller.handle(MenuAction::adjust(1), runtime));
+    static_cast<void>(controller.resolution_text("1600"));
+    static_cast<void>(controller.handle(MenuAction::activate(), runtime));
+    CHECK(runtime.graphics.resolution == "900x1600");
+    static_cast<void>(controller.handle(MenuAction::adjust(1), runtime));
+    static_cast<void>(controller.handle(MenuAction::adjust(-1), runtime));
+    CHECK(runtime.graphics.resolution == "900x1600");
+    static_cast<void>(controller.handle(MenuAction::activate(), runtime));
+    static_cast<void>(controller.resolution_text("640"));
+    static_cast<void>(controller.select(GraphicsSettingId::VSync));
+    CHECK_FALSE(controller.editing_resolution());
+    CHECK(runtime.graphics.resolution == "900x1600");
+}
+
 TEST_CASE("graphics Back pointer row still saves and leaves after moving language") {
     tenriff::config::RuntimeConfig runtime;
     GraphicsSettingsController controller;

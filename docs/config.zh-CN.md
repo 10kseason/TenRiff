@@ -1,5 +1,7 @@
 # TenRiff 配置模式（当前）
 
+**1.8.8 追加发布条件：**包含自由调整窗口大小与直接输入宽高、结果页的 `F9` PNG 保存提示，以及多拍长 LN 与其他轨道单键/短 LN 混合的 LN Mix。请查看与初始分析候选版分开的[新增功能及最终验证状态（韩语）](release-conditions-1.8.8.ko.md)。固定基准仍为 1.8.7，此候选版尚未发布。
+
 依据：[Config.h](../src/config/Config.h)、[Config.cpp](../src/config/Config.cpp)、[默认 JSON](../config/config.json) 与[键位](../src/config/Keymap.cpp)。省略字段使用代码默认值；以下范围描述加载、保存时的规范化规则。
 
 这份文档整理当前 `config/config.json`、`profiles/<name>/config.json`、`profiles/<name>/keymap.json` 的实际配置结构。
@@ -124,12 +126,14 @@ Gauge Shift 始终启用。`mode.gauge` 的 `ex_hard / hard / normal / easy` 选
 - `display_mode` (string)
   - `borderless | windowed | fullscreen`
   - 默认值为 `borderless`；Discord、OBS、Game Bar 等外部 overlay 也推荐使用此模式
-  - `windowed` 是带标题栏的固定大小窗口，可拖动
+  - `windowed` 带标题栏，可移动并拖动边框调整大小。拖动结束时把实际client尺寸保存到配置；最大化、还原及程序调整大小不会覆盖已选值
   - `fullscreen` 是 DXGI 独占全屏，当前 Discord Game Overlay 不会显示
 - `resolution` (string)
   - `native`、旧别名 `720p | 1080p | qhd`，或 `宽x高`（例如 `1600x900`, `1366x768`, `1280x800`, `3440x1440`）。每轴支持320–8192px。
   - 图形设置包含常见尺寸和当前显示器的显示模式。按`F5`刷新列表。自定义尺寸在保存和重启后保留。
-  - 布局保持1920×1080画布比例，其他比例显示留边。窗口模式按比例缩小，以容纳标题栏和任务栏工作区域。
+  - 分辨率`+/-`继续循环预设；按`Enter`或点击数值进入宽/高编辑，用键盘上排数字或数字小键盘输入。`Tab`/方向键切换，`Enter`应用、`Esc`取消、`Backspace`删除、`Delete`清空。每轴必须为320–8192整数；空值或越界值显示错误并保留原设置。不使用其他字符、粘贴或IME输入。
+  - 内容和点击映射保持1920×1080比例，其他窗口比例显示留边。请求尺寸过大时保留选择值，只将实际窗口缩小到工作区域内；通常等比缩小，但实际client每轴至少320px，因此极端窗口比例可能改变。
+  - 独占全屏不支持请求尺寸时回退到窗口模式并保存实际尺寸/模式。保留旧配置标记及默认值；新候选版的实窗、切换和保存验证见[追加发布条件（韩语）](release-conditions-1.8.8.ko.md#창-크기와-직접-해상도-입력)。
   - 皮肤设置使用实际游戏渲染器的等比缩小画面，反映区域移动、轨道/音符/面板尺寸、判定/连击位置和皮肤字体。
 - `vsync` (bool)
 - `refresh_hz` (int)
@@ -186,8 +190,10 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
   - RR/SR、强制 key-mode 变换和 LN Mix 目标选择使用固定 seed；普通 Random 每次游玩生成新的 session seed，并把实际值写入 replay
 - `mods` (string array)
   - Note Structure 可在 `full_long_notes`、`ln_mix_10` 到 `ln_mix_90`、`full_short_notes` 中选择一个
-  - LN Mix 仅把按 base BPM 计算的 1/8-note hold 能在同 lane 下一音符前至少 50ms 结束的 tap 作为候选，并把所选 hold 的长度分配为 60% 长 1/8-note、20% 中 1/16-note、20% 短且交替的 1/24 与 1/32-note
-  - 已有 hold 会保留，与同 lane 已有 span 重叠的 head 会被排除，相同 `random_seed` 会选择相同 tap
+  - 新LN Mix v2以基础BPM×Rate为准，目标为长2/4拍60%、中1拍20%、短1/4或1/2拍20%。保留其他轨道的单键/短LN，不合并同轨道连续单键
+  - 候选单键须容纳至少1/2拍，并在同轨道下一个起点前留出50ms；目标长度放不下时按4→2→1→1/2→1/4拍缩短，因此密集谱面的实际长LN比例可能低于目标
+  - 保留已有LN/CN、原始起点与键音，排除与同轨道已有区间重叠的起点；相同谱面、`random_seed`、Rate和变换版本会重现相同结果
+  - 旧回放缺少变换版本时按v1读取，保留原有8/16/24/32分音符政策。新v2只保留本地记录/回放，不计入旧的谱面级BEST或Sites上传。参见[长度政策、兼容性和验证状态（韩语）](release-conditions-1.8.8.ko.md#ln-mix의-요구-의미)
 - `ghost_battle_enabled` (bool)
   - 默认值为 `false`
   - `true` 时会自动加载当前选中谱面的最佳兼容 replay 作为 ghost 对比

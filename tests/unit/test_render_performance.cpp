@@ -32,6 +32,17 @@ struct MenuWindowResolutionTestAccess {
     static bool point(const MenuWindow& window, int x, int y, float& out_x, float& out_y) {
         return window.translate_window_point(x, y, &out_x, &out_y);
     }
+    static void publish_size(MenuWindow& window, unsigned int width, unsigned int height, bool fallback) {
+        window.publish_window_size_change(width, height, fallback);
+    }
+    static bool resize_pending(const MenuWindow& window) { return window.resize_pending_; }
+    static void apply_config_request(MenuWindow& window) {
+        std::lock_guard<std::mutex> lock(window.config_mutex_);
+        window.config_ = window.pending_config_;
+        window.config_generation_ = window.pending_config_generation_;
+        window.config_dirty_ = false;
+    }
+    static int requested_width(const MenuWindow& window) { return window.pending_config_.width; }
 };
 }
 #endif
@@ -61,6 +72,59 @@ TEST_CASE("render layout and pointer mapping preserve aspect at uncommon resolut
         if (Access::x(window) > 1.0f) CHECK_FALSE(Access::point(window, 0, height / 2, x, y));
         if (Access::y(window) > 1.0f) CHECK_FALSE(Access::point(window, width / 2, 0, x, y));
     }
+}
+
+TEST_CASE("window resize mailbox rejects stale completion before and after a newer request") {
+    using Access = tenriff::render::MenuWindowResolutionTestAccess;
+    tenriff::render::MenuWindow window;
+    tenriff::render::MenuWindowConfig old_request;
+    old_request.display_mode = "fullscreen";
+    old_request.width = 1377;
+    old_request.height = 777;
+    auto newer = old_request;
+    newer.display_mode = "windowed";
+    newer.width = 1500;
+    newer.height = 1000;
+    window.set_config(old_request);
+    Access::apply_config_request(window);
+    Access::publish_size(window, 1377, 777, true);
+    window.set_config(newer);
+    CHECK_FALSE(window.poll_window_size_change().has_value());
+    // The old transition can also finish only after the newer request arrived.
+    Access::publish_size(window, 1377, 777, true);
+    CHECK_FALSE(window.poll_window_size_change().has_value());
+    CHECK(Access::requested_width(window) == 1500);
+    Access::apply_config_request(window);
+    Access::publish_size(window, 1439, 809, false);
+    const auto drag = window.poll_window_size_change();
+    REQUIRE(drag.has_value());
+    CHECK(drag->width == 1439);
+    CHECK(drag->height == 809);
+    CHECK_FALSE(drag->fullscreen_fallback);
+}
+
+TEST_CASE("window resize mailbox is bounded consumes once and distinguishes exclusive fallback") {
+    using Access = tenriff::render::MenuWindowResolutionTestAccess;
+    tenriff::render::MenuWindow window;
+    // Buffer notifications do not represent a user choice and must not persist.
+    window.queue_resize(1500, 1000);
+    CHECK(Access::resize_pending(window));
+    CHECK_FALSE(window.poll_window_size_change().has_value());
+    for (const auto bad : {0u, 319u, 8193u, 0xffffffffu}) {
+        Access::publish_size(window, bad, 720, false);
+        CHECK_FALSE(window.poll_window_size_change().has_value());
+    }
+    Access::publish_size(window, 1500, 1000, false);
+    auto change = window.poll_window_size_change();
+    REQUIRE(change.has_value());
+    CHECK(change->width == 1500);
+    CHECK(change->height == 1000);
+    CHECK_FALSE(change->fullscreen_fallback);
+    CHECK_FALSE(window.poll_window_size_change().has_value());
+    Access::publish_size(window, 900, 1600, true);
+    change = window.poll_window_size_change();
+    REQUIRE(change.has_value());
+    CHECK(change->fullscreen_fallback);
 }
 #endif
 

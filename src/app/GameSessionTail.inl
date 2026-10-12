@@ -569,6 +569,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         return false;
     }
 
+    long_note_mix_version_ = replay_playback_enabled_ ? replay_source_.mode.long_note_mix_version : 2;
     ModeManagerResult mode_result =
         manage_modes(chart_result.chart,
                      chart_result.format,
@@ -576,7 +577,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
                      config_.judge,
                      config_.speed.rate,
                      chart_result.base_bpm,
-                     sample_rate_);
+                     sample_rate_,
+                     static_cast<LongNoteMixVersion>(long_note_mix_version_));
     if (replay_playback_enabled_) {
         const auto base_judge = is_supported_canonical_replay_ruleset(replay_source_.ruleset_id)
                                     ? config::JudgeConfig{} : config_.judge;
@@ -724,6 +726,16 @@ bool GameSession::initialize(const CommandLineOptions& options) {
             ghost_replay_enabled_ = false;
             ghost_replay_source_ = {};
             ghost_replay_event_index_ = 0;
+        } else if (mode_mod_long_note_mix(active_mods_) &&
+                   ghost_replay_source_.mode.long_note_mix_version != long_note_mix_version_) {
+            // Both fields share one chart. Adopt the validated ghost's original
+            // conversion only for this run; rejected ghosts cannot change a new
+            // session. Export this same version so the new score stays replayable.
+            long_note_mix_version_ = ghost_replay_source_.mode.long_note_mix_version;
+            chart_ = manage_modes(chart_result.chart, chart_result.format, config_.mode,
+                                  config_.judge, config_.speed.rate, chart_result.base_bpm,
+                                  sample_rate_, static_cast<LongNoteMixVersion>(long_note_mix_version_)).chart;
+            std::cerr << "[info] LN Mix Legacy: matching the ghost's original short-hold chart." << std::endl;
         }
     }
     if (practice_start_seconds_ > 0.0) {
@@ -2268,6 +2280,7 @@ void GameSession::shutdown() {
         result_.final_gauge = gauge_type_token(final_gauge);
         result_.final_gauge_value = final_gauge_value;
         result_.mods = active_mods_;
+        result_.long_note_mix_version = mode_mod_long_note_mix(active_mods_) ? long_note_mix_version_ : 1;
         result_.player_name = config::normalize_profile_nickname(config_.ui.profile_nickname);
         if (result_.player_name.empty()) {
             result_.player_name = options_.profile;
@@ -2332,6 +2345,7 @@ void GameSession::shutdown() {
             replay.pause_used = result_.pause_used;
             replay.aborted = user_aborted;
             replay.mode.key_mode = config_.mode.key_mode;
+            replay.mode.long_note_mix_version = result_.long_note_mix_version;
             replay.mode.key_conversion_algorithm = config_.mode.key_conversion_algorithm;
             replay.mode.key_conversion_nk2_preset = config_.mode.key_conversion_nk2_preset;
             replay.mode.random = config_.mode.random;
@@ -2392,6 +2406,7 @@ void GameSession::shutdown() {
             exported_result.rate = replay.rate;
             exported_result.game_over = result_.game_over;
             exported_result.mods = result_.mods;
+            exported_result.long_note_mix_version = result_.long_note_mix_version;
             exported_result.rate_multiplier = result_.rate_multiplier;
             exported_result.score_multiplier = result_.score_multiplier;
             exported_result.final_score = result_.final_score;

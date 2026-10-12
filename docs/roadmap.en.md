@@ -18,7 +18,7 @@ The current scope is **1.8.8 analysis and documentation of this plan**. The plug
 
 | Stage | Completion criteria |
 | --- | --- |
-| 1.8.8 | Per-lane FAST/SLOW distributions, accuracy over song time, separate tap/LN-head/release/hold-failure analysis, and explicit data semantics and sample counts |
+| 1.8.8 | Per-lane FAST/SLOW, time-based accuracy, tap/LN-event analysis and sample counts; verify [additional conditions (Korean)](release-conditions-1.8.8.ko.md) for free window sizing, result screenshot hints and multi-beat LN Mix |
 | Before 1.9.0 | A limited read-only plugin API demonstrated by an alternative result analysis view and a personal song filter, both built without core source edits |
 | After 1.9.0 stabilization | Maintain the core feature scope; focus on bug, security and compatibility fixes and plugin extensions |
 

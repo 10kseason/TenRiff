@@ -48,6 +48,12 @@ bool build_sites_score_json(const gameplay::ReplayFile& replay,
     std::string_view clear_status, std::string& payload, std::string& error) {
     payload.clear();
     error.clear();
+    if (mode_mod_long_note_mix(replay.mods) && replay.mode.long_note_mix_version != 1) {
+        // Existing boards do not distinguish conversion versions. Keep a new
+        // multi-beat chart out of the legacy chart-condition leaderboard.
+        error = "Sites upload skipped: LN Mix v2 needs a separate leaderboard condition; this score remains local.";
+        return false;
+    }
     if (replay.ruleset_id != kCanonicalReplayRulesetId || replay.replay_format_version != gameplay::kReplayFormatVersion ||
         replay.aborted || replay.pause_used || replay.mode.autoplay_enabled ||
         replay.mode.practice_no_fail_enabled || replay.mode.one_miss_fail_enabled ||

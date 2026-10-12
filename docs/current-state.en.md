@@ -2,6 +2,8 @@
 
 **Fixed baseline: [1.8.7](baseline-1.8.7.en.md)** (2026-10-10). Use Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`; do not advance it automatically with `latest` or a new release.
 
+**Additional 1.8.8 release conditions:** Include freely resizable windows and direct width/height input, an `F9` PNG hint on results, and LN Mix combining multi-beat holds with taps/short holds on other lanes. See [added features and final verification status (Korean)](release-conditions-1.8.8.ko.md), separate from the initial analysis candidate's checks. The fixed baseline remains 1.8.7; this candidate is unreleased.
+
 **2026-10-12 · 1.8.8 local development candidate (unreleased):** Adds per-lane timing distributions, accuracy over song time, and separate tap/LN-head/release/hold-failure analysis. Unmeasurable misses never become zero-ms samples; judgement and scoring rules stay unchanged. Plugins and 1.9.0 stabilization remain planned. [Analysis criteria and plan (Korean)](result-analysis-1.8.8.ko.md).
 
 **2026-10-09 · TenRiff 1.8.7:** Improves input calibration and chart-loading audio, adds LR2 solo Studio Deck, 750ms FAST/SLOW retention, key reassignment, consolidated Options and complete song-title fitting. [1.8.7 release](release-1.8.7-gate.md).
@@ -137,7 +139,7 @@ This is the document that the next agent or any new contributor should read firs
   - BMS LV/CR calculation evaluates only LN head/tail miss-ms at 0.5x, so `300ms` is treated as `150ms`; runtime gameplay judgement windows remain unchanged
 - Lane transform:
   - Random supports `Off / Mirror / Random (Scratch Fixed) / SR`; ordinary Random keeps scratch fixed, creates a fresh key-lane permutation per play, and records the actual seed in the replay
-  - Mod Manager `LN Mix 10%-90%` preserves existing holds and excludes heads overlapping an existing same-lane span. It selects the requested share of taps that can fit a base-BPM 1/8-note hold while ending at least 50ms before the next same-lane note, then deterministically assigns every Mix level 60% long 1/8-note, 20% medium 1/16-note, and 20% short alternating 1/24- and 1/32-note lengths
+  - New `LN Mix 10%-90%` v2 targets 60% long 2/4-beat, 20% medium 1-beat and 20% short 1/4-/1/2-beat holds at base BPM × Rate. It preserves existing holds, original heads/keysounds and 50ms clearance before the next same-lane head, shortening targets when space is limited without merging repeated taps. Legacy replays keep v1; v2 keeps local history/replay but is excluded from legacy BEST and Sites upload. See [added conditions and checks (Korean)](release-conditions-1.8.8.ko.md)
 - Skins / gameplay feel:
   - standard `10+2 DP` charts map the `10K` lane-color palette across the ten playable key lanes while leaving native 12K palettes independent
   - `rect / triangle / pentagon / hexagon / circle` note shapes; procedural circles and polygons use the full rect-bar width at 100%
@@ -181,7 +183,8 @@ This is the document that the next agent or any new contributor should read firs
   - in R3, releasing an ordinary LN or `#LNMODE 2` CN too early immediately commits BAD, a combo break and gauge loss; regrabbing cannot cancel it. Ordinary LN still completes automatically when held, and CN retains tail release timing
   - when two keyboards press the same key, the logical `Pressed` state remains active until the last input source releases it
 - Graphics:
-  - resolution presets (`720p`, `1080p`, `qhd`, `native`)
+  - existing resolution presets plus direct width/height input (320–8192 per axis) and freely resizable window borders; preserve 16:9 content, margins and click mapping, and save the completed drag size. See [controls and recovery behavior](config.en.md#graphics)
+  - Single-result summaries, analysis tabs and multiplayer results show a small `F9` PNG / `screenshots/` hint. Files use the current working directory; actual saving in this candidate is covered separately by the [additional release checks (Korean)](release-conditions-1.8.8.ko.md)
   - `refresh_hz` (`-1` = `Match Display`, `0` = `Unlimited`, actual maximum 1500 FPS)
   - VSync off: Match Display follows monitor Hz; Unlimited caps gameplay at 1500 FPS while keeping the menu cap at `300`
   - VSync on: present refresh follows the active monitor Hz and render pacing targets `monitor_hz * 2` (`1050` clamp)

@@ -1134,6 +1134,11 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     render.result.analysis_page = result_analysis_page_;
     render.result.analysis_lane_bank = result_analysis_lane_bank_;
     render.result.analysis_mods = mode_mod_summary(last_result_mods_);
+    if (mode_mod_long_note_mix(last_result_mods_)) {
+        render.result.analysis_mods += last_result_long_note_mix_version_ == 1
+            ? ui_text(" / Legacy LN Mix", " / 이전 LN 믹스")
+            : ui_text(" / Long LN Mix", " / 긴 LN 믹스");
+    }
     render.result.profile =
         last_result_player_name_.empty() ? profile_display_name() : last_result_player_name_;
     if (session_mix_active_ && session_mix_cursor_ < session_mix_plan_.entries.size()) {
@@ -1353,7 +1358,11 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     if (last_result_rate_multiplier_ != 1.0) {
         render.result.notes.push_back(ui_text("Rate score x", "Rate 점수 x") + format_decimal(last_result_rate_multiplier_));
     }
-    render.result.notes.push_back(ui_text("Mods: ", "모드: ") + mode_mod_summary(last_result_mods_));
+    render.result.notes.push_back(ui_text("Mods: ", "모드: ") + render.result.analysis_mods);
+    if (mode_mod_long_note_mix(last_result_mods_) && last_result_long_note_mix_version_ != 1) {
+        render.result.notes.push_back(ui_text("Long LN Mix: local history only; separate from legacy bests and online boards.",
+            "긴 LN 믹스: 로컬 기록에 저장하며 이전 최고 기록·온라인 순위와 분리합니다."));
+    }
     render.result.notes.push_back(ui_text("Timing center ", "타이밍 중심 ") + format_signed_ms(render.result.mean_delta_ms) +
                                   ui_text("  spread ", "  분산 ") + format_decimal(render.result.stddev_delta_ms) + "ms");
     if (last_session_replay_playback_) {
@@ -2212,6 +2221,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.loading_percent = 0;
         gameplay_hud_.loading_stage = "Preparing gameplay";
     }
+    (void)service_window_size_change();
     apply_runtime_graphics_config();
     publish_snapshot();
 
@@ -2556,6 +2566,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         } else {
             reset_screen(Screen::SongSelect);
         }
+        (void)service_window_size_change();
         apply_runtime_graphics_config();
         publish_snapshot();
         return;
@@ -2586,6 +2597,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
             reset_gameplay_hud_state(gameplay_hud_);
         }
         reset_screen(Screen::Multiplayer);
+        (void)service_window_size_change();
         apply_runtime_graphics_config();
         publish_snapshot();
         return;
@@ -2654,6 +2666,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         last_export_warnings_.clear();
         last_session_replay_playback_ = false;
         reset_screen(Screen::SongSelect);
+        (void)service_window_size_change();
         apply_runtime_graphics_config();
         {
             std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
@@ -2737,6 +2750,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         last_final_gauge_ = result.final_gauge;
         has_result_ = true;
         last_result_mods_ = result.mods;
+        last_result_long_note_mix_version_ = result.long_note_mix_version;
         last_result_rate_multiplier_ = result.rate_multiplier;
         last_result_score_multiplier_ = result.score_multiplier;
         last_result_final_score_ = result.final_score;
@@ -2784,6 +2798,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
                         "로컬 플레이가 끝났습니다. 재대전 전에 상대를 기다리는 중입니다.");
         }
     }
+    (void)service_window_size_change();
     apply_runtime_graphics_config();
     {
         std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);

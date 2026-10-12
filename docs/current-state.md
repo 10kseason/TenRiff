@@ -2,6 +2,8 @@
 
 **고정 기준선: [1.8.7](baseline-1.8.7.md)** (2026-10-10). Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`을 사용하며 `latest`나 새 릴리스로 자동 변경하지 않습니다.
 
+**1.8.8 추가 릴리스 조건:** 창 크기 자유 조절·가로/세로 직접 입력, 결과의 `F9` PNG 저장 안내, 여러 박 길이 LN과 다른 레인의 단노트·짧은 LN을 섞는 LN Mix를 포함합니다. 초기 분석 후보의 검증과 구분한 [추가 기능·최종 검증 상태](release-conditions-1.8.8.ko.md)를 확인하세요. 기존 고정 기준은 1.8.7이며 아직 미배포입니다.
+
 **2026-10-12 · 1.8.8 로컬 개발 후보(미배포):** 레인별 타이밍 분포, 곡 시간대별 정확도와 단노트/LN 시작·해제·유지 실패 분석을 추가합니다. 측정 불가 미스를 0ms 표본으로 넣지 않으며 판정·점수 규칙을 유지합니다. 플러그인과 1.9.0 안정화는 계획 단계입니다. [분석 구현 기준과 계획](result-analysis-1.8.8.ko.md).
 
 **2026-10-09 · TenRiff 1.8.7:** 입력 보정과 로딩 오디오 경로를 보완하고 LR2 단독 플레이 스튜디오 덱, 750ms FAST/SLOW 유지, 키 재할당, 옵션 통합과 곡 제목 자동 맞춤을 제공합니다. [1.8.7 release](release-1.8.7-gate.md).
@@ -150,7 +152,7 @@
   - BMS LV/CR 계산에서 롱노트 Head/Tail의 miss-ms만 0.5배로 평가해 `300ms`를 `150ms`처럼 완화하며, 실제 gameplay 판정창은 그대로 유지
 - Lane transform:
   - Random은 `Off / Mirror / Random (Scratch Fixed) / SR`를 지원한다. 일반 Random은 매 플레이 새 seed로 스크래치를 제외한 건반만 섞고 replay에는 실제 seed를 기록하며, Mirror는 key-mode 변환 뒤 최종 레인을 반전한다.
-  - Mod Manager의 `LN Mix 10%~90%`는 기존 롱노트를 보존하고 같은 레인의 기존 span과 겹치는 head를 제외한다. base BPM 기준 8비트 LN도 다음 동일 레인 노트보다 50ms 먼저 끝낼 수 있는 단노트 중 설정 비율을 `Random Seed`로 고르고, 선택된 LN 길이는 모든 Mix 단계에서 긴 8비트 60% / 중간 16비트 20% / 짧은 24·32비트 20%로 배분
+  - `LN Mix 10%~90%`의 새 v2는 base BPM×Rate 기준 긴 2·4박 60% / 중간 1박 20% / 짧은 1/4·1/2박 20%를 목표로 혼합. 기존 LN·원본 head·키음을 보존하고 같은 레인 다음 노트 전 50ms를 남기며 공간 부족 시 길이를 단계적으로 낮춤. 동일 레인 연타를 합치지 않음. 이전 리플레이는 v1로 재현하고 v2는 로컬 기록·리플레이에만 남겨 기존 BEST·Sites 업로드에서 제외. [추가 조건과 검증](release-conditions-1.8.8.ko.md) 참고
 - Skins / Gameplay feel:
   - 표준 `10+2 DP` 차트는 스크래치 2개를 제외한 실제 10개 키에 `10K` lane color 팔레트를 순서대로 적용하며, native 12K 팔레트와는 독립적으로 유지
   - `Classic`, `Neon`, `Minimal`, `TenRiff` visual presets
@@ -198,7 +200,8 @@
   - R3에서는 일반 LN과 `#LNMODE 2` CN을 너무 일찍 놓으면 즉시 BAD·콤보 단절·게이지 감소가 확정되며 재입력으로 취소되지 않음. 일반 LN을 끝까지 누르면 자동 완료하고 CN의 꼬리 해제 판정은 유지
   - 같은 키를 두 키보드가 동시에 눌러도 마지막 입력 소스가 해제될 때까지 논리적 `Pressed` 상태를 유지
 - Graphics:
-  - resolution preset (`720p`, `1080p`, `qhd`, `native`)
+  - 기존 해상도 프리셋과 가로/세로 직접 입력(각 320–8192), 창 테두리 자유 크기 조절. 16:9 내용 비율·여백·클릭 좌표를 유지하고 드래그 완료 크기를 저장. [조작과 복구 조건](config.md#graphics) 참고
+  - 단독 요약·분석 탭·멀티 결과 하단에 `F9` PNG 저장과 `screenshots/` 위치를 작게 안내. 현재 작업 폴더 아래에 저장하며, 새 후보의 실제 저장 검증은 [추가 릴리스 조건](release-conditions-1.8.8.ko.md)을 따름
   - `refresh_hz` (`-1` = `디스플레이에 맞춤`, `0` = `무제한`, 실제 최대 1500 FPS)
   - VSync off: 디스플레이에 맞춤은 모니터 주사율을 사용하고, 무제한은 gameplay를 1500 FPS로 제한하며 menu cap `300`은 유지
   - VSync on: present refresh는 active monitor Hz를 따라가고 render pacing은 `monitor_hz * 2`를 목표로 함 (`1050` clamp)

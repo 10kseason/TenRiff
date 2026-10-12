@@ -188,6 +188,7 @@ public:
         std::string player_name;
         gameplay::ResultStats stats;
         std::vector<std::string> mods;
+        int long_note_mix_version = 1;
         double rate_multiplier = 1.0;
         double score_multiplier = 1.0;
         int64_t final_score = 0;
@@ -456,6 +457,7 @@ private:
     uint64_t riff_map_revision_ = 0;
     double chart_base_bpm_ = 0.0;
     std::vector<std::string> active_mods_{};
+    int long_note_mix_version_ = 2;
     double rate_multiplier_ = 1.0;
     double score_multiplier_ = 1.0;
     gameplay::ReplayFile replay_source_{};

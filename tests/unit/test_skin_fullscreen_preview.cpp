@@ -595,10 +595,12 @@ struct MenuAppFeedbackTestAccess {
     static void check_row_bodies() {
         auto menu = std::make_unique<MenuApp>();
         menu->key_enter_ = 13; menu->key_left_ = 37; menu->key_right_ = 39;
+        menu->key_escape_ = 27;
         menu->config_ = config::ConfigLoader{}.defaults();
         menu->config_.audio_ui.background_sound_enabled = false;
         menu->config_.skin.source = "native";
         menu->skin_settings_controller_.reset("5k");
+        bool checked_resolution_value = false;
         for (const auto screen : {MenuApp::Screen::ModeSelect, MenuApp::Screen::ModeMods,
              MenuApp::Screen::SettingsAudio, MenuApp::Screen::SettingsGraphics,
              MenuApp::Screen::SettingsSkins, MenuApp::Screen::QuickSetup}) {
@@ -610,15 +612,51 @@ struct MenuAppFeedbackTestAccess {
                 render::MenuClickEvent event;
                 event.kind = render::MenuHitTargetKind::SettingsRow;
                 event.index = row.row_index;
-                event.part = render::MenuHitPart::Activate;
+                // Real row bodies emit SelectOnly, including Resolution. Its
+                // separate value control is the only adjustable Activate hit.
+                event.part = render::MenuHitPart::SelectOnly;
                 menu->handle_menu_click(event);
                 CHECK(menu->current_screen() == screen);
-                const auto& after = menu->snapshot_.render.generic.rows;
-                auto found = std::find_if(after.begin(), after.end(), [&](const auto& r) { return r.row_index == row.row_index; });
-                REQUIRE(found != after.end());
-                CHECK(found->value == row.value);
+                const auto check_value_unchanged = [&] {
+                    const auto& after = menu->snapshot_.render.generic.rows;
+                    const auto found = std::find_if(after.begin(), after.end(), [&](const auto& r) { return r.row_index == row.row_index; });
+                    REQUIRE(found != after.end());
+                    CHECK(found->value == row.value);
+                };
+                check_value_unchanged();
+                CHECK_FALSE(menu->graphics_settings_controller_.editing_resolution());
+                event.part = render::MenuHitPart::Activate;
+                if (row.value_activatable) {
+                    REQUIRE(screen == MenuApp::Screen::SettingsGraphics);
+                    REQUIRE(row.row_index == static_cast<int>(menu::settings::GraphicsSettingId::Resolution));
+                    checked_resolution_value = true;
+                    const auto resolution = menu->config_.graphics.resolution;
+                    const auto display_mode = menu->config_.graphics.display_mode;
+                    menu->handle_menu_click(event);
+                    CHECK(menu->graphics_settings_controller_.editing_resolution());
+                    CHECK(menu->current_screen() == screen);
+                    CHECK(menu->config_.graphics.resolution == resolution);
+                    CHECK(menu->config_.graphics.display_mode == display_mode);
+                    CHECK_FALSE(menu->graphics_settings_controller_.dirty());
+                    for (const char digit : std::string("1500")) menu->handle_graphics_settings_input(digit);
+                    CHECK(menu->graphics_settings_controller_.resolution_fields()[0] == "1500");
+                    CHECK(menu->config_.graphics.resolution == resolution);
+                    CHECK_FALSE(menu->graphics_settings_controller_.dirty());
+                    menu->handle_graphics_settings_input(menu->key_escape_);
+                    CHECK_FALSE(menu->graphics_settings_controller_.editing_resolution());
+                    CHECK(menu->config_.graphics.resolution == resolution);
+                    check_value_unchanged();
+                } else {
+                    // Keep the original defensive guard check: forged Activate
+                    // on ordinary choices and disabled rows must not adjust.
+                    menu->handle_menu_click(event);
+                    CHECK(menu->current_screen() == screen);
+                    check_value_unchanged();
+                }
             }
         }
+        CHECK(checked_resolution_value);
+        CHECK_FALSE(menu->render_thread_.is_running());
         menu->reset_screen(MenuApp::Screen::SettingsSkins);
         menu->publish_snapshot();
         render::MenuClickEvent event;

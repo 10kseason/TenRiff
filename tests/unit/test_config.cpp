@@ -29,6 +29,25 @@ TEST_CASE("graphics explicit resolutions normalize safely without losing uncommo
     }
 }
 
+TEST_CASE("graphics fitting keeps ordinary aspect and usable bounds for extreme requests") {
+    using tenriff::config::fit_graphics_client_size;
+    CHECK((fit_graphics_client_size(1500, 1000, 1904, 1033) == std::pair<int, int>{1500, 1000}));
+    CHECK((fit_graphics_client_size(900, 1600, 1904, 1033) == std::pair<int, int>{581, 1033}));
+    CHECK((fit_graphics_client_size(320, 8192, 1904, 1033) == std::pair<int, int>{320, 1033}));
+    CHECK((fit_graphics_client_size(8192, 320, 1904, 1033) == std::pair<int, int>{1904, 320}));
+    CHECK((fit_graphics_client_size(8192, 8192, 20000, 20000) == std::pair<int, int>{8192, 8192}));
+}
+
+TEST_CASE("graphics direct dimension entry rejects malformed text instead of selecting native") {
+    using tenriff::config::parse_graphics_dimension_fields;
+    CHECK((parse_graphics_dimension_fields("1500", "1000") == std::pair<int, int>{1500, 1000}));
+    CHECK((parse_graphics_dimension_fields("320", "8192") == std::pair<int, int>{320, 8192}));
+    for (const auto invalid : {"", "319", "8193", "-640", "+640", "640x", "640.0", " 640", "999999999999"}) {
+        CHECK((parse_graphics_dimension_fields(invalid, "900") == std::pair<int, int>{0, 0}));
+        CHECK((parse_graphics_dimension_fields("900", invalid) == std::pair<int, int>{0, 0}));
+    }
+}
+
 TEST_CASE("skin HUD font scales preserve legacy defaults and sanitize portable presets") {
     tenriff::config::SkinConfig skin;
     REQUIRE(tenriff::config::deserialize_skin_config("{}", skin));

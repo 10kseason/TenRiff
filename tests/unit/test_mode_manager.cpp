@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <array>
+#include <cmath>
 #include <limits>
 #include <optional>
 #include <string>
@@ -263,7 +265,7 @@ TEST_CASE("mode manager converts an exact deterministic percentage of taps into 
     CHECK(reseeded_starts != converted_starts);
 }
 
-TEST_CASE("mode manager keeps the long 60 medium 20 short 20 LN duration mix") {
+TEST_CASE("mode manager legacy LN mix keeps the exact short subdivision distribution") {
     tenriff::gameplay::GameplayChart chart;
     chart.lane_count = 1;
     constexpr int64_t kStart = 1000;
@@ -288,7 +290,7 @@ TEST_CASE("mode manager keeps the long 60 medium 20 short 20 LN duration mix") {
             make_judge_config(),
             1.0,
             120.0,
-            4800);
+            4800, tenriff::app::LongNoteMixVersion::LegacyShort);
 
         int converted = 0;
         int sixteenth = 0;
@@ -357,7 +359,7 @@ TEST_CASE("mode manager LN mix leaves fifty milliseconds before the next same-la
         make_judge_config(),
         1.0,
         120.0,
-        1000);
+        1000, tenriff::app::LongNoteMixVersion::LegacyShort);
 
     REQUIRE(result.chart.notes.size() == 3u);
     int sixteenth = 0;
@@ -392,7 +394,7 @@ TEST_CASE("mode manager LN mix defaults its timing basis to 44.1 kHz and 180 BPM
         tenriff::app::ChartFormat::Bms,
         mode,
         make_judge_config(),
-        1.0);
+        1.0, 0.0, 0, tenriff::app::LongNoteMixVersion::LegacyShort);
 
     REQUIRE(result.chart.notes.size() == 3u);
     int sixteenth = 0;
@@ -425,7 +427,7 @@ TEST_CASE("mode manager LN mix does not extend duplicate same-lane heads") {
         make_judge_config(),
         1.0,
         120.0,
-        1000);
+        1000, tenriff::app::LongNoteMixVersion::LegacyShort);
 
     REQUIRE(result.chart.notes.size() == 3u);
     CHECK_FALSE(result.chart.notes[0].end_sample.has_value());
@@ -451,7 +453,7 @@ TEST_CASE("mode manager LN mix does not extend a tap inside an existing same-lan
         make_judge_config(),
         1.0,
         180.0,
-        1000);
+        1000, tenriff::app::LongNoteMixVersion::LegacyShort);
 
     REQUIRE(result.chart.notes.size() == 3u);
     REQUIRE(result.chart.notes[0].end_sample.has_value());
@@ -485,6 +487,141 @@ TEST_CASE("mode manager removes no-ln-release when full short notes is active") 
     for (const auto& note : result.chart.notes) {
         CHECK_FALSE(note.end_sample.has_value());
         CHECK_FALSE(note.release_required);
+    }
+}
+
+TEST_CASE("mode manager musical LN mix allocates multi-beat long medium and short holds") {
+    tenriff::gameplay::GameplayChart chart;
+    chart.lane_count = 1;
+    for (int i = 0; i < 100; ++i) append_note(chart, 1, 1000 + i * 2500);
+    chart.duration_samples = 251000;
+    for (int percent : {10, 50, 90}) {
+        tenriff::config::ModeConfig mode;
+        mode.random_seed = 24680;
+        mode.mods = {"ln_mix_" + std::to_string(percent)};
+        const auto mixed = tenriff::app::manage_modes(chart, tenriff::app::ChartFormat::Bms,
+            mode, make_judge_config(), 1.0, 120.0, 1000);
+        std::array<int, 5> counts{};
+        const std::array<int64_t, 5> lengths{125, 250, 500, 1000, 2000};
+        for (const auto& note : mixed.chart.notes) {
+            if (!note.end_sample) continue;
+            const auto length = *note.end_sample - note.start_sample;
+            const auto found = std::find(lengths.begin(), lengths.end(), length);
+            REQUIRE(found != lengths.end());
+            ++counts[static_cast<std::size_t>(found - lengths.begin())];
+            CHECK_FALSE(note.release_required);
+        }
+        CHECK(counts[0] == percent / 10);
+        CHECK(counts[1] == percent / 10);
+        CHECK(counts[2] == percent / 5);
+        CHECK(counts[3] == percent * 3 / 10);
+        CHECK(counts[4] == percent * 3 / 10);
+        CHECK_FALSE(has_lane_overlap(mixed.chart));
+        CHECK(mixed.mod_multiplier == doctest::Approx(1.0));
+    }
+}
+
+TEST_CASE("mode manager musical LN mix preserves other lane taps short holds and all head metadata") {
+    tenriff::gameplay::GameplayChart chart;
+    chart.lane_count = 3;
+    for (int i = 0; i < 20; ++i) append_note(chart, 1, 1000 + i * 2500);
+    // These dense taps cannot be converted: their same-lane gap is too small.
+    for (int i = 0; i < 800; ++i) append_note(chart, 2, 1000 + i * 60);
+    for (int i = 0; i < 90; ++i) append_note(chart, 3, 1200 + i * 500, 1325 + i * 500, i % 2 != 0);
+    chart.duration_samples = 51000;
+    for (std::size_t i = 0; i < chart.notes.size(); ++i) {
+        chart.notes[i].note_id = i;
+        chart.notes[i].audio_asset_id = i + 10;
+        chart.notes[i].audio_gain = 0.375f;
+        chart.notes[i].audio_asset_count = 2;
+        chart.notes[i].audio_asset_ids = {i + 10, i + 20, 0, 0};
+    }
+    tenriff::config::ModeConfig mode;
+    mode.random_seed = 12345;
+    mode.mods = {"ln_mix_90"};
+    const auto first = tenriff::app::manage_modes(chart, tenriff::app::ChartFormat::Bms,
+        mode, make_judge_config(), 1.0, 120.0, 1000);
+    const auto repeated = tenriff::app::manage_modes(chart, tenriff::app::ChartFormat::Bms,
+        mode, make_judge_config(), 1.0, 120.0, 1000);
+    REQUIRE(first.chart.notes.size() == chart.notes.size());
+    int mixed_spans = 0;
+    for (std::size_t i = 0; i < first.chart.notes.size(); ++i) {
+        const auto& note = first.chart.notes[i];
+        const auto& source = chart.notes[note.note_id];
+        CHECK(note.lane == source.lane);
+        CHECK(note.start_sample == source.start_sample);
+        CHECK(note.audio_asset_id == source.audio_asset_id);
+        CHECK(note.audio_gain == source.audio_gain);
+        CHECK(note.audio_asset_count == source.audio_asset_count);
+        CHECK(note.audio_asset_ids == source.audio_asset_ids);
+        CHECK(note.end_sample == repeated.chart.notes[i].end_sample);
+        if (source.end_sample) {
+            CHECK(note.end_sample == source.end_sample);
+            CHECK(note.release_required == source.release_required);
+        }
+        if (note.lane != 1 || !note.end_sample || *note.end_sample - note.start_sample < 1000) continue;
+        const auto inside = [&](const auto& other) {
+            return other.start_sample > note.start_sample && other.start_sample < *note.end_sample;
+        };
+        const bool tap_inside = std::any_of(first.chart.notes.begin(), first.chart.notes.end(),
+            [&](const auto& other) { return other.lane == 2 && !other.end_sample && inside(other); });
+        const bool short_ln_inside = std::any_of(first.chart.notes.begin(), first.chart.notes.end(),
+            [&](const auto& other) { return other.lane == 3 && other.end_sample && inside(other); });
+        mixed_spans += tap_inside && short_ln_inside ? 1 : 0;
+    }
+    CHECK(mixed_spans > 0);
+    CHECK_FALSE(has_lane_overlap(first.chart));
+    mode.random_seed = 54321;
+    const auto reseeded = tenriff::app::manage_modes(chart, tenriff::app::ChartFormat::Bms,
+        mode, make_judge_config(), 1.0, 120.0, 1000);
+    bool differs = false;
+    for (std::size_t i = 0; i < first.chart.notes.size(); ++i) {
+        differs = differs || first.chart.notes[i].end_sample != reseeded.chart.notes[i].end_sample;
+    }
+    CHECK(differs);
+}
+
+TEST_CASE("mode manager musical LN mix fits dense lanes without consuming the next head") {
+    tenriff::gameplay::GameplayChart chart;
+    chart.lane_count = 1;
+    for (int i = 0; i < 20; ++i) append_note(chart, 1, 1000 + i * 350);
+    chart.duration_samples = 8000;
+    tenriff::config::ModeConfig mode;
+    mode.mods = {"ln_mix_90"};
+    const auto mixed = tenriff::app::manage_modes(chart, tenriff::app::ChartFormat::Bms,
+        mode, make_judge_config(), 1.0, 120.0, 1000);
+    REQUIRE(mixed.chart.notes.size() == 20);
+    for (std::size_t i = 0; i < mixed.chart.notes.size(); ++i) {
+        const auto& note = mixed.chart.notes[i];
+        CHECK(note.start_sample == chart.notes[i].start_sample);
+        if (!note.end_sample) continue;
+        CHECK((*note.end_sample - note.start_sample == 125 || *note.end_sample - note.start_sample == 250));
+        if (i + 1 < mixed.chart.notes.size()) CHECK(mixed.chart.notes[i + 1].start_sample - *note.end_sample >= 50);
+    }
+    CHECK_FALSE(has_lane_overlap(mixed.chart));
+}
+
+TEST_CASE("mode manager musical LN lengths follow BPM sample rate and playback rate") {
+    for (int sr : {1000, 48000}) for (double bpm : {120.0, 180.0}) for (double rate : {0.5, 1.0, 2.0}) {
+        tenriff::gameplay::GameplayChart chart;
+        chart.lane_count = 1;
+        const double beat = sr * 60.0 / (bpm * rate);
+        for (int i = 0; i < 20; ++i) append_note(chart, 1, static_cast<int64_t>(std::llround((1 + i * 6) * beat)));
+        chart.duration_samples = static_cast<int64_t>(std::llround(121 * beat));
+        tenriff::config::ModeConfig mode;
+        mode.mods = {"ln_mix_50"};
+        const auto mixed = tenriff::app::manage_modes(chart, tenriff::app::ChartFormat::Bms,
+            mode, make_judge_config(), rate, bpm, sr);
+        int two_beats = 0;
+        int four_beats = 0;
+        for (const auto& note : mixed.chart.notes) if (note.end_sample) {
+            const auto duration = *note.end_sample - note.start_sample;
+            two_beats += duration == std::llround(2 * beat) ? 1 : 0;
+            four_beats += duration == std::llround(4 * beat) ? 1 : 0;
+        }
+        CHECK(two_beats == 3);
+        CHECK(four_beats == 3);
+        CHECK_FALSE(has_lane_overlap(mixed.chart));
     }
 }
 

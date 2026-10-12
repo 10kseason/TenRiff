@@ -2,6 +2,8 @@
 
 **固定基準: [1.8.7](baseline-1.8.7.ja.md)**（2026-10-10）。Git tag `1.8.7`、commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347` を使い、`latest` や新しいリリースに合わせて自動変更しません。
 
+**1.8.8 の追加リリース条件:** ウィンドウの自由なサイズ変更と幅・高さの直接入力、結果画面の `F9` PNG 保存案内、複数拍の長い LN と他レーンの単ノート・短い LN を組み合わせる LN Mix を含みます。初期分析候補とは別の[追加機能・最終検証状況（韓国語）](release-conditions-1.8.8.ko.md)を参照してください。固定基準は 1.8.7 のままで、未配布です。
+
 **2026-10-12 · 1.8.8 ローカル開発候補（未配布）:** レーン別タイミング分布、曲の時間帯別精度、単ノート/LN の開始・離鍵・維持失敗の分析を追加します。測定不能のミスを 0ms 標本にせず、判定・採点規則を維持します。プラグインと 1.9.0 安定化は計画段階です。[分析基準と計画（韓国語）](result-analysis-1.8.8.ko.md)。
 
 **2026-10-09 · TenRiff 1.8.7:** 入力補正と読み込み時の音声処理を改善し、LR2ソロのスタジオデッキ、750msのFAST/SLOW表示、キー再割り当て、設定統合と曲名の自動サイズ調整を追加します。 [1.8.7 release](release-1.8.7-gate.md).
@@ -137,7 +139,7 @@
   - BMS の LV/CR 計算では long-note Head/Tail の miss-ms だけを 0.5倍で評価し、`300ms`を`150ms`として緩和する。実際の gameplay 判定 window は変更しない
 - Lane transform:
   - Random は `Off / Mirror / Random (Scratch Fixed) / SR` に対応。通常 Random は scratch を固定し、play ごとに新しい key-lane 配置を生成して実際の seed を replay に記録
-  - Mod Manager の `LN Mix 10%～90%` は既存 hold を維持し、同じ lane の既存 span と重なる head を除外する。base BPM 基準の 1/8-note hold が次の同一 lane note より 50ms 以上前に終わる tap から設定割合を `Random Seed` で選び、すべての Mix 段階で長い 1/8-note 60% / 中間 1/16-note 20% / 短い 1/24・1/32-note 20% に配分する
+  - 新しい `LN Mix 10%～90%` v2はbase BPM×Rate基準で長い2・4拍60% / 中間1拍20% / 短い1/4・1/2拍20%を目標に混合。既存LN・元の開始位置とキー音を維持し、同一レーンの次の開始まで50msを確保。空間不足では長さを段階的に下げ、連打は結合しない。旧リプレイはv1で再現し、v2はローカル記録・リプレイのみで従来BEST・Sites送信から除外。[追加条件と検証（韓国語）](release-conditions-1.8.8.ko.md)を参照
 - Skins / gameplay feel:
   - 標準 `10+2 DP` chart は scratch 2 lane を除く実際の 10 key に `10K` lane-color palette を順番に適用し、native 12K palette とは独立して保持
   - `rect / triangle / pentagon / hexagon / circle` note shape。procedural 円・多角形は 100% で rect bar と同じ全幅を使用
@@ -181,7 +183,8 @@
   - R3では通常LNと`#LNMODE 2` CNを早く離しすぎると即座にBAD・コンボ切れ・ゲージ減少が確定し、再入力で取り消せない。通常LNの保持による自動完了とCNの末尾解放判定は維持
   - 2 台のキーボードが同じキーを押しても、最後の入力ソースが離すまで論理 `Pressed` は維持される
 - Graphics:
-  - resolution presets (`720p`, `1080p`, `qhd`, `native`)
+  - 従来の解像度プリセット、幅/高さの直接入力（各320–8192）、枠のドラッグによる自由なサイズ変更。16:9の内容比率・余白・クリック座標を維持し、ドラッグ終了サイズを保存。[操作と復帰条件](config.ja.md#graphics)を参照
+  - ソロ結果の概要・分析タブ・マルチ結果の下部に小さな `F9` PNG / `screenshots/` 案内を表示。現在の作業フォルダー配下へ保存し、新候補の実際の保存確認は[追加リリース検証（韓国語）](release-conditions-1.8.8.ko.md)で別途扱う
   - `refresh_hz` (`-1` = `Match Display`、`0` = `Unlimited`、実際の上限は 1500 FPS)
   - VSync off: Match Display は monitor Hz に従い、Unlimited は gameplay を 1500 FPS に制限しつつ menu cap `300` を維持
   - VSync on: present refresh は active monitor Hz に追従し、render pacing は `monitor_hz * 2` を目標にする（`1050` clamp）

@@ -1,5 +1,7 @@
 # TenRiff Config Schema (current)
 
+**1.8.8 추가 릴리스 조건:** 창 크기 자유 조절·가로/세로 직접 입력, 결과의 `F9` PNG 저장 안내, 여러 박 길이 LN과 다른 레인의 단노트·짧은 LN을 섞는 LN Mix를 포함합니다. 초기 분석 후보의 검증과 구분한 [추가 기능·최종 검증 상태](release-conditions-1.8.8.ko.md)를 확인하세요. 기존 고정 기준은 1.8.7이며 아직 미배포입니다.
+
 확인 기준: [Config.h](../src/config/Config.h), [Config.cpp](../src/config/Config.cpp), [기본 JSON](../config/config.json), [키맵](../src/config/Keymap.cpp). 생략된 값은 코드 기본값을 사용하며, 아래 범위는 로드·저장 시 정규화 규칙입니다.
 
 이 문서는 현재 `config/config.json`, `profiles/<name>/config.json`, `profiles/<name>/keymap.json` 기준으로 실제 동작하는 설정 구조를 정리합니다.
@@ -123,12 +125,14 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 - `display_mode` (string)
   - `borderless | windowed | fullscreen`
   - 기본값은 `borderless`; Discord/OBS/Game Bar 같은 외부 오버레이에도 이 모드를 권장
-  - `windowed`는 제목줄이 있는 고정 크기 창이며 이동 가능
+  - `windowed`는 제목줄이 있는 창이며 이동과 테두리 드래그 크기 조절 가능. 드래그를 끝낼 때 실제 client 크기를 프로필에 저장하며 최대화·복원·프로그램에 의한 크기 변경은 선택값을 덮어쓰지 않음
   - `fullscreen`은 DXGI 독점 전체 화면이라 현재 Discord Game Overlay가 표시되지 않음
 - `resolution` (string)
   - `native`, 기존 별칭 `720p | 1080p | qhd`, 또는 `가로x세로` (예: `1600x900`, `1366x768`, `1280x800`, `3440x1440`). 각 축은 320–8192px.
   - 그래픽 설정의 해상도 항목은 일반적인 크기와 현재 모니터의 표시 모드를 함께 제공. `F5`로 목록 새로고침. 직접 지정한 크기도 저장·재실행 후 유지.
-  - 화면 배치는 1920×1080 기준 비율을 유지하며 다른 화면 비율에는 여백을 표시. 창 모드는 제목줄·작업 표시줄을 포함해 화면 안에 들어가도록 비례 축소.
+  - 해상도 `+/-`는 기존 프리셋을 순환. `Enter` 또는 값 클릭으로 가로/세로 초안을 열고 키보드 상단 숫자열·숫자패드로 입력. `Tab`·방향키로 항목 전환, `Enter` 적용, `Esc` 취소, `Backspace` 삭제, `Delete` 현재 항목 비우기. 각 축 320–8192 정수만 적용하며 빈 값·범위 오류는 기존 설정을 유지하고 오류 표시. 숫자키 외의 문자·붙여넣기·IME 입력은 사용하지 않음.
+  - 화면 내용은 1920×1080 비율과 클릭 좌표 변환을 유지하며 다른 창 비율에는 여백 표시. 입력 크기가 작업 영역보다 크면 선택한 값은 보존하고 실제 창만 축소. 보통 비례 축소하지만 실제 client 각 축 최소 320px 때문에 극단적인 비율에서는 창 비율이 달라질 수 있음.
+  - 독점 전체화면이 요청한 크기를 지원하지 않으면 창 모드로 복구하고 실제 크기·모드를 저장. 기존 프로필 토큰과 기본값은 유지. 새 후보의 실창·전환·저장 검증 상태는 [추가 릴리스 조건](release-conditions-1.8.8.ko.md#창-크기와-직접-해상도-입력) 참고.
   - 스킨 설정 미리보기는 실제 게임 렌더러를 같은 비율로 축소. 플레이필드 이동, 레인·노트·기어 크기, 판정·콤보 위치와 스킨 글꼴을 반영.
 - `vsync` (bool)
 - `refresh_hz` (int)
@@ -186,8 +190,10 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
   - RR/SR, 강제 key-mode 변환, LN Mix 대상 선택의 고정 seed이며 Mirror 레인 반전 자체는 사용하지 않음. 일반 Random은 플레이마다 새 session seed를 만들고 replay에 실제 값을 기록
 - `mods` (string array)
   - Note Structure에서 `full_long_notes`, `ln_mix_10`~`ln_mix_90`, `full_short_notes` 중 하나를 선택 가능
-  - LN Mix는 base BPM 기준 8비트 LN도 다음 동일 레인 노트보다 50ms 먼저 끝낼 수 있는 단노트만 후보로 삼고, 요청 비율만큼 선택한 LN 길이를 긴 8비트 60% / 중간 16비트 20% / 짧은 24·32비트 20%로 배분
-  - 기존 롱노트는 보존하고 같은 레인의 기존 span과 겹치는 head는 제외하며, 같은 `random_seed`에서는 같은 단노트가 변환됨
+  - 새 LN Mix v2는 base BPM×Rate 기준 긴 2·4박 60% / 중간 1박 20% / 짧은 1/4·1/2박 20%를 목표로 배분. 다른 레인의 단노트·짧은 LN을 유지하며 같은 레인의 연타를 합치지 않음
+  - 다음 같은 레인 노트 전 50ms와 최소 1/2박 공간을 확보할 수 있는 단노트만 후보. 긴 목표가 들어가지 않으면 4→2→1→1/2→1/4박 중 들어가는 길이로 낮추므로 고밀도에서는 실제 긴 LN 비율이 목표보다 낮을 수 있음
+  - 기존 LN/CN과 원본 head·키음은 보존하고 같은 레인의 기존 span과 겹치는 head는 제외. 같은 채보·`random_seed`·Rate·변환 버전에서는 동일하게 재현
+  - 이전 LN Mix 리플레이의 변환 버전 누락은 v1로 읽어 기존 8·16·24·32비트 정책을 유지. 새 v2는 로컬 기록·리플레이만 허용하며 기존 채보 BEST·Sites 업로드에서 제외. [길이 정책·호환성·검증 상태](release-conditions-1.8.8.ko.md#ln-mix의-요구-의미) 참고
 - `ghost_battle_enabled` (bool)
   - 기본값은 `false`
   - `true`면 선택한 차트의 최고 호환 replay를 자동 ghost 비교 대상으로 불러옴

@@ -32,7 +32,7 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
     };
     static constexpr SettingsHelpText graphics[] = {
         {"Choose windowed, borderless, or fullscreen display.", "창 모드, 테두리 없는 창, 전체 화면 중 표시 방식을 고릅니다.", "ウィンドウ、ボーダーレス、全画面を選びます。"},
-        {"Set the output resolution. Higher resolutions show more detail and require more GPU work.", "화면 해상도를 고릅니다. 높일수록 선명해지지만 GPU 작업량도 늘어납니다.", "表示解像度を選びます。高解像度ほどGPU負荷が増えます。"},
+        {"Use +/- for presets, or Enter to type Width and Height (320-8192). Drag a Windowed border to resize and save. The display keeps its proportions.", "-/+로 프리셋을 고르거나 Enter로 가로·세로(320~8192)를 입력합니다. 창 테두리를 늘리면 크기가 저장되며 화면 비율은 유지됩니다.", "-/+でプリセット、Enterで幅と高さ（320〜8192）を入力。ウィンドウ枠をドラッグするとサイズを保存し、表示の比率は維持します。"},
         {"Set the frame-rate limit when VSync is off. Menus remain capped at 300 FPS.", "수직동기화가 꺼졌을 때 프레임 상한을 정합니다. 메뉴는 최대 300 FPS로 동작합니다.", "垂直同期オフ時のFPS上限です。メニューは最大300 FPSです。"},
         {"Match presentation to the monitor to reduce tearing. This may add display latency.", "모니터 주기에 맞춰 화면 찢어짐을 줄입니다. 표시 지연이 늘어날 수 있습니다.", "モニターに同期して画面のずれを抑えます。表示遅延が増える場合があります。"},
         {"Show FPS and frame-time statistics. Use the graph to check stutters.", "FPS와 프레임 시간 통계를 표시합니다. 그래프로 순간 끊김을 확인할 수 있습니다.", "FPSとフレーム時間を表示します。グラフで瞬間的な停止を確認できます。"},

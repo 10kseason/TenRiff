@@ -32,6 +32,8 @@ struct ReplayTrace {
 };
 
 struct ReplayModeSettings {
+    // Missing on old evidence: v1 short subdivisions; v2 musical multi-beat holds.
+    int long_note_mix_version = 1;
     std::string key_mode;
     std::string key_conversion_algorithm;
     std::string key_conversion_nk2_preset;
@@ -78,6 +80,7 @@ struct ReplayFile {
 };
 
 struct ResultFile {
+    int long_note_mix_version = 1;
     int version = kNativeScoreVersion;
     int replay_format_version = kReplayFormatVersion;
     std::string chart_path;

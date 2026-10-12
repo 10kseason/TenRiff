@@ -871,10 +871,11 @@
                          presentation.interaction_ready ? controls_alpha : presentation.background,
                          DWRITE_TEXT_ALIGNMENT_CENTER);
 
-        draw_result_text("TENRIFF PERFORMANCE ANALYSIS SYSTEM",
-                         d2d_->hud_format.Get(),
+        draw_result_text(result_loc("F9 / Screenshot (PNG)  >  screenshots/",
+                                    "F9 / 스크린샷 (PNG)  >  screenshots/"),
+                         d2d_->body_format.Get(),
                          native_rect("result_single.rect.047", D2D1::RectF(620.0f, 1022.0f, 1300.0f, 1050.0f)),
                          d2d_->muted_brush.Get(),
-                         0.46f * presentation.background,
+                         0.82f * presentation.background,
                          DWRITE_TEXT_ALIGNMENT_CENTER);
         draw_analysis_tabs();

@@ -118,8 +118,13 @@ GraphicsSettingsViewModel GraphicsSettingsView::build(
     view.rows.push_back(make_row(
         GraphicsSettingId::Resolution, SettingsRowKind::Choice,
         localized(language, "Resolution", "해상도"),
-        resolution_label(runtime.graphics.resolution, language),
-        controller, false, true));
+        controller.editing_resolution()
+            ? ((controller.resolution_field() == 0 ? "[" : "") + controller.resolution_fields()[0] +
+               (controller.resolution_field() == 0 ? "]" : "") + " x " +
+               (controller.resolution_field() == 1 ? "[" : "") + controller.resolution_fields()[1] +
+               (controller.resolution_field() == 1 ? "]" : ""))
+            : resolution_label(runtime.graphics.resolution, language),
+        controller, true, true));
     view.rows.push_back(make_row(
         GraphicsSettingId::RefreshHz, SettingsRowKind::Choice,
         localized(language, "Refresh Hz", "주사율"), refresh_hz_label,
@@ -186,6 +191,14 @@ GraphicsSettingsViewModel GraphicsSettingsView::build(
         }
     }
 
+    if (controller.editing_resolution()) {
+        view.rows[1].label = localized(language, "Width x Height", "가로 x 세로");
+        view.notes.push_back(localized(language,
+            controller.resolution_error() ? "Invalid size: enter whole numbers from 320 to 8192 for both dimensions."
+                                          : "Type Width / Height. Tab or arrows switch fields; Enter applies; Esc cancels; Delete clears.",
+            controller.resolution_error() ? "잘못된 크기입니다. 가로·세로 모두 320~8192 사이 정수를 입력하세요."
+                                          : "가로·세로 입력: Tab 또는 방향키로 항목 전환, Enter 적용, Esc 취소, Delete 지우기."));
+    }
     const std::string normalized_display = to_lower_ascii(runtime.graphics.display_mode);
     if (normalized_display == "fullscreen") {
         view.notes.push_back(localized(
@@ -205,8 +218,8 @@ GraphicsSettingsViewModel GraphicsSettingsView::build(
         "BGA OFF suppresses gameplay image/video backgrounds and disables their decoder/upscaler work. Song Select background previews remain visible.",
         "BGA를 끄면 게임플레이 이미지/영상 배경과 디코더/업스케일러 작업이 비활성화됩니다. 선곡 배경 미리보기는 유지됩니다."));
     view.notes.push_back(localized(language,
-        "Resolution includes common sizes and display modes. F5 refreshes the monitor list. Refresh Hz is Match Display or Unlimited (1500 FPS max).",
-        "해상도는 일반 크기와 모니터 지원 크기를 포함합니다. F5로 모니터 목록을 갱신합니다. 주사율은 디스플레이에 맞춤 또는 무제한(최대 1500 FPS)입니다."));
+        "Resolution: +/- selects presets; Enter or click the value edits Width / Height (320-8192). Drag a Windowed border to resize and save. F5 refreshes display modes.",
+        "해상도: +/-로 목록 선택, Enter 또는 값 클릭으로 가로·세로 입력(320~8192). 창 테두리를 끌면 크기가 저장됩니다. F5로 모니터 목록을 갱신합니다."));
     view.notes.push_back(localized(language,
         "BGA Behind Notes blocks bright backgrounds only under the playfield while keeping BGA visible outside it.",
         "기어 뒤 BGA를 가리면 바깥 BGA는 유지하면서 노트 영역 아래의 밝은 배경만 차단합니다."));

@@ -1,16 +1,20 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#include <windows.h>
 
 // Developer integration smoke. Run only in a newly created sandbox; never point
 // it at an installed game, an account, a real song library, or a user profile.
 #include "app/MenuApp.h"
 #include "app/GameSession.h"
+#include "app/MenuRecordUtils.h"
+#include "app/ReplayVerifier.h"
 #include "config/KeycodeMap.h"
 #include "config/SimpleJson.h"
 #include "timing/HighResClock.h"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -21,6 +25,7 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <vector>
 
 namespace {
 using Clock = std::chrono::steady_clock;
@@ -191,6 +196,114 @@ struct MenuAppVisualTestAccess {
     static bool result(const MenuApp& app) { return app.has_result_; }
     static int analysis_page(const MenuApp& app) { return app.result_analysis_page_; }
     static bool analysis_available(const MenuApp& app) { return app.last_result_.analysis.available; }
+    static void digits(MenuApp& app, std::string_view value) {
+        for (const char digit : value) { const char name[]{digit, 0}; key(app, name); }
+    }
+    static void check_free_resolution(MenuApp& app, Report& report) {
+        click(app, Kind::SettingsRow, 1);
+        report.check("graphics.custom_size_editor", app.graphics_settings_controller_.editing_resolution());
+        digits(app, "1500");
+        key(app, "Tab");
+        digits(app, "1000");
+        app.handle_text_input("1000");  // Delayed WM_CHAR must not duplicate raw numeric keys.
+        key(app, "Enter");
+        report.check("graphics.custom_size_applied", app.config_.graphics.resolution == "1500x1000" &&
+            !app.graphics_settings_controller_.editing_resolution());
+        std::string detail;
+        report.check("graphics.custom_size_present", present(app, detail), detail);
+        key(app, "Enter");
+        report.check("graphics.keyboard_size_editor", app.graphics_settings_controller_.editing_resolution());
+        for (const char* digit : {"Numpad1", "Numpad5", "Numpad0", "Numpad0"}) key(app, digit);
+        key(app, "Tab"); digits(app, "1000"); key(app, "Enter");
+        report.check("graphics.numpad_size_applied", app.config_.graphics.resolution == "1500x1000" &&
+            !app.graphics_settings_controller_.editing_resolution());
+        click(app, Kind::SettingsRow, 1);
+        digits(app, "12");
+        key(app, "F10");
+        key(app, "F11");
+        report.check("graphics.editor_blocks_account_and_chat", !app.ranked_account_overlay_visible_ && !app.chat_overlay_visible_);
+        key(app, "Enter");
+        report.check("graphics.invalid_size_retains_previous", app.graphics_settings_controller_.editing_resolution() &&
+            app.graphics_settings_controller_.resolution_error() && app.config_.graphics.resolution == "1500x1000");
+        key(app, "Escape");
+        report.check("graphics.custom_size_cancel", !app.graphics_settings_controller_.editing_resolution() &&
+            screen(app) == Screen::SettingsGraphics);
+
+        const bool resized = resize_owned_window(1377, 777);
+        const bool consumed = app.service_window_size_change();
+        if (consumed) app.publish_snapshot();
+        report.check("graphics.window_resize_native_mailbox", resized && consumed &&
+            app.config_.graphics.resolution == "1377x777");
+        const auto saved = config::ConfigLoader{}.load_profile(app.profile_dir_);
+        report.check("graphics.window_resize_profile_readback", saved.success() &&
+            saved.config.graphics.resolution == "1377x777" && saved.config.graphics.display_mode == "windowed");
+        report.check("graphics.window_resize_present", present(app, detail), detail);
+        const bool queued = resize_owned_window(1369, 769);
+        click(app, Kind::SettingsRow, 1);  // Consumes pending resize before opening the edit draft.
+        report.check("graphics.pending_resize_before_edit", queued &&
+            app.graphics_settings_controller_.resolution_fields()[0] == "1369" &&
+            app.graphics_settings_controller_.resolution_fields()[1] == "769");
+        digits(app, "1500"); key(app, "Tab"); digits(app, "1000"); key(app, "Enter");
+        report.check("graphics.explicit_size_wins_over_pending_resize", app.config_.graphics.resolution == "1500x1000");
+        report.check("graphics.explicit_size_after_resize_present", present(app, detail), detail);
+    }
+    static bool resize_owned_window(int width, int height) {
+        // Only the fixture's own window receives this native sizing sequence.
+        // It verifies the WM_SIZE/drag-end mailbox and profile path, not physical dragging.
+        HWND owned = nullptr;
+        EnumWindows([](HWND hwnd, LPARAM output) -> BOOL {
+            DWORD pid = 0; GetWindowThreadProcessId(hwnd, &pid);
+            wchar_t type[64]{}; GetClassNameW(hwnd, type, 64);
+            if (pid == GetCurrentProcessId() && std::wstring(type) == L"TenRiffMenuWindow") {
+                *reinterpret_cast<HWND*>(output) = hwnd; return FALSE;
+            }
+            return TRUE;
+        }, reinterpret_cast<LPARAM>(&owned));
+        bool resized = false;
+        if (owned) {
+            RECT outer{}, client{};
+            GetWindowRect(owned, &outer); GetClientRect(owned, &client);
+            SendMessageW(owned, WM_ENTERSIZEMOVE, 0, 0);
+            resized = SetWindowPos(owned, nullptr, 0, 0,
+                width + outer.right - outer.left - client.right,
+                height + outer.bottom - outer.top - client.bottom,
+                SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE) != FALSE;
+            SendMessageW(owned, WM_EXITSIZEMOVE, 0, 0);
+            GetClientRect(owned, &client);
+            resized = resized && client.right == width && client.bottom == height;
+        }
+        return resized;
+    }
+    static void check_result_screenshot(MenuApp& app, Report& report, const std::string& page) {
+        const auto directory = std::filesystem::current_path() / "screenshots";
+        std::vector<std::filesystem::path> previous;
+        if (std::filesystem::exists(directory)) {
+            for (const auto& entry : std::filesystem::directory_iterator(directory)) previous.push_back(entry.path());
+        }
+        std::string detail;
+        const bool live = present(app, detail);  // Let the selected result page reach the renderer first.
+        key(app, "F9");
+        const auto deadline = Clock::now() + std::chrono::seconds(3);
+        bool complete = false;
+        while (Clock::now() < deadline && !complete) {
+            if (std::filesystem::exists(directory)) {
+                for (const auto& entry : std::filesystem::directory_iterator(directory)) {
+                    if (entry.path().extension() != ".png" ||
+                        std::find(previous.begin(), previous.end(), entry.path()) != previous.end()) continue;
+                    std::ifstream input(entry.path(), std::ios::binary | std::ios::ate);
+                    if (!input || input.tellg() < 32) continue;
+                    std::array<unsigned char, 8> header{}, end{};
+                    input.seekg(0); input.read(reinterpret_cast<char*>(header.data()), header.size());
+                    input.seekg(-12, std::ios::end); input.read(reinterpret_cast<char*>(end.data()), end.size());
+                    complete = input.good() && header == std::array<unsigned char, 8>{137,80,78,71,13,10,26,10} &&
+                        end == std::array<unsigned char, 8>{0,0,0,0,73,69,78,68};
+                    if (complete) { detail = entry.path().filename().string(); break; }
+                }
+            }
+            if (!complete) std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        report.check("result.screenshot_" + page, live && complete && screen(app) == Screen::Result, detail);
+    }
     static void check_analysis_boundaries(MenuApp& app, Report& report) {
         const auto saved_lanes = app.last_result_.analysis.lane_count;
         app.last_result_.analysis.lane_count = 32;  // Loaded replay evidence can exceed menu key modes.
@@ -209,6 +322,55 @@ struct MenuAppVisualTestAccess {
         report.check("result.analysis_multiplayer_guard", app.result_analysis_page_ == 0);
         app.last_game_was_multiplayer_ = saved_multiplayer;
         app.publish_snapshot();
+    }
+    static void check_ln_mix_record_boundaries(MenuApp& app, Report& report) {
+        const auto saved_records = app.local_play_records_;
+        const auto saved_best = app.chart_best_results_;
+        const auto saved_indices = app.chart_play_record_indices_;
+        const auto saved_current = app.current_song_record_indices_;
+        const auto saved_mods = app.config_.mode.mods;
+        app.local_play_records_.clear();
+        app.chart_best_results_.clear();
+        app.chart_play_record_indices_.clear();
+        menu_records::ParsedResultRecord record;
+        record.chart_path = app.last_chart_path_;
+        record.mods = {"ln_mix_30"};
+        record.stats = app.last_result_;
+        record.long_note_mix_version = 1;
+        ReplayVerificationResult verified;
+        verified.status = ReplayVerificationStatus::Verified;
+        verified.official_eligible = true;
+        verified.stats = record.stats;
+        verified.final_score = 100;
+        verified.clear_status = "CLEAR";
+        verified.final_gauge = "normal";
+        app.append_chart_result_record(record, "fixture-v1-result", "fixture-v1-replay", verified);
+        const auto legacy_best = app.chart_best_results_;
+        report.check("records.legacy_ln_best_retained", !legacy_best.empty());
+        record.long_note_mix_version = 2;
+        verified.final_score = 200;
+        // Deliberately present an eligible claim: the chart-best storage itself
+        // must still refuse to mix conversion versions, independently of verification.
+        app.append_chart_result_record(record, "fixture-v2-result", "fixture-v2-replay", verified);
+        bool best_unchanged = app.chart_best_results_.size() == legacy_best.size();
+        for (const auto& [key, best] : legacy_best) {
+            const auto found = app.chart_best_results_.find(key);
+            best_unchanged = best_unchanged && found != app.chart_best_results_.end() &&
+                found->second.best_score == best.best_score;
+        }
+        report.check("records.long_ln_history_without_legacy_best_overwrite",
+            best_unchanged && app.local_play_records_.size() == 2 &&
+            app.local_play_records_.back().long_note_mix_version == 2);
+        app.config_.mode.mods = record.mods;
+        app.current_song_record_indices_ = {0};
+        report.check("records.auto_ghost_skips_legacy_mix", app.best_replay_path_for_selected_song().empty());
+        app.current_song_record_indices_ = {0, 1};
+        report.check("records.auto_ghost_uses_current_mix", app.best_replay_path_for_selected_song() == "fixture-v2-replay");
+        app.local_play_records_ = saved_records;
+        app.chart_best_results_ = saved_best;
+        app.chart_play_record_indices_ = saved_indices;
+        app.current_song_record_indices_ = saved_current;
+        app.config_.mode.mods = saved_mods;
     }
     static void check_loading_pacing(MenuApp& app, Report& report) {
         const auto saved_refresh = app.config_.graphics.refresh_hz;
@@ -333,6 +495,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
             Access::key(app, "Esc");
             expect_screen(app, report, "keymap.nested_test.back", Screen::Keymap);
         } else if (page.index == 3) {
+            Access::check_free_resolution(app, report);
             Access::click(app, Kind::SettingsRow,
                 static_cast<int>(tenriff::app::menu::settings::GraphicsSettingId::Bga), Part::Increment);
             report.check("graphics.bga_toggle", !Access::config(app).graphics.bga_enabled);
@@ -356,6 +519,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
 
     std::atomic<bool> observing{true};
     bool loading = false, countdown = false, playing = false, gameplay_present = false;
+    bool gameplay_resize_attempted = false, gameplay_resized = false;
     int64_t first_play_present = 0, last_sample = 0;
     std::thread observer([&] {
         while (observing.load(std::memory_order_acquire)) {
@@ -363,6 +527,10 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
             loading |= value.loading; countdown |= value.countdown; playing |= value.playing;
             last_sample = std::max(last_sample, value.sample);
             if (value.playing) {
+                if (!gameplay_resize_attempted) {
+                    gameplay_resize_attempted = true;
+                    gameplay_resized = Access::resize_owned_window(1439, 809);
+                }
                 if (!first_play_present) first_play_present = value.presented_ns;
                 gameplay_present |= value.presented_ns > first_play_present;
             }
@@ -381,6 +549,11 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
     report.check("menu_gameplay.start_countdown_observed", countdown);
     report.check("menu_gameplay.audio_clock_advanced", playing && last_sample > 0);
     report.check("menu_gameplay.presents_advanced", gameplay_present);
+    report.check("menu_gameplay.window_resize_retained_on_result", gameplay_resized &&
+        Access::config(app).graphics.resolution == "1439x809");
+    const auto resized_profile = tenriff::config::ConfigLoader{}.load_profile("profiles/menu-smoke");
+    report.check("menu_gameplay.window_resize_profile_readback", resized_profile.success() &&
+        resized_profile.config.graphics.resolution == "1439x809");
     expect_screen(app, report, "natural_result", Screen::Result);
     report.check("natural_result.has_stats", Access::result(app));
     Access::key(app, "Space");
@@ -391,9 +564,12 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
     report.check("result.analysis_mouse_types", Access::analysis_page(app) == 2);
     Access::click(app, Kind::SettingsRow, 6);
     report.check("result.analysis_mouse_timeline", Access::analysis_page(app) == 3);
+    Access::check_result_screenshot(app, report, "timeline");
     Access::key(app, "Escape");
     report.check("result.analysis_escape_summary", Access::analysis_page(app) == 0 && Access::screen(app) == Screen::Result);
+    Access::check_result_screenshot(app, report, "summary");
     Access::check_analysis_boundaries(app, report);
+    Access::check_ln_mix_record_boundaries(app, report);
     Access::click(app, Kind::SettingsRow, 4);
     const auto result_rows = Access::rows(app);
     Access::click(app, Kind::SettingsRow, 0);
@@ -530,6 +706,22 @@ int wmain(int argc, wchar_t** argv) {
             }
             app->shutdown();
             report.check("menu.exit_code", app->exit_code() == 0);
+        }
+        {
+            // A fresh application instance must read the persisted custom size,
+            // not merely reuse the first instance's in-memory configuration.
+            auto restarted = std::make_unique<tenriff::app::MenuApp>();
+            const bool initialized = restarted->initialize(options);
+            report.check("menu.restart_custom_size", initialized &&
+                Access::config(*restarted).graphics.resolution == "1439x809" &&
+                Access::config(*restarted).graphics.display_mode == "windowed");
+            if (initialized) {
+                Access::isolate(*restarted);
+                Access::attach_present_probe(*restarted);
+                std::string detail;
+                report.check("menu.restart_custom_size_present", Access::present(*restarted, detail), detail);
+            }
+            restarted->shutdown();
         }
         options.chart_path = "songs/fixture/smoke.bms";
         separate_pause_flow(options, report);

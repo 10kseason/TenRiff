@@ -2,6 +2,8 @@
 
 **Fixed baseline: [1.8.7](baseline-1.8.7.en.md)** (2026-10-10). Use Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`; do not advance it automatically with `latest` or a new release.
 
+**Additional 1.8.8 release conditions:** Include freely resizable windows and direct width/height input, an `F9` PNG hint on results, and LN Mix combining multi-beat holds with taps/short holds on other lanes. See [added features and final verification status (Korean)](release-conditions-1.8.8.ko.md), separate from the initial analysis candidate's checks. The fixed baseline remains 1.8.7; this candidate is unreleased.
+
 **2026-10-12 · 1.8.8 local development candidate (unreleased):** Adds per-lane timing distributions, accuracy over song time, and separate tap/LN-head/release/hold-failure analysis. Unmeasurable misses never become zero-ms samples; judgement and scoring rules stay unchanged. Plugins and 1.9.0 stabilization remain planned. [Analysis criteria and plan (Korean)](result-analysis-1.8.8.ko.md).
 
 **2026-10-09 · TenRiff 1.8.7:** Improves input calibration and chart-loading audio, adds LR2 solo Studio Deck, 750ms FAST/SLOW retention, key reassignment, consolidated Options and complete song-title fitting. [1.8.7 release](release-1.8.7-gate.md).

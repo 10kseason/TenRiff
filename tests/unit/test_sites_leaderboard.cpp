@@ -47,6 +47,22 @@ TEST_CASE("Sites payload preserves all four native metrics without display round
     CHECK(object->at("timing_profile").as_string() == "bms-easy");
 }
 
+TEST_CASE("Sites keeps musical LN Mix v2 out of unversioned legacy boards") {
+    auto replay = score_fixture();
+    replay.mods = {"ln_mix_30"};
+    std::string payload, error;
+    REQUIRE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
+    for (int version : {0, 2, 3}) {
+        replay.mode.long_note_mix_version = version;
+        CHECK_FALSE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
+        CHECK(payload.empty());
+        CHECK(error.find("separate leaderboard condition") != std::string::npos);
+    }
+    replay.mods.clear();
+    replay.mode.long_note_mix_version = 2;
+    CHECK(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
+}
+
 TEST_CASE("Sites ruleset 4 payload separates every BMS rank and fixed osu timing") {
     const char* profiles[] = {"bms-veryhard", "bms-hard", "bms-normal", "bms-easy"};
     for (int rank = 0; rank <= 3; ++rank) {

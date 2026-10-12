@@ -18,6 +18,7 @@ void MenuWindow::apply_pending_config() {
             return;
         }
         pending = pending_config_;
+        config_generation_ = pending_config_generation_;
         config_dirty_ = false;
     }
 
@@ -506,7 +507,7 @@ bool MenuWindow::recreate_targets() {
 }
 
 bool MenuWindow::resize_swap_chain(unsigned int width, unsigned int height) {
-    if (!d2d_ || !d2d_->swap_chain || width == 0 || height == 0) {
+    if (!d2d_ || !d2d_->swap_chain || width == 0 || height == 0 || width > 8192 || height > 8192) {
         return false;
     }
 
@@ -559,6 +560,20 @@ bool MenuWindow::enter_fullscreen_mode(unsigned int width,
         return false;
     }
 
+    Microsoft::WRL::ComPtr<IDXGIOutput> output;
+    DXGI_MODE_DESC target = build_target_mode_desc(config_, width, height), closest{};
+    // Arbitrary client dimensions are useful in a window but may not be legal
+    // exclusive output modes. Keep them usable instead of retrying forever.
+    if (SUCCEEDED(d2d_->swap_chain->GetContainingOutput(&output)) && output) {
+        const HRESULT mode_hr = output->FindClosestMatchingMode(&target, &closest, d2d_->device.Get());
+        if (mode_hr == DXGI_ERROR_UNSUPPORTED ||
+            (SUCCEEDED(mode_hr) && (closest.Width != width || closest.Height != height))) {
+            std::cerr << "[" << log_context << "] Unsupported exclusive size " << width << "x" << height
+                      << "; using a resizable window." << std::endl;
+            return fallback_to_windowed();
+        }
+    }
+
     const HRESULT fs_hr = d2d_->swap_chain->SetFullscreenState(TRUE, nullptr);
     if (FAILED(fs_hr)) {
         std::cerr << "[" << log_context << "] SetFullscreenState(TRUE) failed hr=0x"
@@ -579,5 +594,29 @@ bool MenuWindow::enter_fullscreen_mode(unsigned int width,
         return false;
     }
 
+    return true;
+}
+
+bool MenuWindow::fallback_to_windowed() {
+    if (!hwnd_ || !d2d_ || !d2d_->swap_chain) return false;
+    if (FAILED(d2d_->swap_chain->SetFullscreenState(FALSE, nullptr))) return false;
+    fullscreen_ = false;
+    fullscreen_restore_pending_ = false;
+    config_.display_mode = "windowed";
+    const auto hwnd = static_cast<HWND>(hwnd_);
+    const auto monitor = query_monitor_display_info(hwnd);
+    UINT width = 0, height = 0;
+    int x = 0, y = 0;
+    resolve_window_bounds(config_, monitor, width, height, x, y);
+    const DWORD style = window_style_for_display_mode(config_.display_mode);
+    const DWORD ex_style = window_ex_style_for_display_mode(config_.display_mode);
+    const SIZE outer = window_size_for_client_area(width, height, style, ex_style);
+    SetWindowLongPtrW(hwnd, GWL_STYLE, static_cast<LONG_PTR>(style));
+    SetWindowLongPtrW(hwnd, GWL_EXSTYLE, static_cast<LONG_PTR>(ex_style));
+    SetWindowPos(hwnd, nullptr, x, y, outer.cx, outer.cy,
+                 SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_FRAMECHANGED);
+    if (!resize_swap_chain(width, height)) return false;
+    resize_pending_ = false;
+    publish_window_size_change(width, height, true);
     return true;
 }

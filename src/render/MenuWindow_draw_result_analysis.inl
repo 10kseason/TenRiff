@@ -143,5 +143,9 @@
         draw_result_control_text(result_loc("ENTER / CONTINUE", "ENTER / 계속"), d2d_->hud_format.Get(), proceed, d2d_->text_brush.Get(), 1.0f);
         register_hit(back, MenuHitTargetKind::SettingsRow, 3);
         register_hit(proceed, MenuHitTargetKind::SettingsRow, 0);
-        text_at(result_loc("F2 / Next tab    R / Retry    F1 / Replay", "F2 / 다음 탭    R / 재도전    F1 / 리플레이"),
-                620, 1008, 1330, true);
+        draw_result_text(result_loc("F2 / Next tab    R / Retry    F1 / Replay", "F2 / 다음 탭    R / 재도전    F1 / 리플레이"),
+            d2d_->body_format.Get(), D2D1::RectF(600, 992, 1340, 1020), d2d_->muted_brush.Get(),
+            1.0f, DWRITE_TEXT_ALIGNMENT_CENTER);
+        draw_result_text(result_loc("F9 / Screenshot (PNG)  >  screenshots/", "F9 / 스크린샷 (PNG)  >  screenshots/"),
+            d2d_->body_format.Get(), D2D1::RectF(600, 1024, 1340, 1052), d2d_->muted_brush.Get(),
+            1.0f, DWRITE_TEXT_ALIGNMENT_CENTER);

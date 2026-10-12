@@ -500,6 +500,10 @@
                                      row.target_kind, row.row_index, MenuHitPart::SelectOnly);
                         draw_action(minus_rect, L'-', MenuHitPart::Decrement, row.enabled && row.decrement_enabled);
                         draw_action(plus_rect, L'+', MenuHitPart::Increment, row.enabled && row.increment_enabled);
+                        if (row.enabled && row.activatable && row.value_activatable) {
+                            // Specific value hit follows broad selection regions.
+                            register_hit(value_rect, row.target_kind, row.row_index, MenuHitPart::Activate);
+                        }
                     } else {
                         const D2D1_RECT_F value_rect =
                             native_rect("generic.rect.043", D2D1::RectF(std::max(label_rect.right + 12.0f, row_left + 320.0f),
