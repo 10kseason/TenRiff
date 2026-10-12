@@ -2,6 +2,8 @@
 
 **고정 기준선: [1.8.7](baseline-1.8.7.md)** (2026-10-10). Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`을 사용하며 `latest`나 새 릴리스로 자동 변경하지 않습니다.
 
+**2026-10-13 · 1.8.9.2:** BMS의 같은 레인·시각에 중복된 일반 노트와 롱노트 시작점을 게임 안에서 롱노트 하나로 보정합니다. 원본 파일, LN 길이와 키음을 보존하며 Native와 변환에 함께 적용합니다. 이전 리플레이는 당시 배치를 유지합니다. [동작·호환 한계](release-1.8.9.2-gate.md). 고정 기준선은 1.8.7입니다.
+
 **2026-10-13 · 1.8.9.1:** 연속 키 설정, 전 변환기 키음·롱노트 보존, FAST/SLOW·타이밍 배경 토글, 게이지 확대, 미리보기 기어 드래그와 판정 테두리·배경 제거를 제공합니다. 기존 리플레이는 원래 변환으로 재생합니다. [동작·검증·호환 한계](release-1.8.9.1-gate.md). 고정 기준선은 1.8.7입니다.
 
 **2026-10-12 · 1.8.9:** 로비의 큰 BEST 숫자·키 모드 색·흰 통합 외곽선, 오른쪽 위 정보·왼쪽 아래 점수·오른쪽 아래 가로 riff map의 Studio HUD, 큰 결과 글자·분석 탭·중앙 정렬한 조작을 제공합니다. S+ 색·글꼴을 유지하고, 메뉴의 Judge Easy/Hard가 새 세션에서 사라지던 전달 경로를 수정했습니다. [동작·검증·남은 범위](release-1.8.9-gate.md), [Judge 원인과 호환성](judge-session-handoff-1.8.9.ko.md)를 참고하세요.
@@ -44,7 +46,7 @@
 - BMS landmines (`D1-D9`, `E1-E9`) are playable, including `#WAV00`, base-36 damage tokens, `ZZ` instant fail, exact press/release boundary behavior, and lane-mod/key-converter remapping.
 - Results and local records expose fixed native score separately from detail score, and categorical native accuracy separately from continuous timing-based detailed accuracy.
 - 새 replay evidence v3는 차트 SHA-256, canonical ruleset, result-to-replay SHA-256을 저장하고 입력 trace를 headless 엔진으로 재실행합니다. 공식 로컬 best는 재계산된 verified 결과만 사용하며 legacy/custom/assist 기록은 히스토리에 `unverified`로 남습니다.
-- 사용자 고정 기준 버전은 `1.8.7`; 현재 소스는 `1.8.9.1`
+- 사용자 고정 기준 버전은 `1.8.7`; 현재 소스는 `1.8.9.2`
 - 1.7.9 UI 개선: 프로필/첫 실행의 언어·3단계 글자 크기, 사진 미리보기/시작 메뉴 사진, ALL SONG 통합 소스, 선곡 경계와 디지털 탭, 정적인 TI와 홀로그램 TENRIFF. [사용 및 구현 안내](menu-profile-library-polish.ko.md).
 - 1.7.1은 최대 8인 HUD·결과, 동점 순위·점수 대기 상태, P-GREAT 전용 연출, 독립 판정·콤보 위치, 옵션 10개, 오디오 노멀라이즈와 선곡 난이도표 카드를 제공합니다. [변경 설명](gameplay-polish-followup.md), [검증 범위](release-1.7.1-gate.md) 참고.
 - 기본 선곡·싱글 결과 UI는 차분한 패널과 단색 주 동작 버튼을 사용하며, 결과는 큰 점수·등급·정확도 중심으로 표시한다. 사용자 TenRiff 스킨 경로를 유지하며, 1.7.1 대전 결과는 참가자 전원 순위를 표시한다. 구현/검증 안내는 `docs/menu-visual-polish.md`와 `docs/gameplay-polish-followup.md` 참고.

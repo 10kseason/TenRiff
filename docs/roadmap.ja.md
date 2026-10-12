@@ -2,6 +2,8 @@
 
 **固定基準: [1.8.7](baseline-1.8.7.ja.md)**（2026-10-10）。Git tag `1.8.7`、commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347` を使い、`latest` や新しいリリースに合わせて自動変更しません。
 
+**2026-10-13 · 1.8.9.2:** BMSの同じレーン・時刻に重複した通常ノートとロングノートの始点を、Native・変換の前に1本のロングノートへ補正します。原本、LNの長さとキー音を保持し、旧リプレイは当時の配置を維持します。[動作・互換性の制限（韓国語）](release-1.8.9.2-gate.md)。固定基準は1.8.7です。
+
 **2026-10-13 · 1.8.9.1:** 連続キー設定、全変換器のキー音・ロングノート保持、FAST/SLOW・タイミング背景切替、ゲージ拡大、プレビューのギア移動と判定文字の枠・背景除去を追加しました。既存リプレイは元の変換を維持します。[動作・検証・互換性の制限（韓国語）](release-1.8.9.1-gate.md)。固定基準は1.8.7です。
 
 > 文書の範囲: 初期設計・改善案・当時の分析を含みます。未完了の提案や過去の測定値は現在の挙動・既定値・性能保証ではありません。[現在の状態](current-state.ja.md)と[設定](config.ja.md)を参照してください。
@@ -10,7 +12,7 @@
 
 ## Current Baseline
 - Windows GUI / runtime が主なサポート経路です。
-- 固定基準は `1.8.7`、このソースは `1.8.9.1`。公開 package は NK3 P64 と generalized pattern MLP inference model を同梱するが、BGA upscaler model は同梱しない。互換性と権利を確認済みの upscaler ONNX を選択しても path を保存するだけで、BGA Upscaler は user が有効化して high-spec warning を確認するまで off のまま。自動 benchmark gate はない。
+- 固定基準は `1.8.7`、このソースは `1.8.9.2`。公開 package は NK3 P64 と generalized pattern MLP inference model を同梱するが、BGA upscaler model は同梱しない。互換性と権利を確認済みの upscaler ONNX を選択しても path を保存するだけで、BGA Upscaler は user が有効化して high-spec warning を確認するまで off のまま。自動 benchmark gate はない。
 - 現行 menu / runtime は BMS family（`.bms/.bme/.bml/.pms`）専用で、native、bundle/profile の TenRiff `skin.json`、LR2 skin をサポート。
 - 現在出荷されている挙動は [`docs/current-state.ja.md`](current-state.ja.md) を先に見てください。この roadmap は方向と残作業を示す文書です。
 

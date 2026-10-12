@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.8.9.2] - 2026-10-13
+
+- Correct BMS files that place a tap on the same lane and sample as a complete long-note head, including the reported DELTA chart from measure 42. Coalesce the duplicate before Native play, key-count conversion or randomization, preserving the authored LN span, identity and keysounds. Original chart/audio files are untouched.
+- Use existing `key_conversion_version=3` for new plays; absent/1 and 2 keep the previous layout and scoring when replayed. Exclude older ghosts only on charts requiring duplicate-head correction so they cannot restore the faulty live layout. New v3 replays require 1.8.9.2 or later; R1–R4 timing rules and the fixed 1.8.7 baseline remain unchanged.
+- See [cause, verification scope and compatibility](docs/release-1.8.9.2-gate.md). Retain the 1.8.9.1 UI, key binding and converter fixes. No web deployment or performance claim is included.
+
 ## [1.8.9.1] - 2026-10-13
 
 - Continue primary/secondary key assignment on the next lane after each successful save; ignore held-key repeats and stop at the last lane.

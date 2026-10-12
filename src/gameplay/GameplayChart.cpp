@@ -3,9 +3,51 @@
 #include <algorithm>
 #include <cmath>
 #include <iterator>
+#include <map>
 #include <set>
 
 namespace tenriff::gameplay {
+
+std::size_t coalesce_bms_long_note_heads(GameplayChart& chart) {
+    if (!chart.bms_rank.has_value()) return 0;  // Only authored BMS charts.
+    using Cell = std::pair<int64_t, int>;
+    std::map<Cell, std::size_t> heads;
+    for (std::size_t i = 0; i < chart.notes.size(); ++i) {
+        const auto& note = chart.notes[i];
+        if (note.lane > 0 && note.end_sample && *note.end_sample > note.start_sample)
+            heads.emplace(Cell{note.start_sample, note.lane}, i);
+    }
+    if (heads.empty()) return 0;
+    std::vector<bool> remove(chart.notes.size(), false);
+    GameplayChart removed;
+    for (std::size_t i = 0; i < chart.notes.size(); ++i) {
+        const auto& tap = chart.notes[i];
+        if (tap.end_sample) continue;
+        const auto found = heads.find({tap.start_sample, tap.lane});
+        if (found == heads.end()) continue;
+        auto& hold = chart.notes[found->second];
+        // Preserve the hold's ID, duration and release policy. Equal-gain sounds
+        // can share its trigger; overflow/different-gain sounds remain timed BGM.
+        if (tap.audio_gain == hold.audio_gain && note_audio_asset_count(tap) > 0) {
+            if (hold.audio_asset_count == 0 && hold.audio_asset_id != kInvalidAudioAssetId)
+                hold.add_audio_asset(hold.audio_asset_id);
+            for (std::size_t sound = 0; sound < note_audio_asset_count(tap); ++sound)
+                hold.add_audio_asset(note_audio_asset_at(tap, sound));
+        }
+        removed.notes.push_back(tap);
+        remove[i] = true;
+    }
+    if (removed.notes.empty()) return 0;
+    std::size_t keep = 0;
+    for (std::size_t i = 0; i < chart.notes.size(); ++i) {
+        if (remove[i]) continue;
+        if (keep != i) chart.notes[keep] = std::move(chart.notes[i]);
+        ++keep;
+    }
+    chart.notes.resize(keep);
+    preserve_chart_keysounds(removed, chart);
+    return removed.notes.size();
+}
 
 void preserve_chart_keysounds(const GameplayChart& source, GameplayChart& converted) {
     // Match the live keysound scheduler's one voice per chart timestamp/asset.

@@ -2,6 +2,8 @@
 
 **固定基准：[1.8.7](baseline-1.8.7.zh-CN.md)**（2026-10-10）。使用 Git tag `1.8.7`、commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`，不随 `latest` 或新版本自动更新。
 
+**2026-10-13 · 1.8.9.2:** 在原生游玩或键数转换前，将BMS同轨同一时刻重叠的普通音符与长键起点合并为一个长键。保留原文件、长键区间与键音，旧回放维持原有排列。[行为与兼容限制（韩文）](release-1.8.9.2-gate.md)。固定基准仍为1.8.7。
+
 **2026-10-13 · 1.8.9.1：** 增加连续按键设置、全部转换器的键音及长键保留、FAST/SLOW和时间提示背景开关、更大的血条、预览中的轨道拖动及无边框背景的判定文字。旧回放保留原转换方式。[行为、验证与兼容限制（韩文）](release-1.8.9.1-gate.md)。固定基准仍为1.8.7。
 
 **2026-10-12 · 1.8.9：**提供更大的大厅BEST数字、键数模式配色与白色共用外框，采用右上信息／左下分数／右下横向riff map的Studio HUD，并加大结果文字、突出分析标签及居中操作。保留S+颜色与字体，修正Judge Easy/Hard选择未传入新会话的问题。参见[行为、验证与剩余范围](release-1.8.9-gate.md)及[Judge原因与兼容性](judge-session-handoff-1.8.9.ko.md)（韩语）。
@@ -40,7 +42,7 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 用户固定基准为 `1.8.7`，当前源码版本为 `1.8.9.1`
+- 用户固定基准为 `1.8.7`，当前源码版本为 `1.8.9.2`
 - 1.7.1 提供最多8人的 HUD 与结果、并列名次与分数等待状态、P-GREAT 专属效果、判定与连击独立位置、10张选项卡、音量标准化及选曲难度表卡片。见[变更详情](gameplay-polish-followup.md)和[验证范围](release-1.7.1-gate.md)。
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
 - 默认结果页面突出分数、等级和准确率；棱镜演出保留在自定义皮肤中。保留现有2.2秒展示流程、Space跳过和按钮启用规则。

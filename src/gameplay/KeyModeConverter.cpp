@@ -1454,6 +1454,18 @@ static KeyModeConverterResult convert_key_mode_chart_impl(const GameplayChart& c
 
 KeyModeConverterResult convert_key_mode_chart(const GameplayChart& chart, const KeyModeConverterOptions& options) {
     if (options.conversion_version == 1) return convert_key_mode_chart_impl(chart, options);
+    if (options.conversion_version == 3) {
+        GameplayChart normalized = chart;
+        const auto merged = coalesce_bms_long_note_heads(normalized);
+        auto compatible = options;
+        compatible.conversion_version = 2;
+        // Reuse v2 unchanged after source repair; its local provenance indexing
+        // must run after coalescing so surviving authored IDs still map correctly.
+        auto result = convert_key_mode_chart(normalized, compatible);
+        if (result.converted) preserve_chart_keysounds(chart, result.chart);
+        if (merged > 0) result.warnings.push_back("Coalesced " + std::to_string(merged) + " duplicate BMS long-note head(s).");
+        return result;
+    }
     if (options.conversion_version != 2) return {chart, false, {"Unsupported key conversion version."}};
     // Use local indices for provenance: callers can supply non-unique public IDs.
     // Restore the caller's IDs before returning; no chart/replay format changes.
