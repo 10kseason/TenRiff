@@ -58,3 +58,5 @@
             draw_text_clipped_aligned(wloc("BACK TO LOBBY", "로비로 돌아가기"), d2d_->title_format.Get(),
                 back, d2d_->accent_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
             d2d_->title_format->SetParagraphAlignment(alignment);
+            draw_text_clipped(wloc("F9 / Screenshot (PNG)  >  screenshots/", "F9 / 스크린샷 (PNG)  >  screenshots/"),
+                d2d_->body_format.Get(), D2D1::RectF(96.0f, 984.0f, 1120.0f, 1020.0f), d2d_->muted_brush.Get());

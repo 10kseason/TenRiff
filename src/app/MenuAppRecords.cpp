@@ -83,9 +83,11 @@ bool live_result_claims_match(const menu_records::ParsedResultRecord& parsed,
                               std::string_view clear_status,
                               std::string_view final_gauge,
                               double rate_multiplier,
-                              double score_multiplier) {
+                              double score_multiplier,
+                              int long_note_mix_version) {
     const auto& stored = parsed.stats;
     return parsed.final_score == final_score &&
+           parsed.long_note_mix_version == long_note_mix_version &&
            parsed.game_over == game_over &&
            parsed.clear_status == clear_status &&
            parsed.final_gauge == final_gauge &&
@@ -161,6 +163,7 @@ void MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
     record.final_gauge = effective_final_gauge;
     record.game_over = effective_game_over;
     record.mods = parsed.mods;
+    record.long_note_mix_version = parsed.long_note_mix_version;
     record.rate_multiplier = parsed.rate_multiplier;
     record.score_multiplier = parsed.score_multiplier;
     record.pause_used = parsed.pause_used;
@@ -196,7 +199,10 @@ void MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
         chart_play_record_indices_[key].push_back(record_index);
         // Keep autoplay runs in local history/replay browsing, but never let
         // them become the chart's official best score or clear lamp.
-        if (note_count_modified || mode_mod_auto_scratch(parsed.mods) || parsed.autoplay_enabled ||
+        // The old chart-wide best has no conversion-version dimension. Keep
+        // musical LN Mix in history without replacing legacy/default bests.
+        if (note_count_modified || mode_mod_auto_scratch(parsed.mods) ||
+            (mode_mod_long_note_mix(parsed.mods) && parsed.long_note_mix_version != 1) || parsed.autoplay_enabled ||
             parsed.practice_no_fail_enabled || !verification.official_eligible) {
             continue;
         }
@@ -387,7 +393,8 @@ void MenuApp::cache_current_session_result(const std::string& chart_path,
                                                            last_clear_status_,
                                                            last_final_gauge_,
                                                            last_result_rate_multiplier_,
-                                                           last_result_score_multiplier_);
+                                                           last_result_score_multiplier_,
+                                                           last_result_long_note_mix_version_);
         if (!evidence_matches || !claims_match) {
             verification.status = ReplayVerificationStatus::Invalid;
             verification.detail = !evidence_matches
@@ -411,7 +418,8 @@ void MenuApp::cache_current_session_result(const std::string& chart_path,
             verification.official_eligible =
                 (finished || last_game_over_) && !aborted && !parsed->aborted &&
                 !parsed->autoplay_enabled && !parsed->practice_no_fail_enabled &&
-                !mode_mod_adds_notes(parsed->mods) && !mode_mod_auto_scratch(parsed->mods);
+                !mode_mod_adds_notes(parsed->mods) && !mode_mod_auto_scratch(parsed->mods) &&
+                (!mode_mod_long_note_mix(parsed->mods) || parsed->long_note_mix_version == 1);
         }
     }
 
@@ -517,6 +525,7 @@ const MenuApp::ReplaySummary* MenuApp::replay_summary_for_path(const std::string
             summary.rate = parsed->rate;
             summary.input_offset_ms = parsed->input_offset_ms;
             summary.mods = parsed->mods;
+            summary.long_note_mix_version = parsed->long_note_mix_version;
             summary.rate_multiplier = parsed->rate_multiplier;
             summary.score_multiplier = parsed->score_multiplier;
             summary.pause_used = parsed->pause_used;
@@ -565,6 +574,7 @@ bool MenuApp::open_result_record(const std::string& result_path,
     last_final_gauge_ = parsed->final_gauge;
     has_result_ = true;
     last_result_mods_ = parsed->mods;
+    last_result_long_note_mix_version_ = parsed->long_note_mix_version;
     last_result_rate_multiplier_ = parsed->rate_multiplier;
     last_result_score_multiplier_ = parsed->score_multiplier;
     last_result_final_score_ = parsed->final_score;
@@ -581,6 +591,8 @@ bool MenuApp::open_result_record(const std::string& result_path,
     update_last_chart_metadata(parsed->chart_path, entry);
     result_presentation_start_ns_ = timing::HighResClock::now_ns();
     result_presentation_skipped_ = false;
+    result_analysis_page_ = 0;
+    result_analysis_lane_bank_ = 0;
     push_screen(Screen::Result);
     return true;
 }
@@ -636,6 +648,8 @@ std::string MenuApp::best_replay_path_for_selected_song() const {
         const auto& record = local_play_records_[record_index];
         if (!record.replay_path.empty() &&
             equivalent_mode_mod_tokens(record.mods, config_.mode.mods) &&
+            (!mode_mod_long_note_mix(record.mods) ||
+             record.long_note_mix_version == static_cast<int>(LongNoteMixVersion::Musical)) &&
             menu_records::default_ghost_replay_allowed(record.autoplay_enabled,
                                                        record.practice_no_fail_enabled,
                                                        record.clear_status)) {

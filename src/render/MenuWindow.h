@@ -3,6 +3,7 @@
 #ifdef _WIN32
 
 #include "GameplayHudLimits.h"
+#include "gameplay/TimingAnalysis.h"
 #include "app/ImportedGameplaySkin.h"
 #include "app/NativeMenuSkin.h"
 #include "ui/Localization.h"
@@ -346,6 +347,10 @@ struct ResultShiftMarker {
 };
 
 struct ResultScreenData {
+    gameplay::TimingAnalysis analysis;
+    int analysis_page = 0;  // 0 summary, 1 lanes, 2 note types, 3 song time.
+    int analysis_lane_bank = 0;
+    std::string analysis_mods;
     std::vector<MultiplayerPlayerData> multiplayer_players;
     bool peer_battle = false;
     std::string profile;
@@ -654,6 +659,8 @@ struct MenuRowData {
     // keyboard cursor. The renderer derives exactly three flashes from this time.
     int64_t change_flash_started_ns = 0;
     bool enabled = true;
+    // A value can open an editor while its row body still only selects it.
+    bool value_activatable = false;
 };
 
 struct SkinPreviewData {
@@ -882,6 +889,14 @@ public:
     void request_close();
     void request_screenshot();
     void queue_resize(unsigned int width, unsigned int height);
+    void begin_window_resize();
+    void end_window_resize();
+    struct WindowSizeChange {
+        int width = 0, height = 0;
+        bool fullscreen_fallback = false;
+        std::uint64_t request_generation = 0;
+    };
+    [[nodiscard]] std::optional<WindowSizeChange> poll_window_size_change();
     void on_mouse_button_down(int window_x, int window_y);
     void on_mouse_click(int window_x, int window_y, bool double_click);
     void on_mouse_secondary_click(int window_x, int window_y);
@@ -949,6 +964,8 @@ private:
     void update_cursor_visibility(bool hidden);
     [[nodiscard]] bool resize_swap_chain(unsigned int width, unsigned int height);
     [[nodiscard]] bool enter_fullscreen_mode(unsigned int width, unsigned int height, const char* log_context);
+    [[nodiscard]] bool fallback_to_windowed();
+    void publish_window_size_change(unsigned int width, unsigned int height, bool fullscreen_fallback);
     void push_click_event(MenuClickEvent event);
     void push_text_input(std::string text);
     void clear_song_scrollbar_state();
@@ -961,6 +978,8 @@ private:
     MenuWindowConfig config_{};
     MenuWindowConfig pending_config_{};
     bool config_dirty_ = false;
+    std::uint64_t pending_config_generation_ = 0;
+    std::uint64_t config_generation_ = 0;
 
     std::atomic<bool> should_close_{false};
     std::atomic<bool> initialized_{false};
@@ -991,6 +1010,10 @@ private:
     bool fullscreen_restore_pending_ = false;
     bool com_initialized_ = false;
     bool resize_pending_ = false;
+    bool window_resize_active_ = false;
+    unsigned int resize_start_width_ = 0, resize_start_height_ = 0;
+    std::mutex window_size_change_mutex_;
+    std::optional<WindowSizeChange> window_size_change_;
     unsigned int pending_width_ = 0;
     unsigned int pending_height_ = 0;
     unsigned int swap_chain_flags_ = 0;

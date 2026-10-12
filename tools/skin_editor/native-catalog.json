@@ -37,6 +37,7 @@
     "font.song_artist.size": 18.0,
     "font.result_score.size": 104.0,
     "font.result_metric.size": 32.0,
+    "font.grade.size": 84.0,
     "font.hud.size": 16.0,
     "font.rank.size": 128.0,
     "font.stats_label.size": 16.0,
@@ -88,16 +89,7 @@
     "options.border": "#282828FF",
     "options.value": "#F5F5F5FF",
     "palette.020914": "#080808FF",
-    "palette.54e9ff": "#E5E5E5FF",
-    "palette.a56bff": "#EAEAEAFF",
     "palette.f7fafd": "#FDFDFDFF",
-    "palette.68edf3": "#E5E5E5FF",
-    "palette.827a98": "#999999FF",
-    "palette.63e9ff": "#E5E5E5FF",
-    "palette.73ddf5": "#D3D3D3FF",
-    "palette.a8ea58": "#EAEAEAFF",
-    "palette.ff6b7d": "#FFFFFFFF",
-    "palette.f2b84b": "#F2F2F2FF",
     "palette.0b1620": "#111111FF",
     "palette.f4f1ff": "#F7F7F7FF",
     "palette.05070a": "#080808FF",
@@ -1824,6 +1816,7 @@
     "song_artist": "Segoe UI",
     "result_score": "Bahnschrift",
     "result_metric": "Segoe UI",
+    "grade": "Bahnschrift SemiBold",
     "hud": "Segoe UI",
     "rank": "Bahnschrift SemiBold",
     "stats_label": "Segoe UI",
@@ -2082,122 +2075,122 @@
     },
     "rects.generic.rect.025": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 154,
+      "line": 158,
       "expression": "x0 + 4.0f, swatch_top, x1 - 4.0f, swatch_top + swatch_height"
     },
     "rects.generic.rect.026": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 229,
+      "line": 233,
       "expression": "left, top, native_list_right, list_bottom_limit + 20.0f"
     },
     "rects.generic.rect.027": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 232,
+      "line": 236,
       "expression": "row_left + 6, top + 22, base_row_right, top + 48"
     },
     "rects.generic.rect.028": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 234,
+      "line": 238,
       "expression": "row_left + 6, top + 22, base_row_right, top + 48"
     },
     "rects.generic.rect.029": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 237,
+      "line": 241,
       "expression": "left, bottom - 240.0f, native_list_right, bottom"
     },
     "rects.generic.rect.030": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 238,
+      "line": 242,
       "expression": "native_list_right + 24.0f, top, right, bottom"
     },
     "rects.generic.rect.031": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 272,
+      "line": 276,
       "expression": "base_row_right + preview_gap + (modern_settings_screen ? 20.0f : 0.0f), top + (modern_settings_screen ? 0.0f : 24.0f), right - (modern_settings_screen ? 0.0f : 24.0f), bottom - (modern_settings_screen ? 0.0f : 24.0f)"
     },
     "rects.generic.rect.032": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 347,
+      "line": 351,
       "expression": "row_left, row_y, row_right, row_y + row_height"
     },
     "rects.generic.rect.033": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 365,
+      "line": 369,
       "expression": "row_left, row_y + 10, row_left + 3, row_y + row_height - 10"
     },
     "rects.generic.rect.034": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 396,
+      "line": 400,
       "expression": "row_left + 18.0f, row_y + 8.0f, std::max(row_left + 160.0f, label_right), row_y + row_height - 8.0f"
     },
     "rects.generic.rect.035": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 410,
+      "line": 414,
       "expression": "track_left, track_center_y - 4.0f, track_right, track_center_y + 4.0f"
     },
     "rects.generic.rect.036": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 428,
+      "line": 432,
       "expression": "track_rect.left, track_rect.top, knob_x, track_rect.bottom"
     },
     "rects.generic.rect.037": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 441,
+      "line": 445,
       "expression": "track_rect.left, row_y + 6.0f, track_rect.right, row_y + row_height - 6.0f"
     },
     "rects.generic.rect.038": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 445,
+      "line": 449,
       "expression": "value_left, row_y + 8.0f, row_right - 18.0f, row_y + row_height - 8.0f"
     },
     "rects.generic.rect.039": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 457,
+      "line": 461,
       "expression": "std::max(label_rect.right + 12.0f, row_left + 320.0f), row_y + 8.0f, value_right, row_y + row_height - 8.0f"
     },
     "rects.generic.rect.040": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 494,
+      "line": 498,
       "expression": "minus_left, row_y + 6.0f, minus_left + action_width, row_y + row_height - 6.0f"
     },
     "rects.generic.rect.041": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 496,
+      "line": 500,
       "expression": "plus_left, row_y + 6.0f, plus_left + action_width, row_y + row_height - 6.0f"
     },
     "rects.generic.rect.042": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 498,
+      "line": 502,
       "expression": "row_rect.left, row_rect.top, minus_rect.left - action_gap * 0.5f, row_rect.bottom"
     },
     "rects.generic.rect.043": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 505,
+      "line": 513,
       "expression": "std::max(label_rect.right + 12.0f, row_left + 320.0f), row_y + 8.0f, row_right - 18.0f, row_y + row_height - 8.0f"
     },
     "rects.generic.rect.044": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 527,
+      "line": 535,
       "expression": "row_right + scrollbar_gap, track_top, row_right + scrollbar_gap + scrollbar_width, track_bottom"
     },
     "rects.generic.rect.045": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 550,
+      "line": 558,
       "expression": "track_rect.left + 1.0f, thumb_top, track_rect.right - 1.0f, thumb_top + thumb_height"
     },
     "rects.generic.rect.046": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 573,
+      "line": 581,
       "expression": "hit_left, slot_top, hit_right, slot_bottom"
     },
     "rects.generic.rect.049": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 644,
+      "line": 652,
       "expression": "line_left, line_y, line_right, line_y + line_height"
     },
     "rects.generic.rect.050": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 647,
+      "line": 655,
       "expression": "line_left - 12.0f, line_y - 4.0f, line_right, line_y + line_height + 4.0f"
     },
     "rects.generic_help.rect.001": {
@@ -2337,192 +2330,192 @@
     },
     "rects.result_single.rect.001": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 98,
+      "line": 142,
       "expression": "0.0f, 0.0f, kBaseWidth, kBaseHeight"
     },
     "rects.result_single.rect.002": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 143,
+      "line": 187,
       "expression": "54.0f, 38.0f, 1866.0f, 122.0f"
     },
     "rects.result_single.rect.003": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 146,
+      "line": 190,
       "expression": "128, 36, 384, 100"
     },
     "rects.result_single.rect.004": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 149,
+      "line": 193,
       "expression": "410.0f, 44.0f, 600.0f, 84.0f"
     },
     "rects.result_single.rect.005": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 154,
+      "line": 198,
       "expression": "410.0f, 80.0f, 650.0f, 108.0f"
     },
     "rects.result_single.rect.006": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 168,
+      "line": 212,
       "expression": "1400.0f, 28.0f, 1848.0f, 108.0f"
     },
     "rects.result_single.rect.007": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 172,
+      "line": 216,
       "expression": "profile_rect.left + 15.0f, profile_rect.top + 9.0f, profile_rect.left + 77.0f, profile_rect.top + 71.0f"
     },
     "rects.result_single.rect.008": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 195,
+      "line": 239,
       "expression": "profile_text_left, profile_rect.top + 10.0f, profile_rect.right - 23.0f, profile_rect.top + 44.0f"
     },
     "rects.result_single.rect.009": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 201,
+      "line": 245,
       "expression": "profile_text_left, profile_rect.top + 44.0f, profile_rect.right - 23.0f, profile_rect.bottom - 9.0f"
     },
     "rects.result_single.rect.010": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 209,
+      "line": 253,
       "expression": "70.0f, 154.0f, 590.0f, modern_library_screen ? 738.0f : 704.0f"
     },
     "rects.result_single.rect.011": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 213,
+      "line": 257,
       "expression": "song_panel.left + 44.0f, song_panel.top + 42.0f, song_panel.right - 44.0f, song_panel.top + 382.0f"
     },
     "rects.result_single.rect.012": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 225,
+      "line": 269,
       "expression": "song_panel.left + 230.0f, song_panel.top + 14.0f, song_panel.right - 24.0f, song_panel.top + 38.0f"
     },
     "rects.result_single.rect.013": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 232,
+      "line": 276,
       "expression": "song_panel.left + 44.0f, song_panel.top + 402.0f, song_panel.right - 44.0f, song_panel.top + 455.0f"
     },
     "rects.result_single.rect.014": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 238,
+      "line": 282,
       "expression": "song_panel.left + 44.0f, song_panel.top + 455.0f, song_panel.right - 44.0f, song_panel.top + 488.0f"
     },
     "rects.result_single.rect.015": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 257,
+      "line": 301,
       "expression": "left, song_panel.top + 505.0f, left + metadata_width - 8.0f, song_panel.top + 530.0f"
     },
     "rects.result_single.rect.016": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 263,
+      "line": 307,
       "expression": "left, song_panel.top + 530.0f, left + metadata_width - 8.0f, song_panel.top + 558.0f"
     },
     "rects.result_single.rect.026": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 511,
+      "line": 550,
       "expression": "1320.0f, 154.0f, 1848.0f, modern_library_screen ? 738.0f : 704.0f"
     },
     "rects.result_single.rect.027": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 515,
+      "line": 554,
       "expression": "analysis_panel.left + 24.0f, analysis_panel.top + 18.0f, analysis_panel.right - 24.0f, analysis_panel.top + 48.0f"
     },
     "rects.result_single.rect.028": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 521,
+      "line": 561,
       "expression": "analysis_panel.left + 26.0f, analysis_panel.top + 66.0f, analysis_panel.right - 26.0f, analysis_panel.top + 98.0f"
     },
     "rects.result_single.rect.029": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 526,
+      "line": 566,
       "expression": "analysis_panel.left + 30.0f, analysis_panel.top + 118.0f, analysis_panel.right - 30.0f, analysis_panel.top + 226.0f"
     },
     "rects.result_single.rect.030": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 569,
+      "line": 601,
       "expression": "timing_track.left + 12.0f, timing_track.top + 8.0f, center_x - 12.0f, timing_track.top + 38.0f"
     },
     "rects.result_single.rect.031": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 572,
+      "line": 604,
       "expression": "center_x + 12.0f, timing_track.top + 8.0f, timing_track.right - 12.0f, timing_track.top + 38.0f"
     },
     "rects.result_single.rect.032": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 593,
+      "line": 627,
       "expression": "timing_track.left, timing_track.bottom + 8.0f, center_x, timing_track.bottom + 36.0f"
     },
     "rects.result_single.rect.033": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 600,
+      "line": 635,
       "expression": "center_x, timing_track.bottom + 8.0f, timing_track.right, timing_track.bottom + 36.0f"
     },
     "rects.result_single.rect.034": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 608,
+      "line": 643,
       "expression": "analysis_panel.left + 26.0f, analysis_panel.top + 286.0f, analysis_panel.right - 26.0f, analysis_panel.top + 318.0f"
     },
     "rects.result_single.rect.035": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 613,
+      "line": 648,
       "expression": "analysis_panel.left + 30.0f, analysis_panel.top + 332.0f, analysis_panel.right - 30.0f, analysis_panel.bottom - 36.0f"
     },
     "rects.result_single.rect.036": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 619,
+      "line": 654,
       "expression": "gauge_plot.left + gauge_axis_width, gauge_plot.top, gauge_plot.right, gauge_plot.bottom"
     },
     "rects.result_single.rect.037": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 633,
+      "line": 668,
       "expression": "gauge_plot.left, y - 13.0f, gauge_track.left - 8.0f, y + 13.0f"
     },
     "rects.result_single.rect.038": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 673,
+      "line": 724,
       "expression": "70.0f, 770.0f, 1270.0f, 994.0f"
     },
     "rects.result_single.rect.039": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 704,
+      "line": 755,
       "expression": "left, stats_panel.top, left + statistic_width, stats_panel.bottom"
     },
     "rects.result_single.rect.040": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 722,
+      "line": 773,
       "expression": "cell.left + 14.0f, cell.top + 28.0f + rise, cell.right - 14.0f, cell.top + 58.0f + rise"
     },
     "rects.result_single.rect.041": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 729,
+      "line": 780,
       "expression": "cell.left + 10.0f, cell.top + 76.0f + rise, cell.right - 10.0f, cell.top + 126.0f + rise"
     },
     "rects.result_single.rect.042": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 736,
+      "line": 787,
       "expression": "cell.left + 10.0f, cell.top + 142.0f + rise, cell.right - 10.0f, cell.top + 174.0f + rise"
     },
     "rects.result_single.rect.043": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 771,
+      "line": 820,
       "expression": "1320.0f, 770.0f, 1848.0f, 856.0f"
     },
     "rects.result_single.rect.044": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 773,
+      "line": 822,
       "expression": "1320.0f, 872.0f, 1574.0f, 942.0f"
     },
     "rects.result_single.rect.045": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 775,
+      "line": 824,
       "expression": "1594.0f, 872.0f, 1848.0f, 942.0f"
     },
     "rects.result_single.rect.046": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 834,
+      "line": 883,
       "expression": "1320.0f, 952.0f, 1848.0f, 982.0f"
     },
     "rects.result_single.rect.047": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 841,
+      "line": 891,
       "expression": "620.0f, 1022.0f, 1300.0f, 1050.0f"
     },
     "rects.result_summary.rect.001": {
@@ -2573,7 +2566,7 @@
     "rects.result_summary.rect.010": {
       "file": "MenuWindow_draw_result_summary.inl",
       "line": 53,
-      "expression": "summary_left, 458.0f, summary_left + 250.0f, 530.0f"
+      "expression": "summary_left, 450.0f, summary_left + 250.0f, 548.0f"
     },
     "rects.result_summary.rect.011": {
       "file": "MenuWindow_draw_result_summary.inl",
@@ -2607,7 +2600,7 @@
     },
     "rects.songselect.rect.002": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 919,
+      "line": 921,
       "expression": "cell.left, cell.top + 22.0f, cell.right, cell.bottom"
     },
     "rects.songselect.rect.003": {
@@ -2802,267 +2795,267 @@
     },
     "rects.songselect.rect.042": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 607,
+      "line": 606,
       "expression": "showcase.left + 40.0f, showcase.top + 54.0f, showcase.right - 40.0f, showcase.top + 216.0f"
     },
     "rects.songselect.rect.043": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 613,
+      "line": 615,
       "expression": "showcase.left + 52.0f, showcase.top + 224.0f, showcase.right - 52.0f, showcase.bottom - 22.0f"
     },
     "rects.songselect.rect.044": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 620,
+      "line": 622,
       "expression": "center_panel.left, showcase.bottom + center_section_gap, center_panel.right, showcase.bottom + center_section_gap + center_paired_height"
     },
     "rects.songselect.rect.045": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 635,
+      "line": 637,
       "expression": "best_panel.left + 22.0f, best_panel.top + 16.0f, best_panel.right - 22.0f, best_panel.top + 46.0f"
     },
     "rects.songselect.rect.046": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 642,
-      "expression": "best_panel.left + 24.0f, best_panel.top + 48.0f, best_panel.right - 24.0f, best_panel.top + 122.0f"
+      "line": 644,
+      "expression": "best_panel.left + 24.0f, best_panel.top + 44.0f, best_panel.right - 24.0f, best_panel.top + 130.0f"
     },
     "rects.songselect.rect.047": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 700,
+      "line": 702,
       "expression": "column_left, best_panel.top + 152.0f, column_right, best_panel.top + 184.0f"
     },
     "rects.songselect.rect.048": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 707,
+      "line": 709,
       "expression": "column_left, best_panel.top + 188.0f, column_right, best_panel.top + 228.0f"
     },
     "rects.songselect.rect.049": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 715,
+      "line": 717,
       "expression": "column_left, best_panel.top + 234.0f, column_right, best_panel.bottom - 22.0f"
     },
     "rects.songselect.rect.050": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 722,
+      "line": 724,
       "expression": "center_panel.left, best_panel.bottom + center_section_gap, center_panel.right, center_panel.bottom"
     },
     "rects.songselect.rect.052": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 725,
+      "line": 727,
       "expression": "action_strip.left, action_strip.top, action_strip.left + (action_strip.right - action_strip.left) * 0.32f, action_strip.bottom"
     },
     "rects.songselect.rect.053": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 728,
+      "line": 730,
       "expression": "filter_button.right + 12.0f, action_strip.top, action_strip.right, action_strip.bottom"
     },
     "rects.songselect.rect.054": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 756,
+      "line": 758,
       "expression": "table_button.left, table_button.top, table_actions_left - 8.0f, table_button.bottom"
     },
     "rects.songselect.rect.055": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 757,
+      "line": 759,
       "expression": "table_actions_left, table_button.top + 7.0f, table_button.right - 8.0f, table_button.top + 38.0f"
     },
     "rects.songselect.rect.056": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 758,
+      "line": 760,
       "expression": "table_actions_left, table_button.top + 44.0f, table_button.right - 8.0f, table_button.bottom - 7.0f"
     },
     "rects.songselect.rect.057": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 763,
+      "line": 765,
       "expression": "table_link.left + 14, table_link.top + 12, table_link.right - 8, table_link.top + 34"
     },
     "rects.songselect.rect.058": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 767,
+      "line": 769,
       "expression": "table_link.left + 14, table_link.top + 40, table_link.right - 8, table_link.bottom - 10"
     },
     "rects.songselect.rect.059": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 784,
+      "line": 786,
       "expression": "right_left, right_panel.top + 24.0f, right_right, right_panel.top + 76.0f"
     },
     "rects.songselect.rect.060": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 797,
+      "line": 799,
       "expression": "right_left, right_panel.top + 78.0f, right_right, right_panel.top + 112.0f"
     },
     "rects.songselect.rect.061": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 805,
+      "line": 807,
       "expression": "right_left, right_panel.top + 150.0f, right_right, right_panel.top + 332.0f"
     },
     "rects.songselect.rect.062": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 822,
+      "line": 824,
       "expression": "difficulty_card.left + 18.0f, difficulty_card.top + 14.0f, difficulty_split - 12.0f, difficulty_card.top + 40.0f"
     },
     "rects.songselect.rect.063": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 829,
+      "line": 831,
       "expression": "difficulty_split + 16.0f, difficulty_card.top + 14.0f, difficulty_card.right - 14.0f, difficulty_card.top + 40.0f"
     },
     "rects.songselect.rect.064": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 842,
+      "line": 844,
       "expression": "difficulty_card.left + 18.0f, difficulty_card.top + 38.0f, difficulty_split - 12.0f, difficulty_card.top + 112.0f"
     },
     "rects.songselect.rect.065": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 855,
+      "line": 857,
       "expression": "difficulty_card.left + 14.0f, difficulty_card.top + 118.0f, difficulty_split - 10.0f, difficulty_card.bottom - 14.0f"
     },
     "rects.songselect.rect.066": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 862,
+      "line": 864,
       "expression": "difficulty_split + 12.0f, difficulty_card.top + 48.0f, difficulty_card.right - 12.0f, difficulty_card.top + 112.0f"
     },
     "rects.songselect.rect.067": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 875,
+      "line": 877,
       "expression": "difficulty_split + 12.0f, difficulty_card.top + 118.0f, difficulty_card.right - 12.0f, difficulty_card.bottom - 14.0f"
     },
     "rects.songselect.rect.068": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 884,
+      "line": 886,
       "expression": "right_left, metadata_top, right_right, metadata_top + 78.0f"
     },
     "rects.songselect.rect.069": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 900,
+      "line": 902,
       "expression": "right_left + 12.0f, metadata_top + 6.0f, right_left + metadata_width - 10.0f, metadata_top + 72.0f"
     },
     "rects.songselect.rect.070": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 902,
+      "line": 904,
       "expression": "right_left + metadata_width + 12.0f, metadata_top + 6.0f, right_left + metadata_width * 2.0f - 10.0f, metadata_top + 72.0f"
     },
     "rects.songselect.rect.071": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 904,
+      "line": 906,
       "expression": "right_left + metadata_width * 2.0f + 12.0f, metadata_top + 6.0f, right_left + metadata_width * 3.0f - 10.0f, metadata_top + 72.0f"
     },
     "rects.songselect.rect.072": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 906,
+      "line": 908,
       "expression": "right_left + metadata_width * 3.0f + 12.0f, metadata_top + 6.0f, right_right - 10.0f, metadata_top + 72.0f"
     },
     "rects.songselect.rect.073": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 932,
+      "line": 934,
       "expression": "right_left, right_panel.top + 460.0f, right_right, right_panel.top + 608.0f"
     },
     "rects.songselect.rect.074": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 947,
+      "line": 949,
       "expression": "mode_area.left + col * (mode_width + mode_gap), mode_area.top + row * (mode_height + mode_gap), mode_area.left + col * (mode_width + mode_gap) + mode_width, mode_area.top + row * (mode_height + mode_gap) + mode_height"
     },
     "rects.songselect.rect.075": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 970,
+      "line": 972,
       "expression": "cell.left + 12.0f, cell.top + 5.0f, cell.right - 12.0f, cell.top + 29.0f"
     },
     "rects.songselect.rect.076": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 976,
+      "line": 978,
       "expression": "cell.left + 12.0f, cell.top + 26.0f, cell.right - 12.0f, cell.bottom - 4.0f"
     },
     "rects.songselect.rect.077": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 985,
+      "line": 987,
       "expression": "value_rect.left + 2.0f, value_rect.top + 2.0f, value_rect.right + 2.0f, value_rect.bottom + 2.0f"
     },
     "rects.songselect.rect.078": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1018,
+      "line": 1020,
       "expression": "right_left, right_panel.top + 626.0f, right_right, right_panel.top + 654.0f"
     },
     "rects.songselect.rect.079": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1023,
+      "line": 1025,
       "expression": "right_left, right_panel.top + 432.0f, right_right, right_panel.top + 492.0f"
     },
     "rects.songselect.rect.080": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1025,
+      "line": 1027,
       "expression": "right_left, right_panel.top + 508.0f, right_right, right_panel.top + 568.0f"
     },
     "rects.songselect.rect.081": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1037,
+      "line": 1039,
       "expression": "right_left, right_panel.top + 583.0f, right_right, right_panel.top + 617.0f"
     },
     "rects.songselect.rect.082": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1040,
+      "line": 1042,
       "expression": "right_left, right_panel.top + 162.0f, right_left + 190.0f, right_panel.top + 238.0f"
     },
     "rects.songselect.rect.083": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1046,
+      "line": 1048,
       "expression": "right_left + 220.0f, right_panel.top + 162.0f, right_left + 390.0f, right_panel.top + 238.0f"
     },
     "rects.songselect.rect.084": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1053,
+      "line": 1055,
       "expression": "right_left, right_panel.top + 270.0f, right_right, right_panel.top + 410.0f"
     },
     "rects.songselect.rect.085": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1058,
+      "line": 1060,
       "expression": "right_left, right_panel.top + 162.0f, right_right, right_panel.top + 238.0f"
     },
     "rects.songselect.rect.086": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1063,
+      "line": 1065,
       "expression": "right_left, right_panel.top + 252.0f, right_left + (right_right - right_left) * 0.62f, right_panel.top + 332.0f"
     },
     "rects.songselect.rect.087": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1069,
+      "line": 1071,
       "expression": "right_left + (right_right - right_left) * 0.67f, right_panel.top + 252.0f, right_right, right_panel.top + 332.0f"
     },
     "rects.songselect.rect.088": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1083,
+      "line": 1085,
       "expression": "right_left, right_panel.top + 354.0f, right_right, right_panel.top + 390.0f"
     },
     "rects.songselect.rect.089": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1098,
+      "line": 1100,
       "expression": "right_left, right_panel.top + 410.0f, right_right, right_panel.top + 470.0f"
     },
     "rects.songselect.rect.090": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1103,
+      "line": 1105,
       "expression": "right_left, right_panel.top + 490.0f, right_right, right_panel.top + 550.0f"
     },
     "rects.songselect.rect.091": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1112,
+      "line": 1114,
       "expression": "right_left, right_panel.bottom - 112.0f, right_right, right_panel.bottom - 24.0f"
     },
     "rects.songselect.rect.092": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1153,
+      "line": 1155,
       "expression": "38.0f, 944.0f, 1882.0f, 1048.0f"
     },
     "rects.songselect.rect.093": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1156,
+      "line": 1158,
       "expression": "bottom_bar.left + 12.0f, bottom_bar.top + 12.0f, bottom_bar.left + 260.0f, bottom_bar.bottom - 12.0f"
     },
     "rects.songselect.rect.094": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1166,
+      "line": 1168,
       "expression": "back_button.right + 28.0f, bottom_bar.top + 12.0f, bottom_bar.right - 28.0f, bottom_bar.top + 48.0f"
     },
     "rects.songselect.rect.095": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1170,
+      "line": 1172,
       "expression": "back_button.right + 28.0f, bottom_bar.top + 48.0f, bottom_bar.right - 28.0f, bottom_bar.bottom - 10.0f"
     },
     "rects.title_native.rect.001": {

@@ -2,6 +2,10 @@
 
 **固定基准：[1.8.7](baseline-1.8.7.zh-CN.md)**（2026-10-10）。使用 Git tag `1.8.7`、commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`，不随 `latest` 或新版本自动更新。
 
+**2026-10-12 · 1.8.8：**整合结果分析、自由窗口大小及F9 PNG提示、长LN Mix，并改善显示可读性、难度表URL与筛选、皮肤轨道快捷键、减少键数时的键音保留，以及单人开始和立即重试操作。当前验证、软件包及公开状态见[1.8.8发布说明](release-1.8.8-gate.md)。固定基准仍为1.8.7。
+
+**分析与扩展计划：**区分各轨道分布、时间分段准确度和单键/LN起始、松键、保持失败，无法测量的漏击不作为0ms样本。长LN Mix v2仅保留本地记录与回放，不计入旧BEST或Sites上传。插件与1.9.0稳定化仍为计划。参见[分析标准](result-analysis-1.8.8.ko.md)、[显示/菜单/键音变更](release-feedback-1.8.8.ko.md)、[开始与重试操作](gameplay-start-controls.ko.md)（韩语）。
+
 **2026-10-09 · TenRiff 1.8.7:** 改善输入校准和谱面加载音频，支持LR2单人Studio Deck、750ms FAST/SLOW保留、按键重新分配、选项整合及完整曲名自动缩放。 [1.8.7 release](release-1.8.7-gate.md).
 
 **2026-10-08 · TenRiff 1.8.6:** 为Native单人游玩新增Studio Deck HUD。左右Shift可绑定为游玩按键；F5/F6将Hi-Speed减半/加倍，F11打开聊天。仍可选择经典HUD。 [1.8.6 release](release-1.8.6-gate.md).

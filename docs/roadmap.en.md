@@ -8,9 +8,26 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current Baseline
 - Windows GUI / runtime is the primary supported path.
-- Project version line is `1.8.7`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
+- The fixed baseline is `1.8.7` and this source targets `1.8.8`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
 - The active menu / runtime is BMS-family only (`.bms/.bme/.bml/.pms`) and supports native, bundled/profile TenRiff `skin.json`, and LR2 skins.
 - For current shipped behavior, read `docs/current-state.en.md` first; this roadmap is about direction and remaining work.
+
+## 1.8.8 Analysis and 1.9.0 Stabilization Plan (2026-10-12)
+
+The current source scope is **1.8.8**, including analysis, window sizing, long LN Mix and display/menu/keysound/start-control improvements. See the [release gate](release-1.8.8-gate.md) for current validation and publication status. The plugin host, API and SDK are not implemented; `1.9.0` is a future stabilization target. The fixed `1.8.7` baseline, existing tags and release files remain preserved. This plan sets the next development priorities; the earlier stage list below does not automatically authorize additional unfinished core features.
+
+| Stage | Completion criteria |
+| --- | --- |
+| 1.8.8 | Validate lane FAST/SLOW, time accuracy, tap/LN events, distributions/sample counts, free window sizing, result PNGs, long LN Mix, readability, menu input, keysound preservation and solo start/retry against the [release gate](release-1.8.8-gate.md) |
+| Before 1.9.0 | A limited read-only plugin API demonstrated by an alternative result analysis view and a personal song filter, both built without core source edits |
+| After 1.9.0 stabilization | Maintain the core feature scope; focus on bug, security and compatibility fixes and plugin extensions |
+
+- **Analysis rules:** Show only LN events meaningful under the active ruleset. Analysis must not change judgement, scoring, combo or gauge rules. Automatic completion of a normal LN is not a release-timing sample. Count unmeasurable misses separately, never as `0 ms`. Show distributions, sample counts and spread alongside the mean so alternating `−20 ms / +20 ms` does not appear precise. See the [analysis criteria and detailed plan (Korean)](result-analysis-1.8.8.ko.md).
+- **Core/plugin boundary (planned):** The core owns input, the audio clock, judgement, scores, official record storage/verification, and multiplayer rules/session state. The first API exposes read-only data, separate personal settings/analysis storage, and bounded result-view, song sort/filter, HUD and menu extensions.
+- **Execution isolation (planned):** Run external code in a separate execution environment. The game never waits for its computation and never calls it directly from input/audio paths. Apply permission restrictions and execution/time budgets separately; contain faults, infinite loops and excessive output. Choose the runtime and concrete budgets after prototype validation.
+- **Multiplayer (planned):** The core blocks external plugin execution and result application, then rebuilds plugin-affected play state using default rules. Do not rely on plugins disabling themselves. Preserve personal keymaps and audio offsets. If future single-player extensions change judgement, charts or input, segregate their records from default records.
+- **API freeze gate (planned):** If either sample repeatedly needs engine edits, the API is not ready to freeze. Ship a small SDK with API documentation, runnable samples, error logs and a launch mode that loads no plugins. Verify that users and AI can build mods using the documented API and samples.
+- **Version policy (planned):** `1.9.0` stabilizes feature scope and compatibility; it does not freeze version numbers or files forever. Distinguish core patch, plugin and public-API compatibility versions, and verify existing mod/record compatibility. A future fixed-baseline change requires separate approval and synchronized documentation.
 
 ## 0) Fix the Skeleton and Master Clock
 - Treat **AudioThread as the master clock** for all timing-sensitive work.

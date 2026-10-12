@@ -20,6 +20,7 @@
 #include "app/menu/settings/CalibrationSettingsView.h"
 #include "app/menu/settings/GraphicsSettingsView.h"
 #include "app/menu/settings/InputSettingsView.h"
+#include "config/KeycodeMap.h"
 #include "util/Utf8Compat.h"
 
 namespace tenriff::app {
@@ -81,6 +82,28 @@ std::optional<std::string> pick_onnx_model_dialog_utf8() {
 }  // namespace
 
 void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
+    // Consume a completed native drag before applying a newer explicit choice.
+    (void)service_window_size_change();
+    if (graphics_settings_controller_.editing_resolution()) {
+#ifdef _WIN32
+        const auto vk = config::KeycodeMap::polling_vk_for_keycode(keycode);
+        if (vk && ((*vk >= '0' && *vk <= '9') || (*vk >= VK_NUMPAD0 && *vk <= VK_NUMPAD9))) {
+            const char digit = static_cast<char>(*vk >= VK_NUMPAD0 ? '0' + *vk - VK_NUMPAD0 : *vk);
+            apply_graphics_settings_effects(graphics_settings_controller_.resolution_text(std::string(1, digit)));
+            return;
+        }
+#endif
+        if (keycode == key_backspace_ || keycode == key_delete_) {
+            apply_graphics_settings_effects(graphics_settings_controller_.resolution_erase(keycode == key_delete_));
+            return;
+        }
+        if (keycode == key_tab_) {
+            apply_graphics_settings_effects(graphics_settings_controller_.handle(menu::MenuAction::move(1), config_));
+            return;
+        }
+        if (keycode != key_up_ && keycode != key_down_ && keycode != key_left_ &&
+            keycode != key_right_ && keycode != key_enter_ && keycode != key_escape_) return;
+    }
     if (keycode == key_f5_) {
         refresh_graphics_resolutions();
         publish_snapshot();
@@ -239,6 +262,7 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
         row.value = std::move(source.value);
         row.selected = source.selected;
         row.activatable = source.activatable;
+        row.value_activatable = source.id == menu::settings::GraphicsSettingId::Resolution;
         row.adjustable = source.adjustable;
         row.increment_enabled = source.adjustable;
         row.decrement_enabled = source.adjustable;
@@ -247,6 +271,14 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
         render.generic.rows.push_back(std::move(row));
     }
     render.generic.notes = std::move(view.notes);
+    if (!graphics_resolution_status_.empty()) render.generic.notes.insert(render.generic.notes.begin(), graphics_resolution_status_);
+    if (graphics_settings_controller_.editing_resolution()) {
+        render.generic.footer_notes.push_back(ui_text(
+            graphics_settings_controller_.resolution_error() ? "Invalid size: enter whole numbers from 320 to 8192 for both dimensions."
+                : "Type Width / Height. Tab or arrows switch fields; Enter applies; Esc cancels; Delete clears.",
+            graphics_settings_controller_.resolution_error() ? "잘못된 크기입니다. 가로·세로 모두 320~8192 사이 정수를 입력하세요."
+                : "가로·세로 입력: Tab 또는 방향키로 항목 전환, Enter 적용, Esc 취소, Delete 지우기."));
+    }
 }
 
 void MenuApp::populate_onnx_upscaler_confirm_render_data(render::MenuRenderData& render) {

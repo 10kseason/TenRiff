@@ -143,10 +143,14 @@
                 ctx->DrawRectangle(D2D1::RectF(scene_left, scene_top, scene_left + kBaseWidth * scene_scale,
                                               scene_top + kBaseHeight * scene_scale), d2d_->button_border_brush.Get());
             draw_text_clipped_aligned(wloc("Actual gameplay proportions", "실제 인게임 비율"), d2d_->body_format.Get(),
-                                      D2D1::RectF(viewport.left, rect.bottom - 140.0f, viewport.right, rect.bottom - 110.0f),
+                                      D2D1::RectF(viewport.left, rect.bottom - 152.0f, viewport.right, rect.bottom - 124.0f),
                                       d2d_->muted_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+            draw_text_clipped_aligned(wloc("Lane: 1-9 / 0=10 / Shift+1-6=11-16", "레인: 1-9 / 0=10 / Shift+1-6=11-16"),
+                                      d2d_->body_format.Get(),
+                                      D2D1::RectF(viewport.left, rect.bottom - 122.0f, viewport.right, rect.bottom - 96.0f),
+                                      d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
             const float preview_visual_opacity = static_cast<float>(std::clamp(preview.visual_opacity, 0.20, 1.0));
-            const float swatch_top = rect.bottom - 96.0f;
+            const float swatch_top = rect.bottom - 82.0f;
             const float swatch_height = native_metric("generic.swatch_height", 54.0f);
             for (int lane = 0; lane < lane_count; ++lane) {
                 const float x0 = viewport.left + (viewport.right - viewport.left) * lane / lane_count;
@@ -500,6 +504,10 @@
                                      row.target_kind, row.row_index, MenuHitPart::SelectOnly);
                         draw_action(minus_rect, L'-', MenuHitPart::Decrement, row.enabled && row.decrement_enabled);
                         draw_action(plus_rect, L'+', MenuHitPart::Increment, row.enabled && row.increment_enabled);
+                        if (row.enabled && row.activatable && row.value_activatable) {
+                            // Specific value hit follows broad selection regions.
+                            register_hit(value_rect, row.target_kind, row.row_index, MenuHitPart::Activate);
+                        }
                     } else {
                         const D2D1_RECT_F value_rect =
                             native_rect("generic.rect.043", D2D1::RectF(std::max(label_rect.right + 12.0f, row_left + 320.0f),

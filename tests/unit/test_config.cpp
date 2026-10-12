@@ -29,6 +29,25 @@ TEST_CASE("graphics explicit resolutions normalize safely without losing uncommo
     }
 }
 
+TEST_CASE("graphics fitting keeps ordinary aspect and usable bounds for extreme requests") {
+    using tenriff::config::fit_graphics_client_size;
+    CHECK((fit_graphics_client_size(1500, 1000, 1904, 1033) == std::pair<int, int>{1500, 1000}));
+    CHECK((fit_graphics_client_size(900, 1600, 1904, 1033) == std::pair<int, int>{581, 1033}));
+    CHECK((fit_graphics_client_size(320, 8192, 1904, 1033) == std::pair<int, int>{320, 1033}));
+    CHECK((fit_graphics_client_size(8192, 320, 1904, 1033) == std::pair<int, int>{1904, 320}));
+    CHECK((fit_graphics_client_size(8192, 8192, 20000, 20000) == std::pair<int, int>{8192, 8192}));
+}
+
+TEST_CASE("graphics direct dimension entry rejects malformed text instead of selecting native") {
+    using tenriff::config::parse_graphics_dimension_fields;
+    CHECK((parse_graphics_dimension_fields("1500", "1000") == std::pair<int, int>{1500, 1000}));
+    CHECK((parse_graphics_dimension_fields("320", "8192") == std::pair<int, int>{320, 8192}));
+    for (const auto invalid : {"", "319", "8193", "-640", "+640", "640x", "640.0", " 640", "999999999999"}) {
+        CHECK((parse_graphics_dimension_fields(invalid, "900") == std::pair<int, int>{0, 0}));
+        CHECK((parse_graphics_dimension_fields("900", invalid) == std::pair<int, int>{0, 0}));
+    }
+}
+
 TEST_CASE("skin HUD font scales preserve legacy defaults and sanitize portable presets") {
     tenriff::config::SkinConfig skin;
     REQUIRE(tenriff::config::deserialize_skin_config("{}", skin));
@@ -269,6 +288,41 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.ui.account_server_mode == "main");
     CHECK(tenriff::config::resolved_skin_lane_colors(config.skin, "7+1").size() == 8u);
     CHECK(tenriff::config::resolved_skin_lane_colors(config.skin, "16k").size() == 16u);
+}
+
+TEST_CASE("profile start controls retain legacy defaults and roundtrip without changing timing offsets") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    std::filesystem::create_directories(temp.path / "config");
+    std::filesystem::create_directories(temp.path / "profiles" / "test");
+    write_file(temp.path / "config" / "config.json", "{}");
+    write_file(temp.path / "profiles" / "test" / "config.json", "{}");
+    CurrentPathGuard cwd;
+    std::filesystem::current_path(temp.path);
+    ConfigLoader loader;
+    auto legacy = loader.load_profile("profiles/test");
+    REQUIRE(legacy.success());
+    CHECK_FALSE(legacy.config.ui.skip_start_countdown);
+    CHECK(legacy.config.ui.instant_restart_key.empty());
+    auto edited = legacy.config;
+    edited.ui.skip_start_countdown = true;
+    edited.ui.instant_restart_key = "F12";
+    edited.input_offset_ms = 12.5;
+    edited.sound_offset_ms = -8.0;
+    REQUIRE(loader.save_profile("profiles/test", edited));
+    const auto loaded = loader.load_profile("profiles/test");
+    REQUIRE(loaded.success());
+    CHECK(loaded.config.ui.skip_start_countdown);
+    CHECK(loaded.config.ui.instant_restart_key == "F12");
+    CHECK(loaded.config.input_offset_ms == doctest::Approx(12.5));
+    CHECK(loaded.config.sound_offset_ms == doctest::Approx(-8.0));
+    write_file(temp.path / "profiles" / "test" / "config.json",
+               R"({"ui":{"skip_start_countdown":"true","instant_restart_key":123}})");
+    const auto malformed = loader.load_profile("profiles/test");
+    REQUIRE(malformed.success());
+    CHECK_FALSE(malformed.config.ui.skip_start_countdown);
+    CHECK(malformed.config.ui.instant_restart_key.empty());
 }
 
 TEST_CASE("config save and load preserve favorites and collections") {

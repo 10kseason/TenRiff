@@ -1,5 +1,7 @@
 # TenRiff 配置模式（当前）
 
+**1.8.8：**包含结果分析、自由调整窗口大小与直接输入宽高、结果页的 `F9` PNG 保存提示、长 LN Mix，以及菜单、键音和开始操作改进。当前验证与交付状态见[发布说明（韩语）](release-1.8.8-gate.md)。用户固定基准仍为 1.8.7，保留其现有标签和发布文件。
+
 依据：[Config.h](../src/config/Config.h)、[Config.cpp](../src/config/Config.cpp)、[默认 JSON](../config/config.json) 与[键位](../src/config/Keymap.cpp)。省略字段使用代码默认值；以下范围描述加载、保存时的规范化规则。
 
 这份文档整理当前 `config/config.json`、`profiles/<name>/config.json`、`profiles/<name>/keymap.json` 的实际配置结构。
@@ -124,12 +126,14 @@ Gauge Shift 始终启用。`mode.gauge` 的 `ex_hard / hard / normal / easy` 选
 - `display_mode` (string)
   - `borderless | windowed | fullscreen`
   - 默认值为 `borderless`；Discord、OBS、Game Bar 等外部 overlay 也推荐使用此模式
-  - `windowed` 是带标题栏的固定大小窗口，可拖动
+  - `windowed` 带标题栏，可移动并拖动边框调整大小。拖动结束时把实际client尺寸保存到配置；最大化、还原及程序调整大小不会覆盖已选值
   - `fullscreen` 是 DXGI 独占全屏，当前 Discord Game Overlay 不会显示
 - `resolution` (string)
   - `native`、旧别名 `720p | 1080p | qhd`，或 `宽x高`（例如 `1600x900`, `1366x768`, `1280x800`, `3440x1440`）。每轴支持320–8192px。
   - 图形设置包含常见尺寸和当前显示器的显示模式。按`F5`刷新列表。自定义尺寸在保存和重启后保留。
-  - 布局保持1920×1080画布比例，其他比例显示留边。窗口模式按比例缩小，以容纳标题栏和任务栏工作区域。
+  - 分辨率`+/-`继续循环预设；按`Enter`或点击数值进入宽/高编辑，用键盘上排数字或数字小键盘输入。`Tab`/方向键切换，`Enter`应用、`Esc`取消、`Backspace`删除、`Delete`清空。每轴必须为320–8192整数；空值或越界值显示错误并保留原设置。不使用其他字符、粘贴或IME输入。
+  - 内容和点击映射保持1920×1080比例，其他窗口比例显示留边。请求尺寸过大时保留选择值，只将实际窗口缩小到工作区域内；通常等比缩小，但实际client每轴至少320px，因此极端窗口比例可能改变。
+  - 独占全屏不支持请求尺寸时回退到窗口模式并保存实际尺寸/模式。保留旧配置标记及默认值；新候选版的实窗、切换和保存验证见[追加发布条件（韩语）](release-conditions-1.8.8.ko.md#창-크기와-직접-해상도-입력)。
   - 皮肤设置使用实际游戏渲染器的等比缩小画面，反映区域移动、轨道/音符/面板尺寸、判定/连击位置和皮肤字体。
 - `vsync` (bool)
 - `refresh_hz` (int)
@@ -186,8 +190,10 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
   - RR/SR、强制 key-mode 变换和 LN Mix 目标选择使用固定 seed；普通 Random 每次游玩生成新的 session seed，并把实际值写入 replay
 - `mods` (string array)
   - Note Structure 可在 `full_long_notes`、`ln_mix_10` 到 `ln_mix_90`、`full_short_notes` 中选择一个
-  - LN Mix 仅把按 base BPM 计算的 1/8-note hold 能在同 lane 下一音符前至少 50ms 结束的 tap 作为候选，并把所选 hold 的长度分配为 60% 长 1/8-note、20% 中 1/16-note、20% 短且交替的 1/24 与 1/32-note
-  - 已有 hold 会保留，与同 lane 已有 span 重叠的 head 会被排除，相同 `random_seed` 会选择相同 tap
+  - 新LN Mix v2以基础BPM×Rate为准，目标为长2/4拍60%、中1拍20%、短1/4或1/2拍20%。保留其他轨道的单键/短LN，不合并同轨道连续单键
+  - 候选单键须容纳至少1/2拍，并在同轨道下一个起点前留出50ms；目标长度放不下时按4→2→1→1/2→1/4拍缩短，因此密集谱面的实际长LN比例可能低于目标
+  - 保留已有LN/CN、原始起点与键音，排除与同轨道已有区间重叠的起点；相同谱面、`random_seed`、Rate和变换版本会重现相同结果
+  - 旧回放缺少变换版本时按v1读取，保留原有8/16/24/32分音符政策。新v2只保留本地记录/回放，不计入旧的谱面级BEST或Sites上传。参见[长度政策、兼容性和验证状态（韩语）](release-conditions-1.8.8.ko.md#ln-mix의-요구-의미)
 - `ghost_battle_enabled` (bool)
   - 默认值为 `false`
   - `true` 时会自动加载当前选中谱面的最佳兼容 replay 作为 ghost 对比
@@ -227,6 +233,10 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 
 ### `ui`
 
+`ui.skip_start_countdown` 和 `ui.instant_restart_key` 是本体功能，保存在配置档及 `.trprofile` 导出文件中。跳过的仅是加载后的初始 `3 / 2 / 1` 显示；音频准备、原有谱面开头的3秒空白及判定时间保持不变。从暂停继续时始终保留3秒恢复倒计时。多人游戏强制保留初始倒计时并禁用即时重新开始；Session Mix 也禁用即时重新开始。暂停或初始倒计时期间不会触发，必须松开按键后才能再次触发。轨道键、保留键冲突和编辑器练习起点等细节见[开始与重新开始说明（韩语）](gameplay-start-controls.ko.md)。
+
+这些设置不会改变 Sites 记录提交规则。长 LN Mix v2 不计入旧 BEST 或 Sites 是独立的变换规则；[插件运行环境、API 和 SDK 仍是未来计划（韩语）](result-analysis-1.8.8.ko.md)。
+
 `last_played_chart_path` 保存最近一次开始游玩的谱面本地路径，默认空字符串。回放和编辑器练习不会更新；重启后可供 `title_music=last_played` 使用。
 
 | 字段 | 类型、范围、默认值 | 行为 |
@@ -235,6 +245,8 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `profile_avatar_path` | string; UTF-8 ≤2048 bytes | 本地 PNG/JPG 头像路径。 |
 | `language` | `en`, `ko`, `ja`; `en` | UI 语言；无效值规范化为 en。 |
 | `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | 配置档和首次设置中的菜单字号：100%、115%、130%。游戏内字体继续由皮肤控制。 |
+| `skip_start_countdown` | bool; `false` | 跳过单人游玩开始时的 `3 / 2 / 1` 显示；适用于正常开始、菜单重新开始及结果页重试。 |
+| `instant_restart_key` | string; `""`（未分配） | 从头重新开始正在进行的单人谱面的键名。新一轮始终跳过初始倒计时；中断的尝试不保存结果或回放。 |
 | `all_song_sources` | bool; `false` | 恢复 ALL SONG，合并已登记文件夹的缓存并去除相同谱面路径的重复项。 |
 | `result_tail_ms` | double; `500` ms | 判定完成后结果切换的额外等待时间。`audio.play_to_end=true` 时同时考虑谱面音频结束时刻。 |
 | `require_enter_to_exit` | bool; `true` | 为读写兼容保留；当前 Windows 结果输入路径不使用此值自动退出。 |
@@ -246,7 +258,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `collections` | object: name → string[] | 按集合名称分组的谱面键列表。 |
 | `song_collection_filter` | string; `all` | 全部、收藏或集合筛选；即时保存。 |
 | `song_key_filter` | int: `0..16`; `0` | 键数筛选；0 为全部。UI 可选 4K–10K、12K、14K、16K。 |
-| `song_level_min_filter`, `song_level_max_filter` | int: `0..50`; `0` | 难度边界；0 表示不启用对应边界。 |
+| `song_level_min_filter`, `song_level_max_filter` | int: `0..50`; `0` | 难度边界；0 表示不启用对应边界。选择外部难度表时使用表中显示的数字等级，启用边界时排除非数字标签。原生 LV 继续使用现有内置等级。见[数字及前缀处理（韩语）](release-feedback-1.8.8.ko.md#선택한-난이도표-기준의-최소최대-필터)。 |
 | `difficulty_table_path` | string | 本地 header JSON 或下载的缓存；选表切换至 safe 索引。原生 LV 清空路径及有效缓存中的表信息。 |
 | `difficulty_table_url` | string | 原始 HTTP(S) BMSTable 页面或 header URL；解析 meta 并缓存 header/data，选择本地 JSON 时清空。 |
 | `online_records_server_url` | string | 记录、排名与聊天 API URL；失败不阻止本地游玩或记录。 |

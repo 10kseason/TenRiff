@@ -3,6 +3,7 @@
 #include "app/ModeManager.h"
 #include "app/ReplayVerifier.h"
 #include "app/SitesLeaderboardClient.h"
+#include "gameplay/ModeApplier.h"
 #include "timing/HighResClock.h"
 #include "../support/MockAsioDriver.h"
 
@@ -1257,6 +1258,150 @@ struct GameSessionAudioTestAccess {
         CHECK(session->last_audio_sample_.load() == 50400);
     }
 
+    static void check_reduced_keysound_pcm_render() {
+        CompletionTestDirectory directory;
+        gameplay::GameplayChart original;
+        original.lane_count = 8;
+        original.duration_samples = 12000;
+        // Decode real PCM files through the production loader, then render with
+        // the same scheduler/resampler as gameplay. No audio device is opened.
+        for (int asset = 0; asset < 9; ++asset) {
+            const auto wav = directory.path / ("sound-" + std::to_string(asset) + ".wav");
+            std::ofstream file(wav, std::ios::binary);
+            const auto le = [&](uint32_t value, int bytes) {
+                for (int i = 0; i < bytes; ++i) file.put(static_cast<char>((value >> (8 * i)) & 0xff));
+            };
+            constexpr int frames = 512;
+            file.write("RIFF", 4); le(36 + frames * 2, 4); file.write("WAVEfmt ", 8);
+            le(16, 4); le(1, 2); le(1, 2); le(48000, 4); le(96000, 4);
+            le(2, 2); le(16, 2); file.write("data", 4); le(frames * 2, 4);
+            for (int frame = 0; frame < frames; ++frame) {
+                const auto value = static_cast<int16_t>(2000 * std::sin(
+                    (frame + 1) * 6.283185307179586 * (180 + 60 * asset) / 48000.0));
+                le(static_cast<uint16_t>(value), 2);
+            }
+            file.close();
+            (void)original.intern_audio_asset(wav.u8string());
+        }
+        const auto render = [&](const gameplay::GameplayChart& chart, double rate,
+                                 int offset_ms, bool play_notes) {
+            auto session = std::make_unique<GameSession>();
+            session->sample_rate_ = 48000;
+            session->chart_ = chart;
+            session->config_.speed.rate = rate;
+            session->config_.sound_offset_ms = offset_ms;
+            session->config_.audio_ui.bgm_volume = 1.0;
+            session->config_.audio_ui.keysound_volume = 1.0;
+            REQUIRE(session->prepare_chart_audio());
+            session->stop_chart_audio_workers();
+            for (const auto& asset : session->chart_audio_assets_) {
+                const auto clip = std::atomic_load(&asset.clip.samples);
+                REQUIRE(clip);
+                REQUIRE(clip->size() == 1024u);
+            }
+            REQUIRE(session->chart_audio_events_.size() == chart.audio_cues.size());
+            for (std::size_t i = 0; i < chart.audio_cues.size(); ++i) {
+                CHECK(session->chart_audio_events_[i].start_sample ==
+                      chart.audio_cues[i].start_sample + offset_ms * 48);
+                CHECK(session->chart_audio_events_[i].gain == chart.audio_cues[i].gain);
+            }
+            if (play_notes) {
+                // Offset0 is perfect authored-time input. The offset7 variant
+                // aligns reference input to the existing BGM sound-offset policy.
+                for (const auto& note : chart.notes)
+                    session->schedule_note_keysound(note, note.start_sample + offset_ms * 48);
+            }
+            constexpr uint32_t total_frames = 12000;
+            std::vector<float> output(total_frames * 2);
+            for (uint32_t start = 0; start < total_frames; start += 127) {
+                const auto count = std::min<uint32_t>(127, total_frames - start);
+                session->schedule_chart_audio(start + count);
+                session->mix_chart_audio(output.data() + start * 2, count, start);
+            }
+            CHECK(session->chart_audio_voices_.empty());
+            CHECK(session->chart_.duration_samples == chart.duration_samples);
+            return output;
+        };
+        for (const double rate : {0.5, 1.0, 2.0}) {
+            auto source = original;
+            const auto head = static_cast<int64_t>(960 / rate);
+            source.audio_cues = {{static_cast<int64_t>(240 / rate), 8}};
+            for (int lane = 1; lane <= 8; ++lane) {
+                gameplay::NoteEvent note;
+                note.lane = lane;
+                note.note_id = static_cast<std::size_t>(lane);
+                note.start_sample = head;
+                if (lane % 2 == 0) note.end_sample = static_cast<int64_t>(4320 / rate);
+                note.add_audio_asset(static_cast<std::size_t>(lane - 1));
+                note.audio_gain = static_cast<float>(lane) * 0.1f;
+                source.notes.push_back(note);
+            }
+            for (const auto algorithm : {gameplay::KeyModeConversionAlgorithm::Krrcream,
+                                          gameplay::KeyModeConversionAlgorithm::NK2,
+                                          gameplay::KeyModeConversionAlgorithm::NK3}) {
+                gameplay::ModeSettings settings;
+                settings.key_mode = gameplay::KeyMode::Keys4;
+                settings.key_conversion_algorithm = algorithm;
+                settings.random_seed = 42;
+                const auto converted = gameplay::apply_mode_settings(source, settings, {120.0 * rate, 48000});
+                REQUIRE(converted.chart.lane_count == 4);
+                REQUIRE(converted.chart.audio_cues.size() > source.audio_cues.size());
+                for (const int offset : {0, 7}) {
+                    const auto reference = render(source, rate, offset, true);
+                    const auto actual = render(converted.chart, rate, offset, true);
+                    double max_error = 0.0;
+                    for (std::size_t i = 0; i < reference.size(); ++i)
+                        max_error = (std::max)(max_error, std::abs(static_cast<double>(reference[i] - actual[i])));
+                    CHECK(max_error <= 0.000001);
+                    // No input: dropped notes remain audible, while the retained
+                    // notes still require input. This also detects duplicated voices.
+                    const auto automatic = render(converted.chart, rate, offset, false);
+                    const auto old_bgm = render(source, rate, offset, false);
+                    CHECK(automatic != old_bgm);
+                    CHECK(automatic != actual);
+                    // An explicitly requested test evidence directory can keep
+                    // one decoded/mixed example; ordinary CTest leaves no files.
+                    if (rate == 1.0 && offset == 0 && algorithm == gameplay::KeyModeConversionAlgorithm::Krrcream) {
+#ifdef _WIN32
+                        if (const wchar_t* requested = _wgetenv(L"TENRIFF_KEYSOUND_EVIDENCE_DIR")) {
+                            const auto destination = std::filesystem::path(requested);
+#else
+                        if (const char* requested = std::getenv("TENRIFF_KEYSOUND_EVIDENCE_DIR")) {
+                            const auto destination = std::filesystem::u8path(requested);
+#endif
+                            REQUIRE(std::filesystem::is_directory(destination));
+                            const auto save = [&](const char* name, const std::vector<float>& pcm) {
+                                const auto path = destination / name;
+                                REQUIRE_FALSE(std::filesystem::exists(path));
+                                std::ofstream wav(path, std::ios::binary);
+                                const auto le = [&](uint32_t value, int bytes) {
+                                    for (int i = 0; i < bytes; ++i)
+                                        wav.put(static_cast<char>((value >> (8 * i)) & 0xff));
+                                };
+                                const auto bytes = static_cast<uint32_t>(pcm.size() * 2);
+                                wav.write("RIFF", 4); le(36 + bytes, 4); wav.write("WAVEfmt ", 8);
+                                le(16, 4); le(1, 2); le(2, 2); le(48000, 4); le(192000, 4);
+                                le(4, 2); le(16, 2); wav.write("data", 4); le(bytes, 4);
+                                for (const float sample : pcm)
+                                    le(static_cast<uint16_t>(static_cast<int16_t>(
+                                        std::lround(std::clamp(sample, -1.0f, 1.0f) * 32767.0f))), 2);
+                                REQUIRE(wav.good());
+                            };
+                            save("reference-complete.wav", reference);
+                            save("reduced-complete.wav", actual);
+                            save("reduced-no-input.wav", automatic);
+                            save("original-bgm-only.wav", old_bgm);
+                        }
+                    }
+                    std::cout << "[reduced-keysound-pcm] algorithm=" << gameplay::to_string(algorithm)
+                              << " rate=" << rate << " offset_ms=" << offset
+                              << " restored=" << converted.chart.audio_cues.size() - source.audio_cues.size()
+                              << " frames=12000 max_abs_error=" << max_error << '\n';
+                }
+            }
+        }
+    }
+
     static void check_audio_preparation() {
         CompletionTestDirectory directory;
         const auto wav = directory.path / "tail.wav";
@@ -1438,8 +1583,87 @@ struct GameSessionAudioTestAccess {
         CHECK(session.engine_->stats().raw_score == 0);
     }
 
-    static void check_pause_countdown(uint32_t resume_key) {
+    static void check_instant_restart_guards() {
+        constexpr uint32_t restart_key = 123; // F12, never injected into the OS
+        for (int blocked = 0; blocked < 7; ++blocked) {
+            auto session = pause_fixture();
+            session->instant_restart_keycode_ = restart_key;
+            if (blocked == 1) session->peer_battle_mode_ = true;
+            if (blocked == 2) session->set_course_gauge(100.0);
+            if (blocked == 3) session->countdown_active_ = true;
+            if (blocked == 4) session->paused_ = true;
+            if (blocked == 5) session->gameplay_started_ = false;
+            if (blocked == 6) session->instant_restart_key_armed_ = false;
+            control(*session, restart_key);
+            CHECK(session->was_restart_requested() == (blocked == 0));
+            CHECK(session->was_instant_restart_requested() == (blocked == 0));
+            CHECK(session->was_user_aborted() == (blocked == 0));
+            CHECK(session->engine_->replay().events.empty());
+            CHECK_FALSE(session->was_exit_requested());
+            if (blocked == 0) {
+                session->shutdown();
+                CHECK_FALSE(session->result().has_value);
+                CHECK(session->result().replay_path.empty());
+                CHECK(session->result().result_path.empty());
+            }
+        }
         auto session = pause_fixture();
+        session->instant_restart_keycode_ = restart_key;
+        session->instant_restart_key_armed_ = false;
+        control(*session, restart_key);
+        control(*session, restart_key);
+        CHECK_FALSE(session->was_restart_requested());
+        input::InputEvent release{};
+        release.keycode = restart_key;
+        release.state = input::InputState::Released;
+        REQUIRE(session->handle_control_input(release));
+        control(*session, restart_key);
+        CHECK(session->was_instant_restart_requested());
+
+        auto overlay = pause_fixture();
+        overlay->instant_restart_keycode_ = restart_key;
+        overlay->control_input_callback_ = [](const input::InputEvent&) { return true; };
+        control(*overlay, restart_key);
+        CHECK_FALSE(overlay->was_restart_requested());
+        overlay->control_input_callback_ = {};
+        control(*overlay, restart_key);
+        CHECK_FALSE(overlay->was_restart_requested());
+        REQUIRE(overlay->handle_control_input(release));
+        control(*overlay, restart_key);
+        CHECK(overlay->was_instant_restart_requested());
+    }
+
+    static void check_instant_restart_input_queues() {
+        for (bool replay : {false, true}) {
+            auto session = pause_fixture();
+            session->instant_restart_keycode_ = 123;
+            session->replay_playback_enabled_ = replay;
+            session->rebuild_polled_gameplay_keys();
+            CHECK(std::any_of(session->polled_gameplay_keys_.begin(), session->polled_gameplay_keys_.end(),
+                              [](const auto& key) { return key.keycode == 123; }));
+            input::InputEvent press{};
+            press.keycode = 123;
+            press.state = input::InputState::Pressed;
+            press.input_time_ns = timing::HighResClock::now_ns();
+            REQUIRE(session->input_thread_.queue().push(press));
+            session->process_input_queue(48000, 48480, 0);
+            CHECK(session->was_instant_restart_requested());
+            CHECK(session->engine_->replay().events.empty());
+            session->shutdown();
+            CHECK_FALSE(session->result().has_value);
+        }
+        // Ordinary pause Retry remains distinct from the immediate shortcut.
+        auto pause = pause_fixture();
+        control(*pause, 27);
+        control(*pause, 40);
+        control(*pause, 13);
+        CHECK(pause->was_restart_requested());
+        CHECK_FALSE(pause->was_instant_restart_requested());
+    }
+
+    static void check_pause_countdown(uint32_t resume_key, bool skip_start = false) {
+        auto session = pause_fixture();
+        session->config_.ui.skip_start_countdown = skip_start;
         control(*session, 27);
         CHECK(session->paused_.load());
         paused_buffer(*session, 48000, 0);
@@ -1840,8 +2064,22 @@ TEST_CASE("audio preparation preserves replay chart duration and publishes termi
     tenriff::app::GameSessionAudioTestAccess::check_audio_preparation();
 }
 
+TEST_CASE("reduced keysounds match complete source PCM through real decode scheduling gain and rate mixing") {
+    tenriff::app::GameSessionAudioTestAccess::check_reduced_keysound_pcm_render();
+}
+
 TEST_CASE("pause Continue and Esc keep audio and judgement frozen for a full three second countdown") {
-    for (uint32_t key : {13u, 27u}) tenriff::app::GameSessionAudioTestAccess::check_pause_countdown(key);
+    for (bool skip_start : {false, true})
+        for (uint32_t key : {13u, 27u})
+            tenriff::app::GameSessionAudioTestAccess::check_pause_countdown(key, skip_start);
+}
+
+TEST_CASE("instant restart requires active solo released control and never exports the abandoned attempt") {
+    tenriff::app::GameSessionAudioTestAccess::check_instant_restart_guards();
+}
+
+TEST_CASE("instant restart reaches live and replay input queues without creating lane events") {
+    tenriff::app::GameSessionAudioTestAccess::check_instant_restart_input_queues();
 }
 
 TEST_CASE("Esc cancels a resume countdown without advancing the chart") {

@@ -188,6 +188,7 @@ public:
         std::string player_name;
         gameplay::ResultStats stats;
         std::vector<std::string> mods;
+        int long_note_mix_version = 1;
         double rate_multiplier = 1.0;
         double score_multiplier = 1.0;
         int64_t final_score = 0;
@@ -215,6 +216,7 @@ public:
     void set_control_input_callback(ControlInputCallback callback);
     void set_practice_no_fail_override(bool enabled) { practice_no_fail_override_ = enabled; }
     void set_practice_start_seconds(double seconds) { practice_start_seconds_ = std::max(0.0, seconds); }
+    void set_instant_restart_start(bool enabled) { instant_restart_start_ = enabled; }
     void set_peer_battle_mode(bool enabled, uint32_t rate_milli = 1000) {
         peer_battle_mode_ = enabled;
         peer_battle_rate_milli_ = rate_milli;
@@ -236,6 +238,9 @@ public:
     [[nodiscard]] const std::string& audio_error() const { return audio_error_message_; }
     [[nodiscard]] bool was_restart_requested() const {
         return restart_requested_.load(std::memory_order_acquire);
+    }
+    [[nodiscard]] bool was_instant_restart_requested() const {
+        return instant_restart_requested_.load(std::memory_order_acquire);
     }
     [[nodiscard]] bool was_exit_requested() const {
         return exit_requested_.load(std::memory_order_acquire);
@@ -315,6 +320,7 @@ private:
         int64_t start_sample = 0;
         std::size_t asset_id = 0;
         Kind kind = Kind::Bgm;
+        float gain = 1.0f;
     };
 
     struct ChartAudioVoice {
@@ -456,6 +462,7 @@ private:
     uint64_t riff_map_revision_ = 0;
     double chart_base_bpm_ = 0.0;
     std::vector<std::string> active_mods_{};
+    int long_note_mix_version_ = 2;
     double rate_multiplier_ = 1.0;
     double score_multiplier_ = 1.0;
     gameplay::ReplayFile replay_source_{};
@@ -504,6 +511,10 @@ private:
     std::atomic<bool> pause_resume_requested_{false};
     std::atomic<int> resume_countdown_value_{0};
     std::atomic<bool> restart_requested_{false};
+    std::atomic<bool> instant_restart_requested_{false};
+    bool instant_restart_start_ = false;
+    bool instant_restart_key_armed_ = true;
+    uint32_t instant_restart_keycode_ = 0;
     std::atomic<bool> exit_requested_{false};
     std::atomic<int> pause_menu_cursor_{0};
     std::atomic<int64_t> last_audio_sample_{0};
@@ -567,7 +578,7 @@ private:
     int64_t hispeed_decrease_next_repeat_ns_ = 0;
     int64_t hispeed_increase_next_repeat_ns_ = 0;
     int64_t result_transition_sample_ = 0;
-    bool gameplay_started_ = false;
+    std::atomic<bool> gameplay_started_{false};
     bool result_transition_pending_ = false;
     bool peer_battle_mode_ = false;
     uint32_t peer_battle_rate_milli_ = 1000;

@@ -6,6 +6,7 @@
 #include "app/ChartAudioStreaming.h"
 #include "app/ChartFileHash.h"
 #include "app/GameplayCompletionFlow.h"
+#include "app/GameplayStartPolicy.h"
 #include "app/MemoryDiagnostics.h"
 #include "audio/OggVorbisDecoder.h"
 

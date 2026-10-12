@@ -291,8 +291,10 @@ void MenuApp::populate_mode_mods_render_data(render::MenuRenderData& render) {
     render.generic.notes.push_back(ui_text("Final score uses the lowest multiplier between active mods and the current Rate.",
                                            "최종 점수는 활성 모드와 현재 Rate 중 더 낮은 배율을 사용합니다."));
     render.generic.notes.push_back(ui_text(
-        "LN Mix lengths use 60% long (1/8), 20% medium (1/16), and 20% short (alternating 1/24-1/32) notes. Random Seed keeps the result deterministic.",
-        "LN Mix 길이는 긴 8비트 60%, 중간 16비트 20%, 짧은 24~32비트 20%로 배분합니다. Random Seed로 같은 결과를 재현합니다."));
+        "LN Mix targets 60% long (2/4 beats), 20% medium (1 beat), and 20% short (1/4-1/2 beat). Same-lane space can shorten holds; Random Seed reproduces the mix.",
+        "LN Mix는 긴 2·4박 60%, 중간 1박 20%, 짧은 1/4·1/2박 20%를 목표로 합니다. 같은 레인의 여유에 따라 짧아지며 Random Seed로 재현합니다."));
+    render.generic.notes.push_back(ui_text("Long LN Mix: local history only; separate from legacy bests and online boards.",
+        "긴 LN 믹스: 로컬 기록에 저장하며 이전 최고 기록·온라인 순위와 분리합니다."));
     render.generic.notes.push_back(ui_text("Current: ", "현재: ") + mode_score_summary(config_.mode.mods, config_.speed.rate));
     render.generic.notes.push_back(ui_text(
         "Judge Easy widens PG/GR/GD by 35%. Judge Hard uses EASY PG/GR/GD 17.5/55.714/98.571 ms, scaled by BMS RANK.",

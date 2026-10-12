@@ -43,6 +43,32 @@ TEST_CASE("skin stable identifiers map across the optional LR2 row") {
     CHECK_FALSE(tenriff::app::menu::settings::skin_setting_index(SkinSettingsRowId::Lr2Resolution, false).has_value());
 }
 
+TEST_CASE("skin direct lane selection preserves the active editor row and config while rejecting absent lanes") {
+    tenriff::config::RuntimeConfig runtime;
+    SkinSettingsController controller;
+    controller.reset("16k");
+    static_cast<void>(controller.select(SkinSettingsRowId::LaneWidth, false));
+    for (int lane = 1; lane <= 16; ++lane) {
+        const auto effects = controller.select_lane(lane);
+        CHECK(controller.edit_lane() == lane - 1);
+        CHECK(controller.selected_id() == SkinSettingsRowId::LaneWidth);
+        CHECK_FALSE(controller.dirty());
+        CHECK_FALSE(effects.menu.persist_config);
+        CHECK_FALSE(effects.increment_skin_revision);
+    }
+    CHECK(controller.select_lane(0).empty());
+    CHECK(controller.select_lane(17).empty());
+    CHECK(controller.edit_lane() == 15);
+    controller.reset("4k");
+    CHECK(controller.select_lane(5).empty());
+    CHECK(controller.select_lane(10).empty());
+    CHECK(controller.edit_lane() == 0);
+    static_cast<void>(controller.select(SkinSettingsRowId::TargetLane, false));
+    static_cast<void>(controller.handle(MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames));
+    CHECK(controller.edit_lane() == 3);
+    CHECK_FALSE(controller.dirty());
+}
+
 TEST_CASE("skin HUD layout switches both directions and persists through the standard settings path") {
     tenriff::config::RuntimeConfig runtime;
     SkinSettingsController controller;

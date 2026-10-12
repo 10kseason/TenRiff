@@ -1,5 +1,7 @@
 # TenRiff Config Schema (current)
 
+**1.8.8:** 結果分析、ウィンドウの自由なサイズ変更と幅・高さの直接入力、結果画面の `F9` PNG 保存案内、長い LN Mix、メニュー・キー音・開始操作の改善を含みます。現在の検証・配布状況は[リリース案内（韓国語）](release-1.8.8-gate.md)を参照してください。ユーザーの固定基準は 1.8.7 のままで、既存のタグ・配布ファイルを保持します。
+
 確認元: [Config.h](../src/config/Config.h)、[Config.cpp](../src/config/Config.cpp)、[既定 JSON](../config/config.json)、[キーマップ](../src/config/Keymap.cpp)。省略値にはコード既定値を使い、以下の範囲は読込・保存時の正規化規則です。
 
 この文書は、`config/config.json`、`profiles/<name>/config.json`、`profiles/<name>/keymap.json` を基準に、現在実際に有効な設定構造をまとめたものです。
@@ -124,12 +126,14 @@ Gauge Shift は常に有効です。`mode.gauge` の `ex_hard / hard / normal / 
 - `display_mode` (string)
   - `borderless | windowed | fullscreen`
   - 既定値は `borderless`。Discord、OBS、Game Bar などの外部 overlay にもこの mode を推奨
-  - `windowed` はタイトルバー付き固定サイズウィンドウ
+  - `windowed` はタイトルバー付きで、移動と枠のドラッグによるサイズ変更が可能。ドラッグ終了時の実clientサイズをプロファイルへ保存し、最大化・復元・プログラム側の変更では選択値を上書きしない
   - `fullscreen` は DXGI exclusive fullscreen のため、現在の Discord Game Overlay は表示されない
 - `resolution` (string)
   - `native`、従来の別名 `720p | 1080p | qhd`、または `幅x高さ`（例: `1600x900`, `1366x768`, `1280x800`, `3440x1440`）。各軸は320–8192px。
   - グラフィック設定では一般的なサイズと現在のモニターの表示モードを選択できます。`F5`で一覧を更新。手動指定したサイズも保存・再起動後に保持します。
-  - 1920×1080の画面比率を維持し、異なる比率では余白を表示。ウィンドウはタイトルバーとタスクバーの作業領域に収まるよう比例縮小します。
+  - 解像度の`+/-`はプリセットを切替。`Enter`または値のクリックで幅/高さの編集を開き、キーボード上段の数字・テンキーで入力。`Tab`・方向キーで項目切替、`Enter`適用、`Esc`取消、`Backspace`削除、`Delete`項目消去。各軸は320–8192の整数で、空欄・範囲外はエラーを表示して設定を維持。ほかの文字・貼り付け・IME入力は使いません。
+  - 内容とクリック座標は1920×1080比率を維持し、異なるウィンドウ比率には余白を表示。大きすぎる指定値は保存したまま実ウィンドウを作業領域に収めます。通常は比例縮小ですが、実clientの各軸320px以上という下限により極端なウィンドウ比率は変わる場合があります。
+  - 独占全画面が要求サイズに非対応ならウィンドウへ復帰し、実際のサイズ/モードを保存。既存のプロファイルトークンと既定値は維持。[新候補の実ウィンドウ・切替・保存検証（韓国語）](release-conditions-1.8.8.ko.md#창-크기와-직접-해상도-입력)を参照してください。
   - スキン設定は実際のゲーム描画を同じ比率で縮小し、フィールド移動、レーン・ノート・ギアのサイズ、判定・コンボ位置とスキンのフォントを反映します。
 - `vsync` (bool)
 - `refresh_hz` (int)
@@ -186,8 +190,10 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
   - RR/SR、強制 key-mode 変換、LN Mix 対象選択の固定 seed。通常 Random は play ごとに新しい session seed を生成し、実際の値を replay に記録
 - `mods` (string array)
   - Note Structure では `full_long_notes`、`ln_mix_10`～`ln_mix_90`、`full_short_notes` のいずれか一つを選択できる
-  - LN Mix は base BPM 基準の 1/8-note hold が次の同一 lane note より 50ms 以上前に終わる tap のみを候補にし、選択した hold の長さを長い 1/8-note 60% / 中間 1/16-note 20% / 短い 1/24・1/32-note 20% に配分する
-  - 既存 hold は維持され、同じ lane の既存 span と重なる head は除外され、同じ `random_seed` では同じ tap が選択される
+  - 新しい LN Mix v2 は base BPM×Rate を基準に、長い2・4拍60% / 中間1拍20% / 短い1/4・1/2拍20%を目標に配分。他レーンの単ノート・短いLNを保ち、同じレーンの連打は結合しない
+  - 次の同一レーンの開始まで50msの余裕と最低1/2拍の長さを確保できる単ノートが候補。目標が収まらなければ4→2→1→1/2→1/4拍の順に短縮するため、高密度譜面の実際の長いLN比率は目標を下回る場合がある
+  - 既存LN/CNと元の開始位置・キー音を維持し、同一レーンの既存区間と重なる開始は除外。同じ譜面・`random_seed`・Rate・変換版で同じ結果を再現
+  - 変換版のない旧リプレイはv1として従来の8・16・24・32分音符の方針を維持。新v2はローカル記録・リプレイのみで、従来の譜面単位BESTとSites送信から除外。[長さ・互換性・検証状況（韓国語）](release-conditions-1.8.8.ko.md#ln-mix의-요구-의미)を参照
 - `ghost_battle_enabled` (bool)
   - 既定値は `false`
   - `true` のとき、選択譜面の互換性ある best replay を自動ロードして ghost 比較を行う
@@ -227,6 +233,10 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 
 ### `ui`
 
+`ui.skip_start_countdown` と `ui.instant_restart_key` はプロファイルと `.trprofile` 書き出しに保存する本体の機能です。省略するのは読み込み後の初期 `3 / 2 / 1` 表示だけで、音声の準備、既存の譜面前の3秒の余白、判定時刻は維持します。一時停止からの再開は常に3秒のカウントダウンを維持します。マルチでは初期カウントダウンを強制し、即時再開始を無効化します。セッションミックスでも即時再開始は無効です。一時停止中・初期カウントダウン中には作動せず、再度使うにはキーを離してから押します。レーン・予約キーとの競合やエディター練習の開始位置は[開始・再開始の案内（韓国語）](gameplay-start-controls.ko.md)を参照してください。
+
+これらの設定は Sites への記録送信方針を変更しません。長い LN Mix v2 の従来 BEST・Sites からの除外は別の変換方針です。[プラグイン実行環境・API・SDK は今後の計画（韓国語）](result-analysis-1.8.8.ko.md)です。
+
 `last_played_chart_path` は最後にプレイを開始した譜面のローカルパスです。既定値は空文字列。リプレイ・エディター練習では更新せず、再起動後も `title_music=last_played` で使用します。
 
 | 項目 | 型・範囲・既定値 | 動作 |
@@ -235,6 +245,8 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | `profile_avatar_path` | string; UTF-8 ≤2048 bytes | ローカル PNG/JPG アバターのパス。 |
 | `language` | `en`, `ko`, `ja`; `en` | UI 言語。不正値は en に正規化。 |
 | `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | プロファイル・初回設定のメニュー文字サイズ（100%・115%・130%）。プレイ中の文字サイズはスキン設定を維持。 |
+| `skip_start_countdown` | bool; `false` | ソロプレイ開始時の `3 / 2 / 1` 表示を省略。通常の開始、メニューからの再開始、結果画面からの再試行に適用。 |
+| `instant_restart_key` | string; `""`（未割当） | 進行中のソロ譜面を最初から再開始するキー名。新しい試行では初期カウントダウンを常に省略し、中断した試行の結果・リプレイは保存しない。 |
 | `all_song_sources` | bool; `false` | 登録フォルダーを統合する ALL SONG を復元。同一チャートパスの重複を除外。 |
 | `result_tail_ms` | double; `500` ms | 判定完了後の結果遷移の追加待機時間。`audio.play_to_end=true` の場合は譜面音声の終了時刻も考慮します。 |
 | `require_enter_to_exit` | bool; `true` | 読込・保存互換用。現在の Windows 結果入力経路はこの値で自動終了しません。 |
@@ -246,7 +258,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | `collections` | object: name → string[] | 名前付きコレクションごとの譜面キー。 |
 | `song_collection_filter` | string; `all` | 全譜面・お気に入り・コレクションのフィルター。即時保存。 |
 | `song_key_filter` | int: `0..16`; `0` | キー数フィルター。0 は全件。UI は 4K–10K、12K、14K、16K。 |
-| `song_level_min_filter`, `song_level_max_filter` | int: `0..50`; `0` | 難易度の境界。0 はその境界を無効化。 |
+| `song_level_min_filter`, `song_level_max_filter` | int: `0..50`; `0` | 難易度の境界。0 はその境界を無効化。外部表の選択中は表の表示数値レベルを使用し、境界が有効な場合は非数値ラベルを除外。標準 LV は従来の内蔵レベルを使用。[数値・接頭辞の扱い（韓国語）](release-feedback-1.8.8.ko.md#선택한-난이도표-기준의-최소최대-필터)を参照。 |
 | `difficulty_table_path` | string | ローカル header JSON または取得済みキャッシュ。表の選択は safe 索引へ切替。標準 LV はパスと有効なキャッシュの表情報を除去。 |
 | `difficulty_table_url` | string | 元の HTTP(S) BMSTable ページ/header URL。meta を解決し header/data をキャッシュ。ローカル JSON 選択時は空にする。 |
 | `online_records_server_url` | string | 記録・ランキング・チャット API URL。失敗してもローカルプレイ・記録は維持。 |

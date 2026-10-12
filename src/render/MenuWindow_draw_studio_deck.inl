@@ -45,15 +45,15 @@
             draw_full_song_title(studio_fonts.studio_title.Get(), song_title_rect, d2d_->text_brush.Get(), true);
             d2d_->text_brush->SetColor(saved_title_color);
             studio_text(c.artist_text, studio_fonts.studio_body.Get(),
-                D2D1::RectF(deck.left_x, 90, deck.left_x + deck.left_width, 111), ng_color("body", D2D1::ColorF(0x7C889B)));
+                D2D1::RectF(deck.left_x, 94, deck.left_x + deck.left_width, 121), ng_color("body", D2D1::ColorF(0x7C889B)));
             const float cell_width = (deck.left_width - 12.0f) / 3.0f;
             for (int i = 0; i < 6; ++i) {
                 const float x = deck.left_x + (i % 3) * (cell_width + 6.0f) + 9.0f;
                 const float y = 135.0f + (i / 3) * 62.0f;
                 studio_text(c.studio_setting_labels[i], studio_fonts.studio_label.Get(),
-                    D2D1::RectF(x, y, x + cell_width - 18.0f, y + 16), muted);
+                    D2D1::RectF(x, y, x + cell_width - 18.0f, y + 21), muted);
                 studio_text(c.studio_setting_values[i], studio_fonts.studio_numbers[4].Get(),
-                    D2D1::RectF(x, y + 19, x + cell_width - 18.0f, y + 43), D2D1::ColorF(0xDDE3EB));
+                    D2D1::RectF(x, y + 23, x + cell_width - 18.0f, y + 51), D2D1::ColorF(0xDDE3EB));
             }
             if (deck.map_visible) {
                 const float progress = data.gameplay.duration_samples > 0 ? static_cast<float>(std::clamp(
@@ -90,19 +90,19 @@
             const float x = deck.right_x, right = x + deck.right_width;
             static const std::wstring score_label = L"SCORE";
             studio_text(score_label, studio_fonts.studio_numbers[1].Get(), D2D1::RectF(x, 48, right, 68), muted, DWRITE_TEXT_ALIGNMENT_LEADING, 3);
-            const auto score_rect = D2D1::RectF(x, 70, right, 124);
+            const auto score_rect = D2D1::RectF(x, 70, right, 140);
             studio_text(c.studio_score_padded, studio_fonts.studio_score.Get(), score_rect, D2D1::ColorF(0x232A35), DWRITE_TEXT_ALIGNMENT_TRAILING);
             studio_text(c.studio_score_significant, studio_fonts.studio_score.Get(), score_rect, ng_color("score", D2D1::ColorF(0xF4F7FB)), DWRITE_TEXT_ALIGNMENT_TRAILING);
-            float y = 130;
+            float y = 148;
             if (data.gameplay.pacemaker_mode != "off" && !data.gameplay.pacemaker_mode.empty()) {
-                studio_text(c.studio_pace, studio_fonts.studio_numbers[3].Get(), D2D1::RectF(x, y, right, y + 22),
+                studio_text(c.studio_pace, studio_fonts.studio_numbers[3].Get(), D2D1::RectF(x, y, right, y + 27),
                     D2D1::ColorF(data.gameplay.pacemaker_delta < 0 ? 0xFF6B78 : 0x66E6B0));
                 y += 28;
             }
             y += 14;
-            studio_text(c.studio_accuracy, studio_fonts.studio_accuracy.Get(), D2D1::RectF(x, y, right, y + 36), d2d_->accent_brush->GetColor());
-            studio_text(c.studio_detail, studio_fonts.studio_numbers[3].Get(), D2D1::RectF(x, y + 40, right, y + 62), muted);
-            y += 80;
+            studio_text(c.studio_accuracy, studio_fonts.studio_accuracy.Get(), D2D1::RectF(x, y, right, y + 46), d2d_->accent_brush->GetColor());
+            studio_text(c.studio_detail, studio_fonts.studio_numbers[3].Get(), D2D1::RectF(x, y + 50, right, y + 78), muted);
+            y += 94;
             auto* fill = d2d_->note_fill_brush.Get(); const auto saved = fill->GetColor();
             fill->SetColor(D2D1::ColorF(0x12161E));
             ctx->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(x, y, right, y + 8), 4, 4), fill);
@@ -121,15 +121,15 @@
             // Fit complete name/count pairs, wrapping on pair boundaries.
             float cursor = x;
             for (std::size_t i = 0; i < 5; ++i) {
-                const float name_width = static_cast<float>(labels[i].size()) * 9.0f;
-                const float count_width = static_cast<float>(c.studio_judge_counts[i].size()) * 9.0f;
+                const float name_width = static_cast<float>(labels[i].size()) * 12.0f;
+                const float count_width = static_cast<float>(c.studio_judge_counts[i].size()) * 12.0f;
                 const float width = name_width + count_width + 18.0f;
-                if (cursor > x && cursor + width > right) { cursor = x; y += 24; }
-                studio_text(labels[i], studio_fonts.studio_numbers[3].Get(), D2D1::RectF(cursor, y, cursor + name_width, y + 22), ng_judge_color(tokens[i]));
-                studio_text(c.studio_judge_counts[i], studio_fonts.studio_numbers[3].Get(), D2D1::RectF(cursor + name_width + 5, y, cursor + width, y + 22), D2D1::ColorF(0x8A96A8));
+                if (cursor > x && cursor + width > right) { cursor = x; y += 29; }
+                studio_text(labels[i], studio_fonts.studio_numbers[3].Get(), D2D1::RectF(cursor, y, cursor + name_width, y + 27), ng_judge_color(tokens[i]));
+                studio_text(c.studio_judge_counts[i], studio_fonts.studio_numbers[3].Get(), D2D1::RectF(cursor + name_width + 5, y, cursor + width, y + 27), D2D1::ColorF(0x8A96A8));
                 cursor += width;
             }
-            studio_text(c.studio_max, studio_fonts.studio_numbers[2].Get(), D2D1::RectF(x, y + 34, right, y + 56), muted);
+            studio_text(c.studio_max, studio_fonts.studio_numbers[2].Get(), D2D1::RectF(x, y + 36, right, y + 62), muted);
         };
         auto draw_studio_rails = [&] {
             const auto& field = surface_layout.player_field;
@@ -147,7 +147,7 @@
             const float x = field.right + 14, y = gameplay_studio_gauge_marker_y(hit, ratio);
             ctx->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(x, y, x + 62, y + 27), 6, 6), fill);
             fill->SetColor(saved);
-            studio_text(scene_hud_cache.gauge_value_text, studio_fonts.studio_numbers[4].Get(), D2D1::RectF(x + 8, y + 2, x + 54, y + 26), D2D1::ColorF(0x0A0C10), DWRITE_TEXT_ALIGNMENT_CENTER);
+            studio_text(scene_hud_cache.gauge_value_text, studio_fonts.studio_numbers[4].Get(), D2D1::RectF(x + 4, y, x + 58, y + 27), D2D1::ColorF(0x0A0C10), DWRITE_TEXT_ALIGNMENT_CENTER);
             studio_text(scene_hud_cache.studio_gauge_name, studio_fonts.studio_numbers[0].Get(), D2D1::RectF(x, y + 30, x + 86, y + 48), color, DWRITE_TEXT_ALIGNMENT_LEADING, 2);
         };
         auto draw_studio_combo = [&](const GameplayFieldLayout& field, const std::wstring& value,

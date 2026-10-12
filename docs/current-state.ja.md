@@ -2,6 +2,10 @@
 
 **固定基準: [1.8.7](baseline-1.8.7.ja.md)**（2026-10-10）。Git tag `1.8.7`、commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347` を使い、`latest` や新しいリリースに合わせて自動変更しません。
 
+**2026-10-12 · 1.8.8:** 結果分析、自由なウィンドウサイズとF9 PNG案内、長いLN Mixに加え、表示の読みやすさ、難易度表URL・フィルター、スキンのレーンショートカット、キー数削減時のキー音保全、ソロ開始・即時再試行を改善します。現在の検証・パッケージ・公開状況は[1.8.8リリース案内](release-1.8.8-gate.md)を参照してください。固定基準は1.8.7を維持します。
+
+**分析と拡張計画:** レーン別分布・時間帯別精度・単ノート/LN開始・離鍵・維持失敗を区別し、測定不能のミスを0ms標本にしません。長いLN Mix v2はローカル記録・リプレイ専用で、従来BEST・Sites送信から除外します。プラグインと1.9.0安定化は計画です。[分析基準](result-analysis-1.8.8.ko.md)、[画面・メニュー・キー音](release-feedback-1.8.8.ko.md)、[開始・再試行操作](gameplay-start-controls.ko.md)（韓国語）。
+
 **2026-10-09 · TenRiff 1.8.7:** 入力補正と読み込み時の音声処理を改善し、LR2ソロのスタジオデッキ、750msのFAST/SLOW表示、キー再割り当て、設定統合と曲名の自動サイズ調整を追加します。 [1.8.7 release](release-1.8.7-gate.md).
 
 **2026-10-08 · TenRiff 1.8.6:** Nativeソロプレイ用のスタジオデッキHUDを追加。左右のShiftをプレイキーに設定でき、F5/F6でHi-Speedを半分/2倍、F11でチャットを開きます。クラシックHUDも選択できます。 [1.8.6 release](release-1.8.6-gate.md).
@@ -23,7 +27,7 @@
 - 1.7.10 は ALL SONG の削除済みキャッシュ項目、統合進捗、完了状態の通知を改善します。[検証と未再現の症状](release-1.7.10-gate.md)。
 - 1.7.8 は新しい標準メニュー、4〜16キー対応 Luma Keys、日本語 UI とウェブ/オフラインスキン編集を追加します。メニューとゲームプレイの設定は `native` と `gameplay.native` に分けます。[検証範囲](release-1.7.8-gate.md)。
 
-現在のプロジェクト版は **1.8.7** です。Audioの曲終了方式で**最後まで聴く**（既定）か**後奏スキップ**を選べ、正常終了した結果は追加入力なしで保存・送信します。新しいプレイはBMS RANK対応のR4判定とウェブ送信用の判定プロファイルを使い、既存のR1/R2/R3記録は維持します。既定の出力はWASAPIです。変更内容、完了したリリース検証と残る制限は[1.8.7リリース案内](release-1.8.7-gate.md)を参照してください。
+固定基準は **1.8.7**、このソースのバージョンは **1.8.8** です。Audioの曲終了方式で**最後まで聴く**（既定）か**後奏スキップ**を選べ、正常終了した結果は追加入力なしで保存・送信します。新しいプレイはBMS RANK対応のR4判定とウェブ送信用の判定プロファイルを使い、既存のR1/R2/R3記録は維持します。既定の出力はWASAPIです。今回の検証状況と残る制限は[1.8.8リリース案内](release-1.8.8-gate.md)を参照してください。
 
 [ローカル 1.7.1 r2 レポート](local-1.7.1-r2.ko.md)の 749/739 件は以前のビルドの記録です。新リリースの結果として再利用しません。[曲管理](library-management.md)、[基準 BPM](reference-bpm.md)、[スキンプリセット](skin-presets.md)、[ASIO](asio-audio.md)を参照してください。
 
@@ -135,7 +139,7 @@
   - BMS の LV/CR 計算では long-note Head/Tail の miss-ms だけを 0.5倍で評価し、`300ms`を`150ms`として緩和する。実際の gameplay 判定 window は変更しない
 - Lane transform:
   - Random は `Off / Mirror / Random (Scratch Fixed) / SR` に対応。通常 Random は scratch を固定し、play ごとに新しい key-lane 配置を生成して実際の seed を replay に記録
-  - Mod Manager の `LN Mix 10%～90%` は既存 hold を維持し、同じ lane の既存 span と重なる head を除外する。base BPM 基準の 1/8-note hold が次の同一 lane note より 50ms 以上前に終わる tap から設定割合を `Random Seed` で選び、すべての Mix 段階で長い 1/8-note 60% / 中間 1/16-note 20% / 短い 1/24・1/32-note 20% に配分する
+  - 新しい `LN Mix 10%～90%` v2はbase BPM×Rate基準で長い2・4拍60% / 中間1拍20% / 短い1/4・1/2拍20%を目標に混合。既存LN・元の開始位置とキー音を維持し、同一レーンの次の開始まで50msを確保。空間不足では長さを段階的に下げ、連打は結合しない。旧リプレイはv1で再現し、v2はローカル記録・リプレイのみで従来BEST・Sites送信から除外。[追加条件と検証（韓国語）](release-1.8.8-gate.md)を参照
 - Skins / gameplay feel:
   - 標準 `10+2 DP` chart は scratch 2 lane を除く実際の 10 key に `10K` lane-color palette を順番に適用し、native 12K palette とは独立して保持
   - `rect / triangle / pentagon / hexagon / circle` note shape。procedural 円・多角形は 100% で rect bar と同じ全幅を使用
@@ -179,7 +183,8 @@
   - R3では通常LNと`#LNMODE 2` CNを早く離しすぎると即座にBAD・コンボ切れ・ゲージ減少が確定し、再入力で取り消せない。通常LNの保持による自動完了とCNの末尾解放判定は維持
   - 2 台のキーボードが同じキーを押しても、最後の入力ソースが離すまで論理 `Pressed` は維持される
 - Graphics:
-  - resolution presets (`720p`, `1080p`, `qhd`, `native`)
+  - 従来の解像度プリセット、幅/高さの直接入力（各320–8192）、枠のドラッグによる自由なサイズ変更。16:9の内容比率・余白・クリック座標を維持し、ドラッグ終了サイズを保存。[操作と復帰条件](config.ja.md#graphics)を参照
+  - ソロ結果の概要・分析タブ・マルチ結果の下部に小さな `F9` PNG / `screenshots/` 案内を表示。現在の作業フォルダー配下へ保存し、今回の実際の保存確認は[追加リリース検証（韓国語）](release-1.8.8-gate.md)で別途扱う
   - `refresh_hz` (`-1` = `Match Display`、`0` = `Unlimited`、実際の上限は 1500 FPS)
   - VSync off: Match Display は monitor Hz に従い、Unlimited は gameplay を 1500 FPS に制限しつつ menu cap `300` を維持
   - VSync on: present refresh は active monitor Hz に追従し、render pacing は `monitor_hz * 2` を目標にする（`1050` clamp）

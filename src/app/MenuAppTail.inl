@@ -1041,6 +1041,19 @@ void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
     append_menu_row(render.generic, ui_text("Import All Settings", "전체 설정 가져오기"), ".trprofile",
                     settings_cursor_ == profile_setup::kImportSettingsRow, render::MenuHitTargetKind::SettingsRow,
                     profile_setup::kImportSettingsRow, true, false);
+    append_menu_row(render.generic, ui_text("Skip Start Countdown", "시작 카운트다운 생략"),
+                    config_.ui.skip_start_countdown ? ui_text("On", "켜짐") : ui_text("Off", "꺼짐"),
+                    settings_cursor_ == profile_setup::kSkipStartCountdownRow, render::MenuHitTargetKind::SettingsRow,
+                    profile_setup::kSkipStartCountdownRow, false, true);
+    append_menu_row(render.generic, ui_text("Instant Restart Key", "즉시 재시작 키"),
+                    profile_restart_key_capture_active_
+                        ? (profile_restart_key_status_.empty()
+                            ? ui_text("Press a key (Esc cancels, Delete clears)", "키 입력 (Esc 취소, Delete 해제)")
+                            : profile_restart_key_status_)
+                        : (config_.ui.instant_restart_key.empty() ? ui_text("Unassigned", "미지정")
+                                                                  : config_.ui.instant_restart_key),
+                    settings_cursor_ == profile_setup::kInstantRestartKeyRow, render::MenuHitTargetKind::SettingsRow,
+                    profile_setup::kInstantRestartKeyRow, true, false);
     append_menu_row(render.generic,
                     first_run ? ui_text("Continue to Song Select", "곡 선택으로 계속")
                               : ui_text("Done", "완료"),
@@ -1130,6 +1143,15 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     render.result.profile_avatar_path = config_.ui.profile_avatar_path;
     render.result.presentation_start_ns = result_presentation_start_ns_;
     render.result.presentation_skipped = result_presentation_skipped_;
+    render.result.analysis = last_result_.analysis;
+    render.result.analysis_page = result_analysis_page_;
+    render.result.analysis_lane_bank = result_analysis_lane_bank_;
+    render.result.analysis_mods = mode_mod_summary(last_result_mods_);
+    if (mode_mod_long_note_mix(last_result_mods_)) {
+        render.result.analysis_mods += last_result_long_note_mix_version_ == 1
+            ? ui_text(" / Legacy LN Mix", " / 이전 LN 믹스")
+            : ui_text(" / Long LN Mix", " / 긴 LN 믹스");
+    }
     render.result.profile =
         last_result_player_name_.empty() ? profile_display_name() : last_result_player_name_;
     if (session_mix_active_ && session_mix_cursor_ < session_mix_plan_.entries.size()) {
@@ -1238,8 +1260,8 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
         last_result_.counts.pg == judged && last_result_.counts.gr == 0 &&
         last_result_.counts.gd == 0 && last_result_.counts.bd == 0 &&
         last_result_.counts.pr == 0;
-    render.result.mean_delta_ms = last_result_.mean_delta_ms;
-    render.result.stddev_delta_ms = last_result_.stddev_delta_ms();
+    render.result.mean_delta_ms = last_result_.analysis.available ? last_result_.analysis.total.mean_delta_ms : last_result_.mean_delta_ms;
+    render.result.stddev_delta_ms = last_result_.analysis.available ? last_result_.analysis.total.stddev_delta_ms() : last_result_.stddev_delta_ms();
     render.result.fast_count = last_result_.negative_delta_count;
     render.result.slow_count = last_result_.positive_delta_count;
     render.result.shift_count = static_cast<int>(last_result_.shifts.size());
@@ -1261,21 +1283,21 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     const int signed_delta_count = positive_delta_count + negative_delta_count;
     int timing_guidance_direction = 0;
     if (signed_delta_count >= kResultTimingGuidanceMinSignedSamples &&
-        std::abs(last_result_.mean_delta_ms) >= kResultTimingGuidanceMinMeanMs) {
+        std::abs(render.result.mean_delta_ms) >= kResultTimingGuidanceMinMeanMs) {
         const int dominant_count = (std::max)(positive_delta_count, negative_delta_count);
         if (dominant_count * kResultTimingGuidanceDominantDenominator >=
             signed_delta_count * kResultTimingGuidanceDominantNumerator) {
-            if (positive_delta_count > negative_delta_count && last_result_.mean_delta_ms >= 0.0) {
+            if (positive_delta_count > negative_delta_count && render.result.mean_delta_ms >= 0.0) {
                 timing_guidance_direction = 1;
-            } else if (negative_delta_count > positive_delta_count && last_result_.mean_delta_ms <= 0.0) {
+            } else if (negative_delta_count > positive_delta_count && render.result.mean_delta_ms <= 0.0) {
                 timing_guidance_direction = -1;
             }
         }
     }
     if (timing_guidance_direction == 0 &&
-        judged >= kResultTimingGuidanceMinSignedSamples &&
-        std::abs(last_result_.mean_delta_ms) >= kResultTimingGuidanceFallbackMeanMs) {
-        timing_guidance_direction = (last_result_.mean_delta_ms > 0.0) ? 1 : -1;
+        (last_result_.analysis.available ? last_result_.analysis.total.measured_count : static_cast<uint64_t>(judged)) >= kResultTimingGuidanceMinSignedSamples &&
+        std::abs(render.result.mean_delta_ms) >= kResultTimingGuidanceFallbackMeanMs) {
+        timing_guidance_direction = (render.result.mean_delta_ms > 0.0) ? 1 : -1;
     }
     render.result.timing_guidance_visible = timing_guidance_direction != 0;
     render.result.timing_guidance_direction = timing_guidance_direction;
@@ -1283,7 +1305,7 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
         const std::string bias_summary =
             (signed_delta_count > 0)
                 ? ("+" + std::to_string(positive_delta_count) + " / -" + std::to_string(negative_delta_count))
-                : format_signed_offset_ms(last_result_.mean_delta_ms);
+                : format_signed_offset_ms(render.result.mean_delta_ms);
         if (timing_guidance_direction > 0) {
             render.result.timing_guidance_title =
                 ui_text("Timing Advice ", "타이밍 알림 ") + "(" + bias_summary + ")";
@@ -1349,8 +1371,12 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     if (last_result_rate_multiplier_ != 1.0) {
         render.result.notes.push_back(ui_text("Rate score x", "Rate 점수 x") + format_decimal(last_result_rate_multiplier_));
     }
-    render.result.notes.push_back(ui_text("Mods: ", "모드: ") + mode_mod_summary(last_result_mods_));
-    render.result.notes.push_back(ui_text("Timing center ", "타이밍 중심 ") + format_signed_ms(last_result_.mean_delta_ms) +
+    render.result.notes.push_back(ui_text("Mods: ", "모드: ") + render.result.analysis_mods);
+    if (mode_mod_long_note_mix(last_result_mods_) && last_result_long_note_mix_version_ != 1) {
+        render.result.notes.push_back(ui_text("Long LN Mix: local history only; separate from legacy bests and online boards.",
+            "긴 LN 믹스: 로컬 기록에 저장하며 이전 최고 기록·온라인 순위와 분리합니다."));
+    }
+    render.result.notes.push_back(ui_text("Timing center ", "타이밍 중심 ") + format_signed_ms(render.result.mean_delta_ms) +
                                   ui_text("  spread ", "  분산 ") + format_decimal(render.result.stddev_delta_ms) + "ms");
     if (last_session_replay_playback_) {
         render.result.notes.push_back(ui_text("Replay playback session: no new replay/result export was written.",
@@ -1982,7 +2008,8 @@ void MenuApp::update_pressed_keys(const input::InputEvent& event) {
     if (event.state == input::InputState::Pressed) {
         const bool new_press = pressed_keys_.insert(event.keycode).second;
         if (event.keycode != song_select_repeat_key_ &&
-            (song_select_repeat_key_ == key_left_ || song_select_repeat_key_ == key_right_)) {
+            (song_select_repeat_key_ == key_left_ || song_select_repeat_key_ == key_right_ ||
+             song_select_repeat_key_ == key_backspace_)) {
             reset_song_select_repeat();
         }
         if (new_press && is_song_select_repeat_key(event.keycode)) {
@@ -2135,12 +2162,17 @@ int MenuApp::selected_adjustment_repeat_row(uint32_t keycode) {
 bool MenuApp::is_song_select_repeat_key(uint32_t keycode) {
     if (skin_preview_fullscreen_) return false;
     if (help_overlay_visible_ || profile_nickname_edit_active_ ||
-        difficulty_table_url_editing_ || online_records_url_editing_ || song_select_search_active_ ||
+        online_records_url_editing_ || song_select_search_active_ ||
         chat_overlay_visible_ || ranked_account_overlay_visible_ || chat_url_warning_visible_ ||
         (current_screen() == Screen::Multiplayer && multiplayer_menu_.edit_field != MultiplayerEditField::None) ||
         (current_screen() == Screen::Keymap &&
          keymap_settings_controller_.capture_active())) {
         return false;
+    }
+
+    if (difficulty_table_url_editing_) {
+        return (current_screen() == Screen::SongSelect || current_screen() == Screen::SongBrowser) &&
+               keycode == key_backspace_ && !difficulty_table_url_input_.empty();
     }
 
     if (keycode == key_page_up_ || keycode == key_page_down_) {
@@ -2180,6 +2212,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
                               const std::string& replay_path,
                               GameplayLaunchKind launch_kind) {
     // Restart iteratively so each completed GameSession leaves the stack before relaunch.
+    bool instant_restart_start = false;
     for (;;) {
     const bool replay_playback = !replay_path.empty();
     // The caller owns the launch intent. Inferring it from lobby flags makes a
@@ -2208,6 +2241,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.loading_percent = 0;
         gameplay_hud_.loading_stage = "Preparing gameplay";
     }
+    (void)service_window_size_change();
     apply_runtime_graphics_config();
     publish_snapshot();
 
@@ -2216,6 +2250,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     stop_song_preview_audio();
 
     GameSession session;
+    session.set_instant_restart_start(instant_restart_start);
     if (!peer_battle && replay_path.empty() && bms_editor_practice_start_seconds_.has_value()) {
         session.set_practice_no_fail_override(true);
         session.set_practice_start_seconds(*bms_editor_practice_start_seconds_);
@@ -2552,6 +2587,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         } else {
             reset_screen(Screen::SongSelect);
         }
+        (void)service_window_size_change();
         apply_runtime_graphics_config();
         publish_snapshot();
         return;
@@ -2582,6 +2618,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
             reset_gameplay_hud_state(gameplay_hud_);
         }
         reset_screen(Screen::Multiplayer);
+        (void)service_window_size_change();
         apply_runtime_graphics_config();
         publish_snapshot();
         return;
@@ -2596,6 +2633,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         persist_runtime_config();
     }
     const bool session_restart_requested = session.was_restart_requested();
+    const bool session_instant_restart_requested = session.was_instant_restart_requested();
     const bool session_exit_requested = session.was_exit_requested();
     session.shutdown();
     const bool session_aborted = session.was_user_aborted() || !session.audio_error().empty();
@@ -2623,6 +2661,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         persist_runtime_config();
     }
     if (session_restart_requested) {
+        instant_restart_start = session_instant_restart_requested;
         {
             std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
             reset_gameplay_hud_state(gameplay_hud_);
@@ -2650,6 +2689,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         last_export_warnings_.clear();
         last_session_replay_playback_ = false;
         reset_screen(Screen::SongSelect);
+        (void)service_window_size_change();
         apply_runtime_graphics_config();
         {
             std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
@@ -2733,6 +2773,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         last_final_gauge_ = result.final_gauge;
         has_result_ = true;
         last_result_mods_ = result.mods;
+        last_result_long_note_mix_version_ = result.long_note_mix_version;
         last_result_rate_multiplier_ = result.rate_multiplier;
         last_result_score_multiplier_ = result.score_multiplier;
         last_result_final_score_ = result.final_score;
@@ -2756,6 +2797,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         }
         result_presentation_start_ns_ = timing::HighResClock::now_ns();
         result_presentation_skipped_ = false;
+        result_analysis_page_ = 0;
+        result_analysis_lane_bank_ = 0;
         replace_screen(Screen::Result);
     } else {
         has_result_ = false;
@@ -2778,6 +2821,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
                         "로컬 플레이가 끝났습니다. 재대전 전에 상대를 기다리는 중입니다.");
         }
     }
+    (void)service_window_size_change();
     apply_runtime_graphics_config();
     {
         std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);

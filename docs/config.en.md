@@ -1,5 +1,7 @@
 # TenRiff Config Schema (current)
 
+**1.8.8:** Includes result analysis, freely resizable windows and direct width/height entry, result `F9` PNG hints, long LN Mix, and menu, keysound and start-control improvements. See the [release guide (Korean)](release-1.8.8-gate.md) for current verification and delivery status. The user-pinned baseline remains 1.8.7; its existing tag and release files are preserved.
+
 Reference: [Config.h](../src/config/Config.h), [Config.cpp](../src/config/Config.cpp), [default JSON](../config/config.json), and [keymaps](../src/config/Keymap.cpp). Missing values use code defaults; bounds below describe load/save normalization.
 
 This document summarizes the configuration structure that is actually active today, based on `config/config.json`, `profiles/<name>/config.json`, and `profiles/<name>/keymap.json`.
@@ -123,12 +125,14 @@ Grade/Session Mix uses a separate LR2-reference gauge, carried between songs, wi
 - `display_mode` (string)
   - `borderless | windowed | fullscreen`
   - the default is `borderless`; it is also the recommended mode for external overlays such as Discord, OBS, and Game Bar
-  - `windowed` is a fixed-size window with a title bar and can be moved
+  - `windowed` has a title bar and supports moving/resizing by dragging its borders. Ending a resize drag saves the actual client size to the profile; maximize/restore and programmatic resizing do not overwrite the selected value
   - `fullscreen` is DXGI exclusive fullscreen, where the current Discord Game Overlay is not displayed
 - `resolution` (string)
   - `native`, legacy aliases `720p | 1080p | qhd`, or `widthxheight` (e.g. `1600x900`, `1366x768`, `1280x800`, `3440x1440`). Each axis accepts 320–8192px.
   - Graphics Settings combines common sizes with the current monitor's display modes. Press `F5` to refresh the list. Explicit custom sizes survive saving and restarting.
-  - Layout preserves the 1920×1080 canvas aspect, with margins for other aspect ratios. Windowed mode scales proportionally to fit the title bar and taskbar work area.
+  - Resolution `+/-` keeps cycling presets. `Enter` or clicking the value opens Width/Height drafts; type with the keyboard's top-row digits or numpad. `Tab`/arrows switch fields, `Enter` applies, `Esc` cancels, `Backspace` erases and `Delete` clears the field. Each axis must be an integer from 320 to 8192; empty/out-of-range values show an error and preserve the setting. Other characters, paste and IME input are not used.
+  - Content and click mapping retain the 1920×1080 aspect, with margins for other window shapes. Oversized requests retain the selected dimensions while the actual window fits the work area. Fitting is normally proportional, but the minimum actual client size of 320px per axis can alter extreme window aspect ratios.
+  - An unsupported exclusive-fullscreen size falls back to windowed mode and saves the actual size/mode. Existing profile tokens and defaults stay unchanged. See [new-candidate window/transition/save verification (Korean)](release-conditions-1.8.8.ko.md#창-크기와-직접-해상도-입력).
   - Skin Settings uses a uniformly scaled view of the actual gameplay renderer, including field movement, lane/note/gear sizes, judgement/combo positions and skin fonts.
 - `vsync` (bool)
 - `refresh_hz` (int)
@@ -184,8 +188,10 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
   - fixed seed for RR/SR, forced key-mode conversion, and LN Mix selection; ordinary Random creates a fresh session seed per play and records the actual value in the replay
 - `mods` (string array)
   - Note Structure accepts one of `full_long_notes`, `ln_mix_10` through `ln_mix_90`, or `full_short_notes`
-  - LN Mix considers only taps that can fit a base-BPM 1/8-note hold while ending at least 50ms before the next same-lane note, then assigns the selected holds 60% long 1/8-note, 20% medium 1/16-note, and 20% short alternating 1/24- and 1/32-note lengths
-  - existing holds are preserved, heads overlapping an existing same-lane span are excluded, and the same `random_seed` selects the same taps
+  - new LN Mix v2 targets 60% long alternating 2/4-beat holds, 20% medium 1-beat holds and 20% short alternating 1/4-/1/2-beat holds, using base BPM × Rate; other lanes keep taps/short holds and same-lane repeated taps are not merged
+  - candidates must fit at least half a beat and end 50ms before the next same-lane head; a target that does not fit steps down through 4, 2, 1, 1/2 and 1/4 beats, so dense charts can realize fewer long holds than the target ratio
+  - existing LN/CN, original heads and keysounds are preserved; heads overlapping an existing same-lane span are excluded. The same chart, `random_seed`, Rate and transform version reproduce the same result
+  - legacy replay metadata without a transform version uses v1 and its original 1/8-, 1/16-, 1/24- and 1/32-note policy. New v2 allows local history/replay only and is excluded from legacy chart-wide BEST and Sites upload. See [length policy, compatibility and verification (Korean)](release-conditions-1.8.8.ko.md#ln-mix의-요구-의미)
 - `ghost_battle_enabled` (bool)
   - defaults to `false`
   - when `true`, TenRiff auto-loads the selected chart's best compatible replay for ghost comparison
@@ -225,6 +231,10 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
 
 ### `ui`
 
+`ui.skip_start_countdown` and `ui.instant_restart_key` are built-in controls saved in the profile and `.trprofile` exports. Only the initial `3 / 2 / 1` display after loading is skipped; audio preparation, the existing three-second chart lead-in and judgement timing remain unchanged. Resuming from pause always retains its three-second countdown. Multiplayer forces the initial countdown and blocks instant restart; Session Mix also blocks instant restart. Instant restart does not fire while paused or during the initial countdown, and the key must be released before it can trigger again. See [start/restart controls (Korean)](gameplay-start-controls.ko.md) for lane/reserved-key conflicts and editor-practice start positions.
+
+These controls do not change Sites submission policy. Long LN Mix v2 exclusion from legacy BEST and Sites is a separate conversion policy; the [plugin runtime, API and SDK remain future plans (Korean)](result-analysis-1.8.8.ko.md).
+
 `last_played_chart_path` is the local path of the most recent chart whose gameplay started; empty by default. Replay and editor practice do not update it. Used by `title_music=last_played` across restarts.
 
 | Field | Type, range, default | Behavior |
@@ -233,6 +243,8 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
 | `profile_avatar_path` | string; UTF-8 ≤2048 bytes | Local PNG/JPG avatar path. |
 | `language` | `en`, `ko`, `ja`; `en` | UI language; invalid values normalize to en. |
 | `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | Profile and first-run menu text at 100%, 115%, or 130%. Gameplay fonts remain skin-controlled. |
+| `skip_start_countdown` | bool; `false` | Skip the initial `3 / 2 / 1` display in solo play, including normal starts, menu restarts and result retries. |
+| `instant_restart_key` | string; `""` (unassigned) | Key name for restarting an active solo chart from the beginning. The new attempt always skips the initial countdown; the interrupted attempt saves no result or replay. |
 | `all_song_sources` | bool; `false` | Restore ALL SONG, combining registered folder caches and deduplicating identical chart paths. |
 | `result_tail_ms` | double; `500` ms | Extra result-transition delay after judgement completion; the chart audio end is also considered when `audio.play_to_end=true`. |
 | `require_enter_to_exit` | bool; `true` | Retained for read/write compatibility; the current Windows result-input path does not use it to auto-exit. |
@@ -244,7 +256,7 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
 | `collections` | object: name → string[] | Chart keys grouped by collection name. |
 | `song_collection_filter` | string; `all` | All/favorites/collection filter; saved immediately. |
 | `song_key_filter` | int: `0..16`; `0` | Key-count filter; zero means all. UI choices are 4K–10K, 12K, 14K and 16K. |
-| `song_level_min_filter`, `song_level_max_filter` | int: `0..50`; `0` | Level bounds; zero disables the corresponding bound. |
+| `song_level_min_filter`, `song_level_max_filter` | int: `0..50`; `0` | Level bounds; zero disables the corresponding bound. With an external table selected, use its displayed numeric level and exclude nonnumeric labels while bounds are active. Native LV keeps the existing built-in level. See [number/prefix handling (Korean)](release-feedback-1.8.8.ko.md#선택한-난이도표-기준의-최소최대-필터). |
 | `difficulty_table_path` | string | Local header JSON or downloaded profile-cache header. Selecting a table switches to safe indexing; Native LV clears it and removes table metadata from a valid cache. |
 | `difficulty_table_url` | string | Original HTTP(S) BMSTable page/header URL. Resolves bmstable metadata and caches header/data; local JSON selection clears it. |
 | `online_records_server_url` | string | Records/ranking/chat API URL; failures do not block local play or records. |

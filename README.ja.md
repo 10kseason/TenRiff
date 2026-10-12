@@ -2,6 +2,10 @@
 
 **固定基準: [1.8.7](docs/baseline-1.8.7.ja.md)**（2026-10-10）。Git tag `1.8.7`、commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347` を使い、`latest` や新しいリリースに合わせて自動変更しません。
 
+**2026-10-12 · 1.8.8:** 結果分析、自由なウィンドウサイズとF9 PNG案内、長いLN Mixに加え、表示の読みやすさ、難易度表URL・フィルター、スキンのレーンショートカット、キー数削減時のキー音保全、ソロ開始・即時再試行を改善します。現在の検証・パッケージ・公開状況は[1.8.8リリース案内](docs/release-1.8.8-gate.md)を参照してください。固定基準は1.8.7を維持します。
+
+**分析と拡張計画:** レーン別分布・時間帯別精度・単ノート/LN開始・離鍵・維持失敗を区別し、測定不能のミスを0ms標本にしません。長いLN Mix v2はローカル記録・リプレイ専用で、従来BEST・Sites送信から除外します。プラグインと1.9.0安定化は計画です。[分析基準](docs/result-analysis-1.8.8.ko.md)、[画面・メニュー・キー音](docs/release-feedback-1.8.8.ko.md)、[開始・再試行操作](docs/gameplay-start-controls.ko.md)（韓国語）。
+
 **2026-10-09 · TenRiff 1.8.7:** 入力補正と読み込み時の音声処理を改善し、LR2ソロのスタジオデッキ、750msのFAST/SLOW表示、キー再割り当て、設定統合と曲名の自動サイズ調整を追加します。 [1.8.7 release](docs/release-1.8.7-gate.md).
 
 **2026-10-08 · TenRiff 1.8.6:** Nativeソロプレイ用のスタジオデッキHUDを追加。左右のShiftをプレイキーに設定でき、F5/F6でHi-Speedを半分/2倍、F11でチャットを開きます。クラシックHUDも選択できます。 [1.8.6 release](docs/release-1.8.6-gate.md).
@@ -22,13 +26,13 @@
 
 **マルチプレイRate対応ビルド:** ロビーでリーダーが共通のRateを設定します。全員がこのprotocol v6ビルドを使用してください。旧v5クライアントとは接続できません。[案内](docs/multiplayer-rate-build.ko.md)（韓国語）。
 
-この配布版は **1.8.7 Sites 統合版**です。新しいフォルダーに展開し、`launch_win.bat` から起動して F10 でウェブアカウントを一度連携してください。対象となる新しいプレイのスコア・詳細スコア・精度・詳細精度を送信します。新しいプレイは ruleset-4 を使用し、ウェブ送信には判定プロファイルが必要です。ruleset-1/2/3 のリプレイは当時の判定とLN動作を、既存のウェブ記録はIDとスコアを維持します。[接続ガイド](docs/sites-leaderboard.md)（韓国語）を参照してください。
+配布バージョンは [**1.8.8 Sites 統合版**](https://github.com/10kseason/TenRiff/releases/tag/1.8.8)です。固定基準は1.8.7を維持します。新しいフォルダーに展開し、`launch_win.bat` から起動して F10 でウェブアカウントを一度連携してください。対象となる新しいプレイのスコア・詳細スコア・精度・詳細精度を送信します。新しいプレイは ruleset-4 を使用し、ウェブ送信には判定プロファイルが必要です。ruleset-1/2/3 のリプレイは当時の判定とLN動作を、既存のウェブ記録はIDとスコアを維持します。[接続ガイド](docs/sites-leaderboard.md)（韓国語）を参照してください。
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | 日本語
 
-TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。現在のプロジェクト版は `1.8.7` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
+TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。固定基準は `1.8.7`、このソースのバージョンは `1.8.8` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
 
-この README は導入文書です。現在の挙動、`1.8.7` project state、`1.8.7 fixed stable baseline` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
+この README は導入文書です。現在の挙動、`1.8.8` のバージョンと固定 `1.8.7` の基準、`1.8.7 fixed stable baseline` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
 
 TenRiff のコードベースは、伝統的な長文設計書主導だけで積み上がったものではなく、高速な反復と実験を重視した `vibe coding` 的な性格を持つ作品でもあります。
 

@@ -18,6 +18,14 @@
 
 namespace tenriff::util {
 
+// Edit UTF-8 text at a code-point boundary, never leave a partial final character.
+inline void erase_last_utf8_codepoint(std::string& value) {
+    if (value.empty()) return;
+    std::size_t start = value.size() - 1;
+    while (start > 0 && (static_cast<unsigned char>(value[start]) & 0xC0u) == 0x80u) --start;
+    value.erase(start);
+}
+
 #ifdef _WIN32
 inline std::wstring byte_widen(std::string_view value) {
     std::wstring wide;

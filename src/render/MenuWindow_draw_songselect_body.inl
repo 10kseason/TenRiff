@@ -603,10 +603,12 @@
                     ? data.song_select.selected_source_path
                     : data.song_select.selected_record_status;
             if (d2d_->rank_format && d2d_->accent_brush) {
-                draw_centered_text(to_wide(headline), d2d_->rank_format.Get(),
-                                   native_rect("songselect.rect.042", D2D1::RectF(showcase.left + 40.0f, showcase.top + 54.0f,
-                                               showcase.right - 40.0f, showcase.top + 216.0f)),
-                                   d2d_->accent_brush.Get());
+                const auto headline_rect = native_rect("songselect.rect.042", D2D1::RectF(showcase.left + 40.0f,
+                    showcase.top + 54.0f, showcase.right - 40.0f, showcase.top + 216.0f));
+                if (data.song_select.showing_records)
+                    draw_grade(2, to_wide(headline), d2d_->rank_format.Get(), headline_rect,
+                               1.0f, DWRITE_TEXT_ALIGNMENT_CENTER);
+                else draw_centered_text(to_wide(headline), d2d_->rank_format.Get(), headline_rect, d2d_->accent_brush.Get());
             }
             if (d2d_->body_format && d2d_->muted_brush) {
                 draw_centered_text(to_wide(subline), d2d_->body_format.Get(),
@@ -637,11 +639,11 @@
                               d2d_->muted_brush.Get());
         }
         if (d2d_->header_format && d2d_->accent_brush) {
-            draw_centered_text(to_wide(data.song_select.rank.empty() ? "--" : data.song_select.rank),
-                               d2d_->header_format.Get(),
-                               native_rect("songselect.rect.046", D2D1::RectF(best_panel.left + 24.0f, best_panel.top + 48.0f,
-                                           best_panel.right - 24.0f, best_panel.top + 122.0f)),
-                               d2d_->accent_brush.Get());
+            draw_grade(1, to_wide(data.song_select.rank.empty() ? "--" : data.song_select.rank),
+                       d2d_->grade_format.Get(),
+                       native_rect("songselect.rect.046", D2D1::RectF(best_panel.left + 24.0f, best_panel.top + 44.0f,
+                                   best_panel.right - 24.0f, best_panel.top + 130.0f)),
+                       1.0f, DWRITE_TEXT_ALIGNMENT_CENTER);
         }
         draw_rule(best_panel.left + 22.0f, best_panel.top + 136.0f,
                   best_panel.right - 22.0f, 0.28f);

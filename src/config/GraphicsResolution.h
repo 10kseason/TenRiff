@@ -4,12 +4,48 @@
 #include <array>
 #include <charconv>
 #include <cctype>
+#include <cmath>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
 namespace tenriff::config {
+
+inline constexpr int kGraphicsDimensionMin = 320;
+inline constexpr int kGraphicsDimensionMax = 8192;
+
+inline bool valid_graphics_dimensions(int width, int height) {
+    return width >= kGraphicsDimensionMin && width <= kGraphicsDimensionMax &&
+           height >= kGraphicsDimensionMin && height <= kGraphicsDimensionMax;
+}
+
+inline std::pair<int, int> fit_graphics_client_size(int width, int height,
+                                                   int available_width, int available_height) {
+    width = std::clamp(width, kGraphicsDimensionMin, kGraphicsDimensionMax);
+    height = std::clamp(height, kGraphicsDimensionMin, kGraphicsDimensionMax);
+    const double fit = std::min({1.0, static_cast<double>(std::max(1, available_width)) / width,
+                               static_cast<double>(std::max(1, available_height)) / height});
+    // Very extreme requested ratios cannot fit both the work area and a usable
+    // minimum client size. Keep the 320px minimum; content still letterboxes.
+    return {std::max(kGraphicsDimensionMin, static_cast<int>(std::floor(width * fit))),
+            std::max(kGraphicsDimensionMin, static_cast<int>(std::floor(height * fit)))};
+}
+
+// Direct entry is deliberately strict. Invalid text must not silently select
+// Monitor Native as the legacy config normalizer does for unknown tokens.
+inline std::pair<int, int> parse_graphics_dimension_fields(std::string_view width_text,
+                                                         std::string_view height_text) {
+    int width = 0, height = 0;
+    const auto parse = [](std::string_view text, int& number) {
+        if (text.empty() || text.size() > 4) return false;
+        for (const char ch : text) if (ch < '0' || ch > '9') return false;
+        const auto result = std::from_chars(text.data(), text.data() + text.size(), number);
+        return result.ec == std::errc{} && result.ptr == text.data() + text.size();
+    };
+    return parse(width_text, width) && parse(height_text, height) && valid_graphics_dimensions(width, height)
+               ? std::pair<int, int>{width, height} : std::pair<int, int>{0, 0};
+}
 
 // Keep the old profile tokens; explicit dimensions use the same string field.
 inline std::pair<int, int> graphics_resolution_dimensions(std::string_view value) {
@@ -38,7 +74,7 @@ inline std::pair<int, int> graphics_resolution_dimensions(std::string_view value
         const auto result = std::from_chars(text.data(), text.data() + text.size(), number);
         // Bound explicit allocations while allowing portrait and 8K displays.
         return result.ec == std::errc{} && result.ptr == text.data() + text.size() &&
-               number >= 320 && number <= 8192;
+               number >= kGraphicsDimensionMin && number <= kGraphicsDimensionMax;
     };
     if (!parse(width_text, width) || !parse(height_text, height)) return {0, 0};
     return {width, height};

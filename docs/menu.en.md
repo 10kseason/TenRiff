@@ -1,5 +1,7 @@
 # Menu structure and controls
 
+For the 1.8.8 additions, see [URL deletion, table-level filters and skin lane shortcuts](release-feedback-1.8.8.ko.md), [start/restart controls](gameplay-start-controls.ko.md) and [result-analysis controls](result-analysis-1.8.8.ko.md) (Korean). Current verification and delivery status is in the [1.8.8 release guide](release-1.8.8-gate.md).
+
 Current behavior below targets client 1.7.2. The collapsed early blueprint is not a list of implemented features.
 
 ## Current screens and controls

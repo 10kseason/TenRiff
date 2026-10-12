@@ -138,6 +138,8 @@ struct UiConfig {
     // Gameplay keeps the skin pointer on screen by default so players can drag the
     // playfield mid-song or run the game in a window alongside overlays.
     bool show_cursor_in_gameplay = true;
+    bool skip_start_countdown = false;
+    std::string instant_restart_key;
     std::string active_song_source;
     std::string last_played_chart_path;
     // The aggregate library preserves the last individual source for switching back.

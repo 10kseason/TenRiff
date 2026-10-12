@@ -75,6 +75,13 @@ public:
     [[nodiscard]] GraphicsSettingId selected_id() const noexcept;
     [[nodiscard]] OnnxUpscalerConfirmId selected_confirmation_id() const noexcept;
     [[nodiscard]] bool dirty() const noexcept;
+    [[nodiscard]] bool editing_resolution() const noexcept { return resolution_editing_; }
+    [[nodiscard]] int resolution_field() const noexcept { return resolution_field_; }
+    [[nodiscard]] const std::array<std::string, 2>& resolution_fields() const noexcept { return resolution_fields_; }
+    [[nodiscard]] bool resolution_error() const noexcept { return resolution_error_; }
+    [[nodiscard]] GraphicsSettingsEffects resolution_text(std::string_view text);
+    [[nodiscard]] GraphicsSettingsEffects resolution_erase(bool clear_all = false);
+    void set_native_resolution(int width, int height) noexcept;
 
     void set_display_resolutions(const std::vector<std::pair<int, int>>& modes);
     void reset(GraphicsSettingId selected = GraphicsSettingId::Display) noexcept;
@@ -108,6 +115,12 @@ private:
     OnnxUpscalerConfirmId selected_confirmation_id_ =
         OnnxUpscalerConfirmId::KeepNative;
     bool dirty_ = false;
+    bool resolution_editing_ = false;
+    bool resolution_error_ = false;
+    bool resolution_replace_ = true;
+    int resolution_field_ = 0;
+    int native_width_ = 1280, native_height_ = 720;
+    std::array<std::string, 2> resolution_fields_{};
     std::vector<std::string> resolution_choices_ = config::graphics_resolution_choices();
 };
 

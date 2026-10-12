@@ -2,6 +2,7 @@
 #include "render/MenuWindow.h"
 #include "render/GameplaySpriteBatch.h"
 #include "config/BuiltinDifficultyTables.h"
+#include "config/GraphicsResolution.h"
 #include "render/GameplayFeedbackText.h"
 #include "render/GameplayStudioDeck.h"
 #include "render/GameplaySongTitle.h"
@@ -45,6 +46,7 @@
 
 #include <d2d1_1.h>
 #include <d2d1helper.h>
+#include <d2d1effects.h>
 #include <d3d11.h>
 #include <d3dcompiler.h>
 #include <dwrite.h>
@@ -1653,7 +1655,7 @@ MonitorDisplayInfo query_monitor_display_info(HWND hwnd) {
 
 DWORD window_style_for_display_mode(std::string_view display_mode) {
     if (display_mode == "windowed") {
-        return WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
+        return WS_OVERLAPPEDWINDOW;
     }
     return WS_POPUP;
 }
@@ -1677,10 +1679,10 @@ void resolve_window_bounds(const MenuWindowConfig& config,
                            UINT& out_height,
                            int& out_x,
                            int& out_y) {
-    const UINT desired_width =
-        (config.width > 0) ? static_cast<UINT>(config.width) : monitor.width;
-    const UINT desired_height =
-        (config.height > 0) ? static_cast<UINT>(config.height) : monitor.height;
+    const UINT desired_width = std::min(8192u,
+        (config.width > 0) ? static_cast<UINT>(config.width) : monitor.width);
+    const UINT desired_height = std::min(8192u,
+        (config.height > 0) ? static_cast<UINT>(config.height) : monitor.height);
 
     const RECT placement_rect = config.display_mode == "windowed" ? monitor.work_rect : monitor.rect;
     const DWORD style = window_style_for_display_mode(config.display_mode);
@@ -1690,12 +1692,16 @@ void resolve_window_bounds(const MenuWindowConfig& config,
     const int available_height = std::max(1L, placement_rect.bottom - placement_rect.top - frame.cy);
     // Independent axis clamps changed the chosen aspect ratio and could put
     // the bottom of a window underneath the taskbar on smaller displays.
-    const double fit = std::min({1.0, static_cast<double>(available_width) / std::max(1u, desired_width),
-                               static_cast<double>(available_height) / std::max(1u, desired_height)});
-    out_width = std::max(1u, static_cast<UINT>(std::floor(desired_width * fit)));
-    out_height = std::max(1u, static_cast<UINT>(std::floor(desired_height * fit)));
+    const auto fitted = config::fit_graphics_client_size(static_cast<int>(desired_width),
+        static_cast<int>(desired_height), available_width, available_height);
+    out_width = static_cast<UINT>(fitted.first);
+    out_height = static_cast<UINT>(fitted.second);
 
     if (config.display_mode == "fullscreen") {
+        // Exclusive output modes are checked against DXGI before entering them;
+        // fitting to the current desktop here would discard a supported mode.
+        out_width = std::clamp(desired_width, 320u, 8192u);
+        out_height = std::clamp(desired_height, 320u, 8192u);
         out_x = monitor.rect.left;
         out_y = monitor.rect.top;
         return;
@@ -2124,11 +2130,11 @@ LRESULT CALLBACK menu_window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpa
             DestroyWindow(hwnd);
             return 0;
         case WM_SETCURSOR:
-            if (window && window->horizontal_drag_cursor()) {
+            if (LOWORD(lparam) == HTCLIENT && window && window->horizontal_drag_cursor()) {
                 SetCursor(LoadCursor(nullptr, IDC_SIZEWE));
                 return TRUE;
             }
-            if (window && window->cursor_hidden()) {
+            if (LOWORD(lparam) == HTCLIENT && window && window->cursor_hidden()) {
                 SetCursor(nullptr);
                 return TRUE;
             }
@@ -2141,6 +2147,25 @@ LRESULT CALLBACK menu_window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpa
                 window->queue_resize(LOWORD(lparam), HIWORD(lparam));
             }
             return 0;
+        case WM_ENTERSIZEMOVE:
+            if (window) window->begin_window_resize();
+            return 0;
+        case WM_EXITSIZEMOVE:
+            if (window) window->end_window_resize();
+            return 0;
+        case WM_GETMINMAXINFO: {
+            const DWORD style = static_cast<DWORD>(GetWindowLongPtrW(hwnd, GWL_STYLE));
+            if ((style & WS_THICKFRAME) != 0) {
+                auto* limits = reinterpret_cast<MINMAXINFO*>(lparam);
+                const auto ex_style = static_cast<DWORD>(GetWindowLongPtrW(hwnd, GWL_EXSTYLE));
+                const SIZE minimum = window_size_for_client_area(320, 320, style, ex_style);
+                const SIZE maximum = window_size_for_client_area(8192, 8192, style, ex_style);
+                limits->ptMinTrackSize = POINT{minimum.cx, minimum.cy};
+                limits->ptMaxTrackSize = POINT{maximum.cx, maximum.cy};
+                return 0;
+            }
+            break;
+        }
         case WM_CHAR:
             if (window) {
                 window->on_text_input(static_cast<wchar_t>(wparam));
@@ -2370,6 +2395,18 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_artist_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> result_score_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> result_metric_format;
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> grade_format;
+    struct GradeBitmap {
+        std::wstring text;
+        Microsoft::WRL::ComPtr<IDWriteTextFormat> format;
+        Microsoft::WRL::ComPtr<ID2D1Bitmap1> bitmap;
+        D2D1_COLOR_F color{};
+        float width = 0, height = 0;
+        bool attempted = false;
+        DWRITE_TEXT_ALIGNMENT alignment = DWRITE_TEXT_ALIGNMENT_LEADING;
+    };
+    std::array<GradeBitmap, 3> grade_bitmaps{};
+    Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> result_gauge_gradient;
     Microsoft::WRL::ComPtr<IDWriteTextLayout> generic_help_layout;
     std::wstring generic_help_text;
     float generic_help_width = 0.0f;
@@ -2515,8 +2552,6 @@ bool MenuWindow::initialize(const MenuWindowConfig& config) {
     shutdown();
 
     config_ = config;
-    pending_config_ = config;
-    config_dirty_ = false;
     should_close_.store(false, std::memory_order_release);
     fatal_error_.store(false, std::memory_order_release);
     screenshot_requested_.store(false, std::memory_order_release);
@@ -2738,6 +2773,7 @@ bool MenuWindow::initialize(const MenuWindowConfig& config) {
 void MenuWindow::set_config(const MenuWindowConfig& config) {
     std::lock_guard<std::mutex> lock(config_mutex_);
     pending_config_ = config;
+    ++pending_config_generation_;
     config_dirty_ = true;
 }
 
@@ -5024,12 +5060,54 @@ bool MenuWindow::save_screenshot_to_png() {
 }
 
 void MenuWindow::queue_resize(unsigned int width, unsigned int height) {
-    if (width == 0 || height == 0) {
+    if (width == 0 || height == 0 || width > 8192 || height > 8192) {
         return;
     }
     pending_width_ = width;
     pending_height_ = height;
     resize_pending_ = true;
+}
+
+void MenuWindow::begin_window_resize() {
+    if (config_.display_mode != "windowed" || !hwnd_) return;
+    RECT rect{};
+    if (!GetClientRect(static_cast<HWND>(hwnd_), &rect)) return;
+    window_resize_active_ = true;
+    resize_start_width_ = rect.right - rect.left;
+    resize_start_height_ = rect.bottom - rect.top;
+}
+
+void MenuWindow::end_window_resize() {
+    const bool active = window_resize_active_;
+    window_resize_active_ = false;
+    if (!active || config_.display_mode != "windowed" || !hwnd_) return;
+    RECT rect{};
+    if (!GetClientRect(static_cast<HWND>(hwnd_), &rect)) return;
+    const unsigned int width = rect.right - rect.left, height = rect.bottom - rect.top;
+    if (width == resize_start_width_ && height == resize_start_height_) return;
+    publish_window_size_change(width, height, false);
+}
+
+void MenuWindow::publish_window_size_change(unsigned int width, unsigned int height, bool fallback) {
+    if (width < 320 || height < 320 || width > 8192 || height > 8192) return;
+    config_.width = static_cast<int>(width);
+    config_.height = static_cast<int>(height);
+    std::lock_guard<std::mutex> config_lock(config_mutex_);
+    // A newer explicit request wins even if the previous fullscreen transition
+    // finished later. The next render applies that request; do not persist this one.
+    if (config_generation_ != pending_config_generation_) return;
+    if (!config_dirty_) pending_config_ = config_;
+    std::lock_guard<std::mutex> lock(window_size_change_mutex_);
+    window_size_change_ = WindowSizeChange{static_cast<int>(width), static_cast<int>(height), fallback, config_generation_};
+}
+
+std::optional<MenuWindow::WindowSizeChange> MenuWindow::poll_window_size_change() {
+    std::lock_guard<std::mutex> config_lock(config_mutex_);
+    std::lock_guard<std::mutex> lock(window_size_change_mutex_);
+    auto change = window_size_change_;
+    window_size_change_.reset();
+    if (change && change->request_generation != pending_config_generation_) return std::nullopt;
+    return change;
 }
 
 std::optional<MenuClickEvent> MenuWindow::poll_click_event() {
@@ -5116,6 +5194,7 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family, const app::Native
                 {std::addressof(d2d_->song_record_value_format), "song_record_value"}, {std::addressof(d2d_->song_record_detail_format), "song_record_detail"},
                 {std::addressof(d2d_->song_title_format), "song_title"}, {std::addressof(d2d_->song_artist_format), "song_artist"},
                 {std::addressof(d2d_->result_score_format), "result_score"}, {std::addressof(d2d_->result_metric_format), "result_metric"},
+                {std::addressof(d2d_->grade_format), "grade"},
                 {std::addressof(d2d_->hud_format), "hud"}, {std::addressof(d2d_->rank_format), "rank"},
                 {std::addressof(d2d_->stats_label_format), "stats_label"}, {std::addressof(d2d_->stats_value_format), "stats_value"}};
             for (const auto& role : roles) {
@@ -5180,6 +5259,7 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family, const app::Native
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 18.0f, &d2d_->song_artist_format) ||
         !create_text_format(L"Bahnschrift", DWRITE_FONT_WEIGHT_SEMI_BOLD, 104.0f, &d2d_->result_score_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 32.0f, &d2d_->result_metric_format) ||
+        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_BOLD, 84.0f, &d2d_->grade_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 16.0f, &d2d_->hud_format) ||
         !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 128.0f, &d2d_->rank_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 16.0f, &d2d_->stats_label_format) ||
@@ -5199,16 +5279,17 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family, const app::Native
     d2d_->menu_ellipsis_signs.clear();
     d2d_->generic_help_layout.Reset();
     for (auto& text : d2d_->menu_readable_text) text = {};
+    for (auto& grade : d2d_->grade_bitmaps) grade = {};
     auto& sf = d2d_->preview_fonts;
-    if (!create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 24, &sf.studio_title, true) ||
-        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 14, &sf.studio_body, true) ||
-        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 11, &sf.studio_label, true) ||
-        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 40, &sf.studio_score, true) ||
-        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 26, &sf.studio_accuracy, true) ||
+    if (!create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 30, &sf.studio_title, true) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 18, &sf.studio_body, true) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 15, &sf.studio_label, true) ||
+        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 54, &sf.studio_score, true) ||
+        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 36, &sf.studio_accuracy, true) ||
         !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_BOLD, 30, &sf.studio_judgement, true) ||
         !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 18, &sf.studio_timing, true) ||
         !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 70, &sf.studio_combo, true)) return false;
-    constexpr float studio_sizes[] = {11, 12, 13, 14, 16, 18};
+    constexpr float studio_sizes[] = {14, 16, 17, 18, 22, 24};
     for (std::size_t i = 0; i < sf.studio_numbers.size(); ++i)
         if (!create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD,
                                 studio_sizes[i], &sf.studio_numbers[i], true)) return false;

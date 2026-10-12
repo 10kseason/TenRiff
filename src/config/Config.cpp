@@ -721,6 +721,9 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.ui.require_enter_to_exit = get_bool(*ui, "require_enter_to_exit", config.ui.require_enter_to_exit);
         config.ui.show_cursor_in_gameplay =
             get_bool(*ui, "show_cursor_in_gameplay", config.ui.show_cursor_in_gameplay);
+        config.ui.skip_start_countdown = get_bool(*ui, "skip_start_countdown", config.ui.skip_start_countdown);
+        config.ui.instant_restart_key = get_string(*ui, "instant_restart_key", config.ui.instant_restart_key);
+        if (config.ui.instant_restart_key.size() > 32) config.ui.instant_restart_key.clear();
         config.ui.active_song_source =
             get_string(*ui, "active_song_source", config.ui.active_song_source);
         config.ui.last_played_chart_path =
@@ -1224,6 +1227,8 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     ui.emplace("result_tail_ms", JsonValue{config.ui.result_tail_ms});
     ui.emplace("require_enter_to_exit", JsonValue{config.ui.require_enter_to_exit});
     ui.emplace("show_cursor_in_gameplay", JsonValue{config.ui.show_cursor_in_gameplay});
+    ui.emplace("skip_start_countdown", JsonValue{config.ui.skip_start_countdown});
+    ui.emplace("instant_restart_key", JsonValue{config.ui.instant_restart_key});
     ui.emplace("active_song_source", JsonValue{config.ui.active_song_source});
     ui.emplace("last_played_chart_path", JsonValue{config.ui.last_played_chart_path});
     ui.emplace("song_sources_initialized", JsonValue{config.ui.song_sources_initialized});

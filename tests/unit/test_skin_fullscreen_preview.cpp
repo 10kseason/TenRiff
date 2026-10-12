@@ -208,6 +208,132 @@ struct MenuAppSkinPreviewTestAccess {
         }
     }
 
+    static void check_table_url_repeat() {
+        for (const auto screen : {MenuApp::Screen::SongSelect, MenuApp::Screen::SongBrowser}) {
+            auto menu = fixture();
+            menu->reset_screen(screen);
+            menu->difficulty_table_url_editing_ = true;
+            menu->difficulty_table_url_input_ = u8"https://host/가漢😀";
+            key(*menu, menu->key_backspace_, input::InputState::Pressed);
+            CHECK(menu->difficulty_table_url_input_ == u8"https://host/가漢");
+            const auto first_due = menu->song_select_repeat_next_ns_;
+            REQUIRE(first_due > 0);
+            key(*menu, menu->key_backspace_, input::InputState::Pressed);
+            CHECK(menu->difficulty_table_url_input_ == u8"https://host/가漢");
+            menu->service_song_select_repeat(first_due - 1, true);
+            CHECK(menu->difficulty_table_url_input_ == u8"https://host/가漢");
+            menu->service_song_select_repeat(first_due, true);
+            CHECK(menu->difficulty_table_url_input_ == u8"https://host/가");
+            menu->service_song_select_repeat(menu->song_select_repeat_next_ns_, true);
+            CHECK(menu->difficulty_table_url_input_ == "https://host/");
+            key(*menu, menu->key_backspace_, input::InputState::Released);
+            CHECK(menu->song_select_repeat_key_ == 0);
+            menu->service_song_select_repeat(first_due + 1'000'000'000LL, true);
+            CHECK(menu->difficulty_table_url_input_ == "https://host/");
+
+            key(*menu, menu->key_backspace_, input::InputState::Pressed);
+            const auto after_press = menu->difficulty_table_url_input_;
+            menu->service_song_select_repeat(menu->song_select_repeat_next_ns_, false);
+            CHECK(menu->difficulty_table_url_input_ == after_press);
+            CHECK(menu->pressed_keys_.empty());
+            CHECK(menu->song_select_repeat_key_ == 0);
+            key(*menu, menu->key_backspace_, input::InputState::Pressed);
+            menu->help_overlay_visible_ = true;
+            const auto before_overlay = menu->difficulty_table_url_input_;
+            menu->service_song_select_repeat(menu->song_select_repeat_next_ns_, true);
+            CHECK(menu->difficulty_table_url_input_ == before_overlay);
+            CHECK(menu->song_select_repeat_key_ == 0);
+            menu->help_overlay_visible_ = false;
+            key(*menu, menu->key_backspace_, input::InputState::Released);
+            key(*menu, menu->key_backspace_, input::InputState::Pressed);
+            tap(*menu, menu->key_escape_);
+            CHECK_FALSE(menu->difficulty_table_url_editing_);
+            CHECK(menu->song_select_repeat_key_ == 0);
+            const auto cancelled = menu->difficulty_table_url_input_;
+            menu->service_song_select_repeat(first_due + 2'000'000'000LL, true);
+            CHECK(menu->difficulty_table_url_input_ == cancelled);
+
+            key(*menu, menu->key_backspace_, input::InputState::Released);
+            menu->difficulty_table_url_editing_ = true;
+            menu->difficulty_table_url_input_ = u8"가";
+            key(*menu, menu->key_backspace_, input::InputState::Pressed);
+            CHECK(menu->difficulty_table_url_input_.empty());
+            menu->service_song_select_repeat(menu->song_select_repeat_next_ns_, true);
+            CHECK(menu->song_select_repeat_key_ == 0);
+            key(*menu, menu->key_backspace_, input::InputState::Released);
+            menu->difficulty_table_url_input_ = std::string(510, 'x');
+            menu->handle_text_input(u8"가");
+            CHECK(menu->difficulty_table_url_input_ == std::string(510, 'x'));
+            menu->difficulty_table_url_input_ = std::string(509, 'x');
+            menu->handle_text_input(u8"가");
+            CHECK(menu->difficulty_table_url_input_ == std::string(509, 'x') + u8"가");
+            tap(*menu, menu->key_backspace_);
+            CHECK(menu->difficulty_table_url_input_ == std::string(509, 'x'));
+        }
+    }
+
+    static void check_lane_number_shortcuts() {
+        auto menu = fixture();
+        menu->skin_settings_controller_.reset("16k");
+        static_cast<void>(menu->skin_settings_controller_.select(SkinSettingsRowId::LaneWidth, false));
+        const auto digit = [](char value) { return config::KeycodeMap::to_keycode(std::string(1, value)).value(); };
+        const auto left_shift = config::KeycodeMap::to_keycode("LShift").value();
+        const auto left_control = config::KeycodeMap::to_keycode("LControl").value();
+        const auto left_alt = config::KeycodeMap::to_keycode("LAlt").value();
+        for (int lane = 1; lane <= 10; ++lane) {
+            tap(*menu, digit(lane == 10 ? '0' : static_cast<char>('0' + lane)));
+            CHECK(menu->skin_settings_controller_.edit_lane() == lane - 1);
+            CHECK(menu->skin_settings_controller_.selected_id() == SkinSettingsRowId::LaneWidth);
+            CHECK_FALSE(menu->skin_settings_controller_.dirty());
+        }
+        key(*menu, left_shift, input::InputState::Pressed);
+        for (int lane = 11; lane <= 16; ++lane) {
+            tap(*menu, digit(static_cast<char>('0' + lane - 10)));
+            CHECK(menu->skin_settings_controller_.edit_lane() == lane - 1);
+        }
+        tap(*menu, digit('0'));
+        CHECK(menu->skin_settings_controller_.edit_lane() == 15);
+        key(*menu, left_shift, input::InputState::Released);
+        tap(*menu, config::KeycodeMap::to_keycode("Numpad3").value());
+        CHECK(menu->skin_settings_controller_.edit_lane() == 2);
+        menu->help_overlay_visible_ = true;
+        tap(*menu, digit('1'));
+        CHECK(menu->skin_settings_controller_.edit_lane() == 2);
+        menu->help_overlay_visible_ = false;
+        menu->skin_preview_fullscreen_ = true;
+        tap(*menu, digit('1'));
+        CHECK(menu->skin_settings_controller_.edit_lane() == 2);
+        menu->skin_preview_fullscreen_ = false;
+        menu->key_lcontrol_ = left_control;
+        for (auto modifier : {left_control, left_alt}) {
+            key(*menu, modifier, input::InputState::Pressed);
+            tap(*menu, digit('1'));
+            CHECK(menu->skin_settings_controller_.edit_lane() == 2);
+            key(*menu, modifier, input::InputState::Released);
+        }
+        menu->difficulty_table_url_editing_ = true;
+        menu->handle_skins_settings_input(digit('1'));
+        CHECK(menu->skin_settings_controller_.edit_lane() == 2);
+        menu->difficulty_table_url_editing_ = false;
+        menu->skin_settings_controller_.reset("4k");
+        tap(*menu, digit('0'));
+        CHECK(menu->skin_settings_controller_.edit_lane() == 0);
+        menu->skin_settings_controller_.reset("7+1");
+        menu->config_.skin.scratch_position = "right";
+        tap(*menu, digit('1'));
+        CHECK(menu->skin_settings_controller_.edit_lane() == 1);
+        CHECK(menu->snapshot_.render.generic.skin_preview.selected_lane == 1);
+        tap(*menu, digit('8'));
+        CHECK(menu->skin_settings_controller_.edit_lane() == 0);
+        CHECK(menu->snapshot_.render.generic.skin_preview.selected_lane == 8);
+        const auto probes = menu->current_menu_probe_keycodes();
+        CHECK(std::find(probes.begin(), probes.end(), digit('1')) != probes.end());
+        CHECK(std::find(probes.begin(), probes.end(), left_shift) != probes.end());
+        menu->reset_screen(MenuApp::Screen::Title);
+        menu->handle_skins_settings_input(digit('2'));
+        CHECK(menu->skin_settings_controller_.edit_lane() == 0);
+    }
+
     static void check_navigation_reset() {
         auto menu = fixture();
         tap(*menu, menu->key_f6_);
@@ -242,6 +368,12 @@ TEST_CASE("skin fullscreen preview respects existing modal input ownership") {
 
 TEST_CASE("skin fullscreen preview cannot survive a navigation reset") {
     tenriff::app::MenuAppSkinPreviewTestAccess::check_navigation_reset();
+}
+TEST_CASE("difficulty table URL held Backspace repeats complete UTF8 characters only while focused") {
+    tenriff::app::MenuAppSkinPreviewTestAccess::check_table_url_repeat();
+}
+TEST_CASE("skin lane number shortcuts honor visible order bounds and modal ownership") {
+    tenriff::app::MenuAppSkinPreviewTestAccess::check_lane_number_shortcuts();
 }
 #endif
 
@@ -595,10 +727,12 @@ struct MenuAppFeedbackTestAccess {
     static void check_row_bodies() {
         auto menu = std::make_unique<MenuApp>();
         menu->key_enter_ = 13; menu->key_left_ = 37; menu->key_right_ = 39;
+        menu->key_escape_ = 27;
         menu->config_ = config::ConfigLoader{}.defaults();
         menu->config_.audio_ui.background_sound_enabled = false;
         menu->config_.skin.source = "native";
         menu->skin_settings_controller_.reset("5k");
+        bool checked_resolution_value = false;
         for (const auto screen : {MenuApp::Screen::ModeSelect, MenuApp::Screen::ModeMods,
              MenuApp::Screen::SettingsAudio, MenuApp::Screen::SettingsGraphics,
              MenuApp::Screen::SettingsSkins, MenuApp::Screen::QuickSetup}) {
@@ -610,15 +744,51 @@ struct MenuAppFeedbackTestAccess {
                 render::MenuClickEvent event;
                 event.kind = render::MenuHitTargetKind::SettingsRow;
                 event.index = row.row_index;
-                event.part = render::MenuHitPart::Activate;
+                // Real row bodies emit SelectOnly, including Resolution. Its
+                // separate value control is the only adjustable Activate hit.
+                event.part = render::MenuHitPart::SelectOnly;
                 menu->handle_menu_click(event);
                 CHECK(menu->current_screen() == screen);
-                const auto& after = menu->snapshot_.render.generic.rows;
-                auto found = std::find_if(after.begin(), after.end(), [&](const auto& r) { return r.row_index == row.row_index; });
-                REQUIRE(found != after.end());
-                CHECK(found->value == row.value);
+                const auto check_value_unchanged = [&] {
+                    const auto& after = menu->snapshot_.render.generic.rows;
+                    const auto found = std::find_if(after.begin(), after.end(), [&](const auto& r) { return r.row_index == row.row_index; });
+                    REQUIRE(found != after.end());
+                    CHECK(found->value == row.value);
+                };
+                check_value_unchanged();
+                CHECK_FALSE(menu->graphics_settings_controller_.editing_resolution());
+                event.part = render::MenuHitPart::Activate;
+                if (row.value_activatable) {
+                    REQUIRE(screen == MenuApp::Screen::SettingsGraphics);
+                    REQUIRE(row.row_index == static_cast<int>(menu::settings::GraphicsSettingId::Resolution));
+                    checked_resolution_value = true;
+                    const auto resolution = menu->config_.graphics.resolution;
+                    const auto display_mode = menu->config_.graphics.display_mode;
+                    menu->handle_menu_click(event);
+                    CHECK(menu->graphics_settings_controller_.editing_resolution());
+                    CHECK(menu->current_screen() == screen);
+                    CHECK(menu->config_.graphics.resolution == resolution);
+                    CHECK(menu->config_.graphics.display_mode == display_mode);
+                    CHECK_FALSE(menu->graphics_settings_controller_.dirty());
+                    for (const char digit : std::string("1500")) menu->handle_graphics_settings_input(digit);
+                    CHECK(menu->graphics_settings_controller_.resolution_fields()[0] == "1500");
+                    CHECK(menu->config_.graphics.resolution == resolution);
+                    CHECK_FALSE(menu->graphics_settings_controller_.dirty());
+                    menu->handle_graphics_settings_input(menu->key_escape_);
+                    CHECK_FALSE(menu->graphics_settings_controller_.editing_resolution());
+                    CHECK(menu->config_.graphics.resolution == resolution);
+                    check_value_unchanged();
+                } else {
+                    // Keep the original defensive guard check: forged Activate
+                    // on ordinary choices and disabled rows must not adjust.
+                    menu->handle_menu_click(event);
+                    CHECK(menu->current_screen() == screen);
+                    check_value_unchanged();
+                }
             }
         }
+        CHECK(checked_resolution_value);
+        CHECK_FALSE(menu->render_thread_.is_running());
         menu->reset_screen(MenuApp::Screen::SettingsSkins);
         menu->publish_snapshot();
         render::MenuClickEvent event;

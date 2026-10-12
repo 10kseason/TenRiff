@@ -1,9 +1,11 @@
 #include "gameplay/ModeApplier.h"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <numeric>
 #include <random>
+#include <set>
 #include <utility>
 
 #include "gameplay/KeyModeConverter.h"
@@ -34,6 +36,32 @@ void sort_audio_cues(GameplayChart& chart) {
                          }
                          return lhs.asset_id < rhs.asset_id;
                      });
+}
+
+void preserve_reduced_keysounds(const GameplayChart& source, GameplayChart& converted) {
+    // Match the live keysound scheduler's one voice per chart timestamp/asset.
+    // Lane and note IDs may change during conversion; neither identifies sound.
+    // Existing BGM is already audible, and authored duplicate cues stay intact.
+    using Sound = std::pair<int64_t, std::size_t>;
+    std::set<Sound> audible;
+    for (const auto& cue : converted.audio_cues) audible.emplace(cue.start_sample, cue.asset_id);
+    for (const auto& note : converted.notes) {
+        for (std::size_t i = 0; i < note_audio_asset_count(note); ++i) {
+            audible.emplace(note.start_sample, note_audio_asset_at(note, i));
+        }
+    }
+    bool added = false;
+    for (const auto& note : source.notes) {
+        if (!std::isfinite(note.audio_gain) || note.audio_gain <= 0.0f) continue;
+        for (std::size_t i = 0; i < note_audio_asset_count(note); ++i) {
+            const auto asset = note_audio_asset_at(note, i);
+            if (asset >= converted.audio_assets.size() ||
+                !audible.emplace(note.start_sample, asset).second) continue;
+            converted.audio_cues.push_back({note.start_sample, asset, std::clamp(note.audio_gain, 0.0f, 1.0f)});
+            added = true;
+        }
+    }
+    if (added) sort_audio_cues(converted);
 }
 
 int resolve_lane_count(const GameplayChart& chart) {
@@ -122,7 +150,6 @@ void apply_lane_map(GameplayChart& chart, const std::vector<int>& lane_map) {
 struct ScratchExtraction {
     GameplayChart chart;
     std::size_t scratch_note_count = 0;
-    std::size_t autoplay_cue_count = 0;
 };
 
 ScratchExtraction extract_key_part(const GameplayChart& source) {
@@ -149,15 +176,8 @@ ScratchExtraction extract_key_part(const GameplayChart& source) {
     for (const auto& source_note : source.notes) {
         if (std::binary_search(scratches.begin(), scratches.end(), source_note.lane)) {
             ++result.scratch_note_count;
-            const std::size_t asset_count = note_audio_asset_count(source_note);
-            for (std::size_t asset_index = 0; asset_index < asset_count; ++asset_index) {
-                const std::size_t asset_id = note_audio_asset_at(source_note, asset_index);
-                if (asset_id == kInvalidAudioAssetId) {
-                    continue;
-                }
-                result.chart.audio_cues.push_back(AudioCueEvent{source_note.start_sample, asset_id});
-                ++result.autoplay_cue_count;
-            }
+            // Restore missing sounds after the final conversion, where retained
+            // key notes and authored BGM can prevent duplicate playback.
             continue;
         }
 
@@ -616,9 +636,8 @@ ModeApplyResult apply_mode_settings(const GameplayChart& chart,
         } else if (scratch_extracted) {
             result.warnings.push_back(
                 "Scratch-aware key conversion excluded " + std::to_string(extracted.scratch_note_count) +
-                " scratch note(s), remapped only the key lanes, and moved " +
-                std::to_string(extracted.autoplay_cue_count) +
-                " followed scratch keysound(s) to autoplay.");
+                " scratch note(s), remapped only the key lanes, and preserved followed scratch keysounds "
+                "through retained notes or autoplay.");
         }
     }
 
@@ -638,6 +657,13 @@ ModeApplyResult apply_mode_settings(const GameplayChart& chart,
         apply_full_random(result.chart, settings.random_seed);
     } else if (settings.random == RandomMode::SuperRandom) {
         apply_super_random(result.chart, settings.random_seed, result.warnings);
+    }
+
+    // One final boundary covers every converter, grouped DP conversion, scratch
+    // extraction and legacy fallback without changing the playable chart/seed.
+    if (target_count > 0 && (result.chart.lane_count < resolve_lane_count(chart) ||
+                             (scratch_extracted && conversion_succeeded))) {
+        preserve_reduced_keysounds(chart, result.chart);
     }
 
     return result;

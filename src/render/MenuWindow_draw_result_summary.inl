@@ -48,17 +48,17 @@
         draw_result_text(result_loc("GRADE", "등급"), d2d_->hud_format.Get(),
                          native_rect("result_summary.rect.009", D2D1::RectF(summary_left, 424.0f, summary_left + 230.0f, 452.0f)),
                          d2d_->muted_brush.Get(), presentation.rank);
-        draw_result_text(data.result.rank.empty() ? "--" : data.result.rank,
-                         d2d_->header_format.Get(),
-                         native_rect("result_summary.rect.010", D2D1::RectF(summary_left, 458.0f, summary_left + 250.0f, 530.0f)),
-                         d2d_->accent_brush.Get(), presentation.rank);
+        draw_grade(0, to_wide(data.result.rank.empty() ? "--" : data.result.rank),
+                   d2d_->grade_format.Get(),
+                   native_rect("result_summary.rect.010", D2D1::RectF(summary_left, 450.0f, summary_left + 250.0f, 548.0f)),
+                   presentation.rank);
         draw_result_text(result_loc("ACCURACY", "정확도"), d2d_->hud_format.Get(),
                          native_rect("result_summary.rect.011", D2D1::RectF(summary_left + 300.0f, 424.0f, summary_right, 452.0f)),
                          d2d_->muted_brush.Get(), presentation.rank);
         draw_result_text(format_decimal(data.result.accuracy, 2) + "%",
                          d2d_->header_format.Get(),
                          native_rect("result_summary.rect.012", D2D1::RectF(summary_left + 300.0f, 458.0f, summary_right, 530.0f)),
-                         d2d_->text_brush.Get(), presentation.rank);
+                         semantic_brush(0x63E9FF), presentation.rank);
 
         const D2D1_RECT_F status_chip =
             native_rect("result_summary.rect.013", D2D1::RectF(summary_left, 558.0f, summary_right, 610.0f));

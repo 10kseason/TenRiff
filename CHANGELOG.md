@@ -1,8 +1,21 @@
 # Changelog
 
-## [Unreleased]
+## [1.8.8] - 2026-10-12
 
-- Pin the fixed stable baseline to the published 1.8.7 tag, commit and asset hashes. Synchronize Korean, English, Japanese and Simplified Chinese entry documents; mark earlier baselines as historical. This documentation-only follow-up leaves the released runtime and archives unchanged.
+Version scope and validation: see the [1.8.8 release gate](docs/release-1.8.8-gate.md) for current verification and delivery status. The user-pinned baseline remains 1.8.7.
+
+- Add lane timing distributions, accuracy across 12 song-time segments, and separate tap/LN-head/release/hold-failure analysis. Show measured counts, signed mean, mean absolute error and spread; unmeasurable misses and automatic LN completion never create zero-ms samples. Older records remain readable with analysis unavailable when absent. [Analysis semantics](docs/result-analysis-1.8.8.ko.md).
+- Support freely resizable windows and direct width/height entry while retaining presets, 16:9 content and correct pointer mapping. Add small F9 PNG/save-directory hints on single and multiplayer results. [Sizing and screenshot behavior](docs/release-conditions-1.8.8.ko.md) retains the earlier candidate evidence; current release checks are recorded separately.
+- Extend LN Mix with multi-beat holds alongside taps and short holds on other lanes, preserving original heads/keysounds and existing holds without merging repeated same-lane taps. Missing transform-version metadata retains v1. New v2 keeps local history/replay but is excluded from legacy chart-wide BEST and Sites upload. No ranking backend deployment is included.
+- Enlarge Studio Deck information and result timing/rank text, retain semantic judgement colors, draw gauge history with a height-based red/yellow/green gradient, and cache rank-color bloom as a small bitmap. Judgement and scoring rules remain unchanged.
+- Repeat table-URL Backspace on complete UTF-8 codepoints, filter against the selected table's numeric labels instead of falling back to native difficulty, and select skin lanes with 1-9, 0 for lane 10 and Shift+1-6 for lanes 11-16. Preserve normal filtering, existing lane controls and modal input ownership. [Display and menu details](docs/release-feedback-1.8.8.ko.md).
+- Restore keysounds removed by reduced-key conversion as background audio at their original head times, deduplicating identical time/asset sounds already played by final notes or authored BGM. Preserve playable notes, original BGM duplicates, replay seeds and existing Rate mixing; this does not add pitch-preserving time stretch. [Keysound scope and limits](docs/release-feedback-1.8.8.ko.md#키-수를-줄일-때-사라지던-키음-보존).
+- Add profile settings for skipping the initial solo countdown (default off) and an optional instant-retry key (default unbound). Instant retry skips the new attempt's display countdown while preserving audio preparation/chart lead-in; resume countdown and multiplayer synchronization remain intact. [Start/retry controls and restrictions](docs/gameplay-start-controls.ko.md).
+- Document read-only plugin boundaries, core-enforced multiplayer defaults, permission/runtime limits, sample-plugin acceptance gates, an SDK and future 1.9.0 stabilization. The plugin runtime/API/SDK remain unimplemented plans.
+
+### Earlier fixed-baseline documentation
+
+- Pin the fixed stable baseline to the published 1.8.7 tag, commit and asset hashes. Synchronize Korean, English, Japanese and Simplified Chinese entry documents; mark earlier baselines as historical. That earlier documentation-only update left the published 1.8.7 runtime and archives unchanged; the fixed identity remains preserved.
 
 ## [1.8.7] - 2026-10-09
 

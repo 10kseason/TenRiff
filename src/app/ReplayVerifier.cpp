@@ -225,7 +225,8 @@ ReplayVerificationResult verify_replay_against_chart(
                                                    canonical_judge,
                                                    replay.rate,
                                                    base_bpm,
-                                                   replay.sample_rate);
+                                                   replay.sample_rate,
+                                                   static_cast<LongNoteMixVersion>(replay.mode.long_note_mix_version));
     if (!equivalent_mode_mod_tokens(managed.active_mods, replay.mods)) {
         return invalid_result("Replay mods do not normalize to the recorded mode set.");
     }
@@ -309,7 +310,8 @@ ReplayVerificationResult verify_replay_against_chart(
                                !replay.aborted &&
                                !replay.mode.autoplay_enabled &&
                                !replay.mode.practice_no_fail_enabled &&
-                               !mode_mod_adds_notes(replay.mods) && !mode_mod_auto_scratch(replay.mods);
+                               !mode_mod_adds_notes(replay.mods) && !mode_mod_auto_scratch(replay.mods) &&
+                               !(mode_mod_long_note_mix(replay.mods) && replay.mode.long_note_mix_version != 1);
     result.detail = result.claims_match
                         ? "Replay outcome reproduced under the canonical ruleset."
                         : "Replay outcome reproduced; stored score/stat claims were ignored because they differ.";

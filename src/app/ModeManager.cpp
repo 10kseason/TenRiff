@@ -308,7 +308,9 @@ void apply_mixed_long_notes(gameplay::GameplayChart& chart,
                             int percent,
                             uint32_t random_seed,
                             double base_bpm,
-                            int sample_rate) {
+                            int sample_rate,
+                            LongNoteMixVersion version,
+                            double rate) {
     percent = std::clamp(percent, 0, 100);
     if (percent <= 0 || chart.notes.empty()) {
         return;
@@ -347,6 +349,17 @@ void apply_mixed_long_notes(gameplay::GameplayChart& chart,
     const int64_t sixteenth_samples = long_note_subdivision_samples(sample_rate, base_bpm, 16);
     const int64_t twenty_fourth_samples = long_note_subdivision_samples(sample_rate, base_bpm, 24);
     const int64_t thirty_second_samples = long_note_subdivision_samples(sample_rate, base_bpm, 32);
+    // Legacy selection and duration arithmetic must remain byte-for-byte stable
+    // for old replays. New durations follow the chart's playback-rate clock.
+    const double musical_bpm = (std::isfinite(base_bpm) && base_bpm > 0.0 ? base_bpm : 180.0) *
+        (std::isfinite(rate) && rate > 0.0 ? rate : 1.0);
+    const std::array<int64_t, 5> musical_lengths = {
+        long_note_subdivision_samples(sample_rate, musical_bpm, 16), // 1/4 beat
+        long_note_subdivision_samples(sample_rate, musical_bpm, 8),  // 1/2 beat
+        long_note_subdivision_samples(sample_rate, musical_bpm, 4),  // 1 beat
+        long_note_subdivision_samples(sample_rate, musical_bpm, 2),  // 2 beats
+        long_note_subdivision_samples(sample_rate, musical_bpm, 1),  // 4 beats
+    };
     std::vector<Candidate> candidates;
     candidates.reserve(chart.notes.size());
 
@@ -383,9 +396,12 @@ void apply_mixed_long_notes(gameplay::GameplayChart& chart,
                 end_sample =
                     chart.notes[indices[position + 1]].start_sample - same_lane_clearance_samples;
             }
-            // Every candidate must fit the longest bucket so the requested ratio never
-            // changes through tail clamping on dense same-lane patterns.
-            if (end_sample <= note.start_sample || end_sample - note.start_sample < eighth_samples) {
+            // V1 requires its longest (half-beat) duration. V2 keeps the same
+            // half-beat eligibility at the effective rate; longer tails are
+            // chosen only where the original same-lane heads leave room.
+            const int64_t minimum_space = version == LongNoteMixVersion::LegacyShort
+                ? eighth_samples : musical_lengths[1];
+            if (end_sample <= note.start_sample || end_sample - note.start_sample < minimum_space) {
                 continue;
             }
 
@@ -435,6 +451,22 @@ void apply_mixed_long_notes(gameplay::GameplayChart& chart,
             duration_samples = dense_index % 2u == 0u
                                    ? twenty_fourth_samples
                                    : thirty_second_samples;
+        }
+        if (version == LongNoteMixVersion::Musical) {
+            std::size_t length_index = 2; // Medium 20%: one beat.
+            if (i >= duration_counts.sixteenth &&
+                i < duration_counts.sixteenth + duration_counts.eighth) {
+                // Long 60%: alternating two/four-beat holds let other lanes
+                // continue their original taps and short holds underneath.
+                length_index = 3 + (i - duration_counts.sixteenth) % 2;
+            } else if (i >= duration_counts.sixteenth + duration_counts.eighth) {
+                length_index = (i - duration_counts.sixteenth - duration_counts.eighth) % 2;
+            }
+            const int64_t available = candidate.end_sample - note.start_sample;
+            while (length_index > 0 && musical_lengths[length_index] > available) {
+                --length_index;
+            }
+            duration_samples = musical_lengths[length_index];
         }
         note.end_sample = std::min(candidate.end_sample, note.start_sample + duration_samples);
         note.release_required = false;
@@ -754,6 +786,10 @@ bool mode_mod_auto_scratch(const std::vector<std::string>& tokens) {
     return has_mod_token(normalize_mode_mod_tokens(tokens), "auto_scratch");
 }
 
+bool mode_mod_long_note_mix(const std::vector<std::string>& tokens) {
+    return selected_long_note_mix_percent(normalize_mode_mod_tokens(tokens)) > 0;
+}
+
 std::string mode_mod_summary(const std::vector<std::string>& tokens) {
     const std::vector<std::string> normalized = normalize_mode_mod_tokens(tokens);
     std::vector<std::string> labels;
@@ -827,7 +863,8 @@ ModeManagerResult manage_modes(const gameplay::GameplayChart& chart,
                                const config::JudgeConfig& judge,
                                double rate,
                                double base_bpm,
-                               int sample_rate) {
+                               int sample_rate,
+                               LongNoteMixVersion long_note_mix_version) {
     ModeManagerResult result;
     result.chart = chart;
     result.judge = judge;
@@ -859,7 +896,8 @@ ModeManagerResult manage_modes(const gameplay::GameplayChart& chart,
         } else if (const int mix_percent = selected_long_note_mix_percent(result.active_mods);
                    mix_percent > 0) {
             apply_mixed_long_notes(
-                result.chart, mix_percent, config.random_seed, base_bpm, sample_rate);
+                result.chart, mix_percent, config.random_seed, base_bpm, sample_rate,
+                long_note_mix_version, rate);
         }
         if (has_mod_token(result.active_mods, "no_ln_release")) {
             apply_no_ln_release(result.chart);

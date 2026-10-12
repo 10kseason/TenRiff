@@ -321,6 +321,7 @@ private:
     void apply_input_settings_effects(const menu::MenuEffectFlags& effects);
     void apply_calibration_settings_effects(const menu::MenuEffectFlags& effects);
     void refresh_graphics_resolutions();
+    bool service_window_size_change();
     void handle_graphics_settings_input(uint32_t keycode);
     void apply_graphics_settings_effects(
         const menu::settings::GraphicsSettingsEffects& effects);
@@ -578,6 +579,7 @@ private:
         std::string final_gauge = "normal";
         bool game_over = true;
         std::vector<std::string> mods;
+        int long_note_mix_version = 1;
         double rate_multiplier = 1.0;
         double score_multiplier = 1.0;
         bool pause_used = false;
@@ -613,6 +615,7 @@ private:
         double rate = 1.0;
         double input_offset_ms = 0.0;
         std::vector<std::string> mods;
+        int long_note_mix_version = 1;
         double rate_multiplier = 1.0;
         double score_multiplier = 1.0;
         bool pause_used = false;
@@ -649,6 +652,7 @@ private:
     std::string last_final_gauge_ = "normal";
     std::vector<std::string> last_export_warnings_;
     std::vector<std::string> last_result_mods_{};
+    int last_result_long_note_mix_version_ = 1;
     double last_result_rate_multiplier_ = 1.0;
     double last_result_score_multiplier_ = 1.0;
     int64_t last_result_final_score_ = 0;
@@ -723,6 +727,7 @@ private:
     menu::settings::InputSettingsController input_settings_controller_{};
     menu::settings::CalibrationSettingsController calibration_settings_controller_{};
     menu::settings::GraphicsSettingsController graphics_settings_controller_{};
+    std::string graphics_resolution_status_;
     menu::settings::KeymapSettingsController keymap_settings_controller_{};
     menu::settings::ModeSettingsController mode_settings_controller_{};
     menu::settings::SkinSettingsController skin_settings_controller_{};
@@ -755,6 +760,8 @@ private:
     uint64_t profile_avatar_revision_ = 0;
     bool profile_nickname_edit_active_ = false;
     std::string profile_nickname_before_edit_;
+    bool profile_restart_key_capture_active_ = false;
+    std::string profile_restart_key_status_;
     bool help_overlay_visible_ = false;
     std::string available_lr2_skin_root_;
     std::vector<std::string> available_lr2_skin_names_{};
@@ -777,6 +784,8 @@ private:
     gameplay::ResultStats last_result_{};
     int64_t result_presentation_start_ns_ = 0;
     bool result_presentation_skipped_ = false;
+    int result_analysis_page_ = 0;
+    int result_analysis_lane_bank_ = 0;
 
     int64_t last_indexer_snapshot_ns_ = 0;
     int64_t last_song_select_slow_snapshot_log_ns_ = 0;

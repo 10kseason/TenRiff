@@ -1,5 +1,7 @@
 # Portable skin presets
 
+For 1.8.8 target-lane number shortcuts and their visual left-to-right order, see [skin lane controls (Korean)](release-feedback-1.8.8.ko.md#스킨의-숫자-레인-선택). These shortcuts select an editing target; the `.trskin` format is unchanged.
+
 `Options > Skins` now includes **Export Skin Preset** and **Import Skin Preset**.
 Export writes one `.trskin` file. Send that file to another player, then import it
 on their computer. Dropping a `.trskin` onto the Skins screen also imports it.

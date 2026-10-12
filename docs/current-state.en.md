@@ -2,6 +2,10 @@
 
 **Fixed baseline: [1.8.7](baseline-1.8.7.en.md)** (2026-10-10). Use Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`; do not advance it automatically with `latest` or a new release.
 
+**2026-10-12 · 1.8.8:** Combines result analysis, free window sizing and F9 PNG hints, long LN Mix, readability updates, table URL/filter fixes, skin lane shortcuts, preserved keysounds during key-count reduction, and solo start/instant-retry controls. See the [1.8.8 release gate](release-1.8.8-gate.md) for current validation, packages and publication status. The fixed baseline remains 1.8.7.
+
+**Analysis and extension plans:** Separate lane distributions, time-based accuracy and tap/LN-head/release/hold-failure events; unmeasurable misses are never zero-ms samples. Long LN Mix v2 keeps local history/replay only and is excluded from legacy BEST and Sites uploads. Plugins and 1.9.0 stabilization remain plans. [Analysis](result-analysis-1.8.8.ko.md), [display/menu/keysound changes](release-feedback-1.8.8.ko.md), [start/retry controls](gameplay-start-controls.ko.md) (Korean).
+
 **2026-10-09 · TenRiff 1.8.7:** Improves input calibration and chart-loading audio, adds LR2 solo Studio Deck, 750ms FAST/SLOW retention, key reassignment, consolidated Options and complete song-title fitting. [1.8.7 release](release-1.8.7-gate.md).
 
 **2026-10-08 · TenRiff 1.8.6:** Adds the Studio Deck HUD for Native solo play. Left and right Shift work as play keys; F5/F6 halve/double Hi-Speed and F11 opens chat. Classic HUD remains selectable. [1.8.6 release](release-1.8.6-gate.md).
@@ -23,7 +27,7 @@
 - 1.7.10 hardens ALL SONG against deleted cached entries and adds merge progress and consistent completion-state publication. [Verification and unreproduced symptom](release-1.7.10-gate.md).
 - 1.7.8 adds modern native menus, Luma Keys digital keyboard skins for every 4K–16K layout, Japanese UI, and web/offline skin editing. Menu and gameplay visual controls are stored separately in `native` and `gameplay.native`. [Validation](release-1.7.8-gate.md).
 
-The current project version is **1.8.7**. Audio → Song Ending offers **Listen** (default) or **Skip Outro**; completed plays save and submit without another key. New plays use R4 timing based on BMS RANK and a timing profile for web submissions; existing R1/R2/R3 records are preserved. WASAPI remains the default. See the [1.8.7 release gate](release-1.8.7-gate.md) for changes, completed release checks and remaining limits.
+The fixed baseline is **1.8.7**; this source version is **1.8.8**. Audio → Song Ending offers **Listen** (default) or **Skip Outro**; completed plays save and submit without another key. New plays use R4 timing based on BMS RANK and a timing profile for web submissions; existing R1/R2/R3 records are preserved. WASAPI remains the default. See the [1.8.8 release gate](release-1.8.8-gate.md) for this release's validation status and remaining limits.
 
 The 749/739 checks in the [local 1.7.1 r2 report](local-1.7.1-r2.ko.md) are historical, not the new release's results. See [library management](library-management.md), [reference BPM](reference-bpm.md), [skin presets](skin-presets.md) and [ASIO](asio-audio.md).
 
@@ -135,7 +139,7 @@ This is the document that the next agent or any new contributor should read firs
   - BMS LV/CR calculation evaluates only LN head/tail miss-ms at 0.5x, so `300ms` is treated as `150ms`; runtime gameplay judgement windows remain unchanged
 - Lane transform:
   - Random supports `Off / Mirror / Random (Scratch Fixed) / SR`; ordinary Random keeps scratch fixed, creates a fresh key-lane permutation per play, and records the actual seed in the replay
-  - Mod Manager `LN Mix 10%-90%` preserves existing holds and excludes heads overlapping an existing same-lane span. It selects the requested share of taps that can fit a base-BPM 1/8-note hold while ending at least 50ms before the next same-lane note, then deterministically assigns every Mix level 60% long 1/8-note, 20% medium 1/16-note, and 20% short alternating 1/24- and 1/32-note lengths
+  - New `LN Mix 10%-90%` v2 targets 60% long 2/4-beat, 20% medium 1-beat and 20% short 1/4-/1/2-beat holds at base BPM × Rate. It preserves existing holds, original heads/keysounds and 50ms clearance before the next same-lane head, shortening targets when space is limited without merging repeated taps. Legacy replays keep v1; v2 keeps local history/replay but is excluded from legacy BEST and Sites upload. See [added conditions and checks (Korean)](release-1.8.8-gate.md)
 - Skins / gameplay feel:
   - standard `10+2 DP` charts map the `10K` lane-color palette across the ten playable key lanes while leaving native 12K palettes independent
   - `rect / triangle / pentagon / hexagon / circle` note shapes; procedural circles and polygons use the full rect-bar width at 100%
@@ -179,7 +183,8 @@ This is the document that the next agent or any new contributor should read firs
   - in R3, releasing an ordinary LN or `#LNMODE 2` CN too early immediately commits BAD, a combo break and gauge loss; regrabbing cannot cancel it. Ordinary LN still completes automatically when held, and CN retains tail release timing
   - when two keyboards press the same key, the logical `Pressed` state remains active until the last input source releases it
 - Graphics:
-  - resolution presets (`720p`, `1080p`, `qhd`, `native`)
+  - existing resolution presets plus direct width/height input (320–8192 per axis) and freely resizable window borders; preserve 16:9 content, margins and click mapping, and save the completed drag size. See [controls and recovery behavior](config.en.md#graphics)
+  - Single-result summaries, analysis tabs and multiplayer results show a small `F9` PNG / `screenshots/` hint. Files use the current working directory; actual saving in this release is covered separately by the [additional release checks (Korean)](release-1.8.8-gate.md)
   - `refresh_hz` (`-1` = `Match Display`, `0` = `Unlimited`, actual maximum 1500 FPS)
   - VSync off: Match Display follows monitor Hz; Unlimited caps gameplay at 1500 FPS while keeping the menu cap at `300`
   - VSync on: present refresh follows the active monitor Hz and render pacing targets `monitor_hz * 2` (`1050` clamp)

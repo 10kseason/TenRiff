@@ -102,6 +102,39 @@ bool GraphicsSettingsController::dirty() const noexcept {
     return dirty_;
 }
 
+void GraphicsSettingsController::set_native_resolution(int width, int height) noexcept {
+    if (config::valid_graphics_dimensions(width, height)) {
+        native_width_ = width;
+        native_height_ = height;
+    }
+}
+
+GraphicsSettingsEffects GraphicsSettingsController::resolution_text(std::string_view text) {
+    if (!resolution_editing_ || text.empty()) return {};
+    auto& field = resolution_fields_[static_cast<std::size_t>(resolution_field_)];
+    for (const unsigned char ch : text) {
+        if (ch < 0x20 || ch >= 0x7f) continue;
+        if (resolution_replace_) { field.clear(); resolution_replace_ = false; }
+        if (field.size() < 16) field.push_back(static_cast<char>(ch));
+    }
+    resolution_error_ = false;
+    GraphicsSettingsEffects effects;
+    effects.menu.render_changed = true;
+    return effects;
+}
+
+GraphicsSettingsEffects GraphicsSettingsController::resolution_erase(bool clear_all) {
+    if (!resolution_editing_) return {};
+    auto& field = resolution_fields_[static_cast<std::size_t>(resolution_field_)];
+    if (clear_all || resolution_replace_) field.clear();
+    else if (!field.empty()) field.pop_back();
+    resolution_replace_ = false;
+    resolution_error_ = false;
+    GraphicsSettingsEffects effects;
+    effects.menu.render_changed = true;
+    return effects;
+}
+
 void GraphicsSettingsController::set_display_resolutions(const std::vector<std::pair<int, int>>& modes) {
     // Enumeration runs when opening Graphics or pressing F5, never per frame.
     resolution_choices_ = config::graphics_resolution_choices(modes);
@@ -113,6 +146,8 @@ void GraphicsSettingsController::reset(GraphicsSettingId selected) noexcept {
         : GraphicsSettingId::Display;
     selected_confirmation_id_ = OnnxUpscalerConfirmId::KeepNative;
     dirty_ = false;
+    resolution_editing_ = false;
+    resolution_error_ = false;
 }
 
 GraphicsSettingsEffects GraphicsSettingsController::select(
@@ -121,6 +156,10 @@ GraphicsSettingsEffects GraphicsSettingsController::select(
         return {};
     }
     selected_id_ = target;
+    if (resolution_editing_ && target != GraphicsSettingId::Resolution) {
+        resolution_editing_ = false;
+        resolution_error_ = false;
+    }
     GraphicsSettingsEffects effects;
     effects.menu.render_changed = true;
     return effects;
@@ -130,6 +169,38 @@ GraphicsSettingsEffects GraphicsSettingsController::handle(
     const MenuAction& action,
     config::RuntimeConfig& runtime,
     std::optional<GraphicsSettingId> target) {
+    if (resolution_editing_) {
+        GraphicsSettingsEffects effects;
+        effects.menu.render_changed = true;
+        // A click on another row cancels the draft, then selects that row.
+        if (target && *target != GraphicsSettingId::Resolution) {
+            resolution_editing_ = false;
+            resolution_error_ = false;
+            effects.merge(select(*target));
+            return effects;
+        }
+        if (action.kind == MenuActionKind::Back) {
+            resolution_editing_ = false;
+            resolution_error_ = false;
+        } else if (action.kind == MenuActionKind::Move || action.kind == MenuActionKind::Adjust) {
+            if (action.direction != 0) resolution_field_ = 1 - resolution_field_;
+            resolution_replace_ = true;
+        } else if (action.kind == MenuActionKind::Activate) {
+            const auto [width, height] = config::parse_graphics_dimension_fields(resolution_fields_[0], resolution_fields_[1]);
+            if (width == 0) {
+                resolution_error_ = true;
+            } else {
+                const auto token = config::normalize_graphics_resolution(std::to_string(width) + "x" + std::to_string(height));
+                resolution_editing_ = false;
+                resolution_error_ = false;
+                if (runtime.graphics.resolution != token) {
+                    runtime.graphics.resolution = token;
+                    effects.merge(mark_changed(true));
+                }
+            }
+        }
+        return effects;
+    }
     if (action.kind == MenuActionKind::Back) {
         return leave_screen();
     }
@@ -261,6 +332,18 @@ GraphicsSettingsEffects GraphicsSettingsController::apply_selected_action(
                 cycle_display_mode(runtime.graphics.display_mode, direction);
             return mark_changed(true);
         case GraphicsSettingId::Resolution:
+            if (is_activate) {
+                auto [width, height] = config::graphics_resolution_dimensions(runtime.graphics.resolution);
+                if (width == 0) { width = native_width_; height = native_height_; }
+                resolution_fields_ = {std::to_string(width), std::to_string(height)};
+                resolution_editing_ = true;
+                resolution_error_ = false;
+                resolution_replace_ = true;
+                resolution_field_ = 0;
+                GraphicsSettingsEffects effects;
+                effects.menu.render_changed = true;
+                return effects;
+            }
             // Remember custom sizes across subsequent +/- adjustments too.
             if (const auto token = config::normalize_graphics_resolution(runtime.graphics.resolution);
                 std::find(resolution_choices_.begin(), resolution_choices_.end(), token) == resolution_choices_.end()) {

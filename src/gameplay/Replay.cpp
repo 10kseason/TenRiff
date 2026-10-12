@@ -9,6 +9,7 @@
 #include <utility>
 
 #include "config/SimpleJson.h"
+#include "gameplay/TimingAnalysisJson.h"
 
 namespace tenriff::gameplay {
 
@@ -228,6 +229,8 @@ config::JsonValue build_stats_json(const ResultStats& stats) {
     obj.emplace("negative_delta_count", config::JsonValue{static_cast<double>(stats.negative_delta_count)});
     obj.emplace("gauge_history", build_gauge_history_json(stats.gauge_history));
     obj.emplace("shifts", build_shift_json(stats.shifts));
+    auto analysis = build_timing_analysis_json(stats.analysis);
+    if (!analysis.is_null()) obj.emplace("analysis_v1", std::move(analysis));
     return config::JsonValue{std::move(obj)};
 }
 
@@ -256,6 +259,9 @@ config::JsonValue build_trace_json(const ReplayTrace& trace) {
 
 config::JsonValue build_mode_json(const ReplayModeSettings& mode) {
     config::JsonObject obj;
+    if (mode.long_note_mix_version != 1) {
+        obj.emplace("long_note_mix_version", config::JsonValue{static_cast<double>(mode.long_note_mix_version)});
+    }
     if (!mode.key_mode.empty()) {
         obj.emplace("key_mode", config::JsonValue{mode.key_mode});
     }
@@ -312,7 +318,7 @@ ExportResult save_json_file(const std::string& path, const config::JsonValue& ro
         return result;
     }
 
-    file << config::json_stringify(root, indent);
+    file << config::json_stringify(root, indent, std::numeric_limits<double>::max_digits10);
     if (!file) {
         result.error = "Failed to write export file: " + path;
         return result;
@@ -324,6 +330,11 @@ ExportResult save_json_file(const std::string& path, const config::JsonValue& ro
 }  // namespace
 
 ExportResult save_replay_json(const std::string& path, const ReplayFile& replay, int indent) {
+    if (replay.mode.long_note_mix_version != 1 && replay.mode.long_note_mix_version != 2) {
+        ExportResult result;
+        result.error = "Unsupported LN Mix conversion version.";
+        return result;
+    }
     if (replay.bms_rank && (*replay.bms_rank < 0 || *replay.bms_rank > 3)) {
         ExportResult result;
         result.error = "Replay BMS rank must be an integer from 0 through 3.";
@@ -362,6 +373,11 @@ ExportResult save_replay_json(const std::string& path, const ReplayFile& replay,
 }
 
 ExportResult save_result_json(const std::string& path, const ResultFile& result_file, int indent) {
+    if (result_file.long_note_mix_version != 1 && result_file.long_note_mix_version != 2) {
+        ExportResult result;
+        result.error = "Unsupported LN Mix conversion version.";
+        return result;
+    }
     if (result_file.bms_rank && (*result_file.bms_rank < 0 || *result_file.bms_rank > 3)) {
         ExportResult result;
         result.error = "Result BMS rank must be an integer from 0 through 3.";
@@ -370,6 +386,9 @@ ExportResult save_result_json(const std::string& path, const ResultFile& result_
     config::JsonObject obj;
     obj.emplace("version", config::JsonValue{static_cast<double>(result_file.version)});
     obj.emplace("replay_format_version", config::JsonValue{static_cast<double>(result_file.replay_format_version)});
+    if (result_file.long_note_mix_version != 1) {
+        obj.emplace("long_note_mix_version", config::JsonValue{static_cast<double>(result_file.long_note_mix_version)});
+    }
     obj.emplace("chart_path", config::JsonValue{result_file.chart_path});
     obj.emplace("chart_format", config::JsonValue{result_file.chart_format});
     if (result_file.bms_rank) {
@@ -466,6 +485,13 @@ ReplayLoadResult load_replay_json(const std::string& path) {
     replay.aborted = read_json_bool(*root, "aborted", false);
 
     if (const auto* mode = find_json_object(*root, "mode")) {
+        if (const auto* version = find_json_value(*mode, "long_note_mix_version")) {
+            if (!version->is_number() || (version->as_number() != 1.0 && version->as_number() != 2.0)) {
+                result.error = "Unsupported LN Mix conversion version.";
+                return result;
+            }
+            replay.mode.long_note_mix_version = static_cast<int>(version->as_number());
+        }
         replay.mode.key_mode = read_json_string(*mode, "key_mode");
         replay.mode.key_conversion_algorithm =
             read_json_string(*mode, "key_conversion_algorithm");
@@ -526,6 +552,7 @@ ReplayLoadResult load_replay_json(const std::string& path) {
     }
 
     if (const auto* stats = find_json_object(*root, "stats")) {
+        replay.stats.analysis = parse_timing_analysis_json(find_json_value(*stats, "analysis_v1"));
         if (const auto* counts = find_json_object(*stats, "counts")) {
             replay.stats.counts.pg = read_json_int(*counts, "pg", 0);
             replay.stats.counts.gr = read_json_int(*counts, "gr", 0);
@@ -650,6 +677,10 @@ ReplayLoadResult load_replay_json(const std::string& path) {
 
 ReplayValidationResult validate_replay_evidence(const ReplayFile& replay) {
     ReplayValidationResult result;
+    if (replay.mode.long_note_mix_version != 1 && replay.mode.long_note_mix_version != 2) {
+        result.error = "Unsupported LN Mix conversion version.";
+        return result;
+    }
     if (replay.bms_rank && (*replay.bms_rank < 0 || *replay.bms_rank > 3)) {
         result.error = "Replay BMS rank must be an integer from 0 through 3.";
         return result;

@@ -4,6 +4,7 @@
 #include <cctype>
 #include <charconv>
 #include <cmath>
+#include <limits>
 #include <sstream>
 
 namespace tenriff::config {
@@ -449,8 +450,9 @@ JsonParseResult parse_json(std::string_view text) {
     return parser.parse();
 }
 
-std::string json_stringify(const JsonValue& value, int indent) {
+std::string json_stringify(const JsonValue& value, int indent, int number_precision) {
     std::ostringstream out;
+    out.precision(std::clamp(number_precision, 1, std::numeric_limits<double>::max_digits10));
     write_value(out, value, indent, 0);
     return out.str();
 }

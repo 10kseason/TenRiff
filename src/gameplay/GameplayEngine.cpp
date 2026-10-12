@@ -72,6 +72,7 @@ GameplayEngine::GameplayEngine(const GameplayChart& chart, const GameplayConfig&
     }
 
     stats_.record_note_total(playable_note_count, total_combo_steps);
+    stats_.analysis.initialize(lane_count_, sample_rate_, duration_samples_);
     if (gauge_shift_enabled_) {
         for (std::size_t i = 0; i < kGaugeShiftPriority.size(); ++i) {
             gauge_shift_states_[i] = gauge_manager_.initialState(kGaugeShiftPriority[i]);
@@ -137,7 +138,7 @@ std::optional<NoteEvent> GameplayEngine::handle_input(int lane, input::InputStat
         if (!hit_note.has_value()) {
             if (previous_next_index == lane_state.next_index &&
                 should_apply_early_empty_poor(lane_state, input_sample)) {
-                apply_empty_poor(input_sample);
+                apply_empty_poor(lane, input_sample);
                 lane_state.mask_until = input_sample + windows_.mask;
             }
             return std::nullopt;
@@ -484,6 +485,8 @@ std::optional<NoteEvent> GameplayEngine::try_hit_note(LaneState& lane, int64_t i
                              note.end_sample.has_value() && !note.release_required;
         apply_judgement(judgement, delta_ms, input_sample, weight, combo_impact, osu_head_miss,
                         lr2_hold ? 0.0 : weight);
+        stats_.analysis.observe(note.end_sample.has_value() ? TimingEventKind::LnHead : TimingEventKind::Tap,
+                                note.lane, note.start_sample, judgement, delta_ms, weight);
 
         if (note.end_sample.has_value()) {
             if (game_over_) {
@@ -516,7 +519,6 @@ void GameplayEngine::apply_missed_note(const NoteEvent& note, int64_t sample) {
 }
 
 void GameplayEngine::apply_bad_miss(const NoteEvent& note, int64_t sample) {
-    static_cast<void>(note);
     record_osu_mania_od8_judgement(stats_.osu_od8, OsuManiaJudgement::Miss);
     apply_judgement(game::Judgement::BD,
                     std::numeric_limits<double>::quiet_NaN(),
@@ -524,10 +526,11 @@ void GameplayEngine::apply_bad_miss(const NoteEvent& note, int64_t sample) {
                     1.0,
                     ComboImpact::Break,
                     true);
+    stats_.analysis.observe(note.end_sample.has_value() ? TimingEventKind::LnHead : TimingEventKind::Tap,
+                            note.lane, note.start_sample, game::Judgement::BD, std::nullopt, 1.0);
 }
 
 void GameplayEngine::apply_indirect_miss(const NoteEvent& note, int64_t sample) {
-    static_cast<void>(note);
     record_osu_mania_od8_judgement(stats_.osu_od8, OsuManiaJudgement::Miss);
     apply_judgement(game::Judgement::PR,
                     std::numeric_limits<double>::quiet_NaN(),
@@ -535,15 +538,19 @@ void GameplayEngine::apply_indirect_miss(const NoteEvent& note, int64_t sample) 
                     1.0,
                     ComboImpact::Break,
                     true);
+    stats_.analysis.observe(note.end_sample.has_value() ? TimingEventKind::LnHead : TimingEventKind::Tap,
+                            note.lane, note.start_sample, game::Judgement::PR, std::nullopt, 1.0);
 }
 
-void GameplayEngine::apply_empty_poor(int64_t sample) {
+void GameplayEngine::apply_empty_poor(int lane, int64_t sample) {
     apply_judgement(game::Judgement::PR,
                     std::numeric_limits<double>::quiet_NaN(),
                     sample,
                     1.0,
                     ComboImpact::Preserve,
                     false);
+    stats_.analysis.observe(TimingEventKind::EmptyPoor, lane, sample,
+                            game::Judgement::PR, std::nullopt, 1.0);
 }
 
 OsuManiaJudgement GameplayEngine::record_osu_hold(const HoldState& hold,
@@ -582,6 +589,7 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
     }
 
     auto& hold = *lane.hold;
+    const int lane_number = static_cast<int>(&lane - lanes_.data()) + 1;
     const int64_t hold_timeout = windows_.hold_break;
     const bool lr2_hold = gauge_manager_.policy().course_lr2_deltas && !hold.release_required;
     const double tail_gauge_weight = lr2_hold ? 0.0 : 0.5;
@@ -605,6 +613,9 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
                             combo_impact,
                             osu_judgement == OsuManiaJudgement::Miss,
                             tail_gauge_weight);
+            stats_.analysis.observe(judgement == game::Judgement::BD ? TimingEventKind::HoldFailure
+                                                                    : TimingEventKind::LnRelease,
+                                    lane_number, hold.end_sample, judgement, delta_ms, 0.5);
             lane.hold.reset();
             return;
         }
@@ -620,6 +631,8 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
                             ComboImpact::Break,
                             osu_judgement == OsuManiaJudgement::Miss,
                             tail_gauge_weight);
+            stats_.analysis.observe(TimingEventKind::LnRelease, lane_number, hold.end_sample,
+                                    game::Judgement::BD, std::nullopt, 0.5);
             lane.hold.reset();
         }
         return;
@@ -642,6 +655,13 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
                             combo_impact,
                             osu_judgement == OsuManiaJudgement::Miss,
                             tail_gauge_weight);
+            // A held-through standard LN is a scoring PG, but no player release
+            // was measured. Keep its original scoring delta while excluding that
+            // synthetic zero from the independent timing distribution.
+            stats_.analysis.observe(hold.release_active ? TimingEventKind::LnRelease
+                                                       : TimingEventKind::AutoCompletion,
+                                    lane_number, hold.end_sample, judgement,
+                                    hold.release_active ? std::optional<double>{delta_ms} : std::nullopt, 0.5);
         }
         lane.hold.reset();
     }

@@ -532,6 +532,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
     };
 
 #include "MenuWindow_draw_wordmark.inl"
+#include "MenuWindow_draw_grade.inl"
 
     auto loc = [&](std::string_view english, std::string_view korean) {
         return ui::text(data.ui_language, english, korean);

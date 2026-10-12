@@ -79,6 +79,7 @@ void GameSession::rebuild_input_thread_config(input::InputThreadConfig& input_co
         append_unique_key(f9_keycode_);
         append_unique_key(f10_keycode_);
         append_unique_key(f11_keycode_);
+        append_unique_key(instant_restart_keycode_);
     }
 }
 
@@ -121,6 +122,7 @@ void GameSession::rebuild_polled_gameplay_keys() {
     append_unique_key(f9_keycode_);
     append_unique_key(f10_keycode_);
     append_unique_key(f11_keycode_);
+    append_unique_key(instant_restart_keycode_);
 }
 
 GameSession::GameSession() = default;
@@ -153,6 +155,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     resume_countdown_value_.store(0, std::memory_order_release);
     pause_resume_end_sample_ = 0;
     restart_requested_.store(false, std::memory_order_release);
+    instant_restart_requested_.store(false, std::memory_order_release);
+    instant_restart_key_armed_ = true;
+    instant_restart_keycode_ = 0;
     exit_requested_.store(false, std::memory_order_release);
     pause_menu_cursor_.store(0, std::memory_order_release);
     pause_sample_offset_ = 0;
@@ -569,6 +574,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         return false;
     }
 
+    long_note_mix_version_ = replay_playback_enabled_ ? replay_source_.mode.long_note_mix_version : 2;
     ModeManagerResult mode_result =
         manage_modes(chart_result.chart,
                      chart_result.format,
@@ -576,7 +582,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
                      config_.judge,
                      config_.speed.rate,
                      chart_result.base_bpm,
-                     sample_rate_);
+                     sample_rate_,
+                     static_cast<LongNoteMixVersion>(long_note_mix_version_));
     if (replay_playback_enabled_) {
         const auto base_judge = is_supported_canonical_replay_ruleset(replay_source_.ruleset_id)
                                     ? config::JudgeConfig{} : config_.judge;
@@ -724,9 +731,21 @@ bool GameSession::initialize(const CommandLineOptions& options) {
             ghost_replay_enabled_ = false;
             ghost_replay_source_ = {};
             ghost_replay_event_index_ = 0;
+        } else if (mode_mod_long_note_mix(active_mods_) &&
+                   ghost_replay_source_.mode.long_note_mix_version != long_note_mix_version_) {
+            // Both fields share one chart. Adopt the validated ghost's original
+            // conversion only for this run; rejected ghosts cannot change a new
+            // session. Export this same version so the new score stays replayable.
+            long_note_mix_version_ = ghost_replay_source_.mode.long_note_mix_version;
+            chart_ = manage_modes(chart_result.chart, chart_result.format, config_.mode,
+                                  config_.judge, config_.speed.rate, chart_result.base_bpm,
+                                  sample_rate_, static_cast<LongNoteMixVersion>(long_note_mix_version_)).chart;
+            std::cerr << "[info] LN Mix Legacy: matching the ghost's original short-hold chart." << std::endl;
         }
     }
-    if (practice_start_seconds_ > 0.0) {
+    // The immediate shortcut means the beginning of the song even when this
+    // attempt came from an editor practice marker. Ordinary Retry keeps it.
+    if (practice_start_seconds_ > 0.0 && !instant_restart_start_) {
         const double rate = std::max(0.0001, rate_multiplier_);
         const auto start_sample = static_cast<int64_t>(std::llround(
             practice_start_seconds_ * static_cast<double>(sample_rate_) / rate));
@@ -783,6 +802,10 @@ bool GameSession::initialize(const CommandLineOptions& options) {
                   << " expected=" << std::max(1, chart_.lane_count)
                   << ". Invalid bindings or duplicate lane keys may prevent judgement/input interaction."
                   << std::endl;
+    }
+    instant_restart_keycode_ = resolve_instant_restart_key(config_.ui.instant_restart_key, key_to_lane_);
+    if (!config_.ui.instant_restart_key.empty() && instant_restart_keycode_ == 0) {
+        std::cerr << "[warn] Instant Restart Key is invalid, reserved or bound to a lane; disabled for this chart." << std::endl;
     }
     rebuild_polled_gameplay_keys();
     report_loading_progress(88, "Preparing chart audio");
@@ -905,8 +928,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     }
     std::cerr << std::endl;
 
-    countdown_active_ = true;
-    countdown_value_ = static_cast<int>(kGameplayStartCountdownSeconds);
+    countdown_value_ = gameplay_start_countdown_seconds(config_.ui.skip_start_countdown,
+                                                       peer_battle_mode_, instant_restart_start_);
+    countdown_active_ = countdown_value_ > 0;
     report_loading_progress(100, "Ready");
     return true;
 }
@@ -1719,7 +1743,7 @@ bool GameSession::prepare_chart_audio() {
         asset.first_use_sample = (std::min)(asset.first_use_sample, sample);
         asset.last_use_sample = (std::max)(asset.last_use_sample, sample);
         ++asset.use_count;
-        chart_audio_events_.push_back(ChartAudioEvent{sample, cue.asset_id, ChartAudioEvent::Kind::Bgm});
+        chart_audio_events_.push_back(ChartAudioEvent{sample, cue.asset_id, ChartAudioEvent::Kind::Bgm, cue.gain});
     }
     for (const auto& note : chart_.notes) {
         const int64_t sample = std::max<int64_t>(0, note.start_sample);
@@ -2129,7 +2153,7 @@ void GameSession::schedule_chart_audio(int64_t buffer_end_samples) {
         if (evt.start_sample >= buffer_end_samples) {
             break;
         }
-        chart_audio_voices_.push_back(ChartAudioVoice{evt.start_sample, evt.asset_id, evt.kind, 1.0f});
+        chart_audio_voices_.push_back(ChartAudioVoice{evt.start_sample, evt.asset_id, evt.kind, evt.gain});
         ++next_chart_audio_event_;
     }
 }
@@ -2268,6 +2292,7 @@ void GameSession::shutdown() {
         result_.final_gauge = gauge_type_token(final_gauge);
         result_.final_gauge_value = final_gauge_value;
         result_.mods = active_mods_;
+        result_.long_note_mix_version = mode_mod_long_note_mix(active_mods_) ? long_note_mix_version_ : 1;
         result_.player_name = config::normalize_profile_nickname(config_.ui.profile_nickname);
         if (result_.player_name.empty()) {
             result_.player_name = options_.profile;
@@ -2332,6 +2357,7 @@ void GameSession::shutdown() {
             replay.pause_used = result_.pause_used;
             replay.aborted = user_aborted;
             replay.mode.key_mode = config_.mode.key_mode;
+            replay.mode.long_note_mix_version = result_.long_note_mix_version;
             replay.mode.key_conversion_algorithm = config_.mode.key_conversion_algorithm;
             replay.mode.key_conversion_nk2_preset = config_.mode.key_conversion_nk2_preset;
             replay.mode.random = config_.mode.random;
@@ -2392,6 +2418,7 @@ void GameSession::shutdown() {
             exported_result.rate = replay.rate;
             exported_result.game_over = result_.game_over;
             exported_result.mods = result_.mods;
+            exported_result.long_note_mix_version = result_.long_note_mix_version;
             exported_result.rate_multiplier = result_.rate_multiplier;
             exported_result.score_multiplier = result_.score_multiplier;
             exported_result.final_score = result_.final_score;
@@ -2812,6 +2839,14 @@ void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
     }
     pending_input_events_.clear();
 
+    // A key held through restart/loading/resume must be released before it can
+    // start another attempt. It never becomes a lane press or replay event.
+    instant_restart_key_armed_ = true;
+    if (instant_restart_keycode_ != 0) {
+        const auto vk = config::KeycodeMap::polling_vk_for_keycode(instant_restart_keycode_);
+        if (vk) instant_restart_key_armed_ = (GetAsyncKeyState(static_cast<int>(*vk)) & 0x8000) == 0;
+    }
+
     hispeed_decrease_held_ = false;
     hispeed_increase_held_ = false;
     hispeed_decrease_next_repeat_ns_ = 0;
@@ -2862,8 +2897,27 @@ void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
 }
 
 bool GameSession::handle_control_input(const input::InputEvent& event) {
+    const bool restart_key = instant_restart_keycode_ != 0 && event.keycode == instant_restart_keycode_;
+    if (restart_key && event.state == input::InputState::Released) instant_restart_key_armed_ = true;
     if (control_input_callback_ && control_input_callback_(event)) {
+        if (restart_key && event.state == input::InputState::Pressed) instant_restart_key_armed_ = false;
         reset_tuning_repeats();
+        return true;
+    }
+    if (restart_key) {
+        if (event.state == input::InputState::Pressed) {
+            const bool allowed = instant_restart_key_armed_ && gameplay_started_.load(std::memory_order_acquire) &&
+                !peer_battle_mode_ && !course_gauge_enabled_ && !countdown_active_ &&
+                !paused_.load(std::memory_order_acquire) && !finished_.load(std::memory_order_acquire);
+            instant_restart_key_armed_ = false;
+            if (allowed) {
+                instant_restart_requested_.store(true, std::memory_order_release);
+                restart_requested_.store(true, std::memory_order_release);
+                user_aborted_.store(true, std::memory_order_release);
+                stop_requested_.store(true, std::memory_order_release);
+                finished_.store(true, std::memory_order_release);
+            }
+        }
         return true;
     }
     // Course runs cannot be paused or aborted with Esc, including their opening
@@ -2947,6 +3001,7 @@ bool GameSession::handle_control_input(const input::InputEvent& event) {
                     pause_resume_requested_.store(true, std::memory_order_release);
                     break;
                 case GameplayPauseAction::Restart:
+                    if (peer_battle_mode_ || course_gauge_enabled_) break;
                     restart_requested_.store(true, std::memory_order_release);
                     user_aborted_.store(true, std::memory_order_release);
                     stop_requested_.store(true, std::memory_order_release);

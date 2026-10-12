@@ -1,5 +1,7 @@
 # TenRiff Config Schema (current)
 
+**1.8.8:** 결과 분석, 자유 해상도와 가로·세로 직접 입력, 결과의 `F9` PNG 저장 안내, 긴 LN Mix, 메뉴·키음·시작 조작 개선을 포함합니다. 현재 검증·배포 상태는 [릴리스 안내](release-1.8.8-gate.md)를 따릅니다. 사용자 고정 기준은 계속 1.8.7이며 기존 태그·배포 파일은 유지합니다.
+
 확인 기준: [Config.h](../src/config/Config.h), [Config.cpp](../src/config/Config.cpp), [기본 JSON](../config/config.json), [키맵](../src/config/Keymap.cpp). 생략된 값은 코드 기본값을 사용하며, 아래 범위는 로드·저장 시 정규화 규칙입니다.
 
 이 문서는 현재 `config/config.json`, `profiles/<name>/config.json`, `profiles/<name>/keymap.json` 기준으로 실제 동작하는 설정 구조를 정리합니다.
@@ -123,12 +125,14 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 - `display_mode` (string)
   - `borderless | windowed | fullscreen`
   - 기본값은 `borderless`; Discord/OBS/Game Bar 같은 외부 오버레이에도 이 모드를 권장
-  - `windowed`는 제목줄이 있는 고정 크기 창이며 이동 가능
+  - `windowed`는 제목줄이 있는 창이며 이동과 테두리 드래그 크기 조절 가능. 드래그를 끝낼 때 실제 client 크기를 프로필에 저장하며 최대화·복원·프로그램에 의한 크기 변경은 선택값을 덮어쓰지 않음
   - `fullscreen`은 DXGI 독점 전체 화면이라 현재 Discord Game Overlay가 표시되지 않음
 - `resolution` (string)
   - `native`, 기존 별칭 `720p | 1080p | qhd`, 또는 `가로x세로` (예: `1600x900`, `1366x768`, `1280x800`, `3440x1440`). 각 축은 320–8192px.
   - 그래픽 설정의 해상도 항목은 일반적인 크기와 현재 모니터의 표시 모드를 함께 제공. `F5`로 목록 새로고침. 직접 지정한 크기도 저장·재실행 후 유지.
-  - 화면 배치는 1920×1080 기준 비율을 유지하며 다른 화면 비율에는 여백을 표시. 창 모드는 제목줄·작업 표시줄을 포함해 화면 안에 들어가도록 비례 축소.
+  - 해상도 `+/-`는 기존 프리셋을 순환. `Enter` 또는 값 클릭으로 가로/세로 초안을 열고 키보드 상단 숫자열·숫자패드로 입력. `Tab`·방향키로 항목 전환, `Enter` 적용, `Esc` 취소, `Backspace` 삭제, `Delete` 현재 항목 비우기. 각 축 320–8192 정수만 적용하며 빈 값·범위 오류는 기존 설정을 유지하고 오류 표시. 숫자키 외의 문자·붙여넣기·IME 입력은 사용하지 않음.
+  - 화면 내용은 1920×1080 비율과 클릭 좌표 변환을 유지하며 다른 창 비율에는 여백 표시. 입력 크기가 작업 영역보다 크면 선택한 값은 보존하고 실제 창만 축소. 보통 비례 축소하지만 실제 client 각 축 최소 320px 때문에 극단적인 비율에서는 창 비율이 달라질 수 있음.
+  - 독점 전체화면이 요청한 크기를 지원하지 않으면 창 모드로 복구하고 실제 크기·모드를 저장. 기존 프로필 토큰과 기본값은 유지. 새 후보의 실창·전환·저장 검증 상태는 [추가 릴리스 조건](release-conditions-1.8.8.ko.md#창-크기와-직접-해상도-입력) 참고.
   - 스킨 설정 미리보기는 실제 게임 렌더러를 같은 비율로 축소. 플레이필드 이동, 레인·노트·기어 크기, 판정·콤보 위치와 스킨 글꼴을 반영.
 - `vsync` (bool)
 - `refresh_hz` (int)
@@ -186,8 +190,10 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
   - RR/SR, 강제 key-mode 변환, LN Mix 대상 선택의 고정 seed이며 Mirror 레인 반전 자체는 사용하지 않음. 일반 Random은 플레이마다 새 session seed를 만들고 replay에 실제 값을 기록
 - `mods` (string array)
   - Note Structure에서 `full_long_notes`, `ln_mix_10`~`ln_mix_90`, `full_short_notes` 중 하나를 선택 가능
-  - LN Mix는 base BPM 기준 8비트 LN도 다음 동일 레인 노트보다 50ms 먼저 끝낼 수 있는 단노트만 후보로 삼고, 요청 비율만큼 선택한 LN 길이를 긴 8비트 60% / 중간 16비트 20% / 짧은 24·32비트 20%로 배분
-  - 기존 롱노트는 보존하고 같은 레인의 기존 span과 겹치는 head는 제외하며, 같은 `random_seed`에서는 같은 단노트가 변환됨
+  - 새 LN Mix v2는 base BPM×Rate 기준 긴 2·4박 60% / 중간 1박 20% / 짧은 1/4·1/2박 20%를 목표로 배분. 다른 레인의 단노트·짧은 LN을 유지하며 같은 레인의 연타를 합치지 않음
+  - 다음 같은 레인 노트 전 50ms와 최소 1/2박 공간을 확보할 수 있는 단노트만 후보. 긴 목표가 들어가지 않으면 4→2→1→1/2→1/4박 중 들어가는 길이로 낮추므로 고밀도에서는 실제 긴 LN 비율이 목표보다 낮을 수 있음
+  - 기존 LN/CN과 원본 head·키음은 보존하고 같은 레인의 기존 span과 겹치는 head는 제외. 같은 채보·`random_seed`·Rate·변환 버전에서는 동일하게 재현
+  - 이전 LN Mix 리플레이의 변환 버전 누락은 v1로 읽어 기존 8·16·24·32비트 정책을 유지. 새 v2는 로컬 기록·리플레이만 허용하며 기존 채보 BEST·Sites 업로드에서 제외. [길이 정책·호환성·검증 상태](release-conditions-1.8.8.ko.md#ln-mix의-요구-의미) 참고
 - `ghost_battle_enabled` (bool)
   - 기본값은 `false`
   - `true`면 선택한 차트의 최고 호환 replay를 자동 ghost 비교 대상으로 불러옴
@@ -227,6 +233,10 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 
 ### `ui`
 
+`ui.skip_start_countdown`과 `ui.instant_restart_key`는 프로필 설정과 `.trprofile` 내보내기에 저장되는 본체 기능입니다. 생략하는 것은 로딩 뒤의 초기 `3 / 2 / 1` 표시뿐이며, 오디오 준비와 기존 채보 앞 3초 여백·판정 시각은 유지합니다. 일시정지에서 계속할 때의 3초 재개 카운트다운은 항상 유지합니다. 멀티에서는 초기 카운트다운을 강제하고 즉시 재시작을 차단하며, 세션 믹스에서도 즉시 재시작을 차단합니다. 즉시 재시작은 일시정지·초기 카운트다운 중에는 작동하지 않고, 다시 사용하려면 키를 떼었다 눌러야 합니다. 레인·예약 키 충돌과 편집기 연습의 시작 위치 등은 [시작·재시작 안내](gameplay-start-controls.ko.md)를 참고하세요.
+
+이 설정은 Sites 기록 제출 정책을 바꾸지 않습니다. 긴 LN Mix v2의 기존 BEST·Sites 제외는 별도 변환 정책이며, [플러그인 실행 환경·API·SDK는 향후 계획](result-analysis-1.8.8.ko.md)입니다.
+
 `last_played_chart_path`는 마지막으로 실제 플레이를 시작한 차트의 로컬 경로입니다. 기본값은 빈 문자열이며 리플레이·편집기 연습은 갱신하지 않습니다. `title_music=last_played`에서 재사용합니다.
 
 | 항목 | 형식·범위·기본값 | 동작 |
@@ -235,6 +245,8 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `profile_avatar_path` | string; UTF-8 ≤2048 bytes | 로컬 PNG/JPG 아바타 경로. |
 | `language` | `en`, `ko`, `ja`; `en` | UI 언어. 다른 값은 en으로 정규화. |
 | `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | 프로필/첫 실행에서 보통·크게·더 크게 선택. 메뉴 글자 100%·115%·130%, 게임플레이 스킨 글자는 별도 유지. |
+| `skip_start_countdown` | bool; `false` | 단독 플레이의 초기 `3 / 2 / 1` 표시 생략. 일반 곡 시작과 메뉴 재시작·결과 재시도에 적용. |
+| `instant_restart_key` | string; `""` (미지정) | 진행 중인 단독 곡을 처음부터 다시 시작할 키 이름. 새 시도의 초기 카운트다운은 항상 생략하며, 중단한 시도는 결과·리플레이로 저장하지 않음. |
 | `all_song_sources` | bool; `false` | `ALL SONG` 통합 목록을 다음 실행에서도 복원. 등록된 폴더 캐시를 순서대로 읽고 경로가 같은 차트는 한 번만 표시. |
 | `result_tail_ms` | double; `500` ms | 판정 완료 후 결과 전환 시 추가 대기 시간. `audio.play_to_end=true`이면 차트 오디오 종료 시점도 함께 고려합니다. |
 | `require_enter_to_exit` | bool; `true` | 읽기·저장 호환 필드. 현재 Windows 결과 입력 경로는 이 값으로 자동 종료하지 않습니다. |
@@ -246,7 +258,7 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `collections` | object: name → string[] | 이름 있는 컬렉션별 차트 키 목록. |
 | `song_collection_filter` | string; `all` | 전체·즐겨찾기·컬렉션 필터. 변경 즉시 저장. |
 | `song_key_filter` | int: `0..16`; `0` | 키 수 필터. 0은 전체. UI 선택은 4K–10K, 12K, 14K, 16K. |
-| `song_level_min_filter`, `song_level_max_filter` | int: `0..50`; `0` | 난이도 경계. 0이면 해당 경계를 사용하지 않음. |
+| `song_level_min_filter`, `song_level_max_filter` | int: `0..50`; `0` | 난이도 경계. 0이면 해당 경계를 사용하지 않음. 외부 표 선택 중에는 표시된 표의 숫자 레벨을 사용하며, 제한이 있으면 비숫자 항목을 제외. 기본 LV는 기존 내장 레벨 사용. [숫자·접두사 처리](release-feedback-1.8.8.ko.md#선택한-난이도표-기준의-최소최대-필터) 참고. |
 | `difficulty_table_path` | string | 로컬 header JSON 또는 다운로드한 프로필 캐시 header. 표 선택 시 safe 인덱스로 전환. 기본 LV 선택 시 비우고 정상 캐시에서 외부 표 정보만 제거. |
 | `difficulty_table_url` | string | 원본 HTTP(S) BMSTable 페이지/header URL. bmstable meta를 해석해 header/data를 캐시하고 로컬 JSON 선택 시 비움. |
 | `online_records_server_url` | string | 기록·랭킹·채팅 API URL. 실패해도 로컬 플레이·기록은 유지. |

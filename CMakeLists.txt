@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.8.7 LANGUAGES C CXX)
+project(TenRiff VERSION 1.8.8 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -167,6 +167,8 @@ add_library(tenriff_core
     src/gameplay/ModeSettings.cpp
     src/gameplay/OsuManiaScore.cpp
     src/gameplay/ResultStats.cpp
+    src/gameplay/TimingAnalysis.cpp
+    src/gameplay/TimingAnalysisJson.cpp
     src/gameplay/Replay.cpp
     src/network/LanDiscovery.cpp
     src/network/PeerProtocol.cpp
@@ -760,6 +762,8 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_osu_mania_score.cpp
         tests/unit/test_session_result_status.cpp
         tests/unit/test_replay_export.cpp
+        tests/unit/test_timing_analysis.cpp
+        tests/unit/test_timing_analysis_json.cpp
         tests/unit/test_chart_loader.cpp
         tests/unit/test_chart_audio_streaming.cpp
         tests/unit/test_chart_audio_playback.cpp

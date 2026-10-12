@@ -42,13 +42,24 @@ namespace tenriff::app {
 // Seed only in-memory state, then use the production settings builders.
 // MenuApp is never initialized: no profiles, indexing, services or input start.
 struct MenuAppVisualTestAccess {
-    static void populate_inner_settings(render::MenuRenderData& source, bool graphics, int selected) {
+    static void populate_inner_settings(render::MenuRenderData& source, bool graphics, int selected,
+                                        bool edit_resolution = false, bool invalid_resolution = false) {
         auto app = std::make_unique<MenuApp>();
         app->config_.ui.language = ui::language_token(source.ui_language);
         source.generic.rows.clear();
         source.generic.notes.clear();
         if (graphics) {
-            if (selected >= 0) {
+            if (edit_resolution) {
+                using namespace menu::settings;
+                auto& controller = app->graphics_settings_controller_;
+                controller.reset(GraphicsSettingId::Resolution);
+                (void)controller.handle(menu::MenuAction::activate(), app->config_);
+                (void)controller.resolution_text(invalid_resolution ? "12x" : "1377");
+                (void)controller.handle(menu::MenuAction::move(1), app->config_);
+                (void)controller.resolution_text("777");
+                if (invalid_resolution) (void)controller.handle(menu::MenuAction::activate(), app->config_);
+            }
+            if (selected >= 0 && !edit_resolution) {
                 if (const auto id = menu::settings::graphics_setting_id_at(static_cast<std::size_t>(selected)))
                     app->graphics_settings_controller_.reset(*id);
             }
@@ -229,7 +240,7 @@ struct MenuWindowVisualTestAccess {
             (source.generic.heading == ui::text(source.ui_language, "Key Mode Settings", "키 모드 설정") ||
              source.generic.heading == ui::text(source.ui_language, "Graphics Settings", "그래픽 설정"));
         const bool song_fixture = source.kind == MenuScreenKind::SongSelect;
-        const bool result_fixture = source.kind == MenuScreenKind::ResultScreen && !source.result.peer_battle;
+        const bool result_fixture = source.kind == MenuScreenKind::ResultScreen;
         // Sample before the verification render: crossing the reveal boundary
         // during that draw must not falsely require buttons from an earlier frame.
         const bool result_controls_expected = result_fixture && result_presentation_frame(
@@ -262,7 +273,7 @@ struct MenuWindowVisualTestAccess {
                 const bool pause_control = region.kind == MenuHitTargetKind::GameplayPauseAction ||
                     region.kind == MenuHitTargetKind::GameplayPauseAdjust;
                 const bool result_control = result_fixture && region.kind == MenuHitTargetKind::SettingsRow &&
-                    region.part == MenuHitPart::Activate && region.index >= 0 && region.index <= 2;
+                    region.part == MenuHitPart::Activate && region.index >= 0 && region.index <= 7;
                 if (preview_button && visit != 0) continue;
                 if (!pause_control && !preview_button && !menu_card && !song_control && region.kind != MenuHitTargetKind::SettingsRow && region.kind != MenuHitTargetKind::KeymapButton)
                     continue;
@@ -321,7 +332,9 @@ struct MenuWindowVisualTestAccess {
         }
         if (verify && result_fixture) {
             if (result_controls_expected) {
-                for (const int id : {0, 2, 1}) {
+                for (const int id : {0, 2, 1, 3, 4, 5, 6}) {
+                    if (source.result.peer_battle && id != 0) continue;
+                    if (source.result.analysis_page != 0 && (id == 1 || id == 2)) continue;
                     if (id == 1 && !source.result.replay_available) continue;
                     if (!verified_result_targets.count(id))
                         failures.emplace_back("required result action missing: id=" + std::to_string(id));
@@ -375,6 +388,10 @@ struct MenuWindowVisualTestAccess {
                     require_part(MenuHitPart::SelectOnly);
                     if (row.decrement_enabled) require_part(MenuHitPart::Decrement);
                     if (row.increment_enabled) require_part(MenuHitPart::Increment);
+                    if (row.value_activatable ||
+                        (source.generic.heading == ui::text(source.ui_language, "Graphics Settings", "그래픽 설정") &&
+                         row.row_index == static_cast<int>(app::menu::settings::GraphicsSettingId::Resolution)))
+                        require_part(MenuHitPart::Activate);
                 } else if (row.activatable) require_part(MenuHitPart::Activate);
             }
         }
@@ -421,6 +438,11 @@ int main(int argc, char** argv) {
     config.display_mode = "windowed";
     config.vsync = true;
     bool result = false;
+    bool gauge_ramp = false;
+    std::string result_grade;
+    int analysis_page = 0;
+    bool analysis_unavailable = false;
+    bool analysis_no_samples = false;
     bool options_grid = false;
     bool table_editor = false;
     bool gameplay = false;
@@ -495,6 +517,8 @@ int main(int argc, char** argv) {
     bool settings = false;
     bool mode_settings = false;
     bool graphics_settings = false;
+    bool edit_resolution = false;
+    bool invalid_resolution = false;
     bool skin_settings = false;
     bool keymap_settings = false;
     bool keymap_test = false;
@@ -538,6 +562,17 @@ int main(int argc, char** argv) {
     data.ui_language = tenriff::ui::Language::Korean;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
+        if (arg == "--gauge-ramp") { result = gauge_ramp = true; continue; }
+        if (arg == "--result-grade" && i + 1 < argc) { result_grade = argv[++i]; continue; }
+        // Keep new fixture switches out of the long legacy else-if chain:
+        // MSVC counts those branches against its nested-block limit.
+        if (arg == "--analysis-page" && i + 1 < argc) {
+            result = true; analysis_page = std::clamp(std::stoi(argv[++i]), 0, 3); continue;
+        }
+        if (arg == "--analysis-unavailable") { analysis_unavailable = true; continue; }
+        if (arg == "--analysis-no-samples") { analysis_no_samples = true; continue; }
+        if (arg == "--edit-resolution") { settings = graphics_settings = edit_resolution = true; continue; }
+        if (arg == "--invalid-resolution") { settings = graphics_settings = edit_resolution = invalid_resolution = true; continue; }
         if (arg == "--fullscreen-preview") fullscreen_skin_preview = settings = skin_settings = true;
         else if (arg == "--no-vsync") config.vsync = false;
         else if (arg == "--menu-roundtrip") menu_roundtrip = true;
@@ -804,7 +839,8 @@ int main(int argc, char** argv) {
     if (mode_settings || graphics_settings) {
         data.generic.heading = graphics_settings ? loc("Graphics Settings", "그래픽 설정")
                                                 : loc("Key Mode Settings", "키 모드 설정");
-        tenriff::app::MenuAppVisualTestAccess::populate_inner_settings(data, graphics_settings, selected_setting);
+        tenriff::app::MenuAppVisualTestAccess::populate_inner_settings(data, graphics_settings, selected_setting,
+            edit_resolution, invalid_resolution);
     }
     if (keymap_settings) {
         using namespace tenriff::app::menu::settings;
@@ -851,26 +887,29 @@ int main(int argc, char** argv) {
         data.generic.heading = loc("Profile Setup", "프로필 설정");
         data.generic.profile_preview_visible = true;
         data.generic.profile_avatar_path = avatar_path;
-        const std::array<std::string, 12> labels{
+        const std::array<std::string, 16> labels{
             loc("Language", "언어"), loc("Menu Font Size", "메뉴 글자 크기"),
             loc("Songs Folder", "곡 폴더"), loc("Gauge", "게이지"), "Rate",
             loc("Visual Latency", "비주얼 레이턴시"), loc("Keysound", "키음"),
             loc("Input Backend", "입력 방식"), loc("Nickname", "닉네임"),
             loc("Avatar Image", "프로필 사진"), loc("Clear Avatar", "사진 지우기"),
+            loc("Export All Settings", "전체 설정 내보내기"), loc("Import All Settings", "전체 설정 가져오기"),
+            loc("Skip Start Countdown", "시작 카운트다운 생략"), loc("Instant Restart Key", "즉시 재시작 키"),
             loc("Done", "완료")};
-        const std::array<std::string, 12> values{
+        const std::array<std::string, 16> values{
             data.ui_language == tenriff::ui::Language::Japanese ? "日本語" : loc("English", "한국어"),
             data.ui_text_scale > 1.2f ? loc("Extra Large", "더 크게") :
                 data.ui_text_scale > 1.0f ? loc("Large", "크게") : loc("Normal", "보통"),
             "ALL SONG", "NORMAL", "1.00x", "0 ms", "Follow", "RawInput", "PLAYER",
             avatar_path.empty() ? loc("Not set", "설정 안 됨") : "preview-avatar.png",
-            loc("Clear", "지우기"), loc("Back", "돌아가기")};
+            loc("Clear", "지우기"), ".trprofile", ".trprofile", loc("Off", "꺼짐"), "F12", loc("Back", "돌아가기")};
         for (int i = 0; i < static_cast<int>(labels.size()); ++i) {
             MenuRowData row;
             row.label = labels[i]; row.value = values[i]; row.row_index = i;
             row.target_kind = MenuHitTargetKind::SettingsRow;
-            row.selected = i == 1; row.adjustable = i < 8;
-            row.increment_enabled = row.decrement_enabled = true;
+            row.selected = i == 1; row.adjustable = (i < 8 && i != 2) || i == 13;
+            row.activatable = !row.adjustable || i <= 1;
+            row.increment_enabled = row.decrement_enabled = row.adjustable;
             data.generic.rows.push_back(std::move(row));
         }
         data.generic.notes = {
@@ -937,7 +976,7 @@ int main(int argc, char** argv) {
     songs.result_available = !empty;
     songs.search_active = search_active;
     songs.search_query = search_query;
-    songs.rank = "AAA";
+    songs.rank = result_grade.empty() ? "S+" : result_grade;
     songs.best_score = 9452;
     songs.detail_score = 8901;
     songs.max_detail_score = 9120;
@@ -995,7 +1034,7 @@ int main(int argc, char** argv) {
     score.key_count = menu_keys;
     score.level = 12;
     score.bpm = 180;
-    score.rank = failed ? "C" : "AAA";
+    score.rank = result_grade.empty() ? (failed ? "F" : "S+") : result_grade;
     score.status = failed ? "FAILED" : "CLEAR";
     score.cleared = !failed;
     score.score = failed ? 4230 : 9452;
@@ -1014,12 +1053,45 @@ int main(int argc, char** argv) {
     score.stddev_delta_ms = 14.6;
     score.fast_count = 824;
     score.slow_count = 992;
+    score.analysis_page = analysis_page;
+    if (!analysis_unavailable) {
+        using tenriff::gameplay::TimingEventKind;
+        using tenriff::game::Judgement;
+        score.analysis.initialize(menu_keys, 48000, 48000 * 120);
+        for (int i = 0; i < 640; ++i) {
+            const auto kind = i % 5 == 0 ? TimingEventKind::LnHead : TimingEventKind::Tap;
+            const double delta = (i % 2 == 0 ? -1.0 : 1.0) * (20.0 + (i % 7) * 5.0);
+            score.analysis.observe(kind, i % menu_keys + 1, static_cast<int64_t>(i) * 8800,
+                Judgement::GR, analysis_no_samples || i % 41 == 0 ? std::nullopt : std::optional<double>{delta}, 1.0);
+        }
+        for (int i = 0; i < 60; ++i) {
+            score.analysis.observe(TimingEventKind::AutoCompletion, i % menu_keys + 1, i * 82000,
+                Judgement::PG, std::nullopt, 0.5);
+            if (!analysis_no_samples) {
+                score.analysis.observe(TimingEventKind::LnRelease, i % menu_keys + 1, i * 82000,
+                    Judgement::PG, 3.0, 0.5);
+                if (i % 10 == 0) score.analysis.observe(TimingEventKind::HoldFailure, i % menu_keys + 1,
+                    i * 82000, Judgement::BD, -180.0, 0.5);
+            }
+        }
+        score.mean_delta_ms = score.analysis.total.mean_delta_ms;
+        score.stddev_delta_ms = score.analysis.total.stddev_delta_ms();
+        score.fast_count = static_cast<int>(score.analysis.total.fast_count);
+        score.slow_count = static_cast<int>(score.analysis.total.slow_count);
+        double points = 0.0, weight = 0.0;
+        for (const auto& bucket : score.analysis.segments) {
+            points += bucket.accuracy_points;
+            weight += bucket.accuracy_weight;
+        }
+        score.accuracy = weight > 0.0 ? points / weight * 100.0 : 0.0;
+        score.analysis_mods = "SYNTHETIC FIXTURE";
+    }
     score.replay_available = !failed;
     score.notes = {loc("VIEW ONLY", "보기 전용") + " / " + loc("OFFLINE", "오프라인"),
                    preview_backend};
     for (int i = 0; i <= 80; ++i) {
         const float position = static_cast<float>(i) / 80.0f;
-        score.gauge_points.push_back({position, failed ? 0.7f * (1.0f - position)
+        score.gauge_points.push_back({position, gauge_ramp ? 1.0f - position : failed ? 0.7f * (1.0f - position)
             : 0.65f + 0.17f * std::sin(position * 18.0f)});
     }
     if (options_grid) {
