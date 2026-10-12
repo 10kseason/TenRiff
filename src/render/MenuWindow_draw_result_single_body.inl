@@ -93,6 +93,45 @@
             }
         };
 
+        // These tabs use native geometry so old skin layouts cannot hide access
+        // to analysis that was not part of their original result schema.
+        const auto draw_analysis_tabs = [&]() {
+            const std::array<std::string, 4> labels{{result_loc("SUMMARY", "요약"),
+                result_loc("LANES", "레인"), result_loc("NOTE TYPES", "노트 종류"),
+                result_loc("TIMELINE", "시간대")}};
+            for (int i = 0; i < 4; ++i) {
+                const auto rect = D2D1::RectF(674.0f + i * 176.0f, 44.0f,
+                                             840.0f + i * 176.0f, 98.0f);
+                draw_result_panel(rect, 1.0f, data.result.analysis_page == i);
+                draw_result_control_text(labels[static_cast<std::size_t>(i)], d2d_->option_format.Get(),
+                    rect, data.result.analysis_page == i ? d2d_->text_brush.Get() : d2d_->muted_brush.Get(), 1.0f);
+                if (presentation.interaction_ready) register_hit(rect, MenuHitTargetKind::SettingsRow, 3 + i);
+            }
+        };
+        const auto draw_measured_histogram = [&](const gameplay::TimingDistribution& dist,
+                                                 const D2D1_RECT_F& rect, float alpha) {
+            if (!d2d_->accent_brush) return;
+            const auto saved_color = d2d_->accent_brush->GetColor();
+            const auto saved_opacity = d2d_->accent_brush->GetOpacity();
+            const auto maximum = (std::max)(uint64_t{1}, *std::max_element(dist.histogram.begin(), dist.histogram.end()));
+            const float width = (rect.right - rect.left) / static_cast<float>(dist.histogram.size());
+            for (std::size_t i = 0; i < dist.histogram.size(); ++i) {
+                const float height = static_cast<float>(static_cast<double>(dist.histogram[i]) /
+                    static_cast<double>(maximum)) * (rect.bottom - rect.top);
+                if (dist.histogram[i] == 0) continue;
+                d2d_->accent_brush->SetColor(D2D1::ColorF(i < 21 ? 0x54E9FF : 0xA56BFF));
+                d2d_->accent_brush->SetOpacity(alpha);
+                ctx->FillRectangle(D2D1::RectF(rect.left + width * static_cast<float>(i), rect.bottom - height,
+                    rect.left + width * static_cast<float>(i + 1) - 1.0f, rect.bottom), d2d_->accent_brush.Get());
+            }
+            d2d_->accent_brush->SetColor(saved_color);
+            d2d_->accent_brush->SetOpacity(saved_opacity);
+        };
+        if (data.result.analysis_page != 0) {
+#include "MenuWindow_draw_result_analysis.inl"
+            return;
+        }
+
         ID2D1Bitmap* result_art =
             find_song_card_preview_bitmap(data.result.background_path);
         const D2D1_RECT_F full_result_rect = native_rect("result_single.rect.001", D2D1::RectF(0.0f, 0.0f, kBaseWidth, kBaseHeight));
@@ -516,7 +555,8 @@
                                      analysis_panel.right - 24.0f, analysis_panel.top + 48.0f)),
                          d2d_->accent_brush.Get(),
                          presentation.graph);
-        draw_result_text(result_loc("TIMING ESTIMATE", "타이밍 분포 추정"),
+        draw_result_text(result_loc("MEASURED TIMING", "실측 타이밍 분포") +
+                         "  N=" + (data.result.analysis.available ? std::to_string(data.result.analysis.total.measured_count) : "--"),
                          d2d_->body_format.Get(),
                          native_rect("result_single.rect.028", D2D1::RectF(analysis_panel.left + 26.0f, analysis_panel.top + 66.0f,
                                      analysis_panel.right - 26.0f, analysis_panel.top + 98.0f)),
@@ -536,21 +576,13 @@
         if (d2d_->accent_brush) {
             const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
             const float saved_opacity = d2d_->accent_brush->GetOpacity();
-            const float spread = static_cast<float>(std::clamp(data.result.stddev_delta_ms, 1.0, 65.0));
-            const float mean = static_cast<float>(std::clamp(data.result.mean_delta_ms, -80.0, 80.0));
-            // Derived from the track so the 57 bars always land inside it.
-            const float bar_spacing = (timing_track.right - timing_track.left - 24.0f) / 56.0f;
-            for (int bar = -28; bar <= 28; ++bar) {
-                const float delta = static_cast<float>(bar) * 2.8f;
-                const float gaussian = std::exp(-0.5f * ((delta - mean) / spread) * ((delta - mean) / spread));
-                const float x = center_x + static_cast<float>(bar) * bar_spacing;
-                const float height = gaussian * 76.0f * presentation.graph;
-                d2d_->accent_brush->SetColor(bar < 0 ? native_palette("palette.54e9ff", D2D1::ColorF(0x54E9FF))
-                                                      : native_palette("palette.a56bff", D2D1::ColorF(0xA56BFF)));
-                d2d_->accent_brush->SetOpacity((data.result.judged_notes > 0 ? 0.72f : 0.20f) * presentation.graph);
-                ctx->DrawLine(D2D1::Point2F(x, timing_track.bottom - 12.0f),
-                              D2D1::Point2F(x, timing_track.bottom - 12.0f - height),
-                              d2d_->accent_brush.Get(), 5.0f);
+            if (data.result.analysis.available) {
+                draw_measured_histogram(data.result.analysis.total, D2D1::RectF(timing_track.left + 12,
+                    timing_track.top + 40, timing_track.right - 12, timing_track.bottom - 12), presentation.graph);
+            } else {
+                draw_result_text(result_loc("Analysis unavailable for this record", "이 기록에는 분석 데이터가 없습니다"),
+                    d2d_->hud_format.Get(), timing_track, d2d_->muted_brush.Get(), presentation.graph,
+                    DWRITE_TEXT_ALIGNMENT_CENTER);
             }
             d2d_->accent_brush->SetColor(native_palette("palette.f7fafd", D2D1::ColorF(0xF7FAFD)));
             d2d_->accent_brush->SetOpacity(0.52f * presentation.graph);
@@ -588,14 +620,17 @@
             d2d_->accent_brush->SetColor(saved_color);
             d2d_->accent_brush->SetOpacity(saved_opacity);
         }
-        draw_result_text(result_loc("MEAN", "평균") + "  " + format_signed_ms(data.result.mean_delta_ms),
+        draw_result_text(result_loc("MEAN", "평균") + "  " +
+                         (data.result.analysis.available && data.result.analysis.total.measured_count > 0
+                            ? format_signed_ms(data.result.mean_delta_ms) : std::string("--")),
                          d2d_->hud_format.Get(),
                          native_rect("result_single.rect.032", D2D1::RectF(timing_track.left, timing_track.bottom + 8.0f,
                                      center_x, timing_track.bottom + 36.0f)),
                          d2d_->muted_brush.Get(),
                          presentation.graph);
         draw_result_text(result_loc("STD. DEV.", "표준편차") + "  " +
-                             format_decimal(data.result.stddev_delta_ms) + "ms",
+                             (data.result.analysis.available && data.result.analysis.total.measured_count > 1
+                                ? format_decimal(data.result.stddev_delta_ms) + "ms" : std::string("--")),
                          d2d_->hud_format.Get(),
                          native_rect("result_single.rect.033", D2D1::RectF(center_x, timing_track.bottom + 8.0f,
                                      timing_track.right, timing_track.bottom + 36.0f)),
@@ -842,3 +877,4 @@
                          d2d_->muted_brush.Get(),
                          0.46f * presentation.background,
                          DWRITE_TEXT_ALIGNMENT_CENTER);
+        draw_analysis_tabs();

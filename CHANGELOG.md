@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### 1.8.8 local development candidate
+
+- Add result analysis for lane timing distributions, tap/LN-head/release/hold-failure events and accuracy across 12 equal song-time segments. Show measured sample counts, mean absolute error and sample spread alongside signed means; unmeasurable misses and automatic LN completion never create zero-ms timing samples.
+- Add result analysis pages while keeping judgement, scoring, combo, gauge and replay rules unchanged. Keep older records readable and show analysis as unavailable when the extra data is absent. This is local development, not a published 1.8.8 release; see [analysis semantics and verification criteria](docs/result-analysis-1.8.8.ko.md).
+- Document the limited read-only plugin boundary, core-enforced multiplayer defaults, separate permission/runtime limits, two sample-plugin acceptance gates, SDK and future 1.9.0 stabilization policy. The plugin runtime/API/SDK are not implemented in this change.
+
+### Fixed-baseline documentation
+
 - Pin the fixed stable baseline to the published 1.8.7 tag, commit and asset hashes. Synchronize Korean, English, Japanese and Simplified Chinese entry documents; mark earlier baselines as historical. This documentation-only follow-up leaves the released runtime and archives unchanged.
 
 ## [1.8.7] - 2026-10-09

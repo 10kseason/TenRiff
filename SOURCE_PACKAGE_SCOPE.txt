@@ -1,6 +1,8 @@
-TenRiff 1.8.7 public source inventory
+TenRiff 1.8.8 development source scope (unreleased)
 
-1.8.7 is a client-only public source release. This inventory is the current public upload scope.
+The fixed public baseline is the client-only 1.8.7 release. Its tag and published source archive remain unchanged.
+This 1.8.8 development tree retains the following client-only package scope and privacy boundary for a future release; it is not evidence of a new upload or completed package verification.
+The result-analysis implementation is local development. Plugin host/API/SDK and 1.9.0 stabilization remain plans only; see docs/result-analysis-1.8.8.ko.md.
 
 Included in versioned source bundles:
 - CHANGELOG.md

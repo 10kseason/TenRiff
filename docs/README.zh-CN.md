@@ -2,6 +2,8 @@
 
 **固定基准：[1.8.7](baseline-1.8.7.zh-CN.md)**（2026-10-10）。使用 Git tag `1.8.7`、commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`，不随 `latest` 或新版本自动更新。
 
+**2026-10-12 · 1.8.8 本地开发候选版（未发布）：**新增各轨道时机分布、曲目时间分段准确度及单键/LN 起始、松键、保持失败的独立分析。无法测量的漏击不作为 0ms 样本，保留判定和计分规则。插件与 1.9.0 稳定化仍为计划。[分析标准与计划（韩语）](result-analysis-1.8.8.ko.md)。
+
 **2026-10-09 · TenRiff 1.8.7:** 改善输入校准和谱面加载音频，支持LR2单人Studio Deck、750ms FAST/SLOW保留、按键重新分配、选项整合及完整曲名自动缩放。 [1.8.7 release](release-1.8.7-gate.md).
 
 **2026-10-08 · TenRiff 1.8.6:** 为Native单人游玩新增Studio Deck HUD。左右Shift可绑定为游玩按键；F5/F6将Hi-Speed减半/加倍，F11打开聊天。仍可选择经典HUD。 [1.8.6 release](release-1.8.6-gate.md).

@@ -2839,14 +2839,22 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
     }
 
     if (current_screen() == Screen::Result) {
-        if (event.part != render::MenuHitPart::Activate || event.index < 0 || event.index > 2 ||
+        if (event.part != render::MenuHitPart::Activate || event.index < 0 || event.index > 7 ||
             (last_game_was_multiplayer_ && event.index != 0)) {
             return;
         }
         if (!last_game_was_multiplayer_ && !result_presentation_ready()) {
             return;
         }
-        if (event.index == 1 && !last_game_was_multiplayer_) {
+        if (event.index >= 3 && !last_game_was_multiplayer_) {
+            if (event.index == 7) {
+                if (result_analysis_page_ != 1 || last_result_.analysis.lane_count <= 16) return;
+                result_analysis_lane_bank_ = 1 - result_analysis_lane_bank_;
+            } else {
+                result_analysis_page_ = event.index - 3;
+            }
+            publish_snapshot();
+        } else if (event.index == 1 && !last_game_was_multiplayer_) {
             (void)launch_last_result_replay();
         } else if (event.index == 2 && !last_game_was_multiplayer_) {
             handle_result_input(key_left_);
@@ -4695,6 +4703,22 @@ void MenuApp::handle_result_input(uint32_t keycode) {
             reset_screen(Screen::Multiplayer);
             publish_snapshot();
         }
+        return;
+    }
+    if (keycode == key_f2_) {
+        result_analysis_page_ = (result_analysis_page_ + 1) % 4;
+        publish_snapshot();
+        return;
+    }
+    if (result_analysis_page_ == 1 && (keycode == key_up_ || keycode == key_down_) &&
+        last_result_.analysis.lane_count > 16) {
+        result_analysis_lane_bank_ = 1 - result_analysis_lane_bank_;
+        publish_snapshot();
+        return;
+    }
+    if (result_analysis_page_ != 0 && (keycode == key_escape_ || keycode == key_backspace_)) {
+        result_analysis_page_ = 0;
+        publish_snapshot();
         return;
     }
     if (keycode == key_left_ || (key_r_ != 0 && keycode == key_r_)) {

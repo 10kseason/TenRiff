@@ -1130,6 +1130,10 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     render.result.profile_avatar_path = config_.ui.profile_avatar_path;
     render.result.presentation_start_ns = result_presentation_start_ns_;
     render.result.presentation_skipped = result_presentation_skipped_;
+    render.result.analysis = last_result_.analysis;
+    render.result.analysis_page = result_analysis_page_;
+    render.result.analysis_lane_bank = result_analysis_lane_bank_;
+    render.result.analysis_mods = mode_mod_summary(last_result_mods_);
     render.result.profile =
         last_result_player_name_.empty() ? profile_display_name() : last_result_player_name_;
     if (session_mix_active_ && session_mix_cursor_ < session_mix_plan_.entries.size()) {
@@ -1238,8 +1242,8 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
         last_result_.counts.pg == judged && last_result_.counts.gr == 0 &&
         last_result_.counts.gd == 0 && last_result_.counts.bd == 0 &&
         last_result_.counts.pr == 0;
-    render.result.mean_delta_ms = last_result_.mean_delta_ms;
-    render.result.stddev_delta_ms = last_result_.stddev_delta_ms();
+    render.result.mean_delta_ms = last_result_.analysis.available ? last_result_.analysis.total.mean_delta_ms : last_result_.mean_delta_ms;
+    render.result.stddev_delta_ms = last_result_.analysis.available ? last_result_.analysis.total.stddev_delta_ms() : last_result_.stddev_delta_ms();
     render.result.fast_count = last_result_.negative_delta_count;
     render.result.slow_count = last_result_.positive_delta_count;
     render.result.shift_count = static_cast<int>(last_result_.shifts.size());
@@ -1261,21 +1265,21 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     const int signed_delta_count = positive_delta_count + negative_delta_count;
     int timing_guidance_direction = 0;
     if (signed_delta_count >= kResultTimingGuidanceMinSignedSamples &&
-        std::abs(last_result_.mean_delta_ms) >= kResultTimingGuidanceMinMeanMs) {
+        std::abs(render.result.mean_delta_ms) >= kResultTimingGuidanceMinMeanMs) {
         const int dominant_count = (std::max)(positive_delta_count, negative_delta_count);
         if (dominant_count * kResultTimingGuidanceDominantDenominator >=
             signed_delta_count * kResultTimingGuidanceDominantNumerator) {
-            if (positive_delta_count > negative_delta_count && last_result_.mean_delta_ms >= 0.0) {
+            if (positive_delta_count > negative_delta_count && render.result.mean_delta_ms >= 0.0) {
                 timing_guidance_direction = 1;
-            } else if (negative_delta_count > positive_delta_count && last_result_.mean_delta_ms <= 0.0) {
+            } else if (negative_delta_count > positive_delta_count && render.result.mean_delta_ms <= 0.0) {
                 timing_guidance_direction = -1;
             }
         }
     }
     if (timing_guidance_direction == 0 &&
-        judged >= kResultTimingGuidanceMinSignedSamples &&
-        std::abs(last_result_.mean_delta_ms) >= kResultTimingGuidanceFallbackMeanMs) {
-        timing_guidance_direction = (last_result_.mean_delta_ms > 0.0) ? 1 : -1;
+        (last_result_.analysis.available ? last_result_.analysis.total.measured_count : static_cast<uint64_t>(judged)) >= kResultTimingGuidanceMinSignedSamples &&
+        std::abs(render.result.mean_delta_ms) >= kResultTimingGuidanceFallbackMeanMs) {
+        timing_guidance_direction = (render.result.mean_delta_ms > 0.0) ? 1 : -1;
     }
     render.result.timing_guidance_visible = timing_guidance_direction != 0;
     render.result.timing_guidance_direction = timing_guidance_direction;
@@ -1283,7 +1287,7 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
         const std::string bias_summary =
             (signed_delta_count > 0)
                 ? ("+" + std::to_string(positive_delta_count) + " / -" + std::to_string(negative_delta_count))
-                : format_signed_offset_ms(last_result_.mean_delta_ms);
+                : format_signed_offset_ms(render.result.mean_delta_ms);
         if (timing_guidance_direction > 0) {
             render.result.timing_guidance_title =
                 ui_text("Timing Advice ", "타이밍 알림 ") + "(" + bias_summary + ")";
@@ -1350,7 +1354,7 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
         render.result.notes.push_back(ui_text("Rate score x", "Rate 점수 x") + format_decimal(last_result_rate_multiplier_));
     }
     render.result.notes.push_back(ui_text("Mods: ", "모드: ") + mode_mod_summary(last_result_mods_));
-    render.result.notes.push_back(ui_text("Timing center ", "타이밍 중심 ") + format_signed_ms(last_result_.mean_delta_ms) +
+    render.result.notes.push_back(ui_text("Timing center ", "타이밍 중심 ") + format_signed_ms(render.result.mean_delta_ms) +
                                   ui_text("  spread ", "  분산 ") + format_decimal(render.result.stddev_delta_ms) + "ms");
     if (last_session_replay_playback_) {
         render.result.notes.push_back(ui_text("Replay playback session: no new replay/result export was written.",
@@ -2756,6 +2760,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         }
         result_presentation_start_ns_ = timing::HighResClock::now_ns();
         result_presentation_skipped_ = false;
+        result_analysis_page_ = 0;
+        result_analysis_lane_bank_ = 0;
         replace_screen(Screen::Result);
     } else {
         has_result_ = false;

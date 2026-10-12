@@ -7,6 +7,7 @@
 
 #include "config/SimpleJson.h"
 #include "gameplay/Replay.h"
+#include "gameplay/TimingAnalysisJson.h"
 #include "util/Utf8Compat.h"
 
 namespace tenriff::app::menu_records {
@@ -379,6 +380,7 @@ std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path&
     }
 
     ParsedResultRecord out;
+    out.stats.analysis = gameplay::parse_timing_analysis_json(find_json_value(*stats_obj, "analysis_v1"));
     const int score_version = read_json_int(*root, "version", 1);
     out.replay_format_version = read_json_int(*root, "replay_format_version", 0);
     out.chart_path = read_json_string(*root, "chart_path");

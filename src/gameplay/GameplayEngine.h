@@ -135,7 +135,7 @@ private:
     void apply_missed_note(const NoteEvent& note, int64_t sample);
     void apply_bad_miss(const NoteEvent& note, int64_t sample);
     void apply_indirect_miss(const NoteEvent& note, int64_t sample);
-    void apply_empty_poor(int64_t sample);
+    void apply_empty_poor(int lane, int64_t sample);
     bool process_mines_until(LaneState& lane, int lane_number, int64_t sample);
     void detonate_mine(const MineEvent& mine, int lane_number);
     [[nodiscard]] OsuManiaJudgement record_osu_hold(const HoldState& hold,

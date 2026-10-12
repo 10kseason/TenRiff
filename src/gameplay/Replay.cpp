@@ -9,6 +9,7 @@
 #include <utility>
 
 #include "config/SimpleJson.h"
+#include "gameplay/TimingAnalysisJson.h"
 
 namespace tenriff::gameplay {
 
@@ -228,6 +229,8 @@ config::JsonValue build_stats_json(const ResultStats& stats) {
     obj.emplace("negative_delta_count", config::JsonValue{static_cast<double>(stats.negative_delta_count)});
     obj.emplace("gauge_history", build_gauge_history_json(stats.gauge_history));
     obj.emplace("shifts", build_shift_json(stats.shifts));
+    auto analysis = build_timing_analysis_json(stats.analysis);
+    if (!analysis.is_null()) obj.emplace("analysis_v1", std::move(analysis));
     return config::JsonValue{std::move(obj)};
 }
 
@@ -312,7 +315,7 @@ ExportResult save_json_file(const std::string& path, const config::JsonValue& ro
         return result;
     }
 
-    file << config::json_stringify(root, indent);
+    file << config::json_stringify(root, indent, std::numeric_limits<double>::max_digits10);
     if (!file) {
         result.error = "Failed to write export file: " + path;
         return result;
@@ -526,6 +529,7 @@ ReplayLoadResult load_replay_json(const std::string& path) {
     }
 
     if (const auto* stats = find_json_object(*root, "stats")) {
+        replay.stats.analysis = parse_timing_analysis_json(find_json_value(*stats, "analysis_v1"));
         if (const auto* counts = find_json_object(*stats, "counts")) {
             replay.stats.counts.pg = read_json_int(*counts, "pg", 0);
             replay.stats.counts.gr = read_json_int(*counts, "gr", 0);

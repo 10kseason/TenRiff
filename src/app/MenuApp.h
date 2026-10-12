@@ -777,6 +777,8 @@ private:
     gameplay::ResultStats last_result_{};
     int64_t result_presentation_start_ns_ = 0;
     bool result_presentation_skipped_ = false;
+    int result_analysis_page_ = 0;
+    int result_analysis_lane_bank_ = 0;
 
     int64_t last_indexer_snapshot_ns_ = 0;
     int64_t last_song_select_slow_snapshot_log_ns_ = 0;

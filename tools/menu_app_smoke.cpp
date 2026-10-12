@@ -189,6 +189,27 @@ struct MenuAppVisualTestAccess {
     }
     static const config::RuntimeConfig& config(const MenuApp& app) { return app.config_; }
     static bool result(const MenuApp& app) { return app.has_result_; }
+    static int analysis_page(const MenuApp& app) { return app.result_analysis_page_; }
+    static bool analysis_available(const MenuApp& app) { return app.last_result_.analysis.available; }
+    static void check_analysis_boundaries(MenuApp& app, Report& report) {
+        const auto saved_lanes = app.last_result_.analysis.lane_count;
+        app.last_result_.analysis.lane_count = 32;  // Loaded replay evidence can exceed menu key modes.
+        app.result_analysis_page_ = 1;
+        app.result_analysis_lane_bank_ = 0;
+        click(app, render::MenuHitTargetKind::SettingsRow, 7);
+        report.check("result.analysis_lane_bank_mouse", app.result_analysis_lane_bank_ == 1);
+        key(app, "Down");
+        report.check("result.analysis_lane_bank_keyboard", app.result_analysis_lane_bank_ == 0);
+        app.last_result_.analysis.lane_count = saved_lanes;
+        app.result_analysis_page_ = 0;
+        const bool saved_multiplayer = app.last_game_was_multiplayer_;
+        app.last_game_was_multiplayer_ = true;
+        key(app, "F2");
+        click(app, render::MenuHitTargetKind::SettingsRow, 4);
+        report.check("result.analysis_multiplayer_guard", app.result_analysis_page_ == 0);
+        app.last_game_was_multiplayer_ = saved_multiplayer;
+        app.publish_snapshot();
+    }
     static void check_loading_pacing(MenuApp& app, Report& report) {
         const auto saved_refresh = app.config_.graphics.refresh_hz;
         app.config_.graphics.refresh_hz = 0;
@@ -363,6 +384,17 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
     expect_screen(app, report, "natural_result", Screen::Result);
     report.check("natural_result.has_stats", Access::result(app));
     Access::key(app, "Space");
+    report.check("result.analysis_available", Access::analysis_available(app));
+    Access::key(app, "F2");
+    report.check("result.analysis_keyboard_lanes", Access::analysis_page(app) == 1);
+    Access::click(app, Kind::SettingsRow, 5);
+    report.check("result.analysis_mouse_types", Access::analysis_page(app) == 2);
+    Access::click(app, Kind::SettingsRow, 6);
+    report.check("result.analysis_mouse_timeline", Access::analysis_page(app) == 3);
+    Access::key(app, "Escape");
+    report.check("result.analysis_escape_summary", Access::analysis_page(app) == 0 && Access::screen(app) == Screen::Result);
+    Access::check_analysis_boundaries(app, report);
+    Access::click(app, Kind::SettingsRow, 4);
     const auto result_rows = Access::rows(app);
     Access::click(app, Kind::SettingsRow, 0);
     const bool mouse_return = Access::screen(app) == Screen::SongSelect;

@@ -50,6 +50,8 @@ struct JsonParseResult {
 
 JsonParseResult parse_json(std::string_view text);
 
-std::string json_stringify(const JsonValue& value, int indent = 0);
+// The default retains existing compact-number formatting. Evidence exporters can
+// request max_digits10 when counters and floating-point moments must round-trip.
+std::string json_stringify(const JsonValue& value, int indent = 0, int number_precision = 6);
 
 }  // namespace tenriff::config

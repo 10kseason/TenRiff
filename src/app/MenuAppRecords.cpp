@@ -581,6 +581,8 @@ bool MenuApp::open_result_record(const std::string& result_path,
     update_last_chart_metadata(parsed->chart_path, entry);
     result_presentation_start_ns_ = timing::HighResClock::now_ns();
     result_presentation_skipped_ = false;
+    result_analysis_page_ = 0;
+    result_analysis_lane_bank_ = 0;
     push_screen(Screen::Result);
     return true;
 }

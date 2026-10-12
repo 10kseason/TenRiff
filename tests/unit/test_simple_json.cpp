@@ -1,5 +1,7 @@
 #include "doctest/doctest.h"
 
+#include <limits>
+
 #include "config/SimpleJson.h"
 
 using tenriff::config::parse_json;
@@ -55,4 +57,19 @@ TEST_CASE("simple json enforces the JSON number grammar") {
 TEST_CASE("simple json rejects unescaped control characters in strings") {
     CHECK_FALSE(parse_json("\"line\nbreak\"").success());
     CHECK(parse_json("\"line\\nbreak\"").success());
+}
+
+TEST_CASE("simple json optional precision retains exact evidence numbers and default formatting") {
+    const tenriff::config::JsonValue integer{1'234'567.0};
+    CHECK(tenriff::config::json_stringify(integer) == "1.23457e+06");
+    const auto exact = tenriff::config::json_stringify(integer, 0, std::numeric_limits<double>::max_digits10);
+    CHECK(exact == "1234567");
+    const auto parsed = parse_json(exact);
+    REQUIRE(parsed.success());
+    CHECK(parsed.root->as_number() == 1'234'567.0);
+    const tenriff::config::JsonValue moment{0.12345678901234567};
+    const auto moment_parsed = parse_json(tenriff::config::json_stringify(
+        moment, 0, std::numeric_limits<double>::max_digits10));
+    REQUIRE(moment_parsed.success());
+    CHECK(moment_parsed.root->as_number() == moment.as_number());
 }

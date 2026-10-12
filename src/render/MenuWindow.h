@@ -3,6 +3,7 @@
 #ifdef _WIN32
 
 #include "GameplayHudLimits.h"
+#include "gameplay/TimingAnalysis.h"
 #include "app/ImportedGameplaySkin.h"
 #include "app/NativeMenuSkin.h"
 #include "ui/Localization.h"
@@ -346,6 +347,10 @@ struct ResultShiftMarker {
 };
 
 struct ResultScreenData {
+    gameplay::TimingAnalysis analysis;
+    int analysis_page = 0;  // 0 summary, 1 lanes, 2 note types, 3 song time.
+    int analysis_lane_bank = 0;
+    std::string analysis_mods;
     std::vector<MultiplayerPlayerData> multiplayer_players;
     bool peer_battle = false;
     std::string profile;

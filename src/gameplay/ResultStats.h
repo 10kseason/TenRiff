@@ -5,6 +5,7 @@
 
 #include "game/GaugeManager.h"
 #include "gameplay/OsuManiaScore.h"
+#include "gameplay/TimingAnalysis.h"
 
 namespace tenriff::gameplay {
 
@@ -37,6 +38,7 @@ struct ShiftEvent {
 };
 
 struct ResultStats {
+    TimingAnalysis analysis;
     JudgementCounts counts;
     int combo = 0;
     int max_combo = 0;
