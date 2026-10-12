@@ -27,18 +27,31 @@
         };
         const auto draw_keymap_button = [&](const D2D1_RECT_F& rect, const std::wstring& label,
                                             bool selected, MenuHitTargetKind target, int index,
-                                            MenuHitPart part, bool enabled) {
-            auto* fill = selected ? d2d_->button_selected_brush.Get() : d2d_->button_brush.Get();
+                                            MenuHitPart part, bool enabled, std::optional<uint32_t> key_color = {}) {
+            auto* fill = key_color ? d2d_->note_fill_brush.Get()
+                                   : selected ? d2d_->button_selected_brush.Get() : d2d_->button_brush.Get();
+            const auto saved_color = fill->GetColor();
+            const auto saved_opacity = fill->GetOpacity();
+            if (key_color) { fill->SetColor(D2D1::ColorF(*key_color)); fill->SetOpacity(1.0f); }
+            ctx->FillRoundedRectangle(D2D1::RoundedRect(rect, 8, 8), fill);
+            fill->SetColor(saved_color); fill->SetOpacity(saved_opacity);
             auto* border = selected ? d2d_->accent_brush.Get() : d2d_->button_border_brush.Get();
-            if (fill) ctx->FillRoundedRectangle(D2D1::RoundedRect(rect, 8, 8), fill);
-            if (border) ctx->DrawRoundedRectangle(D2D1::RoundedRect(rect, 8, 8), border, selected ? 2.0f : 1.0f);
-            const auto paragraph = d2d_->body_format->GetParagraphAlignment();
-            d2d_->body_format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
-            draw_text_clipped_aligned(label, d2d_->body_format.Get(),
-                                      D2D1::RectF(rect.left + 4, rect.top + 4, rect.right - 4, rect.bottom - 4),
-                                      enabled || testing_keys ? d2d_->text_brush.Get() : d2d_->muted_brush.Get(),
-                                      DWRITE_TEXT_ALIGNMENT_CENTER);
-            d2d_->body_format->SetParagraphAlignment(paragraph);
+            if (border) ctx->DrawRoundedRectangle(D2D1::RoundedRect(rect, 8, 8), border, selected ? 3.0f : 1.0f);
+            // Contrast follows the actual resolved color, including single-color mode.
+            const uint32_t rgb = key_color.value_or(0);
+            const float lightness = (0.2126f * ((rgb >> 16) & 255) + 0.7152f * ((rgb >> 8) & 255) +
+                                     0.0722f * (rgb & 255)) / 255.0f;
+            auto* text = key_color ? native_color(lightness > 0.5f ? 0x101820 : 0xFFFFFF, 1.0f)
+                                  : enabled || testing_keys ? d2d_->text_brush.Get() : d2d_->muted_brush.Get();
+            if (key_color && selected) ctx->DrawRoundedRectangle(D2D1::RoundedRect(
+                D2D1::RectF(rect.left + 4, rect.top + 4, rect.right - 4, rect.bottom - 4), 5, 5), text, 1.4f);
+            auto* format = key_color ? d2d_->result_action_format.Get() : d2d_->body_format.Get();
+            const auto paragraph = format->GetParagraphAlignment();
+            format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+            draw_text_clipped_aligned(label, format,
+                                      D2D1::RectF(rect.left + 5, rect.top + 4, rect.right - 5, rect.bottom - 4),
+                                      text, DWRITE_TEXT_ALIGNMENT_CENTER);
+            format->SetParagraphAlignment(paragraph);
             if (enabled) register_hit(rect, target, index, part);
         };
 
@@ -93,10 +106,10 @@
             const bool secondary_selected = row.selected && data.generic.keymap_secondary_selected && !testing_keys;
             draw_keymap_button(D2D1::RectF(x + 4, keys_top + 60, x + key_width - 4, keys_bottom - 8),
                                to_wide(short_binding(row.value)), primary_selected,
-                               row.target_kind, row.row_index, MenuHitPart::Activate, row.activatable);
+                               row.target_kind, row.row_index, MenuHitPart::Activate, row.activatable, row.key_color);
             draw_keymap_button(D2D1::RectF(x, secondary_top, x + key_width, secondary_top + 64),
                                to_wide(short_binding(row.secondary_value)), secondary_selected,
-                               row.target_kind, row.row_index, MenuHitPart::Increment, row.activatable);
+                               row.target_kind, row.row_index, MenuHitPart::Increment, row.activatable, row.key_color);
             if (!testing_keys && row.activatable) {
                 // A dedicated clear control leaves the primary binding intact.
                 const auto clear = D2D1::RectF(x + key_width - 23, secondary_top - 22, x + key_width, secondary_top);

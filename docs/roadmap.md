@@ -2,6 +2,8 @@
 
 **고정 기준선: [1.8.7](baseline-1.8.7.md)** (2026-10-10). Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`을 사용하며 `latest`나 새 릴리스로 자동 변경하지 않습니다.
 
+**2026-10-13 · 1.8.9.3:** 리절트 점수·등급·정확도와 판정 개수의 크기를 조정하고, 로비 동작 카드 색·은은한 Bloom, 스킨 레인 색을 따르는 키 설정, 곡 목록 레벨 색을 개선했습니다. 인디케이터 배경과 스킨의 대상 간격·비주얼 프리셋 항목을 제거하고 대상 레인을 노트 색상 바로 위로 옮겼습니다. [변경·검증 범위](release-1.8.9.3-gate.md). 고정 기준은 1.8.7이며 1.8.9.2의 BMS 보정과 리플레이 호환성을 유지합니다.
+
 **2026-10-13 · 1.8.9.2:** BMS의 같은 레인·시각에 중복된 일반 노트와 롱노트 시작점을 게임 안에서 롱노트 하나로 보정합니다. 원본 파일, LN 길이와 키음을 보존하며 Native와 변환에 함께 적용합니다. 이전 리플레이는 당시 배치를 유지합니다. [동작·호환 한계](release-1.8.9.2-gate.md). 고정 기준선은 1.8.7입니다.
 
 **2026-10-13 · 1.8.9.1:** 연속 키 설정, 전 변환기 키음·롱노트 보존, FAST/SLOW·타이밍 배경 토글, 게이지 확대, 미리보기 기어 드래그와 판정 테두리·배경 제거를 제공합니다. 기존 리플레이는 원래 변환으로 재생합니다. [동작·검증·호환 한계](release-1.8.9.1-gate.md). 고정 기준선은 1.8.7입니다.
@@ -12,7 +14,7 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current baseline
 - Windows GUI/runtime is the primary supported path.
-- The fixed baseline is `1.8.7` and this source targets `1.8.9.2`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
+- The fixed baseline is `1.8.7` and this source targets `1.8.9.3`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
 - The active menu/runtime is BMS-family only (`.bms/.bme/.bml/.pms`) and supports native, bundled/profile TenRiff `skin.json`, and LR2 skins.
 - For current shipped behavior, read `docs/current-state.md` first; this roadmap is about direction and remaining work.
 

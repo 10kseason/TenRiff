@@ -490,32 +490,7 @@
                             combo_anchor_y + 16.0f,
                             feedback_center_x + kGameplayTimingIndicatorHalfWidth,
                             combo_anchor_y + 16.0f + kGameplayTimingIndicatorHeight);
-            if (data.gameplay.indicator_background_visible && d2d_->card_brush) {
-                d2d_->card_brush->SetOpacity(0.75f);
-                ctx->FillRoundedRectangle(D2D1::RoundedRect(indicator_rect, 4.0f, 4.0f), d2d_->card_brush.Get());
-                d2d_->card_brush->SetOpacity(1.0f);
-            }
-            if (data.gameplay.indicator_background_visible && d2d_->accent_brush) {
-                const auto saved_color = d2d_->accent_brush->GetColor();
-                const float saved_opacity = d2d_->accent_brush->GetOpacity();
-                d2d_->accent_brush->SetOpacity(0.26f);
-                d2d_->accent_brush->SetColor(ng_color("timing_fast",D2D1::ColorF(0x5DA9FF)));
-                ctx->FillRectangle(D2D1::RectF(indicator_rect.left, indicator_rect.top,
-                                               feedback_center_x, indicator_rect.bottom),
-                                   d2d_->accent_brush.Get());
-                d2d_->accent_brush->SetColor(ng_color("timing_slow",D2D1::ColorF(0xFF5A6B)));
-                ctx->FillRectangle(D2D1::RectF(feedback_center_x, indicator_rect.top,
-                                               indicator_rect.right, indicator_rect.bottom),
-                                   d2d_->accent_brush.Get());
-                d2d_->accent_brush->SetColor(saved_color);
-                d2d_->accent_brush->SetOpacity(saved_opacity);
-            }
-            if (data.gameplay.indicator_background_visible && d2d_->button_border_brush) {
-                ctx->DrawRoundedRectangle(D2D1::RoundedRect(indicator_rect, 4.0f, 4.0f),
-                                          d2d_->button_border_brush.Get(),
-                                          1.0f);
-            }
-
+            // Keep only the timing marks, including for older presets that enable a backing.
             const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
             const float indicator_center_y = (indicator_rect.top + indicator_rect.bottom) * 0.5f;
             d2d_->text_brush->SetColor(ng_color("timing",D2D1::ColorF(0xF7FAFD, 0.92f)));

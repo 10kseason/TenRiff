@@ -615,40 +615,23 @@ TEST_CASE("TenRiff skin import includes assets referenced only by another key mo
     CHECK(!loaded.gameplay.note_images.front().path.empty());
 }
 
-TEST_CASE("Skin settings stable row ids account for the optional LR2 row") {
-    const tenriff::app::SkinSettingsRows native_rows{false};
-    const tenriff::app::SkinSettingsRows lr2_rows{true};
-    CHECK(native_rows.count() == 68);
-    CHECK(lr2_rows.count() == 69);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::KeyMode) == 0);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::ScratchPosition) == 1);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::SkinSource) == 2);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::Lr2Resolution) == -1);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::VisualLatency) == 4);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::ImportSkin) == 5);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::OpenSkinEditor) == 11);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::KeyBackdropBrightness) == 40);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::KeyBackdropHeight) == 41);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::HudLayout) == 45);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::HudRiffMapVisible) == 46);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::TimingBarMode) == 53);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::IndicatorBackground) == 54);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::ComboFontSize) == 63);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::JudgementFontSize) == 64);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 67);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::VisualLatency) == 4);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::Lr2Resolution) == 5);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::ImportSkin) == 6);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::OpenSkinEditor) == 12);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::KeyBackdropBrightness) == 41);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::KeyBackdropHeight) == 42);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::HudLayout) == 46);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::HudRiffMapVisible) == 47);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::TimingBarMode) == 54);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::IndicatorBackground) == 55);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::ComboFontSize) == 64);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::JudgementFontSize) == 65);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 68);
+TEST_CASE("Skin settings retain stable IDs while grouping lane selection with note color") {
+    using namespace tenriff::app;
+    for (const bool lr2 : {false, true}) {
+        const SkinSettingsRows rows{lr2};
+        CHECK(rows.count() == (lr2 ? 66 : 65));
+        CHECK(rows.index_of(SkinSettingsRowId::Lr2Resolution) == (lr2 ? 5 : -1));
+        CHECK(rows.index_of(SkinSettingsRowId::TargetGap) == -1);
+        CHECK(rows.index_of(SkinSettingsRowId::VisualPreset) == -1);
+        CHECK(rows.index_of(SkinSettingsRowId::IndicatorBackground) == -1);
+        CHECK(rows.index_of(SkinSettingsRowId::TargetLane) + 1 == rows.index_of(SkinSettingsRowId::LaneColor));
+        CHECK(skin_settings_category(SkinSettingsRowId::TargetLane) == SkinSettingsCategory::Notes);
+        CHECK(rows.index_of(SkinSettingsRowId::Back) == rows.count() - 1);
+        for (const auto id : kSkinSettingsRowOrder) {
+            if (!lr2 && id == SkinSettingsRowId::Lr2Resolution) continue;
+            CHECK(rows.index_of(id) >= 0);
+        }
+    }
 }
 
 TEST_CASE("7+1 presentation moves only the visual scratch lane") {

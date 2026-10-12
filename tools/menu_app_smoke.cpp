@@ -103,7 +103,36 @@ namespace tenriff::app {
 // These existing test friends are defined only in this executable. Menu actions
 // run on their owner thread; the observer reads only mutex-protected HUD data.
 struct MenuAppVisualTestAccess {
+    static void check_keymap_palette(MenuApp& app, Report& report) {
+        const auto saved_skin = app.config_.skin;
+        const auto saved_controller = app.keymap_settings_controller_;
+        for (const char* mode : {"4k", "5k", "7k", "8k", "10k", "16k"}) {
+            app.keymap_settings_controller_.reset(std::stoi(mode), mode);
+            const auto count = app.keymap_settings_controller_.lane_ids().size();
+            auto& palette = app.config_.skin.lane_colors[mode];
+            palette.assign(count, "blue");
+            palette.front() = "yellow";
+            app.config_.skin.single_color = "off";
+            for (const bool single : {false, true}) {
+                app.config_.skin.single_color = single ? "red" : "off";
+                const auto expected = config::resolved_skin_lane_colors(app.config_.skin, mode);
+                render::MenuRenderData bindings, nkro;
+                app.populate_keymap_render_data(bindings);
+                app.populate_keymap_test_render_data(nkro);
+                bool valid = expected.size() == count && count == static_cast<std::size_t>(std::stoi(mode));
+                for (std::size_t i = 0; i < count; ++i) {
+                    const auto rgb = config::skin_color_rgb(expected[i]);
+                    valid = valid && bindings.generic.rows[i + 1].key_color == rgb &&
+                        nkro.generic.rows[i].key_color == rgb;
+                }
+                report.check(std::string("keymap.palette_") + mode + (single ? "_single" : "_lanes"), valid);
+            }
+        }
+        app.config_.skin = saved_skin;
+        app.keymap_settings_controller_ = saved_controller;
+    }
     static void check_sequential_keymap(MenuApp& app, Report& report) {
+        check_keymap_palette(app, report);
         const auto original = app.keymap_;
         app.keymap_settings_controller_.reset(4, "4k");
         click(app, Kind::SettingsRow, 1);
@@ -511,6 +540,19 @@ struct MenuAppVisualTestAccess {
     }
     static void check_lane_shortcuts(MenuApp& app, Report& report) {
         const auto saved_controller = app.skin_settings_controller_;
+        render::MenuRenderData skin_view;
+        app.populate_skin_settings_render_data(skin_view);
+        bool removed = true;
+        bool adjacent = false;
+        for (std::size_t i = 0; i < skin_view.generic.rows.size(); ++i) {
+            const auto id = static_cast<SkinSettingsRowId>(skin_view.generic.rows[i].row_index);
+            removed = removed && id != SkinSettingsRowId::TargetGap && id != SkinSettingsRowId::VisualPreset &&
+                id != SkinSettingsRowId::IndicatorBackground;
+            if (id == SkinSettingsRowId::TargetLane && i + 1 < skin_view.generic.rows.size())
+                adjacent = skin_view.generic.rows[i + 1].row_index == static_cast<int>(SkinSettingsRowId::LaneColor);
+        }
+        report.check("skin.retired_rows_absent", removed);
+        report.check("skin.target_lane_above_note_color", adjacent);
         app.skin_settings_controller_.reset("16k");
         (void)app.skin_settings_controller_.select(SkinSettingsRowId::LaneWidth, false);
         key(app, "0");
@@ -635,6 +677,9 @@ struct MenuAppFeedbackTestAccess {
         // from affecting the deterministic control sequence.
         session.input_thread_.stop();
         while (session.input_thread_.queue().pop().has_value()) {}
+        // Playback-start/resume also polls held bindings directly. Isolate that
+        // baseline from desktop keys as well; fixture events use the dispatcher.
+        session.polled_gameplay_keys_.clear();
     }
     static void escape(GameSession& session) {
         // The normal audio callback applies controls while holding this mutex.
@@ -1089,7 +1134,8 @@ void separate_delta_flow(tenriff::app::CommandLineOptions options, Report& repor
         result.stats.total_notes == 4 && result.stats.counts.bd == 0 && result.stats.counts.pr == 0);
     report.check("delta.result_version", result.key_conversion_version == 3);
     const auto replay = gameplay::load_replay_json(result.replay_path);
-    report.check("delta.replay_version", replay.success() && replay.replay->mode.key_conversion_version == 3);
+    report.check("delta.replay_version", replay.success() && replay.replay->mode.key_conversion_version == 3,
+                 replay.error);
     std::string error;
     const auto saved = app::menu_records::parse_result_file(std::filesystem::u8path(result.result_path), &error);
     report.check("delta.local_result_version", saved && saved->key_conversion_version == 3 && saved->stats.total_notes == 4, error);

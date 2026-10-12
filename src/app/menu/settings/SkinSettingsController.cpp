@@ -152,6 +152,7 @@ SkinSettingsEffects SkinSettingsController::select_lane(int one_based_lane) noex
     if (one_based_lane < 1 || one_based_lane > lane_count_for_skin_mode(edit_mode_) ||
         edit_lane_ == one_based_lane - 1) return {};
     edit_lane_ = one_based_lane - 1;
+    edit_gap_ = std::min(edit_lane_, std::max(0, lane_count_for_skin_mode(edit_mode_) - 2));
     // Selection only: keep the current color/width row and do not dirty the skin.
     SkinSettingsEffects effects;
     effects.menu.render_changed = true;
@@ -362,6 +363,7 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
         case SkinSettingsRowId::TargetLane: {
             const int lane_count = lane_count_for_skin_mode(edit_mode_);
             edit_lane_ = (edit_lane_ + direction + lane_count) % lane_count;
+            edit_gap_ = std::min(edit_lane_, std::max(0, lane_count - 2));
             SkinSettingsEffects effects;
             effects.menu.render_changed = true;
             return effects;
@@ -707,7 +709,8 @@ SkinSettingsEffects SkinSettingsController::mark_changed() noexcept {
 void SkinSettingsController::clamp_edit_targets() noexcept {
     const int lane_count = lane_count_for_skin_mode(edit_mode_);
     edit_lane_ = std::clamp(edit_lane_, 0, lane_count - 1);
-    edit_gap_ = std::clamp(edit_gap_, 0, std::max(0, lane_count - 2));
+    // The target-lane selector owns the adjacent gap after retiring Target Gap.
+    edit_gap_ = std::min(edit_lane_, std::max(0, lane_count - 2));
 }
 
 }  // namespace tenriff::app::menu::settings

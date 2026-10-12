@@ -859,18 +859,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                                       std::to_string(skin_edit_lane_ + 1))) +
                         " / " + std::to_string(lane_count),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TargetLane), false, true);
-    append_menu_row(render.generic,
-                    ui_text("Target Gap", "대상 간격"),
-                    (gap_count > 0)
-                        ? (std::to_string(skin_edit_gap_ + 1) + "-" + std::to_string(skin_edit_gap_ + 2) +
-                           " / " + std::to_string(gap_count))
-                        : ui_text("N/A", "없음"),
-                    false,
-                    render::MenuHitTargetKind::SettingsRow,
-                    static_cast<int>(SkinSettingsRowId::TargetGap),
-                    false,
-                    gap_count > 0);
-    append_menu_row(render.generic, ui_text("Lane Color", "레인 색상"),
+    append_menu_row(render.generic, ui_text("Note Color", "노트 색상"),
                     single_color_enabled
                         ? ui_text("Single Color Active", "단일 색상 사용 중")
                         : config::skin_color_label(preview_lane_palette[static_cast<std::size_t>(skin_edit_lane_)]),
@@ -905,9 +894,6 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::ShowHoldTail), false, true);
     append_menu_row(render.generic, ui_text("LN Tail Taper", "LN 꼬리 테이퍼"), ui_on_off(config_.skin.hold_tail_taper_enabled),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::LnTailTaper), false, true);
-    append_menu_row(render.generic, ui_text("Visual Preset", "비주얼 프리셋"),
-                    config::skin_visual_preset_label(config_.skin.visual_preset),
-                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::VisualPreset), false, true);
     append_menu_row(render.generic, ui_text("Lane Tint Opacity", "레인 색상 농도"),
                     format_percent(config_.skin.lane_background_opacity),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::LaneBackgroundOpacity), false, true);
@@ -929,9 +915,6 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     config::normalize_skin_hud_layout_token(config_.skin.hud_layout) == "classic"
                         ? ui_text("Classic", "클래식") : ui_text("Studio Deck", "스튜디오 덱"),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::HudLayout), false, true);
-    append_menu_row(render.generic, ui_text("Indicator Background", "인디케이터 배경"),
-                    ui_on_off(config_.skin.indicator_background_visible),
-                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::IndicatorBackground), false, true);
     append_menu_row(render.generic, ui_text("Studio Riff Map", "스튜디오 리프 맵"),
                     ui_on_off(config_.skin.hud_riff_map_visible),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::HudRiffMapVisible), false, true);

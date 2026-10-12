@@ -15,9 +15,9 @@
 
 using tenriff::config::ConfigLoader;
 
-TEST_CASE("feedback regression indicator background defaults on and round trips off") {
+TEST_CASE("feedback regression legacy indicator setting defaults off and remains readable") {
     tenriff::config::SkinConfig skin;
-    CHECK(skin.indicator_background_visible);
+    CHECK_FALSE(skin.indicator_background_visible);
     REQUIRE(tenriff::config::deserialize_skin_config(R"({"indicator_background_visible":false})", skin));
     CHECK_FALSE(skin.indicator_background_visible);
     tenriff::config::SkinConfig restored;

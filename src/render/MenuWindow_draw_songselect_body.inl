@@ -429,8 +429,7 @@
                 draw_trailing_text(to_wide(level), d2d_->title_format.Get(),
                                    native_rect("songselect.rect.029", D2D1::RectF(value_left, card.top + 13.0f,
                                                card.right - 12.0f, card.top + 48.0f)),
-                                   song.selected && d2d_->accent_brush
-                                       ? static_cast<ID2D1Brush*>(d2d_->accent_brush.Get())
+                                   modern_library_screen ? semantic_color(0xC2A0FF)
                                        : static_cast<ID2D1Brush*>(d2d_->text_brush.Get()));
             }
             if (song.favorite && d2d_->hud_format && d2d_->accent_brush) {

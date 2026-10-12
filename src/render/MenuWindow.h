@@ -517,7 +517,7 @@ struct GameplayHudData {
     std::string hit_burst_style = "prism";
     std::string hud_layout = "studio";
     bool hud_riff_map_visible = true;
-    bool indicator_background_visible = true;
+    bool indicator_background_visible = false;
     std::string key_label_position = "bottom";
     bool note_border_enabled = true;
     std::string note_shape = "rect";
@@ -647,6 +647,7 @@ struct MenuRowData {
     std::string label;
     std::string value;
     std::string secondary_value;
+    std::optional<uint32_t> key_color;
     bool selected = false;
     bool activatable = false;
     bool adjustable = false;
@@ -716,7 +717,7 @@ struct SkinPreviewData {
     std::string hit_burst_style = "prism";
     std::string hud_layout = "studio";
     bool hud_riff_map_visible = true;
-    bool indicator_background_visible = true;
+    bool indicator_background_visible = false;
     std::string key_label_position = "bottom";
     bool note_border_enabled = true;
     std::string note_shape = "rect";

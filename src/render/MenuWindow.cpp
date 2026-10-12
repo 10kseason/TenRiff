@@ -2396,6 +2396,7 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_metadata_value_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> result_score_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> result_metric_format;
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> result_judgement_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> result_accuracy_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> result_label_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> result_body_format;
@@ -2417,7 +2418,7 @@ struct MenuWindow::D2DResources {
         uint32_t rgb = 0;
         bool attempted = false;
     };
-    std::array<PanelGlowBitmap, 2> panel_glow_bitmaps{};
+    std::array<PanelGlowBitmap, 6> panel_glow_bitmaps{};
     std::array<ReadableTextLayout, 2> result_action_layouts{};
     std::array<Microsoft::WRL::ComPtr<ID2D1PathGeometry>, 2> result_action_icons{};
     std::array<bool, 2> result_action_icons_attempted{};
@@ -5236,6 +5237,7 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family, const app::Native
                 {std::addressof(d2d_->song_metadata_value_format), "song_metadata_value"},
                 {std::addressof(d2d_->result_score_format), "result_score"}, {std::addressof(d2d_->result_metric_format), "result_metric"},
                 {std::addressof(d2d_->result_accuracy_format), "result_accuracy"},
+                {std::addressof(d2d_->result_judgement_format), "result_judgement"},
                 {std::addressof(d2d_->result_label_format), "result_label"}, {std::addressof(d2d_->result_body_format), "result_body"},
                 {std::addressof(d2d_->result_action_format), "result_action"},
                 {std::addressof(d2d_->grade_format), "grade"},
@@ -5301,14 +5303,15 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family, const app::Native
                             &d2d_->song_record_detail_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 24.0f, &d2d_->song_title_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 18.0f, &d2d_->song_artist_format) ||
-        !create_text_format(L"Bahnschrift", DWRITE_FONT_WEIGHT_SEMI_BOLD, 116.0f, &d2d_->result_score_format) ||
+        !create_text_format(L"Bahnschrift", DWRITE_FONT_WEIGHT_SEMI_BOLD, 100.0f, &d2d_->result_score_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 36.0f, &d2d_->song_metadata_value_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 52.0f, &d2d_->result_metric_format) ||
-        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 64.0f, &d2d_->result_accuracy_format) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 46.0f, &d2d_->result_judgement_format) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 68.0f, &d2d_->result_accuracy_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 24.0f, &d2d_->result_label_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 24.0f, &d2d_->result_body_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 30.0f, &d2d_->result_action_format) ||
-        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_BOLD, 84.0f, &d2d_->grade_format) ||
+        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_BOLD, 104.0f, &d2d_->grade_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 16.0f, &d2d_->hud_format) ||
         !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 128.0f, &d2d_->rank_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 16.0f, &d2d_->stats_label_format) ||

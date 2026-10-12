@@ -50,6 +50,7 @@ void MenuApp::populate_keymap_render_data(render::MenuRenderData& render) {
     render.generic.keymap_keyboard = true;
     render.generic.keymap_secondary_selected = keymap_settings_controller_.secondary_selected();
     render.generic.keymap_capture_active = keymap_settings_controller_.capture_active();
+    const auto colors = config::resolved_skin_lane_colors(config_.skin, keymap_settings_controller_.edit_mode());
     int keymap_row_index = 0;
     for (auto& source : view.rows) {
         render::MenuHitTargetKind target_kind = render::MenuHitTargetKind::SettingsRow;
@@ -70,6 +71,10 @@ void MenuApp::populate_keymap_render_data(render::MenuRenderData& render) {
                         activatable,
                         false);
         render.generic.rows.back().secondary_value = std::move(source.secondary_value);
+        const int lane_index = row_index - 1;
+        if (target_kind == render::MenuHitTargetKind::SettingsRow && lane_index >= 0 &&
+            static_cast<std::size_t>(lane_index) < colors.size())
+            render.generic.rows.back().key_color = config::skin_color_rgb(colors[lane_index]);
         if (row_index == 0 && target_kind == render::MenuHitTargetKind::SettingsRow) {
             auto& row = render.generic.rows.back();
             row.adjustable = row.increment_enabled = row.decrement_enabled = activatable;
@@ -92,6 +97,8 @@ void MenuApp::populate_keymap_test_render_data(render::MenuRenderData& render) {
     render.generic.footer_reserved_lines = view.footer_reserved_lines;
     render.generic.keymap_keyboard = true;
     render.generic.keymap_test = true;
+    const auto colors = config::resolved_skin_lane_colors(config_.skin, keymap_settings_controller_.edit_mode());
+    std::size_t lane_index = 0;
     for (auto& source : view.rows) {
         const bool is_back = source.action == menu::settings::KeymapActionId::Back;
         append_menu_row(render.generic,
@@ -104,6 +111,8 @@ void MenuApp::populate_keymap_test_render_data(render::MenuRenderData& render) {
                         is_back,
                         false);
         render.generic.rows.back().secondary_value = std::move(source.secondary_value);
+        if (!is_back && lane_index < colors.size())
+            render.generic.rows.back().key_color = config::skin_color_rgb(colors[lane_index++]);
     }
     render.generic.footer_notes = std::move(view.footer_notes);
 }

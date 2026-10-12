@@ -111,18 +111,21 @@ TEST_CASE("Studio riff map toggle follows keyboard and pointer settings routing 
     }
 }
 
-TEST_CASE("feedback regression indicator background toggle persists for every skin source") {
+TEST_CASE("retired skin controls cannot mutate old presets through stale mouse targets") {
     for (const auto source : {"native", "lr2", "tenriff"}) {
         tenriff::config::RuntimeConfig runtime;
         runtime.skin.source = source;
+        runtime.skin.indicator_background_visible = true;
         SkinSettingsController controller;
         controller.reset("10k");
-        const auto changed = controller.handle(MenuAction::activate(), runtime, kLr2Names, kTenRiffNames,
-                                                SkinSettingsRowId::IndicatorBackground);
-        CHECK_FALSE(runtime.skin.indicator_background_visible);
-        CHECK(changed.menu.render_changed);
-        CHECK(controller.dirty());
-        CHECK(controller.handle(MenuAction::back(), runtime, kLr2Names, kTenRiffNames).menu.persist_config);
+        const auto saved = tenriff::config::serialize_skin_config(runtime.skin);
+        for (const auto id : {SkinSettingsRowId::TargetGap, SkinSettingsRowId::VisualPreset,
+                              SkinSettingsRowId::IndicatorBackground}) {
+            const auto changed = controller.handle(MenuAction::activate(), runtime, kLr2Names, kTenRiffNames, id);
+            CHECK_FALSE(changed.menu.render_changed);
+            CHECK_FALSE(controller.dirty());
+        }
+        CHECK(tenriff::config::serialize_skin_config(runtime.skin) == saved);
     }
 }
 
@@ -162,10 +165,17 @@ TEST_CASE("skin controller owns edit mode lane and gap selection") {
         SkinSettingsRowId::TargetLane);
     CHECK(controller.edit_lane() == 7);
     CHECK_FALSE(effects.menu.persist_config);
-    effects = controller.handle(
-        MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames,
-        SkinSettingsRowId::TargetGap);
     CHECK(controller.edit_gap() == 6);
+    static_cast<void>(controller.select_lane(3));
+    CHECK(controller.edit_gap() == 2);
+    const auto original = tenriff::config::resolved_skin_lane_spacing_scales(runtime.skin, "7+1");
+    static_cast<void>(controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames,
+                                       SkinSettingsRowId::LaneSpacing));
+    const auto adjusted = tenriff::config::resolved_skin_lane_spacing_scales(runtime.skin, "7+1");
+    for (std::size_t i = 0; i < original.size(); ++i) {
+        if (i == 2) CHECK(adjusted[i] > original[i]);
+        else CHECK(adjusted[i] == original[i]);
+    }
 }
 
 TEST_CASE("skin source changes request refreshes and preserve typed row identity") {

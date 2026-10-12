@@ -874,7 +874,8 @@
                                  alpha * zero_scale,
                                  DWRITE_TEXT_ALIGNMENT_CENTER);
                 draw_result_text(result_statistics[index].value,
-                                 modern_library_screen ? d2d_->result_metric_format.Get() : d2d_->stats_value_format.Get(),
+                                 modern_library_screen ? (index < 5 ? d2d_->result_judgement_format.Get() : d2d_->result_metric_format.Get())
+                                                       : d2d_->stats_value_format.Get(),
                                  native_rect("result_single.rect.041", D2D1::RectF(cell.left + 10.0f, cell.top + 70.0f + rise,
                                              cell.right - 10.0f, cell.top + 138.0f + rise)),
                                  d2d_->accent_brush.Get(),
