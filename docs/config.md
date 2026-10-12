@@ -304,6 +304,7 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `hit_burst_style` | `prism`, `ring`, `spark`; `prism` | 내장 Hit Burst 모양. |
 | `hud_layout` | `classic`, `studio`; `studio` | Native·가져온 LR2 스킨의 단독 플레이 HUD 스타일. LR2 노트·건반·기어 이미지와 비율은 유지함. 키가 없는 기존 프로필도 기본값 `studio`를 사용하며 Options › Skins에서 Classic으로 변경. 1.8.9는 오른쪽 위 정보·왼쪽 아래 점수·오른쪽 아래 가로 맵을 배치하며 좁은 여백에서는 축소·반대쪽 이동. 극단 필드와 Performance HUD가 양쪽 상단을 막으면 정보 카드만 숨김. 다른 이미지 스킨·고스트·멀티는 Classic 유지. 알 수 없는 값은 `studio`. [배치와 검증 범위](release-1.8.9-gate.md). |
 | `hud_riff_map_visible` | bool; `true` | Studio Deck의 64구간 가로 노트 밀도 맵과 경과/전체 시간 표시. 기본 위치는 오른쪽 아래이며 여백에 따라 이동·축소하고 아주 좁으면 시간 글자를 생략함. Options › Skins › 스튜디오 리프 맵에서 변경하며 프로필·스킨 프리셋에 저장됨. 꺼도 다른 카드 위치와 Classic HUD는 유지. |
+| `indicator_background_visible` | bool; `true` | Options › Skins › HUD › 인디케이터 배경. FAST/SLOW·타이밍 표시 뒤의 배경/테두리를 끄거나 켬. 글자·눈금·오차 마커는 유지. 프로필·스킨 프리셋에 저장되며 `skin.json` 필드가 아님. |
 | `ui_font` | `default`, `malgun`, `bahnschrift`, `consolas`; `default` | 메뉴 글꼴. default는 Segoe UI; 로고·랭크·콤보 전용 글꼴은 유지. |
 | `key_label_position` | `bottom`, `top`, `off`; `bottom` | 레인 키 이름 위치. |
 | `judgement_line_position` | double: `0..1`; `0.82` | 판정선 세로 위치 비율. |
@@ -362,6 +363,7 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 - old single-layout keymaps는 런타임에서 10K map으로 마이그레이션됩니다.
 - runtime은 최종 차트 lane count 기준으로 해당 mode binding을 선택합니다.
 - key rebinding은 성공 즉시 `keymap.json`에 저장되고 별도의 최종 저장 단계를 요구하지 않습니다.
+- 저장 성공 후 같은 기본/보조 슬롯의 다음 키 입력을 바로 기다립니다. 마지막 키에서 종료하며 눌러 둔 키의 반복 입력은 무시합니다. 저장 실패·시간 초과·취소·보조 키 해제는 다음 키로 진행하지 않습니다.
 - 같은 모드에서는 하나의 물리 키를 기본·보조 슬롯 중 한 곳에만 새로 지정합니다. 이미 지정된 키를 입력하면 이전 슬롯은 미할당으로 비우고 선택한 슬롯으로 옮깁니다. 다른 키 모드는 바꾸지 않습니다.
 - 기본 키의 명시적인 빈 문자열은 미할당으로 저장·복원합니다. 재할당으로 비운 슬롯이 재시작 후 기본 키로 돌아오지 않도록 하기 위한 동작입니다. 과거 파일의 빈 문자열도 미할당으로 취급하며, 누락한 항목이나 잘못된 비어 있지 않은 키 이름은 기존처럼 기본값을 사용합니다. `Reset`으로 해당 모드의 기본 배치를 복원할 수 있습니다.
 - Song Select에서 키맵 편집을 열면 현재 선택된 차트의 lane count를 우선 사용하고, 그 다음 `mode.key_mode`, 마지막으로 `10k`를 기본 편집 대상으로 삼습니다.

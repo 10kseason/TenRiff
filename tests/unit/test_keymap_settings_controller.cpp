@@ -137,6 +137,31 @@ TEST_CASE("keymap back cancels capture before clearing transient state and navig
     CHECK(controller.status_message().empty());
 }
 
+TEST_CASE("feedback regression key assignment advances one lane in the same slot and stops") {
+    for (const bool secondary : {false, true}) {
+        KeymapSettingsController controller;
+        controller.reset(4, "4k");
+        static_cast<void>(controller.select(1, secondary));
+        static_cast<void>(controller.handle(MenuAction::activate(), 100));
+        for (int lane = 1; lane <= 4; ++lane) {
+            CHECK(controller.selected_row() == lane);
+            CHECK(controller.secondary_selected() == secondary);
+            REQUIRE(controller.capture_active());
+            const auto effects = controller.finish_capture("Saved", lane * 1000, true);
+            CHECK(effects.refresh_input_scope == (lane == 4));
+            CHECK(controller.capture_active() == (lane < 4));
+            if (lane < 4) CHECK(controller.capture_deadline_ns() == lane * 1000 +
+                tenriff::app::menu::settings::kKeymapCaptureTimeoutNs);
+        }
+        CHECK(controller.selected_row() == 4);
+        static_cast<void>(controller.select(2, secondary));
+        static_cast<void>(controller.handle(MenuAction::activate(), 100));
+        static_cast<void>(controller.finish_capture("Save failed", 200));
+        CHECK(controller.selected_row() == 2);
+        CHECK_FALSE(controller.capture_active());
+    }
+}
+
 TEST_CASE("keymap view keeps main rows actions and capture status value-only") {
     tenriff::config::KeymapManager manager;
     const auto keymap = manager.default_keymap();

@@ -19,6 +19,8 @@ struct KeyModeConverterOptions {
   int sample_rate = 44100;
   KeyModeConversionAlgorithm algorithm = KeyModeConversionAlgorithm::Krrcream;
   Nk2Preset nk2_preset = Nk2Preset::Native;
+  // v1 reproduces historical replay layouts; new sessions use lossless-hold v2.
+  int conversion_version = 2;
 };
 
 struct KeyModeConverterResult {

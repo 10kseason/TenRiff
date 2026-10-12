@@ -259,6 +259,9 @@ config::JsonValue build_trace_json(const ReplayTrace& trace) {
 
 config::JsonValue build_mode_json(const ReplayModeSettings& mode) {
     config::JsonObject obj;
+    if (mode.key_conversion_version != 1) {
+        obj.emplace("key_conversion_version", config::JsonValue{static_cast<double>(mode.key_conversion_version)});
+    }
     if (mode.long_note_mix_version != 1) {
         obj.emplace("long_note_mix_version", config::JsonValue{static_cast<double>(mode.long_note_mix_version)});
     }
@@ -330,6 +333,11 @@ ExportResult save_json_file(const std::string& path, const config::JsonValue& ro
 }  // namespace
 
 ExportResult save_replay_json(const std::string& path, const ReplayFile& replay, int indent) {
+    if (replay.mode.key_conversion_version != 1 && replay.mode.key_conversion_version != 2) {
+        ExportResult result;
+        result.error = "Unsupported key conversion version.";
+        return result;
+    }
     if (replay.mode.long_note_mix_version != 1 && replay.mode.long_note_mix_version != 2) {
         ExportResult result;
         result.error = "Unsupported LN Mix conversion version.";
@@ -373,6 +381,11 @@ ExportResult save_replay_json(const std::string& path, const ReplayFile& replay,
 }
 
 ExportResult save_result_json(const std::string& path, const ResultFile& result_file, int indent) {
+    if (result_file.key_conversion_version != 1 && result_file.key_conversion_version != 2) {
+        ExportResult result;
+        result.error = "Unsupported key conversion version.";
+        return result;
+    }
     if (result_file.long_note_mix_version != 1 && result_file.long_note_mix_version != 2) {
         ExportResult result;
         result.error = "Unsupported LN Mix conversion version.";
@@ -386,6 +399,9 @@ ExportResult save_result_json(const std::string& path, const ResultFile& result_
     config::JsonObject obj;
     obj.emplace("version", config::JsonValue{static_cast<double>(result_file.version)});
     obj.emplace("replay_format_version", config::JsonValue{static_cast<double>(result_file.replay_format_version)});
+    if (result_file.key_conversion_version != 1) {
+        obj.emplace("key_conversion_version", config::JsonValue{static_cast<double>(result_file.key_conversion_version)});
+    }
     if (result_file.long_note_mix_version != 1) {
         obj.emplace("long_note_mix_version", config::JsonValue{static_cast<double>(result_file.long_note_mix_version)});
     }
@@ -485,6 +501,13 @@ ReplayLoadResult load_replay_json(const std::string& path) {
     replay.aborted = read_json_bool(*root, "aborted", false);
 
     if (const auto* mode = find_json_object(*root, "mode")) {
+        if (const auto* version = find_json_value(*mode, "key_conversion_version")) {
+            if (!version->is_number() || (version->as_number() != 1.0 && version->as_number() != 2.0)) {
+                result.error = "Unsupported key conversion version.";
+                return result;
+            }
+            replay.mode.key_conversion_version = static_cast<int>(version->as_number());
+        }
         if (const auto* version = find_json_value(*mode, "long_note_mix_version")) {
             if (!version->is_number() || (version->as_number() != 1.0 && version->as_number() != 2.0)) {
                 result.error = "Unsupported LN Mix conversion version.";
@@ -676,6 +699,8 @@ ReplayLoadResult load_replay_json(const std::string& path) {
 }
 
 ReplayValidationResult validate_replay_evidence(const ReplayFile& replay) {
+    if (replay.mode.key_conversion_version != 1 && replay.mode.key_conversion_version != 2)
+        return {"Unsupported key conversion version."};
     ReplayValidationResult result;
     if (replay.mode.long_note_mix_version != 1 && replay.mode.long_note_mix_version != 2) {
         result.error = "Unsupported LN Mix conversion version.";

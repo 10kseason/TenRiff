@@ -11,6 +11,7 @@ namespace tenriff::gameplay {
 struct ModeApplyContext {
     double base_bpm = 0.0;
     int sample_rate = 0;
+    int key_conversion_version = 2;
 };
 
 struct ModeApplyResult {

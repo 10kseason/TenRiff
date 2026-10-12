@@ -1253,6 +1253,13 @@ std::string build_bms_text(const chart::BmsChart& parsed_chart,
 
     std::vector<OutputEvent> generated_events;
     generated_events.reserve(converted_chart.notes.size() * 2u + converted_chart.mines.size());
+    // The file converter does not load audio assets. Track authored position +
+    // WAV token here, just as the runtime tracks sample + resolved audio asset.
+    std::set<std::pair<double, std::string>> audible_heads;
+    for (const auto& event : normalized_chart.events) {
+        if (event.type == chart::BmsNormalizedEventType::Bgm)
+            audible_heads.emplace(event.position, event.object_id);
+    }
 
     for (const auto& note : converted_chart.notes) {
         if (note.lane <= 0 || note.lane > static_cast<int>(layout.lane_channels.size())) {
@@ -1279,6 +1286,7 @@ std::string build_bms_text(const chart::BmsChart& parsed_chart,
 
         const std::string& channel = layout.lane_channels[static_cast<std::size_t>(note.lane - 1)];
         generated_events.push_back(OutputEvent{start_slot, channel, source.object_id});
+        audible_heads.emplace(start_slot.absolute_position, source.object_id);
 
         if (!note.end_sample.has_value() || !lnobj_token.has_value()) {
             continue;
@@ -1345,6 +1353,21 @@ std::string build_bms_text(const chart::BmsChart& parsed_chart,
         }
         commands.push_back(command);
     }
+
+    std::size_t preserved_keysounds = 0;
+    for (const auto& placement : placements) {
+        if (!audible_heads.emplace(placement.start.absolute_position, placement.object_id).second) continue;
+        // Each omitted head gets its own BGM row: merging simultaneous WAVs
+        // into one channel-01 row would overwrite all but one of their sounds.
+        const OutputEvent cue{placement.start, "01", placement.object_id};
+        const auto data = build_measure_data({cue}, warnings);
+        if (!data.empty()) {
+            commands.push_back(chart::BmsMeasureCommand{placement.start.measure, "01", data});
+            ++preserved_keysounds;
+        }
+    }
+    if (preserved_keysounds > 0) warnings.push_back("Preserved " + std::to_string(preserved_keysounds) +
+        " omitted keysound head(s) as BGM at their authored positions.");
 
     // BMS has no separate lane-layout table. Preserve empty target lanes with
     // zero-only visible-channel declarations so a sparse converted chart still

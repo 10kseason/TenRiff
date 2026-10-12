@@ -135,7 +135,7 @@
                 item.color = item.brush->GetColor();
                 item.brush->SetColor(color);
             }
-            draw_gameplay_hud(*skin_preview_scene, true);
+            draw_gameplay_hud(*skin_preview_scene, true, scene_scale, scene_left, scene_top);
             for (const auto& item : preview_brushes) if (item.brush) item.brush->SetColor(item.color);
             ctx->SetTransform(saved_transform);
             ctx->PopAxisAlignedClip();

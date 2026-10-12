@@ -161,13 +161,24 @@ KeymapSettingsEffects KeymapSettingsController::update_capture_timeout(
 
 KeymapSettingsEffects KeymapSettingsController::finish_capture(
     std::string status_message,
-    std::int64_t now_ns) {
+    std::int64_t now_ns,
+    bool advance) {
     capture_active_ = false;
     capture_deadline_ns_ = 0;
+    // Advance only after a successful assignment. Keep the primary/secondary
+    // slot, renew the timeout and stop at the last lane instead of wrapping.
+    if (advance && selected_lane().has_value() &&
+        selected_row_ < static_cast<int>(lane_ids_.size())) {
+        ++selected_row_;
+        capture_active_ = true;
+        capture_deadline_ns_ = now_ns + kKeymapCaptureTimeoutNs;
+    }
     show_status(std::move(status_message), now_ns);
     KeymapSettingsEffects effects;
     effects.menu.render_changed = true;
-    effects.refresh_input_scope = true;
+    // Sequential capture still probes every key. Resnapshotting physical state
+    // here can erase the pressed event before its queued release is consumed.
+    effects.refresh_input_scope = !capture_active_;
     return effects;
 }
 

@@ -59,7 +59,7 @@ jobs:
         run: cmake -S . -B build/nk3-cpu -G "Visual Studio 17 2022" -A x64 -DTENRIFF_ENABLE_TESTS=ON -DTENRIFF_ENABLE_ONNX_UPSCALER=OFF -DOpenVINO_DIR="$env:TENRIFF_CI_OPENVINO_DIR"
 
       - name: Build NK3 CPU smoke
-        run: cmake --build build/nk3-cpu --config Release --target nk3_onnx_smoke
+        run: cmake --build build/nk3-cpu --config Release --target nk3_onnx_smoke bms_parser_tests
 
       - name: Run NK3 CPU smoke
         env:
@@ -75,6 +75,13 @@ jobs:
           python -u -c "import openvino as ov; print('OpenVINO', ov.__version__); core = ov.Core(); print('Devices', core.available_devices); model = core.read_model('models/NK3-P64-hybrid.onnx'); print('Model read'); core.query_model(model, 'CPU'); print('CPU query passed'); core.compile_model(model, 'CPU'); print('CPU compile passed')"
           if ($LASTEXITCODE -ne 0) { throw "OpenVINO CPU preflight failed: $LASTEXITCODE" }
           ctest --test-dir build/nk3-cpu -C Release -R "^nk3_onnx_smoke$" --output-on-failure
+
+      - name: Run NK3 conversion feedback regressions
+        env:
+          TENRIFF_NK3_BACKEND: OPENVINO
+          TENRIFF_NK3_DEVICE: CPU
+          ONEDNN_MAX_CPU_ISA: AVX2
+        run: ./build/nk3-cpu/Release/bms_parser_tests.exe "--filter=NK3 feedback regression"
 
       - name: Report native crash details
         if: failure()

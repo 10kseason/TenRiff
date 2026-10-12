@@ -160,7 +160,7 @@
             rect.top = middle - half; rect.bottom = middle + half;
             return rect;
         };
-        if (!is_skin_preview && !gameplay_field_drag_state_.active) {
+        if (!gameplay_field_drag_state_.active) {
             gameplay_field_drag_state_.visible = false;
         }
         const int64_t render_now_ns = timing::HighResClock::now_ns();
@@ -442,7 +442,7 @@
                 effective_lane_spacing_scales,
                 data.gameplay.ghost_visible,
                 data.gameplay.lane_center_gap_scale,
-                !is_skin_preview && gameplay_field_drag_state_.has_local_override
+                gameplay_field_drag_state_.has_local_override
                     ? gameplay_field_drag_state_.offset_x
                     : data.gameplay.gameplay_field_offset_x,
                 data.gameplay.note_divider_gap_px, hidden_scratch_mask);
@@ -490,12 +490,12 @@
                             combo_anchor_y + 16.0f,
                             feedback_center_x + kGameplayTimingIndicatorHalfWidth,
                             combo_anchor_y + 16.0f + kGameplayTimingIndicatorHeight);
-            if (d2d_->card_brush) {
+            if (data.gameplay.indicator_background_visible && d2d_->card_brush) {
                 d2d_->card_brush->SetOpacity(0.75f);
                 ctx->FillRoundedRectangle(D2D1::RoundedRect(indicator_rect, 4.0f, 4.0f), d2d_->card_brush.Get());
                 d2d_->card_brush->SetOpacity(1.0f);
             }
-            if (d2d_->accent_brush) {
+            if (data.gameplay.indicator_background_visible && d2d_->accent_brush) {
                 const auto saved_color = d2d_->accent_brush->GetColor();
                 const float saved_opacity = d2d_->accent_brush->GetOpacity();
                 d2d_->accent_brush->SetOpacity(0.26f);
@@ -510,7 +510,7 @@
                 d2d_->accent_brush->SetColor(saved_color);
                 d2d_->accent_brush->SetOpacity(saved_opacity);
             }
-            if (d2d_->button_border_brush) {
+            if (data.gameplay.indicator_background_visible && d2d_->button_border_brush) {
                 ctx->DrawRoundedRectangle(D2D1::RoundedRect(indicator_rect, 4.0f, 4.0f),
                                           d2d_->button_border_brush.Get(),
                                           1.0f);
@@ -1202,16 +1202,17 @@
             return;
         }
 
-        if (!is_skin_preview) {
+        {
+            gameplay_field_drag_state_.scene_scale = std::max(0.001f, scene_scale);
             gameplay_field_drag_state_.visible = data.gameplay.active && !data.gameplay.loading && !data.gameplay.paused;
             gameplay_field_drag_state_.left =
-                surface_layout.player_field.right + kGameplayFieldDragHandleGap;
+                scene_left + (surface_layout.player_field.right + kGameplayFieldDragHandleGap) * scene_scale;
             gameplay_field_drag_state_.top =
-                surface_layout.player_field.top + kGameplayFieldDragHandleTop;
+                scene_top + (surface_layout.player_field.top + kGameplayFieldDragHandleTop) * scene_scale;
             gameplay_field_drag_state_.right =
-                gameplay_field_drag_state_.left + kGameplayFieldDragHandleWidth;
+                gameplay_field_drag_state_.left + kGameplayFieldDragHandleWidth * scene_scale;
             gameplay_field_drag_state_.bottom =
-                gameplay_field_drag_state_.top + kGameplayFieldDragHandleHeight;
+                gameplay_field_drag_state_.top + kGameplayFieldDragHandleHeight * scene_scale;
             gameplay_field_drag_state_.offset_x = surface_layout.offset_x;
             gameplay_field_drag_state_.min_offset_x = surface_layout.min_offset_x;
             gameplay_field_drag_state_.max_offset_x = surface_layout.max_offset_x;
@@ -1337,12 +1338,12 @@
             const D2D1_RECT_F label_rect =
                 D2D1::RectF(gauge_left - 90.0f,
                             gauge_top - 42.0f,
-                            gauge_left + 140.0f,
+                            gauge_left + gauge_width + 90.0f,
                             gauge_top - 8.0f);
             const D2D1_RECT_F value_rect =
                 D2D1::RectF(gauge_left - 90.0f,
                             gauge_bottom + 8.0f,
-                            gauge_left + 140.0f,
+                            gauge_left + gauge_width + 90.0f,
                             gauge_bottom + 50.0f);
             if (scene_body_format && d2d_->accent_brush) {
                 const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
@@ -2986,13 +2987,16 @@
             d2d_->text_brush->SetOpacity(saved_text_opacity);
         }
 
-        if (!is_skin_preview && gameplay_field_drag_state_.visible && d2d_->card_brush &&
+        if (gameplay_field_drag_state_.visible && d2d_->card_brush &&
             d2d_->text_brush && scene_body_format) {
+            const auto hit_rect = D2D1::RectF(gameplay_field_drag_state_.left, gameplay_field_drag_state_.top,
+                gameplay_field_drag_state_.right, gameplay_field_drag_state_.bottom);
+            if (is_skin_preview) register_hit(hit_rect, MenuHitTargetKind::GameplayFieldDrag, 0);
             const D2D1_RECT_F handle_rect = D2D1::RectF(
-                gameplay_field_drag_state_.left,
-                gameplay_field_drag_state_.top,
-                gameplay_field_drag_state_.right,
-                gameplay_field_drag_state_.bottom);
+                (hit_rect.left - scene_left) / scene_scale,
+                (hit_rect.top - scene_top) / scene_scale,
+                (hit_rect.right - scene_left) / scene_scale,
+                (hit_rect.bottom - scene_top) / scene_scale);
             const D2D1_ROUNDED_RECT handle = D2D1::RoundedRect(handle_rect, 11.0f, 11.0f);
             const bool highlighted = gameplay_field_drag_state_.hovered ||
                                      gameplay_field_drag_state_.active;

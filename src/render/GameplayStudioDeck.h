@@ -54,10 +54,10 @@ inline GameplayStudioDeckLayout compute_gameplay_studio_deck_layout(
     GameplayStudioDeckLayout layout;
     if (!std::isfinite(field_left) || !std::isfinite(field_right) || field_right <= field_left)
         return layout;
-    const bool gauge_on_left = field_right + 90.0f > 1896.0f && field_left >= 114.0f;
-    layout.gauge_marker_x = gauge_on_left ? field_left - 90.0f : field_right + 14.0f;
-    const float left_end = std::clamp(field_left - (gauge_on_left ? 108.0f : 32.0f), 24.0f, 1856.0f);
-    const float right_start = std::clamp(field_right + (gauge_on_left ? 32.0f : 108.0f), 24.0f, 1856.0f);
+    const bool gauge_on_left = field_right + 114.0f > 1896.0f && field_left >= 138.0f;
+    layout.gauge_marker_x = gauge_on_left ? field_left - 114.0f : field_right + 18.0f;
+    const float left_end = std::clamp(field_left - (gauge_on_left ? 132.0f : 32.0f), 24.0f, 1856.0f);
+    const float right_start = std::clamp(field_right + (gauge_on_left ? 32.0f : 132.0f), 24.0f, 1856.0f);
     const float safe_right = std::isfinite(header_safe_right)
         ? std::clamp(header_safe_right, 24.0f, 1856.0f) : 1856.0f;
     struct Span { float x; float width; };
@@ -106,8 +106,8 @@ inline GameplaySongTitleLayout gameplay_studio_song_title_layout(const GameplayS
 inline float gameplay_studio_gauge_marker_y(float hit_y, double gauge_ratio) {
     const double ratio = std::isfinite(gauge_ratio) ? std::clamp(gauge_ratio, 0.0, 1.0) : 0.0;
     const float safe_hit_y = std::isfinite(hit_y) ? std::max(0.0f, hit_y) : 0.0f;
-    return std::clamp(safe_hit_y * (1.0f - static_cast<float>(ratio)) - 16.0f,
-                      8.0f, std::max(8.0f, safe_hit_y - 54.0f));
+    return std::clamp(safe_hit_y * (1.0f - static_cast<float>(ratio)) - 20.0f,
+                      8.0f, std::max(8.0f, safe_hit_y - 66.0f));
 }
 
 inline std::array<float, 5> gameplay_studio_judgement_ratios(const std::array<int, 5>& counts) {

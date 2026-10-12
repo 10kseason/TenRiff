@@ -929,6 +929,9 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     config::normalize_skin_hud_layout_token(config_.skin.hud_layout) == "classic"
                         ? ui_text("Classic", "클래식") : ui_text("Studio Deck", "스튜디오 덱"),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::HudLayout), false, true);
+    append_menu_row(render.generic, ui_text("Indicator Background", "인디케이터 배경"),
+                    ui_on_off(config_.skin.indicator_background_visible),
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::IndicatorBackground), false, true);
     append_menu_row(render.generic, ui_text("Studio Riff Map", "스튜디오 리프 맵"),
                     ui_on_off(config_.skin.hud_riff_map_visible),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::HudRiffMapVisible), false, true);
@@ -1073,6 +1076,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.skin_preview.visible = true;
     render.generic.skin_preview.hud_layout = config::normalize_skin_hud_layout_token(config_.skin.hud_layout);
     render.generic.skin_preview.hud_riff_map_visible = config_.skin.hud_riff_map_visible;
+    render.generic.skin_preview.indicator_background_visible = config_.skin.indicator_background_visible;
     render.generic.skin_preview.mode_label = skin_mode_label;
     render.generic.skin_preview.selected_color_label =
         manifest_style && !manifest_style->lane_colors.empty()

@@ -96,6 +96,7 @@ inline GameplayHudData make_skin_gameplay_preview(const SkinPreviewData& preview
     hud.hit_burst_style = preview.hit_burst_style;
     hud.hud_layout = preview.hud_layout;
     hud.hud_riff_map_visible = preview.hud_riff_map_visible;
+    hud.indicator_background_visible = preview.indicator_background_visible;
     hud.key_label_position = preview.key_label_position;
     hud.note_border_enabled = preview.note_border_enabled;
     hud.note_shape = preview.note_shape;

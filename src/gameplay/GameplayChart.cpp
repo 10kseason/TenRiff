@@ -3,8 +3,38 @@
 #include <algorithm>
 #include <cmath>
 #include <iterator>
+#include <set>
 
 namespace tenriff::gameplay {
+
+void preserve_chart_keysounds(const GameplayChart& source, GameplayChart& converted) {
+    // Match the live keysound scheduler's one voice per chart timestamp/asset.
+    // Lane and note IDs may change during conversion; neither identifies sound.
+    // Existing BGM is already audible, and authored duplicate cues stay intact.
+    using Sound = std::pair<int64_t, std::size_t>;
+    std::set<Sound> audible;
+    for (const auto& cue : converted.audio_cues) audible.emplace(cue.start_sample, cue.asset_id);
+    for (const auto& note : converted.notes) {
+        for (std::size_t i = 0; i < note_audio_asset_count(note); ++i) {
+            audible.emplace(note.start_sample, note_audio_asset_at(note, i));
+        }
+    }
+    bool added = false;
+    for (const auto& note : source.notes) {
+        if (!std::isfinite(note.audio_gain) || note.audio_gain <= 0.0f) continue;
+        for (std::size_t i = 0; i < note_audio_asset_count(note); ++i) {
+            const auto asset = note_audio_asset_at(note, i);
+            if (asset >= converted.audio_assets.size() ||
+                !audible.emplace(note.start_sample, asset).second) continue;
+            converted.audio_cues.push_back({note.start_sample, asset, std::clamp(note.audio_gain, 0.0f, 1.0f)});
+            added = true;
+        }
+    }
+    if (added) std::stable_sort(converted.audio_cues.begin(), converted.audio_cues.end(),
+        [](const AudioCueEvent& a, const AudioCueEvent& b) {
+            return a.start_sample != b.start_sample ? a.start_sample < b.start_sample : a.asset_id < b.asset_id;
+        });
+}
 
 bool NoteEvent::add_audio_asset(std::size_t asset_id) {
     if (asset_id == kInvalidAudioAssetId) {

@@ -103,6 +103,39 @@ namespace tenriff::app {
 // These existing test friends are defined only in this executable. Menu actions
 // run on their owner thread; the observer reads only mutex-protected HUD data.
 struct MenuAppVisualTestAccess {
+    static void check_sequential_keymap(MenuApp& app, Report& report) {
+        const auto original = app.keymap_;
+        app.keymap_settings_controller_.reset(4, "4k");
+        click(app, Kind::SettingsRow, 1);
+        const auto code = config::KeycodeMap::to_keycode("Q").value();
+        const auto now = timing::HighResClock::now_ns();
+        app.handle_input_event({code, input::InputState::Pressed, now});
+        report.check("keymap.first_key_advances", app.keymap_settings_controller_.selected_row() == 2 &&
+            app.keymap_settings_controller_.capture_active());
+        app.handle_input_event({code, input::InputState::Pressed, now + 1});
+        report.check("keymap.held_key_does_not_advance", app.keymap_settings_controller_.selected_row() == 2);
+        app.handle_input_event({code, input::InputState::Released, now + 2});
+        for (const char* name : {"W", "E", "R"}) key(app, name);
+        report.check("keymap.last_key_stops_capture", app.keymap_settings_controller_.selected_row() == 4 &&
+            !app.keymap_settings_controller_.capture_active());
+        config::KeymapManager manager;
+        const auto saved = manager.load_profile(app.profile_dir_);
+        const auto bindings = manager.bindings_for_mode(saved.keymap, "4k");
+        report.check("keymap.sequential_profile_readback", saved.success() &&
+            bindings.at("lane1") == "Q" && bindings.at("lane2") == "W" &&
+            bindings.at("lane3") == "E" && bindings.at("lane4") == "R");
+        click(app, Kind::SettingsRow, 1, Part::Increment);
+        key(app, "T");
+        report.check("keymap.secondary_advances_in_same_slot", app.keymap_settings_controller_.selected_row() == 2 &&
+            app.keymap_settings_controller_.secondary_selected() && app.keymap_settings_controller_.capture_active());
+        key(app, "Delete");
+        report.check("keymap.secondary_delete_stops_capture", !app.keymap_settings_controller_.capture_active());
+        std::string error;
+        report.check("keymap.fixture_restored", manager.save_profile(app.profile_dir_, original, &error), error);
+        app.keymap_ = app.working_keymap_ = original;
+        app.refresh_menu_input_polling_scope();
+        app.publish_snapshot();
+    }
     static void select_hard_judge(MenuApp& app, Report& report) {
         click(app, Kind::SettingsRow, 0, Part::Increment);
         click(app, Kind::SettingsRow, 0, Part::Increment);
@@ -646,6 +679,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
             Access::key(app, "Esc");
             expect_screen(app, report, "mode.nested_mods.pointer.back", Screen::ModeSelect);
         } else if (page.index == 1) {
+            Access::check_sequential_keymap(app, report);
             Access::click(app, Kind::KeymapButton,
                 static_cast<int>(tenriff::app::menu::settings::KeymapActionId::NkroTest));
             expect_screen(app, report, "keymap.nested_test", Screen::KeymapTest);

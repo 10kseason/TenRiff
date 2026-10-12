@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.8.9 LANGUAGES C CXX)
+project(TenRiff VERSION 1.8.9.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -815,6 +815,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_online_records_client.cpp
         tests/unit/test_sites_leaderboard.cpp
         tests/unit/test_bms_key_converter.cpp
+        tests/unit/test_conversion_feedback.cpp
         tests/unit/test_bms_editor.cpp
         tests/unit/test_bms_editor_preview.cpp
         tests/unit/test_utf8_compat.cpp

@@ -175,6 +175,9 @@ void MenuWindow::draw(const MenuRenderData& data) {
     const bool has_title_art = title_background != nullptr;
 #include "MenuWindow_draw_native_motion.inl"
     MenuRenderData* skin_preview_scene = nullptr;
+    const auto drag_context = data.generic.skin_preview.visible
+        ? (data.generic.skin_preview.fullscreen ? FieldDragContext::FullscreenPreview : FieldDragContext::EmbeddedPreview)
+        : (data.kind == MenuScreenKind::GameplayHud ? FieldDragContext::Gameplay : FieldDragContext::None);
     if (data.generic.skin_preview.visible &&
         (data.kind == MenuScreenKind::GenericList || data.generic.skin_preview.fullscreen)) {
         if (!d2d_->skin_preview_scene) d2d_->skin_preview_scene = std::make_unique<MenuRenderData>();
@@ -187,7 +190,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
         skin_preview_scene->gameplay = make_skin_gameplay_preview(data.generic.skin_preview, render_now_ns, data.ui_language);
         if (!ensure_gameplay_note_sprites(skin_preview_scene->gameplay)) invalidate_gameplay_note_sprite_cache();
         if (!ensure_gameplay_background_bitmap(skin_preview_scene->gameplay)) invalidate_gameplay_background_cache();
-        if (!ensure_gameplay_static_cache(skin_preview_scene->gameplay, false,
+        if (!ensure_gameplay_static_cache(skin_preview_scene->gameplay, true,
                 gameplay_studio_header_safe_right(skin_preview_scene->performance.visible))) invalidate_gameplay_static_cache();
         static_cast<void>(load_song_card_preview_bitmap(skin_preview_scene->gameplay.skin_background_path));
     } else if (data.kind == MenuScreenKind::GameplayHud) {
@@ -387,7 +390,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
     if (data.kind != MenuScreenKind::SongSelect) {
         clear_song_scrollbar_state();
     }
-    if (data.kind != MenuScreenKind::GameplayHud && !gameplay_field_drag_state_.active) {
+    if (drag_context == FieldDragContext::None && !gameplay_field_drag_state_.active) {
         gameplay_field_drag_state_.visible = false;
         gameplay_field_drag_state_.hovered = false;
     }
@@ -1169,7 +1172,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
 
     // Both play and the Skin Settings thumbnail draw the same scene in 1920x1080
     // coordinates. Only the enclosing transform changes in the thumbnail.
-    auto draw_gameplay_hud = [&](const MenuRenderData& data, bool is_skin_preview = false) {
+    auto draw_gameplay_hud = [&](const MenuRenderData& data, bool is_skin_preview = false,
+                                 float scene_scale = 1.0f, float scene_left = 0.0f, float scene_top = 0.0f) {
 #include "MenuWindow_draw_gameplay_body.inl"
     };
 

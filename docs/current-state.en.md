@@ -2,6 +2,8 @@
 
 **Fixed baseline: [1.8.7](baseline-1.8.7.en.md)** (2026-10-10). Use Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`; do not advance it automatically with `latest` or a new release.
 
+**2026-10-13 · 1.8.9.1:** Adds sequential key binding, converter keysound/hold preservation, FAST/SLOW/timing backing controls, larger gauges, preview gear dragging and text-only judgements. Existing replays retain their original conversion. [Behavior, verification and compatibility limits (Korean)](release-1.8.9.1-gate.md). The fixed baseline remains 1.8.7.
+
 **2026-10-12 · 1.8.9:** Adds larger lobby BEST numbers, key-mode colors and a white shared frame; Studio information at the upper right, score at the lower left and a horizontal riff map at the lower right; and larger result text, analysis tabs and centered actions. S+ color/font are preserved. Judge Easy/Hard selections now reach new sessions. See [behavior, verification and remaining scope](release-1.8.9-gate.md) and [Judge cause and compatibility](judge-session-handoff-1.8.9.ko.md) (Korean).
 
 **1.8.9 performance scope:** Final six-round p50 deltas remain within the historical +0.03ms target, but ghost p95 increased by +0.05125ms (about +1.94%), so the strict no-tail-increase criterion was not met. These are synthetic CPU render-call measurements, not physical latency, GPU throughput or a general performance gain. See [results, initial regression, diagnostics and limits](release-1.8.9-gate.md#성능-측정과-잔여-한계) (Korean).
@@ -38,7 +40,7 @@ The 749/739 checks in the [local 1.7.1 r2 report](local-1.7.1-r2.ko.md) are hist
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- User-pinned baseline version: `1.8.7`; current source targets `1.8.9`
+- User-pinned baseline version: `1.8.7`; current source targets `1.8.9.1`
 - 1.7.1 provides full-room HUD/results for up to eight players, tied ranks/missing-score states, P-GREAT-only effects, independent judgement/combo placement, ten Options cards, audio normalization and the Song Select difficulty-table card. See [follow-up details](gameplay-polish-followup.md) and [verification](release-1.7.1-gate.md).
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
 - Native Result now emphasizes score, grade and accuracy; the prism remains in custom skins. The existing 2.2-second reveal, Space skip and control readiness rules are preserved.

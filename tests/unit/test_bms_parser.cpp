@@ -75,9 +75,14 @@ bool is_windows_runtime_integration_test(std::string_view name) {
 bool is_nk3_openvino_integration_test(std::string_view name) {
     // OpenVINO inference is covered by the dedicated non-ASan CPU smoke job.
     // Keep this list exact so the sanitizer suite still runs every pure host test.
-    static constexpr std::array<std::string_view, 2> kTests = {
+    static constexpr std::array<std::string_view, 7> kTests = {
         "runtime mode settings use the selected KeyWeaver NK3 converter",
         "runtime NK3 remasters a chart even when the target key count is unchanged",
+        "NK3 feedback regression converters preserve full source holds and every keysound",
+        "NK3 feedback regression real BMS LNOBJ heads survive native load and key conversion",
+        "NK3 feedback regression impossible chords preserve sound without cutting occupied holds",
+        "NK3 feedback regression replay verifier reproduces legacy and repaired key conversion",
+        "NK3 feedback regression exported BMS keeps dropped chord sounds and full LNOBJ spans",
     };
     return std::find(kTests.begin(), kTests.end(), name) != kTests.end();
 }
@@ -94,12 +99,15 @@ int main(int argc, char** argv) {
     int shard_count = 1;
     bool skip_windows_runtime_integration = false;
     bool skip_nk3_openvino_integration = false;
+    std::string name_filter;
     constexpr std::string_view kShardIndexPrefix = "--shard-index=";
     constexpr std::string_view kShardCountPrefix = "--shard-count=";
     for (int index = 1; index < argc; ++index) {
         const std::string_view argument(argv[index]);
         try {
-            if (argument.rfind(kShardIndexPrefix, 0) == 0) {
+            if (argument.rfind("--filter=", 0) == 0) {
+                name_filter = std::string(argument.substr(9));
+            } else if (argument.rfind(kShardIndexPrefix, 0) == 0) {
                 shard_index = std::stoi(std::string(argument.substr(kShardIndexPrefix.size())));
             } else if (argument.rfind(kShardCountPrefix, 0) == 0) {
                 shard_count = std::stoi(std::string(argument.substr(kShardCountPrefix.size())));
@@ -133,7 +141,7 @@ int main(int argc, char** argv) {
             registry_index % static_cast<std::size_t>(shard_count) ==
             static_cast<std::size_t>(shard_index);
         ++registry_index;
-        if (!selected) {
+        if (!selected || (!name_filter.empty() && test.name.find(name_filter) == std::string::npos)) {
             continue;
         }
         ++selected_tests;

@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <map>
 #include <numeric>
 #include <random>
 #include <stdexcept>
@@ -1195,11 +1196,14 @@ void density_reducer(IntMatrix& matrix,
 }
 
 struct OverlapResolutionStats {
-    std::size_t clipped = 0;
+    std::size_t clipped = 0; // legacy v1 only
+    std::size_t restored = 0;
+    std::size_t relocated = 0;
     std::size_t removed = 0;
 };
 
-[[nodiscard]] OverlapResolutionStats resolve_lane_overlaps(GameplayChart& chart) {
+// Frozen 1.8.9 repair, retained for existing replay/ghost evidence.
+[[nodiscard]] OverlapResolutionStats resolve_lane_overlaps_legacy(GameplayChart& chart) {
     OverlapResolutionStats stats;
     if (chart.lane_count <= 0 || chart.notes.empty()) {
         return stats;
@@ -1248,9 +1252,84 @@ struct OverlapResolutionStats {
     return stats;
 }
 
+
+[[nodiscard]] OverlapResolutionStats resolve_lane_overlaps(const GameplayChart& source, GameplayChart& chart) {
+    OverlapResolutionStats stats;
+    if (chart.lane_count <= 0) return stats;
+
+    // Allocate authored holds first, using complete closed intervals. Clipping a
+    // tail to make room for a tap changes the phrase (and may export as a tap).
+    // The converters propose lanes; this shared boundary supplies feasible lanes
+    // and leaves truly over-capacity notes to the keysound preservation pass.
+    std::vector<NoteEvent> holds;
+    std::vector<bool> consumed(chart.notes.size(), false);
+    std::vector<std::size_t> first_mapping(source.notes.size(), chart.notes.size());
+    for (std::size_t i = 0; i < chart.notes.size(); ++i) {
+        const auto& note = chart.notes[i];
+        if (note.note_id < source.notes.size() &&
+            note.start_sample == source.notes[note.note_id].start_sample &&
+            first_mapping[note.note_id] == chart.notes.size()) first_mapping[note.note_id] = i;
+    }
+    for (std::size_t i = 0; i < source.notes.size(); ++i) {
+        const auto& original = source.notes[i];
+        if (!original.end_sample || *original.end_sample <= original.start_sample) continue;
+        auto hold = original;
+        const auto mapped = first_mapping[i];
+        if (mapped < chart.notes.size()) {
+            hold.lane = chart.notes[mapped].lane;
+            consumed[mapped] = true;
+            if (chart.notes[mapped].end_sample != original.end_sample) ++stats.restored;
+        } else {
+            hold.lane = std::clamp(1 + static_cast<int>((original.lane - 0.5) * chart.lane_count /
+                                                       std::max(1, source.lane_count)), 1, chart.lane_count);
+            ++stats.restored;
+        }
+        holds.push_back(hold);
+    }
+    const auto ordered = [](const NoteEvent& a, const NoteEvent& b) {
+        if (a.start_sample != b.start_sample) return a.start_sample < b.start_sample;
+        if (a.lane != b.lane) return a.lane < b.lane;
+        return a.note_id < b.note_id;
+    };
+    std::stable_sort(holds.begin(), holds.end(), ordered);
+    std::vector<NoteEvent> other;
+    for (std::size_t i = 0; i < chart.notes.size(); ++i)
+        if (!consumed[i]) other.push_back(chart.notes[i]);
+    std::stable_sort(other.begin(), other.end(), ordered);
+    std::vector<std::map<int64_t, int64_t>> occupied(static_cast<std::size_t>(chart.lane_count));
+    std::vector<NoteEvent> repaired;
+    repaired.reserve(holds.size() + other.size());
+    const auto place = [&](NoteEvent note) {
+        const int preferred = std::clamp(note.lane, 1, chart.lane_count) - 1;
+        const auto end = note.end_sample.value_or(note.start_sample);
+        for (int distance = 0; distance < chart.lane_count; ++distance) {
+            for (int direction : {1, -1}) {
+                if (distance == 0 && direction < 0) continue;
+                const int lane = preferred + distance * direction;
+                if (lane < 0 || lane >= chart.lane_count) continue;
+                auto& intervals = occupied[static_cast<std::size_t>(lane)];
+                const auto next = intervals.lower_bound(note.start_sample);
+                if (next != intervals.end() && next->first <= end) continue;
+                if (next != intervals.begin() && std::prev(next)->second >= note.start_sample) continue;
+                intervals.emplace(note.start_sample, end);
+                if (lane != preferred) ++stats.relocated;
+                note.lane = lane + 1;
+                repaired.push_back(std::move(note));
+                return;
+            }
+        }
+        ++stats.removed;
+    };
+    for (const auto& note : holds) place(note);
+    for (const auto& note : other) place(note);
+    std::stable_sort(repaired.begin(), repaired.end(), ordered);
+    chart.notes = std::move(repaired);
+    return stats;
+}
+
 }  // namespace
 
-KeyModeConverterResult convert_key_mode_chart(const GameplayChart& chart, const KeyModeConverterOptions& options) {
+static KeyModeConverterResult convert_key_mode_chart_impl(const GameplayChart& chart, const KeyModeConverterOptions& options) {
     if (options.algorithm == KeyModeConversionAlgorithm::NK2 ||
         options.algorithm == KeyModeConversionAlgorithm::NK3) {
         const bool use_nk3 = options.algorithm == KeyModeConversionAlgorithm::NK3;
@@ -1261,7 +1340,8 @@ KeyModeConverterResult convert_key_mode_chart(const GameplayChart& chart, const 
             return conversion_result;
         }
 
-        const OverlapResolutionStats overlap_stats = resolve_lane_overlaps(conversion_result.chart);
+        const OverlapResolutionStats overlap_stats = options.conversion_version == 1
+            ? resolve_lane_overlaps_legacy(conversion_result.chart) : resolve_lane_overlaps(chart, conversion_result.chart);
         const std::string engine_name = use_nk3 ? "NK3" : "nK2";
         if (conversion_result.chart.notes.empty()) {
             conversion_result.chart = chart;
@@ -1270,10 +1350,10 @@ KeyModeConverterResult convert_key_mode_chart(const GameplayChart& chart, const 
                 engine_name + " produced no playable notes after overlap repair.");
             return conversion_result;
         }
-        if (overlap_stats.clipped > 0 || overlap_stats.removed > 0) {
+        if (overlap_stats.restored > 0 || overlap_stats.relocated > 0 || overlap_stats.removed > 0) {
             conversion_result.warnings.push_back(
-                engine_name + " resolved lane overlaps (clipped=" +
-                std::to_string(overlap_stats.clipped) + ", removed=" +
+                engine_name + " repaired lane occupancy (restored=" +
+                std::to_string(overlap_stats.restored) + ", relocated=" + std::to_string(overlap_stats.relocated) + ", removed=" +
                 std::to_string(overlap_stats.removed) + ").");
         }
         return conversion_result;
@@ -1350,7 +1430,8 @@ KeyModeConverterResult convert_key_mode_chart(const GameplayChart& chart, const 
                     random);
 
     GameplayChart rebuilt = rebuild_chart_from_matrix(chart, converted_matrix, options.target_lane_count);
-    const OverlapResolutionStats overlap_stats = resolve_lane_overlaps(rebuilt);
+    const OverlapResolutionStats overlap_stats = options.conversion_version == 1
+            ? resolve_lane_overlaps_legacy(rebuilt) : resolve_lane_overlaps(chart, rebuilt);
     if (rebuilt.notes.empty()) {
         result.warnings.push_back("Key mode converter produced no playable notes.");
         return result;
@@ -1361,13 +1442,27 @@ KeyModeConverterResult convert_key_mode_chart(const GameplayChart& chart, const 
     result.warnings.push_back("Key mode converter remapped " +
                               std::to_string(source_lane_count) + "K to " +
                               std::to_string(options.target_lane_count) + "K.");
-    if (overlap_stats.clipped > 0 || overlap_stats.removed > 0) {
-        result.warnings.push_back("Key mode converter resolved lane overlaps (clipped=" +
-                                  std::to_string(overlap_stats.clipped) +
+    if (overlap_stats.restored > 0 || overlap_stats.relocated > 0 || overlap_stats.removed > 0) {
+        result.warnings.push_back("Key mode converter repaired lane occupancy (restored=" +
+                                  std::to_string(overlap_stats.restored) + ", relocated=" + std::to_string(overlap_stats.relocated) +
                                   ", removed=" +
                                   std::to_string(overlap_stats.removed) +
                                   ").");
     }
+    return result;
+}
+
+KeyModeConverterResult convert_key_mode_chart(const GameplayChart& chart, const KeyModeConverterOptions& options) {
+    if (options.conversion_version == 1) return convert_key_mode_chart_impl(chart, options);
+    if (options.conversion_version != 2) return {chart, false, {"Unsupported key conversion version."}};
+    // Use local indices for provenance: callers can supply non-unique public IDs.
+    // Restore the caller's IDs before returning; no chart/replay format changes.
+    GameplayChart indexed = chart;
+    for (std::size_t i = 0; i < indexed.notes.size(); ++i) indexed.notes[i].note_id = i;
+    auto result = convert_key_mode_chart_impl(indexed, options);
+    for (auto& note : result.chart.notes)
+        if (note.note_id < chart.notes.size()) note.note_id = chart.notes[note.note_id].note_id;
+    if (result.converted) preserve_chart_keysounds(chart, result.chart);
     return result;
 }
 

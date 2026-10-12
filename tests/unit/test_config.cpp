@@ -15,6 +15,16 @@
 
 using tenriff::config::ConfigLoader;
 
+TEST_CASE("feedback regression indicator background defaults on and round trips off") {
+    tenriff::config::SkinConfig skin;
+    CHECK(skin.indicator_background_visible);
+    REQUIRE(tenriff::config::deserialize_skin_config(R"({"indicator_background_visible":false})", skin));
+    CHECK_FALSE(skin.indicator_background_visible);
+    tenriff::config::SkinConfig restored;
+    REQUIRE(tenriff::config::deserialize_skin_config(tenriff::config::serialize_skin_config(skin), restored));
+    CHECK_FALSE(restored.indicator_background_visible);
+}
+
 TEST_CASE("graphics explicit resolutions normalize safely without losing uncommon dimensions") {
     using tenriff::config::normalize_graphics_resolution;
     CHECK(normalize_graphics_resolution(" 1600 X 900 ") == "1600x900");

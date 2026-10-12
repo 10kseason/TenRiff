@@ -38,31 +38,6 @@ void sort_audio_cues(GameplayChart& chart) {
                      });
 }
 
-void preserve_reduced_keysounds(const GameplayChart& source, GameplayChart& converted) {
-    // Match the live keysound scheduler's one voice per chart timestamp/asset.
-    // Lane and note IDs may change during conversion; neither identifies sound.
-    // Existing BGM is already audible, and authored duplicate cues stay intact.
-    using Sound = std::pair<int64_t, std::size_t>;
-    std::set<Sound> audible;
-    for (const auto& cue : converted.audio_cues) audible.emplace(cue.start_sample, cue.asset_id);
-    for (const auto& note : converted.notes) {
-        for (std::size_t i = 0; i < note_audio_asset_count(note); ++i) {
-            audible.emplace(note.start_sample, note_audio_asset_at(note, i));
-        }
-    }
-    bool added = false;
-    for (const auto& note : source.notes) {
-        if (!std::isfinite(note.audio_gain) || note.audio_gain <= 0.0f) continue;
-        for (std::size_t i = 0; i < note_audio_asset_count(note); ++i) {
-            const auto asset = note_audio_asset_at(note, i);
-            if (asset >= converted.audio_assets.size() ||
-                !audible.emplace(note.start_sample, asset).second) continue;
-            converted.audio_cues.push_back({note.start_sample, asset, std::clamp(note.audio_gain, 0.0f, 1.0f)});
-            added = true;
-        }
-    }
-    if (added) sort_audio_cues(converted);
-}
 
 int resolve_lane_count(const GameplayChart& chart) {
     int lane_count = chart.lane_count;
@@ -239,6 +214,7 @@ KeyModeConverterOptions default_converter_options(int source_lane_count,
     options.sample_rate = context.sample_rate;
     options.algorithm = algorithm;
     options.nk2_preset = nk2_preset;
+    options.conversion_version = context.key_conversion_version;
 
     if (target_lane_count == 10) {
         options.max_keys = 10;
@@ -661,9 +637,11 @@ ModeApplyResult apply_mode_settings(const GameplayChart& chart,
 
     // One final boundary covers every converter, grouped DP conversion, scratch
     // extraction and legacy fallback without changing the playable chart/seed.
-    if (target_count > 0 && (result.chart.lane_count < resolve_lane_count(chart) ||
-                             (scratch_extracted && conversion_succeeded))) {
-        preserve_reduced_keysounds(chart, result.chart);
+    const bool preserve_audio = context.key_conversion_version == 1
+        ? (result.chart.lane_count < resolve_lane_count(chart) || (scratch_extracted && conversion_succeeded))
+        : (conversion_succeeded || result.chart.lane_count != resolve_lane_count(chart) || scratch_extracted);
+    if (target_count > 0 && preserve_audio) {
+        preserve_chart_keysounds(chart, result.chart);
     }
 
     return result;

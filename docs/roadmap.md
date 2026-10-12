@@ -2,19 +2,21 @@
 
 **고정 기준선: [1.8.7](baseline-1.8.7.md)** (2026-10-10). Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`을 사용하며 `latest`나 새 릴리스로 자동 변경하지 않습니다.
 
+**2026-10-13 · 1.8.9.1:** 연속 키 설정, 전 변환기 키음·롱노트 보존, FAST/SLOW·타이밍 배경 토글, 게이지 확대, 미리보기 기어 드래그와 판정 테두리·배경 제거를 제공합니다. 기존 리플레이는 원래 변환으로 재생합니다. [동작·검증·호환 한계](release-1.8.9.1-gate.md). 고정 기준선은 1.8.7입니다.
+
 > 문서 성격: 초기 설계·개선 방향과 당시 분석을 포함합니다. 미완료 제안이나 과거 수치는 현재 동작·기본값·성능 보장이 아닙니다. 현재 기준은 [현재 상태](current-state.md)와 [설정](config.md)을 확인하세요.
 
 This roadmap captures the recommended high-level order for building out the game loop while avoiding scope creep. Each stage locks in direction before layering extra features.
 
 ## Current baseline
 - Windows GUI/runtime is the primary supported path.
-- The fixed baseline is `1.8.7` and this source targets `1.8.9`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
+- The fixed baseline is `1.8.7` and this source targets `1.8.9.1`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
 - The active menu/runtime is BMS-family only (`.bms/.bme/.bml/.pms`) and supports native, bundled/profile TenRiff `skin.json`, and LR2 skins.
 - For current shipped behavior, read `docs/current-state.md` first; this roadmap is about direction and remaining work.
 
 ## 1.8.8–1.8.9 분석과 1.9.0 안정화 계획 (2026-10-12)
 
-현재 소스는 **1.8.9 릴리스 라인**입니다. 1.8.8의 분석·해상도·LN Mix·키음·시작 조작 위에서 로비·HUD·결과 가독성을 개선하고, 메뉴의 Judge Easy/Hard 선택을 새 세션에 전달하는 수정을 소스에 반영했습니다. 완료한 로컬 검사·성능 측정 결과와 한계, 남은 패키지·CI·공개 단계를 구분합니다. 확정된 동작과 새 검증·공개 상태는 [1.8.9 릴리스 검증](release-1.8.9-gate.md)에 기록합니다. 플러그인 실행 환경·API·SDK는 아직 구현하지 않았으며 `1.9.0`은 향후 안정화 목표입니다. 고정 기준 `1.8.7`, 기존 태그·배포 파일과 1.8.8 기록은 그대로 유지합니다. 뒤의 초기 단계 목록이 미완료 본체 기능 추가를 자동으로 승인하지는 않습니다.
+2026-10-12 당시 소스는 **1.8.9 릴리스 라인**입니다. 1.8.8의 분석·해상도·LN Mix·키음·시작 조작 위에서 로비·HUD·결과 가독성을 개선하고, 메뉴의 Judge Easy/Hard 선택을 새 세션에 전달하는 수정을 소스에 반영했습니다. 완료한 로컬 검사·성능 측정 결과와 한계, 남은 패키지·CI·공개 단계를 구분합니다. 확정된 동작과 새 검증·공개 상태는 [1.8.9 릴리스 검증](release-1.8.9-gate.md)에 기록합니다. 플러그인 실행 환경·API·SDK는 아직 구현하지 않았으며 `1.9.0`은 향후 안정화 목표입니다. 고정 기준 `1.8.7`, 기존 태그·배포 파일과 1.8.8 기록은 그대로 유지합니다. 뒤의 초기 단계 목록이 미완료 본체 기능 추가를 자동으로 승인하지는 않습니다.
 
 | 단계 | 완료 조건 |
 | --- | --- |

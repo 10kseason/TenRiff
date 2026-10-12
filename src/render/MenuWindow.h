@@ -517,6 +517,7 @@ struct GameplayHudData {
     std::string hit_burst_style = "prism";
     std::string hud_layout = "studio";
     bool hud_riff_map_visible = true;
+    bool indicator_background_visible = true;
     std::string key_label_position = "bottom";
     bool note_border_enabled = true;
     std::string note_shape = "rect";
@@ -715,6 +716,7 @@ struct SkinPreviewData {
     std::string hit_burst_style = "prism";
     std::string hud_layout = "studio";
     bool hud_riff_map_visible = true;
+    bool indicator_background_visible = true;
     std::string key_label_position = "bottom";
     bool note_border_enabled = true;
     std::string note_shape = "rect";
@@ -1248,7 +1250,10 @@ private:
         int selected_index = -1;
     };
 
+    enum class FieldDragContext { None, Gameplay, EmbeddedPreview, FullscreenPreview };
     struct GameplayFieldDragState {
+        FieldDragContext context = FieldDragContext::None;
+        float scene_scale = 1.0f;
         bool visible = false;
         bool hovered = false;
         bool active = false;

@@ -218,7 +218,7 @@ void MenuApp::apply_keymap_capture(uint32_t keycode) {
         ui_text("Saved ", "저장됨: ") + "Key " + lane.substr(4) +
             (secondary_slot ? ui_text(" secondary = ", " 보조 = ") : " = ") +
             (clear_secondary ? ui_text("Unassigned", "미할당") : key_name),
-        timing::HighResClock::now_ns()));
+        timing::HighResClock::now_ns(), !clear_secondary));
 }
 
 void MenuApp::apply_keymap_reset() {
