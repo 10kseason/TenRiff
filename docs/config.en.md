@@ -47,7 +47,8 @@ If a profile does not exist, it is created automatically on first launch.
 - `volume` (double)
   - master volume
 - `bgm_volume` (double)
-  - New-settings default: `1.0` (100%). First Audio row; existing saved profile values are preserved.
+  - New-settings default: `1.0` (100%). Immediately after Master volume; existing saved profile values are preserved.
+  - Version 1.8.9.7 lowers only TenRiff scene music (title, menus, song-selection background and results) to 40% of its former reference output. BMS chart BGM, keysounds, song/editor previews and UI effects keep their original scale. Displayed/saved values and existing volume ranges are unchanged; this does not reproduce the perceived loudness of Windows volume 40%.
 - `normalize_audio` (bool)
   - In-game RMS loudness control, default false. ON retains RMS → soft limiter → master; OFF applies linear master gain and only guards final output overflow. Menu music and song previews are unchanged.
 - `keysound_volume` (double)
@@ -56,6 +57,8 @@ If a profile does not exist, it is created automatically on first launch.
 See [ASIO setup](asio-audio.md). ASIO holds the selected sample rate fixed and resamples chart audio. `frames` is a request negotiated to a legal driver size. Presets do not overwrite ASIO frames; `exclusive` and `periods` apply to WASAPI. ASIO failures do not fall back to WASAPI automatically.
 
 ### `input`
+
+Version 1.8.9.7 requests MMCSS `Games`/High and disables execution-speed power throttling on the input thread only. API failures are logged at startup and retain the existing input path. Cleanup restores power policy and reverts MMCSS on the owning thread, including RawInput-to-Polling fallback. No global power plan, registry or audio priority changes. Physical latency improvement requires a separate play comparison.
 
 - `backend` (string)
   - `polling | rawinput`

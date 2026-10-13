@@ -47,7 +47,8 @@
 - `volume` (double)
   - master volume
 - `bgm_volume` (double)
-  - 新设置默认值为 `1.0`（100%）。位于音频设置首行，保留已有配置的保存值。
+  - 新设置默认值为 `1.0`（100%）。位于主音量之后，保留已有配置的保存值。
+  - 1.8.9.7仅将TenRiff自带音乐（标题、菜单、选曲界面背景音乐和结果）的基准输出降至原来的40%。BMS曲目的BGM、键音、选曲试听、编辑器试听及UI音效保持原有比例。显示值、保存值及音量范围不变，不代表听感等同于Windows音量40%。
 - `normalize_audio` (bool)
   - 游戏内RMS音量调整，默认false。ON保留RMS→软限幅→主音量；OFF仅应用线性主音量与最终输出范围限制。菜单音乐及选曲试听不变。
 - `keysound_volume` (double)
@@ -56,6 +57,8 @@
 参见 [ASIO 设置](asio-audio.md)。ASIO 固定所选采样率并对谱面音频重采样。`frames` 为请求值，按驱动支持的大小协商。预设不覆盖 ASIO frames；`exclusive` 与 `periods` 仅用于 WASAPI。ASIO 失败时不会自动切换 WASAPI。
 
 ### `input`
+
+1.8.9.7仅为输入线程请求MMCSS `Games`/High并关闭执行速度电源节流。API失败记录到启动日志并保留原输入路径，退出时由原线程恢复电源状态及解除MMCSS，RawInput转Polling也保留作用域。不修改全局电源计划、注册表或音频优先级。物理输入延迟是否改善仍需实际游玩对比。
 
 - `backend` (string)
   - `polling | rawinput`

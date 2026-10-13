@@ -8,6 +8,7 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#include <avrt.h>
 
 #include "config/KeycodeMap.h"
 #include "timing/HighResClock.h"
@@ -26,6 +27,73 @@ constexpr int64_t kRawInputRegistrationHealthIntervalNs = 100'000'000LL;
 
 // Global pointer for window procedure (thread-local would be cleaner but adds complexity).
 thread_local InputThread* g_input_thread = nullptr;
+
+// Own scheduling on the producer thread, including its in-place RawInput ->
+// Polling fallback. Never change process/global power policy or the audio task.
+class ScopedInputScheduling {
+public:
+    ScopedInputScheduling() {
+        if (!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL)) {
+            std::cerr << "[warn] Input fallback priority failed error=" << GetLastError() << '\n';
+        }
+        DWORD task_index = 0;
+        mmcss_ = AvSetMmThreadCharacteristicsW(L"Games", &task_index);
+        if (!mmcss_) {
+            std::cerr << "[warn] Input MMCSS registration failed error=" << GetLastError() << '\n';
+        } else if (!AvSetMmThreadPriority(mmcss_, AVRT_PRIORITY_HIGH)) {
+            std::cerr << "[warn] Input MMCSS High priority failed error=" << GetLastError() << '\n';
+        } else {
+            std::cerr << "[info] Input scheduling: MMCSS Games/High active.\n";
+        }
+
+        // Resolve these APIs at runtime so older Windows can retain the existing
+        // input path. Save the complete state and restore it on this same thread.
+        const auto kernel = GetModuleHandleW(L"kernel32.dll");
+        const auto get_info = reinterpret_cast<GetThreadInformationFn>(
+            GetProcAddress(kernel, "GetThreadInformation"));
+        set_info_ = reinterpret_cast<SetThreadInformationFn>(
+            GetProcAddress(kernel, "SetThreadInformation"));
+        previous_power_.Version = THREAD_POWER_THROTTLING_CURRENT_VERSION;
+        if (!get_info || !set_info_) {
+            std::cerr << "[warn] Input power throttling API unavailable; keeping system policy.\n";
+        } else if (!get_info(GetCurrentThread(), ThreadPowerThrottling,
+                             &previous_power_, sizeof(previous_power_))) {
+            std::cerr << "[warn] Input power policy query failed error=" << GetLastError() << '\n';
+        } else {
+            auto power = previous_power_;
+            power.ControlMask |= THREAD_POWER_THROTTLING_EXECUTION_SPEED;
+            power.StateMask &= ~THREAD_POWER_THROTTLING_EXECUTION_SPEED;
+            power_changed_ = set_info_(GetCurrentThread(), ThreadPowerThrottling,
+                                       &power, sizeof(power)) != FALSE;
+            if (power_changed_) {
+                std::cerr << "[info] Input scheduling: execution-speed power throttling off.\n";
+            } else {
+                std::cerr << "[warn] Input power policy update failed error=" << GetLastError() << '\n';
+            }
+        }
+    }
+
+    ~ScopedInputScheduling() {
+        if (power_changed_ && !set_info_(GetCurrentThread(), ThreadPowerThrottling,
+                                         &previous_power_, sizeof(previous_power_))) {
+            std::cerr << "[warn] Input power policy restore failed error=" << GetLastError() << '\n';
+        }
+        if (mmcss_ && !AvRevertMmThreadCharacteristics(mmcss_)) {
+            std::cerr << "[warn] Input MMCSS cleanup failed error=" << GetLastError() << '\n';
+        }
+    }
+
+    ScopedInputScheduling(const ScopedInputScheduling&) = delete;
+    ScopedInputScheduling& operator=(const ScopedInputScheduling&) = delete;
+
+private:
+    using GetThreadInformationFn = BOOL(WINAPI*)(HANDLE, THREAD_INFORMATION_CLASS, LPVOID, DWORD);
+    using SetThreadInformationFn = BOOL(WINAPI*)(HANDLE, THREAD_INFORMATION_CLASS, LPVOID, DWORD);
+    HANDLE mmcss_ = nullptr;
+    SetThreadInformationFn set_info_ = nullptr;
+    THREAD_POWER_THROTTLING_STATE previous_power_{};
+    bool power_changed_ = false;
+};
 
 LRESULT CALLBACK input_window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
     switch (msg) {
@@ -238,6 +306,7 @@ void InputThread::signal_start_result(bool success) {
 }
 
 void InputThread::thread_main() {
+    ScopedInputScheduling scheduling;
     g_input_thread = this;
     if (config_.backend == InputBackend::Polling) {
         signal_start_result(true);
@@ -390,9 +459,6 @@ bool InputThread::thread_main_rawinput() {
 
     signal_start_result(true);
 
-    // Set thread priority (above normal for input responsiveness).
-    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
-
     const bool polling_shadow_enabled = config_.rawinput_polling_shadow;
     const int polling_hz = config_.polling_hz <= 0 ? 1000 : config_.polling_hz;
     const int64_t interval_ns = 1'000'000'000LL / static_cast<int64_t>(polling_hz);
@@ -505,8 +571,6 @@ void InputThread::thread_main_polling(bool reconcile_existing_state) {
     } else {
         refresh_polling_key_state(keys, last_state);
     }
-    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
-
     timing::PreciseWait precise_wait;
     int64_t next_tick_ns = timing::HighResClock::now_ns();
     while (!should_stop_.load(std::memory_order_acquire)) {

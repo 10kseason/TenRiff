@@ -1,4 +1,4 @@
-    // Profile borders are cached separately from grade glyphs. Gaussian bloom
+    // Panel borders are cached separately from grade glyphs. Gaussian bloom
     // is rebuilt only for a new size/color, never during steady menu frames.
     auto draw_panel_glow = [&](const D2D1_RECT_F& rect, float radius, uint32_t rgb, std::size_t slot, float strength = 1.0f) {
         const float width = std::ceil(rect.right - rect.left);

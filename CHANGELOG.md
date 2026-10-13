@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.9.7] - 2026-10-14
+
+- Request MMCSS Games/High on the input producer and disable its execution-speed power throttling, restoring the previous power state and unregistering MMCSS on the owning thread. Unsupported or failed APIs log once and preserve input operation.
+- Give the home menu's action borders the same sky-blue, red and white colors as their icons, with subtle cached Gaussian glow and smooth selection emphasis.
+- Reduce only TenRiff's own title/menu/result music to 40% of its previous reference output. BMS gameplay BGM, keysounds, song/editor previews, UI effects and saved volume values retain their original scale.
+- Preserve the precise waits from 1.8.9.6, numerical judgement windows, R1–R5 processing, score/gauge/replay contracts and the fixed 1.8.7 baseline. Physical latency, long-session and other-PC improvements are not established. See [scope and verification](docs/release-1.8.9.7-gate.md).
+
 ## [1.8.9.6] - 2026-10-13
 
 - Replace coarse short sleeps in input and gameplay/HUD service loops with reusable thread-owned high-resolution timers; RawInput also wakes on queued messages. Retain short yields and existing polling deadlines.
