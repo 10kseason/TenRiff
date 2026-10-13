@@ -157,7 +157,7 @@ void AudioSettingsController::set_asio_drivers(std::vector<AudioDriverChoice> dr
 }
 
 void AudioSettingsController::reset(AudioSettingId selected) noexcept {
-    selected_id_ = audio_setting_index(selected).has_value() ? selected : AudioSettingId::BgmVolume;
+    selected_id_ = audio_setting_index(selected).has_value() ? selected : AudioSettingId::MasterVolume;
     dirty_ = false;
     asio_drivers_loaded_ = false;
 }
@@ -198,7 +198,7 @@ MenuEffectFlags AudioSettingsController::move_selection(int direction) noexcept 
     }
     const auto current_index = audio_setting_index(selected_id_);
     if (!current_index.has_value()) {
-        selected_id_ = AudioSettingId::BgmVolume;
+        selected_id_ = AudioSettingId::MasterVolume;
         return MenuEffectFlags{true, false, false, false};
     }
 
@@ -380,7 +380,7 @@ MenuEffectFlags AudioSettingsController::apply_selected_action(
 
 MenuEffectFlags AudioSettingsController::leave_screen() noexcept {
     const bool was_dirty = dirty_;
-    selected_id_ = AudioSettingId::BgmVolume;
+    selected_id_ = AudioSettingId::MasterVolume;
     dirty_ = false;
     return MenuEffectFlags{
         true,

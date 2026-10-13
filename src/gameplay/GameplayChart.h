@@ -61,6 +61,11 @@ struct ScrollSegment {
     double end_position = 0.0;
 };
 
+// Shared by chart queries and render-time lookup of an immutable scroll map.
+// An empty map uses sample coordinates, as charts without scroll events do.
+[[nodiscard]] double scroll_visual_position_at(const std::vector<ScrollSegment>& segments,
+                                              int64_t sample);
+
 enum class VisualLayer {
     Base,
     Overlay,

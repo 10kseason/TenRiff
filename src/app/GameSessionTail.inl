@@ -170,6 +170,17 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     last_audio_timing_.store({});
     startup_input_timing_anchor_ = {};
     clock_sync_.reset();
+    shared_input_clock_.reset();
+    audio_input_timing_anchor_ = {};
+    stale_input_catchup_used_ = false;
+    judgement_horizon_sample_ = 0;
+    judgement_horizon_active_ = false;
+    chronological_judgement_ = true;
+    ghost_chronological_judgement_ = false;
+    visual_scroll_segments_.reset();
+    scheduled_input_audio_.clear();
+    scheduled_input_audio_index_ = 0;
+    scheduled_input_audio_prepared_ = false;
     countdown_active_ = false;
     countdown_value_ = 0;
     countdown_started_ns_ = 0;
@@ -606,6 +617,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     gameplay_config.judge = mode_result.judge;
     gameplay_config.legacy_hold_release = replay_playback_enabled_ &&
         replay_uses_legacy_hold_release(replay_source_);
+    gameplay_config.chronological_judgement = !replay_playback_enabled_ ||
+        replay_uses_chronological_judgement(replay_source_);
+    chronological_judgement_ = gameplay_config.chronological_judgement;
     gameplay_config.gauge = config_.gauge;
     gameplay_config.input_offset_ms = config_.input_offset_ms;
     gameplay_config.practice_no_fail_enabled =
@@ -880,6 +894,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     ghost_lane_pressed_.assign(static_cast<std::size_t>(std::max(1, chart_.lane_count)), 0);
 
     engine_ = std::make_unique<gameplay::GameplayEngine>(chart_, gameplay_config);
+    visual_scroll_segments_ =
+        std::make_shared<const std::vector<gameplay::ScrollSegment>>(chart_.scroll_segments);
+    prepare_scheduled_input_audio(gameplay_config);
     prepare_riff_map();
     if (ghost_replay_enabled_) {
         gameplay::GameplayConfig ghost_config = gameplay_config;
@@ -887,6 +904,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
                                           ? config::JudgeConfig{} : config_.judge;
         ghost_config.judge = replay_judge_config_for_playback(ghost_replay_source_, ghost_base_judge, chart_.bms_rank);
         ghost_config.legacy_hold_release = replay_uses_legacy_hold_release(ghost_replay_source_);
+        ghost_config.chronological_judgement = replay_uses_chronological_judgement(ghost_replay_source_);
+        ghost_chronological_judgement_ = ghost_config.chronological_judgement;
         ghost_config.gauge_shift_enabled = true;
         ghost_config.gauge_policy = {};
         if (!ghost_replay_source_.mode.gauge.empty()) {
@@ -1143,10 +1162,11 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             continue;
         }
 
-        // Rendering follows the device playback head. The engine/write cursor
-        // includes queued audio and must never advance visuals by that latency.
+        // R5 publishes the same filtered base clock used by input mapping.
+        // The audio write cursor and intentional input calibration stay separate.
         snapshot.current_sample = timing.playback_sample;
         snapshot.audio_sample_time_ns = timing.time_ns;
+        snapshot.audio_clock_rate = timing.clock_rate;
         snapshot.audio_buffer_frames = timing.buffer_frames;
         break;
     }
@@ -1334,6 +1354,7 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
     snapshot.lookahead_samples = lookahead_samples;
     snapshot.current_visual_position = chart_.visual_position_at(snapshot.current_sample);
     snapshot.visual_velocity = chart_.visual_velocity_at(snapshot.current_sample);
+    snapshot.visual_scroll_segments = visual_scroll_segments_;
     // Keep the field scale anchored to the starting BPM. Follow actual visual
     // travel through BPM, #SCROLL, STOP, and reverse segments when choosing the
     // HUD horizon so slow sections still enter from the same top edge without
@@ -2421,7 +2442,12 @@ void GameSession::shutdown() {
                                                               gauge_shift_enabled_,
                                                               course_gauge_enabled_,
                                                               "off");
-            if (auto_scratch_enabled_) replay.ruleset_id = "custom";
+            if (auto_scratch_enabled_ || stale_input_catchup_used_) replay.ruleset_id = "custom-ruleset-5";
+            if (stale_input_catchup_used_) {
+                const std::string warning = "Official scoring disabled: stale input state catch-up is not represented in the replay trace.";
+                result_.export_warnings.push_back(warning);
+                std::cerr << "[warn] " << warning << std::endl;
+            }
             replay.created_utc = created_utc;
             replay.sample_rate = sample_rate_;
             replay.rate = config_.speed.rate;
@@ -2526,6 +2552,13 @@ void GameSession::shutdown() {
     engine_.reset();
     ghost_engine_.reset();
     clock_sync_.reset();
+    shared_input_clock_.reset();
+    audio_input_timing_anchor_ = {};
+    judgement_horizon_active_ = false;
+    visual_scroll_segments_.reset();
+    scheduled_input_audio_.clear();
+    scheduled_input_audio_index_ = 0;
+    scheduled_input_audio_prepared_ = false;
     current_playback_sample_ = 0;
     pause_sample_offset_ = 0;
     pause_physical_start_sample_ = 0;
@@ -2633,6 +2666,7 @@ void GameSession::audio_callback(float* output,
     int64_t committed_sample = logical_buffer_start_samples + static_cast<int64_t>(frames);
     int64_t committed_buffer_start_sample = logical_buffer_start_samples;
     int64_t committed_playback_sample = logical_playback_sample;
+    double committed_clock_rate = 1.0;
 
     {
         std::lock_guard<std::mutex> lock(engine_mutex_);
@@ -2647,6 +2681,9 @@ void GameSession::audio_callback(float* output,
                 pause_physical_start_sample_ = physical_buffer_start_samples;
                 paused_chart_sample_ = logical_buffer_start_samples;
                 paused_playback_sample_ = logical_playback_sample;
+                if (chronological_judgement_) {
+                    paused_playback_sample_ = shared_input_clock_.sample_at(now_ns).value_or(logical_playback_sample);
+                }
                 pause_anchor_valid_ = true;
             }
 
@@ -2677,7 +2714,11 @@ void GameSession::audio_callback(float* output,
                     paused_.store(false, std::memory_order_release);
                     clock_sync_.reset();
                     startup_input_timing_anchor_ = {};
-                    rebaseline_gameplay_start_input_state(paused_chart_sample_);
+                    shared_input_clock_.reset(paused_playback_sample_);
+                    audio_input_timing_anchor_ = {};
+                    rebaseline_gameplay_start_input_state(chronological_judgement_
+                        ? paused_playback_sample_ + (replay_playback_enabled_ || autoplay_enabled_ ? 0 : input_offset_samples_)
+                        : paused_chart_sample_);
                 }
             }
 
@@ -2694,7 +2735,32 @@ void GameSession::audio_callback(float* output,
             // Input timestamps must learn against the device head, not the future write cursor.
             current_playback_sample_ = logical_playback_sample;
             startup_input_timing_anchor_ = StartupInputTimingAnchor{logical_playback_sample, now_ns, true};
+            audio_input_timing_anchor_ = startup_input_timing_anchor_;
             clock_sync_.add_sample(now_ns, logical_playback_sample);
+            int64_t shared_clock_sample = logical_playback_sample;
+            if (chronological_judgement_ || ghost_chronological_judgement_) {
+                const int64_t fitted = clock_sync_.estimate_audio_samples(now_ns).value_or(logical_playback_sample);
+                shared_clock_sample = reconcile_fresh_gameplay_input_sample(
+                    fitted, logical_playback_sample, false, config_.judge.bd_ms, sample_rate_);
+                if (shared_clock_sample > buffer_end_samples + lookahead_samples)
+                    shared_clock_sample = buffer_end_samples;
+                shared_clock_sample = shared_input_clock_.observe(now_ns, shared_clock_sample, sample_rate_);
+            }
+            if (chronological_judgement_) {
+                // One fitted, non-rewinding anchor drives input and the HUD.
+                // Reading it is pure: querying now must not clamp older queued inputs.
+                current_playback_sample_ = shared_clock_sample;
+                startup_input_timing_anchor_.playback_sample = shared_clock_sample;
+                committed_playback_sample = shared_clock_sample;
+                committed_clock_rate = shared_input_clock_.rate();
+            }
+            // Negative calibration means a newly arriving input can still name
+            // a past chart sample. Automatic judgements must wait for that same
+            // calibrated clock, while audio continues filling the write buffer.
+            judgement_horizon_sample_ = chronological_judgement_
+                ? shared_clock_sample + (replay_playback_enabled_ || autoplay_enabled_ ? 0 : input_offset_samples_)
+                : buffer_end_samples;
+            judgement_horizon_active_ = chronological_judgement_;
             if (!audio_timing_diagnostics_logged_) {
                 const int64_t write_ahead_frames =
                     (std::max)(int64_t{0}, logical_buffer_start_samples - logical_playback_sample);
@@ -2724,7 +2790,7 @@ void GameSession::audio_callback(float* output,
             if (paused_.load(std::memory_order_acquire)) {
                 pause_physical_start_sample_ = physical_buffer_start_samples;
                 paused_chart_sample_ = logical_buffer_start_samples;
-                paused_playback_sample_ = logical_playback_sample;
+                paused_playback_sample_ = current_playback_sample_;
                 pause_anchor_valid_ = true;
                 committed_sample = paused_chart_sample_;
                 committed_buffer_start_sample = paused_chart_sample_;
@@ -2734,13 +2800,27 @@ void GameSession::audio_callback(float* output,
                 service_hispeed_repeat(now_ns);
                 service_tuning_repeats(now_ns);
                 process_autoplay_queue(logical_buffer_start_samples,
-                                       buffer_end_samples,
-                                       lookahead_samples);
-                process_ghost_replay_queue(buffer_end_samples, lookahead_samples);
-                engine_->advance(buffer_end_samples);
-                if (ghost_engine_) {
-                    ghost_engine_->advance(buffer_end_samples);
+                                       chronological_judgement_ ? judgement_horizon_sample_ : buffer_end_samples,
+                                       chronological_judgement_ ? 0 : lookahead_samples);
+                process_ghost_replay_queue(
+                    ghost_chronological_judgement_ ? shared_clock_sample : buffer_end_samples,
+                    ghost_chronological_judgement_ ? 0 : lookahead_samples);
+                engine_->advance(judgement_horizon_sample_);
+                if (chronological_judgement_) {
+                    mine_trigger_buffer_.clear();
+                    engine_->drain_mine_triggers(mine_trigger_buffer_);
+                    for (const auto& trigger : mine_trigger_buffer_) {
+                        trigger_lane_hit_effect(trigger.lane);
+                        if (!scheduled_input_audio_prepared_ || (!replay_playback_enabled_ && !autoplay_enabled_))
+                            schedule_mine_keysound(trigger, pin_realtime_audio_start_sample(trigger.sample, logical_buffer_start_samples));
+                    }
                 }
+                if (ghost_engine_) {
+                    ghost_engine_->advance(ghost_chronological_judgement_ ? shared_clock_sample : buffer_end_samples);
+                }
+                // Live input can fail the run in this callback. Decide scratch
+                // keysounds afterward, while retaining their future write time.
+                schedule_input_audio(logical_buffer_start_samples, buffer_end_samples + lookahead_samples);
 
                 if (!lane_activity_.empty() && sample_rate_ > 0) {
                     const float decay = static_cast<float>(static_cast<double>(frames) * 5.0 /
@@ -2780,6 +2860,7 @@ void GameSession::audio_callback(float* output,
                 }
             }
         }
+        judgement_horizon_active_ = false;
     }
 
     if (engine_active && !paused_callback) {
@@ -2813,7 +2894,7 @@ void GameSession::audio_callback(float* output,
     // must also expose this odd sequence value before the final reader check.
     std::atomic_thread_fence(std::memory_order_release);
     last_audio_timing_.store({committed_sample, committed_buffer_start_sample,
-                             committed_playback_sample, callback_time_ns, frames});
+                             committed_playback_sample, callback_time_ns, frames, committed_clock_rate});
     audio_timing_sequence_.fetch_add(1, std::memory_order_release);
     last_audio_sample_.store(committed_sample, std::memory_order_release);
 }
@@ -3167,13 +3248,14 @@ void GameSession::dispatch_lane_input(int lane,
                                       input::InputState state,
                                       int64_t sample,
                                       int64_t audio_buffer_start_sample,
-                                      std::optional<int64_t> physical_input_sample) {
+                                      std::optional<int64_t> physical_input_sample,
+                                      bool emit_audio) {
     update_lane_feedback(lane, state);
     // Live calibration changes judgement, not when a physical press sounds.
     // Replay/autoplay callers retain their recorded/scheduled audio timestamp.
     const int64_t audible_sample = pin_realtime_audio_start_sample(
         physical_input_sample.value_or(sample), audio_buffer_start_sample);
-    if (state == input::InputState::Pressed) {
+    if (emit_audio && state == input::InputState::Pressed) {
         schedule_tone(lane, audible_sample, false);
     }
 
@@ -3183,7 +3265,7 @@ void GameSession::dispatch_lane_input(int lane,
         if (hit_note->note_id < hidden_hit_note_ids_.size()) {
             hidden_hit_note_ids_[hit_note->note_id] = 1;
         }
-        schedule_note_keysound(hit_note.value(), audible_sample);
+        if (emit_audio) schedule_note_keysound(hit_note.value(), audible_sample);
     }
 }
 
@@ -3196,6 +3278,10 @@ void GameSession::process_future_events(int64_t buffer_start_samples,
                                         int64_t buffer_end_samples,
                                         int64_t lookahead_samples) {
     while (true) {
+        if (judgement_horizon_active_) {
+            const auto next = future_events_.peek();
+            if (next && next->sample > judgement_horizon_sample_) return;
+        }
         auto next = future_events_.pop();
         if (!next.has_value()) {
             return;
@@ -3206,7 +3292,7 @@ void GameSession::process_future_events(int64_t buffer_start_samples,
             }
             continue;
         }
-        if (next->sample > buffer_end_samples + lookahead_samples) {
+        if (!judgement_horizon_active_ && next->sample > buffer_end_samples + lookahead_samples) {
             next->sample = buffer_end_samples;
         }
         if (autoplay_enabled_) {
@@ -3268,7 +3354,9 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
             event.input_time_ns,
             startup_input_timing_anchor_.callback_time_ns,
             stale_window_ms);
-        auto mapped = clock_sync_.input_to_audio_samples(event.input_time_ns);
+        auto mapped = judgement_horizon_active_
+            ? shared_input_clock_.sample_at(event.input_time_ns)
+            : clock_sync_.input_to_audio_samples(event.input_time_ns);
         int64_t resolved_sample = resolve_startup_gameplay_input_sample(
             mapped,
             event.input_time_ns,
@@ -3288,8 +3376,10 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
         // Guard an implausible clock mapping before adding intentional input
         // calibration. Clamping the calibrated sample to this buffer quantizes
         // positive offsets according to the callback phase (per-note jitter).
-        if (resolved_sample > buffer_end_samples + lookahead_samples) {
-            resolved_sample = buffer_end_samples;
+        const int64_t mapping_end = judgement_horizon_active_
+            ? current_playback_sample_ + (buffer_end_samples - buffer_start_samples) : buffer_end_samples;
+        if (resolved_sample > mapping_end + lookahead_samples) {
+            resolved_sample = mapping_end;
         }
         const int64_t sample = resolved_sample + input_offset_samples_;
         auto lane = lane_from_keycode(event.keycode);
@@ -3321,7 +3411,10 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
             continue;
         }
         pending_input_events_.push_back(
-            BufferedLaneInput{lane.value(), *logical_state, sample, resolved_sample});
+            BufferedLaneInput{lane.value(), *logical_state, sample,
+                judgement_horizon_active_ ? estimate_input_sample_from_startup_anchor(
+                    event.input_time_ns, audio_input_timing_anchor_, sample_rate_).value_or(resolved_sample)
+                    : resolved_sample});
     }
 
     for (std::size_t lane_index = 0; lane_index < stale_lane_present.size(); ++lane_index) {
@@ -3329,10 +3422,18 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
             continue;
         }
         const auto& buffered = stale_lane_inputs[lane_index];
+        // Startup/resume rebaselines also use catch_up_lane_input; only an
+        // actual discarded stale edge makes this replay trace incomplete.
+        stale_input_catchup_used_ = true;
         catch_up_lane_input(buffered.lane, buffered.state, buffered.sample);
     }
 
     for (const auto& buffered : pending_input_events_) {
+        // Input may have arrived after the paired device observation while
+        // GetBuffer/callback delivery was delayed. It is already observed, so
+        // its calibrated timestamp can safely extend this callback's frontier.
+        if (judgement_horizon_active_)
+            judgement_horizon_sample_ = (std::max)(judgement_horizon_sample_, buffered.sample);
         // Merge synthetic scratch edges before each physical key edge, so the
         // engine and replay preserve exact sample order even with large buffers.
         if (auto_scratch_enabled_) process_autoplay_queue(buffer_start_samples, buffered.sample, 0);
@@ -3383,6 +3484,67 @@ void GameSession::build_autoplay_events() {
                      });
 }
 
+void GameSession::prepare_scheduled_input_audio(const gameplay::GameplayConfig& config) {
+    scheduled_input_audio_.clear();
+    scheduled_input_audio_index_ = 0;
+    scheduled_input_audio_prepared_ = false;
+    if (!chronological_judgement_ ||
+        (!replay_playback_enabled_ && !autoplay_enabled_ && !auto_scratch_enabled_)) return;
+
+    // Scratch playback is known, but other live lanes determine game-over.
+    // Never simulate an incomplete live score to decide future scratch audio.
+    if (auto_scratch_enabled_ && !autoplay_enabled_ && !replay_playback_enabled_) {
+        for (const auto& note : chart_.notes) {
+            if (auto_scratch_lane(note.lane))
+                scheduled_input_audio_.push_back({note.start_sample, note.lane, note, std::nullopt});
+        }
+    } else {
+        // Only loading pays for this temporary engine. It uses exactly the
+        // playback policy/config to resolve replay misses, LN tails and mines;
+        // the callback retains just audio events, never a second scoring engine.
+        gameplay::GameplayEngine audio_plan_engine(chart_, config);
+        const auto& events = replay_playback_enabled_ ? replay_source_.trace.events : autoplay_events_;
+        std::vector<gameplay::MineTrigger> mines;
+        const auto append_mines = [&]() {
+            mines.clear();
+            audio_plan_engine.drain_mine_triggers(mines);
+            for (const auto& mine : mines)
+                scheduled_input_audio_.push_back({mine.sample, mine.lane, std::nullopt, mine});
+        };
+        for (const auto& event : events) {
+            const int64_t sample = replay_playback_enabled_
+                ? playback_sample_for_replay_event(replay_source_, event.sample) : event.sample;
+            auto note = audio_plan_engine.handle_input(event.lane, event.state, sample);
+            if (event.state == input::InputState::Pressed)
+                scheduled_input_audio_.push_back({sample, event.lane, std::move(note), std::nullopt});
+            append_mines();
+        }
+        audio_plan_engine.advance(chart_.duration_samples);
+        append_mines();
+    }
+    std::stable_sort(scheduled_input_audio_.begin(), scheduled_input_audio_.end(),
+        [](const ScheduledInputAudio& lhs, const ScheduledInputAudio& rhs) { return lhs.sample < rhs.sample; });
+    scheduled_input_audio_prepared_ = true;
+}
+
+void GameSession::schedule_input_audio(int64_t buffer_start_samples, int64_t buffer_end_samples) {
+    if (!scheduled_input_audio_prepared_) return;
+    while (scheduled_input_audio_index_ < scheduled_input_audio_.size()) {
+        const auto& event = scheduled_input_audio_[scheduled_input_audio_index_];
+        if (event.sample > buffer_end_samples) break;
+        const int64_t audible = pin_realtime_audio_start_sample(event.sample, buffer_start_samples);
+        if (event.mine) {
+            schedule_mine_keysound(*event.mine, audible);
+        } else {
+            schedule_tone(event.lane, audible, false);
+            if (event.note && (!auto_scratch_enabled_ || autoplay_enabled_ || replay_playback_enabled_ ||
+                               !engine_->is_game_over()))
+                schedule_note_keysound(*event.note, audible);
+        }
+        ++scheduled_input_audio_index_;
+    }
+}
+
 void GameSession::process_autoplay_queue(int64_t buffer_start_samples,
                                          int64_t buffer_end_samples,
                                          int64_t lookahead_samples) {
@@ -3398,7 +3560,7 @@ void GameSession::process_autoplay_queue(int64_t buffer_start_samples,
         dispatch_lane_input(autoplay_event.lane,
                             autoplay_event.state,
                             autoplay_event.sample,
-                            buffer_start_samples);
+                            buffer_start_samples, std::nullopt, !scheduled_input_audio_prepared_);
         ++autoplay_event_index_;
     }
 }
@@ -3435,13 +3597,14 @@ void GameSession::process_replay_input_queue(int64_t buffer_start_samples,
     while (replay_event_index_ < replay_source_.trace.events.size()) {
         const auto& replay_event = replay_source_.trace.events[replay_event_index_];
         const int64_t playback_sample = playback_sample_for_replay_event(replay_source_, replay_event.sample);
-        if (playback_sample > buffer_end_samples + lookahead_samples) {
+        if (playback_sample > (judgement_horizon_active_
+                ? judgement_horizon_sample_ : buffer_end_samples + lookahead_samples)) {
             break;
         }
         dispatch_lane_input(replay_event.lane,
                             replay_event.state,
                             playback_sample,
-                            buffer_start_samples);
+                            buffer_start_samples, std::nullopt, !scheduled_input_audio_prepared_);
         ++replay_event_index_;
     }
 }

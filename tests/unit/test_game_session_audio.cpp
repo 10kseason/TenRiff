@@ -35,6 +35,392 @@ struct CompletionTestDirectory {
 // Exercise the production input-to-voice-to-mixer path without starting a device,
 // input thread, decoder, profile or record writer.
 struct GameSessionAudioTestAccess {
+    static void callback_with_sample_clock(GameSession& session, float* output, uint32_t frames,
+                                            int64_t write, int64_t playback) {
+        session.audio_thread_.callback_ = [&session](float* out, uint32_t count, int64_t start, int64_t head) {
+            session.audio_callback(out, count, start, head);
+        };
+        session.audio_thread_.invoke_callback(output, frames, write, playback,
+            1'000'000'000LL + static_cast<int64_t>(std::llround(
+                playback * 1'000'000'000.0 / session.sample_rate_)));
+    }
+    static void check_timing_audit_ln_release_against_playback_head(int release_ms,
+                                                                  bool delay_final_callback = false) {
+        // Same authored LN and exact physical release, with only callback
+        // buffer size / queued device padding changed. Use real timestamp
+        // mapping and the production callback, without a physical device.
+        constexpr int64_t epoch_ns = 1'000'000'000LL;
+        int mismatches = 0;
+        for (const int rate : {44100, 48000, 96000}) {
+            for (const int buffer_ms : {10, 40}) {
+                for (const int padding_ms : {0, 30}) {
+                    auto session = std::make_unique<GameSession>();
+                    session->sample_rate_ = rate;
+                    session->chart_.lane_count = 1;
+                    session->chart_.duration_samples = rate * 4;
+                    session->chart_.notes = {{1, rate, rate * 2}, {1, rate * 3, std::nullopt}};
+                    gameplay::GameplayConfig config;
+                    config.sample_rate = rate;
+                    config.practice_no_fail_enabled = true;
+                    session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+                    session->lane_activity_.assign(1, 0.0f);
+                    session->lane_pressed_.assign(1, 0);
+                    session->key_to_lane_ = {{32, 1}};
+                    session->lane_binding_state_.configure(session->key_to_lane_);
+                    session->audio_timing_diagnostics_logged_ = true;
+                    session->config_.audio_ui.mute_when_inactive = false;
+                    session->synthetic_tones_enabled_ = false;
+                    session->audio_thread_.callback_ = [&](float* output, uint32_t frames,
+                                                            int64_t start, int64_t playback) {
+                        session->audio_callback(output, frames, start, playback);
+                    };
+                    const auto sample_at_ms = [&](int64_t ms) {
+                        return static_cast<int64_t>(std::llround(static_cast<double>(ms * rate) / 1000.0));
+                    };
+                    const auto frames = static_cast<uint32_t>(sample_at_ms(buffer_ms));
+                    const int64_t padding = sample_at_ms(padding_ms);
+                    std::vector<float> output(frames * 2);
+                    const auto callback_at_ms = [&](int64_t ms) {
+                        const int64_t playback = sample_at_ms(ms);
+                        session->audio_thread_.invoke_callback(output.data(), frames,
+                            playback + padding, playback, epoch_ns + ms * 1'000'000LL);
+                    };
+                    REQUIRE(session->input_thread_.queue().push(
+                        {32, input::InputState::Pressed, epoch_ns + 1'000'000'000LL}));
+                    callback_at_ms(1000);
+                    // Deliver callbacks on the same regular grid up to just
+                    // before the physical key-up, which is fixed for each case.
+                    int64_t next_callback_ms = 1000 + buffer_ms;
+                    while (next_callback_ms < release_ms &&
+                           (!delay_final_callback || next_callback_ms <= 1970)) {
+                        callback_at_ms(next_callback_ms);
+                        next_callback_ms += buffer_ms;
+                    }
+                    REQUIRE(session->input_thread_.queue().push(
+                        {32, input::InputState::Released, epoch_ns + release_ms * 1'000'000LL}));
+                    // A separate control omits intermediate callbacks, then
+                    // delivers the correctly stamped +30 ms release at 2040 ms.
+                    // It tests caller batch ordering, not a real device underrun.
+                    callback_at_ms(delay_final_callback ? 2040 : next_callback_ms);
+                    const auto& recorded = session->engine_->replay().events;
+                    REQUIRE(recorded.size() == 2);
+                    const auto& counts = session->engine_->stats().counts;
+                    const auto& feedback = session->engine_->live_feedback();
+                    // An early -27 ms release must remain GREAT. A standard LN
+                    // held through its tail and released +30 ms later instead
+                    // completes as PG, per the current held-through contract.
+                    const bool early_release = release_ms < 2000;
+                    const double expected_delta = early_release
+                        ? static_cast<double>(sample_at_ms(release_ms) - rate * 2) * 1000.0 / rate : 0.0;
+                    const bool matches = recorded[1].sample == sample_at_ms(release_ms) &&
+                        counts.pg == (early_release ? 1 : 2) &&
+                        counts.gr == (early_release ? 1 : 0) && feedback.has_value &&
+                        std::abs(feedback.delta_ms - expected_delta) < 0.000001;
+                    if (!matches) ++mismatches;
+                    std::cout << "[timing-audit-ln-write-ahead] rate=" << rate
+                              << " buffer_ms=" << buffer_ms << " padding_ms=" << padding_ms
+                              << " physical_release_ms=" << release_ms
+                              << " delayed_callback=" << delay_final_callback
+                              << " release_sample=" << recorded[1].sample
+                              << " pg=" << counts.pg << " gr=" << counts.gr
+                              << " tail_delta_ms=" << feedback.delta_ms
+                              << " matches=" << matches << '\n';
+                }
+            }
+        }
+        // This repository's CHECK throws, so report every numeric condition
+        // before failing the case once. REQUIRE still guards fixture validity.
+        CHECK(mismatches == 0);
+    }
+
+    static void check_timing_audit_ln_release_at_observed_buffer_scale() {
+        constexpr int rate = 48000;
+        constexpr int release_ms = 1991;
+        constexpr int64_t epoch_ns = 1'000'000'000LL;
+        int mismatches = 0;
+        for (const int rank : {0, 1, 2, 3}) {
+            for (const int buffer_ms : {1, 10, 22}) {
+                auto session = std::make_unique<GameSession>();
+                session->sample_rate_ = rate;
+                session->chart_.lane_count = 1;
+                session->chart_.bms_rank = rank;
+                session->chart_.duration_samples = rate * 4;
+                session->chart_.notes = {{1, rate, rate * 2}, {1, rate * 3, std::nullopt}};
+                config::ModeConfig mode;
+                mode.key_mode = "auto";
+                mode.random = "off";
+                const auto managed = manage_modes(session->chart_, ChartFormat::Bms,
+                    mode, config::JudgeConfig{}, 1.0, 120.0, rate);
+                gameplay::GameplayConfig config;
+                config.sample_rate = rate;
+                config.judge = managed.judge;
+                config.practice_no_fail_enabled = true;
+                session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+                session->lane_activity_.assign(1, 0.0f);
+                session->lane_pressed_.assign(1, 0);
+                session->key_to_lane_ = {{32, 1}};
+                session->lane_binding_state_.configure(session->key_to_lane_);
+                session->audio_timing_diagnostics_logged_ = true;
+                session->config_.audio_ui.mute_when_inactive = false;
+                session->synthetic_tones_enabled_ = false;
+                session->audio_thread_.callback_ = [&](float* output, uint32_t frames,
+                                                       int64_t start, int64_t playback) {
+                    session->audio_callback(output, frames, start, playback);
+                };
+                const auto frames = static_cast<uint32_t>(buffer_ms * 48);
+                std::vector<float> output(frames * 2);
+                const auto callback_at_ms = [&](int64_t ms) {
+                    session->audio_thread_.invoke_callback(output.data(), frames,
+                        ms * 48, ms * 48, epoch_ns + ms * 1'000'000LL);
+                };
+                REQUIRE(session->input_thread_.queue().push(
+                    {32, input::InputState::Pressed, epoch_ns + 1'000'000'000LL}));
+                callback_at_ms(1000);
+                int next_callback_ms = 1000 + buffer_ms;
+                while (next_callback_ms < release_ms) {
+                    callback_at_ms(next_callback_ms);
+                    next_callback_ms += buffer_ms;
+                }
+                REQUIRE(session->input_thread_.queue().push(
+                    {32, input::InputState::Released, epoch_ns + release_ms * 1'000'000LL}));
+                callback_at_ms(next_callback_ms);
+                const auto& recorded = session->engine_->replay().events;
+                REQUIRE(recorded.size() == 2);
+                const auto& counts = session->engine_->stats().counts;
+                const auto& feedback = session->engine_->live_feedback();
+                // At -9 ms RANK0 is GREAT (PG8), while RANK1/2/3 are PG.
+                // Every rank must nevertheless preserve the measured -9 ms.
+                const bool sample_matches = recorded[1].sample == release_ms * 48;
+                const bool grade_matches = counts.pg == (rank == 0 ? 1 : 2) &&
+                    counts.gr == (rank == 0 ? 1 : 0);
+                const bool delta_matches = feedback.has_value &&
+                    std::abs(feedback.delta_ms + 9.0) < 0.000001;
+                if (!sample_matches || !grade_matches || !delta_matches) ++mismatches;
+                // 22 ms matches the observed shared-buffer scale, but no real
+                // device is opened: callback phase and key-up remain synthetic.
+                std::cout << "[timing-audit-ln-observed-buffer-scale] rate=" << rate
+                          << " rank=" << rank << " pg_window_ms=" << managed.judge.pg_ms
+                          << " buffer_ms=" << buffer_ms << " padding_ms=0"
+                          << " physical_release_ms=" << release_ms
+                          << " release_sample=" << recorded[1].sample
+                          << " pg=" << counts.pg << " gr=" << counts.gr
+                          << " tail_delta_ms=" << feedback.delta_ms
+                          << " sample_matches=" << sample_matches
+                          << " grade_matches=" << grade_matches
+                          << " delta_matches=" << delta_matches << '\n';
+            }
+        }
+        CHECK(mismatches == 0);
+    }
+
+    static void check_r5_calibrated_ln_horizon() {
+        constexpr int64_t epoch = 1'000'000'000LL;
+        for (const int offset_ms : {-200, -20, 0, 20, 200}) {
+            for (const int buffer_ms : {1, 10, 22}) {
+                auto session = shift_lane_fixture(32, false);
+                session->chart_.notes = {{1, 48000, 96000}, {1, 144000, std::nullopt}};
+                session->chart_.bms_rank = 0;
+                session->chart_.duration_samples = 192000;
+                gameplay::GameplayConfig config;
+                config.practice_no_fail_enabled = true;
+                config::ModeConfig mode;
+                mode.key_mode = "auto";
+                mode.random = "off";
+                config.judge = manage_modes(session->chart_, ChartFormat::Bms,
+                    mode, config::JudgeConfig{}, 1.0, 120.0, 48000).judge;
+                session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+                session->input_offset_samples_ = offset_ms * 48;
+                session->audio_timing_diagnostics_logged_ = true;
+                session->config_.audio_ui.mute_when_inactive = false;
+                session->audio_thread_.callback_ = [&](float* out, uint32_t frames, int64_t start, int64_t playback) {
+                    session->audio_callback(out, frames, start, playback);
+                };
+                std::vector<float> output(buffer_ms * 48 * 2);
+                const auto callback = [&](int ms) {
+                    session->audio_thread_.invoke_callback(output.data(), buffer_ms * 48,
+                        ms * 48, ms * 48, epoch + ms * 1'000'000LL);
+                };
+                const int head_ms = 1000 - offset_ms;
+                const int release_ms = 1991 - offset_ms;
+                REQUIRE(session->input_thread_.queue().push({32, input::InputState::Pressed, epoch + head_ms * 1'000'000LL}));
+                callback(head_ms);
+                int next = head_ms + buffer_ms;
+                for (; next < release_ms; next += buffer_ms) callback(next);
+                REQUIRE(session->input_thread_.queue().push({32, input::InputState::Released, epoch + release_ms * 1'000'000LL}));
+                callback(next);
+                REQUIRE(session->engine_->replay().events.size() == 2);
+                CHECK(session->engine_->replay().events[1].sample == 95568);
+                CHECK(session->engine_->stats().counts.pg == 1);
+                CHECK(session->engine_->stats().counts.gr == 1);
+                CHECK(session->engine_->live_feedback().delta_ms == doctest::Approx(-9.0));
+                CHECK(session->hud_snapshot().current_sample == next * 48);
+            }
+        }
+    }
+
+    static void check_r5_shared_clock_wobble_and_rebase() {
+        constexpr int64_t epoch = 1'000'000'000LL;
+        auto session = shift_lane_fixture(32, false);
+        session->chart_.notes = {{1, 480000, std::nullopt}};
+        session->chart_.duration_samples = 960000;
+        gameplay::GameplayConfig config;
+        config.practice_no_fail_enabled = true;
+        session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+        session->audio_timing_diagnostics_logged_ = true;
+        session->config_.audio_ui.mute_when_inactive = false;
+        session->audio_thread_.callback_ = [&](float* out, uint32_t frames, int64_t start, int64_t playback) {
+            session->audio_callback(out, frames, start, playback);
+        };
+        std::vector<float> output(4800 * 2);
+        int64_t previous = 0;
+        bool saw_filtered_difference = false;
+        bool saw_continuity_clamp = false;
+        for (int i = 1; i <= 100; ++i) {
+            // Small accepted wobble, then a 50 ms persistent wall-clock gap.
+            // Device samples remain strictly increasing; a wide synthetic write
+            // buffer keeps the unrelated future-input guard out of this test.
+            const int64_t qpc = epoch + (i * 10 + (i >= 70 ? 50 : 0)) * 1'000'000LL;
+            const int64_t raw = i * 480 + (i < 60 ? (i % 2 ? 2 : -2) : 0);
+            REQUIRE(session->input_thread_.queue().push({32,
+                i % 2 ? input::InputState::Pressed : input::InputState::Released, qpc}));
+            session->audio_thread_.invoke_callback(output.data(), 4800, raw, raw, qpc);
+            const auto hud = session->hud_snapshot();
+            REQUIRE(session->engine_->replay().events.size() == static_cast<std::size_t>(i));
+            CHECK(session->engine_->replay().events.back().sample == hud.current_sample);
+            CHECK(hud.audio_sample_time_ns == qpc);
+            CHECK(hud.current_sample >= previous);
+            saw_filtered_difference |= hud.current_sample != raw;
+            saw_continuity_clamp |= session->shared_input_clock_.rate() < 1.0;
+            previous = hud.current_sample;
+        }
+        CHECK(saw_filtered_difference);
+        CHECK(saw_continuity_clamp);
+        session->paused_ = true;
+        session->audio_thread_.invoke_callback(output.data(), 4800, 48480, 48480, epoch + 1'060'000'000LL);
+        const int64_t frozen = session->hud_snapshot().current_sample;
+        session->audio_thread_.invoke_callback(output.data(), 4800, 48960, 48960, epoch + 1'070'000'000LL);
+        CHECK(session->hud_snapshot().current_sample == frozen);
+        CHECK(frozen >= previous);
+
+        timing::ClockSync clock;
+        clock.add_sample(epoch, 0);
+        clock.add_sample(epoch + 1'000'000'000LL, 48000);
+        CHECK(clock.estimate_audio_samples(epoch + 2'000'000'000LL).value() == 96000);
+        CHECK(clock.input_to_audio_samples(epoch + 500'000'000LL).value() == 24000);
+    }
+
+    static void check_r5_continuous_clock_bounds() {
+        constexpr int rate = 48000;
+        constexpr int64_t epoch = 1'000'000'000LL;
+        for (const double drift : {-0.001, 0.0, 0.001}) {
+            for (const int wobble_ms : {0, 2, 5, 10}) {
+                GameplayInputClock clock;
+                int64_t previous_frame = 0;
+                int64_t last_anchor_sample = 0;
+                int64_t last_anchor_ns = epoch;
+                double last_rate = 1.0;
+                double max_phase_ms = 0.0;
+                double final_phase_ms = 0.0;
+                int recovered_ms = -1;
+                for (int tick = 0; tick <= 600; ++tick) {
+                    const int64_t elapsed_ms = tick * 20 + (tick >= 50 ? 50 : 0);
+                    const int64_t qpc = epoch + elapsed_ms * 1'000'000LL;
+                    // Wobble stops before the clock step so recovery has a
+                    // stable target, including +/-1000 ppm source-rate drift.
+                    const int delay = tick < 40 && tick % 2 ? wobble_ms : 0;
+                    const int64_t raw = static_cast<int64_t>(std::llround(
+                        (tick * 20 - delay) * 48.0 * (1.0 + drift)));
+                    if (tick > 0) {
+                        const int64_t before_qpc = qpc - 1'000'000LL;
+                        const int64_t displayed = last_anchor_sample + static_cast<int64_t>(std::llround(
+                            (before_qpc - last_anchor_ns) * (rate * last_rate / 1'000'000'000.0)));
+                        const int64_t mapped = clock.sample_at(before_qpc).value();
+                        CHECK(std::abs(displayed - mapped) <= 1);
+                        CHECK(displayed >= previous_frame);
+                        previous_frame = displayed;
+                    }
+                    const int64_t anchor = clock.observe(qpc, raw, rate);
+                    CHECK(anchor >= previous_frame);
+                    CHECK(clock.sample_at(qpc).value() == anchor);
+                    CHECK(clock.rate() >= 0.98);
+                    CHECK(clock.rate() <= 1.02);
+                    last_anchor_sample = anchor;
+                    last_anchor_ns = qpc;
+                    last_rate = clock.rate();
+                    previous_frame = anchor;
+                    final_phase_ms = std::abs(anchor - raw) / 48.0;
+                    max_phase_ms = (std::max)(max_phase_ms, final_phase_ms);
+                    if (tick >= 50 && recovered_ms < 0 && final_phase_ms <= 1.0)
+                        recovered_ms = (tick - 50) * 20;
+                }
+                CHECK(recovered_ms >= 0);
+                CHECK(recovered_ms <= 6000);
+                CHECK(final_phase_ms <= 1.0);
+                std::cout << "[R5-continuous-clock] drift_ppm=" << drift * 1'000'000.0
+                          << " wobble_ms=" << wobble_ms << " max_phase_ms=" << max_phase_ms
+                          << " recovered_ms=" << recovered_ms << " final_phase_ms=" << final_phase_ms << '\n';
+                clock.reset(last_anchor_sample);
+                CHECK(clock.observe(last_anchor_ns + 3'000'000'000LL, last_anchor_sample, rate) == last_anchor_sample);
+                CHECK(clock.sample_at(last_anchor_ns + 3'010'000'000LL).value() == last_anchor_sample + 480);
+            }
+        }
+        // Exercise the actual ring overwrite, including a fresh queued event
+        // from 300 ms ago at a callback rate of 4 kHz.
+        GameplayInputClock wrapped;
+        for (int64_t i = 0; i <= 5000; ++i) {
+            CHECK(wrapped.observe(epoch + i * 250'000, i * 12, rate) == i * 12);
+            if (i >= 1200) CHECK(wrapped.sample_at(epoch + (i - 1200) * 250'000).value() == (i - 1200) * 12);
+        }
+        const int64_t last_time = epoch + 5000 * 250'000LL;
+        CHECK(wrapped.observe(last_time, -1000, rate) == 60000);
+        CHECK(wrapped.observe(last_time - 250'000, -1000, rate) == 60000);
+        CHECK(wrapped.sample_at(last_time + 250'000).value() == 60012);
+        CHECK(wrapped.observe(last_time + 250'000, 60012, rate) == 60012);
+    }
+
+    static void check_r5_scheduled_audio_and_historical_frontier() {
+        for (const int mode : {0, 1, 2, 3}) {
+            auto session = shift_lane_fixture(32, false);
+            session->chart_.notes = {{1, 48000, 96000}, {1, 144000, std::nullopt}};
+            session->chart_.duration_samples = 192000;
+            session->chart_.notes[0].audio_asset_id = 0;
+            session->chart_.notes[1].note_id = 1;
+            session->chart_audio_assets_.resize(1);
+            session->chart_audio_assets_[0].clip.samples = std::make_shared<const std::vector<float>>(1920, 0.25f);
+            session->audio_timing_diagnostics_logged_ = true;
+            session->config_.audio_ui.mute_when_inactive = false;
+            session->config_.audio_ui.normalize_audio = false;
+            session->replay_playback_enabled_ = mode >= 2;
+            session->autoplay_enabled_ = mode == 0;
+            session->auto_scratch_enabled_ = mode == 1;
+            if (mode == 1) {
+                session->chart_format_ = ChartFormat::Bms;
+                session->chart_.scratch_lanes = {1};
+            }
+            session->chronological_judgement_ = mode != 3;
+            session->replay_source_.ruleset_id = std::string(mode == 3 ? kRuleset4ReplayRulesetId : kCanonicalReplayRulesetId);
+            session->replay_source_.trace.sample_rate = 48000;
+            session->replay_source_.trace.events = {{1, input::InputState::Pressed, 48000}, {1, input::InputState::Released, 96000}};
+            gameplay::GameplayConfig config;
+            config.practice_no_fail_enabled = true;
+            config.chronological_judgement = session->chronological_judgement_;
+            session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+            session->build_autoplay_events();
+            session->prepare_scheduled_input_audio(config);
+            session->audio_thread_.callback_ = [&](float* out, uint32_t frames, int64_t start, int64_t playback) {
+                session->audio_callback(out, frames, start, playback);
+            };
+            std::vector<float> output(1920 * 2);
+            session->audio_thread_.invoke_callback(output.data(), 1920, 47520, 46080, 1'960'000'000LL);
+            CHECK(session->engine_->stats().counts.pg == (mode == 3 ? 1 : 0));
+            CHECK(std::all_of(output.begin(), output.begin() + 480 * 2, [](float value) { return value == 0.0f; }));
+            CHECK(std::any_of(output.begin() + 480 * 2, output.end(), [](float value) { return value != 0.0f; }));
+            session->audio_thread_.invoke_callback(output.data(), 1920, 49440, 48000, 2'000'000'000LL);
+            CHECK(session->engine_->stats().counts.pg == 1);
+            CHECK(std::all_of(output.begin(), output.end(), [](float value) { return value == 0.0f; }));
+        }
+    }
+
     static void check_callback_timestamp_pair_delays() {
         constexpr int64_t playback_sample = 48000;
         constexpr uint32_t frames = 480;
@@ -210,7 +596,11 @@ struct GameSessionAudioTestAccess {
                 {32, input::InputState::Pressed, event_time_ns}));
             std::vector<float> audio(callback_frames * 2);
             const int64_t buffer_start = note_sample + phases[i];
-            session->audio_callback(audio.data(), callback_frames, buffer_start, buffer_start);
+            session->audio_thread_.callback_ = [&](float* out, uint32_t frames, int64_t start, int64_t playback) {
+                session->audio_callback(out, frames, start, playback);
+            };
+            session->audio_thread_.invoke_callback(audio.data(), callback_frames, buffer_start, buffer_start,
+                event_time_ns + phases[i] * 1'000'000'000LL / sample_rate);
             REQUIRE(session->engine_->replay().events.size() == 1);
             recorded_samples[i] = session->engine_->replay().events.front().sample;
             REQUIRE(session->engine_->live_feedback().has_value);
@@ -309,7 +699,7 @@ struct GameSessionAudioTestAccess {
     static void check_input_offset_recorded_audio_unchanged() {
         constexpr int64_t recorded_sample = 48144;
         for (const auto ruleset : {kLegacyReplayRulesetId, kPreviousReplayRulesetId,
-                                   kRuleset3ReplayRulesetId, kCanonicalReplayRulesetId}) {
+                                   kRuleset3ReplayRulesetId, kRuleset4ReplayRulesetId, kCanonicalReplayRulesetId}) {
             auto session = shift_lane_fixture(32);
             session->input_offset_samples_ = 9600;
             session->synthetic_tones_enabled_ = true;
@@ -737,6 +1127,9 @@ struct GameSessionAudioTestAccess {
 
     static void check_hud_hold_survivor_lifecycle() {
         auto session = pause_hud_fixture();
+        // This scan test deliberately seeks the historical raw playback head;
+        // R5 clock continuity is tested separately rather than bypassed here.
+        session->chronological_judgement_ = false;
         session->audio_timing_diagnostics_logged_ = true;
         std::vector<float> audio(960);
         const auto snapshot_at = [&](int64_t playback) {
@@ -925,13 +1318,17 @@ struct GameSessionAudioTestAccess {
         session->synthetic_tones_enabled_ = false;
         session->config_.audio_ui.mute_when_inactive = false;
         std::atomic<bool> begin{false}, observed{false}, done{false};
+        session->audio_thread_.callback_ = [&](float* out, uint32_t frames, int64_t write, int64_t playback) {
+            session->audio_callback(out, frames, write, playback);
+        };
         std::thread producer([&] {
             std::vector<float> output(1920);
             while (!begin.load(std::memory_order_acquire)) std::this_thread::yield();
             for (int64_t iteration = 1; iteration <= 500; ++iteration) {
                 const uint32_t frames = iteration % 2 == 0 ? 480 : 960;
                 const int64_t playback = iteration * 4800;
-                session->audio_callback(output.data(), frames, playback + 2400, playback);
+                session->audio_thread_.invoke_callback(output.data(), frames, playback + 2400, playback,
+                    1'000'000'000LL + iteration * 100'000'000LL);
                 if (iteration == 1)
                     while (!observed.load(std::memory_order_acquire)) std::this_thread::yield();
                 if (iteration % 16 == 0) std::this_thread::yield();
@@ -940,18 +1337,23 @@ struct GameSessionAudioTestAccess {
         });
         begin.store(true, std::memory_order_release);
         std::size_t published_snapshots = 0;
+        std::size_t mismatches = 0;
         do {
             const auto hud = session->hud_snapshot();
             if (hud.current_sample > 0) {
                 ++published_snapshots;
                 observed.store(true, std::memory_order_release);
-                CHECK(hud.current_sample % 4800 == 0);
+                mismatches += hud.current_sample % 4800 != 0;
                 const auto iteration = hud.current_sample / 4800;
-                CHECK(hud.audio_buffer_frames == (iteration % 2 == 0 ? 480u : 960u));
-                CHECK(hud.audio_sample_time_ns > 0);
+                mismatches += hud.audio_buffer_frames != (iteration % 2 == 0 ? 480u : 960u);
+                mismatches += hud.audio_sample_time_ns != 1'000'000'000LL + iteration * 100'000'000LL;
+                mismatches += std::abs(hud.audio_clock_rate - 1.0) > 0.000001;
             }
         } while (!done.load(std::memory_order_acquire));
         producer.join();
+        // The local CHECK shim throws; join before reporting a failed snapshot
+        // so a test failure cannot terminate the process via std::thread.
+        CHECK(mismatches == 0);
         const auto final = session->hud_snapshot();
         CHECK(final.current_sample == 500 * 4800);
         CHECK(final.audio_buffer_frames == 480);
@@ -1164,12 +1566,16 @@ struct GameSessionAudioTestAccess {
         session->synthetic_tones_enabled_ = false;
         session->config_.audio_ui.mute_when_inactive = false;
         struct Buffer { int64_t write; int64_t playback; uint32_t frames; };
+        session->audio_thread_.callback_ = [&](float* out, uint32_t frames, int64_t write, int64_t playback) {
+            session->audio_callback(out, frames, write, playback);
+        };
         // Increasing padding resembles extra queued audio under a screen-share
         // workload. Neither its size nor the writable buffer may lead visuals.
         for (const Buffer buffer : {Buffer{4800, 2400, 480}, Buffer{24000, 3000, 960},
                                     Buffer{24960, 4800, 1440}}) {
             std::vector<float> output(buffer.frames * 2);
-            session->audio_callback(output.data(), buffer.frames, buffer.write, buffer.playback);
+            session->audio_thread_.invoke_callback(output.data(), buffer.frames, buffer.write, buffer.playback,
+                1'000'000'000LL + static_cast<int64_t>(std::llround(buffer.playback * 1'000'000'000.0 / sample_rate)));
             const auto hud = session->hud_snapshot();
             REQUIRE(hud.active);
             CHECK(hud.current_sample == buffer.playback);
@@ -1665,7 +2071,7 @@ struct GameSessionAudioTestAccess {
 
     static void check_automatic_result(bool delayed_bgm, bool manual_skip, bool silent,
                                        bool failed_audio = false, bool skip_outro = false, bool pacemaker = false,
-                                       bool auto_scratch = false) {
+                                       bool auto_scratch = false, bool stale_catchup = false) {
         auto session = std::make_unique<GameSession>();
         session->sample_rate_ = 48000;
         session->chart_.lane_count = 4;
@@ -1708,9 +2114,24 @@ struct GameSessionAudioTestAccess {
                                                     GameSession::ChartAudioEvent::Kind::Bgm});
         }
         const int64_t hit_sample = pacemaker ? 13200 : 12000; // GR deliberately misses a 10000 target
+        if (stale_catchup) {
+            session->startup_input_timing_anchor_ = {0, 2'000'000'000LL, true};
+            input::InputEvent stale{};
+            stale.keycode = 32;
+            stale.state = input::InputState::Pressed;
+            stale.input_time_ns = 1'000'000'000LL;
+            REQUIRE(session->input_thread_.queue().push(stale));
+            session->process_input_queue(0, 480, 0);
+            CHECK(session->stale_input_catchup_used_);
+            session->lane_binding_state_.reset();
+            session->catch_up_lane_input(1, input::InputState::Released, 0);
+        }
         session->dispatch_lane_input(1, input::InputState::Pressed, hit_sample, hit_sample);
         session->dispatch_lane_input(1, input::InputState::Released, hit_sample + 1, hit_sample);
         std::vector<float> audio(960);
+        session->audio_thread_.callback_ = [&](float* out, uint32_t frames, int64_t write, int64_t playback) {
+            session->audio_callback(out, frames, write, playback);
+        };
         const int64_t expected_end = (skip_outro || silent || failed_audio) ? 17280 : delayed_bgm ? 96000 : 48000;
         // Model two queued device buffers. No input is injected after the last
         // note unless this is the explicit skip compatibility case.
@@ -1721,7 +2142,8 @@ struct GameSessionAudioTestAccess {
                 skip.state = input::InputState::Pressed;
                 REQUIRE(session->input_thread_.queue().push(skip));
             }
-            session->audio_callback(audio.data(), 480, sample, sample - 960);
+            session->audio_thread_.invoke_callback(audio.data(), 480, sample, sample - 960,
+                3'000'000'000LL + (sample - 960) * 1'000'000'000LL / 48000);
             if (manual_skip && sample >= 14400) break;
             if (sample - 960 < expected_end) CHECK_FALSE(session->finished_.load());
         }
@@ -1729,7 +2151,22 @@ struct GameSessionAudioTestAccess {
         CHECK_FALSE(session->user_aborted_.load());
         CHECK(session->engine_->stats().counts.pg == (pacemaker ? 0 : 1));
         CHECK(session->engine_->stats().counts.gr == (pacemaker ? 1 : 0));
-        CHECK(session->engine_->replay().events.size() == 2);
+        const auto recorded_events = session->engine_->replay().events;
+        // R5 advances through the final tap before handling release at hit+1;
+        // the finished engine does not record that later, scoreless release.
+        // Actual stale state transitions remain in the custom replay trace.
+        REQUIRE(recorded_events.size() == (stale_catchup ? 3u : 1u));
+        if (stale_catchup) {
+            CHECK(recorded_events[0].lane == 1);
+            CHECK(recorded_events[0].state == input::InputState::Pressed);
+            CHECK(recorded_events[0].sample == 0);
+            CHECK(recorded_events[1].lane == 1);
+            CHECK(recorded_events[1].state == input::InputState::Released);
+            CHECK(recorded_events[1].sample == 0);
+        }
+        CHECK(recorded_events.back().lane == 1);
+        CHECK(recorded_events.back().state == input::InputState::Pressed);
+        CHECK(recorded_events.back().sample == hit_sample);
 
         CompletionTestDirectory directory;
         const auto chart_path = directory.path / "fixture.bms";
@@ -1749,14 +2186,31 @@ struct GameSessionAudioTestAccess {
         REQUIRE(result.replay_sha256.size() == 64);
         const auto replay = gameplay::load_replay_json(result.replay_path);
         REQUIRE(replay.success());
+        REQUIRE(replay.replay->trace.events.size() == recorded_events.size());
+        for (std::size_t i = 0; i < recorded_events.size(); ++i) {
+            CHECK(replay.replay->trace.events[i].lane == recorded_events[i].lane);
+            CHECK(replay.replay->trace.events[i].state == recorded_events[i].state);
+            CHECK(replay.replay->trace.events[i].sample == recorded_events[i].sample);
+        }
         std::string payload, error;
         const bool accepted = build_sites_score_json(*replay.replay, result.replay_sha256,
                                     "Completion fixture", result.clear_status, payload, error);
-        CHECK(accepted == !auto_scratch);
-        CHECK(payload.empty() == auto_scratch);
-        CHECK(error.empty() == !auto_scratch);
+        CHECK(accepted == !(auto_scratch || stale_catchup));
+        CHECK(payload.empty() == (auto_scratch || stale_catchup));
+        CHECK(error.empty() == !(auto_scratch || stale_catchup));
+        if (stale_catchup) {
+            CHECK(replay.replay->ruleset_id == "custom-ruleset-5");
+            CHECK_FALSE(is_supported_canonical_replay_ruleset(replay.replay->ruleset_id));
+            CHECK_FALSE(result.pause_used);
+            CHECK(std::any_of(result.export_warnings.begin(), result.export_warnings.end(),
+                [](const std::string& warning) { return warning.find("stale input state catch-up") != std::string::npos; }));
+            std::ifstream saved_result(std::filesystem::u8path(result.result_path));
+            REQUIRE(saved_result.is_open());
+            const std::string saved((std::istreambuf_iterator<char>(saved_result)), std::istreambuf_iterator<char>());
+            CHECK(saved.find("custom-ruleset-5") != std::string::npos);
+        }
         if (auto_scratch) {
-            CHECK(replay.replay->ruleset_id == "custom");
+            CHECK(replay.replay->ruleset_id == "custom-ruleset-5");
             CHECK(result.final_score == 0);
             CHECK(replay.replay->final_score == 0);
             CHECK(result.clear_status.find("ASSIST AUTO SCRATCH") == 0);
@@ -1767,7 +2221,7 @@ struct GameSessionAudioTestAccess {
             CHECK(result.clear_status.find("PACEMAKER") == std::string::npos);
             CHECK_FALSE(replay.replay->mode.practice_no_fail_enabled);
         }
-        CHECK(result.export_warnings.empty());
+        CHECK(result.export_warnings.empty() == !stale_catchup);
     }
     static std::unique_ptr<GameSession> pause_fixture() {
         auto session = std::make_unique<GameSession>();
@@ -1803,7 +2257,7 @@ struct GameSessionAudioTestAccess {
 
     static void paused_buffer(GameSession& session, int64_t sample, int count) {
         std::vector<float> audio(960, 1.0f);
-        session.audio_callback(audio.data(), 480, sample, sample);
+        callback_with_sample_clock(session, audio.data(), 480, sample, sample);
         CHECK(std::all_of(audio.begin(), audio.end(), [](float x) { return x == 0.0f; }));
         CHECK(session.last_audio_sample_.load() == 48000);
         CHECK(session.resume_countdown_value_.load() == count);
@@ -1916,7 +2370,7 @@ struct GameSessionAudioTestAccess {
         CHECK_FALSE(session->paused_.load());
         CHECK_FALSE(session->hud_snapshot().countdown_active);
         std::vector<float> audio(960, 0.0f);
-        session->audio_callback(audio.data(), 480, 192960, 192960);
+        callback_with_sample_clock(*session, audio.data(), 480, 192960, 192960);
         CHECK(session->last_audio_sample_.load() == 48480);
         CHECK(std::any_of(audio.begin(), audio.end(), [](float x) { return x != 0.0f; }));
         CHECK(session->engine_->stats().raw_score == 0);
@@ -1971,7 +2425,7 @@ struct GameSessionAudioTestAccess {
     static void check_pause_resume_hud_playback_anchor(bool pause_in_audio_queue) {
         auto session = pause_hud_fixture();
         std::vector<float> audio(960);
-        session->audio_callback(audio.data(), 480, 47520, 35520);
+        callback_with_sample_clock(*session, audio.data(), 480, 47520, 35520);
         const auto before = session->hud_snapshot();
         REQUIRE(before.current_sample == 35520);
         REQUIRE(hud_contains_note(before, 37500));
@@ -1984,7 +2438,7 @@ struct GameSessionAudioTestAccess {
         } else {
             control(*session, 27);
         }
-        session->audio_callback(audio.data(), 480, 48000, 36000);
+        callback_with_sample_clock(*session, audio.data(), 480, 48000, 36000);
         const auto paused = session->hud_snapshot();
         CHECK(paused.paused);
         CHECK(paused.current_sample == 36000);
@@ -1994,14 +2448,14 @@ struct GameSessionAudioTestAccess {
 
         control(*session, 13);
         for (const int64_t write : {48480LL, 96480LL, 144480LL, 192480LL}) {
-            session->audio_callback(audio.data(), 480, write, write - 12000);
+            callback_with_sample_clock(*session, audio.data(), 480, write, write - 12000);
             const auto countdown = session->hud_snapshot();
             CHECK(countdown.current_sample == 36000);
             CHECK(hud_contains_note(countdown, 37500));
             CHECK(hud_contains_note(countdown, 37500, true));
         }
         REQUIRE_FALSE(session->paused_.load());
-        session->audio_callback(audio.data(), 480, 192960, 180960);
+        callback_with_sample_clock(*session, audio.data(), 480, 192960, 180960);
         const auto resumed = session->hud_snapshot();
         CHECK_FALSE(resumed.paused);
         CHECK(resumed.current_sample == 36000);
@@ -2014,6 +2468,9 @@ struct GameSessionAudioTestAccess {
 
     static void check_hud_note_scan_after_playback_rewind() {
         auto session = pause_hud_fixture();
+        // Historical replay playback retains raw device rewinds. R5 instead
+        // follows device phase changes continuously without instant rewinds.
+        session->chronological_judgement_ = false;
         std::vector<float> audio(960);
         session->audio_callback(audio.data(), 480, 96000, 96000);
         const auto ahead = session->hud_snapshot();
@@ -2296,6 +2753,42 @@ TEST_CASE("audio preparation preserves replay chart duration and publishes termi
 
 TEST_CASE("reduced keysounds match complete source PCM through real decode scheduling gain and rate mixing") {
     tenriff::app::GameSessionAudioTestAccess::check_reduced_keysound_pcm_render();
+}
+
+TEST_CASE("timing audit LN release grade is independent of callback padding and buffer size") {
+    tenriff::app::GameSessionAudioTestAccess::check_timing_audit_ln_release_against_playback_head(1973);
+}
+
+TEST_CASE("timing audit held-through LN completion stays PG across callback padding and buffer size") {
+    tenriff::app::GameSessionAudioTestAccess::check_timing_audit_ln_release_against_playback_head(2030);
+}
+
+TEST_CASE("timing audit held-through LN completion stays PG when the release callback is delayed") {
+    tenriff::app::GameSessionAudioTestAccess::check_timing_audit_ln_release_against_playback_head(2030, true);
+}
+
+TEST_CASE("timing audit LN early release preserves rank and delta at observed shared buffer scale") {
+    tenriff::app::GameSessionAudioTestAccess::check_timing_audit_ln_release_at_observed_buffer_scale();
+}
+
+TEST_CASE("R5 calibrated live LN horizon preserves early release across positive and negative offsets") {
+    tenriff::app::GameSessionAudioTestAccess::check_r5_calibrated_ln_horizon();
+}
+
+TEST_CASE("R5 input and HUD share a monotonic filtered clock through wobble rebase and pause") {
+    tenriff::app::GameSessionAudioTestAccess::check_r5_shared_clock_wobble_and_rebase();
+}
+
+TEST_CASE("R5 continuous clock preserves interframe monotonicity and bounded recovery from phase and rate drift") {
+    tenriff::app::GameSessionAudioTestAccess::check_r5_continuous_clock_bounds();
+}
+
+TEST_CASE("R5 stale input catch-up exports an unranked custom replay without mislabeling pause") {
+    tenriff::app::GameSessionAudioTestAccess::check_automatic_result(false, false, true, false, false, false, false, true);
+}
+
+TEST_CASE("R5 scheduled replay autoplay scratch audio keeps write timing while legacy judgement stays historical") {
+    tenriff::app::GameSessionAudioTestAccess::check_r5_scheduled_audio_and_historical_frontier();
 }
 
 TEST_CASE("duplicate keysounds render once through live autoplay replay BGM and long note production paths") {

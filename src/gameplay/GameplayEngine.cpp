@@ -15,6 +15,19 @@ double clamp_rate(double rate) {
     return rate;
 }
 
+// A strict window is due at boundary + 1. An unrepresentable deadline is
+// never due; saturating to INT64_MAX would repeatedly select an unconsumable event.
+std::optional<int64_t> strict_deadline(int64_t sample, int64_t window) {
+    constexpr auto maximum = (std::numeric_limits<int64_t>::max)();
+    constexpr auto minimum = (std::numeric_limits<int64_t>::min)();
+    if ((window > 0 && sample > maximum - window) ||
+        (window < 0 && sample < minimum - window)) {
+        return std::nullopt;
+    }
+    const int64_t boundary = sample + window;
+    return boundary == maximum ? std::nullopt : std::optional<int64_t>{boundary + 1};
+}
+
 constexpr std::array<game::GaugeType, 4> kGaugeShiftPriority{
     game::GaugeType::ExHard,
     game::GaugeType::Hard,
@@ -35,7 +48,8 @@ GameplayEngine::GameplayEngine(const GameplayChart& chart, const GameplayConfig&
       gauge_shift_enabled_(config.gauge_shift_enabled && !config.gauge_policy.course_lr2_deltas),
       practice_no_fail_enabled_(config.practice_no_fail_enabled),
       one_miss_fail_enabled_(config.one_miss_fail_enabled),
-      legacy_hold_release_(config.legacy_hold_release) {
+      legacy_hold_release_(config.legacy_hold_release),
+      chronological_judgement_(config.chronological_judgement) {
     if (config.gauge_policy.course_lr2_deltas) {
         windows_.indirect_miss_enabled = true;
     }
@@ -117,6 +131,13 @@ std::optional<NoteEvent> GameplayEngine::handle_input(int lane, input::InputStat
     if (!replay_.events.empty()) {
         input_sample = std::max(input_sample, replay_.events.back().sample);
     }
+    if (chronological_judgement_ && input_sample > (std::numeric_limits<int64_t>::min)()) {
+        // Inputs at t precede automatic events at t. Callers must deliver every
+        // input in a same-sample group before advance(t); an explicit advance
+        // is a committed frontier and cannot be undone by a later stale input.
+        advance_chronological(input_sample - 1);
+        if (finished_ || game_over_) return std::nullopt;
+    }
     replay_.events.push_back(ReplayEvent{lane, state, input_sample});
 
     auto& lane_state = lanes_[static_cast<std::size_t>(lane - 1)];
@@ -156,6 +177,15 @@ void GameplayEngine::sync_input_state(int lane, input::InputState state, int64_t
         return;
     }
 
+    if (chronological_judgement_) {
+        if (!replay_.events.empty()) {
+            input_sample = std::max(input_sample, replay_.events.back().sample);
+        }
+        if (input_sample > (std::numeric_limits<int64_t>::min)()) {
+            advance_chronological(input_sample - 1);
+            if (finished_ || game_over_) return;
+        }
+    }
     auto& lane_state = lanes_[static_cast<std::size_t>(lane - 1)];
     // Startup/pause polling reports physical state even when it did not change.
     // Replays start released and must contain transitions, not redundant key-up baselines.
@@ -170,6 +200,10 @@ void GameplayEngine::sync_input_state(int lane, input::InputState state, int64_t
 
 void GameplayEngine::advance(int64_t current_sample) {
     if (finished_ || game_over_) {
+        return;
+    }
+    if (chronological_judgement_) {
+        advance_chronological(current_sample);
         return;
     }
 
@@ -189,6 +223,64 @@ void GameplayEngine::advance(int64_t current_sample) {
         }
     }
 
+    finalize_if_done(current_sample);
+}
+
+void GameplayEngine::advance_chronological(int64_t current_sample) {
+    enum class AutomaticKind { Mine, Miss, Hold };
+    struct AutomaticEvent {
+        int64_t sample;
+        std::size_t lane;
+        AutomaticKind kind;
+    };
+
+    // Only the next event of each kind/lane can be due. This bounded lane scan
+    // uses no allocation or per-sample iteration, even after a long callback gap.
+    // Equal automatic deadlines retain lane order, then mine -> miss -> hold.
+    while (!game_over_) {
+        std::optional<AutomaticEvent> next;
+        const auto consider = [&](int64_t sample, std::size_t lane, AutomaticKind kind) {
+            if (sample <= current_sample && (!next || sample < next->sample)) {
+                next = AutomaticEvent{sample, lane, kind};
+            }
+        };
+        for (std::size_t i = 0; i < lanes_.size(); ++i) {
+            const auto& lane = lanes_[i];
+            if (lane.next_mine_index < lane.mines.size()) {
+                consider(lane.mines[lane.next_mine_index].sample, i, AutomaticKind::Mine);
+            }
+            if (lane.next_index < lane.notes.size()) {
+                const auto deadline = strict_deadline(
+                    lane.notes[lane.next_index].start_sample, windows_.indirect_miss);
+                if (deadline) consider(*deadline, i, AutomaticKind::Miss);
+            }
+            if (lane.hold) {
+                const auto& hold = *lane.hold;
+                if (hold.release_active) {
+                    consider(hold.release_required || !legacy_hold_release_
+                                 ? hold.release_sample : hold.end_sample, i, AutomaticKind::Hold);
+                } else if (hold.release_required) {
+                    const auto deadline = strict_deadline(hold.end_sample, windows_.hold_break);
+                    if (deadline) consider(*deadline, i, AutomaticKind::Hold);
+                } else {
+                    consider(hold.end_sample, i, AutomaticKind::Hold);
+                }
+            }
+        }
+        if (!next) break;
+        auto& lane = lanes_[next->lane];
+        switch (next->kind) {
+        case AutomaticKind::Mine:
+            process_mines_until(lane, static_cast<int>(next->lane) + 1, next->sample);
+            break;
+        case AutomaticKind::Miss:
+            update_miss(lane, next->sample);
+            break;
+        case AutomaticKind::Hold:
+            update_hold(lane, next->sample);
+            break;
+        }
+    }
     finalize_if_done(current_sample);
 }
 

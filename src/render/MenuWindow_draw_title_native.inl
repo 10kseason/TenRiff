@@ -66,54 +66,25 @@
             const auto rounded = D2D1::RoundedRect(rect, 14, 14);
             register_hit(rect, MenuHitTargetKind::TitleButton, static_cast<int>(index));
             draw_glass_panel(rect, 14, 0.95f, 0, button.selected, 0);
-            const bool colored = index == 0 || index == 1 || index == 3;
-            const auto color = primary ? native_palette("title.primary", D2D1::ColorF(0x79D8FA))
-                : index == 1 ? native_palette("title.multiplayer", D2D1::ColorF(0xF06B7B))
-                             : native_palette("title.exit", D2D1::ColorF(0xF2F4F7));
-            if (colored && d2d_->card_brush) {
+            if (primary && d2d_->card_brush) {
                 const auto saved = d2d_->card_brush->GetColor();
-                const auto saved_opacity = d2d_->card_brush->GetOpacity();
-                d2d_->card_brush->SetColor(color);
-                d2d_->card_brush->SetOpacity(1.0f);
+                d2d_->card_brush->SetColor(native_palette("title.primary", D2D1::ColorF(0x111111)));
                 ctx->FillRoundedRectangle(rounded, d2d_->card_brush.Get());
                 d2d_->card_brush->SetColor(saved);
-                d2d_->card_brush->SetOpacity(saved_opacity);
-                // One cached, low-opacity bloom per action; no per-frame blur.
-                const uint32_t card_rgb = (static_cast<uint32_t>(color.r * 255.0f) << 16) |
-                    (static_cast<uint32_t>(color.g * 255.0f) << 8) | static_cast<uint32_t>(color.b * 255.0f);
-                draw_panel_glow(rect, 14, card_rgb, 2 + index, 0.45f);
             } else if (button.selected && d2d_->button_selected_brush) {
                 ctx->FillRoundedRectangle(rounded, d2d_->button_selected_brush.Get());
             }
             if (button.selected) {
-                ctx->DrawRoundedRectangle(rounded,
-                    colored ? d2d_->text_brush.Get() : d2d_->accent_brush.Get(), colored ? 2.5f : 2.0f);
-                // Inset dark focus stays visible even on the white Exit card.
-                if (colored) ctx->DrawRoundedRectangle(D2D1::RoundedRect(
-                    D2D1::RectF(rect.left + 4, rect.top + 4, rect.right - 4, rect.bottom - 4), 11, 11),
-                    native_color(0x18212B, 0.9f), 1.5f);
+                ID2D1Brush* focus = primary ? static_cast<ID2D1Brush*>(d2d_->text_brush.Get())
+                                           : static_cast<ID2D1Brush*>(d2d_->accent_brush.Get());
+                if (focus) ctx->DrawRoundedRectangle(rounded, focus, 2.0f);
             }
             draw_native_focus(rect, 14, index, static_cast<int>(index), button.selected, primary);
             const auto saved_text = d2d_->text_brush->GetColor();
             const auto saved_muted = d2d_->muted_brush->GetColor();
-            if (colored) {
-                // Existing skins can retain a dark Play card with light text.
-                // New cards must not inherit that old Play-only text override.
-                const bool light = 0.2126f * color.r + 0.7152f * color.g + 0.0722f * color.b > 0.5f;
-                auto text = primary ? native_palette("title.primary_text", D2D1::ColorF(0x111820))
-                    : index == 1 ? native_palette("title.multiplayer_text", D2D1::ColorF(0x111820))
-                                 : native_palette("title.exit_text", D2D1::ColorF(0x111820));
-                auto detail = primary ? native_palette("title.primary_detail", D2D1::ColorF(0x263340))
-                    : index == 1 ? native_palette("title.multiplayer_detail", D2D1::ColorF(0x263340))
-                                 : native_palette("title.exit_detail", D2D1::ColorF(0x263340));
-                const char* text_key = primary ? "title.primary_text" : index == 1 ? "title.multiplayer_text" : "title.exit_text";
-                const char* detail_key = primary ? "title.primary_detail" : index == 1 ? "title.multiplayer_detail" : "title.exit_detail";
-                if (!light && (!native_overrides || native_style.colors.find(text_key) == native_style.colors.end()))
-                    text = D2D1::ColorF(0xF5F5F5);
-                if (!light && (!native_overrides || native_style.colors.find(detail_key) == native_style.colors.end()))
-                    detail = D2D1::ColorF(0xD3D3D3);
-                d2d_->text_brush->SetColor(text);
-                d2d_->muted_brush->SetColor(detail);
+            if (primary) {
+                d2d_->text_brush->SetColor(native_palette("title.primary_text", D2D1::ColorF(0xF5F5F5)));
+                d2d_->muted_brush->SetColor(native_palette("title.primary_detail", D2D1::ColorF(0xC2CCD3)));
             }
             const float label_top = rect.top + (primary ? 32.0f : 18.0f);
             draw_text_clipped(to_wide(button.label), d2d_->menu_button_format.Get(),
@@ -128,16 +99,17 @@
                 native_menu_assets::kChevron, native_menu_assets::kNetwork,
                 native_menu_assets::kSliders, native_menu_assets::kExit};
             if (primary) {
-                // Keep the action arrow in the same high-contrast text color.
+                // Only the icons carry action colors; cards and labels retain the dark home style.
                 draw_text_clipped_aligned(L"\u2192", d2d_->menu_icon_format.Get(),
                     native_rect("title_native.rect.020", D2D1::RectF(rect.right - 84, rect.top, rect.right - 20, rect.bottom)),
-                    d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+                    native_color(0x79D8FA, 1.0f), DWRITE_TEXT_ALIGNMENT_CENTER);
             } else {
                 const float cy = (rect.top + rect.bottom) * 0.5f;
-                const auto icon_color = d2d_->text_brush->GetColor();
+                const bool colored_icon = index == 1 || index == 3;
+                const auto icon_color = D2D1::ColorF(index == 1 ? 0xF06B7B : 0xF2F4F7);
                 draw_native_asset(button_assets[std::min<std::size_t>(index, 3)],
                     native_rect("title_native.rect.021", D2D1::RectF(rect.right - 78, cy - 24, rect.right - 30, cy + 24)),
-                    button.selected ? 1.0f : colored ? 0.8f : 0.65f, 0.0f, colored ? &icon_color : nullptr);
+                    colored_icon || button.selected ? 1.0f : 0.65f, 0.0f, colored_icon ? &icon_color : nullptr);
             }
             d2d_->menu_icon_format->SetParagraphAlignment(saved_paragraph);
             d2d_->text_brush->SetColor(saved_text);

@@ -183,12 +183,14 @@ private:
         uint64_t riff_map_revision = 0;
         int sample_rate = 48000;
         int64_t audio_sample_time_ns = 0;
+        double audio_clock_rate = 1.0;
         int64_t hud_publish_time_ns = 0;
         uint32_t audio_buffer_frames = 0;
         int64_t lookahead_samples = 0;
         int64_t past_samples = 0;
         double current_visual_position = 0.0;
         double visual_velocity = 1.0;
+        std::shared_ptr<const std::vector<gameplay::ScrollSegment>> visual_scroll_segments;
         double future_visual_span = 1.0;
         double past_visual_span = 1.0;
         std::string background_base_path;

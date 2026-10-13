@@ -191,13 +191,18 @@ double ClockSync::median(std::vector<double>& values) {
     return (mid + *max_it) / 2.0;
 }
 
-std::optional<int64_t> ClockSync::input_to_audio_samples(int64_t input_time_ns) {
+std::optional<int64_t> ClockSync::estimate_audio_samples(int64_t input_time_ns) const {
     if (!estimate_.has_value()) {
         return std::nullopt;
     }
-
     const long double predicted = predict_audio_samples(*estimate_, input_time_ns);
-    int64_t mapped = static_cast<int64_t>(std::llround(predicted));
+    return static_cast<int64_t>(std::llround(predicted));
+}
+
+std::optional<int64_t> ClockSync::input_to_audio_samples(int64_t input_time_ns) {
+    const auto estimate = estimate_audio_samples(input_time_ns);
+    if (!estimate) return std::nullopt;
+    int64_t mapped = *estimate;
     if (last_output_samples_.has_value() && mapped < *last_output_samples_) {
         mapped = *last_output_samples_;
     }

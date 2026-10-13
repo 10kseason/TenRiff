@@ -101,7 +101,8 @@
   - 当前配置将此值保存并归一化为 `340ms`，自动漏键判定时限独立于BAD命中窗口
   - 默认Normal/Easy/Hard在未输入音符超过 `340ms` 后自动判漏键；Normal/Easy记BAD，Hard记断连的间接 `POOR` / OD8 `MISS`
   - BAD窗口外、自动判漏键前的迟到输入不会命中BAD，而是先将过期音符记为漏键，再检查下一音符
-- 新游玩记录 `tenriff-native-score-v2-ruleset-4`。R3保留旧Easy/Hard范围与RANK、LN松键规则。R1/R2保留PG20ms、不应用RANK和旧LN松键；R1还保留Easy1.25x/Hard BAD340ms/自动漏键=BAD。自定义判定仍非官方。
+- 新游玩记录 `tenriff-native-score-v2-ruleset-5`。R3保留旧Easy/Hard范围与RANK、LN松键规则。R1/R2保留PG20ms、不应用RANK和旧LN松键；R1还保留Easy1.25x/Hard BAD340ms/自动漏键=BAD。自定义判定仍非官方。
+- R5保持原判定时间范围，按时间顺序处理自动事件，并保留R1–R4的原处理顺序。[修正范围](release-1.8.9.5-gate.md)。
 - `hold_grace` (double, ms；默认 `80ms`)
   - 为配置兼容性及 `hold_break` 下限保留；不是当前native尾端PG/GR的判定边界
 - `hold_break` (double, ms；默认 `200ms`)

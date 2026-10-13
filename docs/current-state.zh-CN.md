@@ -1,5 +1,7 @@
 # TenRiff 当前状态
 
+**2026-10-13 · 1.8.9.5:** R5按时间顺序处理LN尾部和自动判定，将判定与音频提前写入分离，并统一输入/显示时间及BPM/STOP边界位置。恢复深色大厅卡片与彩色图标，主音量移至顶部。保留R1–R4及固定基线1.8.7。[范围与验证](release-1.8.9.5-gate.md)。
+
 **固定基准：[1.8.7](baseline-1.8.7.zh-CN.md)**（2026-10-10）。使用 Git tag `1.8.7`、commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`，不随 `latest` 或新版本自动更新。
 
 **2026-10-13 · 1.8.9.4:** 调整结果页面的大等级与分数布局，显示详细准确率，并区分四种Gauge Shift CLEAR颜色。将BGM和键音音量移到音频设置顶部，新设置均默认为100%。包含韩文皮肤名称调整、明确标注的obj谱师与BPM!变速提示，以及同一谱面时刻相同音源的重复播放修正。谱师上传为可选项，保留现有记录ID。[变更、兼容性及验证范围（韩文）](release-1.8.9.4-gate.md)。验证和游戏、网页发布状态分别记录，固定基准仍为1.8.7。
@@ -180,7 +182,7 @@
   - `Judge Easy` 将RANK之后的PG/GR/GD和长按容差扩大为 `1.35x`。EASY的PG/GR/GD=`28.35/87.75/155.25ms`；BAD在所有RANK固定为 `210ms`，mask不变
   - `Judge Hard` 的EASY基准PG/GR/GD=`17.5/55.714286/98.571429ms`。RANK之后PG乘 `17.5/21`，GR/GD乘 `18/21`；BAD在所有RANK固定为 `225ms`，长按容差不变
   - 默认Normal/Easy/Hard在未输入音符超过 `340ms` 后自动判漏键。BAD范围外的迟到输入先将过期音符记为漏键，再检查下一音符，因此命中窗口不会扩大到自动漏键时限
-  - 新游玩记录 `tenriff-native-score-v2-ruleset-4`。R3保留旧Easy/Hard范围与RANK、LN松键规则。R1/R2保留PG20ms、不应用RANK和旧LN松键；R1还保留Easy1.25x/Hard BAD340ms/自动漏键=BAD。自定义判定仍非官方。
+  - 新游玩记录 `tenriff-native-score-v2-ruleset-5`。R3保留旧Easy/Hard范围与RANK、LN松键规则。R1/R2保留PG20ms、不应用RANK和旧LN松键；R1还保留Easy1.25x/Hard BAD340ms/自动漏键=BAD。自定义判定仍非官方。
   - 当同一 lane 的 pending note 已经是 `BAD`，而紧接的下一 note 明确可判为 `GOOD` 或更高时，前一 note 会记为 miss，当前按键则分配给下一 note，避免一次漏键锁成连续 `BAD`
   - 在 `Judge Hard` 下，未输入而漏掉的对象会记为断 combo 的间接 `POOR` 和 OD8 `MISS`；其他会消耗 note 的失败仍记为 `BAD`
   - 非消耗型的超早输入会按 LR2 风格记为 `POOR`，并重新出现在结果 / replay / UI 中

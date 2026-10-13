@@ -32,6 +32,9 @@ public:
     void reset();
 
     [[nodiscard]] std::optional<int64_t> input_to_audio_samples(int64_t input_time_ns);
+    // Inspect the fitted clock without advancing the ordered-input cursor.
+    // HUD/callback-time queries must not clamp older queued input timestamps.
+    [[nodiscard]] std::optional<int64_t> estimate_audio_samples(int64_t input_time_ns) const;
     [[nodiscard]] bool has_estimate() const { return estimate_.has_value(); }
 
 private:

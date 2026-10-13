@@ -141,15 +141,19 @@ std::size_t GameplayChart::intern_visual_asset(std::string path) {
 }
 
 double GameplayChart::visual_position_at(int64_t sample) const {
-    if (scroll_segments.empty()) {
+    return scroll_visual_position_at(scroll_segments, sample);
+}
+
+double scroll_visual_position_at(const std::vector<ScrollSegment>& segments, int64_t sample) {
+    if (segments.empty()) {
         return static_cast<double>(sample);
     }
     const auto it = std::upper_bound(
-        scroll_segments.begin(), scroll_segments.end(), sample,
+        segments.begin(), segments.end(), sample,
         [](int64_t value, const ScrollSegment& segment) { return value < segment.start_sample; });
     const ScrollSegment* segment = nullptr;
-    if (it == scroll_segments.begin()) {
-        segment = &scroll_segments.front();
+    if (it == segments.begin()) {
+        segment = &segments.front();
         if (sample <= segment->start_sample) {
             return segment->start_position;
         }

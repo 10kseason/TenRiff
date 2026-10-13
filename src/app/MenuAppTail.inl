@@ -52,11 +52,13 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.riff_map_revision = gameplay_hud_.riff_map_revision;
     target.sample_rate = gameplay_hud_.sample_rate;
     target.audio_sample_time_ns = gameplay_hud_.audio_sample_time_ns;
+    target.audio_clock_rate = gameplay_hud_.audio_clock_rate;
     target.audio_buffer_frames = gameplay_hud_.audio_buffer_frames;
     target.lookahead_samples = gameplay_hud_.lookahead_samples;
     target.past_samples = gameplay_hud_.past_samples;
     target.current_visual_position = gameplay_hud_.current_visual_position;
     target.visual_velocity = gameplay_hud_.visual_velocity;
+    target.visual_scroll_segments = gameplay_hud_.visual_scroll_segments;
     target.future_visual_span = gameplay_hud_.future_visual_span;
     target.past_visual_span = gameplay_hud_.past_visual_span;
     const render::GameplayBackgroundPolicy background_policy =
@@ -1957,6 +1959,7 @@ void MenuApp::render_tick() {
                         render_cache_.gameplay.finished,
                         render_cache_.gameplay.game_over &&
                             !render_cache_.gameplay.spectating_peer,
+                        render_cache_.gameplay.audio_clock_rate,
                     },
                     timing::HighResClock::now_ns());
                 render_cache_.performance.gameplay_audio_age_ms = diagnostics.audio_age_ms;
@@ -2369,12 +2372,14 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.riff_map_revision = hud.riff_map_revision;
         gameplay_hud_.sample_rate = hud.sample_rate;
         gameplay_hud_.audio_sample_time_ns = hud.audio_sample_time_ns;
+        gameplay_hud_.audio_clock_rate = hud.audio_clock_rate;
         gameplay_hud_.hud_publish_time_ns = hud.hud_publish_time_ns;
         gameplay_hud_.audio_buffer_frames = hud.audio_buffer_frames;
         gameplay_hud_.lookahead_samples = hud.lookahead_samples;
         gameplay_hud_.past_samples = hud.past_samples;
         gameplay_hud_.current_visual_position = hud.current_visual_position;
         gameplay_hud_.visual_velocity = hud.visual_velocity;
+        gameplay_hud_.visual_scroll_segments = hud.visual_scroll_segments;
         gameplay_hud_.future_visual_span = hud.future_visual_span;
         gameplay_hud_.past_visual_span = hud.past_visual_span;
         gameplay_hud_.background_base_path = hud.background_base_path;

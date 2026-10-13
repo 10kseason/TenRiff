@@ -1,5 +1,7 @@
 # TenRiff Current State
 
+**2026-10-13 · 1.8.9.5:** R5 processes LN tails and automatic judgements in time order, separates judgement from audio write-ahead, and aligns input/display timing with exact BPM/STOP scroll positions. Restores dark lobby cards with colored icons and moves Master Volume first. R1–R4 and the fixed 1.8.7 baseline are preserved. [Scope and verification](release-1.8.9.5-gate.md).
+
 **Fixed baseline: [1.8.7](baseline-1.8.7.en.md)** (2026-10-10). Use Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`; do not advance it automatically with `latest` or a new release.
 
 **2026-10-13 · 1.8.9.4:** Rearranges the large result rank and score, shows detail accuracy and distinguishes four Gauge Shift CLEAR colors. BGM/keysound volume move to the top of Audio with 100% defaults for new settings. Includes Korean skin-label revisions, explicit obj credits, BPM! changes and correction of duplicate identical audio at the same chart time. Author uploads are optional and existing record identities are retained. [Changes, compatibility and validation (Korean)](release-1.8.9.4-gate.md). Verification and game/web publication are tracked separately; the fixed baseline remains 1.8.7.
@@ -180,7 +182,7 @@ This is the document that the next agent or any new contributor should read firs
   - `Judge Easy` scales RANK-adjusted PG/GR/GD and hold tolerances by `1.35x`. EASY PG/GR/GD=`28.35/87.75/155.25ms`; BAD is fixed at `210ms` for every RANK; mask is unchanged
   - `Judge Hard` uses EASY PG/GR/GD=`17.5/55.714286/98.571429ms`: multiply PG by `17.5/21` and GR/GD by `18/21` after RANK. BAD is fixed at `225ms` for every RANK; hold tolerances are unchanged
   - default Normal/Easy/Hard automatically miss unplayed notes after `340ms`. A late press outside BAD misses the expired note and checks the next one, so the hit window does not expand to the automatic deadline
-  - New plays record `tenriff-native-score-v2-ruleset-4`. R3 retains its previous Easy/Hard windows and RANK/LN release behavior. R1/R2 retain PG20ms, no RANK and older LN releases; R1 also keeps Easy1.25x/Hard BAD340ms/automatic miss=BAD. Custom timing remains unofficial.
+  - New plays record `tenriff-native-score-v2-ruleset-5`. R3 retains its previous Easy/Hard windows and RANK/LN release behavior. R1/R2 retain PG20ms, no RANK and older LN releases; R1 also keeps Easy1.25x/Hard BAD340ms/automatic miss=BAD. Custom timing remains unofficial.
   - if the pending same-lane note is already a `BAD` while the immediate next note is clearly `GOOD` or better, the pending note is recorded as a miss and the current press scores the next note instead of locking the stream into repeated `BAD`s
   - under `Judge Hard`, an unplayed object becomes a combo-breaking indirect `POOR` and OD8 `MISS`; other note-consuming failures stay `BAD`
   - very early non-consuming presses are handled as LR2-style `POOR` and are visible again in result / replay / UI paths

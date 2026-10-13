@@ -1,6 +1,8 @@
 #include "doctest/doctest.h"
 
+#include <algorithm>
 #include <cmath>
+#include <iostream>
 
 #include "app/ModeManager.h"
 #include "gameplay/GameplayEngine.h"
@@ -656,6 +658,7 @@ TEST_CASE("LN release compatibility preserves the deferred ruleset one and two r
         GameplayConfig config;
         config.sample_rate = 1000;
         config.legacy_hold_release = true;
+        config.chronological_judgement = false;
         config.judge.pg_ms = 10.0;
         config.judge.gr_ms = 20.0;
         config.judge.gd_ms = 30.0;
@@ -679,7 +682,7 @@ TEST_CASE("LN release compatibility preserves the deferred ruleset one and two r
     }
 }
 
-TEST_CASE("LN release keeps the ordinary timing grades inside the tail window") {
+TEST_CASE("legacy LN release keeps historical late standard hold timing grades") {
     for (const bool release_required : {false, true}) {
         for (const int delta : {-30, -20, -10, 0, 15}) {
             GameplayChart chart;
@@ -688,6 +691,7 @@ TEST_CASE("LN release keeps the ordinary timing grades inside the tail window") 
             chart.notes = {NoteEvent{1, 1000, 2000, release_required}};
             GameplayConfig config;
             config.sample_rate = 1000;
+            config.chronological_judgement = false;
             config.judge.pg_ms = 10.0;
             config.judge.gr_ms = 20.0;
             config.judge.gd_ms = 30.0;
@@ -1987,4 +1991,435 @@ TEST_CASE("a missed BAD shows the non PG bar without inventing a timing error") 
     CHECK(engine.non_pg_feedback().judgement == Judgement::BD);
     CHECK_FALSE(engine.timing_feedback().has_value);
     CHECK(tenriff::gameplay::timing_feedback_visible(engine.non_pg_feedback(), 1101, 1000));
+}
+
+
+TEST_CASE("timing audit standard LN completion is independent of advance before late release") {
+    int mismatches = 0;
+    for (const int late_samples : {1, 30, 70, 140}) {
+        GameplayChart chart;
+        chart.lane_count = 2;
+        chart.duration_samples = 10000;
+        chart.notes = {NoteEvent{1, 1000, 2000, false}, NoteEvent{2, 9000}};
+        GameplayConfig config;
+        config.sample_rate = 1000;
+        config.practice_no_fail_enabled = true;
+        GameplayEngine batched(chart, config);
+        GameplayEngine stepped(chart, config);
+
+        (void)batched.handle_input(1, InputState::Pressed, 1000);
+        (void)batched.handle_input(1, InputState::Released, 2000 + late_samples);
+        batched.advance(2000 + late_samples);
+        (void)stepped.handle_input(1, InputState::Pressed, 1000);
+        stepped.advance(2000);
+        (void)stepped.handle_input(1, InputState::Released, 2000 + late_samples);
+        stepped.advance(2000 + late_samples);
+
+        // A standard LN held beyond its tail has already earned automatic PG.
+        // Only the placement of an advance call differs between these traces.
+        const bool matches = batched.replay().events.size() == 2u &&
+            stepped.replay().events.size() == 2u &&
+            batched.replay().events[1].sample == stepped.replay().events[1].sample &&
+            batched.stats().counts.pg == 2 && batched.stats().counts.gr == 0 &&
+            batched.stats().counts.gd == 0 && batched.stats().counts.bd == 0 &&
+            batched.stats().raw_score == stepped.stats().raw_score &&
+            batched.stats().detailed_accuracy_percent() ==
+                doctest::Approx(stepped.stats().detailed_accuracy_percent());
+        std::cout << "[timing-audit-ln] late=" << late_samples
+                  << " batch_pg=" << batched.stats().counts.pg
+                  << " batch_gr=" << batched.stats().counts.gr
+                  << " batch_gd=" << batched.stats().counts.gd
+                  << " batch_bd=" << batched.stats().counts.bd
+                  << " batch_score=" << batched.stats().raw_score
+                  << " step_score=" << stepped.stats().raw_score
+                  << " batch_detail=" << batched.stats().detailed_accuracy_percent()
+                  << " step_detail=" << stepped.stats().detailed_accuracy_percent()
+                  << " matches=" << matches << '\n';
+        mismatches += matches ? 0 : 1;
+    }
+    // This repository's CHECK aborts its test case, so assert after every row.
+    CHECK(mismatches == 0);
+}
+
+TEST_CASE("timing audit early empty poor is independent of automatic miss batching") {
+    GameplayChart chart;
+    chart.lane_count = 2;
+    chart.duration_samples = 10000;
+    chart.notes = {NoteEvent{1, 1000}, NoteEvent{1, 2000}, NoteEvent{2, 9000}};
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.practice_no_fail_enabled = true;
+    GameplayEngine batched(chart, config);
+    GameplayEngine stepped(chart, config);
+
+    (void)batched.handle_input(1, InputState::Pressed, 1400);
+    batched.advance(1400);
+    stepped.advance(1341);
+    (void)stepped.handle_input(1, InputState::Pressed, 1400);
+    stepped.advance(1400);
+
+    // The same press falls behind the first missed note and ahead of the next.
+    // Its additional empty-POOR damage must not depend on callback partitioning.
+    const bool matches = batched.replay().events.size() == 1u &&
+        stepped.replay().events.size() == 1u &&
+        batched.replay().events[0].sample == stepped.replay().events[0].sample &&
+        batched.stats().counts.bd == stepped.stats().counts.bd &&
+        batched.stats().counts.pr == stepped.stats().counts.pr &&
+        batched.gauge_state().value == doctest::Approx(stepped.gauge_state().value);
+    std::cout << "[timing-audit-poor] batch_bd=" << batched.stats().counts.bd
+              << " step_bd=" << stepped.stats().counts.bd
+              << " batch_pr=" << batched.stats().counts.pr
+              << " step_pr=" << stepped.stats().counts.pr
+              << " batch_gauge=" << batched.gauge_state().value
+              << " step_gauge=" << stepped.gauge_state().value
+              << " matches=" << matches << '\n';
+    CHECK(matches);
+}
+
+TEST_CASE("timing audit automatic hold and miss outcomes follow time across advance partitions") {
+    int mismatches = 0;
+    for (const bool same_lane : {false, true}) {
+        GameplayChart chart;
+        chart.lane_count = 2;
+        chart.duration_samples = 10000;
+        chart.notes = {NoteEvent{1, 1000, 2000, false},
+                       NoteEvent{same_lane ? 1 : 2, same_lane ? 2100 : 1658},
+                       NoteEvent{2, 9000}};
+        GameplayConfig config;
+        config.sample_rate = 1000;
+        config.practice_no_fail_enabled = true;
+        GameplayEngine batched(chart, config);
+        GameplayEngine stepped(chart, config);
+        const int64_t final_sample = same_lane ? 2441 : 2001;
+        const int64_t first_boundary = same_lane ? 2000 : 1999;
+
+        (void)batched.handle_input(1, InputState::Pressed, 1000);
+        batched.advance(final_sample);
+        (void)stepped.handle_input(1, InputState::Pressed, 1000);
+        stepped.advance(first_boundary);
+        stepped.advance(final_sample);
+
+        // A lane loop (or miss-before-hold loop) must not reverse timed scoring
+        // events. Even when counts match, gauge capping and combo do not commute.
+        const bool matches = batched.stats().counts.pg == stepped.stats().counts.pg &&
+            batched.stats().counts.bd == stepped.stats().counts.bd &&
+            batched.stats().raw_score == stepped.stats().raw_score &&
+            batched.gauge_state().value == doctest::Approx(stepped.gauge_state().value) &&
+            batched.stats().combo == stepped.stats().combo &&
+            batched.stats().max_combo == stepped.stats().max_combo;
+        std::cout << "[timing-audit-auto] same_lane=" << same_lane
+                  << " batch_gauge=" << batched.gauge_state().value
+                  << " step_gauge=" << stepped.gauge_state().value
+                  << " batch_combo=" << batched.stats().combo
+                  << " step_combo=" << stepped.stats().combo
+                  << " batch_max=" << batched.stats().max_combo
+                  << " step_max=" << stepped.stats().max_combo
+                  << " matches=" << matches << '\n';
+        mismatches += matches ? 0 : 1;
+    }
+    CHECK(mismatches == 0);
+}
+
+
+TEST_CASE("chronological automatic events preserve failure at a cross-lane low-gauge deadline") {
+    GameplayChart chart;
+    chart.lane_count = 2;
+    chart.duration_samples = 10000;
+    chart.notes = {NoteEvent{1, 1000, 2000}, NoteEvent{2, 1658}, NoteEvent{2, 9000}};
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.initial_gauge_value = 6.1;
+    GameplayEngine batched(chart, config);
+    GameplayEngine stepped(chart, config);
+    (void)batched.handle_input(1, InputState::Pressed, 1000);
+    (void)stepped.handle_input(1, InputState::Pressed, 1000);
+    batched.advance(2001);
+    stepped.advance(1999);
+    stepped.advance(2001);
+
+    // The miss becomes due at 1999. A tail due at 2000 cannot rescue a dead gauge.
+    CHECK(batched.is_game_over());
+    CHECK(stepped.is_game_over());
+    CHECK(batched.gauge_state().value == doctest::Approx(0.0));
+    CHECK(batched.stats().counts.pg == 1);
+    CHECK(batched.stats().counts.bd == 1);
+    CHECK(batched.stats().raw_score == stepped.stats().raw_score);
+    CHECK(batched.stats().max_combo == stepped.stats().max_combo);
+}
+
+TEST_CASE("chronological mine miss CN timeout and LN completion share one event order") {
+    GameplayChart chart;
+    chart.lane_count = 4;
+    chart.duration_samples = 10000;
+    chart.notes = {NoteEvent{1, 1000, 2000}, NoteEvent{2, 1000, 1700, true},
+                   NoteEvent{3, 1400}, NoteEvent{4, 9000}};
+    chart.mines = {MineEvent{4, 1800, 5.0, false, 7, 42}};
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    GameplayEngine batched(chart, config);
+    GameplayEngine stepped(chart, config);
+    for (GameplayEngine* engine : {&batched, &stepped}) {
+        (void)engine->handle_input(4, InputState::Pressed, 500);
+        (void)engine->handle_input(1, InputState::Pressed, 1000);
+        (void)engine->handle_input(2, InputState::Pressed, 1000);
+    }
+    batched.advance(2500);
+    for (int64_t sample : {1741, 1800, 1901, 2000, 2500}) stepped.advance(sample);
+
+    CHECK(batched.stats().counts.pg == 3);
+    CHECK(batched.stats().counts.bd == 2);
+    CHECK(batched.gauge_state().value == doctest::Approx(85.72));
+    CHECK(batched.gauge_state().value == doctest::Approx(stepped.gauge_state().value));
+    CHECK(batched.stats().combo == stepped.stats().combo);
+    CHECK(batched.stats().max_combo == stepped.stats().max_combo);
+    CHECK(batched.stats().raw_score == stepped.stats().raw_score);
+    std::vector<tenriff::gameplay::MineTrigger> batch_mines;
+    std::vector<tenriff::gameplay::MineTrigger> step_mines;
+    batched.drain_mine_triggers(batch_mines);
+    stepped.drain_mine_triggers(step_mines);
+    REQUIRE(batch_mines.size() == 1u);
+    REQUIRE(step_mines.size() == 1u);
+    CHECK(batch_mines[0].sample == 1800);
+    CHECK(batch_mines[0].mine_id == step_mines[0].mine_id);
+}
+
+TEST_CASE("chronological same-sample input group precedes automatic tail and mine events") {
+    for (bool synced_release : {false, true}) {
+        GameplayChart chart;
+        chart.lane_count = 3;
+        chart.duration_samples = 10000;
+        chart.notes = {NoteEvent{1, 1000, 2000}, NoteEvent{2, 1000, 2000, true},
+                       NoteEvent{3, 9000}};
+        chart.mines = {MineEvent{1, 2000, 5.0, false, 7, 42}};
+        GameplayConfig config;
+        config.sample_rate = 1000;
+        GameplayEngine engine(chart, config);
+        (void)engine.handle_input(1, InputState::Pressed, 1000);
+        (void)engine.handle_input(2, InputState::Pressed, 1000);
+        engine.advance(1999);
+        if (synced_release) engine.sync_input_state(1, InputState::Released, 2000);
+        else (void)engine.handle_input(1, InputState::Released, 2000);
+        (void)engine.handle_input(2, InputState::Released, 2000);
+        engine.advance(2000);
+        engine.advance(2500);
+        CHECK(engine.stats().counts.pg == 4);
+        CHECK(engine.stats().counts.bd == 0);
+        CHECK(engine.gauge_state().value == doctest::Approx(100.0));
+        std::vector<tenriff::gameplay::MineTrigger> mines;
+        engine.drain_mine_triggers(mines);
+        CHECK(mines.empty());
+    }
+}
+
+TEST_CASE("chronological input and catch-up sync complete older LN tails before a late release") {
+    for (bool synced_release : {false, true}) {
+        GameplayChart chart;
+        chart.lane_count = 2;
+        chart.duration_samples = 10000;
+        chart.notes = {NoteEvent{1, 1000, 2000}, NoteEvent{2, 9000}};
+        GameplayConfig config;
+        config.sample_rate = 1000;
+        GameplayEngine direct(chart, config);
+        GameplayEngine stepped(chart, config);
+        for (GameplayEngine* engine : {&direct, &stepped}) {
+            (void)engine->handle_input(1, InputState::Pressed, 1000);
+        }
+        stepped.advance(2029);
+        for (GameplayEngine* engine : {&direct, &stepped}) {
+            if (synced_release) engine->sync_input_state(1, InputState::Released, 2030);
+            else (void)engine->handle_input(1, InputState::Released, 2030);
+            engine->advance(2030);
+        }
+        CHECK(direct.stats().counts.pg == 2);
+        CHECK(direct.stats().raw_score == stepped.stats().raw_score);
+        CHECK(direct.stats().detailed_accuracy_percent() == doctest::Approx(100.0));
+        REQUIRE(direct.replay().events.size() == 2u);
+        CHECK(direct.replay().events[1].sample == 2030);
+    }
+}
+
+TEST_CASE("chronological equal automatic deadlines retain lane and mine-before-hold order") {
+    for (bool same_lane : {false, true}) {
+        GameplayChart chart;
+        chart.lane_count = 3;
+        chart.duration_samples = 10000;
+        chart.notes = {NoteEvent{same_lane ? 1 : 2, 1000, 2000}, NoteEvent{3, 9000}};
+        chart.mines = {MineEvent{1, 2000, 5.0, false, 7, 42}};
+        GameplayConfig config;
+        config.sample_rate = 1000;
+        config.initial_gauge_value = 4.9;
+        GameplayEngine batched(chart, config);
+        GameplayEngine stepped(chart, config);
+        for (GameplayEngine* engine : {&batched, &stepped}) {
+            if (!same_lane) engine->sync_input_state(1, InputState::Pressed, 500);
+            (void)engine->handle_input(same_lane ? 1 : 2, InputState::Pressed, 1000);
+        }
+        batched.advance(2001);
+        stepped.advance(1999);
+        stepped.advance(2000);
+        stepped.advance(2001);
+        // At an equal sample, lane 1 comes first; in the same lane the mine
+        // comes before the hold. Its lethal damage cannot be rescued by a tail.
+        CHECK(batched.is_game_over());
+        CHECK(stepped.is_game_over());
+        CHECK(batched.stats().counts.pg == 1);
+        CHECK(batched.stats().raw_score == stepped.stats().raw_score);
+        CHECK(batched.gauge_state().value == doctest::Approx(0.0));
+    }
+}
+
+TEST_CASE("historical engine ordering remains selectable for rulesets one through four") {
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.chronological_judgement = false;
+    GameplayChart chart;
+    chart.lane_count = 2;
+    chart.duration_samples = 10000;
+    chart.notes = {NoteEvent{1, 1000, 2000}, NoteEvent{2, 9000}};
+    GameplayEngine late(chart, config);
+    (void)late.handle_input(1, InputState::Pressed, 1000);
+    (void)late.handle_input(1, InputState::Released, 2030);
+    late.advance(2030);
+    CHECK(late.stats().counts.pg == 1);
+    CHECK(late.stats().counts.gr == 1);
+    CHECK(late.stats().raw_score == 3750);
+
+    chart.notes = {NoteEvent{1, 1000}, NoteEvent{1, 2000}, NoteEvent{2, 9000}};
+    GameplayEngine poor(chart, config);
+    (void)poor.handle_input(1, InputState::Pressed, 1400);
+    poor.advance(1400);
+    CHECK(poor.stats().counts.bd == 1);
+    CHECK(poor.stats().counts.pr == 0);
+
+    chart.notes = {NoteEvent{1, 1000, 2000}, NoteEvent{2, 1658}, NoteEvent{2, 9000}};
+    config.initial_gauge_value = 6.1;
+    GameplayEngine lane_order(chart, config);
+    (void)lane_order.handle_input(1, InputState::Pressed, 1000);
+    lane_order.advance(2001);
+    CHECK_FALSE(lane_order.is_game_over());
+    CHECK(lane_order.gauge_state().value == doctest::Approx(0.04));
+    CHECK(lane_order.stats().counts.pg == 2);
+}
+
+
+TEST_CASE("chronological mixed timelines preserve results and replay prefixes under callback partitions") {
+    struct TraceInput { int lane; InputState state; int64_t sample; };
+    int mismatches = 0;
+    int comparisons = 0;
+    for (uint32_t seed = 1; seed <= 32; ++seed) {
+        uint32_t random_state = seed;
+        const auto next_random = [&]() {
+            random_state = random_state * 1664525u + 1013904223u;
+            return random_state;
+        };
+        GameplayChart chart;
+        chart.lane_count = 4;
+        chart.duration_samples = 101000;
+        std::vector<TraceInput> inputs;
+        constexpr int head_deltas[] = {-100, -30, -1, 0, 1, 30, 100, 250};
+        constexpr int tail_deltas[] = {-150, -30, -1, 0, 1, 30, 150, 250};
+        for (int block = 0; block < 8; ++block) {
+            for (int lane = 1; lane <= 4; ++lane) {
+                const int64_t start = 1000 + block * 1000 + lane * 7 + next_random() % 30;
+                const unsigned kind = (next_random() >> 16) % 3;
+                const int64_t end = start + 120 + next_random() % 300;
+                NoteEvent note{lane, start};
+                if (kind != 0) note.end_sample = end;
+                note.release_required = kind == 2;
+                chart.notes.push_back(note);
+                // Some heads are deliberately omitted. The remaining input
+                // trace alternates physical press/release per lane, with enough
+                // space between blocks that even late CN releases do not overlap.
+                if ((next_random() >> 16) % 5 != 0) {
+                    const int64_t press = start + head_deltas[(next_random() >> 16) % 8];
+                    const int64_t release = kind == 0 ? press + 1 :
+                        std::max(press + 1, end + tail_deltas[(next_random() >> 16) % 8]);
+                    inputs.push_back({lane, InputState::Pressed, press});
+                    inputs.push_back({lane, InputState::Released, release});
+                }
+                if ((next_random() >> 16) % 3 == 0) {
+                    chart.mines.push_back(MineEvent{lane, start + 50 + next_random() % 350,
+                                                    5.0, false});
+                }
+            }
+        }
+        chart.notes.push_back(NoteEvent{4, 100000});
+        std::stable_sort(inputs.begin(), inputs.end(), [](const TraceInput& a, const TraceInput& b) {
+            if (a.sample != b.sample) return a.sample < b.sample;
+            if (a.state != b.state) return a.state == InputState::Released;
+            return a.lane < b.lane;
+        });
+        GameplayConfig config;
+        config.sample_rate = 1000;
+        constexpr double initial_gauges[] = {100.0, 45.0, 15.0, 6.1};
+        config.initial_gauge_value = initial_gauges[seed % 4];
+        // Mix live fail behavior and no-fail traces, so long automatic-event
+        // sequences as well as stopping exactly at a lethal event are covered.
+        config.practice_no_fail_enabled = seed % 3 == 0;
+        GameplayEngine reference(chart, config);
+        std::vector<std::size_t> expected_prefix_sizes;
+        for (std::size_t index = 0; index < inputs.size();) {
+            const int64_t sample = inputs[index].sample;
+            do {
+                const auto& input = inputs[index++];
+                (void)reference.handle_input(input.lane, input.state, input.sample);
+            } while (index < inputs.size() && inputs[index].sample == sample);
+            expected_prefix_sizes.push_back(reference.replay().events.size());
+        }
+        reference.advance(100500);
+
+        for (int partitions : {0, 1, 3, 7}) {
+            GameplayEngine candidate(chart, config);
+            int64_t previous_sample = 0;
+            std::size_t group = 0;
+            bool prefixes_match = true;
+            const auto advance_gap = [&](int64_t from, int64_t through) {
+                for (int part = 1; part <= partitions; ++part) {
+                    candidate.advance(from + (through - from) * part / (partitions + 1));
+                }
+            };
+            for (std::size_t index = 0; index < inputs.size();) {
+                const int64_t sample = inputs[index].sample;
+                advance_gap(previous_sample, sample - 1);
+                do {
+                    const auto& input = inputs[index++];
+                    (void)candidate.handle_input(input.lane, input.state, input.sample);
+                } while (index < inputs.size() && inputs[index].sample == sample);
+                const auto& actual = candidate.replay().events;
+                const auto& expected = reference.replay().events;
+                prefixes_match = prefixes_match && actual.size() == expected_prefix_sizes[group++];
+                if (actual.size() > expected.size()) prefixes_match = false;
+                else for (std::size_t i = 0; i < actual.size(); ++i) {
+                    prefixes_match = prefixes_match && actual[i].lane == expected[i].lane &&
+                        actual[i].state == expected[i].state && actual[i].sample == expected[i].sample;
+                }
+                previous_sample = sample;
+            }
+            advance_gap(previous_sample, 100500);
+            candidate.advance(100500);
+            const auto& a = candidate.stats();
+            const auto& b = reference.stats();
+            const bool matches = prefixes_match && a.counts.pg == b.counts.pg &&
+                a.counts.gr == b.counts.gr && a.counts.gd == b.counts.gd &&
+                a.counts.bd == b.counts.bd && a.counts.pr == b.counts.pr &&
+                a.raw_score == b.raw_score && a.combo == b.combo && a.max_combo == b.max_combo &&
+                a.detailed_accuracy_percent() == doctest::Approx(b.detailed_accuracy_percent()) &&
+                candidate.gauge_state().type == reference.gauge_state().type &&
+                candidate.gauge_state().value == doctest::Approx(reference.gauge_state().value) &&
+                candidate.is_game_over() == reference.is_game_over() &&
+                candidate.is_finished() == reference.is_finished();
+            ++comparisons;
+            if (!matches) {
+                ++mismatches;
+                std::cout << "[timing-r5-property-mismatch] seed=" << seed
+                          << " partitions=" << partitions << " prefixes=" << prefixes_match
+                          << " gauge=" << candidate.gauge_state().value
+                          << " reference_gauge=" << reference.gauge_state().value << '\n';
+            }
+        }
+    }
+    std::cout << "[timing-r5-property] fixtures=32 comparisons=" << comparisons
+              << " mismatches=" << mismatches << '\n';
+    CHECK(comparisons == 128);
+    CHECK(mismatches == 0);
 }

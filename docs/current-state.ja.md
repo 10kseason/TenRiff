@@ -1,5 +1,7 @@
 # TenRiff Current State
 
+**2026-10-13 · 1.8.9.5:** R5でLN終端・自動判定を時刻順に処理し、音声の先行書き込みと判定を分離。入力・表示時刻とBPM/STOP境界の表示位置を合わせます。ロビーは暗いカードと色付きアイコン、音声設定はマスター音量を先頭に戻します。R1–R4と固定基準1.8.7を保持。[変更と検証](release-1.8.9.5-gate.md)。
+
 **固定基準: [1.8.7](baseline-1.8.7.ja.md)**（2026-10-10）。Git tag `1.8.7`、commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347` を使い、`latest` や新しいリリースに合わせて自動変更しません。
 
 **2026-10-13 · 1.8.9.4:** リザルトの大きなランクとスコアの配置・詳細精度を整理し、Gauge Shift CLEARの4色を区別します。BGM・キー音の音量をAudioの先頭に移し、新規設定では両方100%にします。韓国語スキン名称、明記されたobjクレジットとBPM!変速表示、同じ譜面時刻の同一音源の重複再生補正を含みます。譜面作者の送信は任意で、既存の記録IDを維持します。[変更・互換性・検証範囲（韓国語）](release-1.8.9.4-gate.md)。検証とゲーム・ウェブ公開の状態は別途記録し、固定基準は1.8.7です。
@@ -180,7 +182,7 @@
   - `Judge Easy` はRANK適用後のPG/GR/GDとホールド許容幅を `1.35x` に拡大。EASYのPG/GR/GD=`28.35/87.75/155.25ms`。BADは全RANKで `210ms` 固定、maskは維持
   - `Judge Hard` はEASYのPG/GR/GD=`17.5/55.714286/98.571429ms`。RANK適用後にPGへ `17.5/21`、GR/GDへ `18/21` を掛ける。BADは全RANKで `225ms` 固定、ホールド許容幅は維持
   - 標準のNormal/Easy/Hardは未入力ノートが `340ms` を超えると自動ミス。BAD範囲外の遅い入力は前のノートをミスにして次を調べるため、判定幅が自動ミス期限まで広がることはない
-  - 新しいプレイは `tenriff-native-score-v2-ruleset-4`。R3は以前のEasy/Hard幅とRANK・LN解放規則を維持。R1/R2はPG20ms・RANK無効・旧LN解放、R1はEasy1.25x/Hard BAD340ms/自動ミス=BADも維持。カスタム判定は非公式。
+  - 新しいプレイは `tenriff-native-score-v2-ruleset-5`。R3は以前のEasy/Hard幅とRANK・LN解放規則を維持。R1/R2はPG20ms・RANK無効・旧LN解放、R1はEasy1.25x/Hard BAD340ms/自動ミス=BADも維持。カスタム判定は非公式。
   - 同一 lane の pending note がすでに `BAD` で、直後の note が明確に `GOOD` 以上なら、pending note を miss として記録し、現在の press を次の note に割り当てて連続 `BAD` lock を防ぐ
   - `Judge Hard` では未入力の object を combo-breaking indirect `POOR` かつ OD8 `MISS` として記録し、その他の note-consuming failure は `BAD` のまま
   - かなり早い non-consuming press は LR2 スタイル `POOR` として扱われ、result / replay / UI に再表示される
