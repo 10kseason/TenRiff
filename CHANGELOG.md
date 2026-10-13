@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.8.9.4] - 2026-10-13
+
+- Move the native result rank into the large top position (144 default), with score (64) beside accuracy below it; retain S+ styling. Show detail accuracy beside detail score and use five judgement columns plus max combo. Legacy image results retain their accuracy column because they lack the native summary.
+- Color Gauge Shift EASY/NORMAL/HARD/EX CLEAR green/yellow/orange/red, preserving other status colors.
+- Put BGM and keysound volume first in Audio Settings, default both to 100% for new settings and preserve saved values.
+- Apply the requested Korean skin labels in menus and help without renaming stored fields or changing the skin format.
+- Display explicit BMS OBJ credits as `obj:` in Song Select and Result, and mark actual chart BPM changes with `BPM! :`. Cache v16 reindexes earlier caches to calculate both fields; original charts are not rewritten.
+- Submit `chart_author` only when available (UTF-8, at most 480 bytes). The web integration uses a separate `chart_metadata` table keyed by chart hash, keeping board IDs, ranking conditions and scores unchanged. No replay field is added.
+- Suppress duplicate chart audio only when the authored sample, decoded PCM and effective gain match, including aliases under different WAV IDs or files. Preserve distinct sounds, distinct times and gains; silent or failed sounds cannot suppress an audible one.
+- Retain conversion version 3, historical replay paths, R1–R4 rules and the fixed 1.8.7 baseline. The [release gate](docs/release-1.8.9.4-gate.md) separates recorded local/web checks from independent package, CI and game-publication evidence; final delivery status belongs to the release notes and separate verification record. Earlier release counts are not evidence for this version.
+
 ## [1.8.9.3] - 2026-10-13
 
 - Rebalance native results: smaller play score and judgement counts, larger rank and summary accuracy; preserve rank colors and S+ bloom.

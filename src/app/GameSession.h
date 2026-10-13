@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "app/ChartLoader.h"
+#include "app/ChartAudioDedup.h"
 #include "app/CommandLine.h"
 #include "app/InputBackendStatus.h"
 #include "app/GameSessionInputTiming.h"
@@ -288,6 +289,7 @@ private:
 
     struct ChartAudioClip {
         std::shared_ptr<const std::vector<float>> samples;
+        std::shared_ptr<const ChartAudioPcmIdentity> identity;
     };
 
     enum class ChartAudioAssetState {
@@ -323,6 +325,7 @@ private:
         std::size_t asset_id = 0;
         Kind kind = Kind::Bgm;
         float gain = 1.0f;
+        int64_t chart_sample = (std::numeric_limits<int64_t>::min)();
     };
 
     struct ChartAudioVoice {
@@ -330,6 +333,9 @@ private:
         std::size_t asset_id = 0;
         ChartAudioEvent::Kind kind = ChartAudioEvent::Kind::Bgm;
         float gain = 1.0f;
+        int64_t chart_sample = (std::numeric_limits<int64_t>::min)();
+        bool dedup_claimed = false;
+        std::shared_ptr<const ChartAudioPcmIdentity> decoded_identity;
     };
 
     struct BufferedLaneInput {
@@ -601,9 +607,8 @@ private:
     std::deque<std::size_t> chart_audio_load_queue_;
     std::vector<std::thread> chart_audio_loader_threads_;
     std::unique_ptr<std::atomic<int64_t>[]> chart_audio_active_until_samples_;
-    // Chart sample each keysound asset was last voiced at, so a chord that assigns
-    // the same sound to several lanes is heard once instead of stacking gain.
-    std::vector<int64_t> last_keysound_chart_samples_;
+    ChartAudioPcmRegistry chart_audio_pcm_registry_;
+    ChartAudioDeduplicator chart_audio_deduplicator_;
     std::vector<BufferedLaneInput> pending_input_events_;
     std::vector<uint8_t> hidden_hit_note_ids_;
     std::vector<uint8_t> ghost_hidden_hit_note_ids_;

@@ -2395,6 +2395,7 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_artist_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_metadata_value_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> result_score_format;
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> result_grade_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> result_metric_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> result_judgement_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> result_accuracy_format;
@@ -5236,6 +5237,7 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family, const app::Native
                 {std::addressof(d2d_->song_title_format), "song_title"}, {std::addressof(d2d_->song_artist_format), "song_artist"},
                 {std::addressof(d2d_->song_metadata_value_format), "song_metadata_value"},
                 {std::addressof(d2d_->result_score_format), "result_score"}, {std::addressof(d2d_->result_metric_format), "result_metric"},
+                {std::addressof(d2d_->result_grade_format), "result_grade"},
                 {std::addressof(d2d_->result_accuracy_format), "result_accuracy"},
                 {std::addressof(d2d_->result_judgement_format), "result_judgement"},
                 {std::addressof(d2d_->result_label_format), "result_label"}, {std::addressof(d2d_->result_body_format), "result_body"},
@@ -5303,7 +5305,8 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family, const app::Native
                             &d2d_->song_record_detail_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 24.0f, &d2d_->song_title_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 18.0f, &d2d_->song_artist_format) ||
-        !create_text_format(L"Bahnschrift", DWRITE_FONT_WEIGHT_SEMI_BOLD, 100.0f, &d2d_->result_score_format) ||
+        !create_text_format(L"Bahnschrift", DWRITE_FONT_WEIGHT_SEMI_BOLD, 64.0f, &d2d_->result_score_format) ||
+        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_BOLD, 144.0f, &d2d_->result_grade_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 36.0f, &d2d_->song_metadata_value_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 52.0f, &d2d_->result_metric_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 46.0f, &d2d_->result_judgement_format) ||

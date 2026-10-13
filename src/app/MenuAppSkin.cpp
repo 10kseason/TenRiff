@@ -873,9 +873,9 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     static_cast<int>(SkinSettingsRowId::SingleColor),
                     false,
                     true);
-    append_menu_row(render.generic, ui_text("Note Fade In", "노트 페이드인 안개"), format_percent(config_.skin.note_fade_in),
+    append_menu_row(render.generic, ui_text("Note Fade In", "노트 페이드인 농도"), format_percent(config_.skin.note_fade_in),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::NoteFadeIn), false, true);
-    append_menu_row(render.generic, ui_text("Note Fade Out", "노트 페이드아웃 안개"), format_percent(config_.skin.note_fade_out),
+    append_menu_row(render.generic, ui_text("Note Fade Out", "노트 페이드아웃 농도"), format_percent(config_.skin.note_fade_out),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::NoteFadeOut), false, true);
     append_menu_row(render.generic, ui_text("Note Shape", "노트 모양"), ui_skin_note_shape_label(config_.skin.note_shape),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::NoteShape), false, true);
@@ -884,15 +884,15 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     append_menu_row(render.generic, ui_text("Image Aspect", "이미지 비율"),
                     ui_skin_note_image_aspect_label(config_.skin.note_image_aspect),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::ImageAspect), false, true);
-    append_menu_row(render.generic, ui_text("White Dividers", "흰 레인 구분선"), ui_on_off(config_.skin.show_lane_dividers),
+    append_menu_row(render.generic, ui_text("White Dividers", "키 구분 선"), ui_on_off(config_.skin.show_lane_dividers),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::LaneDividers), false, true);
     append_menu_row(render.generic, ui_text("Judgement Line", "판정선 표시"), ui_on_off(config_.skin.show_judgement_line),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::JudgementLine), false, true);
     append_menu_row(render.generic, ui_text("Gear Boundary", "기어 경계선"), ui_on_off(config_.skin.show_gear_boundary_line),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::GearBoundary), false, true);
-    append_menu_row(render.generic, ui_text("LN Tail Cap", "LN \uD14C\uC77C \uCEA1"), ui_on_off(config_.skin.show_hold_tail),
+    append_menu_row(render.generic, ui_text("LN Tail Cap", "LN 끝 표시"), ui_on_off(config_.skin.show_hold_tail),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::ShowHoldTail), false, true);
-    append_menu_row(render.generic, ui_text("LN Tail Taper", "LN 꼬리 테이퍼"), ui_on_off(config_.skin.hold_tail_taper_enabled),
+    append_menu_row(render.generic, ui_text("LN Tail Taper", "LN 끝 사기롱놋화"), ui_on_off(config_.skin.hold_tail_taper_enabled),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::LnTailTaper), false, true);
     append_menu_row(render.generic, ui_text("Lane Tint Opacity", "레인 색상 농도"),
                     format_percent(config_.skin.lane_background_opacity),
@@ -908,20 +908,20 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::LnBodyOpacity), false, true);
     append_menu_row(render.generic, ui_text("Judge Glow", "판정선 글로우"), ui_on_off(config_.skin.judgement_line_glow_enabled),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::JudgementLineGlow), false, true);
-    append_menu_row(render.generic, ui_text("Hit Burst Style", "키 폭발 모양"),
+    append_menu_row(render.generic, ui_text("Hit Burst Style", "키 키밤 모양"),
                     config::skin_hit_burst_style_label(config_.skin.hit_burst_style),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::HitBurstStyle), false, true);
     append_menu_row(render.generic, ui_text("HUD Style", "HUD 스타일"),
                     config::normalize_skin_hud_layout_token(config_.skin.hud_layout) == "classic"
                         ? ui_text("Classic", "클래식") : ui_text("Studio Deck", "스튜디오 덱"),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::HudLayout), false, true);
-    append_menu_row(render.generic, ui_text("Studio Riff Map", "스튜디오 리프 맵"),
+    append_menu_row(render.generic, ui_text("Studio Riff Map", "그래프 맵"),
                     ui_on_off(config_.skin.hud_riff_map_visible),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::HudRiffMapVisible), false, true);
-    append_menu_row(render.generic, ui_text("Hit Burst Brightness", "키 폭발 밝기"),
+    append_menu_row(render.generic, ui_text("Hit Burst Brightness", "키 키밤 밝기"),
                     format_percent(config_.skin.key_pulse_brightness),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::KeyPulse), false, true);
-    append_menu_row(render.generic, ui_text("Key Labels", "키 이름"),
+    append_menu_row(render.generic, ui_text("Key Labels", "키 표시 위치"),
                     config::skin_key_label_position_label(config_.skin.key_label_position),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::KeyLabelPosition), false, true);
     append_menu_row(render.generic, ui_text("Judge Line", "판정선 위치"), format_percent(config_.skin.judgement_line_position),
@@ -1005,19 +1005,19 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     append_menu_row(render.generic, ui_text("Back", "뒤로"), "", false,
                     render::MenuHitTargetKind::SettingsRow,
                     static_cast<int>(SkinSettingsRowId::Back), true, false);
-    append_menu_row(render.generic, ui_text("Key Press Backdrop", "키 입력 배경색"),
+    append_menu_row(render.generic, ui_text("Key Press Backdrop", "키 빔"),
                     ui_on_off(backdrop_enabled), false,
                     render::MenuHitTargetKind::SettingsRow,
                     static_cast<int>(SkinSettingsRowId::KeyBackdrop), false, true);
-    append_slider_menu_row(render.generic, ui_text("Key Backdrop Opacity", "키 배경색 농도"),
+    append_slider_menu_row(render.generic, ui_text("Key Backdrop Opacity", "키 빔 농도"),
                            format_percent(backdrop_opacity),
                            backdrop_opacity, false,
                            render::MenuHitTargetKind::SettingsRow,
                            static_cast<int>(SkinSettingsRowId::KeyBackdropOpacity));
-    append_slider_menu_row(render.generic, ui_text("Key Backdrop Brightness", "키 배경색 밝기"),
+    append_slider_menu_row(render.generic, ui_text("Key Backdrop Brightness", "키 빔 밝기"),
                            format_percent(backdrop_brightness), backdrop_brightness / 2.0, false,
                            render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::KeyBackdropBrightness));
-    append_slider_menu_row(render.generic, ui_text("Key Backdrop Max Height", "키 배경색 최대 높이"),
+    append_slider_menu_row(render.generic, ui_text("Key Backdrop Max Height", "키 빔 최대 높이"),
                            format_percent(backdrop_height), backdrop_height, false,
                            render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::KeyBackdropHeight));
     append_slider_menu_row(render.generic, ui_text("Combo Font Size", "콤보 글자 크기"),
@@ -1225,7 +1225,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
         "왼쪽부터 레인을 선택합니다: 1-9, 0=10, Shift+1-6=11-16. 현재 설정 행은 그대로 유지됩니다."));
     render.generic.notes.push_back(ui_text(
         "Key backdrop has separate On/Off, opacity, brightness (0-200%) and maximum height (0-100%, from the field bottom). Hit-burst brightness is separate.",
-        "키 배경색은 켬/끔, 농도, 밝기(0~200%), 최대 높이(필드 아래부터 0~100%)를 따로 조절합니다. 키 폭발 밝기는 별도입니다."));
+        "키 빔은 켬/끔, 농도, 밝기(0~200%), 최대 높이(필드 아래부터 0~100%)를 따로 조절합니다. 키 키밤 밝기는 별도입니다."));
     render.generic.notes.push_back(ui_text(
         "Judgement line thickness scales with Note Height; the preview uses the gameplay renderer.",
         "판정선 두께는 노트 높이 비율을 따릅니다. 미리보기는 실제 게임 렌더러를 사용합니다."));

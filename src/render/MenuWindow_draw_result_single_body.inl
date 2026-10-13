@@ -18,6 +18,10 @@
             d2d_->note_fill_brush->SetOpacity(1.0f);
             return d2d_->note_fill_brush.Get();
         };
+        const auto result_status_brush = [&](ID2D1Brush* fallback) -> ID2D1Brush* {
+            const auto rgb = result_gauge_shift_clear_color(data.result.status);
+            return rgb ? semantic_brush(*rgb) : fallback;
+        };
         const auto draw_result_outline = [&](const D2D1_RECT_F& rect, uint32_t rgb,
                                             float width, float alpha, float radius = 12.0f) {
             auto* brush = semantic_brush(rgb);
@@ -334,9 +338,10 @@
             -information_slide, 0.0f);
         draw_result_panel(song_panel, presentation.information, true);
         if (modern_library_screen) draw_result_outline(song_panel, 0xA9BAC6, 1.6f, presentation.information);
+        const float author_space = data.result.chart_author.empty() ? 0.0f : 26.0f;
         const D2D1_RECT_F art_rect =
             native_rect("result_single.rect.011", D2D1::RectF(song_panel.left + 44.0f, song_panel.top + 42.0f,
-                        song_panel.right - 44.0f, song_panel.top + 382.0f));
+                        song_panel.right - 44.0f, song_panel.top + 382.0f - author_space));
         if (result_art) {
             const D2D1_RECT_F source = centered_bitmap_source_rect(result_art->GetSize(), art_rect);
             ctx->DrawBitmap(result_art,
@@ -354,16 +359,22 @@
                          DWRITE_TEXT_ALIGNMENT_TRAILING);
         draw_result_text(data.result.title.empty() ? std::string("Unknown Chart") : data.result.title,
                          d2d_->result_action_format.Get(),
-                         native_rect("result_single.rect.013", D2D1::RectF(song_panel.left + 44.0f, song_panel.top + 402.0f,
-                                     song_panel.right - 44.0f, song_panel.top + 455.0f)),
+                         native_rect("result_single.rect.013", D2D1::RectF(song_panel.left + 44.0f, song_panel.top + 402.0f - author_space,
+                                     song_panel.right - 44.0f, song_panel.top + 455.0f - author_space)),
                          d2d_->text_brush.Get(),
                          presentation.information);
         draw_result_text(data.result.artist.empty() ? std::string("Unknown Artist") : data.result.artist,
                          d2d_->result_body_format.Get(),
-                         native_rect("result_single.rect.014", D2D1::RectF(song_panel.left + 44.0f, song_panel.top + 455.0f,
-                                     song_panel.right - 44.0f, song_panel.top + 488.0f)),
+                         native_rect("result_single.rect.014", D2D1::RectF(song_panel.left + 44.0f, song_panel.top + 455.0f - author_space,
+                                     song_panel.right - 44.0f, song_panel.top + 488.0f - author_space)),
                          d2d_->muted_brush.Get(),
                          presentation.information);
+        if (!data.result.chart_author.empty()) {
+            draw_result_text("obj: " + data.result.chart_author, d2d_->body_format.Get(),
+                             native_rect("result_single.chart_author", D2D1::RectF(song_panel.left + 44.0f, song_panel.top + 464.0f,
+                                         song_panel.right - 44.0f, song_panel.top + 490.0f)),
+                             d2d_->muted_brush.Get(), presentation.information);
+        }
 
         const int display_level = data.result.level > 0 ? data.result.level : data.result.native_level;
         const std::string mode_label =
@@ -568,8 +579,8 @@
         draw_result_text(localized_result_status(),
                          d2d_->title_format.Get(),
                          status_rect,
-                         result_success ? static_cast<ID2D1Brush*>(d2d_->text_brush.Get())
-                                        : static_cast<ID2D1Brush*>(d2d_->muted_brush.Get()),
+                         result_status_brush(result_success ? static_cast<ID2D1Brush*>(d2d_->text_brush.Get())
+                                                           : static_cast<ID2D1Brush*>(d2d_->muted_brush.Get())),
                          presentation.status,
                          DWRITE_TEXT_ALIGNMENT_CENTER);
         if (presentation.status_scan > 0.0f && presentation.status_scan < 1.0f &&
@@ -839,15 +850,17 @@
             {result_loc("ACCURACY", "정확도"), format_decimal(data.result.accuracy) + "%",
              result_loc("DETAIL", "상세") + " " + format_decimal(data.result.detailed_accuracy) + "%", D2D1::ColorF(0x63E9FF)},
         }};
-        // Keep large percentages readable without shrinking all seven columns.
-        constexpr std::array<float, 7> statistic_weights = {1, 1, 1, 1, 1, 1.15f, 1.35f};
-        const float statistic_unit = (stats_panel.right - stats_panel.left) / 7.5f;
+        // The native summary owns both accuracies. Legacy image layouts still
+        // need their original accuracy cell because they do not draw that summary.
+        const std::size_t statistic_count = modern_library_screen ? 6 : result_statistics.size();
+        constexpr std::array<float, 7> legacy_statistic_weights = {1, 1, 1, 1, 1, 1.15f, 1.35f};
+        const float statistic_unit = (stats_panel.right - stats_panel.left) / (modern_library_screen ? 6.0f : 7.5f);
         float statistic_left = stats_panel.left;
-        for (std::size_t index = 0; index < result_statistics.size(); ++index) {
+        for (std::size_t index = 0; index < statistic_count; ++index) {
             const float alpha = presentation.statistics[index];
             const float rise = 18.0f * (1.0f - alpha);
             const float left = statistic_left;
-            const float statistic_width = statistic_unit * statistic_weights[index];
+            const float statistic_width = statistic_unit * (modern_library_screen ? 1.0f : legacy_statistic_weights[index]);
             statistic_left += statistic_width;
             const D2D1_RECT_F cell =
                 native_rect("result_single.rect.039", D2D1::RectF(left, stats_panel.top, left + statistic_width, stats_panel.bottom));

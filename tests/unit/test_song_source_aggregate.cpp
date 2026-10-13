@@ -30,6 +30,23 @@ struct MenuAppSongSourceTestAccess {
         menu->populate_song_select_render_data(render, {}, {}, nullptr);
         return render;
     }
+    static void check_metadata_handoff(const SongEntry& entry, const std::string& root) {
+        auto menu = std::make_unique<MenuApp>();
+        menu->songs_path_ = root;
+        menu->song_select_view_ = MenuApp::SongSelectView::Songs;
+        menu->update_song_list(SongIndex{{entry}});
+        render::MenuRenderData render;
+        menu->populate_song_select_render_data(render, {}, {}, nullptr);
+        CHECK(render.song_select.selected_song_chart_author == entry.chart_author);
+        CHECK(render.song_select.selected_song_has_bpm_changes == entry.has_bpm_changes);
+        menu->update_last_chart_metadata((std::filesystem::u8path(root) / entry.path).u8string(), &entry);
+        menu->populate_result_render_data(render, {});
+        CHECK(render.result.chart_author == entry.chart_author);
+        CHECK(render.result.artist == entry.artist);
+        menu->update_last_chart_metadata((std::filesystem::u8path(root) / "unindexed.bms").u8string(), nullptr);
+        menu->populate_result_render_data(render, {});
+        CHECK(render.result.chart_author.empty());
+    }
 };
 }  // namespace tenriff::app
 #endif
@@ -253,6 +270,19 @@ TEST_CASE("ALL SONG skips deleted folders inside a valid cache and continues wit
 }
 
 #ifdef _WIN32
+TEST_CASE("1.8.9.4 metadata passes indexed author and BPM changes into lobby and result without stale credits") {
+    AggregateFixture f;
+    const auto root = f.source("metadata");
+    write_text(root / "chart.bms", u8"#TITLE Metadata fixture\n#ARTIST Composer\n#SUBARTIST obj: パターン作者\n"
+               "#BPM 120\n#00103:96\n#00211:01\n");
+    std::vector<std::string> warnings;
+    const auto index = scan_songs(root.u8string(), nullptr, warnings);
+    REQUIRE(index.entries.size() == 1);
+    REQUIRE(index.entries.front().chart_author == u8"パターン作者");
+    REQUIRE(index.entries.front().has_bpm_changes);
+    MenuAppSongSourceTestAccess::check_metadata_handoff(index.entries.front(), root.u8string());
+}
+
 TEST_CASE("ALL SONG final aggregate reaches visible song cards despite a missing middle source") {
     AggregateFixture f;
     const auto first = f.source("first"), last = f.source("last");

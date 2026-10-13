@@ -528,7 +528,8 @@ int key_count_from_mode_token(std::string_view token) {
 
 bool should_store_index_header(std::string_view key) {
     if (key == "BPM" || key == "PLAYER" || key == "GENRE" || key == "TITLE" || key == "ARTIST" ||
-        key == "SUBTITLE" || key == "DIFFICULTY" || key == "PLAYLEVEL" || key == "RANK" ||
+        key == "SUBTITLE" || key == "SUBARTIST" || key == "COMMENT" ||
+        key == "DIFFICULTY" || key == "PLAYLEVEL" || key == "RANK" ||
         key == "TOTAL" || key == "VOLWAV" || key == "LNOBJ" || key == "LNTYPE" || key == "LNMODE" ||
         key == "STAGEFILE" || key == "BACKBMP" || key == "MODEHINT" ||
         key == "PREVIEW" || key == "PREVIEWFILE") {

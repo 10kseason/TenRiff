@@ -35,7 +35,8 @@
     "font.song_record_detail.size": 22.0,
     "font.song_title.size": 24.0,
     "font.song_artist.size": 18.0,
-    "font.result_score.size": 100.0,
+    "font.result_score.size": 64.0,
+    "font.result_grade.size": 144.0,
     "font.song_metadata_value.size": 36.0,
     "font.result_metric.size": 52.0,
     "font.result_judgement.size": 46.0,
@@ -792,6 +793,12 @@
       0,
       0
     ],
+    "result_single.chart_author": [
+      0,
+      0,
+      0,
+      0
+    ],
     "result_single.rect.015": [
       0,
       0,
@@ -978,12 +985,6 @@
       0,
       0
     ],
-    "result_summary.rect.008": [
-      0,
-      0,
-      0,
-      0
-    ],
     "result_summary.rect.009": [
       0,
       0,
@@ -991,6 +992,12 @@
       0
     ],
     "result_summary.rect.010": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "result_summary.rect.008": [
       0,
       0,
       0,
@@ -1021,6 +1028,12 @@
       0
     ],
     "result_summary.rect.015": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "result_summary.rect.016": [
       0,
       0,
       0,
@@ -1375,6 +1388,12 @@
       0
     ],
     "songselect.rect.060": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "songselect.chart_author": [
       0,
       0,
       0,
@@ -1841,6 +1860,7 @@
     "song_title": "Segoe UI",
     "song_artist": "Segoe UI",
     "result_score": "Bahnschrift",
+    "result_grade": "Bahnschrift SemiBold",
     "song_metadata_value": "Segoe UI",
     "result_metric": "Segoe UI",
     "result_judgement": "Segoe UI",
@@ -2362,147 +2382,152 @@
     },
     "rects.result_single.rect.001": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 221,
+      "line": 225,
       "expression": "0.0f, 0.0f, kBaseWidth, kBaseHeight"
     },
     "rects.result_single.rect.002": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 266,
+      "line": 270,
       "expression": "54.0f, 38.0f, 1866.0f, 122.0f"
     },
     "rects.result_single.rect.003": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 269,
+      "line": 273,
       "expression": "128, 36, 384, 100"
     },
     "rects.result_single.rect.004": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 272,
+      "line": 276,
       "expression": "410.0f, 44.0f, 600.0f, 84.0f"
     },
     "rects.result_single.rect.005": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 277,
+      "line": 281,
       "expression": "410.0f, 80.0f, 650.0f, 108.0f"
     },
     "rects.result_single.rect.006": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 291,
+      "line": 295,
       "expression": "1400.0f, 28.0f, 1848.0f, 108.0f"
     },
     "rects.result_single.rect.007": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 296,
+      "line": 300,
       "expression": "profile_rect.left + 15.0f, profile_rect.top + 9.0f, profile_rect.left + 77.0f, profile_rect.top + 71.0f"
     },
     "rects.result_single.rect.008": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 319,
+      "line": 323,
       "expression": "profile_text_left, profile_rect.top + 10.0f, profile_rect.right - 23.0f, profile_rect.top + 44.0f"
     },
     "rects.result_single.rect.009": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 325,
+      "line": 329,
       "expression": "profile_text_left, profile_rect.top + 44.0f, profile_rect.right - 23.0f, profile_rect.bottom - 9.0f"
     },
     "rects.result_single.rect.010": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 333,
+      "line": 337,
       "expression": "70.0f, 154.0f, 590.0f, modern_library_screen ? 738.0f : 704.0f"
     },
     "rects.result_single.rect.011": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 338,
-      "expression": "song_panel.left + 44.0f, song_panel.top + 42.0f, song_panel.right - 44.0f, song_panel.top + 382.0f"
+      "line": 343,
+      "expression": "song_panel.left + 44.0f, song_panel.top + 42.0f, song_panel.right - 44.0f, song_panel.top + 382.0f - author_space"
     },
     "rects.result_single.rect.012": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 350,
+      "line": 355,
       "expression": "song_panel.left + 230.0f, song_panel.top + 14.0f, song_panel.right - 24.0f, song_panel.top + 38.0f"
     },
     "rects.result_single.rect.013": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 357,
-      "expression": "song_panel.left + 44.0f, song_panel.top + 402.0f, song_panel.right - 44.0f, song_panel.top + 455.0f"
+      "line": 362,
+      "expression": "song_panel.left + 44.0f, song_panel.top + 402.0f - author_space, song_panel.right - 44.0f, song_panel.top + 455.0f - author_space"
     },
     "rects.result_single.rect.014": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 363,
-      "expression": "song_panel.left + 44.0f, song_panel.top + 455.0f, song_panel.right - 44.0f, song_panel.top + 488.0f"
+      "line": 368,
+      "expression": "song_panel.left + 44.0f, song_panel.top + 455.0f - author_space, song_panel.right - 44.0f, song_panel.top + 488.0f - author_space"
+    },
+    "rects.result_single.chart_author": {
+      "file": "MenuWindow_draw_result_single_body.inl",
+      "line": 374,
+      "expression": "song_panel.left + 44.0f, song_panel.top + 464.0f, song_panel.right - 44.0f, song_panel.top + 490.0f"
     },
     "rects.result_single.rect.015": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 382,
+      "line": 393,
       "expression": "left, song_panel.top + 494.0f, left + metadata_width - 8.0f, song_panel.top + 522.0f"
     },
     "rects.result_single.rect.016": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 388,
+      "line": 399,
       "expression": "left, song_panel.top + 522.0f, left + metadata_width - 8.0f, song_panel.top + 568.0f"
     },
     "rects.result_single.rect.026": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 631,
+      "line": 642,
       "expression": "1320.0f, 154.0f, 1848.0f, modern_library_screen ? 738.0f : 704.0f"
     },
     "rects.result_single.rect.027": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 636,
+      "line": 647,
       "expression": "analysis_panel.left + 24.0f, analysis_panel.top + 18.0f, analysis_panel.right - 24.0f, analysis_panel.top + 48.0f"
     },
     "rects.result_single.rect.028": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 643,
+      "line": 654,
       "expression": "analysis_panel.left + 26.0f, analysis_panel.top + 66.0f, analysis_panel.right - 26.0f, analysis_panel.top + 98.0f"
     },
     "rects.result_single.rect.029": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 648,
+      "line": 659,
       "expression": "analysis_panel.left + 30.0f, analysis_panel.top + 118.0f, analysis_panel.right - 30.0f, analysis_panel.top + 226.0f"
     },
     "rects.result_single.rect.030": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 683,
+      "line": 694,
       "expression": "timing_track.left + 12.0f, timing_track.top + 8.0f, center_x - 12.0f, timing_track.top + 46.0f"
     },
     "rects.result_single.rect.031": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 686,
+      "line": 697,
       "expression": "center_x + 12.0f, timing_track.top + 8.0f, timing_track.right - 12.0f, timing_track.top + 46.0f"
     },
     "rects.result_single.rect.032": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 709,
+      "line": 720,
       "expression": "timing_track.left, timing_track.bottom + 8.0f, center_x, timing_track.bottom + 36.0f"
     },
     "rects.result_single.rect.033": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 717,
+      "line": 728,
       "expression": "center_x, timing_track.bottom + 8.0f, timing_track.right, timing_track.bottom + 36.0f"
     },
     "rects.result_single.rect.034": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 725,
+      "line": 736,
       "expression": "analysis_panel.left + 26.0f, analysis_panel.top + 286.0f, analysis_panel.right - 26.0f, analysis_panel.top + 318.0f"
     },
     "rects.result_single.rect.035": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 730,
+      "line": 741,
       "expression": "analysis_panel.left + 30.0f, analysis_panel.top + 332.0f, analysis_panel.right - 30.0f, analysis_panel.bottom - 36.0f"
     },
     "rects.result_single.rect.036": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 736,
+      "line": 747,
       "expression": "gauge_plot.left + gauge_axis_width, gauge_plot.top, gauge_plot.right, gauge_plot.bottom"
     },
     "rects.result_single.rect.037": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 750,
+      "line": 761,
       "expression": "gauge_plot.left, y - 16.0f, gauge_track.left - 8.0f, y + 16.0f"
     },
     "rects.result_single.rect.038": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 806,
+      "line": 817,
       "expression": "70.0f, 770.0f, 1270.0f, 994.0f"
     },
     "rects.result_summary.rect.001": {
@@ -2512,47 +2537,47 @@
     },
     "rects.result_single.rect.039": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 853,
+      "line": 866,
       "expression": "left, stats_panel.top, left + statistic_width, stats_panel.bottom"
     },
     "rects.result_single.rect.040": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 871,
+      "line": 884,
       "expression": "cell.left + 14.0f, cell.top + 28.0f + rise, cell.right - 14.0f, cell.top + 58.0f + rise"
     },
     "rects.result_single.rect.041": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 879,
+      "line": 892,
       "expression": "cell.left + 10.0f, cell.top + 70.0f + rise, cell.right - 10.0f, cell.top + 138.0f + rise"
     },
     "rects.result_single.rect.042": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 886,
+      "line": 899,
       "expression": "cell.left + 10.0f, cell.top + 153.0f + rise, cell.right - 10.0f, cell.top + 190.0f + rise"
     },
     "rects.result_single.rect.043": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 919,
+      "line": 932,
       "expression": "1320.0f, 770.0f, 1848.0f, 856.0f"
     },
     "rects.result_single.rect.044": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 921,
+      "line": 934,
       "expression": "1320.0f, 872.0f, 1574.0f, 942.0f"
     },
     "rects.result_single.rect.045": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 923,
+      "line": 936,
       "expression": "1594.0f, 872.0f, 1848.0f, 942.0f"
     },
     "rects.result_single.rect.046": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 974,
+      "line": 987,
       "expression": "1320.0f, 952.0f, 1848.0f, 982.0f"
     },
     "rects.result_single.rect.047": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 982,
+      "line": 995,
       "expression": "620.0f, 1022.0f, 1300.0f, 1050.0f"
     },
     "rects.result_summary.rect.002": {
@@ -2577,53 +2602,58 @@
     },
     "rects.result_summary.rect.006": {
       "file": "MenuWindow_draw_result_summary.inl",
-      "line": 30,
+      "line": 33,
       "expression": "summary_left, 186.0f, summary_right, 216.0f"
     },
     "rects.result_summary.rect.007": {
       "file": "MenuWindow_draw_result_summary.inl",
-      "line": 34,
-      "expression": "summary_left - 4.0f, 220.0f, summary_right, 370.0f"
-    },
-    "rects.result_summary.rect.008": {
-      "file": "MenuWindow_draw_result_summary.inl",
-      "line": 38,
-      "expression": "summary_left, 372.0f, summary_right, 400.0f"
+      "line": 37,
+      "expression": "summary_left - 4.0f, 216.0f, summary_right, 398.0f"
     },
     "rects.result_summary.rect.009": {
       "file": "MenuWindow_draw_result_summary.inl",
-      "line": 50,
+      "line": 49,
       "expression": "summary_left, 424.0f, summary_left + 230.0f, 452.0f"
     },
     "rects.result_summary.rect.010": {
       "file": "MenuWindow_draw_result_summary.inl",
-      "line": 54,
-      "expression": "summary_left, 444.0f, summary_left + 250.0f, 556.0f"
+      "line": 53,
+      "expression": "summary_left, 458.0f, summary_left + 250.0f, 536.0f"
+    },
+    "rects.result_summary.rect.008": {
+      "file": "MenuWindow_draw_result_summary.inl",
+      "line": 57,
+      "expression": "summary_left, 526.0f, summary_left + 250.0f, 554.0f"
     },
     "rects.result_summary.rect.011": {
       "file": "MenuWindow_draw_result_summary.inl",
-      "line": 57,
+      "line": 60,
       "expression": "summary_left + 274.0f, 424.0f, summary_right, 452.0f"
     },
     "rects.result_summary.rect.012": {
       "file": "MenuWindow_draw_result_summary.inl",
-      "line": 61,
-      "expression": "summary_left + 274.0f, 458.0f, summary_right, 548.0f"
+      "line": 64,
+      "expression": "summary_left + 274.0f, 458.0f, summary_right, 536.0f"
     },
     "rects.result_summary.rect.013": {
       "file": "MenuWindow_draw_result_summary.inl",
-      "line": 65,
+      "line": 68,
       "expression": "summary_left, 558.0f, summary_right, 610.0f"
     },
     "rects.result_summary.rect.014": {
       "file": "MenuWindow_draw_result_summary.inl",
-      "line": 74,
+      "line": 77,
       "expression": "status_chip.left + 16.0f, status_chip.top + 8.0f, status_chip.right - 16.0f, status_chip.bottom - 6.0f"
     },
     "rects.result_summary.rect.015": {
       "file": "MenuWindow_draw_result_summary.inl",
       "line": 86,
-      "expression": "summary_left, 634.0f, summary_right, 666.0f"
+      "expression": "summary_left, 634.0f, summary_left + 300.0f, 666.0f"
+    },
+    "rects.result_summary.rect.016": {
+      "file": "MenuWindow_draw_result_summary.inl",
+      "line": 90,
+      "expression": "summary_left + 312.0f, 634.0f, summary_right, 666.0f"
     },
     "rects.songselect.rect.001": {
       "file": "MenuWindow_draw_songselect_body.inl",
@@ -2917,182 +2947,187 @@
     },
     "rects.songselect.rect.060": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 813,
-      "expression": "right_left, right_panel.top + 78.0f, right_right, right_panel.top + 112.0f"
+      "line": 815,
+      "expression": "right_left, right_panel.top + 78.0f, right_right, right_panel.top + (has_chart_author ? 104.0f : 112.0f)"
+    },
+    "rects.songselect.chart_author": {
+      "file": "MenuWindow_draw_songselect_body.inl",
+      "line": 820,
+      "expression": "right_left, right_panel.top + 106.0f, right_right, right_panel.top + 131.0f"
     },
     "rects.songselect.rect.061": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 821,
+      "line": 829,
       "expression": "right_left, right_panel.top + 150.0f, right_right, right_panel.top + (modern_library_screen ? 280.0f : 332.0f)"
     },
     "rects.songselect.rect.062": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 838,
+      "line": 846,
       "expression": "difficulty_card.left + 18.0f, difficulty_card.top + 14.0f, difficulty_split - 12.0f, difficulty_card.top + 40.0f"
     },
     "rects.songselect.rect.063": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 845,
+      "line": 853,
       "expression": "difficulty_split + 16.0f, difficulty_card.top + 14.0f, difficulty_card.right - 14.0f, difficulty_card.top + 40.0f"
     },
     "rects.songselect.rect.064": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 858,
+      "line": 866,
       "expression": "difficulty_card.left + 18.0f, difficulty_card.top + 38.0f, difficulty_split - 12.0f, difficulty_card.top + (modern_library_screen ? 90.0f : 112.0f)"
     },
     "rects.songselect.rect.065": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 871,
+      "line": 879,
       "expression": "difficulty_card.left + 14.0f, difficulty_card.top + (modern_library_screen ? 94.0f : 118.0f), difficulty_split - 10.0f, difficulty_card.bottom - 14.0f"
     },
     "rects.songselect.rect.066": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 878,
+      "line": 886,
       "expression": "difficulty_split + 12.0f, difficulty_card.top + (modern_library_screen ? 42.0f : 48.0f), difficulty_card.right - 12.0f, difficulty_card.top + (modern_library_screen ? 90.0f : 112.0f)"
     },
     "rects.songselect.rect.067": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 891,
+      "line": 899,
       "expression": "difficulty_split + 12.0f, difficulty_card.top + (modern_library_screen ? 94.0f : 118.0f), difficulty_card.right - 12.0f, difficulty_card.bottom - 14.0f"
     },
     "rects.songselect.rect.068": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 903,
+      "line": 911,
       "expression": "right_left, metadata_top, right_right, metadata_top + (modern_library_screen ? 154.0f : 78.0f)"
     },
     "rects.songselect.rect.069": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 939,
+      "line": 947,
       "expression": "metadata_cell(0)"
     },
     "rects.songselect.rect.070": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 940,
+      "line": 948,
       "expression": "metadata_cell(1)"
     },
     "rects.songselect.rect.071": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 941,
+      "line": 949,
       "expression": "metadata_cell(2)"
     },
     "rects.songselect.rect.072": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 942,
+      "line": 950,
       "expression": "metadata_cell(3)"
     },
     "rects.songselect.rect.073": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 966,
+      "line": 975,
       "expression": "right_left, right_panel.top + (modern_library_screen ? 472.0f : 460.0f), right_right, right_panel.top + (modern_library_screen ? 612.0f : 608.0f)"
     },
     "rects.songselect.rect.074": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 982,
+      "line": 991,
       "expression": "mode_area.left + col * (mode_width + mode_gap), mode_area.top + row * (mode_height + mode_gap), mode_area.left + col * (mode_width + mode_gap) + mode_width, mode_area.top + row * (mode_height + mode_gap) + mode_height"
     },
     "rects.songselect.rect.075": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1005,
+      "line": 1014,
       "expression": "cell.left + 12.0f, cell.top + 5.0f, cell.right - 12.0f, cell.top + 29.0f"
     },
     "rects.songselect.rect.076": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1011,
+      "line": 1020,
       "expression": "cell.left + 12.0f, cell.top + 26.0f, cell.right - 12.0f, cell.bottom - 4.0f"
     },
     "rects.songselect.rect.077": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1020,
+      "line": 1029,
       "expression": "value_rect.left + 2.0f, value_rect.top + 2.0f, value_rect.right + 2.0f, value_rect.bottom + 2.0f"
     },
     "rects.songselect.rect.078": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1053,
+      "line": 1062,
       "expression": "right_left, right_panel.top + 626.0f, right_right, right_panel.top + 654.0f"
     },
     "rects.songselect.rect.079": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1058,
+      "line": 1067,
       "expression": "right_left, right_panel.top + 432.0f, right_right, right_panel.top + 492.0f"
     },
     "rects.songselect.rect.080": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1060,
+      "line": 1069,
       "expression": "right_left, right_panel.top + 508.0f, right_right, right_panel.top + 568.0f"
     },
     "rects.songselect.rect.081": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1072,
+      "line": 1081,
       "expression": "right_left, right_panel.top + 583.0f, right_right, right_panel.top + 617.0f"
     },
     "rects.songselect.rect.082": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1075,
+      "line": 1084,
       "expression": "right_left, right_panel.top + 162.0f, right_left + 190.0f, right_panel.top + 238.0f"
     },
     "rects.songselect.rect.083": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1081,
+      "line": 1090,
       "expression": "right_left + 220.0f, right_panel.top + 162.0f, right_left + 390.0f, right_panel.top + 238.0f"
     },
     "rects.songselect.rect.084": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1088,
+      "line": 1097,
       "expression": "right_left, right_panel.top + 270.0f, right_right, right_panel.top + 410.0f"
     },
     "rects.songselect.rect.085": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1093,
+      "line": 1102,
       "expression": "right_left, right_panel.top + 162.0f, right_right, right_panel.top + 238.0f"
     },
     "rects.songselect.rect.086": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1098,
+      "line": 1107,
       "expression": "right_left, right_panel.top + 252.0f, right_left + (right_right - right_left) * 0.62f, right_panel.top + 332.0f"
     },
     "rects.songselect.rect.087": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1104,
+      "line": 1113,
       "expression": "right_left + (right_right - right_left) * 0.67f, right_panel.top + 252.0f, right_right, right_panel.top + 332.0f"
     },
     "rects.songselect.rect.088": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1118,
+      "line": 1127,
       "expression": "right_left, right_panel.top + 354.0f, right_right, right_panel.top + 390.0f"
     },
     "rects.songselect.rect.089": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1133,
+      "line": 1142,
       "expression": "right_left, right_panel.top + 410.0f, right_right, right_panel.top + 470.0f"
     },
     "rects.songselect.rect.090": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1138,
+      "line": 1147,
       "expression": "right_left, right_panel.top + 490.0f, right_right, right_panel.top + 550.0f"
     },
     "rects.songselect.rect.091": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1147,
+      "line": 1156,
       "expression": "right_left, right_panel.bottom - 112.0f, right_right, right_panel.bottom - 24.0f"
     },
     "rects.songselect.rect.092": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1188,
+      "line": 1197,
       "expression": "38.0f, 944.0f, 1882.0f, 1048.0f"
     },
     "rects.songselect.rect.093": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1191,
+      "line": 1200,
       "expression": "bottom_bar.left + 12.0f, bottom_bar.top + 12.0f, bottom_bar.left + 260.0f, bottom_bar.bottom - 12.0f"
     },
     "rects.songselect.rect.094": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1201,
+      "line": 1210,
       "expression": "back_button.right + 28.0f, bottom_bar.top + 12.0f, bottom_bar.right - 28.0f, bottom_bar.top + 48.0f"
     },
     "rects.songselect.rect.095": {
       "file": "MenuWindow_draw_songselect_body.inl",
-      "line": 1205,
+      "line": 1214,
       "expression": "back_button.right + 28.0f, bottom_bar.top + 48.0f, bottom_bar.right - 28.0f, bottom_bar.bottom - 10.0f"
     },
     "rects.title_native.rect.001": {

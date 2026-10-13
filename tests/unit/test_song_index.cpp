@@ -751,7 +751,7 @@ TEST_CASE("cached song index load drops non-BMS menu entries") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 15,\n"
+               "  \"version\": 16,\n"
                "  \"entries\": [\n"
                "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"chart_name\":\"MX\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
                "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"chart_name\":\"Another\",\"format\":\"bms\",\"layout_label\":\"5+1 SP\",\"key_count\":6,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1},\n"
@@ -786,7 +786,7 @@ TEST_CASE("cached song index filters non-BMS entries") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 15,\n"
+               "  \"version\": 16,\n"
                "  \"entries\": [\n"
                 "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"chart_name\":\"MX\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
                 "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"format\":\"bms\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
@@ -808,7 +808,7 @@ TEST_CASE("streaming song index loader parses compact single-line schema 13 cach
 
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
-               "{\"version\":15,\"entries\":["
+               "{\"version\":16,\"entries\":["
                "{\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"Composer\",\"chart_name\":\"Hyper\",\"format\":\"bms\",\"layout_label\":\"7+1 SP\",\"key_count\":8,\"level\":12,\"rating\":7.5,\"bpm\":150,\"mtime\":1},"
                "{\"path\":\"ignored.osu\",\"title\":\"Ignored\",\"artist\":\"Mapper\",\"format\":\"osu\",\"key_count\":10,\"level\":13,\"rating\":8.5,\"bpm\":180,\"mtime\":2}"
                "]}");
@@ -960,7 +960,7 @@ TEST_CASE("cached song index sanitizes control heavy metadata on load") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 15,\n"
+               "  \"version\": 16,\n"
                "  \"entries\": [\n"
                 "    {\"path\":\"legacy.bms\",\"title\":\"Bad\\nTitle\",\"artist\":\"Artist\\tName\",\"chart_name\":\"Hyper\\r\",\"format\":\"bms\\r\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
                "  ]\n"
@@ -1133,7 +1133,7 @@ TEST_CASE("stale song index version triggers silent rescan instead of using cach
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 14,\n"
+               "  \"version\": 15,\n"
                "  \"entries\": [\n"
                 "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"format\":\"bms\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
                "  ]\n"
@@ -1210,6 +1210,87 @@ TEST_CASE("song index and chart loader agree on duration-based reference BPM") {
         for (std::size_t i = 0; i < index.entries.size(); ++i) {
             CHECK(cached.index.entries[i].bpm == doctest::Approx(index.entries[i].bpm));
         }
+    }
+}
+
+TEST_CASE("1.8.9.4 metadata extracts explicit OBJ credits with header priority and UTF-8 cache roundtrip") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        {u8"#SUBARTIST oBj \t: 茜 あかね / BGA: Movie\n#ARTIST Composer (obj: Other)\n", u8"茜 あかね"},
+        {"#SUBARTIST BGA: Movie\n#ARTIST Composer (OBJ: Pattern)\n#COMMENT obj: Other\n", "Pattern"},
+        {u8"#ARTIST Composer\n#COMMENT \"obj：　패터너\"\n", u8"패터너"},
+        {u8"#COMMENT 'obj: 譜面作者'\n", u8"譜面作者"},
+        {"#SUBARTIST obj: \"Quoted Name\"\n", "Quoted Name"},
+        {"#SUBARTIST obj: O'Brien\n", "O'Brien"},
+        {"#SUBARTIST Unlabelled Collaborator\n#ARTIST Composer\n#COMMENT Object: not a credit\n", ""},
+        {"#SUBARTIST object: nope; subjectobj: nope\n#COMMENT obj: Fallback; BGA: Movie\n", "Fallback"},
+        {"#SUBARTIST obj:   \n#ARTIST Composer [obj: Another]\n", "Another"},
+        {"#SETRANDOM 1\n#IF 2\n#SUBARTIST obj: Inactive\n#ELSE\n#SUBARTIST obj: Active\n#ENDIF\n", "Active"},
+    };
+    for (std::size_t i = 0; i < cases.size(); ++i)
+        write_file(temp.path / (std::to_string(i) + ".bms"),
+                   "#TITLE Credit fixture\n#BPM 120\n#00111:01\n" + cases[i].first);
+    for (const auto profile : {tenriff::app::SongIndexProfile::Safe, tenriff::app::SongIndexProfile::Fast}) {
+        SongIndexOptions options;
+        options.profile = profile;
+        std::vector<std::string> warnings;
+        const auto index = scan_songs(temp.path.u8string(), nullptr, warnings, {}, options);
+        REQUIRE(index.entries.size() == cases.size());
+        for (const auto& entry : index.entries) {
+            const auto fixture = static_cast<std::size_t>(std::stoi(entry.path));
+            CHECK_EQ(entry.chart_author, cases[fixture].second);
+            CHECK_FALSE(entry.has_bpm_changes);
+        }
+        const auto path = temp.path / "credit-cache.json";
+        REQUIRE(save_song_index(path.u8string(), index, options));
+        const auto cached = load_song_index(path.u8string(), options);
+        REQUIRE(cached.loaded_from_file);
+        REQUIRE(cached.index.entries.size() == index.entries.size());
+        for (std::size_t i = 0; i < index.entries.size(); ++i)
+            CHECK(cached.index.entries[i].chart_author == index.entries[i].chart_author);
+        // Cached metadata reuse must retain the new fields as well.
+        const auto reused = scan_songs(temp.path.u8string(), &cached.index, warnings, {}, options);
+        REQUIRE(reused.entries.size() == index.entries.size());
+        for (std::size_t i = 0; i < index.entries.size(); ++i)
+            CHECK(reused.entries[i].chart_author == index.entries[i].chart_author);
+    }
+}
+
+TEST_CASE("1.8.9.4 metadata marks only distinct running BPM values and ignores stops or unused definitions") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    const std::vector<std::pair<std::string, bool>> cases = {
+        {"#BPM01 240\n", false},
+        {"#BPM01 120\n#00108:01\n#00203:78\n", false},
+        {"#STOP01 1920\n#00109:01\n", false},
+        {"#00103:96\n", true},
+        {"#BPM01 180.5\n#00108:01\n", true},
+        {"#BPM01 180\n#00108:01\n#00203:78\n", true},
+        {"#BPM01 180\n#00008:01\n#00103:B4\n", false},
+        {"#BPM01 120\n#00103:F0\n#00108:01\n", false},
+        {"#BPM01 240\n#SETRANDOM 1\n#IF 2\n#00108:01\n#ENDIF\n", false},
+    };
+    for (std::size_t i = 0; i < cases.size(); ++i)
+        write_file(temp.path / (std::to_string(i) + ".bms"),
+                   "#TITLE Tempo fixture\n#BPM 120\n#00311:01\n" + cases[i].first);
+    for (const auto profile : {tenriff::app::SongIndexProfile::Safe, tenriff::app::SongIndexProfile::Fast}) {
+        SongIndexOptions options;
+        options.profile = profile;
+        std::vector<std::string> warnings;
+        const auto index = scan_songs(temp.path.u8string(), nullptr, warnings, {}, options);
+        REQUIRE(index.entries.size() == cases.size());
+        for (const auto& entry : index.entries)
+            CHECK(entry.has_bpm_changes == cases[static_cast<std::size_t>(std::stoi(entry.path))].second);
+        const auto path = temp.path / "tempo-cache.json";
+        REQUIRE(save_song_index(path.u8string(), index, options));
+        const auto cached = load_song_index(path.u8string(), options);
+        REQUIRE(cached.loaded_from_file);
+        REQUIRE(cached.index.entries.size() == index.entries.size());
+        for (std::size_t i = 0; i < index.entries.size(); ++i)
+            CHECK(cached.index.entries[i].has_bpm_changes == index.entries[i].has_bpm_changes);
     }
 }
 

@@ -13,7 +13,7 @@
     "background_sound_enabled": true,
     "title_music": "default",
     "volume": 0.7,
-    "bgm_volume": 0.75,
+    "bgm_volume": 1.0,
     "keysound_volume": 1.0,
     "normalize_audio": false,
     "mute_when_inactive": false,

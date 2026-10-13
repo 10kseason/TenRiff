@@ -25,18 +25,17 @@
         }
         const float summary_left = summary_panel.left + 36.0f;
         const float summary_right = summary_panel.right - 36.0f;
-        draw_result_text(result_loc("YOUR SCORE", "이번 플레이 점수"),
+        const std::string grade_label = result_loc("GRADE", "등급") +
+            (data.result.all_perfect ? result_loc(" · ALL PERFECT", " · 올 퍼펙트")
+             : data.result.full_combo ? result_loc(" · FULL COMBO", " · 풀 콤보") : "");
+        draw_result_text(grade_label,
                          d2d_->result_label_format.Get(),
                          native_rect("result_summary.rect.006", D2D1::RectF(summary_left, 186.0f, summary_right, 216.0f)),
-                         d2d_->muted_brush.Get(), presentation.score);
-        draw_result_text(format_int_with_commas(result_counted_score(data.result.score, presentation.score)),
-                         d2d_->result_score_format.Get(),
-                         native_rect("result_summary.rect.007", D2D1::RectF(summary_left - 4.0f, 220.0f, summary_right, 370.0f)),
-                         d2d_->text_brush.Get(), presentation.score);
-        draw_result_text(result_loc("OUT OF ", "최대 ") + format_int_with_commas(data.result.max_score),
-                         d2d_->result_label_format.Get(),
-                         native_rect("result_summary.rect.008", D2D1::RectF(summary_left, 372.0f, summary_right, 400.0f)),
-                         d2d_->muted_brush.Get(), presentation.score);
+                         d2d_->muted_brush.Get(), presentation.rank);
+        draw_grade(0, to_wide(data.result.rank.empty() ? "--" : data.result.rank),
+                   d2d_->result_grade_format.Get(),
+                   native_rect("result_summary.rect.007", D2D1::RectF(summary_left - 4.0f, 216.0f, summary_right, 398.0f)),
+                   presentation.rank);
 
         if (d2d_->button_border_brush) {
             const float saved = d2d_->button_border_brush->GetOpacity();
@@ -46,19 +45,23 @@
                           d2d_->button_border_brush.Get(), 1.0f);
             d2d_->button_border_brush->SetOpacity(saved);
         }
-        draw_result_text(result_loc("GRADE", "등급"), d2d_->result_label_format.Get(),
+        draw_result_text(result_loc("YOUR SCORE", "이번 플레이 점수"), d2d_->result_label_format.Get(),
                          native_rect("result_summary.rect.009", D2D1::RectF(summary_left, 424.0f, summary_left + 230.0f, 452.0f)),
-                         d2d_->muted_brush.Get(), presentation.rank);
-        draw_grade(0, to_wide(data.result.rank.empty() ? "--" : data.result.rank),
-                   d2d_->grade_format.Get(),
-                   native_rect("result_summary.rect.010", D2D1::RectF(summary_left, 444.0f, summary_left + 250.0f, 556.0f)),
-                   presentation.rank);
+                         d2d_->muted_brush.Get(), presentation.score);
+        draw_result_text(format_int_with_commas(result_counted_score(data.result.score, presentation.score)),
+                         d2d_->result_score_format.Get(),
+                         native_rect("result_summary.rect.010", D2D1::RectF(summary_left, 458.0f, summary_left + 250.0f, 536.0f)),
+                         d2d_->text_brush.Get(), presentation.score);
+        draw_result_text(result_loc("OUT OF ", "최대 ") + format_int_with_commas(data.result.max_score),
+                         d2d_->result_label_format.Get(),
+                         native_rect("result_summary.rect.008", D2D1::RectF(summary_left, 526.0f, summary_left + 250.0f, 554.0f)),
+                         d2d_->muted_brush.Get(), presentation.score);
         draw_result_text(result_loc("ACCURACY", "정확도"), d2d_->result_label_format.Get(),
                          native_rect("result_summary.rect.011", D2D1::RectF(summary_left + 274.0f, 424.0f, summary_right, 452.0f)),
                          d2d_->muted_brush.Get(), presentation.rank);
         draw_result_text(format_decimal(data.result.accuracy, 2) + "%",
                          d2d_->result_accuracy_format.Get(),
-                         native_rect("result_summary.rect.012", D2D1::RectF(summary_left + 274.0f, 458.0f, summary_right, 548.0f)),
+                         native_rect("result_summary.rect.012", D2D1::RectF(summary_left + 274.0f, 458.0f, summary_right, 536.0f)),
                          semantic_brush(0x63E9FF), presentation.rank);
 
         const D2D1_RECT_F status_chip =
@@ -73,15 +76,16 @@
         draw_result_text(localized_result_status(), d2d_->result_action_format.Get(),
                          native_rect("result_summary.rect.014", D2D1::RectF(status_chip.left + 16.0f, status_chip.top + 8.0f,
                                      status_chip.right - 16.0f, status_chip.bottom - 6.0f)),
-                         result_success ? static_cast<ID2D1Brush*>(d2d_->accent_brush.Get())
-                                        : static_cast<ID2D1Brush*>(d2d_->text_brush.Get()),
+                         result_status_brush(result_success ? static_cast<ID2D1Brush*>(d2d_->accent_brush.Get())
+                                                           : static_cast<ID2D1Brush*>(d2d_->text_brush.Get())),
                          presentation.status);
-        const std::string summary_detail = data.result.all_perfect
-            ? result_loc("ALL PERFECT", "올 퍼펙트")
-            : data.result.full_combo ? result_loc("FULL COMBO", "풀 콤보")
-            : result_loc("DETAIL SCORE  ", "상세 점수  ") +
+        const std::string summary_detail = result_loc("DETAIL SCORE  ", "상세 점수  ") +
                   format_int_with_commas(data.result.detail_score) + " / " +
                   format_int_with_commas(data.result.max_detail_score);
-        draw_result_text(summary_detail, d2d_->result_label_format.Get(),
-                         native_rect("result_summary.rect.015", D2D1::RectF(summary_left, 634.0f, summary_right, 666.0f)),
+        draw_result_text(summary_detail, d2d_->body_format.Get(),
+                         native_rect("result_summary.rect.015", D2D1::RectF(summary_left, 634.0f, summary_left + 300.0f, 666.0f)),
                          d2d_->muted_brush.Get(), presentation.status);
+        draw_result_text(result_loc("DETAIL ACCURACY  ", "상세 정확도  ") + format_decimal(data.result.detailed_accuracy, 2) + "%",
+                         d2d_->body_format.Get(),
+                         native_rect("result_summary.rect.016", D2D1::RectF(summary_left + 312.0f, 634.0f, summary_right, 666.0f)),
+                         semantic_brush(0x63E9FF), presentation.status);
