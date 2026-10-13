@@ -28,7 +28,7 @@
 
 2026-10-13에 확인한 로컬·웹 검사는 다음과 같습니다. 로그 이름은 별도 릴리스 검증 자료를 기준으로 하며, 이 수치는 독립 패키지 검증이나 게임 공개 완료를 뜻하지 않습니다.
 
-- 로컬 Release `build-r3` 성공. `ctest-r2`는 CTest 3/3, 1132개 검사와 integration skip 0이며, 오프라인 에디터는 34/34입니다.
+- 로컬 Release `build-r4` 성공. `ctest-r3`는 CTest 3/3, 1132개 검사와 integration skip 0이며, 오프라인 에디터는 34/34입니다.
 - `smoke-r3/smoke-report.json`의 실제 MenuApp·GameSession 합성 입력 검사는 220/220, 실패 0입니다. 실제 창·렌더러와 음소거한 공유 오디오를 사용하지만 물리 OS 입력이나 MenuApp 메인 루프 전체를 검증한 것은 아닙니다.
 - `visuals-r3/summary.json`은 34개 합성 화면과 성공한 Presents 4080회를 기록합니다. 이는 캡처·창 입력·geometry 검사 결과이며, 문구 가독성·잘림 등 별도 이미지 감사 결과와 구분합니다.
 - Studio/Classic 노트 배칭 비교는 각각 7/7이며 최대 채널 차이는 각각 1/255, 2/255입니다. fallback은 동일 픽셀 및 배칭 미사용 조건을 적용합니다.
