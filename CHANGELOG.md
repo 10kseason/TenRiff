@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.8.9.6] - 2026-10-13
+
+- Replace coarse short sleeps in input and gameplay/HUD service loops with reusable thread-owned high-resolution timers; RawInput also wakes on queued messages. Retain short yields and existing polling deadlines.
+- Ship the B comparison behavior without diagnostic buffers, trace files or experiment flags. Keep timer-resource fallbacks and avoid global timer-resolution changes.
+- Preserve numerical judgement windows, R1–R5 processing, score/gauge/audio/render/replay contracts and saved settings. Earlier input collection may change the timing a player feels; physical latency and universal stutter removal are not established. See [scope and checks](docs/release-1.8.9.6-gate.md).
+
 ## [1.8.9.5] - 2026-10-13
 
 - Use R5 chronological automatic judgement deadlines so LN tails, misses, mines, combo and gauge outcomes do not depend on audio callback partitioning. Keep R1–R4 playback/verifier policies and the unchanged R4 timing windows.

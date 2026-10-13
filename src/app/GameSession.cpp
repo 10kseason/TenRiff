@@ -55,6 +55,7 @@
 #include "game/SpeedManager.h"
 #include "gameplay/RiffMap.h"
 #include "timing/HighResClock.h"
+#include "timing/PreciseWait.h"
 
 namespace tenriff::app {
 

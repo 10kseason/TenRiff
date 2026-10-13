@@ -11,6 +11,7 @@
 
 #include "config/KeycodeMap.h"
 #include "timing/HighResClock.h"
+#include "timing/PreciseWait.h"
 
 namespace tenriff::input {
 
@@ -404,6 +405,7 @@ bool InputThread::thread_main_rawinput() {
     }
 
     bool runtime_failure = false;
+    timing::PreciseWait precise_wait;
     int64_t next_poll_ns = timing::HighResClock::now_ns();
     int64_t next_registration_health_check_ns = next_poll_ns + kRawInputRegistrationHealthIntervalNs;
     while (!should_stop_.load(std::memory_order_acquire)) {
@@ -459,12 +461,13 @@ bool InputThread::thread_main_rawinput() {
             if (polling_shadow_enabled) {
                 const int64_t remaining_ns = next_poll_ns - now_ns;
                 if (remaining_ns > 200'000) {
-                    std::this_thread::sleep_for(std::chrono::nanoseconds(remaining_ns - 100'000));
+                    // Process queued input promptly: its timestamp is captured by the message pump.
+                    static_cast<void>(precise_wait.wait_for_messages_ns(remaining_ns - 100'000));
                 } else {
                     std::this_thread::yield();
                 }
             } else {
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                static_cast<void>(precise_wait.wait_for_messages_ns(1'000'000));
             }
         }
     }
@@ -504,13 +507,14 @@ void InputThread::thread_main_polling(bool reconcile_existing_state) {
     }
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
 
+    timing::PreciseWait precise_wait;
     int64_t next_tick_ns = timing::HighResClock::now_ns();
     while (!should_stop_.load(std::memory_order_acquire)) {
         int64_t now_ns = timing::HighResClock::now_ns();
         if (now_ns < next_tick_ns) {
             int64_t remaining_ns = next_tick_ns - now_ns;
             if (remaining_ns > 200'000) {
-                std::this_thread::sleep_for(std::chrono::nanoseconds(remaining_ns - 100'000));
+                precise_wait.wait_for_ns(remaining_ns - 100'000);
             } else {
                 std::this_thread::yield();
             }
