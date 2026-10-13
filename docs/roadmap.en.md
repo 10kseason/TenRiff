@@ -2,6 +2,8 @@
 
 **Fixed baseline: [1.8.7](baseline-1.8.7.en.md)** (2026-10-10). Use Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`; do not advance it automatically with `latest` or a new release.
 
+**2026-10-13 · 1.8.9.3:** Refines result typography, colored lobby cards with subtle bloom, skin-colored key bindings and song-list level colors. Removes indicator backings and the target-gap/visual-preset controls, placing Target Lane directly above Note Color. [Changes and verification scope (Korean)](release-1.8.9.3-gate.md). Fixed baseline remains 1.8.7; 1.8.9.2 BMS correction and replay compatibility are retained.
+
 **2026-10-13 · 1.8.9.2:** Coalesces a BMS tap and long-note head at the same lane/time into one playable hold before Native play or conversion. Preserves original files, hold spans and keysounds. Old replays retain their original layout. [Behavior and compatibility limits (Korean)](release-1.8.9.2-gate.md). The fixed baseline remains 1.8.7.
 
 **2026-10-13 · 1.8.9.1:** Adds sequential key binding, converter keysound/hold preservation, FAST/SLOW/timing backing controls, larger gauges, preview gear dragging and text-only judgements. Existing replays retain their original conversion. [Behavior, verification and compatibility limits (Korean)](release-1.8.9.1-gate.md). The fixed baseline remains 1.8.7.
@@ -12,7 +14,7 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current Baseline
 - Windows GUI / runtime is the primary supported path.
-- The fixed baseline is `1.8.7` and this source targets `1.8.9.2`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
+- The fixed baseline is `1.8.7` and this source targets `1.8.9.3`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
 - The active menu / runtime is BMS-family only (`.bms/.bme/.bml/.pms`) and supports native, bundled/profile TenRiff `skin.json`, and LR2 skins.
 - For current shipped behavior, read `docs/current-state.en.md` first; this roadmap is about direction and remaining work.
 

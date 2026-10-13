@@ -51,14 +51,14 @@
                          d2d_->muted_brush.Get(), presentation.rank);
         draw_grade(0, to_wide(data.result.rank.empty() ? "--" : data.result.rank),
                    d2d_->grade_format.Get(),
-                   native_rect("result_summary.rect.010", D2D1::RectF(summary_left, 450.0f, summary_left + 250.0f, 548.0f)),
+                   native_rect("result_summary.rect.010", D2D1::RectF(summary_left, 444.0f, summary_left + 250.0f, 556.0f)),
                    presentation.rank);
         draw_result_text(result_loc("ACCURACY", "정확도"), d2d_->result_label_format.Get(),
-                         native_rect("result_summary.rect.011", D2D1::RectF(summary_left + 300.0f, 424.0f, summary_right, 452.0f)),
+                         native_rect("result_summary.rect.011", D2D1::RectF(summary_left + 274.0f, 424.0f, summary_right, 452.0f)),
                          d2d_->muted_brush.Get(), presentation.rank);
         draw_result_text(format_decimal(data.result.accuracy, 2) + "%",
                          d2d_->result_accuracy_format.Get(),
-                         native_rect("result_summary.rect.012", D2D1::RectF(summary_left + 300.0f, 458.0f, summary_right, 548.0f)),
+                         native_rect("result_summary.rect.012", D2D1::RectF(summary_left + 274.0f, 458.0f, summary_right, 548.0f)),
                          semantic_brush(0x63E9FF), presentation.rank);
 
         const D2D1_RECT_F status_chip =

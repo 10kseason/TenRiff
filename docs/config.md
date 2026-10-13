@@ -304,7 +304,7 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `hit_burst_style` | `prism`, `ring`, `spark`; `prism` | 내장 Hit Burst 모양. |
 | `hud_layout` | `classic`, `studio`; `studio` | Native·가져온 LR2 스킨의 단독 플레이 HUD 스타일. LR2 노트·건반·기어 이미지와 비율은 유지함. 키가 없는 기존 프로필도 기본값 `studio`를 사용하며 Options › Skins에서 Classic으로 변경. 1.8.9는 오른쪽 위 정보·왼쪽 아래 점수·오른쪽 아래 가로 맵을 배치하며 좁은 여백에서는 축소·반대쪽 이동. 극단 필드와 Performance HUD가 양쪽 상단을 막으면 정보 카드만 숨김. 다른 이미지 스킨·고스트·멀티는 Classic 유지. 알 수 없는 값은 `studio`. [배치와 검증 범위](release-1.8.9-gate.md). |
 | `hud_riff_map_visible` | bool; `true` | Studio Deck의 64구간 가로 노트 밀도 맵과 경과/전체 시간 표시. 기본 위치는 오른쪽 아래이며 여백에 따라 이동·축소하고 아주 좁으면 시간 글자를 생략함. Options › Skins › 스튜디오 리프 맵에서 변경하며 프로필·스킨 프리셋에 저장됨. 꺼도 다른 카드 위치와 Classic HUD는 유지. |
-| `indicator_background_visible` | bool; `true` | Options › Skins › HUD › 인디케이터 배경. FAST/SLOW·타이밍 표시 뒤의 배경/테두리를 끄거나 켬. 글자·눈금·오차 마커는 유지. 프로필·스킨 프리셋에 저장되며 `skin.json` 필드가 아님. |
+| `indicator_background_visible` | bool; `false` | 이전 프로필·프리셋 호환용 필드. 1.8.9.3부터 네이티브 판정·FAST/SLOW·타이밍 배경은 값과 무관하게 표시하지 않으며 설정 행도 제거됨. 글자·눈금·오차 마커는 유지. `skin.json` 필드가 아님. |
 | `ui_font` | `default`, `malgun`, `bahnschrift`, `consolas`; `default` | 메뉴 글꼴. default는 Segoe UI; 로고·랭크·콤보 전용 글꼴은 유지. |
 | `key_label_position` | `bottom`, `top`, `off`; `bottom` | 레인 키 이름 위치. |
 | `judgement_line_position` | double: `0..1`; `0.82` | 판정선 세로 위치 비율. |
@@ -384,3 +384,7 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 난이도표 선택 중 ALL SONG은 표에 해당하는 차트만 표시합니다. Native LV를 선택하면 전체를 다시 표시하며 캐시나 원본 곡은 삭제하지 않습니다. 게임 화면과 BGA의 시계는 오디오의 실제 재생 위치를 기준으로 하며 판정·오디오 예약은 기존 쓰기 시계를 유지합니다. 속도를 실제로 변경하면 짧은 클릭음을 재생합니다.
 
 키 입력 배경 밝기는 `skin.key_backdrop_brightness`(0–2, 기본 1), 최대 높이는 `skin.key_backdrop_height`(0–1, 기본 1)입니다. 밝기는 RGB만 바꾸고 높이는 필드 아래쪽을 기준으로 적용합니다. 농도와 독립적이며 실플레이·고스트·스킨 미리보기에서 동일하게 적용합니다. `−/+`가 표시되는 설정은 좌우 방향키를 누른 채 연속 조절할 수 있습니다.
+
+### 1.8.9.3 skin controls
+
+대상 레인은 노트 색상 바로 위에 표시됩니다. 대상 간격과 비주얼 프리셋 행은 제거되었으며 기존 저장값은 유지합니다. 레인 간격 편집은 선택한 레인 다음 간격을 사용하고, 마지막 레인은 마지막 간격을 사용합니다. 키 설정의 기본·보조 키는 해당 편집 키 모드의 스킨 레인 색(단일 색상 포함)을 사용합니다.

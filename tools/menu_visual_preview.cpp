@@ -200,6 +200,9 @@ namespace tenriff::render {
 // geometry resolver. Native dispatch is checked only while its own window has
 // foreground focus; no desktop pointer or keyboard is synthesized.
 struct MenuWindowVisualTestAccess {
+    static bool owns_foreground(const MenuWindow& window) {
+        return GetForegroundWindow() == static_cast<HWND>(window.hwnd_);
+    }
     static config::JsonValue verify_preview_drag(MenuWindow& window, const MenuRenderData& source,
                                                  config::JsonArray& failures) {
         using namespace config;
@@ -605,6 +608,7 @@ int main(int argc, char** argv) {
     bool moved_labels = false;
     bool empty = false;
     bool failed = false;
+    bool result_perfect = false;
     bool reveal = false;
     bool settings = false;
     bool mode_settings = false;
@@ -656,6 +660,7 @@ int main(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
         if (arg == "--indicator-background-off") { indicator_background_off = true; continue; }
+        if (arg == "--result-perfect") { result = result_perfect = true; continue; }
         if (arg == "--gauge-ramp") { result = gauge_ramp = true; continue; }
         if (arg == "--result-grade" && i + 1 < argc) { result_grade = argv[++i]; continue; }
         // Keep new fixture switches out of the long legacy else-if chain:
@@ -964,6 +969,7 @@ int main(int argc, char** argv) {
         data.generic.keymap_keyboard = true; data.generic.keymap_test = keymap_test;
         data.generic.footer_reserved_lines = view.footer_reserved_lines;
         data.generic.footer_notes = std::move(view.footer_notes);
+        const auto key_colors = tenriff::config::resolved_skin_lane_colors(tenriff::config::SkinConfig{}, controller.edit_mode());
         int index = 0;
         for (auto& source : view.rows) {
             MenuRowData row;
@@ -973,6 +979,9 @@ int main(int argc, char** argv) {
             row.row_index = source.action ? static_cast<int>(*source.action) : index;
             if (keymap_test && source.action) row.target_kind = MenuHitTargetKind::SettingsRow;
             if (!keymap_test && index == 0) row.adjustable = row.increment_enabled = row.decrement_enabled = true;
+            const int lane_index = index - (keymap_test ? 0 : 1);
+            if (!source.action && lane_index >= 0 && static_cast<std::size_t>(lane_index) < key_colors.size())
+                row.key_color = tenriff::config::skin_color_rgb(key_colors[lane_index]);
             data.generic.rows.push_back(std::move(row)); ++index;
         }
 
@@ -1222,6 +1231,10 @@ int main(int argc, char** argv) {
             data.generic.rows.push_back(row);
             data.generic.card_descriptions.push_back(descriptions[static_cast<std::size_t>(i)]);
         }
+    }
+    if (result_perfect) {
+        score.score = score.max_score;
+        score.accuracy = score.detailed_accuracy = 100.0;
     }
     if (options_grid || settings || keymap_settings || profile_settings) {
         const auto tips = tenriff::app::settings_help_tips(data.ui_language);
@@ -1767,7 +1780,11 @@ int main(int argc, char** argv) {
                         (present[0] - render_start_ns) / 1e6, (present[1] - present[0]) / 1e6});
             }
         }
-        if (!menu_roundtrip && !hitmap_written && rendered_frames >= 5 && (verify_hits || !hitmap_path.empty())) {
+        // Give the own-window test driver time to focus a newly created window.
+        // Still emit an explicit unverified report after 60 frames if focus fails.
+        if (!menu_roundtrip && !hitmap_written && rendered_frames >= 5 &&
+            (MenuWindowVisualTestAccess::owns_foreground(window) || rendered_frames >= 60) &&
+            (verify_hits || !hitmap_path.empty())) {
             if (!MenuWindowVisualTestAccess::verify_and_write(window, data, hitmap_path, verify_hits)) {
                 window.shutdown(); return 4;
             }

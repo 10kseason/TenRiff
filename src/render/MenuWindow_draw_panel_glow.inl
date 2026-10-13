@@ -1,6 +1,6 @@
     // Profile borders are cached separately from grade glyphs. Gaussian bloom
     // is rebuilt only for a new size/color, never during steady menu frames.
-    auto draw_panel_glow = [&](const D2D1_RECT_F& rect, float radius, uint32_t rgb, std::size_t slot) {
+    auto draw_panel_glow = [&](const D2D1_RECT_F& rect, float radius, uint32_t rgb, std::size_t slot, float strength = 1.0f) {
         const float width = std::ceil(rect.right - rect.left);
         const float height = std::ceil(rect.bottom - rect.top);
         if (width <= 0 || height <= 0 || slot >= d2d_->panel_glow_bitmaps.size()) return;
@@ -45,11 +45,11 @@
             }
         }
         if (cache.bitmap) ctx->DrawBitmap(cache.bitmap.Get(), D2D1::RectF(rect.left - pad, rect.top - pad,
-            rect.left + width + pad, rect.top + height + pad), 0.65f, D2D1_INTERPOLATION_MODE_LINEAR);
+            rect.left + width + pad, rect.top + height + pad), 0.65f * strength, D2D1_INTERPOLATION_MODE_LINEAR);
         const auto color = d2d_->note_fill_brush->GetColor();
         const auto opacity = d2d_->note_fill_brush->GetOpacity();
         d2d_->note_fill_brush->SetColor(D2D1::ColorF(rgb));
-        d2d_->note_fill_brush->SetOpacity(0.85f);
+        d2d_->note_fill_brush->SetOpacity(0.85f * strength);
         ctx->DrawRoundedRectangle(D2D1::RoundedRect(rect, radius, radius), d2d_->note_fill_brush.Get(), 2.2f);
         d2d_->note_fill_brush->SetColor(color);
         d2d_->note_fill_brush->SetOpacity(opacity);

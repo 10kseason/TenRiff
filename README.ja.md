@@ -1,5 +1,7 @@
 # TenRiff
 
+**2026-10-13 · 1.8.9.3:** リザルトの文字サイズ、ロビーの色と控えめなBloom、スキンのレーン色に従うキー設定、曲一覧のレベル色を調整しました。インジケーター背景と対象間隔・ビジュアルプリセット項目を削除し、対象レーンをノート色の直上に移動しました。[変更と検証範囲（韓国語）](docs/release-1.8.9.3-gate.md)。固定基準1.8.7と1.8.9.2のBMS補正・リプレイ互換性を維持します。
+
 **2026-10-13 · 1.8.9.2:** BMSの同じレーン・時刻に重複した通常ノートとロングノートの始点を、Native・変換の前に1本のロングノートへ補正します。原本、LNの長さとキー音を保持し、旧リプレイは当時の配置を維持します。[動作・互換性の制限（韓国語）](docs/release-1.8.9.2-gate.md)。固定基準は1.8.7です。
 
 **2026-10-13 · 1.8.9.1:** 連続キー設定、全変換器のキー音・ロングノート保持、FAST/SLOW・タイミング背景切替、ゲージ拡大、プレビューのギア移動と判定文字の枠・背景除去を追加しました。既存リプレイは元の変換を維持します。[動作・検証・互換性の制限（韓国語）](docs/release-1.8.9.1-gate.md)。固定基準は1.8.7です。
@@ -32,13 +34,13 @@
 
 **マルチプレイRate対応ビルド:** ロビーでリーダーが共通のRateを設定します。全員がこのprotocol v6ビルドを使用してください。旧v5クライアントとは接続できません。[案内](docs/multiplayer-rate-build.ko.md)（韓国語）。
 
-リリース・ダウンロード: [**1.8.9.2 Sites 統合版**](https://github.com/10kseason/TenRiff/releases/tag/1.8.9.2)。実際のパッケージ・公開状況は[リリース記録](docs/release-1.8.9.2-gate.md)を参照してください。固定基準は1.8.7を維持します。新しいフォルダーに展開し、`launch_win.bat` から起動して F10 でウェブアカウントを一度連携してください。対象となる新しいプレイのスコア・詳細スコア・精度・詳細精度を送信します。新しいプレイは ruleset-4 を使用し、ウェブ送信には判定プロファイルが必要です。ruleset-1/2/3 のリプレイは当時の判定とLN動作を、既存のウェブ記録はIDとスコアを維持します。[接続ガイド](docs/sites-leaderboard.md)（韓国語）を参照してください。
+リリース・ダウンロード: [**1.8.9.3 Sites 統合版**](https://github.com/10kseason/TenRiff/releases/tag/1.8.9.3)。実際のパッケージ・公開状況は[リリース記録](docs/release-1.8.9.3-gate.md)を参照してください。固定基準は1.8.7を維持します。新しいフォルダーに展開し、`launch_win.bat` から起動して F10 でウェブアカウントを一度連携してください。対象となる新しいプレイのスコア・詳細スコア・精度・詳細精度を送信します。新しいプレイは ruleset-4 を使用し、ウェブ送信には判定プロファイルが必要です。ruleset-1/2/3 のリプレイは当時の判定とLN動作を、既存のウェブ記録はIDとスコアを維持します。[接続ガイド](docs/sites-leaderboard.md)（韓国語）を参照してください。
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | 日本語
 
-TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。固定基準は `1.8.7`、このソースの準備バージョンは `1.8.9.2` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
+TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。固定基準は `1.8.7`、このソースの準備バージョンは `1.8.9.3` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
 
-この README は導入文書です。現在の挙動、`1.8.9.2` のリリースラインと固定 `1.8.7` の基準、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
+この README は導入文書です。現在の挙動、`1.8.9.3` のリリースラインと固定 `1.8.7` の基準、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
 
 TenRiff のコードベースは、伝統的な長文設計書主導だけで積み上がったものではなく、高速な反復と実験を重視した `vibe coding` 的な性格を持つ作品でもあります。
 

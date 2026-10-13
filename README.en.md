@@ -1,5 +1,7 @@
 # TenRiff
 
+**2026-10-13 · 1.8.9.3:** Refines result typography, colored lobby cards with subtle bloom, skin-colored key bindings and song-list level colors. Removes indicator backings and the target-gap/visual-preset controls, placing Target Lane directly above Note Color. [Changes and verification scope (Korean)](docs/release-1.8.9.3-gate.md). Fixed baseline remains 1.8.7; 1.8.9.2 BMS correction and replay compatibility are retained.
+
 **2026-10-13 · 1.8.9.2:** Coalesces a BMS tap and long-note head at the same lane/time into one playable hold before Native play or conversion. Preserves original files, hold spans and keysounds. Old replays retain their original layout. [Behavior and compatibility limits (Korean)](docs/release-1.8.9.2-gate.md). The fixed baseline remains 1.8.7.
 
 **2026-10-13 · 1.8.9.1:** Adds sequential key binding, converter keysound/hold preservation, FAST/SLOW/timing backing controls, larger gauges, preview gear dragging and text-only judgements. Existing replays retain their original conversion. [Behavior, verification and compatibility limits (Korean)](docs/release-1.8.9.1-gate.md). The fixed baseline remains 1.8.7.
@@ -32,13 +34,13 @@
 
 **Multiplayer Rate build:** the leader sets a shared Room Rate in the lobby. All participants must use this protocol v6 build; previous v5 clients cannot join. [Guide (Korean)](docs/multiplayer.md).
 
-Release and downloads: [**1.8.9.2 Sites integrated**](https://github.com/10kseason/TenRiff/releases/tag/1.8.9.2). Actual package/publication status is tracked in the [release record](docs/release-1.8.9.2-gate.md); the fixed baseline remains 1.8.7. Extract to a new folder, run `launch_win.bat`, then press F10 and link your web account once. Eligible new plays upload score, detail score, accuracy, and detailed accuracy. New plays use ruleset-4 with a required timing profile for web submissions; ruleset-1/2/3 replays retain their original timing and LN behavior, and existing web records keep their IDs and scores. See the [connection guide](docs/sites-leaderboard.md) (Korean).
+Release and downloads: [**1.8.9.3 Sites integrated**](https://github.com/10kseason/TenRiff/releases/tag/1.8.9.3). Actual package/publication status is tracked in the [release record](docs/release-1.8.9.3-gate.md); the fixed baseline remains 1.8.7. Extract to a new folder, run `launch_win.bat`, then press F10 and link your web account once. Eligible new plays upload score, detail score, accuracy, and detailed accuracy. New plays use ruleset-4 with a required timing profile for web submissions; ruleset-1/2/3 replays retain their original timing and LN behavior, and existing web records keep their IDs and scores. See the [connection guide](docs/sites-leaderboard.md) (Korean).
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The fixed baseline is `1.8.7` and this source targets `1.8.9.2`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The fixed baseline is `1.8.7` and this source targets `1.8.9.3`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-This README explains what to read first when opening the project. For current behavior, the `1.8.9.2` release line, the fixed `1.8.7` baseline, configuration and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
+This README explains what to read first when opening the project. For current behavior, the `1.8.9.3` release line, the fixed `1.8.7` baseline, configuration and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
 
 TenRiff should also be read as a `vibe coding` work: it was shaped through fast iteration and experimentation rather than only through a traditional long-form design-first process.
 

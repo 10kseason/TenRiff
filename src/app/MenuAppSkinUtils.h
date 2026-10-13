@@ -87,7 +87,7 @@ enum class SkinSettingsRowId {
 
 // The same order drives keyboard navigation, rendered rows and mouse hit targets.
 // Keep related controls adjacent instead of deriving positions from row labels.
-inline constexpr std::array<SkinSettingsRowId, 69> kSkinSettingsRowOrder = {
+inline constexpr std::array<SkinSettingsRowId, 66> kSkinSettingsRowOrder = {
     SkinSettingsRowId::KeyMode,
     SkinSettingsRowId::ScratchPosition,
     SkinSettingsRowId::SkinSource,
@@ -101,8 +101,6 @@ inline constexpr std::array<SkinSettingsRowId, 69> kSkinSettingsRowOrder = {
     SkinSettingsRowId::ExportPreset,
     SkinSettingsRowId::ImportPreset,
     SkinSettingsRowId::OpenSkinEditor,
-    SkinSettingsRowId::TargetLane,
-    SkinSettingsRowId::TargetGap,
     SkinSettingsRowId::JudgeLinePosition,
     SkinSettingsRowId::LaneWidth,
     SkinSettingsRowId::NoteWidth,
@@ -110,6 +108,7 @@ inline constexpr std::array<SkinSettingsRowId, 69> kSkinSettingsRowOrder = {
     SkinSettingsRowId::DividerWidth,
     SkinSettingsRowId::CenterGap,
     SkinSettingsRowId::NoteGap,
+    SkinSettingsRowId::TargetLane,
     SkinSettingsRowId::LaneColor,
     SkinSettingsRowId::SingleColor,
     SkinSettingsRowId::NoteShape,
@@ -124,7 +123,6 @@ inline constexpr std::array<SkinSettingsRowId, 69> kSkinSettingsRowOrder = {
     SkinSettingsRowId::LnTailTaper,
     SkinSettingsRowId::LnBodyWidth,
     SkinSettingsRowId::LnBodyOpacity,
-    SkinSettingsRowId::VisualPreset,
     SkinSettingsRowId::LaneBackgroundOpacity,
     SkinSettingsRowId::BlackPlayfield,
     SkinSettingsRowId::KeyBackdrop,
@@ -143,7 +141,6 @@ inline constexpr std::array<SkinSettingsRowId, 69> kSkinSettingsRowOrder = {
     SkinSettingsRowId::TimingFeedback,
     SkinSettingsRowId::TimingBar,
     SkinSettingsRowId::TimingBarMode,
-    SkinSettingsRowId::IndicatorBackground,
     SkinSettingsRowId::TimingTextX,
     SkinSettingsRowId::TimingTextY,
     SkinSettingsRowId::TimingBarX,
@@ -172,12 +169,13 @@ enum class SkinSettingsCategory { Source, Geometry, Notes, LongNotes, Effects, H
         case SkinSettingsRowId::ImportPreset: case SkinSettingsRowId::OpenSkinEditor:
         case SkinSettingsRowId::VisualLatency:
             return SkinSettingsCategory::Source;
-        case SkinSettingsRowId::TargetLane: case SkinSettingsRowId::TargetGap:
+        case SkinSettingsRowId::TargetGap:
         case SkinSettingsRowId::JudgeLinePosition: case SkinSettingsRowId::LaneWidth:
         case SkinSettingsRowId::NoteWidth: case SkinSettingsRowId::LaneSpacing:
         case SkinSettingsRowId::DividerWidth: case SkinSettingsRowId::CenterGap:
         case SkinSettingsRowId::NoteGap:
             return SkinSettingsCategory::Geometry;
+        case SkinSettingsRowId::TargetLane:
         case SkinSettingsRowId::LaneColor: case SkinSettingsRowId::SingleColor:
         case SkinSettingsRowId::NoteShape: case SkinSettingsRowId::NoteBorder:
         case SkinSettingsRowId::ImageAspect: case SkinSettingsRowId::NoteHeight:

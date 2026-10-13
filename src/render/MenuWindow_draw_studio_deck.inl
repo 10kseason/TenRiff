@@ -217,9 +217,6 @@
                 text_rect.right += static_cast<float>(data.gameplay.timing_text_offset_x);
                 text_rect.top += static_cast<float>(data.gameplay.timing_text_offset_y);
                 text_rect.bottom += static_cast<float>(data.gameplay.timing_text_offset_y);
-                fill->SetColor(D2D1::ColorF(0x10151D, .94f));
-                if (data.gameplay.indicator_background_visible)
-                    ctx->FillRectangle(D2D1::RectF(text_rect.left - 4, text_rect.top, text_rect.right + 4, text_rect.bottom), fill);
                 studio_text(timing_text, ng_font("timing", studio_fonts.studio_timing.Get()), text_rect, timing_color, DWRITE_TEXT_ALIGNMENT_CENTER);
             }
             if (data.gameplay.show_timing_bar && (data.gameplay.timing_bar_always_visible || has_non_pg_feedback)) {
@@ -227,9 +224,6 @@
                 const float cx = (timing_rect.left + timing_rect.right) * .5f + static_cast<float>(data.gameplay.timing_bar_offset_x);
                 const float by = timing_rect.top + static_cast<float>(data.gameplay.timing_bar_offset_y);
                 const float half_width = std::max(1.0f, (timing_rect.right - timing_rect.left) * .5f);
-                fill->SetColor(D2D1::ColorF(0x10151D, .94f));
-                if (data.gameplay.indicator_background_visible)
-                    ctx->FillRectangle(D2D1::RectF(cx - half_width - 4, by - 8, cx + half_width + 4, by + 10), fill);
                 fill->SetColor(D2D1::ColorF(0x6E7A8C)); ctx->FillRectangle(D2D1::RectF(cx - half_width, by, cx + half_width, by + 2), fill);
                 fill->SetColor(D2D1::ColorF(0xC9CED6)); ctx->FillRectangle(D2D1::RectF(cx - 1, by - 5, cx + 1, by + 7), fill);
                 if (has_timing_feedback) {

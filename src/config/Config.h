@@ -212,7 +212,8 @@ struct SkinConfig {
     // Native/LR2 solo HUD layout. Missing legacy-profile keys also select studio.
     std::string hud_layout = "studio";
     bool hud_riff_map_visible = true;
-    bool indicator_background_visible = true;
+    // Legacy preset field; native indicators are background-free since 1.8.9.3.
+    bool indicator_background_visible = false;
     std::string key_label_position = "bottom";
     // UI text font token: default | malgun | bahnschrift | consolas.
     std::string ui_font = "default";

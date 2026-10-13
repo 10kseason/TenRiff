@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.8.9.3] - 2026-10-13
+
+- Rebalance native results: smaller play score and judgement counts, larger rank and summary accuracy; preserve rank colors and S+ bloom.
+- Color native lobby Play sky blue, Multiplayer red and Exit white with readable dark text and cached subtle border bloom; keep Options styling.
+- Fill primary/secondary key-binding tiles with the skin palette for the active edit mode, including single-color mode, and increase binding-label legibility.
+- Match the song-list level text to the lavender level detail.
+- Remove native judgement/FAST-SLOW/timing backings for new and existing profiles. Keep the legacy indicator field readable without rendering its backing.
+- Remove Target Gap and Visual Preset from in-game skin controls; place Target Lane immediately above Note Color. Adjacent-gap editing follows the selected lane; saved per-gap geometry and preset data stay compatible.
+- Retain 1.8.9.2 BMS duplicate-LN-head correction, conversion version 3, legacy replay paths and R1–R4 rules. See [scope and verification](docs/release-1.8.9.3-gate.md).
+
 ## [1.8.9.2] - 2026-10-13
 
 - Correct BMS files that place a tap on the same lane and sample as a complete long-note head, including the reported DELTA chart from measure 42. Coalesce the duplicate before Native play, key-count conversion or randomization, preserving the authored LN span, identity and keysounds. Original chart/audio files are untouched.
