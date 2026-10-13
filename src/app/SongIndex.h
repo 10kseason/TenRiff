@@ -18,6 +18,7 @@ struct SongEntry {
     std::string path;
     std::string title;
     std::string artist;
+    std::string chart_author;
     std::string chart_name;
     std::string format;
     std::string layout_label;
@@ -28,6 +29,7 @@ struct SongEntry {
     int native_level = 0;
     double rating = 0.0;
     double bpm = 0.0;
+    bool has_bpm_changes = false;
     double nps_min = 0.0;
     double nps_median = 0.0;
     double nps_max = 0.0;

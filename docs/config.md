@@ -47,9 +47,11 @@
 - `volume` (double)
   - master volume
 - `bgm_volume` (double)
+  - 새 설정 기본값은 `1.0` (100%). 오디오 메뉴 첫 행이며, 이미 저장된 프로필 값은 유지합니다.
 - `normalize_audio` (bool)
   - 인게임 RMS 음량 조절, 기본 false. ON은 기존 RMS→소프트 리미터→마스터 경로, OFF는 선형 마스터→최종 출력 범위 제한만 적용합니다. 메뉴 음악·선곡 미리듣기는 그대로 유지합니다.
 - `keysound_volume` (double)
+  - 새 설정 기본값은 `1.0` (100%). BGM 음량 바로 다음 행이며, 이미 저장된 프로필 값은 유지합니다.
 
 ASIO 설정은 [장치 설정 안내](asio-audio.md)를 참고하세요. 선택 샘플레이트를 고정하고 차트 오디오를 리샘플링합니다. `frames`는 요청값이며 드라이버 허용 크기로 협상됩니다. ASIO에서는 프리셋이 버퍼 크기를 덮어쓰지 않으며 `exclusive`·`periods`는 WASAPI 전용입니다. ASIO 오류 시 WASAPI로 자동 전환하지 않습니다.
 
@@ -303,10 +305,10 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `key_pulse_enabled` | bool; `true` | 구버전 ON/OFF 호환. false 또는 밝기 0이면 끔. |
 | `hit_burst_style` | `prism`, `ring`, `spark`; `prism` | 내장 Hit Burst 모양. |
 | `hud_layout` | `classic`, `studio`; `studio` | Native·가져온 LR2 스킨의 단독 플레이 HUD 스타일. LR2 노트·건반·기어 이미지와 비율은 유지함. 키가 없는 기존 프로필도 기본값 `studio`를 사용하며 Options › Skins에서 Classic으로 변경. 1.8.9는 오른쪽 위 정보·왼쪽 아래 점수·오른쪽 아래 가로 맵을 배치하며 좁은 여백에서는 축소·반대쪽 이동. 극단 필드와 Performance HUD가 양쪽 상단을 막으면 정보 카드만 숨김. 다른 이미지 스킨·고스트·멀티는 Classic 유지. 알 수 없는 값은 `studio`. [배치와 검증 범위](release-1.8.9-gate.md). |
-| `hud_riff_map_visible` | bool; `true` | Studio Deck의 64구간 가로 노트 밀도 맵과 경과/전체 시간 표시. 기본 위치는 오른쪽 아래이며 여백에 따라 이동·축소하고 아주 좁으면 시간 글자를 생략함. Options › Skins › 스튜디오 리프 맵에서 변경하며 프로필·스킨 프리셋에 저장됨. 꺼도 다른 카드 위치와 Classic HUD는 유지. |
+| `hud_riff_map_visible` | bool; `true` | Studio Deck의 64구간 가로 노트 밀도 맵과 경과/전체 시간 표시. 기본 위치는 오른쪽 아래이며 여백에 따라 이동·축소하고 아주 좁으면 시간 글자를 생략함. Options › Skins › 그래프 맵에서 변경하며 프로필·스킨 프리셋에 저장됨. 꺼도 다른 카드 위치와 Classic HUD는 유지. |
 | `indicator_background_visible` | bool; `false` | 이전 프로필·프리셋 호환용 필드. 1.8.9.3부터 네이티브 판정·FAST/SLOW·타이밍 배경은 값과 무관하게 표시하지 않으며 설정 행도 제거됨. 글자·눈금·오차 마커는 유지. `skin.json` 필드가 아님. |
 | `ui_font` | `default`, `malgun`, `bahnschrift`, `consolas`; `default` | 메뉴 글꼴. default는 Segoe UI; 로고·랭크·콤보 전용 글꼴은 유지. |
-| `key_label_position` | `bottom`, `top`, `off`; `bottom` | 레인 키 이름 위치. |
+| `key_label_position` | `bottom`, `top`, `off`; `bottom` | 레인 키 표시 위치. |
 | `judgement_line_position` | double: `0..1`; `0.82` | 판정선 세로 위치 비율. |
 | `gameplay_field_offset_x` | double: `-720..720`; `0` | 1920×1080 기준 기어 가로 이동. 실제 창에서 기어와 ↔ 핸들이 보이도록 추가 제한. |
 | `combo_position`, `judgement_position` | double: `0.10..0.78`; `0.24` | 콤보와 판정의 독립 Y 위치. 판정 값이 없는 기존 프로필은 combo_position을 상속. |

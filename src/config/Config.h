@@ -121,7 +121,7 @@ struct AudioUiConfig {
     bool background_sound_enabled = true;
     std::string title_music = "default";
     double master_volume = 0.70;
-    double bgm_volume = 0.75;
+    double bgm_volume = 1.0;
     double keysound_volume = 1.0;
     bool normalize_audio = false;
     bool mute_when_inactive = false;

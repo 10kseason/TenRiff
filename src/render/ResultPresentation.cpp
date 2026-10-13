@@ -28,6 +28,14 @@ float pulse(double seconds, double center, double half_width) {
 
 }  // namespace
 
+std::optional<uint32_t> result_gauge_shift_clear_color(std::string_view status) {
+    if (status == "GAUGE SHIFT EASY CLEAR") return 0x72DB98;
+    if (status == "GAUGE SHIFT NORMAL CLEAR") return 0xFFE477;
+    if (status == "GAUGE SHIFT HARD CLEAR") return 0xFFAA60;
+    if (status == "GAUGE SHIFT EX CLEAR") return 0xFF647A;
+    return std::nullopt;
+}
+
 ResultPresentationFrame result_presentation_frame(int64_t elapsed_ns, bool skipped) {
     ResultPresentationFrame frame;
     const double seconds = skipped

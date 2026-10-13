@@ -193,12 +193,14 @@ struct SongSelectData {
     bool selected_source_all = false;
     std::string selected_song_title;
     std::string selected_song_artist;
+    std::string selected_song_chart_author;
     std::string selected_song_detail;
     std::string selected_song_layout;
     std::string selected_song_chart_name;
     std::string selected_song_difficulty;
     int selected_song_key_count = 0;
     double selected_song_bpm = 0.0;
+    bool selected_song_has_bpm_changes = false;
     double selected_song_nps_min = 0.0;
     double selected_song_nps_median = 0.0;
     double selected_song_nps_max = 0.0;
@@ -358,6 +360,7 @@ struct ResultScreenData {
     std::string track;
     std::string title;
     std::string artist;
+    std::string chart_author;
     std::string background_path;
     std::string chart_name;
     std::string layout_label;

@@ -534,6 +534,9 @@ int main(int argc, char** argv) {
     bool result = false;
     bool gauge_ramp = false;
     std::string result_grade;
+    std::string result_status;
+    std::string chart_author;
+    bool bpm_change = false;
     int analysis_page = 0;
     bool analysis_unavailable = false;
     bool analysis_no_samples = false;
@@ -663,6 +666,9 @@ int main(int argc, char** argv) {
         if (arg == "--result-perfect") { result = result_perfect = true; continue; }
         if (arg == "--gauge-ramp") { result = gauge_ramp = true; continue; }
         if (arg == "--result-grade" && i + 1 < argc) { result_grade = argv[++i]; continue; }
+        if (arg == "--result-status" && i + 1 < argc) { result = true; result_status = argv[++i]; continue; }
+        if (arg == "--chart-author" && i + 1 < argc) { chart_author = argv[++i]; continue; }
+        if (arg == "--bpm-change") { bpm_change = true; continue; }
         // Keep new fixture switches out of the long legacy else-if chain:
         // MSVC counts those branches against its nested-block limit.
         if (arg == "--analysis-page" && i + 1 < argc) {
@@ -1051,6 +1057,8 @@ int main(int argc, char** argv) {
     songs.profile_avatar_path = avatar_path;
     songs.selected_song_title = "Luminous Horizon / A very long chart title [Another]";
     songs.selected_song_artist = "TenRiff UI Preview";
+    songs.selected_song_chart_author = chart_author;
+    songs.selected_song_has_bpm_changes = bpm_change;
     songs.selected_song_key_count = menu_keys;
     songs.selected_song_layout = std::to_string(menu_keys) + " KEYS";
     songs.selected_song_difficulty = display_level;
@@ -1134,12 +1142,13 @@ int main(int argc, char** argv) {
     auto& score = data.result;
     score.title = songs.selected_song_title;
     score.artist = songs.selected_song_artist;
+    score.chart_author = chart_author;
     score.profile = "PLAYER";
     score.key_count = menu_keys;
     score.level = 12;
     score.bpm = 180;
     score.rank = result_grade.empty() ? (failed ? "F" : "S+") : result_grade;
-    score.status = failed ? "FAILED" : "CLEAR";
+    score.status = result_status.empty() ? (failed ? "FAILED" : "CLEAR") : result_status;
     score.cleared = !failed;
     score.score = failed ? 4230 : 9452;
     score.detail_score = 8901;

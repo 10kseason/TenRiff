@@ -616,6 +616,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                                          : nullptr) {
             render.song_select.selected_song_title = song_title_for_ui(*entry);
             render.song_select.selected_song_artist = song_artist_for_ui(*entry);
+            render.song_select.selected_song_chart_author = safe_ui_text(entry->chart_author);
             render.song_select.selected_song_detail = safe_ui_text_or_placeholder(song_detail_label(*entry), "-");
             render.song_select.selected_song_layout = safe_ui_text_or_placeholder(
                 entry->layout_label.empty()
@@ -626,6 +627,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             render.song_select.selected_song_difficulty = safe_ui_text(song_difficulty_label(*entry));
             render.song_select.selected_song_key_count = entry->key_count;
             render.song_select.selected_song_bpm = entry->bpm;
+            render.song_select.selected_song_has_bpm_changes = entry->has_bpm_changes;
             render.song_select.selected_song_nps_min = entry->nps_min;
             render.song_select.selected_song_nps_median = entry->nps_median;
             render.song_select.selected_song_nps_max = entry->nps_max;

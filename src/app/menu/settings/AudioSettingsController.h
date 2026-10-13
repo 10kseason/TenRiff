@@ -35,14 +35,14 @@ enum class AudioSettingId : std::uint8_t {
 };
 
 inline constexpr std::array<AudioSettingId, 16> kAudioSettingOrder{
+    AudioSettingId::BgmVolume,
+    AudioSettingId::KeysoundVolume,
     AudioSettingId::KeysoundMode,
     AudioSettingId::BackgroundSound,
     AudioSettingId::TitleMusic,
     AudioSettingId::PlayToEnd,
     AudioSettingId::MuteWhenInactive,
     AudioSettingId::MasterVolume,
-    AudioSettingId::BgmVolume,
-    AudioSettingId::KeysoundVolume,
     AudioSettingId::Normalize,
     AudioSettingId::SoundOffset,
     AudioSettingId::Preset,
@@ -73,7 +73,7 @@ public:
     [[nodiscard]] const std::vector<AudioDriverChoice>& asio_drivers() const noexcept { return asio_drivers_; }
 
     // Starts a fresh visit to Audio Settings without mutating runtime config.
-    void reset(AudioSettingId selected = AudioSettingId::Preset) noexcept;
+    void reset(AudioSettingId selected = AudioSettingId::BgmVolume) noexcept;
 
     // Pointer selection is kept separate because it has no keyboard-equivalent
     // mutation. Pointer activation/adjustment then uses handle() with a target.
@@ -94,7 +94,7 @@ private:
     [[nodiscard]] MenuEffectFlags leave_screen() noexcept;
     [[nodiscard]] MenuEffectFlags mark_changed() noexcept;
 
-    AudioSettingId selected_id_ = AudioSettingId::Preset;
+    AudioSettingId selected_id_ = AudioSettingId::BgmVolume;
     bool dirty_ = false;
     bool asio_drivers_loaded_ = false;
     std::vector<AudioDriverChoice> asio_drivers_;

@@ -47,9 +47,11 @@
 - `volume` (double)
   - master volume
 - `bgm_volume` (double)
+  - 新设置默认值为 `1.0`（100%）。位于音频设置首行，保留已有配置的保存值。
 - `normalize_audio` (bool)
   - 游戏内RMS音量调整，默认false。ON保留RMS→软限幅→主音量；OFF仅应用线性主音量与最终输出范围限制。菜单音乐及选曲试听不变。
 - `keysound_volume` (double)
+  - 新设置默认值为 `1.0`（100%）。紧接BGM音量，保留已有配置的保存值。
 
 参见 [ASIO 设置](asio-audio.md)。ASIO 固定所选采样率并对谱面音频重采样。`frames` 为请求值，按驱动支持的大小协商。预设不覆盖 ASIO frames；`exclusive` 与 `periods` 仅用于 WASAPI。ASIO 失败时不会自动切换 WASAPI。
 

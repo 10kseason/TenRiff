@@ -388,6 +388,8 @@ TEST_CASE("index parser mode skips heavy asset maps and nonessential commands") 
         "#DIFFICULTY 4\n"
         "#LNOBJ AA\n"
         "#SUBARTIST Guest\n"
+        "#COMMENT obj: Pattern\n"
+        "#UNKNOWNHEADER ignored\n"
         "#WAV01 kick.wav\n"
         "#BMP01 stage.png\n"
         "#00101:01\n"
@@ -410,7 +412,9 @@ TEST_CASE("index parser mode skips heavy asset maps and nonessential commands") 
     CHECK_EQ(result.chart.headers.at("SUBTITLE"), "Another");
     CHECK_EQ(result.chart.headers.at("DIFFICULTY"), "4");
     CHECK_EQ(result.chart.headers.at("LNOBJ"), "AA");
-    CHECK(result.chart.headers.count("SUBARTIST") == 0u);
+    CHECK_EQ(result.chart.headers.at("SUBARTIST"), "Guest");
+    CHECK_EQ(result.chart.headers.at("COMMENT"), "obj: Pattern");
+    CHECK(result.chart.headers.count("UNKNOWNHEADER") == 0u);
     CHECK(result.chart.wav.empty());
     CHECK(result.chart.bmp.empty());
     REQUIRE(result.chart.commands.size() == 5u);

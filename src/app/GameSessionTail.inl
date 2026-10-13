@@ -214,7 +214,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     chart_audio_voices_.clear();
     chart_audio_load_queue_.clear();
     chart_audio_active_until_samples_.reset();
-    last_keysound_chart_samples_.clear();
+    chart_audio_pcm_registry_.clear();
+    chart_audio_deduplicator_.clear();
     pending_input_events_.clear();
     hidden_hit_note_ids_.clear();
     ghost_hidden_hit_note_ids_.clear();
@@ -1716,7 +1717,8 @@ bool GameSession::prepare_chart_audio() {
     chart_audio_voices_.clear();
     chart_audio_load_queue_.clear();
     chart_audio_active_until_samples_.reset();
-    last_keysound_chart_samples_.clear();
+    chart_audio_pcm_registry_.clear();
+    chart_audio_deduplicator_.clear();
     next_chart_audio_event_ = 0;
     startup_preload_budget_bytes_ = 0;
     runtime_chart_audio_budget_bytes_ = 0;
@@ -1738,7 +1740,7 @@ bool GameSession::prepare_chart_audio() {
     }
 
     chart_audio_assets_.resize(asset_count);
-    last_keysound_chart_samples_.assign(asset_count, (std::numeric_limits<int64_t>::min)());
+    std::vector<ChartAudioDeduplicator::Occurrence> audio_occurrences;
     chart_audio_active_until_samples_ = std::make_unique<std::atomic<int64_t>[]>(asset_count);
     for (std::size_t i = 0; i < asset_count; ++i) {
         chart_audio_assets_[i].path = chart_.audio_assets[i].path;
@@ -1760,7 +1762,9 @@ bool GameSession::prepare_chart_audio() {
         asset.first_use_sample = (std::min)(asset.first_use_sample, sample);
         asset.last_use_sample = (std::max)(asset.last_use_sample, sample);
         ++asset.use_count;
-        chart_audio_events_.push_back(ChartAudioEvent{sample, cue.asset_id, ChartAudioEvent::Kind::Bgm, cue.gain});
+        const float gain = std::clamp(cue.gain, 0.0f, 1.0f);
+        chart_audio_events_.push_back(ChartAudioEvent{sample, cue.asset_id, ChartAudioEvent::Kind::Bgm, gain, cue.start_sample});
+        audio_occurrences.push_back({cue.start_sample, cue.asset_id, false, gain});
     }
     for (const auto& note : chart_.notes) {
         const int64_t sample = std::max<int64_t>(0, note.start_sample);
@@ -1774,6 +1778,7 @@ bool GameSession::prepare_chart_audio() {
             asset.first_use_sample = (std::min)(asset.first_use_sample, sample);
             asset.last_use_sample = (std::max)(asset.last_use_sample, sample);
             ++asset.use_count;
+            audio_occurrences.push_back({note.start_sample, asset_id, true, std::clamp(note.audio_gain, 0.0f, 1.0f)});
         });
     }
     for (const auto& mine : chart_.mines) {
@@ -1787,7 +1792,10 @@ bool GameSession::prepare_chart_audio() {
         asset.first_use_sample = (std::min)(asset.first_use_sample, sample);
         asset.last_use_sample = (std::max)(asset.last_use_sample, sample);
         ++asset.use_count;
+        audio_occurrences.push_back({mine.sample, mine.audio_asset_id, true, 1.0f});
     }
+
+    chart_audio_deduplicator_.prepare(std::move(audio_occurrences));
 
     for (auto& asset : chart_audio_assets_) {
         std::stable_sort(asset.use_samples.begin(), asset.use_samples.end());
@@ -1839,7 +1847,8 @@ bool GameSession::prepare_chart_audio() {
         chart_audio_events_.clear();
         chart_audio_voices_.clear();
         chart_audio_active_until_samples_.reset();
-        last_keysound_chart_samples_.clear();
+        chart_audio_pcm_registry_.clear();
+        chart_audio_deduplicator_.clear();
         return false;
     }
 
@@ -1920,8 +1929,28 @@ void GameSession::chart_audio_loader_thread_main() {
         const std::uint64_t decoded_bytes = static_cast<std::uint64_t>(decoded.size()) * sizeof(float);
         auto clip_samples = std::make_shared<const std::vector<float>>(std::move(decoded));
 
+        // Resolve PCM identity through the worker-only registry, before taking
+        // streaming state. The session/HUD loop also needs that state;
+        // a long PCM or slow representative reload must not block its updates.
+        // Registry and asset resets happen only after every worker is joined.
+        std::shared_ptr<const ChartAudioPcmIdentity> identity;
+        if (success && !clip_samples->empty()) {
+            const auto identity_id = chart_audio_pcm_registry_.intern(clip_samples, path,
+                [&](const std::string& representative_path) -> ChartAudioPcmRegistry::Samples {
+                    std::vector<float> representative;
+                    if (!decode_audio_stereo_resampled(representative_path, sample_rate_, representative, nullptr)) return {};
+                    return std::make_shared<const std::vector<float>>(std::move(representative));
+                });
+            identity = std::make_shared<ChartAudioPcmIdentity>(ChartAudioPcmIdentity{clip_samples, identity_id});
+        }
+
         {
             std::lock_guard<std::mutex> lock(chart_audio_stream_mutex_);
+            // Decoding/identity work ran without this lock. Stop may have been
+            // requested meanwhile; never publish into a cancelled load.
+            if (chart_audio_loader_stop_) {
+                return;
+            }
             if (asset_id >= chart_audio_assets_.size()) {
                 continue;
             }
@@ -1938,6 +1967,9 @@ void GameSession::chart_audio_loader_thread_main() {
                 std::atomic_store_explicit(&asset.clip.samples,
                                            std::make_shared<const std::vector<float>>(),
                                            std::memory_order_release);
+                std::atomic_store_explicit(&asset.clip.identity,
+                                           std::shared_ptr<const ChartAudioPcmIdentity>{},
+                                           std::memory_order_release);
                 asset.decoded_bytes = 0;
                 if (!success) {
                     std::cerr << "[warn] Failed to load audio cue '" << path << "': " << error << std::endl;
@@ -1945,6 +1977,7 @@ void GameSession::chart_audio_loader_thread_main() {
             } else {
                 chart_audio_decoded_bytes_ += decoded_bytes;
                 asset.decoded_bytes = decoded_bytes;
+                std::atomic_store_explicit(&asset.clip.identity, std::move(identity), std::memory_order_release);
                 std::atomic_store_explicit(&asset.clip.samples, clip_samples, std::memory_order_release);
                 asset.state = ChartAudioAssetState::Ready;
                 synthetic_tones_enabled_.store(false, std::memory_order_release);
@@ -2119,6 +2152,9 @@ void GameSession::trim_chart_audio_cache(int64_t current_sample) {
             std::atomic_store_explicit(&asset.clip.samples,
                                        std::shared_ptr<const std::vector<float>>{},
                                        std::memory_order_release);
+            std::atomic_store_explicit(&asset.clip.identity,
+                                       std::shared_ptr<const ChartAudioPcmIdentity>{},
+                                       std::memory_order_release);
             chart_audio_decoded_bytes_ -= asset.decoded_bytes;
             asset.decoded_bytes = 0;
             asset.state = ChartAudioAssetState::Unloaded;
@@ -2139,16 +2175,8 @@ void GameSession::schedule_note_keysound(const gameplay::NoteEvent& note, int64_
         if (asset_id >= chart_audio_assets_.size()) {
             return;
         }
-        // Chord members share one chart timestamp, so a keysound already voiced for
-        // this timestamp is the same hit arriving on another lane. Play it once.
-        if (asset_id < last_keysound_chart_samples_.size()) {
-            if (last_keysound_chart_samples_[asset_id] == note.start_sample) {
-                return;
-            }
-            last_keysound_chart_samples_[asset_id] = note.start_sample;
-        }
         chart_audio_voices_.push_back(
-            ChartAudioVoice{start_sample, asset_id, ChartAudioEvent::Kind::Keysound, gain});
+            ChartAudioVoice{start_sample, asset_id, ChartAudioEvent::Kind::Keysound, gain, note.start_sample});
     });
 }
 
@@ -2161,6 +2189,7 @@ void GameSession::schedule_mine_keysound(const gameplay::MineTrigger& trigger, i
         trigger.audio_asset_id,
         ChartAudioEvent::Kind::Keysound,
         1.0f,
+        trigger.sample,
     });
 }
 
@@ -2170,7 +2199,7 @@ void GameSession::schedule_chart_audio(int64_t buffer_end_samples) {
         if (evt.start_sample >= buffer_end_samples) {
             break;
         }
-        chart_audio_voices_.push_back(ChartAudioVoice{evt.start_sample, evt.asset_id, evt.kind, evt.gain});
+        chart_audio_voices_.push_back(ChartAudioVoice{evt.start_sample, evt.asset_id, evt.kind, evt.gain, evt.chart_sample});
         ++next_chart_audio_event_;
     }
 }
@@ -2183,15 +2212,36 @@ void GameSession::mix_chart_audio(float* output, uint32_t frames, int64_t buffer
     const float bgm_gain = gameplay_bgm_gain(config_.audio_ui.bgm_volume);
     const float keysound_gain = static_cast<float>(std::clamp(config_.audio_ui.keysound_volume, 0.0, 2.0));
     const int64_t buffer_end_samples = buffer_start_samples + static_cast<int64_t>(frames);
+    // BGM is queued after input voices. Choose the earliest audible copy in this
+    // buffer rather than letting queue order or buffer size change which wins.
+    chart_audio_deduplicator_.begin_buffer();
+    for (std::size_t i = 0; i < chart_audio_voices_.size(); ++i) {
+        auto& voice = chart_audio_voices_[i];
+        if (voice.dedup_claimed || voice.start_sample >= buffer_end_samples || voice.asset_id >= chart_audio_assets_.size()) continue;
+        const auto& asset = chart_audio_assets_[voice.asset_id];
+        const auto samples = std::atomic_load_explicit(&asset.clip.samples, std::memory_order_acquire);
+        const auto identity = std::atomic_load_explicit(&asset.clip.identity, std::memory_order_acquire);
+        if (!samples || samples->empty() || !identity || identity->samples != samples) continue;
+        if (voice.start_sample + chart_audio_playback_duration_frames(static_cast<int64_t>(samples->size() / 2u),
+                config_.speed.rate) <= buffer_start_samples) continue;
+        // Pin a selected candidate until its voice retires. Concurrent cache
+        // eviction cannot remove the winner after it suppressed another copy.
+        voice.decoded_identity = identity;
+        const float gain = ((voice.kind == ChartAudioEvent::Kind::Keysound) ? keysound_gain : bgm_gain) *
+            std::clamp(voice.gain, 0.0f, 1.0f);
+        chart_audio_deduplicator_.consider(voice.chart_sample, voice.asset_id,
+            voice.kind == ChartAudioEvent::Kind::Keysound, voice.gain, identity->id, gain, voice.start_sample, i);
+    }
     std::size_t write_index = 0;
     for (std::size_t i = 0; i < chart_audio_voices_.size(); ++i) {
-        const auto voice = chart_audio_voices_[i];
+        auto voice = chart_audio_voices_[i];
         if (voice.asset_id >= chart_audio_assets_.size()) {
             continue;
         }
 
         const auto& asset = chart_audio_assets_[voice.asset_id];
-        auto samples = std::atomic_load_explicit(&asset.clip.samples, std::memory_order_acquire);
+        auto samples = voice.decoded_identity ? voice.decoded_identity->samples
+            : std::atomic_load_explicit(&asset.clip.samples, std::memory_order_acquire);
         if (samples && samples->empty()) {
             continue;
         }
@@ -2228,6 +2278,14 @@ void GameSession::mix_chart_audio(float* output, uint32_t frames, int64_t buffer
         const float gain =
             ((voice.kind == ChartAudioEvent::Kind::Keysound) ? keysound_gain : bgm_gain) *
             std::clamp(voice.gain, 0.0f, 1.0f);
+        if (!voice.dedup_claimed && voice.start_sample < buffer_end_samples) {
+            const auto identity = voice.decoded_identity ? voice.decoded_identity
+                : std::atomic_load_explicit(&asset.clip.identity, std::memory_order_acquire);
+            const auto identity_id = identity && identity->samples == samples ? identity->id : 0;
+            if (!chart_audio_deduplicator_.claim(voice.chart_sample, voice.asset_id,
+                    voice.kind == ChartAudioEvent::Kind::Keysound, voice.gain, identity_id, gain, voice.start_sample, i)) continue;
+            voice.dedup_claimed = true;
+        }
         (void)mix_chart_audio_clip_linear(*samples,
                                           voice.start_sample,
                                           config_.speed.rate,
@@ -2499,7 +2557,8 @@ void GameSession::shutdown() {
     chart_audio_voices_.clear();
     chart_audio_load_queue_.clear();
     chart_audio_active_until_samples_.reset();
-    last_keysound_chart_samples_.clear();
+    chart_audio_pcm_registry_.clear();
+    chart_audio_deduplicator_.clear();
     next_chart_audio_event_ = 0;
     startup_preload_budget_bytes_ = 0;
     runtime_chart_audio_budget_bytes_ = 0;

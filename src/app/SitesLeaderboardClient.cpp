@@ -45,7 +45,8 @@ std::string quoted(std::string_view text) {
 
 bool build_sites_score_json(const gameplay::ReplayFile& replay,
     std::string_view replay_sha256, std::string_view chart_title,
-    std::string_view clear_status, std::string& payload, std::string& error) {
+    std::string_view clear_status, std::string& payload, std::string& error,
+    std::string_view chart_author) {
     payload.clear();
     error.clear();
     if (mode_mod_long_note_mix(replay.mods) && replay.mode.long_note_mix_version != 1) {
@@ -101,15 +102,19 @@ bool build_sites_score_json(const gameplay::ReplayFile& replay,
         !std::isfinite(accuracy) || accuracy < 0 || accuracy > 100 ||
         !std::isfinite(detailed_accuracy) || detailed_accuracy < 0 || detailed_accuracy > 100 ||
         replay.stats.max_combo < 0 || replay.stats.max_combo > 10'000'000 ||
-        chart_title.empty() || chart_title.size() > 480 || clear_status.empty() || clear_status.size() > 32) {
+        chart_title.empty() || chart_title.size() > 480 || chart_author.size() > 480 ||
+        clear_status.empty() || clear_status.size() > 32) {
         error = "Sites upload skipped: invalid result metadata."; return false;
     }
     std::ostringstream output;
     output.imbue(std::locale::classic());
     output << "{\"schema_version\":1,\"chart_sha256\":" << quoted(replay.chart_sha256)
            << ",\"replay_sha256\":" << quoted(replay_sha256)
-           << ",\"chart_title\":" << quoted(chart_title)
-           << ",\"key_mode\":" << quoted(std::to_string(lanes) + "K")
+           << ",\"chart_title\":" << quoted(chart_title);
+    // Metadata is supplied by the indexed chart, not replay evidence. Omitting
+    // it preserves old uploads and does not change score/board identity.
+    if (!chart_author.empty()) output << ",\"chart_author\":" << quoted(chart_author);
+    output << ",\"key_mode\":" << quoted(std::to_string(lanes) + "K")
            << ",\"rate_milli\":" << std::llround(replay.rate * 1000.0)
            << ",\"ruleset_id\":" << quoted(replay.ruleset_id)
            << ",\"timing_profile\":" << quoted(timing_profile)
@@ -138,7 +143,7 @@ bool build_sites_score_json(const gameplay::ReplayFile& replay,
 SitesLeaderboardService::~SitesLeaderboardService() { shutdown(); }
 
 void SitesLeaderboardService::enqueue(std::filesystem::path replay_path, std::string replay_sha256,
-                                      std::string chart_title, std::string clear_status) {
+                                      std::string chart_title, std::string clear_status, std::string chart_author) {
     std::error_code ec;
     const bool protected_file = std::filesystem::is_regular_file("config/sites-leaderboard.dpapi", ec);
     ec.clear();
@@ -149,7 +154,8 @@ void SitesLeaderboardService::enqueue(std::filesystem::path replay_path, std::st
         messages_.push_back("Sites upload queue is full; this result remains saved locally.");
         return;
     }
-    pending_.push_back({std::move(replay_path), std::move(replay_sha256), std::move(chart_title), std::move(clear_status)});
+    pending_.push_back({std::move(replay_path), std::move(replay_sha256), std::move(chart_title),
+                        std::move(clear_status), std::move(chart_author)});
     if (!worker_.joinable()) worker_ = std::thread(&SitesLeaderboardService::worker_main, this);
     wake_.notify_one();
 }
@@ -185,7 +191,7 @@ void SitesLeaderboardService::worker_main() {
                 } else if (!loaded.success()) {
                     message = "Sites upload skipped: " + loaded.error;
                 } else if (!build_sites_score_json(*loaded.replay, pending.replay_sha256,
-                           pending.chart_title, pending.clear_status, payload, error)) {
+                           pending.chart_title, pending.clear_status, payload, error, pending.chart_author)) {
                     message = error;
                 } else {
                     bool accepted = false;

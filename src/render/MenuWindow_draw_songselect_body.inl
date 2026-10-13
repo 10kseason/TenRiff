@@ -809,10 +809,18 @@
                     : (data.song_select.showing_records
                            ? data.song_select.selected_record_created_utc
                            : data.song_select.selected_song_artist);
+            const bool has_chart_author = !data.song_select.showing_sources &&
+                !data.song_select.showing_records && !data.song_select.selected_song_chart_author.empty();
             draw_metadata_ellipsis(to_wide(subtitle), d2d_->song_artist_format.Get(),
                               native_rect("songselect.rect.060", D2D1::RectF(right_left, right_panel.top + 78.0f,
-                                          right_right, right_panel.top + 112.0f)),
+                                          right_right, right_panel.top + (has_chart_author ? 104.0f : 112.0f))),
                               d2d_->accent_brush.Get());
+            if (has_chart_author) {
+                draw_metadata_ellipsis(to_wide("obj: " + data.song_select.selected_song_chart_author),
+                    d2d_->body_format.Get(), native_rect("songselect.chart_author",
+                        D2D1::RectF(right_left, right_panel.top + 106.0f, right_right, right_panel.top + 131.0f)),
+                    d2d_->muted_brush.Get());
+            }
         }
         draw_rule(right_left, right_panel.top + 132.0f, right_right, 0.36f);
 
@@ -942,7 +950,8 @@
                 native_rect("songselect.rect.072", metadata_cell(3)),
             }};
             const std::array<std::pair<std::string, std::string>, 4> metadata_values = {{
-                {"BPM", data.song_select.selected_song_bpm > 0.0 ? format_decimal(data.song_select.selected_song_bpm, 1) : "--"},
+                {data.song_select.selected_song_has_bpm_changes ? "BPM! :" : "BPM",
+                 data.song_select.selected_song_bpm > 0.0 ? format_decimal(data.song_select.selected_song_bpm, 1) : "--"},
                 {loc("LEVEL", "레벨"), data.song_select.selected_song_difficulty.empty() ? "--" : data.song_select.selected_song_difficulty},
                 {loc("NOTES", "노트 수"), data.song_select.selected_song_note_count > 0 ? format_int_with_commas(data.song_select.selected_song_note_count) : "--"},
                 {"NPS MED", data.song_select.selected_song_nps_median > 0.0 ? format_decimal(data.song_select.selected_song_nps_median, 1) : "--"},

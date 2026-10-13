@@ -47,9 +47,11 @@ If a profile does not exist, it is created automatically on first launch.
 - `volume` (double)
   - master volume
 - `bgm_volume` (double)
+  - New-settings default: `1.0` (100%). First Audio row; existing saved profile values are preserved.
 - `normalize_audio` (bool)
   - In-game RMS loudness control, default false. ON retains RMS → soft limiter → master; OFF applies linear master gain and only guards final output overflow. Menu music and song previews are unchanged.
 - `keysound_volume` (double)
+  - New-settings default: `1.0` (100%). Immediately after BGM volume; existing saved profile values are preserved.
 
 See [ASIO setup](asio-audio.md). ASIO holds the selected sample rate fixed and resamples chart audio. `frames` is a request negotiated to a legal driver size. Presets do not overwrite ASIO frames; `exclusive` and `periods` apply to WASAPI. ASIO failures do not fall back to WASAPI automatically.
 

@@ -14,7 +14,8 @@
 namespace tenriff::app {
 [[nodiscard]] bool build_sites_score_json(const gameplay::ReplayFile& replay,
     std::string_view replay_sha256, std::string_view chart_title,
-    std::string_view clear_status, std::string& payload, std::string& error);
+    std::string_view clear_status, std::string& payload, std::string& error,
+    std::string_view chart_author = {});
 
 // Opt-in, bounded background uploads. No account tokens or filesystem paths enter the payload.
 class SitesLeaderboardService {
@@ -24,7 +25,7 @@ public:
     SitesLeaderboardService(const SitesLeaderboardService&) = delete;
     SitesLeaderboardService& operator=(const SitesLeaderboardService&) = delete;
     void enqueue(std::filesystem::path replay_path, std::string replay_sha256,
-                 std::string chart_title, std::string clear_status);
+                 std::string chart_title, std::string clear_status, std::string chart_author = {});
     [[nodiscard]] std::vector<std::string> take_messages();
     void cancel_pending();
     void shutdown();
@@ -34,6 +35,7 @@ private:
         std::string replay_sha256;
         std::string chart_title;
         std::string clear_status;
+        std::string chart_author;
     };
     void worker_main();
     std::mutex mutex_;

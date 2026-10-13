@@ -47,9 +47,11 @@ profile が存在しない場合は初回起動時に自動生成されます。
 - `volume` (double)
   - master volume
 - `bgm_volume` (double)
+  - 新規設定の既定値は `1.0`（100%）。Audioの先頭行で、保存済みプロファイルの値は維持します。
 - `normalize_audio` (bool)
   - ゲーム内RMS音量調整。既定false。ONはRMS→ソフトリミッター→マスター、OFFは線形マスター音量→最終出力範囲制限のみ。メニュー音楽と選曲プレビューは変更しません。
 - `keysound_volume` (double)
+  - 新規設定の既定値は `1.0`（100%）。BGM音量の直後で、保存済みプロファイルの値は維持します。
 
 [ASIO 設定](asio-audio.md)参照。選択サンプルレートを固定し譜面音声をリサンプルします。`frames` は要求値でありドライバーの許容サイズに調整します。ASIO では preset は frames を上書きせず、`exclusive` と `periods` は WASAPI 用です。ASIO エラー時の自動 WASAPI 切替はありません。
 

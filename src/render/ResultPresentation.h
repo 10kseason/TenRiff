@@ -2,6 +2,8 @@
 
 #include <array>
 #include <cstdint>
+#include <optional>
+#include <string_view>
 
 namespace tenriff::render {
 
@@ -28,5 +30,7 @@ struct ResultPresentationFrame {
 [[nodiscard]] ResultPresentationFrame result_presentation_frame(int64_t elapsed_ns,
                                                                 bool skipped = false);
 [[nodiscard]] int64_t result_counted_score(int64_t target_score, float progress);
+// Only Gauge Shift clears receive these accents; other result states keep their skin color.
+[[nodiscard]] std::optional<uint32_t> result_gauge_shift_clear_color(std::string_view status);
 
 }  // namespace tenriff::render

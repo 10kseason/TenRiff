@@ -36,7 +36,7 @@ namespace tenriff::app {
 
 namespace {
 
-constexpr int kSongIndexVersion = 15;
+constexpr int kSongIndexVersion = 16;
 constexpr std::uintmax_t kMaxMetadataChartFileBytes = 8u * 1024u * 1024u;
 
 bool cancel_requested(const SongIndexCancelCallback& cancel) {
@@ -449,11 +449,86 @@ std::optional<chart::OsuDifficultyMetrics> calculate_bms_difficulty(const chart:
 
 struct BmsNpsStats {
     double reference_bpm = 0.0;
+    bool has_bpm_changes = false;
     double minimum = 0.0;
     double median = 0.0;
     double maximum = 0.0;
     int note_count = 0;
 };
+
+std::string bms_chart_author_from_headers(const chart::BmsChart& chart) {
+    // SUBARTIST often credits several roles. Only an explicit OBJ: marker
+    // identifies the chart author; never mistake an unlabelled BGA/composer
+    // credit for a pattern author or publish an arbitrary header wholesale.
+    for (const char* key : {"SUBARTIST", "ARTIST", "COMMENT"}) {
+        const auto header = chart.headers.find(key);
+        if (header == chart.headers.end()) continue;
+        std::string text = util::sanitize_ui_text(header->second);
+        // COMMENT commonly quotes the entire value, including the OBJ marker.
+        // Remove that outer pair before extracting the separately quoted name.
+        if (text.size() >= 2 && ((text.front() == '"' && text.back() == '"') ||
+                                 (text.front() == '\'' && text.back() == '\'')))
+            text = trim_copy(std::string_view(text).substr(1, text.size() - 2));
+        for (const std::string separator : {std::string(u8"　"), std::string(u8"\u00a0")}) {
+            for (std::size_t at = text.find(separator); at != std::string::npos; at = text.find(separator, at + 1))
+                text.replace(at, separator.size(), " ");
+        }
+        for (std::size_t at = text.find(u8"："); at != std::string::npos; at = text.find(u8"：", at + 1))
+            text.replace(at, std::string(u8"：").size(), ":");
+        const std::string lower = to_lower(text);
+        for (std::size_t marker = lower.find("obj"); marker != std::string::npos; marker = lower.find("obj", marker + 3)) {
+            if (marker > 0) {
+                const unsigned char preceding = static_cast<unsigned char>(lower[marker - 1]);
+                if (std::isalnum(preceding) || preceding == '_') continue;
+            }
+            std::size_t begin = marker + 3;
+            while (begin < text.size() && text[begin] == ' ') ++begin;
+            if (begin >= text.size() || text[begin] != ':') continue;
+            ++begin;
+            while (begin < text.size() && text[begin] == ' ') ++begin;
+            std::size_t end = text.find_first_of("])};|", begin);
+            if (end == std::string::npos) end = text.size();
+            const auto next_credit = text.find(" / ", begin);
+            if (next_credit != std::string::npos) end = std::min(end, next_credit);
+            std::string author = trim_copy(std::string_view(text).substr(begin, end - begin));
+            if (author.size() >= 2 && ((author.front() == '"' && author.back() == '"') ||
+                                      (author.front() == '\'' && author.back() == '\'')))
+                author = trim_copy(std::string_view(author).substr(1, author.size() - 2));
+            // The optional upload metadata has the same byte budget. Truncate
+            // only on a UTF-8 boundary so Japanese/Korean credits remain valid.
+            while (author.size() > 480) util::erase_last_utf8_codepoint(author);
+            if (!author.empty()) return author;
+        }
+    }
+    return {};
+}
+
+bool bms_has_running_tempo_changes(const chart::BmsNormalizedChart& chart) {
+    // Use the same ordered timing events as playback. Definitions alone,
+    // STOP waits, and BPM changes overwritten at the same position do not
+    // create another running tempo. This also ignores an initial override at 0.
+    constexpr double epsilon = 1e-9;
+    double current_bpm = chart.base_bpm;
+    double current_position = 0.0;
+    std::optional<double> first_running_bpm;
+    const auto different_running_tempo = [&]() {
+        if (!std::isfinite(current_bpm) || current_bpm <= 0.0) return false;
+        if (!first_running_bpm) first_running_bpm = current_bpm;
+        return std::abs(current_bpm - *first_running_bpm) >
+               epsilon * std::max(1.0, std::abs(*first_running_bpm));
+    };
+    for (const auto& event : chart.events) {
+        if (event.position > current_position + epsilon) {
+            if (different_running_tempo()) return true;
+            current_position = event.position;
+        }
+        if (event.type == chart::BmsNormalizedEventType::BpmChange && event.value &&
+            std::isfinite(*event.value) && *event.value > 0.0)
+            current_bpm = *event.value;
+    }
+    return !chart.measures.empty() && chart.measures.back().end() > current_position + epsilon &&
+           different_running_tempo();
+}
 
 std::optional<BmsNpsStats> calculate_bms_nps_stats(const chart::BmsChart& parsed_chart) {
     chart::BmsChartNormalizer normalizer;
@@ -471,6 +546,7 @@ std::optional<BmsNpsStats> calculate_bms_nps_stats(const chart::BmsChart& parsed
 
     BmsNpsStats stats;
     stats.reference_bpm = timeline.timeline.reference_bpm;
+    stats.has_bpm_changes = bms_has_running_tempo_changes(normalized.chart);
     const auto gameplay = build_bms_gameplay_chart(timeline.timeline, parsed_chart, 1.0);
     if (gameplay.chart.notes.empty()) {
         return stats;
@@ -568,6 +644,7 @@ SongEntry build_bms_entry(std::string relative_path,
         entry.artist = util::sanitize_ui_text(artist_it->second);
     }
     entry.chart_name = bms_chart_name_from_headers(parsed.chart);
+    entry.chart_author = bms_chart_author_from_headers(parsed.chart);
 
     auto level_it = parsed.chart.headers.find("PLAYLEVEL");
     if (level_it != parsed.chart.headers.end()) {
@@ -581,6 +658,7 @@ SongEntry build_bms_entry(std::string relative_path,
     entry.bpm = parsed.chart.base_bpm;
     if (const auto nps = calculate_bms_nps_stats(parsed.chart); nps.has_value()) {
         entry.bpm = nps->reference_bpm;
+        entry.has_bpm_changes = nps->has_bpm_changes;
         entry.nps_min = nps->minimum;
         entry.nps_median = nps->median;
         entry.nps_max = nps->maximum;
@@ -1366,6 +1444,10 @@ private:
                     return false;
                 }
                 entry.artist = util::sanitize_ui_text(value.value());
+            } else if (*key == "chart_author") {
+                auto value = parse_string();
+                if (!value.has_value()) return false;
+                entry.chart_author = util::sanitize_ui_text(value.value());
             } else if (*key == "chart_name") {
                 auto value = parse_string();
                 if (!value.has_value()) {
@@ -1426,6 +1508,10 @@ private:
                     return false;
                 }
                 entry.bpm = value.value();
+            } else if (*key == "has_bpm_changes") {
+                auto value = parse_bool();
+                if (!value.has_value()) return false;
+                entry.has_bpm_changes = value.value();
             } else if (*key == "nps_min") {
                 auto value = parse_number();
                 if (!value.has_value() || !std::isfinite(value.value()) || value.value() < 0.0) {
@@ -1661,6 +1747,8 @@ bool save_song_index(const std::string& path,
         write_json_string(file, entry.title);
         file << ",\"artist\":";
         write_json_string(file, entry.artist);
+        file << ",\"chart_author\":";
+        write_json_string(file, entry.chart_author);
         file << ",\"chart_name\":";
         write_json_string(file, entry.chart_name);
         file << ",\"format\":";
@@ -1676,6 +1764,7 @@ bool save_song_index(const std::string& path,
         file << ",\"native_level\":" << entry.native_level;
         file << ",\"rating\":" << entry.rating;
         file << ",\"bpm\":" << entry.bpm;
+        file << ",\"has_bpm_changes\":" << (entry.has_bpm_changes ? "true" : "false");
         file << ",\"nps_min\":" << entry.nps_min;
         file << ",\"nps_median\":" << entry.nps_median;
         file << ",\"nps_max\":" << entry.nps_max;

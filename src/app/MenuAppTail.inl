@@ -1186,6 +1186,7 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     render.result.track = last_chart_title_.empty() ? current_track : last_chart_title_;
     render.result.title = last_chart_title_.empty() ? ui_text("Unknown Chart", "알 수 없는 차트") : last_chart_title_;
     render.result.artist = last_chart_artist_;
+    render.result.chart_author = last_chart_entry_valid_ ? last_chart_entry_.chart_author : std::string{};
     if (last_chart_entry_valid_) {
         render.result.background_path =
             song_background_preview_path_for_entry(last_chart_entry_);
@@ -1627,7 +1628,7 @@ void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render
             ui_text("Assign gameplay keys and test the current mapping.",
                     "게임 키를 지정하고 현재 키 배치를 테스트합니다."),
             ui_text("Import and tune TenRiff or LR2 skins, notes, LN colour, and hit bursts.",
-                    "TenRiff·LR2 스킨과 노트, 롱노트 색, 키 폭발을 설정합니다."),
+                    "TenRiff·LR2 스킨과 노트, 롱노트 색, 키 키밤을 설정합니다."),
             ui_text("Set display mode, resolution, frame timing, and background upscaling.",
                     "화면 모드, 해상도, 프레임 타이밍, 배경 업스케일을 설정합니다."),
             ui_text("Set keysound policy, volumes, and audio preset.",
@@ -2706,7 +2707,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         !result.pause_used &&
         !result.replay_path.empty() && !result.replay_sha256.empty()) {
         sites_leaderboard_service_.enqueue(path_from_utf8(result.replay_path),
-                                           result.replay_sha256, last_chart_title_, result.clear_status);
+                                           result.replay_sha256, last_chart_title_, result.clear_status,
+                                           last_chart_entry_valid_ ? last_chart_entry_.chart_author : std::string{});
     }
     std::string ranked_result_message;
     if (result.has_value && !session_aborted && ranked_authorization.valid() &&

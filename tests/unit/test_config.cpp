@@ -180,7 +180,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.audio.asio_driver.empty());
     CHECK(config.audio_ui.preset == "high");
     CHECK(config.audio_ui.background_sound_enabled);
-    CHECK(config.audio_ui.bgm_volume == doctest::Approx(0.75));
+    CHECK(config.audio_ui.bgm_volume == doctest::Approx(1.0));
     CHECK(config.audio_ui.keysound_volume == doctest::Approx(1.0));
     CHECK(config.sound_offset_ms == doctest::Approx(0.0));
     CHECK(config.input.rawinput);

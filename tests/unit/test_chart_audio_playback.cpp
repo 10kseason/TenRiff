@@ -9,9 +9,11 @@
 #include <fstream>
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "app/ChartAudioPlayback.h"
+#include "app/ChartAudioDedup.h"
 #include "app/AudioFileDecoder.h"
 #include "app/AudioMixPolicy.h"
 #include "app/SongPreviewBuilder.h"
@@ -87,6 +89,109 @@ void write_preview_test_wav(const std::filesystem::path& path, int sample_rate) 
 }
 
 }  // namespace
+
+TEST_CASE("duplicate chart audio identifies exact decoded PCM independently of file aliases") {
+    using Registry = tenriff::app::ChartAudioPcmRegistry;
+    Registry registry;
+    int reloads = 0;
+    const auto unavailable = [&](const std::string&) -> Registry::Samples { ++reloads; return {}; };
+    auto original = std::make_shared<const std::vector<float>>(std::vector<float>{0.25f, -0.5f, 0.0f, 1.0f});
+    auto alias = std::make_shared<const std::vector<float>>(*original);
+    const auto original_id = registry.intern(original, "first.wav", unavailable);
+    CHECK(original_id != 0);
+    CHECK(registry.intern(alias, "another-name.wav", unavailable) == original_id);
+    CHECK(reloads == 0);
+    auto different = std::make_shared<const std::vector<float>>(std::vector<float>{0.25f, -0.5f, 0.0f, 0.999f});
+    CHECK(registry.intern(different, "different.wav", unavailable) != original_id);
+    auto shorter = std::make_shared<const std::vector<float>>(std::vector<float>{0.25f, -0.5f});
+    CHECK(registry.intern(shorter, "shorter.wav", unavailable) != original_id);
+    CHECK(registry.intern(std::make_shared<const std::vector<float>>(), "empty.wav", unavailable) == 0);
+
+    const auto saved = *original;
+    original.reset();
+    alias.reset();
+    auto reloaded_alias = std::make_shared<const std::vector<float>>(saved);
+    CHECK(registry.intern(reloaded_alias, "third.wav", [&](const std::string& path) -> Registry::Samples {
+        ++reloads;
+        CHECK(path == "another-name.wav");
+        return std::make_shared<const std::vector<float>>(saved);
+    }) == original_id);
+    CHECK(reloads == 1);
+}
+
+TEST_CASE("duplicate chart audio registry serializes concurrent decoder identities and expired reloads") {
+    using Registry = tenriff::app::ChartAudioPcmRegistry;
+    Registry registry;
+    constexpr std::size_t worker_count = 4;
+    constexpr std::size_t group_count = 3;
+    constexpr std::size_t rounds = 128;
+    const auto pcm_for = [](std::size_t group) -> Registry::Samples {
+        return std::make_shared<const std::vector<float>>(256, 0.25f * static_cast<float>(group + 1));
+    };
+    const auto reload = [&](const std::string& path) { return pcm_for(static_cast<std::size_t>(std::stoul(path))); };
+    std::vector<std::size_t> expected(group_count);
+    for (std::size_t group = 0; group < group_count; ++group) {
+        // No strong reference survives: the first concurrent lookups must
+        // safely reload the representative while other workers hash aliases.
+        expected[group] = registry.intern(pcm_for(group), std::to_string(group), reload);
+    }
+    std::vector<std::vector<std::size_t>> identities(worker_count, std::vector<std::size_t>(rounds * group_count));
+    std::vector<std::thread> workers;
+    std::atomic<std::size_t> ready{0};
+    std::atomic<bool> start{false};
+    for (std::size_t worker = 0; worker < worker_count; ++worker) {
+        workers.emplace_back([&, worker]() {
+            std::vector<Registry::Samples> samples;
+            for (std::size_t group = 0; group < group_count; ++group) samples.push_back(pcm_for(group));
+            ready.fetch_add(1);
+            while (!start.load()) std::this_thread::yield();
+            for (std::size_t round = 0; round < rounds; ++round) {
+                for (std::size_t group = 0; group < group_count; ++group) {
+                    identities[worker][round * group_count + group] = registry.intern(
+                        samples[group], std::to_string(group) + ":worker-" + std::to_string(worker), reload);
+                }
+            }
+        });
+    }
+    while (ready.load() != worker_count) std::this_thread::yield();
+    start.store(true);
+    for (auto& worker : workers) worker.join();
+    for (const auto& worker : identities) {
+        for (std::size_t sample = 0; sample < worker.size(); ++sample)
+            CHECK(worker[sample] == expected[sample % group_count]);
+    }
+    registry.clear();
+    CHECK(registry.intern(pcm_for(0), "0", reload) == 1);
+}
+
+TEST_CASE("duplicate chart audio claims require authored time PCM and applied gain equality") {
+    tenriff::app::ChartAudioDeduplicator dedup;
+    dedup.prepare({{1000, 0, true, 1.0f}, {1000, 1, true, 1.0f}, {1000, 2, false, 1.0f},
+                   {1001, 1, true, 1.0f}, {1000, 3, true, 1.0f}, {1000, 1, true, 0.5f},
+                   {2000, 0, false, 1.0f}, {2000, 1, true, 1.0f}});
+    CHECK(dedup.claim(1000, 0, true, 1.0f, 41, 1.0f));
+    CHECK(dedup.claim(1001, 1, true, 1.0f, 41, 1.0f));
+    // A later chart event must not make an earlier chord sound eligible again.
+    CHECK_FALSE(dedup.claim(1000, 1, true, 1.0f, 41, 1.0f));
+    CHECK_FALSE(dedup.claim(1000, 2, false, 1.0f, 41, 1.0f));
+    CHECK(dedup.claim(1000, 3, true, 1.0f, 42, 1.0f));
+    CHECK(dedup.claim(1000, 1, true, 0.5f, 41, 0.5f));
+    // A muted BGM copy must not reserve the audible keysound's slot.
+    CHECK(dedup.claim(2000, 0, false, 1.0f, 41, 0.0f));
+    CHECK(dedup.claim(2000, 1, true, 1.0f, 41, 1.0f));
+}
+
+TEST_CASE("duplicate chart audio selects earliest onset independently of BGM enqueue order") {
+    tenriff::app::ChartAudioDeduplicator dedup;
+    dedup.prepare({{1000, 0, true, 1.0f}, {1000, 1, false, 1.0f}});
+    dedup.begin_buffer();
+    dedup.consider(1000, 0, true, 1.0f, 7, 1.0f, 1010, 0);
+    dedup.consider(1000, 1, false, 1.0f, 7, 1.0f, 1000, 1);
+    CHECK_FALSE(dedup.claim(1000, 0, true, 1.0f, 7, 1.0f, 1010, 0));
+    CHECK(dedup.claim(1000, 1, false, 1.0f, 7, 1.0f, 1000, 1));
+    dedup.begin_buffer();
+    CHECK_FALSE(dedup.claim(1000, 0, true, 1.0f, 7, 1.0f, 1050, 0));
+}
 
 TEST_CASE("chart audio playback duration scales with rate") {
     CHECK(tenriff::app::chart_audio_playback_duration_frames(8, 1.0) == 8);

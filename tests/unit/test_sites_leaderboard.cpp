@@ -2,12 +2,39 @@
 #include <chrono>
 #include <fstream>
 #include <iterator>
+#include <iostream>
 #include <limits>
 #include "app/SitesLeaderboardClient.h"
 #include "app/ReplayVerifier.h"
 #include "config/SimpleJson.h"
 using namespace tenriff;
 namespace {
+bool json_values_equal(const config::JsonValue& lhs, const config::JsonValue& rhs) {
+    if (lhs.value.index() != rhs.value.index()) return false;
+    if (lhs.is_object()) {
+        const auto& left = *lhs.as_object();
+        const auto& right = *rhs.as_object();
+        if (left.size() != right.size()) return false;
+        for (const auto& field : left) {
+            const auto found = right.find(field.first);
+            if (found == right.end() || !json_values_equal(field.second, found->second)) return false;
+        }
+        return true;
+    }
+    if (lhs.is_array()) {
+        const auto& left = *lhs.as_array();
+        const auto& right = *rhs.as_array();
+        if (left.size() != right.size()) return false;
+        for (std::size_t i = 0; i < left.size(); ++i)
+            if (!json_values_equal(left[i], right[i])) return false;
+        return true;
+    }
+    if (lhs.is_string()) return lhs.as_string() == rhs.as_string();
+    if (lhs.is_number()) return lhs.as_number() == rhs.as_number();
+    if (lhs.is_bool()) return lhs.as_bool() == rhs.as_bool();
+    return lhs.is_null();
+}
+
 gameplay::ReplayFile score_fixture() {
     gameplay::ReplayFile replay;
     replay.ruleset_id = std::string(app::kCanonicalReplayRulesetId);
@@ -45,6 +72,35 @@ TEST_CASE("Sites payload preserves all four native metrics without display round
     CHECK(object->at("accuracy").as_number() != object->at("detailed_accuracy").as_number());
     CHECK(payload.find("\"detail_score\":496,") != std::string::npos);
     CHECK(object->at("timing_profile").as_string() == "bms-easy");
+}
+
+TEST_CASE("1.8.9.4 Sites optional chart author adds metadata without changing replay or score identity") {
+    const auto replay = score_fixture();
+    std::string old_payload, payload, error;
+    REQUIRE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "FULLCOMBO", old_payload, error));
+    const std::string author = u8"譜面作者 \"패터너\"";
+    REQUIRE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "FULLCOMBO", payload, error, author));
+    // Public synthetic fixture for native/web payload-contract checks.
+    std::cout << "[chart-author-payload] " << payload << '\n';
+    const auto old_json = config::parse_json(old_payload);
+    const auto new_json = config::parse_json(payload);
+    REQUIRE(old_json.success());
+    REQUIRE(new_json.success());
+    const auto& old_fields = *old_json.root->as_object();
+    auto new_fields = *new_json.root->as_object();
+    REQUIRE(new_fields.count("chart_author") == 1);
+    CHECK(new_fields.at("chart_author").as_string() == author);
+    CHECK(old_fields.count("chart_author") == 0);
+    new_fields.erase("chart_author");
+    // Object iteration order is not a wire contract; every existing field's
+    // type and exact value (including binary64 metrics and array order) is.
+    CHECK(json_values_equal(config::JsonValue{new_fields}, config::JsonValue{old_fields}));
+    REQUIRE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "FULLCOMBO", payload, error, ""));
+    CHECK(payload == old_payload);
+    REQUIRE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "FULLCOMBO", payload, error, std::string(480, 'a')));
+    CHECK_FALSE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "FULLCOMBO", payload, error, std::string(481, 'a')));
+    CHECK(payload.empty());
+    CHECK_FALSE(error.empty());
 }
 
 TEST_CASE("Sites payload preserves active judge modifiers without relabeling normal records") {

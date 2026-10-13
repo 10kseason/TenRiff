@@ -1329,6 +1329,162 @@ struct GameSessionAudioTestAccess {
         CHECK(session->last_audio_sample_.load() == 50400);
     }
 
+    static void check_duplicate_keysound_pcm_render() {
+        CompletionTestDirectory directory;
+        gameplay::GameplayChart original;
+        original.lane_count = 3;
+        original.duration_samples = 2048;
+        // Two different WAV containers decode to identical PCM; a third differs
+        // by actual sample values. A fourth chart asset is a path alias.
+        for (int asset = 0; asset < 3; ++asset) {
+            const auto wav = directory.path / ("dedup-" + std::to_string(asset) + ".wav");
+            std::ofstream file(wav, std::ios::binary);
+            const auto le = [&](uint32_t value, int bytes) {
+                for (int i = 0; i < bytes; ++i) file.put(static_cast<char>((value >> (8 * i)) & 0xff));
+            };
+            constexpr int frames = 128;
+            const bool metadata = asset == 1;
+            file.write("RIFF", 4); le(36 + frames * 2 + (metadata ? 12 : 0), 4); file.write("WAVEfmt ", 8);
+            le(16, 4); le(1, 2); le(1, 2); le(48000, 4); le(96000, 4); le(2, 2); le(16, 2);
+            if (metadata) { file.write("JUNK", 4); le(4, 4); file.write("meta", 4); }
+            file.write("data", 4); le(frames * 2, 4);
+            for (int frame = 0; frame < frames; ++frame) {
+                const auto value = static_cast<int16_t>((asset == 2 ? 1200 : 2400) * std::sin((frame + 1) * 0.12));
+                le(static_cast<uint16_t>(value), 2);
+            }
+            file.close();
+            (void)original.intern_audio_asset(wav.u8string());
+        }
+        (void)original.intern_audio_asset((directory.path / "." / "dedup-0.wav").u8string());
+
+        const auto render = [&](const gameplay::GameplayChart& chart, const std::string& mode,
+                                int sound_offset_ms = 0, double bgm_volume = 1.0, uint32_t block = 32) {
+            auto session = std::make_unique<GameSession>();
+            session->sample_rate_ = 48000;
+            session->chart_ = chart;
+            session->config_.speed.rate = 1.0;
+            session->config_.sound_offset_ms = sound_offset_ms;
+            session->config_.audio_ui.bgm_volume = bgm_volume;
+            session->config_.audio_ui.keysound_volume = 1.0;
+            gameplay::GameplayConfig config;
+            config.sample_rate = 48000;
+            config.practice_no_fail_enabled = true;
+            session->engine_ = std::make_unique<gameplay::GameplayEngine>(chart, config);
+            session->lane_activity_.assign(3, 0.0f);
+            session->lane_pressed_.assign(3, 0);
+            REQUIRE(session->prepare_chart_audio());
+            session->stop_chart_audio_workers();
+            for (std::size_t asset_id = 0; asset_id < session->chart_audio_assets_.size(); ++asset_id) {
+                const auto& asset = session->chart_audio_assets_[asset_id];
+                if (asset.use_count == 0) continue;
+                const auto pcm = std::atomic_load(&asset.clip.samples);
+                const auto identity = std::atomic_load(&asset.clip.identity);
+                REQUIRE(pcm);
+                REQUIRE(pcm->size() == 256);
+                REQUIRE(identity && identity->samples == pcm && identity->id != 0);
+                if ((asset_id == 1 || asset_id == 3) && session->chart_audio_assets_[0].use_count > 0) {
+                    const auto first = std::atomic_load(&session->chart_audio_assets_[0].clip.identity);
+                    REQUIRE(first);
+                    CHECK(identity->id == first->id);
+                }
+            }
+            std::vector<gameplay::ReplayEvent> events;
+            for (const auto& note : chart.notes) {
+                const int64_t stagger = mode == "live" ? (note.lane - 1) * 5 : 0;
+                events.push_back({note.lane, input::InputState::Pressed, note.start_sample + stagger});
+                events.push_back({note.lane, input::InputState::Released,
+                    note.end_sample.value_or(note.start_sample + stagger) + 1});
+            }
+            std::stable_sort(events.begin(), events.end(), [](const auto& a, const auto& b) { return a.sample < b.sample; });
+            session->autoplay_enabled_ = mode == "autoplay";
+            session->replay_playback_enabled_ = mode == "replay";
+            session->build_autoplay_events();
+            session->replay_source_.trace.sample_rate = 48000;
+            session->replay_source_.trace.events = events;
+            std::size_t next = 0;
+            std::vector<float> output(2048 * 2);
+            for (uint32_t start = 0; start < 2048; start += block) {
+                const auto count = (std::min)(block, 2048 - start);
+                if (mode == "autoplay") session->process_autoplay_queue(start, start + count, 0);
+                else if (mode == "replay") session->process_replay_input_queue(start, start + count, 0);
+                else while (next < events.size() && events[next].sample < start + count) {
+                    const auto event = events[next++];
+                    session->dispatch_lane_input(event.lane, event.state, event.sample, start);
+                }
+                session->engine_->advance(start + count);
+                session->schedule_chart_audio(start + count);
+                session->mix_chart_audio(output.data() + start * 2, count, start);
+            }
+            CHECK(session->engine_->stats().total_notes == chart.notes.size());
+            CHECK(session->engine_->stats().counts.bd == 0);
+            CHECK(session->engine_->stats().counts.pr == 0);
+            // The engine intentionally stops recording after completion. A
+            // final LN release can arrive in the next callback after its tail
+            // already finished the chart; autoplay also releases at the tail,
+            // while this live/replay fixture releases one sample afterward.
+            const auto& dispatched = mode == "autoplay" ? session->autoplay_events_ : events;
+            const auto& recorded = session->engine_->replay().events;
+            REQUIRE(recorded.size() <= dispatched.size());
+            CHECK(std::count_if(recorded.begin(), recorded.end(), [](const auto& event) {
+                return event.state == input::InputState::Pressed;
+            }) == chart.notes.size());
+            for (std::size_t i = 0; i < recorded.size(); ++i) {
+                CHECK(recorded[i].lane == dispatched[i].lane);
+                CHECK(recorded[i].state == dispatched[i].state);
+                CHECK(recorded[i].sample == dispatched[i].sample);
+            }
+            int64_t final_note_sample = 0;
+            for (const auto& note : chart.notes)
+                final_note_sample = (std::max)(final_note_sample, note.end_sample.value_or(note.start_sample));
+            for (std::size_t i = recorded.size(); i < dispatched.size(); ++i) {
+                CHECK(session->engine_->is_finished());
+                CHECK(dispatched[i].state == input::InputState::Released);
+                CHECK(dispatched[i].sample >= final_note_sample);
+            }
+            CHECK(session->chart_.notes.size() == chart.notes.size());
+            CHECK(session->chart_.duration_samples == chart.duration_samples);
+            CHECK(session->chart_audio_voices_.empty());
+            return output;
+        };
+        auto reference = original;
+        reference.notes = {{1, 256, std::nullopt, false, 0}};
+        auto chord = reference;
+        chord.notes.push_back({2, 256, 1024, false, 1});
+        chord.notes.push_back({3, 256, std::nullopt, false, 3});
+        for (const std::string mode : {"live", "autoplay", "replay"}) {
+            const auto expected = render(reference, mode);
+            CHECK(render(chord, mode) == expected);
+            auto cross = chord;
+            cross.audio_cues = {{256, 0}, {256, 1}};
+            CHECK(render(cross, mode) == expected);
+        }
+        auto bgm = original;
+        bgm.audio_cues = {{256, 0}};
+        const auto one_bgm = render(bgm, "autoplay");
+        bgm.audio_cues.push_back({256, 1});
+        CHECK(render(bgm, "autoplay") == one_bgm);
+        auto gains = reference;
+        gains.audio_cues = {{256, 1, 0.5f}, {256, 2}};
+        auto separate = original;
+        separate.audio_cues = {{256, 0}, {256, 1, 0.5f}, {256, 2}};
+        CHECK(render(gains, "autoplay") == render(separate, "autoplay"));
+        CHECK(render(gains, "autoplay") != one_bgm);
+        auto adjacent_chart = reference;
+        adjacent_chart.notes.push_back({2, 257, std::nullopt, false, 1});
+        separate.audio_cues = {{256, 0}, {257, 1}};
+        CHECK(render(adjacent_chart, "autoplay") == render(separate, "autoplay"));
+        CHECK(render(adjacent_chart, "autoplay") != one_bgm);
+        auto cross = reference;
+        cross.audio_cues = {{256, 1}};
+        CHECK(render(cross, "autoplay", 0, 0.0) == one_bgm);
+        CHECK(render(cross, "autoplay", 1) == one_bgm);
+        bgm.audio_cues = {{256, 0}};
+        const auto early_bgm = render(bgm, "autoplay", -1);
+        // BGM onset and a late key can fall in one callback or separate callbacks.
+        CHECK(render(cross, "autoplay", -1, 1.0, 256) == early_bgm);
+        CHECK(render(cross, "autoplay", -1, 1.0, 32) == early_bgm);
+    }
+
     static void check_reduced_keysound_pcm_render() {
         CompletionTestDirectory directory;
         gameplay::GameplayChart original;
@@ -1978,7 +2134,6 @@ struct GameSessionAudioTestAccess {
         session->synthetic_tones_enabled_ = false;
         session->chart_audio_assets_.resize(1);
         session->chart_audio_assets_[0].clip.samples = std::make_shared<const std::vector<float>>(960, 0.25f);
-        session->last_keysound_chart_samples_.assign(1, -1);
 
         session->dispatch_lane_input(1, input::InputState::Pressed, 48000, 48000);
         REQUIRE(session->chart_audio_voices_.size() == 1);
@@ -2141,6 +2296,10 @@ TEST_CASE("audio preparation preserves replay chart duration and publishes termi
 
 TEST_CASE("reduced keysounds match complete source PCM through real decode scheduling gain and rate mixing") {
     tenriff::app::GameSessionAudioTestAccess::check_reduced_keysound_pcm_render();
+}
+
+TEST_CASE("duplicate keysounds render once through live autoplay replay BGM and long note production paths") {
+    tenriff::app::GameSessionAudioTestAccess::check_duplicate_keysound_pcm_render();
 }
 
 TEST_CASE("pause Continue and Esc keep audio and judgement frozen for a full three second countdown") {
