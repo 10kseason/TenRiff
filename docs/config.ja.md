@@ -101,7 +101,8 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - 現在のプロファイルでは `340ms` に保存・正規化し、BADの入力判定幅から独立した自動ミスの期限として使用する
   - 標準のNormal/Easy/Hardは未入力ノートが `340ms` を超えると自動ミス。Normal/EasyはBAD、Hardはコンボを切る間接 `POOR` / OD8 `MISS` を記録する
   - BAD範囲外から自動ミス期限までの遅い入力はBADヒットにせず、前のノートをミスにして次のノートを調べる
-- 新しいプレイは `tenriff-native-score-v2-ruleset-4`。R3は以前のEasy/Hard幅とRANK・LN解放規則を維持。R1/R2はPG20ms・RANK無効・旧LN解放、R1はEasy1.25x/Hard BAD340ms/自動ミス=BADも維持。カスタム判定は非公式。
+- 新しいプレイは `tenriff-native-score-v2-ruleset-5`。R3は以前のEasy/Hard幅とRANK・LN解放規則を維持。R1/R2はPG20ms・RANK無効・旧LN解放、R1はEasy1.25x/Hard BAD340ms/自動ミス=BADも維持。カスタム判定は非公式。
+- R5は数値の判定幅を変えず自動イベントを時刻順に処理し、R1–R4の旧処理順を保持します。[修正範囲](release-1.8.9.5-gate.md)。
 - `hold_grace` (double, ms; 既定 `80ms`)
   - 設定互換性と `hold_break` の下限のために保持。現在のnative終端PG/GR境界ではない
 - `hold_break` (double, ms; 既定 `200ms`)

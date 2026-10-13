@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <optional>
@@ -8,6 +9,78 @@
 namespace tenriff::app {
 
 inline constexpr double kGameplayInputBacklogCatchupFloorMs = 96.0;
+
+// A continuous presentation/input clock follows the robust device fit without
+// moving an already displayed instant backwards. Corrections change velocity,
+// never phase. The 500 ms target and +/-2% bound are explicit engineering limits,
+// not a measured optimal setting for every physical driver.
+class GameplayInputClock {
+public:
+    void reset(std::optional<int64_t> resume_sample = std::nullopt) {
+        start_ = 0;
+        count_ = 0;
+        resume_sample_ = resume_sample;
+    }
+
+    int64_t observe(int64_t time_ns, int64_t fitted_sample, int sample_rate) {
+        const double nominal = static_cast<double>(sample_rate) / 1'000'000'000.0;
+        if (sample_rate <= 0) return fitted_sample;
+        double sample = static_cast<double>(resume_sample_.value_or(fitted_sample));
+        if (count_ > 0) {
+            const auto& last = segment(count_ - 1);
+            // A duplicate/delayed observation must not disorder the history
+            // used to map queued input. The next fresh observation can refit.
+            if (time_ns <= last.time_ns) return static_cast<int64_t>(std::llround(last.sample));
+            sample = project(last, time_ns);
+        }
+        const double phase_error = static_cast<double>(fitted_sample) - sample;
+        const double rate = std::clamp(1.0 + phase_error / (sample_rate * 0.5), 0.98, 1.02);
+        Segment next{time_ns, sample, nominal * rate, rate};
+        if (count_ == kCapacity) {
+            start_ = (start_ + 1) % kCapacity;
+            --count_;
+        }
+        segments_[(start_ + count_) % kCapacity] = next;
+        ++count_;
+        resume_sample_.reset();
+        return static_cast<int64_t>(std::llround(sample));
+    }
+
+    [[nodiscard]] std::optional<int64_t> sample_at(int64_t time_ns) const {
+        if (count_ == 0) return std::nullopt;
+        // Keep enough fixed history for fresh queued input at high callback
+        // rates. Looking up an old event never mutates the render-time cursor.
+        std::size_t lower = 0;
+        std::size_t upper = count_;
+        while (lower < upper) {
+            const auto middle = lower + (upper - lower) / 2;
+            if (segment(middle).time_ns <= time_ns) lower = middle + 1;
+            else upper = middle;
+        }
+        return static_cast<int64_t>(std::llround(project(segment(lower == 0 ? 0 : lower - 1), time_ns)));
+    }
+
+    [[nodiscard]] double rate() const { return count_ ? segment(count_ - 1).rate : 1.0; }
+
+private:
+    struct Segment {
+        int64_t time_ns = 0;
+        double sample = 0.0;
+        double samples_per_ns = 0.0;
+        double rate = 1.0;
+    };
+    static constexpr std::size_t kCapacity = 4096;
+    [[nodiscard]] const Segment& segment(std::size_t index) const {
+        return segments_[(start_ + index) % kCapacity];
+    }
+    [[nodiscard]] static double project(const Segment& value, int64_t time_ns) {
+        return value.sample + static_cast<double>(time_ns - value.time_ns) * value.samples_per_ns;
+    }
+    std::array<Segment, kCapacity> segments_{};
+    std::size_t start_ = 0;
+    std::size_t count_ = 0;
+    std::optional<int64_t> resume_sample_;
+};
 
 struct StartupInputTimingAnchor {
     int64_t playback_sample = 0;

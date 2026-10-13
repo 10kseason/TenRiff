@@ -285,6 +285,7 @@ TEST_CASE("analysis observes historical deferred LN policy without modernizing R
         chart.notes = {NoteEvent{1, 1000, 2000, charge}};
         auto config = analysis_config();
         config.legacy_hold_release = true;
+        config.chronological_judgement = false;
         GameplayEngine engine(chart, config);
         engine.sync_input_state(1, InputState::Released, 0);
         CHECK(engine.replay().events.empty());

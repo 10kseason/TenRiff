@@ -101,7 +101,8 @@ The 1.8.9 source explicitly passes menu Judge Easy/Hard choices into new session
   - current profiles save and normalize this value to `340ms`, independently of the BAD hit window
   - default Normal/Easy/Hard automatically miss an unplayed note once it is more than `340ms` late. Normal/Easy record BAD; Hard records a combo-breaking indirect `POOR` / OD8 `MISS`
   - a late press outside BAD but before automatic timeout misses the expired note, then checks the next note; it cannot score a BAD hit outside the hit window
-- New plays record `tenriff-native-score-v2-ruleset-4`. R3 retains its previous Easy/Hard windows and RANK/LN release behavior. R1/R2 retain PG20ms, no RANK and older LN releases; R1 also keeps Easy1.25x/Hard BAD340ms/automatic miss=BAD. Custom timing remains unofficial.
+- New plays record `tenriff-native-score-v2-ruleset-5`. R3 retains its previous Easy/Hard windows and RANK/LN release behavior. R1/R2 retain PG20ms, no RANK and older LN releases; R1 also keeps Easy1.25x/Hard BAD340ms/automatic miss=BAD. Custom timing remains unofficial.
+- R5 keeps the numerical timing windows, processes automatic events chronologically, and preserves R1–R4 processing order. [Timing fix](release-1.8.9.5-gate.md).
 - `hold_grace` (double, ms; default `80ms`)
   - retained for configuration compatibility and as the lower bound of `hold_break`; not the current native tail PG/GR boundary
 - `hold_break` (double, ms; default `200ms`)

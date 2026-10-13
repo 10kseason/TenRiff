@@ -74,8 +74,10 @@ public:
         uint64_t riff_map_revision = 0;
         int sample_rate = 48000;
         int64_t audio_sample_time_ns = 0;
+        double audio_clock_rate = 1.0;
         double current_visual_position = 0.0;
         double visual_velocity = 1.0;
+        std::shared_ptr<const std::vector<gameplay::ScrollSegment>> visual_scroll_segments;
         double future_visual_span = 1.0;
         double past_visual_span = 1.0;
         int64_t hud_publish_time_ns = 0;
@@ -345,6 +347,13 @@ private:
         int64_t audio_sample = 0;
     };
 
+    struct ScheduledInputAudio {
+        int64_t sample = 0;
+        int lane = 1;
+        std::optional<gameplay::NoteEvent> note;
+        std::optional<gameplay::MineTrigger> mine;
+    };
+
     struct PolledGameplayKey {
         uint32_t keycode = 0;
     };
@@ -355,6 +364,7 @@ private:
         int64_t playback_sample = 0;
         int64_t time_ns = 0;
         uint32_t buffer_frames = 0;
+        double clock_rate = 1.0;
     };
 
     // A sequence counter provides a coherent tuple, but its payload must also
@@ -365,13 +375,15 @@ private:
         std::atomic<int64_t> playback_sample{0};
         std::atomic<int64_t> time_ns{0};
         std::atomic<uint32_t> buffer_frames{0};
+        std::atomic<double> clock_rate{1.0};
 
         [[nodiscard]] AudioTimingState load() const noexcept {
             return {sample.load(std::memory_order_relaxed),
                     buffer_start_sample.load(std::memory_order_relaxed),
                     playback_sample.load(std::memory_order_relaxed),
                     time_ns.load(std::memory_order_relaxed),
-                    buffer_frames.load(std::memory_order_relaxed)};
+                    buffer_frames.load(std::memory_order_relaxed),
+                    clock_rate.load(std::memory_order_relaxed)};
         }
 
         void store(const AudioTimingState& value) noexcept {
@@ -380,6 +392,7 @@ private:
             playback_sample.store(value.playback_sample, std::memory_order_relaxed);
             time_ns.store(value.time_ns, std::memory_order_relaxed);
             buffer_frames.store(value.buffer_frames, std::memory_order_relaxed);
+            clock_rate.store(value.clock_rate, std::memory_order_relaxed);
         }
     };
 
@@ -407,7 +420,8 @@ private:
                              input::InputState state,
                              int64_t sample,
                              int64_t audio_buffer_start_sample,
-                             std::optional<int64_t> physical_input_sample = std::nullopt);
+                             std::optional<int64_t> physical_input_sample = std::nullopt,
+                             bool emit_audio = true);
     void catch_up_lane_input(int lane, input::InputState state, int64_t sample);
     void schedule_note_guides(int64_t buffer_start_samples, int64_t buffer_end_samples);
     void schedule_note_keysound(const gameplay::NoteEvent& note, int64_t sample);
@@ -445,6 +459,8 @@ private:
     [[nodiscard]] int64_t playback_sample_for_replay_event(const gameplay::ReplayFile& replay,
                                                            int64_t replay_sample) const;
     void build_autoplay_events();
+    void prepare_scheduled_input_audio(const gameplay::GameplayConfig& config);
+    void schedule_input_audio(int64_t buffer_start_samples, int64_t buffer_end_samples);
     void process_replay_input_queue(int64_t buffer_start_samples, int64_t buffer_end_samples, int64_t lookahead_samples);
     void process_autoplay_queue(int64_t buffer_start_samples,
                                 int64_t buffer_end_samples,
@@ -488,6 +504,9 @@ private:
     std::atomic<int> pause_click_action_{-1};
     std::array<std::atomic<int>, 3> pause_click_adjust_{{0, 0, 0}};
     std::size_t autoplay_event_index_ = 0;
+    std::vector<ScheduledInputAudio> scheduled_input_audio_;
+    std::size_t scheduled_input_audio_index_ = 0;
+    bool scheduled_input_audio_prepared_ = false;
     bool practice_no_fail_enabled_ = false;
     bool practice_no_fail_override_ = false;
     double practice_start_seconds_ = 0.0;
@@ -502,6 +521,9 @@ private:
 
     std::unique_ptr<gameplay::GameplayEngine> engine_;
     std::unique_ptr<gameplay::GameplayEngine> ghost_engine_;
+    bool chronological_judgement_ = true;
+    bool ghost_chronological_judgement_ = false;
+    std::shared_ptr<const std::vector<gameplay::ScrollSegment>> visual_scroll_segments_;
     std::mutex engine_mutex_;
 
     input::InputThread input_thread_;
@@ -531,6 +553,11 @@ private:
     std::atomic<uint64_t> audio_timing_sequence_{0};
     AtomicAudioTimingState last_audio_timing_{};
     StartupInputTimingAnchor startup_input_timing_anchor_{};
+    StartupInputTimingAnchor audio_input_timing_anchor_{};
+    GameplayInputClock shared_input_clock_;
+    int64_t judgement_horizon_sample_ = 0;
+    bool judgement_horizon_active_ = false;
+    bool stale_input_catchup_used_ = false;
     bool countdown_active_ = false;
     int countdown_value_ = 0;
     bool hispeed_decrease_held_ = false;

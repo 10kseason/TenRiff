@@ -1000,11 +1000,13 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
     input.riff_map_revision = state.riff_map_revision;
     input.sample_rate = state.sample_rate;
     input.audio_sample_time_ns = state.audio_sample_time_ns;
+    input.audio_clock_rate = state.audio_clock_rate;
     input.audio_buffer_frames = state.audio_buffer_frames;
     input.lookahead_samples = state.lookahead_samples;
     input.past_samples = state.past_samples;
     input.current_visual_position = state.current_visual_position;
     input.visual_velocity = state.visual_velocity;
+    input.visual_scroll_segments = state.visual_scroll_segments;
     input.future_visual_span = state.future_visual_span;
     input.past_visual_span = state.past_visual_span;
     input.combo = state.combo;

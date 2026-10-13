@@ -90,16 +90,10 @@
     "palette.f4f1ff": "#F7F7F7FF",
     "palette.05070a": "#080808FF",
     "palette.a4e8f3": "#D3D3D3FF",
-    "title.primary": "#79D8FAFF",
-    "title.multiplayer": "#F06B7BFF",
-    "title.exit": "#F2F4F7FF",
-    "title.primary_text": "#111820FF",
-    "title.multiplayer_text": "#111820FF",
-    "title.exit_text": "#111820FF",
-    "title.primary_detail": "#263340FF",
-    "title.multiplayer_detail": "#263340FF",
-    "title.exit_detail": "#263340FF",
-    "palette.18212b": "#18212BFF",
+    "title.primary": "#111111FF",
+    "title.primary_text": "#F5F5F5FF",
+    "title.primary_detail": "#D3D3D3FF",
+    "palette.79d8fa": "#79D8FAFF",
     "palette.ecf6ff": "#F2F2F2FF"
   },
   "rects": {
@@ -3217,52 +3211,52 @@
     },
     "rects.title_native.rect.018": {
       "file": "MenuWindow_draw_title_native.inl",
-      "line": 120,
+      "line": 91,
       "expression": "rect.left + 28, label_top, rect.right - 96, label_top + 50"
     },
     "rects.title_native.rect.019": {
       "file": "MenuWindow_draw_title_native.inl",
-      "line": 123,
+      "line": 94,
       "expression": "rect.left + 30, label_top + 56, rect.right - 96, rect.bottom - 14"
     },
     "rects.title_native.rect.020": {
       "file": "MenuWindow_draw_title_native.inl",
-      "line": 133,
+      "line": 104,
       "expression": "rect.right - 84, rect.top, rect.right - 20, rect.bottom"
     },
     "rects.title_native.rect.021": {
       "file": "MenuWindow_draw_title_native.inl",
-      "line": 139,
+      "line": 111,
       "expression": "rect.right - 78, cy - 24, rect.right - 30, cy + 24"
     },
     "rects.title_native.rect.022": {
       "file": "MenuWindow_draw_title_native.inl",
-      "line": 149,
+      "line": 121,
       "expression": "buttons.left + 2, buttons.bottom + 42, buttons.right, buttons.bottom + 78"
     },
     "rects.title_native.rect.023": {
       "file": "MenuWindow_draw_title_native.inl",
-      "line": 151,
+      "line": 123,
       "expression": "skin_layout_rect(data, \"title.footer\", D2D1::RectF(64, 972, 1856, 1048))"
     },
     "rects.title_native.rect.024": {
       "file": "MenuWindow_draw_title_native.inl",
-      "line": 154,
+      "line": 126,
       "expression": "footer.left + 24, footer.top + 18, footer.left + 266, footer.top + 56"
     },
     "rects.title_native.rect.025": {
       "file": "MenuWindow_draw_title_native.inl",
-      "line": 158,
+      "line": 130,
       "expression": "footer.left + 276, footer.top + 18, footer.right - 466, footer.top + 58"
     },
     "rects.title_native.rect.026": {
       "file": "MenuWindow_draw_title_native.inl",
-      "line": 159,
+      "line": 131,
       "expression": "skin_layout_rect(data, \"title.spectrum\", D2D1::RectF(footer.right - 426, footer.top + 18, footer.right - 282, footer.top + 56))"
     },
     "rects.title_native.rect.027": {
       "file": "MenuWindow_draw_title_native.inl",
-      "line": 161,
+      "line": 133,
       "expression": "footer.right - 246, footer.top + 18, footer.right - 24, footer.top + 56"
     },
     "rects.url_warning.rect.001": {

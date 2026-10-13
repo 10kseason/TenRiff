@@ -65,6 +65,9 @@ struct GameplayConfig {
     // Replay rulesets 1/2 deferred LN releases and let a re-press cancel them.
     // Only historical replay playback/verification should opt into that behavior.
     bool legacy_hold_release = false;
+    // R5 orders automatic events by their due sample before each input.
+    // R1-R4 playback/verifiers explicitly select false to retain historical ordering.
+    bool chronological_judgement = true;
 };
 
 struct LiveJudgementFeedback {
@@ -141,6 +144,7 @@ private:
     [[nodiscard]] OsuManiaJudgement record_osu_hold(const HoldState& hold,
                                                      int64_t release_sample,
                                                      bool forced_miss = false);
+    void advance_chronological(int64_t current_sample);
     void update_miss(LaneState& lane, int64_t current_sample);
     void update_hold(LaneState& lane, int64_t current_sample);
     void finalize_if_done(int64_t current_sample);
@@ -183,6 +187,7 @@ private:
     bool practice_no_fail_enabled_ = false;
     bool one_miss_fail_enabled_ = false;
     bool legacy_hold_release_ = false;
+    bool chronological_judgement_ = true;
 };
 
 }  // namespace tenriff::gameplay

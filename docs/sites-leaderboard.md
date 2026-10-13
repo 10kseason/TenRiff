@@ -8,7 +8,7 @@
 
 ## 1.8.41 판정 호환
 
-새 플레이는 `tenriff-native-score-v2-ruleset-4`와 판정 프로파일을 제출합니다.
+새 플레이는 `tenriff-native-score-v2-ruleset-5`와 판정 프로파일을 제출합니다.
 Judge Hard/Easy 변경은 [판정 범위](judgement-windows.md)를 참고하세요.
 웹은 R4를 별도 조건으로 수용하며 R1/R2/R3 보드 ID와 기존 기록을 유지합니다.
 1.8.41을 위한 추가 DB 스키마 마이그레이션은 없습니다. 기록은 계속 클라이언트 제출값이며

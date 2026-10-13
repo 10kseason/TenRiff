@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.8.9.5] - 2026-10-13
+
+- Use R5 chronological automatic judgement deadlines so LN tails, misses, mines, combo and gauge outcomes do not depend on audio callback partitioning. Keep R1–R4 playback/verifier policies and the unchanged R4 timing windows.
+- Judge live input against the playback clock instead of audio write-ahead. Keep keysound scheduling separate from the judgement frontier, including input calibration.
+- Share the input clock estimate with note presentation and query exact scroll segments across BPM/STOP boundaries and visual offsets. The authored judgement-line position and reverse scroll remain unchanged.
+- Correct clock phase through bounded rate changes and keep delayed HUD publication from moving displayed time backwards. Mark runs with discarded stale input state recovery as custom R5 because that recovery cannot be represented faithfully by the existing replay trace.
+- Record R5 in the existing ruleset identity, preserving the replay envelope. Existing web records retain their identities while new R5 boards remain separate.
+- See [timing consistency and release gate](docs/release-1.8.9.5-gate.md) for policy, validation scope and remaining physical-device limits.
+
+- Restore dark home action cards and light text; tint only Play (sky blue), Multiplayer (red) and Exit (white) icons. Options retains its existing appearance.
+- Put Master Volume first, followed by BGM and Keysound Volume, including initial keyboard focus. Saved values and setting identifiers are unchanged.
+
 ## [1.8.9.4] - 2026-10-13
 
 - Move the native result rank into the large top position (144 default), with score (64) beside accuracy below it; retain S+ styling. Show detail accuracy beside detail score and use five judgement columns plus max combo. Legacy image results retain their accuracy column because they lack the native summary.

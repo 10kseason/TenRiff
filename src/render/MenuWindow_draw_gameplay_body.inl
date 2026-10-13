@@ -341,8 +341,7 @@
         const std::string key_label_position =
             config::normalize_skin_key_label_position_token(data.gameplay.key_label_position);
 
-        const GameplayMotionDiagnostics motion_diagnostics = compute_gameplay_motion_diagnostics(
-            GameplayMotionState{
+        const GameplayMotionState motion_state{
                 data.gameplay.current_sample,
                 data.gameplay.duration_samples,
                 data.gameplay.sample_rate,
@@ -352,8 +351,18 @@
                 data.gameplay.visual_offset_ms,
                 data.gameplay.finished || data.gameplay.paused,
                 data.gameplay.game_over && !data.gameplay.spectating_peer,
-            },
-            render_now_ns);
+                data.gameplay.audio_clock_rate,
+            };
+        if (scene_hud_cache.display_chart != data.gameplay.visual_scroll_segments) {
+            scene_hud_cache.display_sample.reset();
+            scene_hud_cache.display_chart = data.gameplay.visual_scroll_segments;
+        }
+        // Preview loops intentionally seek; gameplay alone carries the last
+        // rendered audio sample across delayed HUD publication.
+        const GameplayMotionDiagnostics motion_diagnostics = is_skin_preview
+            ? compute_gameplay_motion_diagnostics(motion_state, render_now_ns)
+            : compute_continuous_gameplay_motion_diagnostics(
+                  motion_state, render_now_ns, scene_hud_cache.display_sample);
         const int64_t display_sample = motion_diagnostics.display_sample;
         auto lane_has_active_hold = [&](const auto& notes,
                                         std::size_t note_count,
@@ -375,10 +384,12 @@
         const float kGameplayTimingIndicatorHalfWidth = ng_metric("timing_half_width");
         const float kGameplayTimingIndicatorHeight = ng_metric("timing_height");
 
-        const double display_visual_position =
-            data.gameplay.current_visual_position +
-            data.gameplay.visual_velocity *
-                static_cast<double>(display_sample - data.gameplay.current_sample);
+        const double display_visual_position = compute_gameplay_display_visual_position(
+            data.gameplay.visual_scroll_segments.get(),
+            display_sample,
+            data.gameplay.current_sample,
+            data.gameplay.current_visual_position,
+            data.gameplay.visual_velocity);
         auto visual_to_y = [&](double position) -> float {
             return static_cast<float>(compute_gameplay_visual_y_normalized(
                 position,

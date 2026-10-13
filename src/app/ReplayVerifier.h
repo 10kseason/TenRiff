@@ -12,6 +12,8 @@
 namespace tenriff::app {
 
 inline constexpr std::string_view kCanonicalReplayRulesetId =
+    "tenriff-native-score-v2-ruleset-5";
+inline constexpr std::string_view kRuleset4ReplayRulesetId =
     "tenriff-native-score-v2-ruleset-4";
 inline constexpr std::string_view kRuleset3ReplayRulesetId =
     "tenriff-native-score-v2-ruleset-3";
@@ -56,6 +58,7 @@ struct ReplayVerificationResult {
 [[nodiscard]] config::JudgeConfig replay_judge_config_for_playback(
     const gameplay::ReplayFile& replay, const config::JudgeConfig& base,
     std::optional<int> bms_rank = std::nullopt);
+[[nodiscard]] bool replay_uses_chronological_judgement(const gameplay::ReplayFile& replay);
 [[nodiscard]] bool replay_uses_legacy_hold_release(const gameplay::ReplayFile& replay);
 [[nodiscard]] bool is_canonical_score_ruleset(const config::JudgeConfig& judge,
                                               const game::GaugeConfig& gauge);

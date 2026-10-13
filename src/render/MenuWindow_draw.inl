@@ -1,4 +1,8 @@
 void MenuWindow::draw(const MenuRenderData& data) {
+    if (data.kind != MenuScreenKind::GameplayHud || !data.gameplay.active || data.gameplay.loading) {
+        gameplay_hud_cache_.display_sample.reset();
+        gameplay_hud_cache_.display_chart.reset();
+    }
     benchmark_gpu_sprite_stats_ = {};
     benchmark_gpu_sprite_submissions_ = 0;
     static int draw_count = 0;

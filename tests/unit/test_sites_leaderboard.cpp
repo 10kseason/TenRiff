@@ -64,7 +64,7 @@ TEST_CASE("Sites payload preserves all four native metrics without display round
     const auto* object = json.root->as_object();
     REQUIRE(object != nullptr);
     CHECK(object->at("schema_version").as_number() == 1);
-    CHECK(object->at("ruleset_id").as_string() == "tenriff-native-score-v2-ruleset-4");
+    CHECK(object->at("ruleset_id").as_string() == "tenriff-native-score-v2-ruleset-5");
     CHECK(object->at("score").as_number() == replay.final_score);
     CHECK(object->at("detail_score").as_number() == replay.stats.detail_score);
     CHECK(object->at("accuracy").as_number() == replay.stats.accuracy_percent());
@@ -184,7 +184,7 @@ TEST_CASE("Sites ruleset 4 payload fails closed on missing or invalid timing met
     replay.chart_format = "osu";
     replay.bms_rank = -1;
     rejects(replay);
-    for (const auto ruleset : {app::kLegacyReplayRulesetId, app::kPreviousReplayRulesetId, app::kRuleset3ReplayRulesetId}) {
+    for (const auto ruleset : {app::kLegacyReplayRulesetId, app::kPreviousReplayRulesetId, app::kRuleset3ReplayRulesetId, app::kRuleset4ReplayRulesetId}) {
         replay = score_fixture();
         replay.ruleset_id = std::string(ruleset);
         rejects(replay);

@@ -101,7 +101,8 @@ ASIO 설정은 [장치 설정 안내](asio-audio.md)를 참고하세요. 선택 
   - 현재 프로필에서는 `340ms`로 저장·정규화하며, BAD 판정창과 별도로 무입력 자동 미스 확정 시점을 정함
   - 기본 Normal/Easy/Hard 모두 노트 시각에서 `340ms`를 초과하면 자동 미스. Normal/Easy는 BAD, Hard는 콤보를 끊는 간접 `POOR`/OD8 `MISS`로 기록
   - BAD창 밖이지만 자동 미스 전인 늦은 입력은 BAD 적중으로 인정하지 않고 이전 노트를 미스 처리한 뒤 다음 노트를 검사함
-- 새 플레이는 `tenriff-native-score-v2-ruleset-4`를 기록합니다. R3는 이전 Easy/Hard 창과 RANK·LN 해제 규칙을 보존합니다. R1/R2는 PG20ms·RANK 미적용·이전 LN 해제, R1은 Easy1.25x/Hard BAD340ms/자동 미스=BAD를 유지합니다. 커스텀 판정은 비공식입니다.
+- 새 플레이는 `tenriff-native-score-v2-ruleset-5`를 기록합니다. R3는 이전 Easy/Hard 창과 RANK·LN 해제 규칙을 보존합니다. R1/R2는 PG20ms·RANK 미적용·이전 LN 해제, R1은 Easy1.25x/Hard BAD340ms/자동 미스=BAD를 유지합니다. 커스텀 판정은 비공식입니다.
+- R5는 수치 창을 바꾸지 않고 자동 사건을 시간순으로 처리하며 R1~R4의 이전 처리 순서를 보존합니다. [일관성 수정](release-1.8.9.5-gate.md).
 - `hold_grace` (double, ms; 기본 `80ms`)
   - 설정 호환용 값이며 현재 native 꼬리 PG/GR 경계로 사용하지 않음; `hold_break`의 하한으로 사용
 - `hold_break` (double, ms; 기본 `200ms`)

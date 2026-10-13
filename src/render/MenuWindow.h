@@ -461,9 +461,11 @@ struct GameplayHudData {
     uint64_t riff_map_revision = 0;
     int sample_rate = 48000;
     int64_t audio_sample_time_ns = 0;
+    double audio_clock_rate = 1.0;
     int64_t activity_publish_time_ns = 0;
     double current_visual_position = 0.0;
     double visual_velocity = 1.0;
+    std::shared_ptr<const std::vector<gameplay::ScrollSegment>> visual_scroll_segments;
     double future_visual_span = 1.0;
     double past_visual_span = 1.0;
     uint32_t audio_buffer_frames = 0;
@@ -1086,6 +1088,9 @@ private:
     };
 
     struct GameplayHudCache {
+        GameplayDisplaySampleCache display_sample;
+        // Retain the identity so a later session cannot reuse its old address.
+        std::shared_ptr<const std::vector<gameplay::ScrollSegment>> display_chart;
         uint64_t studio_text_revision = std::numeric_limits<uint64_t>::max();
         std::array<std::wstring, 6> studio_setting_labels{}, studio_setting_values{};
         std::array<std::wstring, 5> studio_judge_counts{};

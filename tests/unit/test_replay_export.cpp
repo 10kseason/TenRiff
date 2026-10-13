@@ -290,6 +290,7 @@ TEST_CASE("BMS rank metadata round trips and remains optional for old replay evi
     for (const auto ruleset : {tenriff::app::kLegacyReplayRulesetId,
                               tenriff::app::kPreviousReplayRulesetId,
                               tenriff::app::kRuleset3ReplayRulesetId,
+                              tenriff::app::kRuleset4ReplayRulesetId,
                               tenriff::app::kCanonicalReplayRulesetId}) {
         replay.ruleset_id = std::string(ruleset);
         REQUIRE(save_replay_json(path.u8string(), replay).success());
@@ -457,6 +458,7 @@ TEST_CASE("current and legacy replay rulesets reproduce their exact normal easy 
     for (const auto ruleset : {tenriff::app::kLegacyReplayRulesetId,
                                tenriff::app::kPreviousReplayRulesetId,
                                tenriff::app::kRuleset3ReplayRulesetId,
+                               tenriff::app::kRuleset4ReplayRulesetId,
                                tenriff::app::kCanonicalReplayRulesetId}) {
         const bool legacy = ruleset == tenriff::app::kLegacyReplayRulesetId;
         for (const std::string mod : {"", "judge_easy", "judge_hard"}) {
@@ -484,7 +486,8 @@ TEST_CASE("current and legacy replay rulesets reproduce their exact normal easy 
             REQUIRE(verified.verified());
             CHECK_EQ(verified.ruleset_id, std::string(ruleset));
             if (mod == "judge_hard") {
-                const bool wide_bad = legacy || ruleset == tenriff::app::kCanonicalReplayRulesetId;
+                const bool wide_bad = legacy || ruleset == tenriff::app::kCanonicalReplayRulesetId ||
+                                      ruleset == tenriff::app::kRuleset4ReplayRulesetId;
                 CHECK(verified.stats.counts.bd == (wide_bad ? 1 : 0));
                 CHECK(verified.stats.counts.pr == (wide_bad ? 0 : 1));
             } else {
@@ -531,8 +534,10 @@ TEST_CASE("legacy replay playback and ghost policy preserve old automatic miss b
 
 TEST_CASE("explicit R3 and R4 replay rules keep rank and LN timing without chart hash evidence") {
     for (const auto ruleset : {tenriff::app::kRuleset3ReplayRulesetId,
+                               tenriff::app::kRuleset4ReplayRulesetId,
                                tenriff::app::kCanonicalReplayRulesetId}) {
-        const bool r4 = ruleset == tenriff::app::kCanonicalReplayRulesetId;
+        const bool r4 = ruleset == tenriff::app::kCanonicalReplayRulesetId ||
+                        ruleset == tenriff::app::kRuleset4ReplayRulesetId;
         for (const int format : {0, 1, 2, tenriff::gameplay::kReplayFormatVersion}) {
             ReplayFile replay;
             replay.ruleset_id = std::string(ruleset);
@@ -572,6 +577,7 @@ TEST_CASE("explicit R3 and R4 replay rules keep rank and LN timing without chart
             hold_config.practice_no_fail_enabled = true;
             hold_config.judge = hard;
             hold_config.legacy_hold_release = tenriff::app::replay_uses_legacy_hold_release(replay);
+            hold_config.chronological_judgement = tenriff::app::replay_uses_chronological_judgement(replay);
             tenriff::gameplay::GameplayEngine hold_engine(hold_chart, hold_config);
             (void)hold_engine.handle_input(1, InputState::Pressed, 48000);
             (void)hold_engine.handle_input(1, InputState::Released, 72000);
@@ -676,6 +682,7 @@ TEST_CASE("BMS rank replay verification retains old rulesets and applies the new
     for (const auto ruleset : {tenriff::app::kLegacyReplayRulesetId,
                               tenriff::app::kPreviousReplayRulesetId,
                               tenriff::app::kRuleset3ReplayRulesetId,
+                              tenriff::app::kRuleset4ReplayRulesetId,
                               tenriff::app::kCanonicalReplayRulesetId}) {
         ReplayFile replay;
         replay.chart_format = "bms";
@@ -692,6 +699,7 @@ TEST_CASE("BMS rank replay verification retains old rulesets and applies the new
         replay.trace.duration_samples = 48'000;
         replay.trace.events = {{1, InputState::Pressed, 32'096}, {1, InputState::Released, 32'097}};
         const bool current = ruleset == tenriff::app::kCanonicalReplayRulesetId ||
+                             ruleset == tenriff::app::kRuleset4ReplayRulesetId ||
                              ruleset == tenriff::app::kRuleset3ReplayRulesetId;
         const auto playback = tenriff::app::replay_judge_config_for_playback(
             replay, tenriff::config::JudgeConfig{}, chart.bms_rank);
@@ -717,6 +725,7 @@ TEST_CASE("LN regrab replay verification preserves legacy scores without undoing
     for (const auto ruleset : {tenriff::app::kLegacyReplayRulesetId,
                               tenriff::app::kPreviousReplayRulesetId,
                               tenriff::app::kRuleset3ReplayRulesetId,
+                              tenriff::app::kRuleset4ReplayRulesetId,
                               tenriff::app::kCanonicalReplayRulesetId}) {
         ReplayFile replay;
         replay.chart_sha256 = std::string(64, 'b');
@@ -734,6 +743,7 @@ TEST_CASE("LN regrab replay verification preserves legacy scores without undoing
             replay, chart, tenriff::app::ChartFormat::Bms, 120);
         REQUIRE(verified.verified());
         const bool current = ruleset == tenriff::app::kCanonicalReplayRulesetId ||
+                             ruleset == tenriff::app::kRuleset4ReplayRulesetId ||
                              ruleset == tenriff::app::kRuleset3ReplayRulesetId;
         CHECK(verified.stats.counts.pg == (current ? 1 : 2));
         CHECK(verified.stats.counts.bd == (current ? 1 : 0));
@@ -883,7 +893,7 @@ TEST_CASE("replay verifier reconstructs both LN Mix conversions without changing
     mode.mods = {"ln_mix_50"};
     mode.random_seed = 24680;
     for (const auto ruleset : {tenriff::app::kLegacyReplayRulesetId, tenriff::app::kPreviousReplayRulesetId,
-                               tenriff::app::kRuleset3ReplayRulesetId, tenriff::app::kCanonicalReplayRulesetId}) {
+                               tenriff::app::kRuleset3ReplayRulesetId, tenriff::app::kRuleset4ReplayRulesetId, tenriff::app::kCanonicalReplayRulesetId}) {
         for (int version : {1, 2}) {
             const auto managed = tenriff::app::manage_modes(source, tenriff::app::ChartFormat::Bms,
                 mode, tenriff::config::JudgeConfig{}, 1.0, 120.0, 48000,
@@ -904,6 +914,7 @@ TEST_CASE("replay verifier reconstructs both LN Mix conversions without changing
             config.gauge_shift_enabled = true;
             config.judge = tenriff::app::replay_judge_config_for_playback(replay, tenriff::config::JudgeConfig{});
             config.legacy_hold_release = tenriff::app::replay_uses_legacy_hold_release(replay);
+            config.chronological_judgement = tenriff::app::replay_uses_chronological_judgement(replay);
             tenriff::gameplay::GameplayEngine engine(chart, config);
             for (const auto& note : chart.notes) {
                 engine.advance(note.start_sample - 1);
@@ -1402,4 +1413,26 @@ TEST_CASE("LR2 course replay metadata rejects missing carry unknown policies and
     replay.mode.course_gauge = kLr2CourseGaugeId;
     replay.ruleset_id = std::string(tenriff::app::kCanonicalReplayRulesetId);
     CHECK_FALSE(validate_replay_evidence(replay).success());
+}
+
+TEST_CASE("R5 identity selects chronological processing independently of replay envelope version") {
+    ReplayFile replay;
+    for (int format : {0, 1, 2, tenriff::gameplay::kReplayFormatVersion}) {
+        replay.replay_format_version = format;
+        for (const auto legacy : {tenriff::app::kLegacyReplayRulesetId, tenriff::app::kPreviousReplayRulesetId,
+                                 tenriff::app::kRuleset3ReplayRulesetId, tenriff::app::kRuleset4ReplayRulesetId}) {
+            replay.ruleset_id = legacy;
+            CHECK_FALSE(tenriff::app::replay_uses_chronological_judgement(replay));
+            CHECK(tenriff::app::is_supported_canonical_replay_ruleset(legacy));
+        }
+        replay.ruleset_id = tenriff::app::kCanonicalReplayRulesetId;
+        CHECK(tenriff::app::replay_uses_chronological_judgement(replay));
+        CHECK_FALSE(tenriff::app::replay_uses_legacy_hold_release(replay));
+        replay.ruleset_id = "custom-ruleset-5";
+        CHECK(tenriff::app::replay_uses_chronological_judgement(replay));
+        CHECK_FALSE(tenriff::app::replay_uses_legacy_hold_release(replay));
+        CHECK_FALSE(tenriff::app::is_supported_canonical_replay_ruleset(replay.ruleset_id));
+        replay.ruleset_id = "custom";
+        CHECK_FALSE(tenriff::app::replay_uses_chronological_judgement(replay));
+    }
 }

@@ -3,10 +3,13 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <memory>
 #include <string>
+#include <vector>
 
 #include "GameplayHudLimits.h"
 #include "game/GaugeManager.h"
+#include "gameplay/GameplayChart.h"
 #include "gameplay/ResultStats.h"
 
 namespace tenriff::app {
@@ -45,10 +48,12 @@ struct GameplayHudRevisionInput {
     uint64_t riff_map_revision = 0;
     int sample_rate = 48000;
     int64_t audio_sample_time_ns = 0;
+    double audio_clock_rate = 1.0;
     uint32_t audio_buffer_frames = 0;
     int64_t lookahead_samples = 0;
     double current_visual_position = 0.0;
     double visual_velocity = 1.0;
+    std::shared_ptr<const std::vector<gameplay::ScrollSegment>> visual_scroll_segments;
     double future_visual_span = 1.0;
     double past_visual_span = 1.0;
     int64_t past_samples = 0;
@@ -295,11 +300,13 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.riff_map_revision != next.riff_map_revision ||
         previous.sample_rate != next.sample_rate ||
         previous.audio_sample_time_ns != next.audio_sample_time_ns ||
+        previous.audio_clock_rate != next.audio_clock_rate ||
         previous.audio_buffer_frames != next.audio_buffer_frames ||
         previous.lookahead_samples != next.lookahead_samples ||
         previous.past_samples != next.past_samples ||
         previous.current_visual_position != next.current_visual_position ||
         previous.visual_velocity != next.visual_velocity ||
+        previous.visual_scroll_segments != next.visual_scroll_segments ||
         previous.future_visual_span != next.future_visual_span ||
         previous.past_visual_span != next.past_visual_span ||
         previous.feedback_delta_ms != next.feedback_delta_ms ||

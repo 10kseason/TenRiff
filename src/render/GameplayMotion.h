@@ -8,6 +8,8 @@
 #include <string>
 #include <string_view>
 
+#include "gameplay/GameplayChart.h"
+
 namespace tenriff::render {
 
 struct GameplayMotionState {
@@ -20,6 +22,7 @@ struct GameplayMotionState {
     double visual_offset_ms = 0.0;
     bool finished = false;
     bool game_over = false;
+    double audio_clock_rate = 1.0;
 };
 
 struct GameplayMotionDiagnostics {
@@ -30,6 +33,46 @@ struct GameplayMotionDiagnostics {
     double hud_delta_ms = 0.0;
     double extrapolated_ms = 0.0;
     double buffer_ms = 0.0;
+    int64_t display_hold_samples = 0;
+};
+
+// A newly published, slower clock segment can arrive after the previous HUD
+// already extrapolated beyond that segment's anchor. Hold only the rendered
+// audio sample until the continuous clock catches up; never clamp scroll space
+// or visual offset. Owners reset this on a new session or an explicit seek.
+class GameplayDisplaySampleCache {
+public:
+    void reset() { initialized_ = false; }
+
+    int64_t apply(const GameplayMotionState& state, int64_t now_ns, int64_t audio_sample) {
+        if (state.finished || state.game_over || state.sample_rate <= 0 || state.audio_sample_time_ns <= 0) {
+            reset();
+            return audio_sample;
+        }
+        const bool discontinuity = initialized_ &&
+            (state.current_sample < anchor_sample_ || state.audio_sample_time_ns < anchor_ns_ ||
+             now_ns < render_ns_ || state.sample_rate != sample_rate_ ||
+             state.duration_samples != duration_samples_);
+        if (discontinuity) reset();
+        if (initialized_) audio_sample = (std::max)(audio_sample, last_sample_);
+        initialized_ = true;
+        last_sample_ = audio_sample;
+        anchor_sample_ = state.current_sample;
+        anchor_ns_ = state.audio_sample_time_ns;
+        render_ns_ = now_ns;
+        sample_rate_ = state.sample_rate;
+        duration_samples_ = state.duration_samples;
+        return audio_sample;
+    }
+
+private:
+    bool initialized_ = false;
+    int64_t last_sample_ = 0;
+    int64_t anchor_sample_ = 0;
+    int64_t anchor_ns_ = 0;
+    int64_t render_ns_ = 0;
+    int sample_rate_ = 0;
+    int64_t duration_samples_ = 0;
 };
 
 struct GameplayNoteShapeExtents {
@@ -347,6 +390,21 @@ inline double compute_gameplay_note_y_normalized(int64_t sample,
     return std::clamp(clamped_judgement_line + t * (1.0 - clamped_judgement_line), 0.0, 1.0);
 }
 
+inline double compute_gameplay_display_visual_position(
+    const std::vector<gameplay::ScrollSegment>* scroll_segments,
+    int64_t display_sample,
+    int64_t snapshot_sample,
+    double snapshot_position,
+    double snapshot_velocity) {
+    if (scroll_segments) {
+        // Resolve the final sample (including visual offset) against every BPM,
+        // STOP and reverse boundary, not just the snapshot's current velocity.
+        return gameplay::scroll_visual_position_at(*scroll_segments, display_sample);
+    }
+    // Menu previews have synthetic visual coordinates and no chart scroll map.
+    return snapshot_position + snapshot_velocity * static_cast<double>(display_sample - snapshot_sample);
+}
+
 inline double compute_gameplay_visual_y_normalized(double position,
                                                    double display_position,
                                                    double future_span,
@@ -474,8 +532,13 @@ inline GameplayMotionDiagnostics compute_gameplay_motion_diagnostics(const Gamep
         gameplay_extrapolation_limit_samples(state.sample_rate, state.audio_buffer_frames);
 
     const int64_t elapsed_ns = std::max<int64_t>(0, now_ns - state.audio_sample_time_ns);
+    // Follow the same continuous sample clock as input; visual offset remains
+    // a fixed chart-time offset and must not be multiplied by this rate.
+    const double clock_rate = std::isfinite(state.audio_clock_rate) && state.audio_clock_rate > 0.0
+                                  ? state.audio_clock_rate : 1.0;
     const int64_t elapsed_samples = static_cast<int64_t>(std::llround(
-        static_cast<double>(elapsed_ns) * static_cast<double>(state.sample_rate) / 1'000'000'000.0));
+        static_cast<double>(elapsed_ns) * static_cast<double>(state.sample_rate) * clock_rate /
+        1'000'000'000.0));
     diagnostics.extrapolated_samples = std::clamp<int64_t>(
         elapsed_samples,
         int64_t{0},
@@ -491,6 +554,25 @@ inline GameplayMotionDiagnostics compute_gameplay_motion_diagnostics(const Gamep
     diagnostics.display_sample = std::max<int64_t>(0, diagnostics.display_sample);
     if (state.duration_samples > 0) {
         diagnostics.display_sample = std::min(diagnostics.display_sample, state.duration_samples);
+    }
+    return diagnostics;
+}
+
+inline GameplayMotionDiagnostics compute_continuous_gameplay_motion_diagnostics(
+    const GameplayMotionState& state, int64_t now_ns, GameplayDisplaySampleCache& cache) {
+    auto audio_state = state;
+    audio_state.visual_offset_ms = 0.0;
+    auto diagnostics = compute_gameplay_motion_diagnostics(audio_state, now_ns);
+    const int64_t audio_sample = diagnostics.display_sample;
+    diagnostics.display_sample = cache.apply(state, now_ns, audio_sample);
+    diagnostics.display_hold_samples = diagnostics.display_sample - audio_sample;
+    if (state.sample_rate > 0 && std::isfinite(state.visual_offset_ms)) {
+        diagnostics.display_sample += static_cast<int64_t>(std::llround(
+            state.visual_offset_ms * static_cast<double>(state.sample_rate) / 1000.0));
+    }
+    diagnostics.display_sample = (std::max)(int64_t{0}, diagnostics.display_sample);
+    if (state.duration_samples > 0) {
+        diagnostics.display_sample = (std::min)(state.duration_samples, diagnostics.display_sample);
     }
     return diagnostics;
 }
