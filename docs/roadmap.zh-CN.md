@@ -1,5 +1,7 @@
 # TenRiff 开发路线图（分阶段）
 
+**2026-10-13 · 1.8.9.6:** 输入和游戏推进/HUD的短等待使用可复用的高分辨率计时器，RawInput由消息唤醒。采用对比版本B的方式，保留判定范围、R1–R5、回放和固定基线1.8.7。手动试玩感受随轮次变化，不能保证消除所有卡顿。 [Scope / 검증](release-1.8.9.6-gate.md).
+
 **固定基准：[1.8.7](baseline-1.8.7.zh-CN.md)**（2026-10-10）。使用 Git tag `1.8.7`、commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`，不随 `latest` 或新版本自动更新。
 
 **2026-10-13 · 1.8.9.4:** 调整结果页面的大等级与分数布局，显示详细准确率，并区分四种Gauge Shift CLEAR颜色。将BGM和键音音量移到音频设置顶部，新设置均默认为100%。包含韩文皮肤名称调整、明确标注的obj谱师与BPM!变速提示，以及同一谱面时刻相同音源的重复播放修正。谱师上传为可选项，保留现有记录ID。[变更、兼容性及验证范围（韩文）](release-1.8.9.4-gate.md)。验证和游戏、网页发布状态分别记录，固定基准仍为1.8.7。
@@ -16,7 +18,7 @@
 
 ## 当前基线
 - Windows GUI/runtime 是主要受支持路径。
-- 固定基准为 `1.8.7`，此源码版本为 `1.8.9.4`；公开包附带 NK3 P64 与 generalized pattern MLP inference 模型，但不附带 BGA upscaler 模型。选择兼容且权利已厘清的 upscaler ONNX 只会保存路径，BGA Upscaler 会一直保持 off，直到用户手动开启并确认 high-spec warning；不存在自动 benchmark gate。
+- 固定基准为 `1.8.7`，此源码版本为 `1.8.9.6`；公开包附带 NK3 P64 与 generalized pattern MLP inference 模型，但不附带 BGA upscaler 模型。选择兼容且权利已厘清的 upscaler ONNX 只会保存路径，BGA Upscaler 会一直保持 off，直到用户手动开启并确认 high-spec warning；不存在自动 benchmark gate。
 - 当前菜单/runtime 仅支持 BMS family（`.bms/.bme/.bml/.pms`），并支持 native、bundle/profile TenRiff `skin.json` 与 LR2 skin。
 - 关于当前已发布的行为，请先看 [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)；这份路线图主要讲方向和剩余工作。
 

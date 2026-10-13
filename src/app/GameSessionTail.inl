@@ -974,6 +974,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
 
 void GameSession::run() {
     auto next_hud_tick = std::chrono::steady_clock::now();
+    // A coarse 2 ms sleep can round to a system tick and starve the 8 ms HUD.
+    // Reuse one thread-owned timer without changing global timer resolution.
+    timing::PreciseWait hud_wait;
 
     if (countdown_active_ && !stop_requested_.load(std::memory_order_acquire)) {
         countdown_started_ns_ = timing::HighResClock::now_ns();
@@ -1016,7 +1019,7 @@ void GameSession::run() {
                 }
             }
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            hud_wait.wait_for_ns(2'000'000);
         }
     }
 
@@ -1068,7 +1071,7 @@ void GameSession::run() {
             }
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        hud_wait.wait_for_ns(2'000'000);
     }
 
     if (hud_callback_) {

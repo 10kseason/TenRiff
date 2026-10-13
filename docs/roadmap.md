@@ -1,5 +1,7 @@
 # TenRiff Development Roadmap (staged)
 
+**2026-10-13 · 1.8.9.6:** 입력과 게임 진행/HUD의 짧은 대기에 재사용 고해상도 타이머를 적용하고, RawInput은 메시지가 오면 깨어납니다. B 비교 방식의 제품 적용이며, 수치 판정 창·R1~R5·리플레이·고정 기준 1.8.7을 유지합니다. 실제 체감은 회차마다 달라 모든 움찔의 해결을 보장하지 않습니다. [Scope / 검증](release-1.8.9.6-gate.md).
+
 **고정 기준선: [1.8.7](baseline-1.8.7.md)** (2026-10-10). Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`을 사용하며 `latest`나 새 릴리스로 자동 변경하지 않습니다.
 
 **2026-10-13 · 1.8.9.4:** 결과의 큰 등급·점수 배치와 상세 정확도를 정리하고 Gauge Shift CLEAR 4단계 색을 구분합니다. 오디오의 BGM·키음 음량을 맨 위로 옮기며 새 기본값은 모두 100%입니다. 한국어 스킨 명칭, 명시된 obj 채보자와 BPM! 변속 표시, 같은 시점의 동일 음원 중복 재생 보정을 포함합니다. 채보자 업로드는 선택 사항이며 기존 기록 식별자는 유지합니다. [변경·호환·검증 범위](release-1.8.9.4-gate.md). 검증과 게임·웹 공개 상태는 해당 문서에 별도로 기록하며 고정 기준은 1.8.7입니다.
@@ -16,7 +18,7 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current baseline
 - Windows GUI/runtime is the primary supported path.
-- The fixed baseline is `1.8.7` and this source targets `1.8.9.4`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
+- The fixed baseline is `1.8.7` and this source targets `1.8.9.6`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
 - The active menu/runtime is BMS-family only (`.bms/.bme/.bml/.pms`) and supports native, bundled/profile TenRiff `skin.json`, and LR2 skins.
 - For current shipped behavior, read `docs/current-state.md` first; this roadmap is about direction and remaining work.
 

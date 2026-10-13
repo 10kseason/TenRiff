@@ -1,5 +1,7 @@
 # TenRiff
 
+**2026-10-13 · 1.8.9.6:** Reuse high-resolution timers for short input and gameplay/HUD waits; RawInput wakes on messages. Ships the B comparison behavior while preserving judgement windows, R1–R5, replays and the fixed 1.8.7 baseline. Manual impressions varied between runs; this does not guarantee removal of every stutter. [Scope / 검증](docs/release-1.8.9.6-gate.md).
+
 **2026-10-13 · 1.8.9.5:** R5 processes LN tails and automatic judgements in time order, separates judgement from audio write-ahead, and aligns input/display timing with exact BPM/STOP scroll positions. Restores dark lobby cards with colored icons and moves Master Volume first. R1–R4 and the fixed 1.8.7 baseline are preserved. [Scope and verification](docs/release-1.8.9.5-gate.md).
 
 **2026-10-13 · 1.8.9.4:** Rearranges the large result rank and score, shows detail accuracy and distinguishes four Gauge Shift CLEAR colors. BGM/keysound volume move to the top of Audio with 100% defaults for new settings. Includes Korean skin-label revisions, explicit obj credits, BPM! changes and correction of duplicate identical audio at the same chart time. Author uploads are optional and existing record identities are retained. [Changes, compatibility and validation (Korean)](docs/release-1.8.9.4-gate.md). Verification and game/web publication are tracked separately; the fixed baseline remains 1.8.7.
