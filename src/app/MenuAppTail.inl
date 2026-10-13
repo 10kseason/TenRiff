@@ -925,7 +925,7 @@ void MenuApp::sync_menu_music() {
         return;
     }
 
-    const double gain = menu_background_gain(
+    const double gain = tenriff_music_gain(
         true, config_.audio_ui.master_volume, config_.audio_ui.bgm_volume);
     menu_music_.play_looping_file(music_path, gain);
 }

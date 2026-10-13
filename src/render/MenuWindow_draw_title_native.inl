@@ -57,15 +57,24 @@
         draw_text_clipped(wloc("LET'S PLAY", "시작하기"), d2d_->hud_format.Get(),
                           native_rect("title_native.rect.016", D2D1::RectF(buttons.left, buttons.top - 54, buttons.right, buttons.top - 24)), d2d_->muted_brush.Get());
         float button_top = buttons.top;
+        const std::array<uint32_t, 4> action_colors = {0x79D8FA, 0xF06B7B, 0xF2F4F7, 0xF2F4F7};
         for (std::size_t index = 0; index < data.title.buttons.size(); ++index) {
             const auto& button = data.title.buttons[index];
             const bool primary = index == 0;
+            const uint32_t action_color = action_colors[std::min<std::size_t>(index, 3)];
             const float height = (primary ? 168.0f : 114.0f) * button_scale_y;
             const float entrance_x = 24.0f * (1.0f - native_menu_motion_.entrance(static_cast<float>(index) * 0.055f));
             const D2D1_RECT_F rect = native_rect("title_native.rect.017", D2D1::RectF(buttons.left + entrance_x, button_top, buttons.right + entrance_x, button_top + height));
             const auto rounded = D2D1::RoundedRect(rect, 14, 14);
             register_hit(rect, MenuHitTargetKind::TitleButton, static_cast<int>(index));
-            draw_glass_panel(rect, 14, 0.95f, 0, button.selected, 0);
+            // The action edge owns the color; a generic white focus underneath
+            // would wash out the icon-matched outline, especially on selection.
+            if (d2d_->panel_brush) {
+                const float opacity = d2d_->panel_brush->GetOpacity();
+                d2d_->panel_brush->SetOpacity(0.95f);
+                ctx->FillRoundedRectangle(rounded, d2d_->panel_brush.Get());
+                d2d_->panel_brush->SetOpacity(opacity);
+            }
             if (primary && d2d_->card_brush) {
                 const auto saved = d2d_->card_brush->GetColor();
                 d2d_->card_brush->SetColor(native_palette("title.primary", D2D1::ColorF(0x111111)));
@@ -74,12 +83,10 @@
             } else if (button.selected && d2d_->button_selected_brush) {
                 ctx->FillRoundedRectangle(rounded, d2d_->button_selected_brush.Get());
             }
-            if (button.selected) {
-                ID2D1Brush* focus = primary ? static_cast<ID2D1Brush*>(d2d_->text_brush.Get())
-                                           : static_cast<ID2D1Brush*>(d2d_->accent_brush.Get());
-                if (focus) ctx->DrawRoundedRectangle(rounded, focus, 2.0f);
-            }
-            draw_native_focus(rect, 14, index, static_cast<int>(index), button.selected, primary);
+            // Slots 0/1 belong to library/result profiles. Reuse one cached
+            // bloom per home action; focus changes only its drawing opacity.
+            const float focus = native_menu_motion_.focus(index, static_cast<int>(index), button.selected);
+            draw_panel_glow(rect, 14, action_color, 2 + index, 0.42f + 0.58f * focus);
             const auto saved_text = d2d_->text_brush->GetColor();
             const auto saved_muted = d2d_->muted_brush->GetColor();
             if (primary) {
@@ -99,17 +106,17 @@
                 native_menu_assets::kChevron, native_menu_assets::kNetwork,
                 native_menu_assets::kSliders, native_menu_assets::kExit};
             if (primary) {
-                // Only the icons carry action colors; cards and labels retain the dark home style.
+                // Icons and edges share a color while the card face stays dark.
                 draw_text_clipped_aligned(L"\u2192", d2d_->menu_icon_format.Get(),
                     native_rect("title_native.rect.020", D2D1::RectF(rect.right - 84, rect.top, rect.right - 20, rect.bottom)),
-                    native_color(0x79D8FA, 1.0f), DWRITE_TEXT_ALIGNMENT_CENTER);
+                    semantic_color(action_color), DWRITE_TEXT_ALIGNMENT_CENTER);
             } else {
                 const float cy = (rect.top + rect.bottom) * 0.5f;
                 const bool colored_icon = index == 1 || index == 3;
-                const auto icon_color = D2D1::ColorF(index == 1 ? 0xF06B7B : 0xF2F4F7);
+                const auto icon_color = D2D1::ColorF(action_color);
                 draw_native_asset(button_assets[std::min<std::size_t>(index, 3)],
                     native_rect("title_native.rect.021", D2D1::RectF(rect.right - 78, cy - 24, rect.right - 30, cy + 24)),
-                    colored_icon || button.selected ? 1.0f : 0.65f, 0.0f, colored_icon ? &icon_color : nullptr);
+                    colored_icon || button.selected ? 1.0f : 0.65f, 0.0f, &icon_color);
             }
             d2d_->menu_icon_format->SetParagraphAlignment(saved_paragraph);
             d2d_->text_brush->SetColor(saved_text);
