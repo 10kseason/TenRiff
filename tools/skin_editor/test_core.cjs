@@ -19,11 +19,20 @@ test('offline and bundled schemas equal the source of truth', () => {
   assert.deepEqual(bundledSchema, actualSchema);
 });
 test('every client note shape survives common and per-mode editor round trips',()=>{
-  for(const shape of ['rect','circle','triangle','pentagon','hexagon','square','diamond','arrow','hex']){
+  for(const shape of ['rect','simple_rect','circle','triangle','pentagon','hexagon','square','diamond','arrow','hex']){
     const doc={...basic(),gameplay:{note_shape:shape,modes:{'4k':{note_shape:shape}}}};
     const reloaded=C.parse(C.serialize(doc));
     assert.deepEqual(errors(reloaded),[]);assert.equal(C.gameplay(reloaded,'4k').note_shape,shape);
   }
+});
+test('simple rectangle preview keeps the note height with sharp corners and no gradient',()=>{
+  const G=require('./gameplay.js'),rects=[];
+  const ctx=new Proxy({rect(...args){rects.push(args);},roundRect(){throw Error('simple rectangle must have sharp corners');},
+    createLinearGradient(){throw Error('simple rectangle must use a flat fill');}},
+    {get(target,key){return key in target?target[key]:()=>{};}});
+  G.drawNoteShape(ctx,[2,100,74,120],'#79D8FA',{note_shape:'simple_rect',note_border:false},1);
+  assert.deepEqual(rects,[[2,100,72,20]]);
+  assert.equal(ctx.fillStyle,'#79D8FA');
 });
 test('polygon previews retain lane width and black head and tail outlines with opt-out',()=>{
   const G=require('./gameplay.js');

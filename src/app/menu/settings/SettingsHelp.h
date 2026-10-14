@@ -29,6 +29,8 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Mute game audio while another window is active. Audio returns when you focus TenRiff.", "다른 창을 사용하는 동안 게임 소리를 끕니다. TenRiff로 돌아오면 다시 재생됩니다.", "他のウィンドウを使用中は消音し、TenRiffに戻ると解除します。"},
         {"Choose title-screen music: default, random BMS, last played, or none.", "타이틀 음악을 기본 음악, 랜덤 BMS, 마지막 플레이한 곡 또는 없음으로 고릅니다.", "タイトル音楽を標準、ランダムBMS、最後に遊んだ曲、なしから選びます。"},
         {"After the last judgement, listen to the remaining audio or skip it after the result delay. Notes and scoring stay unchanged.", "마지막 판정 뒤 남은 음악을 끝까지 듣거나 결과 대기 시간 후 스킵합니다. 노트와 점수는 그대로입니다.", "最後の判定後、残りの音楽を最後まで聴くか結果待機時間後にスキップします。"},
+        {"Adjust the entire BMS song and previews together, including keysounds. TenRiff menu music is independent.", "키음을 포함한 BMS 곡 전체와 미리듣기 음량을 조절합니다. 텐리프 메뉴 음악과는 별개입니다.", "キー音を含むBMS曲全体と試聴の音量です。TenRiffメニュー音楽とは独立しています。"},
+        {"Adjust TenRiff menu and result music. 100% uses a quiet 10% reference level; BMS songs are unchanged.", "텐리프 메뉴·결과 음악을 조절합니다. 100%는 기본 10% 음량이며 BMS 곡에는 적용되지 않습니다.", "TenRiffのメニュー・結果音楽です。100%は原音の10%を基準とし、BMS曲には適用しません。"},
     };
     static constexpr SettingsHelpText graphics[] = {
         {"Choose windowed, borderless, or fullscreen display.", "창 모드, 테두리 없는 창, 전체 화면 중 표시 방식을 고릅니다.", "ウィンドウ、ボーダーレス、全画面を選びます。"},
@@ -76,6 +78,7 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Change song speed and timing together. 1.00x is original speed; this also affects score eligibility.", "곡 재생 속도와 노트 타이밍을 함께 바꿉니다. 1.00x가 원래 속도이며 기록 조건에도 영향을 줍니다.", "曲速とノート時刻を一緒に変更します。1.00xが原速で、記録条件にも影響します。"},
         {"Change note scrolling speed without changing song speed or judgement timing.", "곡 속도와 판정 시점은 유지하고, 노트가 화면을 이동하는 속도만 바꿉니다.", "曲速と判定時刻を変えず、ノートのスクロール速度だけを変えます。"},
         {"Save mode settings and return.", "모드 설정을 저장하고 돌아갑니다.", "モード設定を保存して戻ります。"},
+        {"Choose Normal, Hard or EX. EX uses BMS RANK-scaled PG/GR/GD 14/44.5714/78.8571 ms at EASY rank, with fixed BAD 250 ms.", "기본·Hard·EX 중 판정 범위를 고릅니다. EX는 EASY RANK 기준 PG·GR·GD 14·44.5714·78.8571ms에 BMS RANK 비율을 적용하고 BAD는 250ms로 고정합니다.", "標準・Hard・EXを選びます。EXはEASY RANK基準PG/GR/GD 14/44.5714/78.8571msにBMS RANK比率を適用し、BADは250ms固定です。"},
     };
     static constexpr SettingsHelpText skin[] = {
         {"Choose the key layout to edit and preview. Each layout keeps its own lane settings.", "편집하고 미리 볼 키 배치를 고릅니다. 레이아웃마다 레인 설정을 따로 유지합니다.", "編集・プレビューするキー配置です。配置ごとにレーン設定を保持します。"},
@@ -147,6 +150,9 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Show the bar for 0.75 seconds after a non-PG judgement, or keep the scale visible. Timing markers expire separately.", "피그렛 외 판정 후 0.75초 동안 막대를 표시하거나 눈금을 항상 표시합니다. 오차 마커는 별도로 사라집니다.", "PG以外の判定後0.75秒表示するか、目盛りを常時表示します。誤差マーカーは別に消えます。"},
         {"Show or hide the chart-density graph and its clock to the left of the Studio Deck playfield. This does not change the Classic HUD.", "그래프 맵의 노트 밀도 그래프와 시계를 켜거나 끕니다. 클래식 HUD에는 영향을 주지 않습니다.", "スタジオデッキのプレイフィールド左側にあるノート密度グラフと時計を表示・非表示にします。クラシックHUDには影響しません。"},
         {"Show or hide the backing behind FAST/SLOW and timing indicators. Judgement remains text-only.", "FAST/SLOW·타이밍 표시 뒤 배경을 켜거나 끕니다. 판정은 항상 글자만 표시합니다.", "FAST/SLOW・タイミング表示の背景を切り替えます。判定は常に文字のみです。"},
+        {"Scale FAST/SLOW text from 50% to 200% independently of judgement, combo and the bar.", "FAST/SLOW 글자 크기를 50~200%로 조절합니다. 판정·콤보·막대 크기와는 별개입니다.", "FAST/SLOW文字を50～200%で調整します。判定・コンボ・バーのサイズとは独立しています。"},
+        {"Scale the timing bar and its markers from 50% to 200% without changing FAST/SLOW text.", "FAST/SLOW 글자 크기를 유지하면서 막대와 마커 크기를 50~200%로 조절합니다.", "FAST/SLOW文字は変えず、バーとマーカーを50～200%で調整します。"},
+        {"Choose a local TTF/OTF font. Missing files use the default font.", "로컬 TTF·OTF 폰트를 선택합니다. 파일이 없어지면 기본 폰트를 사용합니다.", "ローカルのTTF・OTFフォントを選びます。ファイルがなければ標準フォントを使います。"},
     };
     static constexpr SettingsHelpText profile[] = {
         {"Choose the interface language. The change is applied and saved immediately.", "화면 언어를 선택합니다. 변경 즉시 적용하고 저장합니다.", "表示言語を選びます。すぐに適用・保存されます。"},
@@ -164,11 +170,10 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Go to the title screen. You can reopen these settings from Options.", "타이틀 화면으로 이동합니다. 옵션에서 다시 설정할 수 있습니다.", "タイトルへ移動します。オプションから再度設定できます。"},
     };
     static constexpr SettingsHelpText mods[] = {
-        {"Widen or narrow judgement windows. Easy lowers the score multiplier; the current multiplier is shown below.", "판정 시간 범위를 넓히거나 줄입니다. Easy는 점수 배율을 낮추며, 현재 배율은 아래에 표시됩니다.", "判定幅を広げる・狭める設定です。Easyではスコア倍率が下がります。"},
-        {"DP Flip swaps the left and right sides of a double-play layout.", "DP Flip은 더블 플레이 배치의 왼쪽과 오른쪽을 맞바꿉니다.", "DP Flipはダブルプレイの左右を入れ替えます。"},
+        {"DP Flip swaps the left and right sides of a double-play layout.", "더블 플레이에서 왼쪽과 오른쪽 필드를 맞바꿉니다.", "DP Flipはダブルプレイの左右を入れ替えます。"},
         {"Add notes at the selected percentage to practice denser patterns.", "선택한 비율만큼 노트를 추가해 더 밀집된 패턴을 연습합니다.", "選んだ割合でノートを追加し、密度の高い配置を練習します。"},
-        {"Choose Full LN, LN Mix, or Full Tap. Full Tap converts long notes and uses a 0.50 score multiplier.", "전체 LN, LN Mix, 전체 단노트 중 고릅니다. 전체 단노트는 롱노트를 바꾸며 점수 배율은 0.50입니다.", "Full LN、LN Mix、Full Tapを選びます。Full TapはLNを単ノートにし、倍率は0.50です。"},
-        {"No LN Release removes long-note release judgement; continue holding notes through their ends.", "No LN Release는 롱노트 끝의 떼기 판정을 없앱니다. 노트 끝까지 누르고 유지하세요.", "No LN ReleaseはLN終端の離し判定をなくします。終端まで押し続けてください。"},
+        {"Choose Full LN, LN Mix, or Full Tap. Full Tap converts long notes and uses a 0.50 score multiplier.", "모두 롱노트·롱노트 혼합·모두 단노트 중 고릅니다. 모두 단노트는 롱노트를 단노트로 바꾸며 점수 배율은 0.50입니다.", "Full LN、LN Mix、Full Tapを選びます。Full TapはLNを単ノートにし、倍率は0.50です。"},
+        {"No LN Release removes long-note release judgement; continue holding notes through their ends.", "롱노트 끝에서 떼는 타이밍의 판정을 없앱니다. 노트 끝까지 누르고 유지하세요.", "No LN ReleaseはLN終端の離し判定をなくします。終端まで押し続けてください。"},
         {"Auto Scratch plays only BMS scratch lanes. Practice assistance: score multiplier 0%, no official best or ranking. Keyboard lanes remain manual.", "BMS 스크래치 레인만 자동으로 처리합니다. 연습용 보조 기능이며 배율 0%, 최고 기록·랭킹에서 제외됩니다. 일반 키 레인은 직접 입력합니다.", "BMSスクラッチのみ自動演奏します。練習補助のため倍率0%、公式ベスト・ランキング対象外です。鍵盤は手動です。"},
         {"Hide scratch columns only while Auto Scratch is enabled; other key widths remain unchanged.", "오토스크래치를 켰을 때 스크래치 레인을 숨깁니다. 나머지 키의 폭은 유지합니다.", "Auto Scratch中のみスクラッチ列を隠します。他の鍵盤の幅は維持します。"},
         mode[17],

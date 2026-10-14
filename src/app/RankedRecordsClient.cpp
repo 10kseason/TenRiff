@@ -1,6 +1,7 @@
 #include "app/RankedRecordsClient.h"
 #include "app/MainApiTlsPin.h"
 #include "app/SitesLeaderboardClient.h"
+#include "app/SitesUploadResponse.h"
 
 #include "config/SimpleJson.h"
 
@@ -826,20 +827,7 @@ bool submit_sites_leaderboard_score(const std::string& base_url,
         retryable = true;
         return false;
     }
-    if (response.status != 200 && response.status != 201) {
-        retryable = response.status == 429 || response.status >= 500;
-        error = "Sites returned HTTP " + std::to_string(response.status) +
-                "; check the Site's public access and connection key.";
-        return false;
-    }
-    const auto parsed = config::parse_json(response.body);
-    if (parsed.success() && parsed.root->is_object()) {
-        const auto* object = parsed.root->as_object();
-        const auto accepted = object->find("accepted");
-        if (accepted != object->end() && accepted->second.is_bool() && accepted->second.as_bool()) return true;
-    }
-    error = "Sites did not acknowledge the record.";
-    return false;
+    return parse_sites_upload_response(response.status, response.body, retryable, error);
 #else
     error = "Sites automatic upload is available in Windows builds.";
     return false;

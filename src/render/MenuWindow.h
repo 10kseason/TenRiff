@@ -158,6 +158,7 @@ struct SongCardData {
     std::string background_path;
     std::string lamp;
     std::string level_label;
+    bool difficulty_is_aery_five_key = false;
     int level = 0;
     double rating = 0.0;
     int song_index = -1;
@@ -198,6 +199,7 @@ struct SongSelectData {
     std::string selected_song_layout;
     std::string selected_song_chart_name;
     std::string selected_song_difficulty;
+    bool selected_song_difficulty_is_aery_five_key = false;
     int selected_song_key_count = 0;
     double selected_song_bpm = 0.0;
     bool selected_song_has_bpm_changes = false;
@@ -365,6 +367,9 @@ struct ResultScreenData {
     std::string chart_name;
     std::string layout_label;
     std::string difficulty_table_label;
+    std::string difficulty_label;
+    bool difficulty_is_aery_five_key = false;
+    bool has_bpm_changes = false;
     int key_count = 0;
     int level = 0;
     int native_level = 0;
@@ -405,6 +410,7 @@ struct ResultScreenData {
     int slow_count = 0;
     int shift_count = 0;
     int export_warning_count = 0;
+    std::string web_upload_status;
     bool timing_guidance_visible = false;
     int timing_guidance_direction = 0;
     std::string timing_guidance_title;
@@ -509,6 +515,8 @@ struct GameplayHudData {
     double timing_text_offset_y = 0.0;
     double timing_bar_offset_x = 0.0;
     double timing_bar_offset_y = 0.0;
+    double timing_text_scale = 1.0;
+    double timing_bar_scale = 1.0;
 
     bool show_hold_tail = false;
     bool hold_tail_taper_enabled = false;
@@ -668,6 +676,9 @@ struct MenuRowData {
     bool enabled = true;
     // A value can open an editor while its row body still only selects it.
     bool value_activatable = false;
+    // Two independently adjustable endpoints can share one visible range row.
+    int secondary_row_index = -1;
+    bool secondary_selected = false;
 };
 
 struct SkinPreviewData {
@@ -681,6 +692,8 @@ struct SkinPreviewData {
     double timing_text_offset_y = 0.0;
     double timing_bar_offset_x = 0.0;
     double timing_bar_offset_y = 0.0;
+    double timing_text_scale = 1.0;
+    double timing_bar_scale = 1.0;
 
     double gameplay_field_offset_x = 0.0;
     std::array<std::string, kGameplayHudMaxLanes> key_labels{};
@@ -861,6 +874,8 @@ struct MenuRenderData {
     MenuScreenKind kind = MenuScreenKind::GenericList;
     ui::Language ui_language = ui::Language::English;
     std::string ui_font = "default";
+    std::string ui_font_path;
+    uint64_t ui_font_revision = 0;
     float ui_text_scale = 1.0f;
     uint64_t profile_avatar_revision = 0;
     LobbySkinData lobby_skin;

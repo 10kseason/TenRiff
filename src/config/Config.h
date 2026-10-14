@@ -121,6 +121,9 @@ struct AudioUiConfig {
     bool background_sound_enabled = true;
     std::string title_music = "default";
     double master_volume = 0.70;
+    // Chart-wide gain is independent of TenRiff menu/scene music.
+    double gameplay_volume = 1.0;
+    double menu_music_volume = 1.0;
     double bgm_volume = 1.0;
     double keysound_volume = 1.0;
     bool normalize_audio = false;
@@ -192,6 +195,9 @@ struct SkinConfig {
     double timing_text_offset_y = 0.0;
     double timing_bar_offset_x = 0.0;
     double timing_bar_offset_y = 0.0;
+    // Profile multipliers keep FAST/SLOW text and its bar independent of judgement/combo.
+    double timing_text_scale = kSkinHudFontScaleDefault;
+    double timing_bar_scale = kSkinHudFontScaleDefault;
     bool timing_feedback_override = false;
     double note_fade_in = 0.0;
     double note_fade_out = 0.0;
@@ -217,6 +223,7 @@ struct SkinConfig {
     std::string key_label_position = "bottom";
     // UI text font token: default | malgun | bahnschrift | consolas.
     std::string ui_font = "default";
+    std::string ui_font_path;  // Local TTF/OTF; never installs a system font.
     double judgement_line_position = kJudgementLinePositionDefault;
     // Horizontal gameplay-field offset in the renderer's 1920x1080 base space.
     double gameplay_field_offset_x = kGameplayFieldOffsetXDefault;
@@ -265,7 +272,7 @@ struct ModeConfig {
     std::string key_mode = "auto";
     std::string key_conversion_algorithm = "krrcream";
     std::string key_conversion_nk2_preset = "native";
-    std::string gauge = "normal";
+    std::string gauge = "ex_hard";
     std::string random = "off";
     uint32_t random_seed = 0;
     std::vector<std::string> mods;
@@ -277,7 +284,7 @@ struct ModeConfig {
     bool auto_scratch_hide_lanes = false;
     double pacemaker_target_accuracy = kPacemakerAccuracyDefault;
     int64_t pacemaker_target_score = kPacemakerScoreDefault;
-    std::string song_index_profile = "safe";
+    std::string song_index_profile = "fast";
     bool calculate_song_index_difficulty = false;
 };
 

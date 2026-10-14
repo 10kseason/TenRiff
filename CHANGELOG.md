@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.9.0] - 2026-10-14
+
+- Promote the reviewed feedback candidate to 1.9.0 and explicitly pin the fixed baseline to this release. Preserve previous releases; plugin runtime/API/SDK remain future work.
+
+- Move Judge Window to the parent Mode settings with Normal / Hard / EX and localize internal mod controls. EX uses rank-scaled PG14ms and Hard GR/GD times 0.8, fixed BAD250ms, unchanged automatic-miss340ms and Hard's 1.10 score factor. New EX records use R6; other new plays remain R5 and legacy Easy replays remain supported.
+- Follow-up: ungroup result/record numbers, show author/BPM-change/table-level metadata, and tint only the circled 5 of builtin Aery 5K with the key-mode color.
+- Show ordinary BMS SUBARTIST credits alongside the artist and move explicit inline OBJ credits into the pattern-author line without duplicates. Metadata cache v17 refreshes older entries once; original charts and hashes remain unchanged.
+- Use accuracy grades S++ 99 / S+ 98 / S 95 / A+ 93 / A 90 / B 85 / C 80 / D for lower surviving clears; F for failure, with separate AUTO and aborted display.
+- Distinguish web-upload HTTP failures with fixed diagnostic text while preserving score eligibility and stored records.
+
+- Separate whole-chart and TenRiff menu music controls, with a 10% menu reference gain; retain saved BMS submix and keysound balances.
+- Compact Single Play / Multiplayer / Options + Exit lobby, larger action icons, combined difficulty range and corrected sort activation/unknown-level ordering.
+- Double the native song-select best-record rank, preserving its color/glow and the score, accuracy and combo area below it.
+- Add independent FAST/SLOW and timing-bar scales, simple rectangle notes and private local TTF/OTF UI fonts.
+- Default new settings to EX Gauge Shift start, Fast indexing and Ghost Battle off; preserve explicit existing choices and fixed baseline 1.8.7.
+- See [scope and validation](docs/controls-1.9.0.ko.md).
+
 ## [1.8.9.7] - 2026-10-14
 
 - Request MMCSS Games/High on the input producer and disable its execution-speed power throttling, restoring the previous power state and unregistering MMCSS on the owning thread. Unsupported or failed APIs log once and preserve input operation.

@@ -762,7 +762,7 @@ struct GameSessionAudioTestAccess {
         disk.audio.asio_driver = "invalid-loading-regression-driver";
         // Stale disk evidence is never enough to enable a transient judge mod.
         disk.mode.mods = {"judge_hard", "no_ln_release"};
-        for (int scenario = 0; scenario < 5; ++scenario) {
+        for (int scenario = 0; scenario < 6; ++scenario) {
             REQUIRE(loader.save_profile(directory.path.u8string(), disk));
             auto session = std::make_unique<GameSession>();
             if (scenario == 1 || scenario == 3)
@@ -770,6 +770,7 @@ struct GameSessionAudioTestAccess {
             if (scenario == 2) session->set_session_mode_mods({"judge_easy"});
             if (scenario == 3) session->set_peer_battle_mode(true);
             if (scenario == 4) session->set_session_mode_mods({});
+            if (scenario == 5) session->set_session_mode_mods({"judge_ex"});
             CommandLineOptions options;
             options.profile = directory.path.u8string();
             options.chart_path = (directory.path / "missing.bms").u8string();
@@ -780,7 +781,8 @@ struct GameSessionAudioTestAccess {
             session->set_loading_cancel_callback([&] { return parsing; });
             CHECK_FALSE(session->initialize(options));
             CHECK(session->audio_thread_.sample_rate() == 0);
-            const auto expected = scenario == 1 ? "Judge Hard" : scenario == 2 ? "Judge Easy" : "Off";
+            const auto expected = scenario == 1 ? "Judge Hard" : scenario == 2 ? "Judge Easy" :
+                                  scenario == 5 ? "Judge EX" : "Off";
             CHECK(mode_mod_category_value("judge_window", session->config_.mode.mods) == expected);
             if (scenario != 3)
                 CHECK(std::find(session->config_.mode.mods.begin(), session->config_.mode.mods.end(),
@@ -864,7 +866,7 @@ struct GameSessionAudioTestAccess {
     }
 
     static void check_r4_player_and_ghost_boundaries() {
-        const auto play = [](int rank, bool hard, int64_t delta, std::string_view ghost_ruleset) {
+        const auto play = [](int rank, std::string_view judge_mod, int64_t delta, std::string_view ghost_ruleset) {
             auto session = std::make_unique<GameSession>();
             session->sample_rate_ = 48000;
             session->chart_.lane_count = 1;
@@ -875,13 +877,14 @@ struct GameSessionAudioTestAccess {
             config::ModeConfig mode;
             mode.key_mode = "auto";
             mode.random = "off";
-            mode.mods = {hard ? "judge_hard" : "judge_easy"};
+            mode.mods = {std::string(judge_mod)};
             const auto managed = manage_modes(session->chart_, ChartFormat::Bms,
                 mode, config::JudgeConfig{}, 1.0, 120.0, 48000);
             gameplay::GameplayConfig live;
             live.sample_rate = 48000;
             live.practice_no_fail_enabled = true;
             live.judge = managed.judge;
+            live.chronological_judgement = true;
             session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, live);
             session->ghost_replay_source_.ruleset_id = std::string(ghost_ruleset);
             // Explicit scoring policy still applies to unverified old-format
@@ -894,6 +897,7 @@ struct GameSessionAudioTestAccess {
             ghost.judge = replay_judge_config_for_playback(
                 session->ghost_replay_source_, config::JudgeConfig{}, rank);
             ghost.legacy_hold_release = replay_uses_legacy_hold_release(session->ghost_replay_source_);
+            ghost.chronological_judgement = replay_uses_chronological_judgement(session->ghost_replay_source_);
             session->ghost_engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, ghost);
             session->ghost_replay_enabled_ = true;
             session->lane_activity_.assign(1, 0); session->lane_pressed_.assign(1, 0);
@@ -915,8 +919,13 @@ struct GameSessionAudioTestAccess {
         };
         for (int rank = 0; rank <= 3; ++rank) {
             const double rank_scale = std::array<double, 4>{8.0, 15.0, 18.0, 21.0}[rank] / 21.0;
-            for (const bool hard : {false, true}) {
-                const std::array<double, 4> windows = hard
+            for (const std::string_view judge_mod : {"judge_easy", "judge_hard", "judge_ex"}) {
+                const bool ex = judge_mod == "judge_ex";
+                const bool hard = judge_mod == "judge_hard";
+                const std::array<double, 4> windows = ex
+                    ? std::array<double, 4>{14.0 * rank_scale, 44.57142857142857 * rank_scale,
+                                           78.85714285714286 * rank_scale, 250.0}
+                    : hard
                     ? std::array<double, 4>{17.5 * rank_scale, 65.0 * 18.0 / 21.0 * rank_scale,
                                            115.0 * 18.0 / 21.0 * rank_scale, 225.0}
                     : std::array<double, 4>{21.0 * 1.35 * rank_scale, 65.0 * 1.35 * rank_scale,
@@ -924,7 +933,7 @@ struct GameSessionAudioTestAccess {
                 for (std::size_t boundary = 0; boundary < windows.size(); ++boundary) {
                     for (const int outside : {0, 1}) for (const int sign : {-1, 1}) {
                         const int64_t delta = sign * (static_cast<int64_t>(std::llround(windows[boundary] * 48.0)) + outside);
-                        auto session = play(rank, hard, delta, kCanonicalReplayRulesetId);
+                        auto session = play(rank, judge_mod, delta, ex ? kExReplayRulesetId : kCanonicalReplayRulesetId);
                         const auto& player = session->engine_->stats();
                         const auto& ghost = session->ghost_engine_->stats();
                         const std::array<int, 5> actual{player.counts.pg, player.counts.gr, player.counts.gd,
@@ -950,7 +959,7 @@ struct GameSessionAudioTestAccess {
         }
         // A historical R3 ghost at 18ms must stay PG while today's Hard player
         // gets GR; "same ghost mod" does not mean relabeling its old ruleset.
-        auto mixed = play(3, true, 18 * 48, kRuleset3ReplayRulesetId);
+        auto mixed = play(3, "judge_hard", 18 * 48, kRuleset3ReplayRulesetId);
         CHECK(mixed->engine_->stats().counts.gr == 1);
         CHECK(mixed->ghost_engine_->stats().counts.pg == 1);
     }
@@ -1680,6 +1689,34 @@ struct GameSessionAudioTestAccess {
         // both the waveform and stereo balance even though Normalize is OFF.
         for (std::size_t i = 0; i < output.size(); ++i) {
             CHECK(output[i] == doctest::Approx(clip[i] * 2.0f * 0.35f).epsilon(0.00001));
+        }
+    }
+
+    static void check_independent_chart_volume() {
+        // Exercise the real BGM + realtime keysound mixer and output stage.
+        for (const double volume : {0.0, 0.35, 1.0}) {
+            for (const double menu_volume : {0.0, 1.0}) {
+                auto session = std::make_unique<GameSession>();
+                session->config_.audio_ui.master_volume = 0.8;
+                session->config_.audio_ui.gameplay_volume = volume;
+                session->config_.audio_ui.menu_music_volume = menu_volume;
+                session->config_.audio_ui.bgm_volume = 0.5;
+                session->config_.audio_ui.keysound_volume = 1.5;
+                session->config_.audio_ui.normalize_audio = false;
+                session->chart_audio_assets_.resize(2);
+                session->chart_audio_assets_[0].clip.samples =
+                    std::make_shared<const std::vector<float>>(std::vector<float>{0.4f, -0.2f, 0.2f, -0.1f});
+                session->chart_audio_assets_[1].clip.samples =
+                    std::make_shared<const std::vector<float>>(std::vector<float>{0.2f, 0.1f, 0.1f, 0.05f});
+                session->chart_audio_voices_.push_back({0, 0, GameSession::ChartAudioEvent::Kind::Bgm, 1.0f});
+                session->chart_audio_voices_.push_back({0, 1, GameSession::ChartAudioEvent::Kind::Keysound, 1.0f});
+                std::vector<float> output(4, 0.0f);
+                session->mix_chart_audio(output.data(), 2, 0);
+                session->finish_audio_output(output.data(), 2, true);
+                const std::vector<float> expected{0.5f, 0.05f, 0.25f, 0.025f};
+                for (std::size_t i = 0; i < output.size(); ++i)
+                    CHECK(output[i] == doctest::Approx(expected[i] * volume * 0.8).epsilon(0.00001));
+            }
         }
     }
 
@@ -2874,4 +2911,8 @@ TEST_CASE("R4 live player and ghost callbacks share exact modifier edges while R
 
 TEST_CASE("whole chart riff map crosses the production HUD snapshot with unique song revisions") {
     tenriff::app::GameSessionAudioTestAccess::check_riff_map_snapshot_lifecycle();
+}
+
+TEST_CASE("BMS chart volume controls BGM and keysounds independently of menu music") {
+    tenriff::app::GameSessionAudioTestAccess::check_independent_chart_volume();
 }

@@ -95,7 +95,10 @@
             account_button(native_rect("account.rect.008", D2D1::RectF(middle + 5.0f, modal.top + 431.0f, modal.right - 40.0f, modal.top + 487.0f)),
                 loc("IMPORT CONNECTION FILE", "연결 파일 불러오기"), false,
                 MenuHitTargetKind::SitesLeaderboardAction, static_cast<int>(SitesLeaderboardAction::ImportFile));
-            sites_text(511.0f, data.account_overlay.sites_status);
+            if (d2d_->hud_format && d2d_->text_brush)
+                draw_text_clipped(to_wide(data.account_overlay.sites_status), d2d_->hud_format.Get(),
+                    D2D1::RectF(modal.left + 40.0f, modal.top + 511.0f, modal.right - 40.0f, modal.top + 565.0f),
+                    d2d_->text_brush.Get());
             if (data.account_overlay.sites_connected)
                 account_button(native_rect("account.rect.009", D2D1::RectF(modal.left + 40.0f, modal.top + 569.0f, modal.right - 40.0f, modal.top + 619.0f)),
                     loc("DISCONNECT THIS PC", "이 PC 연결 해제"), false,

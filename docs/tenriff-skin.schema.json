@@ -261,7 +261,7 @@
         "hit_burst_style": { "enum": ["prism", "ring", "spark"] },
         "key_label_position": { "enum": ["off", "top", "bottom"] },
         "note_border": { "type": "boolean" },
-        "note_shape": { "enum": ["rect", "circle", "triangle", "pentagon", "hexagon", "square", "diamond", "arrow", "hex"] },
+        "note_shape": { "enum": ["rect", "simple_rect", "circle", "triangle", "pentagon", "hexagon", "square", "diamond", "arrow", "hex"] },
         "lane_colors": { "type": "array", "minItems": 1, "maxItems": 16, "items": { "$ref": "#/$defs/hexColor" } },
         "lane_background_opacity": { "type": "number", "minimum": 0.0, "maximum": 0.45 },
         "black_playfield": { "type": "boolean" },
@@ -483,7 +483,7 @@
         "hit_burst_style": { "enum": ["prism", "ring", "spark"] },
         "key_label_position": { "enum": ["off", "top", "bottom"] },
         "note_border": { "type": "boolean" },
-        "note_shape": { "enum": ["rect", "circle", "triangle", "pentagon", "hexagon", "square", "diamond", "arrow", "hex"] },
+        "note_shape": { "enum": ["rect", "simple_rect", "circle", "triangle", "pentagon", "hexagon", "square", "diamond", "arrow", "hex"] },
         "lane_colors": {
           "type": "array", "minItems": 1, "maxItems": 16,
           "items": { "$ref": "#/$defs/hexColor" }

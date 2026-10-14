@@ -19,6 +19,7 @@ using tenriff::app::menu_song_select::build_song_membership_set;
 using tenriff::app::menu_song_select::count_song_membership_matches;
 using tenriff::app::menu_song_select::song_collection_membership_contains;
 using tenriff::app::menu_song_select::song_difficulty_label;
+using tenriff::app::menu_song_select::song_difficulty_is_aery_five_key;
 using tenriff::app::menu_song_select::song_entry_less_by_difficulty_asc;
 using tenriff::app::menu_song_select::song_entry_less_by_difficulty_desc;
 using tenriff::app::menu_song_select::song_entry_matches_level_filter;
@@ -200,6 +201,27 @@ TEST_CASE("difficulty-table metadata drives labels groups sorting and numeric fi
     CHECK(ascending[0].title == "Table High");
     CHECK(ascending[1].title == "Table Low");
     CHECK(ascending[2].title == "Native");
+}
+
+TEST_CASE("only the built-in 5K Aery table opts into a mode-colored circled-five prefix") {
+    constexpr std::string_view aery_url = "https://asumatoki.kr/table/aery/header.json";
+    SongEntry entry;
+    entry.key_count = 5;
+    entry.difficulty_table_symbol = "⑤";
+    entry.difficulty_table_level = "LEVEL 13";
+    CHECK(song_difficulty_label(entry) == "⑤LEVEL 13");
+    CHECK(song_difficulty_is_aery_five_key(entry, aery_url));
+    CHECK_FALSE(song_difficulty_is_aery_five_key(entry, "https://asumatoki.kr/table/aery7/header.json"));
+    CHECK_FALSE(song_difficulty_is_aery_five_key(entry, "https://example.com/other-five-key/header.json"));
+    CHECK_FALSE(song_difficulty_is_aery_five_key(entry, ""));
+    entry.key_count = 7;
+    CHECK_FALSE(song_difficulty_is_aery_five_key(entry, aery_url));
+    entry.key_count = 5;
+    entry.difficulty_table_symbol = "st";
+    CHECK_FALSE(song_difficulty_is_aery_five_key(entry, aery_url));
+    entry.difficulty_table_symbol = "⑤";
+    entry.difficulty_table_level.clear();
+    CHECK_FALSE(song_difficulty_is_aery_five_key(entry, aery_url));
 }
 
 TEST_CASE("difficulty table levels without level_order use natural numeric ordering") {

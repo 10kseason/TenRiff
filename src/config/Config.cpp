@@ -154,6 +154,10 @@ void sanitize_skin_config(SkinConfig& skin) {
     skin.timing_text_offset_y = clamp_finite(skin.timing_text_offset_y, -400.0, 400.0, 0.0);
     skin.timing_bar_offset_x = clamp_finite(skin.timing_bar_offset_x, -600.0, 600.0, 0.0);
     skin.timing_bar_offset_y = clamp_finite(skin.timing_bar_offset_y, -400.0, 400.0, 0.0);
+    skin.timing_text_scale = clamp_finite(skin.timing_text_scale,
+        kSkinHudFontScaleMin, kSkinHudFontScaleMax, kSkinHudFontScaleDefault);
+    skin.timing_bar_scale = clamp_finite(skin.timing_bar_scale,
+        kSkinHudFontScaleMin, kSkinHudFontScaleMax, kSkinHudFontScaleDefault);
     skin.judgement_offset_x = clamp_finite(skin.judgement_offset_x, -600.0, 600.0, 0.0);
     skin.combo_offset_x = clamp_finite(skin.combo_offset_x, -600.0, 600.0, 0.0);
     skin.combo_font_scale = clamp_finite(skin.combo_font_scale,
@@ -555,6 +559,10 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.audio_ui.master_volume =
             std::clamp(get_number(*audio, "volume", config.audio_ui.master_volume),
                        kMasterVolumeMin, kMasterVolumeMax);
+        config.audio_ui.gameplay_volume =
+            std::clamp(get_number(*audio, "gameplay_volume", config.audio_ui.gameplay_volume), 0.0, 1.0);
+        config.audio_ui.menu_music_volume =
+            std::clamp(get_number(*audio, "menu_music_volume", config.audio_ui.menu_music_volume), 0.0, 1.0);
         config.audio_ui.bgm_volume =
             std::clamp(get_number(*audio, "bgm_volume", config.audio_ui.bgm_volume),
                        kChartMixVolumeMin, kChartMixVolumeMax);
@@ -839,6 +847,10 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.skin.timing_text_offset_y = clamp_finite(get_number(*skin, "timing_text_offset_y", 0.0), -400.0, 400.0, 0.0);
         config.skin.timing_bar_offset_x = clamp_finite(get_number(*skin, "timing_bar_offset_x", 0.0), -600.0, 600.0, 0.0);
         config.skin.timing_bar_offset_y = clamp_finite(get_number(*skin, "timing_bar_offset_y", 0.0), -400.0, 400.0, 0.0);
+        config.skin.timing_text_scale = clamp_finite(get_number(*skin, "timing_text_scale", 1.0),
+            kSkinHudFontScaleMin, kSkinHudFontScaleMax, kSkinHudFontScaleDefault);
+        config.skin.timing_bar_scale = clamp_finite(get_number(*skin, "timing_bar_scale", 1.0),
+            kSkinHudFontScaleMin, kSkinHudFontScaleMax, kSkinHudFontScaleDefault);
 
         config.skin.show_hold_tail =
             get_bool(*skin, "show_hold_tail", config.skin.show_hold_tail);
@@ -870,6 +882,7 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_bool(*skin, "hud_riff_map_visible", config.skin.hud_riff_map_visible);
         config.skin.ui_font = normalize_skin_ui_font_token(
             get_string(*skin, "ui_font", config.skin.ui_font));
+        config.skin.ui_font_path = get_string(*skin, "ui_font_path", config.skin.ui_font_path);
         config.skin.key_label_position = normalize_skin_key_label_position_token(
             get_string(*skin, "key_label_position", config.skin.key_label_position));
         config.skin.judgement_line_position = std::clamp(
@@ -1096,6 +1109,8 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     audio.emplace("background_sound_enabled", JsonValue{config.audio_ui.background_sound_enabled});
     audio.emplace("title_music", JsonValue{normalize_title_music_token(config.audio_ui.title_music)});
     audio.emplace("volume", JsonValue{config.audio_ui.master_volume});
+    audio.emplace("gameplay_volume", JsonValue{config.audio_ui.gameplay_volume});
+    audio.emplace("menu_music_volume", JsonValue{config.audio_ui.menu_music_volume});
     audio.emplace("bgm_volume", JsonValue{config.audio_ui.bgm_volume});
     audio.emplace("keysound_volume", JsonValue{config.audio_ui.keysound_volume});
     audio.emplace("normalize_audio", JsonValue{config.audio_ui.normalize_audio});
@@ -1305,6 +1320,8 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("timing_text_offset_y", JsonValue{config.skin.timing_text_offset_y});
     skin.emplace("timing_bar_offset_x", JsonValue{config.skin.timing_bar_offset_x});
     skin.emplace("timing_bar_offset_y", JsonValue{config.skin.timing_bar_offset_y});
+    skin.emplace("timing_text_scale", JsonValue{config.skin.timing_text_scale});
+    skin.emplace("timing_bar_scale", JsonValue{config.skin.timing_bar_scale});
 
     skin.emplace("show_hold_tail", JsonValue{config.skin.show_hold_tail});
     skin.emplace("hold_tail_taper_enabled", JsonValue{config.skin.hold_tail_taper_enabled});
@@ -1328,6 +1345,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("key_label_position",
                  JsonValue{normalize_skin_key_label_position_token(config.skin.key_label_position)});
     skin.emplace("ui_font", JsonValue{normalize_skin_ui_font_token(config.skin.ui_font)});
+    skin.emplace("ui_font_path", JsonValue{config.skin.ui_font_path});
     skin.emplace("judgement_line_position", JsonValue{config.skin.judgement_line_position});
     skin.emplace("gameplay_field_offset_x", JsonValue{config.skin.gameplay_field_offset_x});
     skin.emplace("combo_position", JsonValue{config.skin.combo_position});
@@ -1740,6 +1758,7 @@ std::string skin_hit_burst_style_label(std::string_view token) {
 
 std::string normalize_skin_ui_font_token(std::string_view token) {
     const std::string normalized = to_lower_ascii(std::string(token));
+    if (normalized == "custom") return "custom";
     if (normalized == "malgun" || normalized == "malgun gothic") {
         return "malgun";
     }
@@ -1754,6 +1773,7 @@ std::string normalize_skin_ui_font_token(std::string_view token) {
 
 std::string skin_ui_font_label(std::string_view token) {
     const std::string normalized = normalize_skin_ui_font_token(token);
+    if (normalized == "custom") return "Custom";
     if (normalized == "malgun") {
         return "Malgun Gothic";
     }
@@ -1802,6 +1822,7 @@ std::string normalize_skin_single_color_token(std::string_view token) {
 
 std::string normalize_skin_note_shape_token(std::string_view token) {
     const std::string normalized = to_lower_ascii(std::string(token));
+    if (normalized == "simple_rect") return normalized;
     if (normalized == "hex") return "hexagon";
     if (normalized == "circle" || normalized == "triangle" || normalized == "pentagon" ||
         normalized == "hexagon" || normalized == "square" || normalized == "diamond" ||
@@ -1831,6 +1852,7 @@ std::string skin_note_image_aspect_label(std::string_view token) {
 
 std::string skin_note_shape_label(std::string_view token) {
     const std::string normalized = normalize_skin_note_shape_token(token);
+    if (normalized == "simple_rect") return "Rect (Simple)";
     if (normalized == "circle") return "Circle";
     if (normalized == "triangle") return "Triangle";
     if (normalized == "pentagon") return "Pentagon";
@@ -2076,7 +2098,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.mode.key_mode = "none";
     config.mode.key_conversion_algorithm = "krrcream";
     config.mode.key_conversion_nk2_preset = "native";
-    config.mode.gauge = "normal";
+    config.mode.gauge = "ex_hard";
     config.mode.random = "off";
     config.mode.random_seed = 0;
     config.mode.mods.clear();
@@ -2088,7 +2110,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.mode.auto_scratch_hide_lanes = false;
     config.mode.pacemaker_target_accuracy = kPacemakerAccuracyDefault;
     config.mode.pacemaker_target_score = kPacemakerScoreDefault;
-    config.mode.song_index_profile = "safe";
+    config.mode.song_index_profile = "fast";
     config.mode.calculate_song_index_difficulty = false;
 
     config.ui.profile_nickname.clear();

@@ -1,5 +1,9 @@
 # TenRiff
 
+**2026-10-14 · 1.9.0 / 新しい固定基準:** 確認済みのローカル候補を指定された正式版へ昇格します。BMS/メニュー音量分離、ロビー・フィルター・スキン操作、ランク・SUBARTIST、韓国語モード表示、EX判定、送信状態を含みます。通常/HardはR5、EXはR6。旧R1–R5記録と保存設定を保持します。[固定基準](docs/baseline-1.9.0.ja.md) · [検証範囲](docs/release-1.9.0-gate.md)。以下の日付付き項目は当時の履歴です。
+
+**1.9.0 リリース:** BMS/メニュー音量の分離、静かなメニュー音楽、コンパクトなロビー、難易度範囲・並び替え修正、インディケーター倍率、シンプル四角ノートとローカルUIフォント。新規設定はEX・高速索引・ゴーストOFF。保存値を保持し、固定基準を1.9.0へ更新します。[範囲](docs/controls-1.9.0.ko.md)。
+
 **2026-10-14 · 1.8.9.7:** 入力スレッドにMMCSS Games/Highと実行速度の電力スロットリング無効化を適用し、ホームのメニュー枠にアイコン色の控えめなglowを加えます。TenRiff独自のメニュー・結果音楽だけを従来の40%に下げ、BMS楽曲・キー音・試聴は元の音量を維持します。固定基準は1.8.7のままで、物理入力遅延の改善は未確認です。 [Scope / 검증](docs/release-1.8.9.7-gate.md).
 
 **2026-10-13 · 1.8.9.6:** 入力とゲーム進行/HUDの短い待機に再利用する高分解能タイマーを使い、RawInputはメッセージで起床します。比較版Bの方式を適用し、判定幅・R1–R5・リプレイ・固定基準1.8.7を維持します。実プレイの感触は回ごとに異なり、すべての引っ掛かりの解消を保証しません。 [Scope / 검증](docs/release-1.8.9.6-gate.md).
@@ -14,13 +18,13 @@
 
 **2026-10-13 · 1.8.9.1:** 連続キー設定、全変換器のキー音・ロングノート保持、FAST/SLOW・タイミング背景切替、ゲージ拡大、プレビューのギア移動と判定文字の枠・背景除去を追加しました。既存リプレイは元の変換を維持します。[動作・検証・互換性の制限（韓国語）](docs/release-1.8.9.1-gate.md)。固定基準は1.8.7です。
 
-**固定基準: [1.8.7](docs/baseline-1.8.7.ja.md)**（2026-10-10）。Git tag `1.8.7`、commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347` を使い、`latest` や新しいリリースに合わせて自動変更しません。
+**固定基準: [1.9.0](docs/baseline-1.9.0.ja.md)**（2026-10-14の明示的な依頼）。Git tag `1.9.0`を使い、`main`や`latest`に合わせて自動更新しません。旧1.8.7基準と既存リリースは履歴として保持します。
 
 **2026-10-12 · 1.8.9:** ロビーの大きなBEST数値・キーモード色・白い共通外枠、右上情報・左下点数・右下横向きriff mapのStudio HUD、大きな結果文字・分析タブ・中央に揃えた操作を追加します。S+の色・書体を維持し、Judge Easy/Hardの選択を新しいセッションへ渡します。[動作・検証・残る範囲](docs/release-1.8.9-gate.md)、[Judgeの原因と互換性](docs/judge-session-handoff-1.8.9.ko.md)（韓国語）を参照してください。
 
 **2026-10-12 · 1.8.8:** 結果分析、自由なウィンドウサイズとF9 PNG案内、長いLN Mixに加え、表示の読みやすさ、難易度表URL・フィルター、スキンのレーンショートカット、キー数削減時のキー音保全、ソロ開始・即時再試行を改善します。現在の検証・パッケージ・公開状況は[1.8.8リリース案内](docs/release-1.8.8-gate.md)を参照してください。固定基準は1.8.7を維持します。
 
-**分析と拡張計画:** レーン別分布・時間帯別精度・単ノート/LN開始・離鍵・維持失敗を区別し、測定不能のミスを0ms標本にしません。長いLN Mix v2はローカル記録・リプレイ専用で、従来BEST・Sites送信から除外します。プラグインと1.9.0安定化は計画です。[分析基準](docs/result-analysis-1.8.8.ko.md)、[画面・メニュー・キー音](docs/release-feedback-1.8.8.ko.md)、[開始・再試行操作](docs/gameplay-start-controls.ko.md)（韓国語）。
+**分析と拡張計画:** レーン別分布・時間帯別精度・単ノート/LN開始・離鍵・維持失敗を区別し、測定不能のミスを0ms標本にしません。長いLN Mix v2はローカル記録・リプレイ専用で、従来BEST・Sites送信から除外します。プラグインは今後の計画で、1.9.0には含みません。[分析基準](docs/result-analysis-1.8.8.ko.md)、[画面・メニュー・キー音](docs/release-feedback-1.8.8.ko.md)、[開始・再試行操作](docs/gameplay-start-controls.ko.md)（韓国語）。
 
 **2026-10-09 · TenRiff 1.8.7:** 入力補正と読み込み時の音声処理を改善し、LR2ソロのスタジオデッキ、750msのFAST/SLOW表示、キー再割り当て、設定統合と曲名の自動サイズ調整を追加します。 [1.8.7 release](docs/release-1.8.7-gate.md).
 
@@ -42,13 +46,13 @@
 
 **マルチプレイRate対応ビルド:** ロビーでリーダーが共通のRateを設定します。全員がこのprotocol v6ビルドを使用してください。旧v5クライアントとは接続できません。[案内](docs/multiplayer-rate-build.ko.md)（韓国語）。
 
-リリース・ダウンロード: [**1.8.9.5 Sites 統合版**](https://github.com/10kseason/TenRiff/releases/tag/1.8.9.5)。実際のパッケージ・公開状況は[リリース記録](docs/release-1.8.9.5-gate.md)を参照してください。固定基準は1.8.7を維持します。新しいフォルダーに展開し、`launch_win.bat` から起動して F10 でウェブアカウントを一度連携してください。対象となる新しいプレイのスコア・詳細スコア・精度・詳細精度を送信します。新しいプレイは ruleset-5 を使用し、ウェブ送信には判定プロファイルが必要です。ruleset-1/2/3/4 のリプレイは当時の判定とLN動作を、既存のウェブ記録はIDとスコアを維持します。[接続ガイド](docs/sites-leaderboard.md)（韓国語）を参照してください。
+リリース・ダウンロード: [**1.9.0 Sites 統合版**](https://github.com/10kseason/TenRiff/releases/tag/1.9.0)。実際のパッケージ・公開状況は[リリース記録](docs/release-1.9.0-gate.md)を参照してください。固定基準は1.9.0を維持します。新しいフォルダーに展開し、`launch_win.bat` から起動して F10 でウェブアカウントを一度連携してください。対象となる新しいプレイのスコア・詳細スコア・精度・詳細精度を送信します。新しいプレイは ruleset-5 (Normal/Hard), ruleset-6 (EX) を使用し、ウェブ送信には判定プロファイルが必要です。ruleset-1/2/3/4 のリプレイは当時の判定とLN動作を、既存のウェブ記録はIDとスコアを維持します。[接続ガイド](docs/sites-leaderboard.md)（韓国語）を参照してください。
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | 日本語
 
-TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。固定基準は `1.8.7`、このソースの準備バージョンは `1.8.9.5` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
+TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。固定基準は `1.9.0`、このソースの準備バージョンは `1.9.0` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
 
-この README は導入文書です。現在の挙動、`1.8.9.5` のリリースラインと固定 `1.8.7` の基準、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
+この README は導入文書です。現在の挙動、`1.9.0` のリリースラインと固定 `1.9.0` の基準、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
 
 TenRiff のコードベースは、伝統的な長文設計書主導だけで積み上がったものではなく、高速な反復と実験を重視した `vibe coding` 的な性格を持つ作品でもあります。
 
@@ -254,8 +258,8 @@ README は導入だけを担当します。詳細は次の順で読むのが効�
    - 文書マップ全体
 2. [`docs/current-state.ja.md`](docs/current-state.ja.md)
    - 現在実際に動いていること
-3. [`docs/baseline-1.8.7.ja.md`](docs/baseline-1.8.7.ja.md)
-   - 後続作業が参照すべき `1.8.7 fixed stable baseline` ベースライン文書
+3. [`docs/baseline-1.9.0.ja.md`](docs/baseline-1.9.0.ja.md)
+   - 後続作業が参照すべき `1.9.0 fixed stable baseline` ベースライン文書
 4. [`docs/gameplay-guide.ja.md`](docs/gameplay-guide.ja.md)
    - 実際のプレイ開始方法、基本操作、HUD/判定/結果画面の説明
 5. [`docs/config.ja.md`](docs/config.ja.md)

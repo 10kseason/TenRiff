@@ -1,12 +1,14 @@
 # TenRiff Docs Map
 
+**2026-10-14 · 1.9.0 / 새 고정 기준선:** 사용자가 검토한 로컬 후보를 정식 배포 버전으로 올립니다. BMS/텐리프 음악 음량 분리, 로비·필터·스킨 조작, 등급·SUBARTIST 표시, 한글 모드와 EX 판정, 업로드 상태 표시를 포함합니다. 기본/Hard는 R5, EX는 R6이며 R1–R5 기록·기존 설정을 보존합니다. [기준선](baseline-1.9.0.md) · [릴리스 검증 범위](release-1.9.0-gate.md). 아래 날짜별 항목은 당시 릴리스 이력입니다.
+
 **2026-10-14 · 1.8.9.7:** 입력 스레드에 MMCSS Games/High와 전원 스로틀링 해제를 적용하고, 로비 메뉴 테두리를 아이콘 색의 은은한 glow로 표시합니다. 텐리프 자체 메뉴·결과 음악만 기존의 40%로 낮추며 BMS 곡·키음·미리듣기는 원래 음량을 유지합니다. 고정 기준선은 1.8.7이며 물리 입력 지연 개선은 아직 입증되지 않았습니다. [Scope / 검증](release-1.8.9.7-gate.md).
 
 **2026-10-13 · 1.8.9.6:** 입력과 게임 진행/HUD의 짧은 대기에 재사용 고해상도 타이머를 적용하고, RawInput은 메시지가 오면 깨어납니다. B 비교 방식의 제품 적용이며, 수치 판정 창·R1~R5·리플레이·고정 기준 1.8.7을 유지합니다. 실제 체감은 회차마다 달라 모든 움찔의 해결을 보장하지 않습니다. [Scope / 검증](release-1.8.9.6-gate.md).
 
 **2026-10-13 · 1.8.9.5:** 오디오 버퍼에 따라 달라지던 LN·자동 판정 순서를 R5에서 시간순으로 통일하고, 입력·화면 시간과 BPM/STOP 경계의 노트 위치를 맞춥니다. 로비는 어두운 카드와 색상 아이콘으로, 오디오는 마스터 음량을 맨 위로 정리합니다. R1~R4 기록과 고정 기준 1.8.7은 보존합니다. [변경·검증 범위](release-1.8.9.5-gate.md).
 
-**고정 기준선: [1.8.7](baseline-1.8.7.md)** (2026-10-10). Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`을 사용하며 `latest`나 새 릴리스로 자동 변경하지 않습니다.
+**고정 기준선: [1.9.0](baseline-1.9.0.md)** (2026-10-14 사용자 요청). Git tag `1.9.0`을 기준으로 하며 `main`이나 `latest`를 따라 자동 변경하지 않습니다. 1.8.7 기준선과 기존 릴리스는 이력으로 보존합니다.
 
 **2026-10-13 · 1.8.9.4:** 결과의 큰 등급·점수 배치와 상세 정확도를 정리하고 Gauge Shift CLEAR 4단계 색을 구분합니다. 오디오의 BGM·키음 음량을 맨 위로 옮기며 새 기본값은 모두 100%입니다. 한국어 스킨 명칭, 명시된 obj 채보자와 BPM! 변속 표시, 같은 시점의 동일 음원 중복 재생 보정을 포함합니다. 채보자 업로드는 선택 사항이며 기존 기록 식별자는 유지합니다. [변경·호환·검증 범위](release-1.8.9.4-gate.md). 검증과 게임·웹 공개 상태는 해당 문서에 별도로 기록하며 고정 기준은 1.8.7입니다.
 
@@ -20,7 +22,7 @@
 
 **2026-10-12 · 1.8.8:** 결과 분석, 자유 해상도와 F9 PNG 안내, 긴 LN Mix에 더해 화면 가독성·난이도표 입력/필터·스킨 레인 단축키·키 수 축소 시 키음 보존·단독 시작/즉시 재시작 조작을 정리했습니다. 현재 검증·패키지·공개 상태는 [1.8.8 릴리스 안내](release-1.8.8-gate.md)에서 확인하세요. 고정 기준은 1.8.7을 유지합니다.
 
-**분석과 확장 계획:** 레인별 분포·시간대 정확도·단노트/LN 시작·해제·유지 실패를 구분하고 측정 불가 미스를 0ms 표본에 넣지 않습니다. 긴 LN Mix v2는 로컬 기록·리플레이만 허용하며 기존 BEST·Sites 업로드에서 제외합니다. 플러그인과 1.9.0 안정화는 계획입니다. [분석 기준](result-analysis-1.8.8.ko.md), [화면·메뉴·키음 변경](release-feedback-1.8.8.ko.md), [시작·재시작 조작](gameplay-start-controls.ko.md).
+**분석과 확장 계획:** 레인별 분포·시간대 정확도·단노트/LN 시작·해제·유지 실패를 구분하고 측정 불가 미스를 0ms 표본에 넣지 않습니다. 긴 LN Mix v2는 로컬 기록·리플레이만 허용하며 기존 BEST·Sites 업로드에서 제외합니다. 플러그인 실행 환경/API/SDK는 후속 계획이며 1.9.0에는 포함하지 않습니다. [분석 기준](result-analysis-1.8.8.ko.md), [화면·메뉴·키음 변경](release-feedback-1.8.8.ko.md), [시작·재시작 조작](gameplay-start-controls.ko.md).
 
 **2026-10-09 · TenRiff 1.8.7:** 입력 보정과 로딩 오디오 경로를 보완하고 LR2 단독 플레이 스튜디오 덱, 750ms FAST/SLOW 유지, 키 재할당, 옵션 통합과 곡 제목 자동 맞춤을 제공합니다. [1.8.7 release](release-1.8.7-gate.md).
 
@@ -66,8 +68,8 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
    - 현재 제품 상태, 핵심 서브시스템, 검증된 명령, 남은 수동 검증 항목
 2. `docs/ui-audit-checklist.md`
    - renderer layout 변경 뒤 반드시 다시 돌려야 하는 UI 수동 검증 매트릭스
-3. [`docs/baseline-1.8.7.md`](baseline-1.8.7.md)
-   - 현재 작업을 어디서부터 쌓아야 하는지 정하는 `1.8.7 fixed stable baseline` 기준선 문서
+3. [`docs/baseline-1.9.0.md`](baseline-1.9.0.md)
+   - 현재 작업을 어디서부터 쌓아야 하는지 정하는 `1.9.0 fixed stable baseline` 기준선 문서
 4. `docs/gameplay-guide.md`
    - 실제 플레이 기준의 시작 방법, 곡 선택, 조작, HUD, 판정, 결과 화면 안내
 5. `docs/multiplayer.md`
@@ -90,8 +92,8 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
 ## Which Docs Are Source Of Truth
 - `docs/current-state.md`
   - 현재 구현 상태의 요약 문서
-- [`docs/baseline-1.8.7.md`](baseline-1.8.7.md)
-  - 후속 작업이 유지해야 하는 `1.8.7 fixed stable baseline` 기준선 문서
+- [`docs/baseline-1.9.0.md`](baseline-1.9.0.md)
+  - 후속 작업이 유지해야 하는 `1.9.0 fixed stable baseline` 기준선 문서
 - `docs/config.md`
   - 실제 `config/config.json`, `profiles/<name>/config.json`, `keymap.json` 기준
 
@@ -117,7 +119,7 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
 
 ## Practical Rule
 - 현재 동작을 확인할 때는 `docs/current-state.md`를 우선 봅니다.
-- 어떤 기준선 위에서 작업을 쌓는지 정할 때는 [`docs/baseline-1.8.7.md`](baseline-1.8.7.md)를 같이 봅니다.
+- 어떤 기준선 위에서 작업을 쌓는지 정할 때는 [`docs/baseline-1.9.0.md`](baseline-1.9.0.md)를 같이 봅니다.
 - 오래된 설계와 현재 코드가 다를 수 있으므로, 충돌하면 구현 코드·회귀 테스트를 먼저 확인하고 `docs/current-state.md`, `docs/config.md`를 정정합니다.
 
 ## Skin Customization
@@ -134,4 +136,4 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
 
 [네이티브 ASIO](asio-audio.md), [대표 BPM](reference-bpm.md), [휴대용 스킨 프리셋](skin-presets.md), [곡 소스와 난이도표](library-management.md), [LR2 게이지 비교](lr2-gauge-audit.ko.md)를 참고하세요.
 
-1.8.7 클라이언트의 Sites 계정 연결, 네 가지 기록 지표, 동점 비교 규칙은 [sites-leaderboard.md](sites-leaderboard.md)를 참고하세요. 이 문서는 공개 클라이언트 프로토콜 설명이며 서버 소스·운영 설정·연결 비밀값을 포함하지 않습니다.
+1.9.0 클라이언트의 Sites 계정 연결, 네 가지 기록 지표, 동점 비교 규칙은 [sites-leaderboard.md](sites-leaderboard.md)를 참고하세요. 이 문서는 공개 클라이언트 프로토콜 설명이며 서버 소스·운영 설정·연결 비밀값을 포함하지 않습니다.

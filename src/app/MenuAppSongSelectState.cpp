@@ -109,9 +109,16 @@ void MenuApp::rebuild_visible_song_list(const std::string* selected_path) {
             const std::string lhs_group = song_group_sort_key(lhs_entry, song_group_mode_);
             const std::string rhs_group = song_group_sort_key(rhs_entry, song_group_mode_);
             if (lhs_group != rhs_group) {
+                // Reversing the encoded group key also put unknown LV and
+                // non-table charts first. Use the same known-before-unknown
+                // level ordering as the ungrouped view in both directions.
+                if (song_group_mode_ == SongGroupMode::Level) {
+                    return song_sort_mode_ == SongSortMode::DifficultyDesc
+                        ? song_entry_less_by_difficulty_desc(lhs_entry, rhs_entry)
+                        : song_entry_less_by_difficulty_asc(lhs_entry, rhs_entry);
+                }
                 const bool reverse_group_order =
-                    (song_group_mode_ == SongGroupMode::Artist && song_sort_mode_ == SongSortMode::ArtistDesc) ||
-                    (song_group_mode_ == SongGroupMode::Level && song_sort_mode_ == SongSortMode::DifficultyDesc);
+                    song_group_mode_ == SongGroupMode::Artist && song_sort_mode_ == SongSortMode::ArtistDesc;
                 return reverse_group_order ? (lhs_group > rhs_group) : (lhs_group < rhs_group);
             }
         }

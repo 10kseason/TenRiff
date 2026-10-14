@@ -75,7 +75,10 @@ int64_t calculate_score(const gameplay::ResultStats& stats);
 int64_t calculate_detail_score(const gameplay::ResultStats& stats);
 int64_t calculate_final_score(const gameplay::ResultStats& stats, double multiplier);
 bool infer_game_over(const gameplay::ResultStats& stats);
-std::string calculate_rank(const gameplay::ResultStats& stats, bool game_over);
+// Display only: legacy game_over also covers aborted/autoplay runs. Preserve
+// those terminal flags while using available status evidence for their labels.
+std::string calculate_rank(const gameplay::ResultStats& stats, bool game_over,
+                           std::string_view clear_status = {}, bool aborted = false);
 bool is_better_record(int64_t candidate_score,
                       int candidate_clear_priority,
                        int64_t candidate_detail_score,

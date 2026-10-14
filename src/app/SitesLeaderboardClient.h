@@ -10,6 +10,7 @@
 #include <vector>
 #include "gameplay/Replay.h"
 #include "app/SitesLeaderboardConnection.h"
+#include "app/SitesUploadStatus.h"
 
 namespace tenriff::app {
 [[nodiscard]] bool build_sites_score_json(const gameplay::ReplayFile& replay,
@@ -20,13 +21,14 @@ namespace tenriff::app {
 // Opt-in, bounded background uploads. No account tokens or filesystem paths enter the payload.
 class SitesLeaderboardService {
 public:
+    enum class EnqueueResult { Queued, NotConnected, Unavailable };
     SitesLeaderboardService() = default;
     ~SitesLeaderboardService();
     SitesLeaderboardService(const SitesLeaderboardService&) = delete;
     SitesLeaderboardService& operator=(const SitesLeaderboardService&) = delete;
-    void enqueue(std::filesystem::path replay_path, std::string replay_sha256,
+    [[nodiscard]] EnqueueResult enqueue(std::filesystem::path replay_path, std::string replay_sha256,
                  std::string chart_title, std::string clear_status, std::string chart_author = {});
-    [[nodiscard]] std::vector<std::string> take_messages();
+    [[nodiscard]] std::vector<SitesUploadMessage> take_messages();
     void cancel_pending();
     void shutdown();
 private:
@@ -44,6 +46,6 @@ private:
     bool stopping_ = false;
     std::uint64_t generation_ = 0;
     std::deque<PendingScore> pending_;
-    std::vector<std::string> messages_;
+    std::vector<SitesUploadMessage> messages_;
 };
 }  // namespace tenriff::app

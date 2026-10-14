@@ -9,6 +9,7 @@ namespace tenriff::app {
 inline constexpr double kCurrentEasyJudgeScale = 1.35;
 inline constexpr double kCurrentEasyBadWindowMs = 210.0;
 inline constexpr double kCurrentHardBadWindowMs = 225.0;
+inline constexpr double kExBadWindowMs = 250.0;
 inline constexpr double kCurrentAutomaticMissWindowMs = 340.0;
 
 enum class JudgeTimingVersion { Ruleset1, Ruleset2And3, Current };
@@ -55,6 +56,18 @@ enum class JudgeTimingVersion { Ruleset1, Ruleset2And3, Current };
     }
     judge.indirect_miss_ms = legacy ? judge.bd_ms : kCurrentAutomaticMissWindowMs;
     judge.indirect_miss_enabled = hard;
+    return judge;
+}
+
+// EX keeps chart RANK scaling and Hard's hold/miss policy. Only the three
+// graded hit windows shrink; BAD is an absolute input window, not the later
+// automatic miss deadline for an untouched note.
+[[nodiscard]] inline config::JudgeConfig judge_timing_for_ex(config::JudgeConfig judge) {
+    judge = judge_timing_for_policy(judge, false, true);
+    judge.pg_ms *= 0.8;
+    judge.gr_ms *= 0.8;
+    judge.gd_ms *= 0.8;
+    judge.bd_ms = kExBadWindowMs;
     return judge;
 }
 

@@ -213,7 +213,12 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
             : std::to_string(config_.mode.random_seed);
     append_menu_row(render.generic, ui_text("Random Seed", "랜덤 시드"), random_seed_value, settings_cursor_ == 13,
                     render::MenuHitTargetKind::SettingsRow, 13, false, true);
-    append_menu_row(render.generic, ui_text("Mods", "모드"), mode_score_summary(config_.mode.mods, config_.speed.rate),
+    append_menu_row(render.generic, ui_text("Judge Window", "판정 범위"),
+                    mode_judge_window_label(config_.mode.mods, ui_language()), settings_cursor_ == 18,
+                    render::MenuHitTargetKind::SettingsRow, 18, true, true);
+    render.generic.rows.back().value_activatable = true;
+    append_menu_row(render.generic, ui_text("Mods", "모드"),
+                    mode_patterns_score_summary(config_.mode.mods, config_.speed.rate, ui_language()),
                     settings_cursor_ == 14, render::MenuHitTargetKind::SettingsRow, 14, true, false);
     append_menu_row(render.generic, "Rate", format_multiplier(config_.speed.rate), settings_cursor_ == 15,
                     render::MenuHitTargetKind::SettingsRow, 15, false, true);
@@ -248,11 +253,15 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
         "Mirror itself is seedless. Key Mode conversion runs first and may still use Random Seed.",
         "미러 자체는 시드를 쓰지 않지만, 먼저 실행되는 키 모드 변환은 랜덤 시드를 사용할 수 있습니다."));
     render.generic.notes.push_back(ui_text("Mods opens the registry-backed Mod Manager and shows the current score multiplier.",
-                                           "모드는 현재 점수 배율을 보여주고, 등록 기반 Mod Manager를 엽니다."));
+                                           "모드는 현재 점수 배율을 보여주고 노트·배치·스크래치 설정을 엽니다."));
+    render.generic.notes.push_back(ui_text(
+        "Judge Window selects Normal, Hard, or EX. Hard/EX PG, GR and GD follow the chart's BMS RANK ratio; BAD stays fixed at 225/250 ms.",
+        "판정 범위는 기본·Hard·EX 중 고릅니다. Hard·EX의 PG·GR·GD는 차트의 BMS RANK 비율을 적용하며 BAD는 각각 225·250ms로 고정됩니다."));
     for (auto& row : render.generic.rows) {
         const auto id = static_cast<menu::settings::ModeSettingId>(row.row_index);
         using Id = menu::settings::ModeSettingId;
-        if (id <= Id::IndexDifficulty) row.category = ui_text("Library", "라이브러리");
+        if (id == Id::JudgeWindow) row.category = ui_text("Gauge & Patterns", "게이지·패턴");
+        else if (id <= Id::IndexDifficulty) row.category = ui_text("Library", "라이브러리");
         else if (id <= Id::PacemakerTarget) row.category = ui_text("Play & Assistance", "플레이·보조");
         else if (id <= Id::Nk2Preset) row.category = ui_text("Key Layout", "키 배치");
         else if (id <= Id::Mods) row.category = ui_text("Gauge & Patterns", "게이지·패턴");
@@ -263,11 +272,11 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
 }
 
 void MenuApp::populate_mode_mods_render_data(render::MenuRenderData& render) {
-    const auto& categories = mode_mod_categories();
+    const auto& categories = visible_mode_mod_categories();
     for (std::size_t i = 0; i < categories.size(); ++i) {
         append_menu_row(render.generic,
-                        std::string(categories[i].label),
-                        mode_mod_category_value(categories[i].token, config_.mode.mods),
+                        mode_mod_category_label(categories[i], ui_language()),
+                        mode_mod_category_ui_value(categories[i].token, config_.mode.mods, ui_language()),
                         settings_cursor_ == static_cast<int>(i),
                         render::MenuHitTargetKind::SettingsRow,
                         static_cast<int>(i),
@@ -292,16 +301,13 @@ void MenuApp::populate_mode_mods_render_data(render::MenuRenderData& render) {
                                            "최종 점수는 활성 모드와 현재 Rate 중 더 낮은 배율을 사용합니다."));
     render.generic.notes.push_back(ui_text(
         "LN Mix targets 60% long (2/4 beats), 20% medium (1 beat), and 20% short (1/4-1/2 beat). Same-lane space can shorten holds; Random Seed reproduces the mix.",
-        "LN Mix는 긴 2·4박 60%, 중간 1박 20%, 짧은 1/4·1/2박 20%를 목표로 합니다. 같은 레인의 여유에 따라 짧아지며 Random Seed로 재현합니다."));
+        "롱노트 혼합은 긴 2·4박 60%, 중간 1박 20%, 짧은 1/4·1/2박 20%를 목표로 합니다. 같은 레인의 여유에 따라 짧아지며 랜덤 시드로 재현합니다."));
     render.generic.notes.push_back(ui_text("Long LN Mix: local history only; separate from legacy bests and online boards.",
         "긴 LN 믹스: 로컬 기록에 저장하며 이전 최고 기록·온라인 순위와 분리합니다."));
-    render.generic.notes.push_back(ui_text("Current: ", "현재: ") + mode_score_summary(config_.mode.mods, config_.speed.rate));
-    render.generic.notes.push_back(ui_text(
-        "Judge Easy widens PG/GR/GD by 35%. Judge Hard uses EASY PG/GR/GD 17.5/55.714/98.571 ms, scaled by BMS RANK.",
-        "Judge Easy는 PG/GR/GD를 35% 넓힙니다. Judge Hard는 EASY 기준 17.5/55.714/98.571ms이며 BMS RANK 비율을 적용합니다."));
-    render.generic.notes.push_back(ui_text(
-        "BAD is fixed across all RANKs: Easy 210 ms / Hard 225 ms. Unplayed notes time out after 340 ms in every mode.",
-        "BAD는 모든 RANK에서 Easy 210ms / Hard 225ms로 고정됩니다. 모든 모드에서 놓친 노트는 340ms가 지나면 자동 미스로 확정됩니다."));
+    render.generic.notes.push_back(ui_text("Current: ", "현재: ") +
+        mode_patterns_score_summary(config_.mode.mods, config_.speed.rate, ui_language()));
+    render.generic.notes.push_back(ui_text("Judge Window is available in Key Mode Settings.",
+        "판정 범위는 상위 키 모드 설정에서 조절합니다."));
     std::vector<std::string> mod_warnings;
     (void)normalize_mode_mod_tokens(config_.mode.mods, &mod_warnings);
     for (const auto& warning : mod_warnings) {

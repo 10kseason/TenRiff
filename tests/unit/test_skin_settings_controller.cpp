@@ -144,6 +144,13 @@ TEST_CASE("skin preset actions use the same keyboard and mouse controller path")
                                              SkinSettingsRowId::ImportPreset);
     CHECK(imported.boundary_action == SkinBoundaryAction::ImportPreset);
     CHECK_FALSE(imported.menu.persist_config);
+    const auto font = controller.handle(MenuAction::activate(), runtime, kLr2Names, kTenRiffNames,
+                                         SkinSettingsRowId::UiFontFile);
+    CHECK(font.boundary_action == SkinBoundaryAction::ChooseUiFont);
+    CHECK_FALSE(font.menu.persist_config);
+    CHECK_FALSE(controller.dirty());
+    CHECK(controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames,
+                             SkinSettingsRowId::UiFontFile).empty());
 }
 
 TEST_CASE("skin controller owns edit mode lane and gap selection") {
@@ -482,6 +489,44 @@ TEST_CASE("combo and judgement font sizes adjust independently with bounded mous
     CHECK(runtime.skin.judgement_font_scale == doctest::Approx(0.5));
     CHECK(runtime.skin.combo_font_scale == doctest::Approx(1.30));
     CHECK(controller.handle(MenuAction::back(), runtime, kLr2Names, kTenRiffNames).menu.persist_config);
+}
+
+TEST_CASE("timing indicator size controls preserve judgement combo positions and sibling scale") {
+    tenriff::config::RuntimeConfig runtime;
+    runtime.skin.source = "tenriff";
+    runtime.skin.timing_text_offset_x = 120;
+    runtime.skin.timing_bar_offset_y = -70;
+    SkinSettingsController controller;
+    controller.reset("4k");
+    (void)controller.handle(MenuAction::set_ratio(0.5), runtime, kLr2Names, kTenRiffNames,
+                            SkinSettingsRowId::TimingTextSize);
+    CHECK(runtime.skin.timing_text_scale == doctest::Approx(1.25));
+    CHECK(runtime.skin.timing_bar_scale == doctest::Approx(1.0));
+    (void)controller.handle(MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames,
+                            SkinSettingsRowId::TimingBarSize);
+    CHECK(runtime.skin.timing_bar_scale == doctest::Approx(0.95));
+    (void)controller.handle(MenuAction::set_ratio(9), runtime, kLr2Names, kTenRiffNames,
+                            SkinSettingsRowId::TimingTextSize);
+    CHECK(runtime.skin.timing_text_scale == doctest::Approx(2.0));
+    (void)controller.handle(MenuAction::set_ratio(-9), runtime, kLr2Names, kTenRiffNames,
+                            SkinSettingsRowId::TimingBarSize);
+    CHECK(runtime.skin.timing_bar_scale == doctest::Approx(0.5));
+    CHECK(runtime.skin.combo_font_scale == doctest::Approx(1.0));
+    CHECK(runtime.skin.judgement_font_scale == doctest::Approx(1.0));
+    CHECK(runtime.skin.timing_text_offset_x == 120);
+    CHECK(runtime.skin.timing_bar_offset_y == -70);
+    CHECK(controller.handle(MenuAction::back(), runtime, kLr2Names, kTenRiffNames).menu.persist_config);
+}
+
+TEST_CASE("simple rectangle is a distinct selectable note shape and retains rectangle compatibility") {
+    tenriff::config::RuntimeConfig runtime;
+    SkinSettingsController controller;
+    controller.reset("4k");
+    (void)controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames,
+                            SkinSettingsRowId::NoteShape);
+    CHECK(runtime.skin.note_shape == "simple_rect");
+    (void)controller.handle(MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames);
+    CHECK(runtime.skin.note_shape == "rect");
 }
 
 TEST_CASE("skin editing starts at four keys and preserves a later edit choice without changing gameplay") {

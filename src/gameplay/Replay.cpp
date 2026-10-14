@@ -716,7 +716,8 @@ ReplayValidationResult validate_replay_evidence(const ReplayFile& replay) {
             !std::isfinite(replay.mode.course_gauge_initial_value.value()) ||
             replay.mode.course_gauge_initial_value.value() < 0.0 ||
             replay.mode.course_gauge_initial_value.value() > 100.0 ||
-            replay.ruleset_id != "custom") {
+            (replay.ruleset_id != "custom" && replay.ruleset_id != "custom-ruleset-5" &&
+             replay.ruleset_id != "custom-ruleset-6")) {
             result.error = "Replay course gauge requires a supported custom rule and a bounded carried value.";
             return result;
         }

@@ -61,6 +61,7 @@
     ctx.save();ctx.globalAlpha=clamp(opacity,0,1);ctx.fillStyle=color;ctx.beginPath();
     if(points){points.forEach(([x,y],i)=>i?ctx.lineTo(cx+x*width,cy+y*width):ctx.moveTo(cx+x*width,cy+y*width));ctx.closePath();}
     else if(shape==='circle')ctx.ellipse(cx,cy,Math.max(1,(width-2)/2),Math.max(1,(width-2)/2),0,0,Math.PI*2);
+    else if(shape==='simple_rect')ctx.rect(rect[0],rect[1],width,Math.max(2,rect[3]-rect[1]));
     else {
       const height=shape==='square'?width:Math.max(2,rect[3]-rect[1]);
       ctx.roundRect(cx-width/2,cy-height/2,width,height,clamp(Math.min(width,height)*.22,3,8));

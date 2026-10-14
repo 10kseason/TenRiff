@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "app/ChartLoader.h"
 #include "config/Config.h"
@@ -13,6 +14,9 @@ namespace tenriff::app {
 
 inline constexpr std::string_view kCanonicalReplayRulesetId =
     "tenriff-native-score-v2-ruleset-5";
+// EX has a separate identity; ordinary and Hard runs retain their R5 boards.
+inline constexpr std::string_view kExReplayRulesetId =
+    "tenriff-native-score-v2-ruleset-6";
 inline constexpr std::string_view kRuleset4ReplayRulesetId =
     "tenriff-native-score-v2-ruleset-4";
 inline constexpr std::string_view kRuleset3ReplayRulesetId =
@@ -55,6 +59,8 @@ struct ReplayVerificationResult {
 
 [[nodiscard]] std::string_view replay_verification_status_token(ReplayVerificationStatus status);
 [[nodiscard]] bool is_supported_canonical_replay_ruleset(std::string_view ruleset_id);
+[[nodiscard]] bool is_current_canonical_replay_ruleset(
+    std::string_view ruleset_id, const std::vector<std::string>& mods);
 [[nodiscard]] config::JudgeConfig replay_judge_config_for_playback(
     const gameplay::ReplayFile& replay, const config::JudgeConfig& base,
     std::optional<int> bms_rank = std::nullopt);
@@ -66,7 +72,8 @@ struct ReplayVerificationResult {
                                                         const game::GaugeConfig& gauge,
                                                         bool standard_gauge_shift,
                                                         bool course_gauge,
-                                                        std::string_view pacemaker_mode);
+                                                        std::string_view pacemaker_mode,
+                                                        const std::vector<std::string>& mods = {});
 
 [[nodiscard]] ReplayVerificationResult verify_replay_against_chart(
     const gameplay::ReplayFile& replay,

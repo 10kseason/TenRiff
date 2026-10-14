@@ -273,6 +273,9 @@ void MenuApp::handle_sites_leaderboard_action(render::SitesLeaderboardAction act
         if (clear_sites_leaderboard_connection("config", error)) {
             sites_leaderboard_service_.cancel_pending();
             sites_last_upload_status_.clear();
+            sites_result_replay_sha256_.clear();
+            sites_result_upload_status_ = ui_text("Web connection changed; record saved locally.",
+                                                 "웹 연결 변경 · 기록은 로컬에 저장");
             refresh_sites_leaderboard_connection();
             sites_connection_status_ = ui_text("Automatic uploads disabled on this PC.",
                                                "이 PC의 자동 업로드 연결을 해제했습니다.");
@@ -308,6 +311,9 @@ void MenuApp::handle_sites_leaderboard_action(render::SitesLeaderboardAction act
         if (error.empty() && install_sites_leaderboard_connection("config", contents, error)) {
             sites_leaderboard_service_.cancel_pending();
             sites_last_upload_status_.clear();
+            sites_result_replay_sha256_.clear();
+            sites_result_upload_status_ = ui_text("Web connection changed; record saved locally.",
+                                                 "웹 연결 변경 · 기록은 로컬에 저장");
             refresh_sites_leaderboard_connection();
             sites_connection_status_ = ui_text("Connection imported and protected. You can play now.",
                                                "연결 정보를 암호화해 저장했습니다. 이제 플레이하면 됩니다.");

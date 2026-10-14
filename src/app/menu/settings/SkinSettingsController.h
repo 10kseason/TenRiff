@@ -20,6 +20,7 @@ enum class SkinBoundaryAction {
     ExportPreset,
     ImportPreset,
     OpenSkinEditor,
+    ChooseUiFont,
 };
 
 struct SkinSettingsEffects {

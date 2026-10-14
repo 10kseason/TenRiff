@@ -619,12 +619,15 @@ TEST_CASE("Skin settings retain stable IDs while grouping lane selection with no
     using namespace tenriff::app;
     for (const bool lr2 : {false, true}) {
         const SkinSettingsRows rows{lr2};
-        CHECK(rows.count() == (lr2 ? 66 : 65));
+        CHECK(rows.count() == (lr2 ? 69 : 68));
         CHECK(rows.index_of(SkinSettingsRowId::Lr2Resolution) == (lr2 ? 5 : -1));
         CHECK(rows.index_of(SkinSettingsRowId::TargetGap) == -1);
         CHECK(rows.index_of(SkinSettingsRowId::VisualPreset) == -1);
         CHECK(rows.index_of(SkinSettingsRowId::IndicatorBackground) == -1);
         CHECK(rows.index_of(SkinSettingsRowId::TargetLane) + 1 == rows.index_of(SkinSettingsRowId::LaneColor));
+        CHECK(rows.index_of(SkinSettingsRowId::UiFont) + 1 == rows.index_of(SkinSettingsRowId::UiFontFile));
+        CHECK(rows.index_of(SkinSettingsRowId::TimingTextSize) + 1 == rows.index_of(SkinSettingsRowId::TimingTextX));
+        CHECK(rows.index_of(SkinSettingsRowId::TimingBarSize) + 1 == rows.index_of(SkinSettingsRowId::TimingBarX));
         CHECK(skin_settings_category(SkinSettingsRowId::TargetLane) == SkinSettingsCategory::Notes);
         CHECK(rows.index_of(SkinSettingsRowId::Back) == rows.count() - 1);
         for (const auto id : kSkinSettingsRowOrder) {
@@ -844,7 +847,7 @@ TEST_CASE("simple square skin loads without assets for all supported lane counts
 TEST_CASE("all procedural note shapes survive native skin load and per-mode overrides") {
     TempDirGuard temp{make_temp_dir()};
     REQUIRE_FALSE(temp.path.empty());
-    for (const std::string shape : {"rect", "circle", "triangle", "pentagon", "hexagon",
+    for (const std::string shape : {"rect", "simple_rect", "circle", "triangle", "pentagon", "hexagon",
                                     "square", "diamond", "arrow", "hex"}) {
         write_file(temp.path / "skin.json",
             "{\"format\":\"tenriff-skin\",\"version\":1,\"name\":\"Shapes\","

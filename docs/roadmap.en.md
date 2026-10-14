@@ -1,10 +1,12 @@
 # TenRiff Development Roadmap (staged)
 
+**2026-10-14 · 1.9.0 / new fixed baseline:** Promotes the reviewed local candidate to the requested release line: independent BMS/TenRiff music volume, lobby/filter/skin controls, grades and SUBARTIST credits, localized mods, EX timing and upload status. Normal/Hard use R5, EX uses R6; historical R1–R5 records and saved settings are preserved. [Baseline](baseline-1.9.0.en.md) · [Release verification scope](release-1.9.0-gate.md). Dated entries below retain their historical release context.
+
 **2026-10-14 · 1.8.9.7:** Input threads request MMCSS Games/High and disable execution-speed power throttling. Home action borders share their icon colors with subtle cached glow. Only TenRiff scene music is reduced to 40%; BMS songs, keysounds and previews retain their original volume scale. The fixed baseline remains 1.8.7; physical input latency improvement is not established. [Scope / 검증](release-1.8.9.7-gate.md).
 
 **2026-10-13 · 1.8.9.6:** Reuse high-resolution timers for short input and gameplay/HUD waits; RawInput wakes on messages. Ships the B comparison behavior while preserving judgement windows, R1–R5, replays and the fixed 1.8.7 baseline. Manual impressions varied between runs; this does not guarantee removal of every stutter. [Scope / 검증](release-1.8.9.6-gate.md).
 
-**Fixed baseline: [1.8.7](baseline-1.8.7.en.md)** (2026-10-10). Use Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`; do not advance it automatically with `latest` or a new release.
+**Fixed baseline: [1.9.0](baseline-1.9.0.en.md)** (explicit user request, 2026-10-14). Use Git tag `1.9.0`; do not advance automatically with `main` or `latest`. Preserve the 1.8.7 baseline and previous releases as history.
 
 **2026-10-13 · 1.8.9.4:** Rearranges the large result rank and score, shows detail accuracy and distinguishes four Gauge Shift CLEAR colors. BGM/keysound volume move to the top of Audio with 100% defaults for new settings. Includes Korean skin-label revisions, explicit obj credits, BPM! changes and correction of duplicate identical audio at the same chart time. Author uploads are optional and existing record identities are retained. [Changes, compatibility and validation (Korean)](release-1.8.9.4-gate.md). Verification and game/web publication are tracked separately; the fixed baseline remains 1.8.7.
 
@@ -20,27 +22,14 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current Baseline
 - Windows GUI / runtime is the primary supported path.
-- The fixed baseline is `1.8.7` and this source targets `1.8.9.7`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
+- The fixed baseline is `1.9.0` and this source targets `1.9.0`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
 - The active menu / runtime is BMS-family only (`.bms/.bme/.bml/.pms`) and supports native, bundled/profile TenRiff `skin.json`, and LR2 skins.
 - For current shipped behavior, read `docs/current-state.en.md` first; this roadmap is about direction and remaining work.
 
-## 1.8.8–1.8.9 Analysis and 1.9.0 Stabilization Plan (2026-10-12)
+## 1.9.0 stabilization scope and follow-up
 
-As of 2026-10-12, the source was **the 1.8.9 release line**. It builds on 1.8.8 analysis, window sizing, LN Mix, keysounds and start controls with implemented lobby/HUD/result readability changes and explicit Judge Easy/Hard handoff into new sessions. Completed local checks and performance results/residual limits are separated from remaining package, CI and publication work. Confirmed behavior and new verification/publication status belong in the [1.8.9 release validation](release-1.8.9-gate.md). The plugin host, API and SDK are not implemented; `1.9.0` remains a future stabilization target. Preserve the fixed `1.8.7` baseline, existing tags/assets and 1.8.8 records. The earlier stage list below does not automatically authorize additional unfinished core features.
+1.9.0 promotes the reviewed candidate and explicitly updates the fixed baseline. Its scope is volume/settings/UI/credits/EX-R6/upload diagnostics, not universal latency resolution. The former plugin prerequisite in the 1.8.8–1.8.9 plan is superseded by this requested release scope. Plugin runtime/API/SDK and major GameSession extraction remain unimplemented follow-up work. Future plugins should start with read-only extensions without taking ownership of input, audio, judgement or official records. Continue focused bug, compatibility and security fixes; future baseline changes require another explicit request and synchronized evidence.
 
-| Stage | Completion criteria |
-| --- | --- |
-| 1.8.8 | Validate lane FAST/SLOW, time accuracy, tap/LN events, distributions/sample counts, free window sizing, result PNGs, long LN Mix, readability, menu input, keysound preservation and solo start/retry against the [release gate](release-1.8.8-gate.md) |
-| 1.8.9 | Lobby/Studio HUD/result UI with S+ preserved and Judge session handoff are implemented in source. Completed local checks, performance residuals and remaining package, CI and publication work are tracked under the [new release criteria](release-1.8.9-gate.md), including hidden upper information when extreme field/overlay geometry leaves no room |
-| Before 1.9.0 | A limited read-only plugin API demonstrated by an alternative result analysis view and a personal song filter, both built without core source edits |
-| After 1.9.0 stabilization | Maintain the core feature scope; focus on bug, security and compatibility fixes and plugin extensions |
-
-- **Analysis rules:** Show only LN events meaningful under the active ruleset. Analysis must not change judgement, scoring, combo or gauge rules. Automatic completion of a normal LN is not a release-timing sample. Count unmeasurable misses separately, never as `0 ms`. Show distributions, sample counts and spread alongside the mean so alternating `−20 ms / +20 ms` does not appear precise. See the [analysis criteria and detailed plan (Korean)](result-analysis-1.8.8.ko.md).
-- **Core/plugin boundary (planned):** The core owns input, the audio clock, judgement, scores, official record storage/verification, and multiplayer rules/session state. The first API exposes read-only data, separate personal settings/analysis storage, and bounded result-view, song sort/filter, HUD and menu extensions.
-- **Execution isolation (planned):** Run external code in a separate execution environment. The game never waits for its computation and never calls it directly from input/audio paths. Apply permission restrictions and execution/time budgets separately; contain faults, infinite loops and excessive output. Choose the runtime and concrete budgets after prototype validation.
-- **Multiplayer (planned):** The core blocks external plugin execution and result application, then rebuilds plugin-affected play state using default rules. Do not rely on plugins disabling themselves. Preserve personal keymaps and audio offsets. If future single-player extensions change judgement, charts or input, segregate their records from default records.
-- **API freeze gate (planned):** If either sample repeatedly needs engine edits, the API is not ready to freeze. Ship a small SDK with API documentation, runnable samples, error logs and a launch mode that loads no plugins. Verify that users and AI can build mods using the documented API and samples.
-- **Version policy (planned):** `1.9.0` stabilizes feature scope and compatibility; it does not freeze version numbers or files forever. Distinguish core patch, plugin and public-API compatibility versions, and verify existing mod/record compatibility. A future fixed-baseline change requires separate approval and synchronized documentation.
 
 ## 0) Fix the Skeleton and Master Clock
 - Treat **AudioThread as the master clock** for all timing-sensitive work.

@@ -78,7 +78,7 @@ ModeSettingsEffects ModeSettingsController::handle_mod_manager(
     const MenuAction& action,
     config::RuntimeConfig& runtime,
     std::optional<std::size_t> target_category) {
-    const auto& categories = mode_mod_categories();
+    const auto& categories = visible_mode_mod_categories();
     ModeSettingsEffects effects;
     if (target_category.has_value()) {
         const std::size_t clamped = std::min(*target_category, categories.size() + 1);
@@ -145,6 +145,10 @@ ModeSettingsEffects ModeSettingsController::apply_selected_action(
         effects.menu.render_changed = true;
         effects.show_mod_manager = true;
         return effects;
+    }
+    if (selected_id_ == ModeSettingId::JudgeWindow && (activate || adjust)) {
+        runtime.mode.mods = cycle_mode_judge_window(runtime.mode.mods, activate ? 1 : action.direction);
+        return mark_changed();
     }
     if (activate) return leave_screen();
     if (!adjust) return {};
@@ -250,6 +254,7 @@ ModeSettingsEffects ModeSettingsController::apply_selected_action(
             return mark_changed();
         case ModeSettingId::Mods:
         case ModeSettingId::Back:
+        case ModeSettingId::JudgeWindow:
             return {};
     }
     return {};

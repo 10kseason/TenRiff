@@ -76,6 +76,32 @@ TEST_CASE("skin HUD font scales preserve legacy defaults and sanitize portable p
     CHECK(skin.judgement_font_scale == doctest::Approx(1.0));
 }
 
+TEST_CASE("timing indicator sizes round trip independently with safe legacy defaults") {
+    using namespace tenriff::config;
+    SkinConfig skin;
+    REQUIRE(deserialize_skin_config("{}", skin));
+    CHECK(skin.timing_text_scale == doctest::Approx(1.0));
+    CHECK(skin.timing_bar_scale == doctest::Approx(1.0));
+    REQUIRE(deserialize_skin_config(R"({"timing_text_scale":1.5,"timing_bar_scale":0.75,"note_shape":"simple_rect"})", skin));
+    SkinConfig restored;
+    REQUIRE(deserialize_skin_config(serialize_skin_config(skin), restored));
+    CHECK(restored.timing_text_scale == doctest::Approx(1.5));
+    CHECK(restored.timing_bar_scale == doctest::Approx(0.75));
+    CHECK(restored.note_shape == "simple_rect");
+    CHECK(restored.combo_font_scale == doctest::Approx(1.0));
+    CHECK(restored.judgement_font_scale == doctest::Approx(1.0));
+    REQUIRE(deserialize_skin_config(R"({"timing_text_scale":9,"timing_bar_scale":-1})", restored));
+    CHECK(restored.timing_text_scale == doctest::Approx(2.0));
+    CHECK(restored.timing_bar_scale == doctest::Approx(0.5));
+    restored.timing_text_scale = std::numeric_limits<double>::quiet_NaN();
+    restored.timing_bar_scale = std::numeric_limits<double>::infinity();
+    REQUIRE(deserialize_skin_config(serialize_skin_config(restored), skin));
+    CHECK(skin.timing_text_scale == doctest::Approx(1.0));
+    CHECK(skin.timing_bar_scale == doctest::Approx(1.0));
+    CHECK(normalize_skin_note_shape_token("SIMPLE_RECT") == "simple_rect");
+    CHECK(normalize_skin_note_shape_token("rectangle") == "rect");
+}
+
 TEST_CASE("skin HUD layout defaults to studio and normalizes portable settings") {
     using namespace tenriff::config;
     SkinConfig skin;
@@ -192,7 +218,10 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.mode.pacemaker_mode == "off");
     CHECK(config.mode.pacemaker_target_accuracy == doctest::Approx(90.0));
     CHECK(config.mode.pacemaker_target_score == 8000);
-    CHECK(config.mode.song_index_profile == "safe");
+    CHECK(config.mode.song_index_profile == "fast");
+    CHECK(config.mode.gauge == "ex_hard");
+    CHECK(config.audio_ui.gameplay_volume == doctest::Approx(1.0));
+    CHECK(config.audio_ui.menu_music_volume == doctest::Approx(1.0));
     CHECK_FALSE(config.mode.calculate_song_index_difficulty);
     CHECK(config.mode.key_conversion_algorithm == "krrcream");
     CHECK(config.mode.key_conversion_nk2_preset == "native");
@@ -671,6 +700,8 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     config.audio_ui.background_sound_enabled = false;
     config.audio_ui.master_volume = 0.65;
     config.audio_ui.bgm_volume = 0.55;
+    config.audio_ui.gameplay_volume = 0.45;
+    config.audio_ui.menu_music_volume = 0.25;
     config.audio_ui.keysound_volume = 1.35;
     config.audio_ui.normalize_audio = true;
     config.skin.judgement_position = 0.4;
@@ -700,6 +731,8 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     CHECK_FALSE(result.config.audio_ui.background_sound_enabled);
     CHECK(result.config.audio_ui.master_volume == doctest::Approx(0.65));
     CHECK(result.config.audio_ui.bgm_volume == doctest::Approx(0.55));
+    CHECK(result.config.audio_ui.gameplay_volume == doctest::Approx(0.45));
+    CHECK(result.config.audio_ui.menu_music_volume == doctest::Approx(0.25));
     CHECK(result.config.audio_ui.keysound_volume == doctest::Approx(1.35));
     CHECK(result.config.audio_ui.normalize_audio);
     CHECK(result.config.skin.judgement_position == doctest::Approx(0.4));
@@ -776,6 +809,10 @@ TEST_CASE("live judge selection crosses a saved-profile reload without becoming 
     tenriff::app::apply_session_only_mode_mods(session, {"judge_hard"});
     const auto persisted = tenriff::app::build_persisted_runtime_config(session);
     CHECK(persisted.mode.mods == std::vector<std::string>{"no_ln_release"});
+    tenriff::app::apply_session_only_mode_mods(session, {"Judge EX", "full_long_notes"});
+    CHECK(tenriff::app::equivalent_mode_mod_tokens(session.mode.mods, {"judge_ex", "no_ln_release"}));
+    CHECK(tenriff::app::build_persisted_runtime_config(session).mode.mods ==
+          std::vector<std::string>{"no_ln_release"});
 }
 
 TEST_CASE("persisted input backend config does not leak replay session mode changes") {
@@ -2458,6 +2495,8 @@ TEST_CASE("timing controls survive profile file save and reload") {
     config.skin.timing_text_offset_y = 90;
     config.skin.timing_bar_offset_x = 150;
     config.skin.timing_bar_offset_y = -80;
+    config.skin.timing_text_scale = 1.75;
+    config.skin.timing_bar_scale = 0.65;
     REQUIRE(loader.save_profile("profiles/timing", config));
     auto loaded = loader.load_profile("profiles/timing");
     REQUIRE(loaded.success());
@@ -2469,6 +2508,8 @@ TEST_CASE("timing controls survive profile file save and reload") {
     CHECK(loaded.config.skin.timing_text_offset_y == 90);
     CHECK(loaded.config.skin.timing_bar_offset_x == 150);
     CHECK(loaded.config.skin.timing_bar_offset_y == -80);
+    CHECK(loaded.config.skin.timing_text_scale == doctest::Approx(1.75));
+    CHECK(loaded.config.skin.timing_bar_scale == doctest::Approx(0.65));
 }
 
 TEST_CASE("note fog and outro choice retain defaults clamp and persist") {
@@ -2496,4 +2537,31 @@ TEST_CASE("note fog and outro choice retain defaults clamp and persist") {
         tenriff::config::serialize_skin_config(loaded.config.skin), portable));
     CHECK(portable.note_fade_in == doctest::Approx(0.35));
     CHECK(portable.note_fade_out == doctest::Approx(0.60));
+}
+
+TEST_CASE("new audio and mode defaults preserve explicit legacy profile choices") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE_FALSE(temp.path.empty());
+    CurrentPathGuard cwd;
+    std::filesystem::current_path(temp.path);
+    std::filesystem::create_directories("profiles/player");
+    ConfigLoader loader;
+    write_file("profiles/player/config.json", R"({"audio":{"bgm_volume":0.6,"keysound_volume":1.3},"mode":{"gauge":"normal","song_index_profile":"safe","ghost_battle_enabled":true}})");
+    auto loaded = loader.load_profile("profiles/player");
+    REQUIRE(loaded.success());
+    CHECK(loaded.config.mode.gauge == "normal");
+    CHECK(loaded.config.mode.song_index_profile == "safe");
+    CHECK(loaded.config.mode.ghost_battle_enabled);
+    CHECK(loaded.config.audio_ui.bgm_volume == doctest::Approx(0.6));
+    CHECK(loaded.config.audio_ui.keysound_volume == doctest::Approx(1.3));
+    CHECK(loaded.config.audio_ui.gameplay_volume == doctest::Approx(1.0));
+    CHECK(loaded.config.audio_ui.menu_music_volume == doctest::Approx(1.0));
+    write_file("profiles/player/config.json", R"({"audio":{"gameplay_volume":4,"menu_music_volume":-2}})");
+    loaded = loader.load_profile("profiles/player");
+    REQUIRE(loaded.success());
+    CHECK(loaded.config.audio_ui.gameplay_volume == doctest::Approx(1.0));
+    CHECK(loaded.config.audio_ui.menu_music_volume == doctest::Approx(0.0));
+    CHECK(loaded.config.mode.gauge == "ex_hard");
+    CHECK(loaded.config.mode.song_index_profile == "fast");
+    CHECK_FALSE(loaded.config.mode.ghost_battle_enabled);
 }

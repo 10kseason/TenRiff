@@ -786,8 +786,10 @@ struct MenuAppFeedbackTestAccess {
         menu->config_ = config::ConfigLoader{}.defaults();
         menu->config_.audio_ui.background_sound_enabled = false;
         menu->config_.skin.source = "native";
+        menu->config_.mode.mods = {"dp_flip"};
         menu->skin_settings_controller_.reset("5k");
         bool checked_resolution_value = false;
+        bool checked_judge_value = false;
         for (const auto screen : {MenuApp::Screen::ModeSelect, MenuApp::Screen::ModeMods,
              MenuApp::Screen::SettingsAudio, MenuApp::Screen::SettingsGraphics,
              MenuApp::Screen::SettingsSkins, MenuApp::Screen::QuickSetup}) {
@@ -799,8 +801,8 @@ struct MenuAppFeedbackTestAccess {
                 render::MenuClickEvent event;
                 event.kind = render::MenuHitTargetKind::SettingsRow;
                 event.index = row.row_index;
-                // Real row bodies emit SelectOnly, including Resolution. Its
-                // separate value control is the only adjustable Activate hit.
+                // Row bodies only select, even when Resolution and Judge Window
+                // expose a separate value control that accepts Activate.
                 event.part = render::MenuHitPart::SelectOnly;
                 menu->handle_menu_click(event);
                 CHECK(menu->current_screen() == screen);
@@ -813,7 +815,19 @@ struct MenuAppFeedbackTestAccess {
                 check_value_unchanged();
                 CHECK_FALSE(menu->graphics_settings_controller_.editing_resolution());
                 event.part = render::MenuHitPart::Activate;
-                if (row.value_activatable) {
+                if (row.value_activatable && screen == MenuApp::Screen::ModeSelect) {
+                    REQUIRE(row.row_index == static_cast<int>(menu::settings::ModeSettingId::JudgeWindow));
+                    checked_judge_value = true;
+                    const auto original_mods = menu->config_.mode.mods;
+                    for (const char* judge : {"judge_hard", "judge_ex", ""}) {
+                        auto expected_mods = original_mods;
+                        if (*judge != '\0') expected_mods.insert(expected_mods.begin(), judge);
+                        menu->handle_menu_click(event);
+                        CHECK(menu->current_screen() == screen);
+                        CHECK(menu->config_.mode.mods == expected_mods);
+                    }
+                    check_value_unchanged();
+                } else if (row.value_activatable) {
                     REQUIRE(screen == MenuApp::Screen::SettingsGraphics);
                     REQUIRE(row.row_index == static_cast<int>(menu::settings::GraphicsSettingId::Resolution));
                     checked_resolution_value = true;
@@ -843,6 +857,7 @@ struct MenuAppFeedbackTestAccess {
             }
         }
         CHECK(checked_resolution_value);
+        CHECK(checked_judge_value);
         CHECK_FALSE(menu->render_thread_.is_running());
         menu->reset_screen(MenuApp::Screen::SettingsSkins);
         menu->publish_snapshot();

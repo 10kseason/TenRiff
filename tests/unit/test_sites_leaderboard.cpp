@@ -5,9 +5,75 @@
 #include <iostream>
 #include <limits>
 #include "app/SitesLeaderboardClient.h"
+#include "app/SitesUploadResponse.h"
 #include "app/ReplayVerifier.h"
 #include "config/SimpleJson.h"
 using namespace tenriff;
+TEST_CASE("Sites upload failures distinguish compatibility authentication and retry without reflecting remote bodies") {
+    const std::string untrusted = R"({"error":"private-response-marker","accepted":true})";
+    struct Case { unsigned status; bool retry; const char* reason; };
+    for (const auto test : {Case{400, false, "ruleset"}, Case{401, false, "connection key"},
+                           Case{403, false, "Access"}, Case{404, false, "endpoint"},
+                           Case{429, true, "rate limited"}, Case{503, true, "temporarily unavailable"},
+                           Case{302, false, "did not accept"}}) {
+        bool retryable = !test.retry;
+        std::string error = "previous error";
+        CHECK_FALSE(app::parse_sites_upload_response(test.status, untrusted, retryable, error));
+        CHECK(retryable == test.retry);
+        CHECK(error.find(std::to_string(test.status)) != std::string::npos);
+        CHECK(error.find(test.reason) != std::string::npos);
+        CHECK(error.find("private-response-marker") == std::string::npos);
+        if (test.status == 400) CHECK(error.find("connection key") == std::string::npos);
+    }
+}
+
+TEST_CASE("Sites accepts only acknowledged 200 and 201 responses and clears stale retry state") {
+    for (const unsigned status : {200u, 201u}) {
+        bool retryable = true;
+        std::string error = "previous error";
+        CHECK(app::parse_sites_upload_response(status, R"({"accepted":true,"duplicate":true})", retryable, error));
+        CHECK_FALSE(retryable);
+        CHECK(error.empty());
+        for (const auto body : {"invalid", "{}", "[]", R"({"accepted":false})", R"({"accepted":"true"})"}) {
+            CHECK_FALSE(app::parse_sites_upload_response(status, body, retryable, error));
+            CHECK_FALSE(retryable);
+            CHECK(error == "Sites did not acknowledge the record.");
+        }
+    }
+}
+
+TEST_CASE("Sites future clock errors use only the allowlisted code and never reflect server text") {
+    bool retryable = true;
+    std::string error;
+    REQUIRE_FALSE(app::parse_sites_upload_response(400,
+        R"({"error_code":"future_play_time","error":"private-response-marker"})", retryable, error));
+    CHECK_FALSE(retryable);
+    CHECK(error.find("PC clock") != std::string::npos);
+    CHECK(error.find("private-response-marker") == std::string::npos);
+    REQUIRE_FALSE(app::parse_sites_upload_response(400,
+        R"({"error_code":"private-response-marker","error":"future_play_time"})", retryable, error));
+    CHECK(error.find("PC clock") == std::string::npos);
+    CHECK(error.find("private-response-marker") == std::string::npos);
+}
+
+TEST_CASE("Sites late asynchronous messages cannot replace a different result status") {
+    const app::SitesUploadMessage completed{std::string(64, 'a'), "Sites community record uploaded."};
+    CHECK(completed.applies_to_result(std::string(64, 'a')));
+    CHECK_FALSE(completed.applies_to_result(std::string(64, 'b')));
+    CHECK_FALSE(completed.applies_to_result(""));
+    CHECK_FALSE(app::SitesUploadMessage{}.applies_to_result(""));
+    CHECK(app::sites_upload_status_text(completed.text).korean == "웹 기록 등록 완료");
+    for (const unsigned status : {400u, 401u, 403u, 404u, 429u}) {
+        bool retryable = false;
+        std::string error;
+        REQUIRE_FALSE(app::parse_sites_upload_response(status, R"({"error":"private-response-marker"})", retryable, error));
+        const auto summary = app::sites_upload_status_text(error);
+        CHECK(summary.english.find(std::to_string(status)) != std::string_view::npos);
+        CHECK(summary.korean.find(std::to_string(status)) != std::string_view::npos);
+        CHECK(summary.english.find("private-response-marker") == std::string_view::npos);
+    }
+}
+
 namespace {
 bool json_values_equal(const config::JsonValue& lhs, const config::JsonValue& rhs) {
     if (lhs.value.index() != rhs.value.index()) return false;
@@ -136,6 +202,33 @@ TEST_CASE("Sites keeps musical LN Mix v2 out of unversioned legacy boards") {
     replay.mods.clear();
     replay.mode.long_note_mix_version = 2;
     CHECK(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
+}
+
+TEST_CASE("Sites EX payload requires its own R6 policy and excludes mixed judge modes") {
+    auto replay = score_fixture();
+    replay.ruleset_id = std::string(app::kExReplayRulesetId);
+    replay.mods = {"judge_ex"};
+    std::string payload, error;
+    REQUIRE(app::build_sites_score_json(replay, std::string(64, 'c'), "EX Fixture", "CLEAR", payload, error));
+    const auto json = config::parse_json(payload);
+    REQUIRE(json.success());
+    const auto* root = json.root->as_object();
+    REQUIRE(root);
+    CHECK(root->at("ruleset_id").as_string() == app::kExReplayRulesetId);
+    CHECK(root->at("mods").as_array()->front().as_string() == "judge_ex");
+    CHECK(root->at("timing_profile").as_string() == "bms-easy");
+    // Synthetic public fixture: exercise the native serializer in web schema QA.
+    std::cout << "[judge-ex-payload] " << payload << '\n';
+    replay.ruleset_id = std::string(app::kCanonicalReplayRulesetId);
+    CHECK_FALSE(app::build_sites_score_json(replay, std::string(64, 'c'), "EX Fixture", "CLEAR", payload, error));
+    replay.ruleset_id = std::string(app::kExReplayRulesetId);
+    for (const std::vector<std::string> mods : {std::vector<std::string>{},
+            std::vector<std::string>{"judge_hard"}, std::vector<std::string>{"judge_ex", "judge_hard"},
+            std::vector<std::string>{"judge_ex", "judge_easy"}}) {
+        replay.mods = mods;
+        CHECK_FALSE(app::build_sites_score_json(replay, std::string(64, 'c'), "EX Fixture", "CLEAR", payload, error));
+        CHECK(payload.empty());
+    }
 }
 
 TEST_CASE("Sites ruleset 4 payload separates every BMS rank and fixed osu timing") {

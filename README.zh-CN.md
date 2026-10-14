@@ -1,5 +1,9 @@
 # TenRiff
 
+**2026-10-14 · 1.9.0 / 新固定基准：** 将已检查的本地候选版提升为指定正式版本，包括BMS/菜单音量分离、大厅/筛选/皮肤操作、等级与SUBARTIST、韩文模式界面、EX判定和上传状态。普通/Hard使用R5，EX使用R6；保留旧R1–R5记录及已保存设置。[固定基准](docs/baseline-1.9.0.zh-CN.md) · [验证范围](docs/release-1.9.0-gate.md)。下方带日期的条目保留当时发布历史。
+
+**1.9.0 发布版：** 独立BMS/菜单音量、更轻的菜单音乐、紧凑大厅、难度范围与排序修复、指示器缩放、简易矩形音符和本地UI字体。新设置默认EX、快速索引、关闭幽灵对战。保留已有设置，固定基准更新为1.9.0。[范围](docs/controls-1.9.0.ko.md)。
+
 **2026-10-14 · 1.8.9.7:** 输入线程请求MMCSS Games/High并关闭执行速度电源节流，主页菜单边框使用与图标一致的颜色和柔和缓存辉光。仅将TenRiff自带菜单、结果音乐降至原来的40%，BMS曲目、键音和试听保持原有音量比例。固定基线仍为1.8.7，物理输入延迟改善尚未证实。 [Scope / 검증](docs/release-1.8.9.7-gate.md).
 
 **2026-10-13 · 1.8.9.6:** 输入和游戏推进/HUD的短等待使用可复用的高分辨率计时器，RawInput由消息唤醒。采用对比版本B的方式，保留判定范围、R1–R5、回放和固定基线1.8.7。手动试玩感受随轮次变化，不能保证消除所有卡顿。 [Scope / 검증](docs/release-1.8.9.6-gate.md).
@@ -14,13 +18,13 @@
 
 **2026-10-13 · 1.8.9.1：** 增加连续按键设置、全部转换器的键音及长键保留、FAST/SLOW和时间提示背景开关、更大的血条、预览中的轨道拖动及无边框背景的判定文字。旧回放保留原转换方式。[行为、验证与兼容限制（韩文）](docs/release-1.8.9.1-gate.md)。固定基准仍为1.8.7。
 
-**固定基准：[1.8.7](docs/baseline-1.8.7.zh-CN.md)**（2026-10-10）。使用 Git tag `1.8.7`、commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`，不随 `latest` 或新版本自动更新。
+**固定基准：[1.9.0](docs/baseline-1.9.0.zh-CN.md)**（2026-10-14明确请求）。使用Git tag `1.9.0`，不随`main`或`latest`自动更新；旧1.8.7基准和既有发布版本保留为历史。
 
 **2026-10-12 · 1.8.9：**提供更大的大厅BEST数字、键数模式配色与白色共用外框，采用右上信息／左下分数／右下横向riff map的Studio HUD，并加大结果文字、突出分析标签及居中操作。保留S+颜色与字体，修正Judge Easy/Hard选择未传入新会话的问题。参见[行为、验证与剩余范围](docs/release-1.8.9-gate.md)及[Judge原因与兼容性](docs/judge-session-handoff-1.8.9.ko.md)（韩语）。
 
 **2026-10-12 · 1.8.8：**整合结果分析、自由窗口大小及F9 PNG提示、长LN Mix，并改善显示可读性、难度表URL与筛选、皮肤轨道快捷键、减少键数时的键音保留，以及单人开始和立即重试操作。当前验证、软件包及公开状态见[1.8.8发布说明](docs/release-1.8.8-gate.md)。固定基准仍为1.8.7。
 
-**分析与扩展计划：**区分各轨道分布、时间分段准确度和单键/LN起始、松键、保持失败，无法测量的漏击不作为0ms样本。长LN Mix v2仅保留本地记录与回放，不计入旧BEST或Sites上传。插件与1.9.0稳定化仍为计划。参见[分析标准](docs/result-analysis-1.8.8.ko.md)、[显示/菜单/键音变更](docs/release-feedback-1.8.8.ko.md)、[开始与重试操作](docs/gameplay-start-controls.ko.md)（韩语）。
+**分析与扩展计划：**区分各轨道分布、时间分段准确度和单键/LN起始、松键、保持失败，无法测量的漏击不作为0ms样本。长LN Mix v2仅保留本地记录与回放，不计入旧BEST或Sites上传。插件仍为后续计划，不属于1.9.0。参见[分析标准](docs/result-analysis-1.8.8.ko.md)、[显示/菜单/键音变更](docs/release-feedback-1.8.8.ko.md)、[开始与重试操作](docs/gameplay-start-controls.ko.md)（韩语）。
 
 **2026-10-09 · TenRiff 1.8.7:** 改善输入校准和谱面加载音频，支持LR2单人Studio Deck、750ms FAST/SLOW保留、按键重新分配、选项整合及完整曲名自动缩放。 [1.8.7 release](docs/release-1.8.7-gate.md).
 
@@ -42,13 +46,13 @@
 
 **多人Rate支持版本：**选曲者在大厅设置全员共用的Rate。所有玩家必须使用本protocol v6版本，不能与旧v5客户端连接。[指南](docs/multiplayer-rate-build.ko.md)（韩语）。
 
-版本与下载：[**1.8.9.5 Sites 集成版**](https://github.com/10kseason/TenRiff/releases/tag/1.8.9.5)；实际软件包／公开状态见[发布记录](docs/release-1.8.9.5-gate.md)，固定基准仍为1.8.7。解压到新文件夹，运行 `launch_win.bat`，然后按 F10 连接一次网页账号。符合条件的新游玩记录会上传分数、详细分数、准确率和详细准确率。新游玩使用 ruleset-5，网页提交必须包含判定配置。ruleset-1/2/3/4回放保留原判定与LN行为，现有网页记录保留ID和分数。请参阅[连接指南](docs/sites-leaderboard.md)（韩语）。
+版本与下载：[**1.9.0 Sites 集成版**](https://github.com/10kseason/TenRiff/releases/tag/1.9.0)；实际软件包／公开状态见[发布记录](docs/release-1.9.0-gate.md)，固定基准仍为1.9.0。解压到新文件夹，运行 `launch_win.bat`，然后按 F10 连接一次网页账号。符合条件的新游玩记录会上传分数、详细分数、准确率和详细准确率。新游玩使用 ruleset-5 (Normal/Hard), ruleset-6 (EX)，网页提交必须包含判定配置。ruleset-1/2/3/4回放保留原判定与LN行为，现有网页记录保留ID和分数。请参阅[连接指南](docs/sites-leaderboard.md)（韩语）。
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。固定基准为 `1.8.7`，此源码版本为 `1.8.9.5`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
+TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。固定基准为 `1.9.0`，此源码版本为 `1.9.0`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
 
-这份 README 是入门文档。关于当前行为、`1.8.9.5` 发布分支和固定 `1.8.7` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
+这份 README 是入门文档。关于当前行为、`1.9.0` 发布分支和固定 `1.9.0` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
 
 TenRiff 也明确属于一种 `vibe coding` 作品：它更多是在快速迭代和实验中成形，而不是只按照传统的长篇设计先行流程推进。
 
@@ -254,8 +258,8 @@ README 只负责入门说明。更详细的内容建议按以下顺序阅读：
    - 文档总索引
 2. [`docs/current-state.zh-CN.md`](docs/current-state.zh-CN.md)
    - 当前实际可用功能
-3. [`docs/baseline-1.8.7.zh-CN.md`](docs/baseline-1.8.7.zh-CN.md)
-   - 后续工作应保持的 `1.8.7 fixed stable baseline` 基准文档
+3. [`docs/baseline-1.9.0.zh-CN.md`](docs/baseline-1.9.0.zh-CN.md)
+   - 后续工作应保持的 `1.9.0 fixed stable baseline` 基准文档
 4. [`docs/gameplay-guide.zh-CN.md`](docs/gameplay-guide.zh-CN.md)
    - 实际开始游玩、基本操作、HUD、判定、结果说明
 5. [`docs/config.zh-CN.md`](docs/config.zh-CN.md)

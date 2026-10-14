@@ -1,12 +1,20 @@
 # TenRiff Current State
 
+**2026-10-14 · 1.9.0 / 새 고정 기준선:** 사용자가 검토한 로컬 후보를 정식 배포 버전으로 올립니다. BMS/텐리프 음악 음량 분리, 로비·필터·스킨 조작, 등급·SUBARTIST 표시, 한글 모드와 EX 판정, 업로드 상태 표시를 포함합니다. 기본/Hard는 R5, EX는 R6이며 R1–R5 기록·기존 설정을 보존합니다. [기준선](baseline-1.9.0.md) · [릴리스 검증 범위](release-1.9.0-gate.md). 아래 날짜별 항목은 당시 릴리스 이력입니다.
+
+1.9.0 릴리스는 `옵션 > 키 모드 설정 > 판정 범위`에서 기본/Hard/EX를 선택합니다. Easy는 새 선택지에서 제거하며 예전 리플레이의 Easy는 유지합니다. 실행 중 선택은 프로필에 저장하지 않아 재시작하면 기본으로 돌아갑니다. [EX 수치와 호환 범위](judge-ex-1.9.0.ko.md).
+- 기본/Hard 새 플레이는 `tenriff-native-score-v2-ruleset-5`, EX만 `tenriff-native-score-v2-ruleset-6`을 기록합니다. R1–R5의 과거 판정·Easy·LN 정책을 보존하며 커스텀 판정은 비공식입니다.
+- `Judge EX`는 EASY 기준 PG/GR/GD=`14/44.571429/78.857143ms`로 Hard의 80%이며 기존 RANK 비율을 유지합니다. BAD는 모든 RANK 250ms, 자동 미스는 별도 340ms, 점수 배율은 Hard와 같은 1.10입니다.
+
+**2026-10-14 · 1.9.0 릴리스:** 이 문서의 새 등급 설명은 공개 전 릴리스에 적용합니다. 이전 버전 항목은 해당 시점의 이력이며, 고정 기준선 1.8.7의 태그·커밋은 유지합니다. [등급 표시와 호환 범위](grade-display.ko.md).
+
 **2026-10-14 · 1.8.9.7:** 입력 스레드에 MMCSS Games/High와 전원 스로틀링 해제를 적용하고, 로비 메뉴 테두리를 아이콘 색의 은은한 glow로 표시합니다. 텐리프 자체 메뉴·결과 음악만 기존의 40%로 낮추며 BMS 곡·키음·미리듣기는 원래 음량을 유지합니다. 고정 기준선은 1.8.7이며 물리 입력 지연 개선은 아직 입증되지 않았습니다. [Scope / 검증](release-1.8.9.7-gate.md).
 
 **2026-10-13 · 1.8.9.6:** 입력과 게임 진행/HUD의 짧은 대기에 재사용 고해상도 타이머를 적용하고, RawInput은 메시지가 오면 깨어납니다. B 비교 방식의 제품 적용이며, 수치 판정 창·R1~R5·리플레이·고정 기준 1.8.7을 유지합니다. 실제 체감은 회차마다 달라 모든 움찔의 해결을 보장하지 않습니다. [Scope / 검증](release-1.8.9.6-gate.md).
 
 **2026-10-13 · 1.8.9.5:** 오디오 버퍼에 따라 달라지던 LN·자동 판정 순서를 R5에서 시간순으로 통일하고, 입력·화면 시간과 BPM/STOP 경계의 노트 위치를 맞춥니다. 로비는 어두운 카드와 색상 아이콘으로, 오디오는 마스터 음량을 맨 위로 정리합니다. R1~R4 기록과 고정 기준 1.8.7은 보존합니다. [변경·검증 범위](release-1.8.9.5-gate.md).
 
-**고정 기준선: [1.8.7](baseline-1.8.7.md)** (2026-10-10). Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`을 사용하며 `latest`나 새 릴리스로 자동 변경하지 않습니다.
+**고정 기준선: [1.9.0](baseline-1.9.0.md)** (2026-10-14 사용자 요청). Git tag `1.9.0`을 기준으로 하며 `main`이나 `latest`를 따라 자동 변경하지 않습니다. 1.8.7 기준선과 기존 릴리스는 이력으로 보존합니다.
 
 **2026-10-13 · 1.8.9.4:** 결과의 큰 등급·점수 배치와 상세 정확도를 정리하고 Gauge Shift CLEAR 4단계 색을 구분합니다. 오디오의 BGM·키음 음량을 맨 위로 옮기며 새 기본값은 모두 100%입니다. 한국어 스킨 명칭, 명시된 obj 채보자와 BPM! 변속 표시, 같은 시점의 동일 음원 중복 재생 보정을 포함합니다. 채보자 업로드는 선택 사항이며 기존 기록 식별자는 유지합니다. [변경·호환·검증 범위](release-1.8.9.4-gate.md). 검증과 게임·웹 공개 상태는 해당 문서에 별도로 기록하며 고정 기준은 1.8.7입니다.
 
@@ -22,7 +30,7 @@
 
 **2026-10-12 · 1.8.8:** 결과 분석, 자유 해상도와 F9 PNG 안내, 긴 LN Mix에 더해 화면 가독성·난이도표 입력/필터·스킨 레인 단축키·키 수 축소 시 키음 보존·단독 시작/즉시 재시작 조작을 정리했습니다. 현재 검증·패키지·공개 상태는 [1.8.8 릴리스 안내](release-1.8.8-gate.md)에서 확인하세요. 고정 기준은 1.8.7을 유지합니다.
 
-**분석과 확장 계획:** 레인별 분포·시간대 정확도·단노트/LN 시작·해제·유지 실패를 구분하고 측정 불가 미스를 0ms 표본에 넣지 않습니다. 긴 LN Mix v2는 로컬 기록·리플레이만 허용하며 기존 BEST·Sites 업로드에서 제외합니다. 플러그인과 1.9.0 안정화는 계획입니다. [분석 기준](result-analysis-1.8.8.ko.md), [화면·메뉴·키음 변경](release-feedback-1.8.8.ko.md), [시작·재시작 조작](gameplay-start-controls.ko.md).
+**분석과 확장 계획:** 레인별 분포·시간대 정확도·단노트/LN 시작·해제·유지 실패를 구분하고 측정 불가 미스를 0ms 표본에 넣지 않습니다. 긴 LN Mix v2는 로컬 기록·리플레이만 허용하며 기존 BEST·Sites 업로드에서 제외합니다. 플러그인 실행 환경/API/SDK는 후속 계획이며 1.9.0에는 포함하지 않습니다. [분석 기준](result-analysis-1.8.8.ko.md), [화면·메뉴·키음 변경](release-feedback-1.8.8.ko.md), [시작·재시작 조작](gameplay-start-controls.ko.md).
 
 **2026-10-09 · TenRiff 1.8.7:** 입력 보정과 로딩 오디오 경로를 보완하고 LR2 단독 플레이 스튜디오 덱, 750ms FAST/SLOW 유지, 키 재할당, 옵션 통합과 곡 제목 자동 맞춤을 제공합니다. [1.8.7 release](release-1.8.7-gate.md).
 
@@ -45,7 +53,7 @@
 - 1.7.10: ALL SONG의 삭제된 캐시 항목 건너뛰기, 캐시 통합 진행률과 완료 상태 전달을 보강했습니다. [검증 범위 및 미재현 증상](release-1.7.10-gate.md).
 - 1.7.8: 새 기본 메뉴 에셋·애니메이션, 4~16키 Luma Keys 디지털 건반, 일본어 UI와 웹/오프라인 스킨 에디터를 제공합니다. 메뉴는 `native`, 인게임은 `gameplay.native`에서 도형·색·위치·글꼴·모션을 편집합니다. [검증 범위](release-1.7.8-gate.md).
 
-고정 기준은 **1.8.7**, 이 소스의 버전은 **1.8.9.4**입니다. Audio의 곡 종료 방식에서 **끝까지 듣기**(기본) 또는 **후주 스킵**을 선택하며, 정상 완료한 결과는 추가 입력 없이 저장·제출합니다. 새 플레이는 BMS RANK를 반영하는 R4와 웹 제출용 판정 프로파일을 사용하고 기존 R1/R2/R3 기록은 유지합니다. WASAPI가 기본 출력입니다. 이번 릴리스의 검증 상태와 남은 한계는 [1.8.9.4 릴리스 안내](release-1.8.9.4-gate.md)를 참고하세요.
+고정 기준은 **1.9.0**, 이 작업본은 **1.9.0 릴리스**입니다. 기본/Hard는 R5, EX는 R6이며 이전 기록은 유지합니다. 변경 범위와 검증 한계는 [릴리스 안내](controls-1.9.0.ko.md)를 참고하세요. 아래 날짜별 항목은 과거 공개 버전 이력입니다.
 
 [로컬 1.7.1 r2 보고서](local-1.7.1-r2.ko.md)의 749/739 검사 횟수는 이전 빌드의 기록입니다. 현재 릴리스 검사 횟수로 재사용하지 않습니다. 기능별 안내는 [곡 소스와 난이도표](library-management.md), [대표 BPM](reference-bpm.md), [스킨 프리셋](skin-presets.md), [ASIO](asio-audio.md)를 참고하세요.
 
@@ -56,7 +64,7 @@
 - BMS landmines (`D1-D9`, `E1-E9`) are playable, including `#WAV00`, base-36 damage tokens, `ZZ` instant fail, exact press/release boundary behavior, and lane-mod/key-converter remapping.
 - Results and local records expose fixed native score separately from detail score, and categorical native accuracy separately from continuous timing-based detailed accuracy.
 - 새 replay evidence v3는 차트 SHA-256, canonical ruleset, result-to-replay SHA-256을 저장하고 입력 trace를 headless 엔진으로 재실행합니다. 공식 로컬 best는 재계산된 verified 결과만 사용하며 legacy/custom/assist 기록은 히스토리에 `unverified`로 남습니다.
-- 사용자 고정 기준 버전은 `1.8.7`; 현재 소스는 `1.8.9.4`
+- 사용자 고정 기준 버전은 `1.9.0`; 현재 소스는 `1.9.0`
 - 1.7.9 UI 개선: 프로필/첫 실행의 언어·3단계 글자 크기, 사진 미리보기/시작 메뉴 사진, ALL SONG 통합 소스, 선곡 경계와 디지털 탭, 정적인 TI와 홀로그램 TENRIFF. [사용 및 구현 안내](menu-profile-library-polish.ko.md).
 - 1.7.1은 최대 8인 HUD·결과, 동점 순위·점수 대기 상태, P-GREAT 전용 연출, 독립 판정·콤보 위치, 옵션 10개, 오디오 노멀라이즈와 선곡 난이도표 카드를 제공합니다. [변경 설명](gameplay-polish-followup.md), [검증 범위](release-1.7.1-gate.md) 참고.
 - 기본 선곡·싱글 결과 UI는 차분한 패널과 단색 주 동작 버튼을 사용하며, 결과는 큰 점수·등급·정확도 중심으로 표시한다. 사용자 TenRiff 스킨 경로를 유지하며, 1.7.1 대전 결과는 참가자 전원 순위를 표시한다. 구현/검증 안내는 `docs/menu-visual-polish.md`와 `docs/gameplay-polish-followup.md` 참고.
@@ -82,7 +90,7 @@
 - `1.2.92`는 standalone BMS key converter에 기본 Krrcream과 결정론적 `nK2 Native 50/50` 선택을 추가.
 - `1.2.93`은 게임 내 Mode Settings의 `Key Converter`에서 `Krrcream`/`KeyWeaver nK2`를 선택하고 설정·리플레이에 저장해 실제 key-mode 변환에 적용.
 - `1.2.95`에서 Mode Settings의 `OSU Charts`로 osu!mania 4K~10K `.osu` 인덱싱·플레이를 잠시 복구했으나, 이 경로는 1.3.1에서 다시 제거되었습니다.
-- 후속 작업의 기준선 문서는 [`docs/baseline-1.8.7.md`](baseline-1.8.7.md)
+- 후속 작업의 기준선 문서는 [`docs/baseline-1.9.0.md`](baseline-1.9.0.md)
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
 - 지원 차트 표면은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용
@@ -164,7 +172,7 @@
   - 별도 `변환 노트 추가` 옵션은 제거했으며, Krrcream은 원본 노트만 재배치하고 nK2는 키 수 확장 시 변환된 목표 레이아웃에 안전한 보조 노트를 직접 생성한다.
   - nK2 프리셋은 기본 `Native (12%)`, `Transform (35%)`, `Remaster (65%)` 중 선택한다. `Remaster`는 예산을 올리면서도 앵커를 잠가 원곡 배치를 유지하고 롱노트 구간을 같은 길이의 롱노트로 채운다. 세 값은 상한이며 실제 추가량은 원본 밀도와 안전창에 따라 낮아진다. Krrcream 선택 시 해당 행은 잠기며, standalone converter GUI의 Krrcream Max/Min/Speed/Seed도 수정할 수 없다.
   - NK3는 번들된 P64를 host beam32에 항상 결합한다. 10K가 아닌 원본을 10K로 변환할 때만 일반화 패턴 MLP를 추가하고, 10→10과 나머지 모든 경로는 P64만 사용한다. 기본 `AUTO` 백엔드는 ncnn Vulkan으로 P64와 MLP를 AMD/NVIDIA GPU에서 실행하고, 선택형 OpenVINO 호환 경로는 폴백으로 유지한다. `TENRIFF_NK3_BACKEND`와 `TENRIFF_NK3_VULKAN_DEVICE`로 강제 선택할 수 있다.
-  - 1.8.7 공식 빌드/Windows ZIP은 standalone BMS key converter CLI/GUI를 만들거나 포함하지 않으며 top-level CMake 옵션도 기본 `OFF`; 소스는 개발 회귀용으로만 유지
+  - 1.9.0 공식 빌드/Windows ZIP은 standalone BMS key converter CLI/GUI를 만들거나 포함하지 않으며 top-level CMake 옵션도 기본 `OFF`; 소스는 개발 회귀용으로만 유지
   - `mode.key_mode=none`은 차트의 원래 키 수와 기본 패턴 레이아웃을 그대로 유지
 - Native difficulty:
   - BMS LV/CR 계산에서 롱노트 Head/Tail의 miss-ms만 0.5배로 평가해 `300ms`를 `150ms`처럼 완화하며, 실제 gameplay 판정창은 그대로 유지
@@ -196,21 +204,22 @@
   - 미래 노트 상단 진입 easing
   - 마지막 판정 노트 뒤 Audio의 곡 종료 방식에 따라 끝까지 듣기(기본) 또는 기존 결과 대기 시간 후 후주 자동 스킵을 적용하며, 끝까지 듣기에서도 기존 레인 키 수동 스킵을 지원
 - Judge:
-  - 1.8.9는 메뉴의 세션 전용 Judge Easy/Hard를 새 게임 세션에 전달함. 프로필에는 저장하지 않아 앱 재시작 시 Normal로 돌아오며, 리플레이 원본·멀티 공통 규칙·과거 기록·R1–R4 수치는 유지. [원인과 기록·웹 표시 범위](judge-session-handoff-1.8.9.ko.md); 실행 검증은 릴리스 기록에서 별도 확인
+  - 1.9.0 릴리스는 `옵션 > 키 모드 설정 > 판정 범위`에서 기본/Hard/EX를 선택합니다. Easy는 새 선택지에서 제거하며 예전 리플레이의 Easy는 유지합니다. 실행 중 선택은 프로필에 저장하지 않아 재시작하면 기본으로 돌아갑니다. [EX 수치와 호환 범위](judge-ex-1.9.0.ko.md).
   - 게이지 선택은 항상 켜지는 `Gauge Shift`의 시작 등급 `EX / Hard / Normal / Easy`를 지정함. EX는 Hard와 구분되는 짙은 흑회색으로 표시하며 내부 호환 토큰은 `ex_hard`를 유지
   - `Gauge Shift`는 선택한 시작 등급부터 Easy까지를 각각 100%에서 독립적으로 병렬 계산하고, 현재 tier가 0%로 탈락하면 같은 판정 이력을 누적한 다음 생존 tier를 선택하며 종료 시 가장 높은 생존 tier로 확정함
   - `Sudden Death (1 MISS)`는 첫 OD8 환산 객체 `MISS`에서 즉시 실패하며, 네이티브 `BAD`만으로는 발동하지 않고 빈 키 `POOR`도 무시하며 Practice No-Fail과 상호 배타적으로 동작
   - OD8 환산은 Sudden Death와 기존 리플레이 호환을 위한 내부 통계로 유지하며, 인게임/결과 UI는 TenRiff native Score만 표시
   - 일반 점수는 최대 10,000점이며 판정 배점은 `PG 6 / GR 3 / GD 1 / PR 0 / FAIL 0` 비율로 정규화됨. LN 머리/꼬리는 각각 0.5 가중치로 한 객체를 구성하며 상세 점수는 별도 체계를 유지함
-  - 정확도는 PG/GR/GD/BD 기준 100/80/50/20%에 각 판정 구간 내부 타이밍으로 최대 0.5%p를 감산하고, PG 타이밍 범위가 8ms를 넘으면 전부 PG여도 99.5%로 제한함
-  - 랭크 경계는 `<75 F / 75 B / 80.5 A / 86.5 A+ / 90 S / 95.5 S+ / 98 AA / 99 SS / 99.75 SSS`
+  - 일반 정확도는 `PG / GR / GD / BD / PR = 100 / 80 / 50 / 20 / 0%`의 판정 가중평균이며, 구간 내부 타이밍을 반영하는 상세 정확도와 별개임. 일반 정확도에는 타이밍 폭 추가 감점이나 99.5% 상한을 적용하지 않음
+  - 1.9.0 릴리스의 생존 완주 등급은 반올림 전 일반 정확도 기준 `99% 이상 S++ / 98% 이상 S+ / 95% 이상 S / 93% 이상 A+ / 90% 이상 A / 85% 이상 B / 80% 이상 C / 80% 미만 D`. 75% 미만 생존 완주도 D이며 실패는 F
+  - 명시적 중단(`ABORTED`/`aborted`)과 기록 없음은 `--`, 자동연주는 `AUTO`. 사망·중단 구별 정보가 없는 구형 실패 기록은 F를 유지하며, 원시 기록·점수·숫자 순위는 변경하지 않음
   - 기본 `PG / GR / GD` 범위는 `21ms / 65ms / 115ms` (BMS RANK EASY)
   - BMS `#RANK` EASY(누락 포함)/NORMAL/HARD/VERYHARD의 PG는 `21/18/15/8ms`; NORMAL/HARD/VERYHARD는 EASY의 PG/GR/GD/BAD 전체에 `18/21`, `15/21`, `8/21`을 적용하고 자동 미스 시점은 유지
   - [최신 판정 범위·RANK별 표·롱노트 규칙](judgement-windows.md)
   - `Judge Easy`는 RANK 적용 후 PG/GR/GD와 홀드 허용창을 `1.35x`로 넓힘. EASY 기준 PG/GR/GD=`28.35/87.75/155.25ms`; BAD는 모든 RANK에서 `210ms` 고정이며 `mask` 유지
   - `Judge Hard`는 EASY 기준 PG/GR/GD=`17.5/55.714286/98.571429ms`. PG에는 `17.5/21`, GR/GD에는 `18/21`을 곱하여 RANK 비율을 유지하고 BAD는 모든 RANK에서 `225ms` 고정. 홀드 허용창 유지
   - 기본 Normal/Easy/Hard 모두 무입력 노트가 `340ms`를 초과하면 자동 미스. BAD창 밖의 늦은 입력은 이전 노트를 미스 처리하고 다음 노트를 검사하므로 BAD창이 자동미스 시점까지 넓어지지 않음
-  - 새 플레이는 `tenriff-native-score-v2-ruleset-5`를 기록합니다. R3는 이전 Easy/Hard 창과 RANK·LN 해제 규칙을 보존합니다. R1/R2는 PG20ms·RANK 미적용·이전 LN 해제, R1은 Easy1.25x/Hard BAD340ms/자동 미스=BAD를 유지합니다. 커스텀 판정은 비공식입니다.
+  - 기본/Hard 새 플레이는 `tenriff-native-score-v2-ruleset-5`, EX만 `tenriff-native-score-v2-ruleset-6`을 기록합니다. R1–R5의 과거 판정·Easy·LN 정책을 보존하며 커스텀 판정은 비공식입니다.
   - 같은 레인에서 이전 노트가 이미 `BAD`이고 바로 다음 노트가 `GOOD` 이상으로 명확하면, 이전 노트는 미스로 정리하고 현재 입력은 다음 노트에 배정해 한 번의 누락이 연속 `BAD`로 고정되지 않게 함
   - `Judge Hard`에서 입력 없이 지나간 노트는 콤보를 끊는 간접 `POOR`이자 OD8 `MISS`로 기록되며, 다른 note-consuming 실패는 `BAD` 유지
   - 너무 이른 non-consuming 입력은 LR2 스타일 `POOR`로 처리되고, 결과/리플레이/UI에 다시 표시됨

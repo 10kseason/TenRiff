@@ -56,15 +56,22 @@
         const float button_scale_y = std::max(0.1f, (buttons.bottom - buttons.top) / 564.0f);
         draw_text_clipped(wloc("LET'S PLAY", "시작하기"), d2d_->hud_format.Get(),
                           native_rect("title_native.rect.016", D2D1::RectF(buttons.left, buttons.top - 54, buttons.right, buttons.top - 24)), d2d_->muted_brush.Get());
-        float button_top = buttons.top;
+        const float compact_top = buttons.top + 318.0f * button_scale_y;
+        const float compact_bottom = compact_top + 104.0f * button_scale_y;
+        const float compact_gap = 18.0f;
+        const float compact_width = (buttons.right - buttons.left - compact_gap) * 0.5f;
         const std::array<uint32_t, 4> action_colors = {0x79D8FA, 0xF06B7B, 0xF2F4F7, 0xF2F4F7};
         for (std::size_t index = 0; index < data.title.buttons.size(); ++index) {
             const auto& button = data.title.buttons[index];
             const bool primary = index == 0;
             const uint32_t action_color = action_colors[std::min<std::size_t>(index, 3)];
-            const float height = (primary ? 168.0f : 114.0f) * button_scale_y;
+            const bool compact = index >= 2;
+            const float height = (compact ? 104.0f : (primary ? 168.0f : 114.0f)) * button_scale_y;
             const float entrance_x = 24.0f * (1.0f - native_menu_motion_.entrance(static_cast<float>(index) * 0.055f));
-            const D2D1_RECT_F rect = native_rect("title_native.rect.017", D2D1::RectF(buttons.left + entrance_x, button_top, buttons.right + entrance_x, button_top + height));
+            const float button_top = compact ? compact_top : buttons.top + (primary ? 0.0f : 186.0f * button_scale_y);
+            const float button_left = buttons.left + (index == 3 ? compact_width + compact_gap : 0.0f);
+            const float button_right = compact ? button_left + compact_width : buttons.right;
+            const D2D1_RECT_F rect = native_rect("title_native.rect.017", D2D1::RectF(button_left + entrance_x, button_top, button_right + entrance_x, button_top + height));
             const auto rounded = D2D1::RoundedRect(rect, 14, 14);
             register_hit(rect, MenuHitTargetKind::TitleButton, static_cast<int>(index));
             // The action edge owns the color; a generic white focus underneath
@@ -93,11 +100,12 @@
                 d2d_->text_brush->SetColor(native_palette("title.primary_text", D2D1::ColorF(0xF5F5F5)));
                 d2d_->muted_brush->SetColor(native_palette("title.primary_detail", D2D1::ColorF(0xC2CCD3)));
             }
-            const float label_top = rect.top + (primary ? 32.0f : 18.0f);
+            const float label_top = compact ? (rect.top + rect.bottom - 50.0f) * 0.5f
+                                            : rect.top + (primary ? 32.0f : 18.0f);
             draw_text_clipped(to_wide(button.label), d2d_->menu_button_format.Get(),
                               native_rect("title_native.rect.018", D2D1::RectF(rect.left + 28, label_top, rect.right - 96, label_top + 50)),
                               d2d_->text_brush.Get());
-            draw_text_clipped(to_wide(button.detail), d2d_->body_format.Get(),
+            if (!compact) draw_text_clipped(to_wide(button.detail), d2d_->body_format.Get(),
                               native_rect("title_native.rect.019", D2D1::RectF(rect.left + 30, label_top + 56, rect.right - 96, rect.bottom - 14)),
                               d2d_->muted_brush.Get());
             const auto saved_paragraph = d2d_->menu_icon_format->GetParagraphAlignment();
@@ -107,25 +115,29 @@
                 native_menu_assets::kSliders, native_menu_assets::kExit};
             if (primary) {
                 // Icons and edges share a color while the card face stays dark.
-                draw_text_clipped_aligned(L"\u2192", d2d_->menu_icon_format.Get(),
-                    native_rect("title_native.rect.020", D2D1::RectF(rect.right - 84, rect.top, rect.right - 20, rect.bottom)),
-                    semantic_color(action_color), DWRITE_TEXT_ALIGNMENT_CENTER);
+                const auto arrow = native_rect("title_native.rect.020", D2D1::RectF(rect.right - 108, rect.top, rect.right - 28, rect.bottom));
+                const float cy = (arrow.top + arrow.bottom) * 0.5f;
+                const float tip = arrow.right - 8.0f;
+                auto* arrow_brush = semantic_color(action_color);
+                ctx->DrawLine(D2D1::Point2F(arrow.left + 8.0f, cy), D2D1::Point2F(tip, cy), arrow_brush, 3.4f);
+                ctx->DrawLine(D2D1::Point2F(tip - 18.0f, cy - 16.0f), D2D1::Point2F(tip, cy), arrow_brush, 3.4f);
+                ctx->DrawLine(D2D1::Point2F(tip - 18.0f, cy + 16.0f), D2D1::Point2F(tip, cy), arrow_brush, 3.4f);
             } else {
                 const float cy = (rect.top + rect.bottom) * 0.5f;
                 const bool colored_icon = index == 1 || index == 3;
                 const auto icon_color = D2D1::ColorF(action_color);
+                const float icon_half = index == 1 ? 30.0f : 24.0f;
                 draw_native_asset(button_assets[std::min<std::size_t>(index, 3)],
-                    native_rect("title_native.rect.021", D2D1::RectF(rect.right - 78, cy - 24, rect.right - 30, cy + 24)),
+                    native_rect("title_native.rect.021", D2D1::RectF(rect.right - 54.0f - icon_half, cy - icon_half, rect.right - 54.0f + icon_half, cy + icon_half)),
                     colored_icon || button.selected ? 1.0f : 0.65f, 0.0f, &icon_color);
             }
             d2d_->menu_icon_format->SetParagraphAlignment(saved_paragraph);
             d2d_->text_brush->SetColor(saved_text);
             d2d_->muted_brush->SetColor(saved_muted);
-            button_top = rect.bottom + 18.0f * button_scale_y;
         }
-        draw_text_clipped(wloc("UP / DOWN  Select     ENTER or double-click  Open",
-                               "위 / 아래  선택     ENTER 또는 더블클릭  열기"),
-                          d2d_->body_format.Get(), native_rect("title_native.rect.022", D2D1::RectF(buttons.left + 2, buttons.bottom + 42, buttons.right, buttons.bottom + 78)), d2d_->muted_brush.Get());
+        draw_text_clipped(wloc("ARROW KEYS  Select     ENTER or double-click  Open",
+                               "방향키  선택     ENTER 또는 더블클릭  열기"),
+                          d2d_->body_format.Get(), native_rect("title_native.rect.022", D2D1::RectF(buttons.left + 2, compact_bottom + 32, buttons.right, compact_bottom + 68)), d2d_->muted_brush.Get());
 
         const D2D1_RECT_F footer = native_rect("title_native.rect.023", skin_layout_rect(data, "title.footer", D2D1::RectF(64, 972, 1856, 1048)));
         draw_glass_panel(footer, 12, 0.9f, 0, false, 0);

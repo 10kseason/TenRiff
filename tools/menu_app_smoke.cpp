@@ -6,6 +6,7 @@
 // Developer integration smoke. Run only in a newly created sandbox; never point
 // it at an installed game, an account, a real song library, or a user profile.
 #include "app/MenuApp.h"
+#include "app/MenuAppSettingsUtils.h"
 #include "app/GameSession.h"
 #include "app/MenuRecordUtils.h"
 #include "app/ReplayVerifier.h"
@@ -103,6 +104,95 @@ namespace tenriff::app {
 // These existing test friends are defined only in this executable. Menu actions
 // run on their owner thread; the observer reads only mutex-protected HUD data.
 struct MenuAppVisualTestAccess {
+    static void check_home_navigation(MenuApp& app, Report& report) {
+        const int saved_cursor = app.title_cursor_;
+        app.title_cursor_ = 0;
+        key(app, "Down"); key(app, "Down"); key(app, "Right");
+        report.check("title.compact_right_selects_exit", app.title_cursor_ == 3);
+        key(app, "Up");
+        report.check("title.compact_up_selects_multiplayer", app.title_cursor_ == 1);
+        key(app, "Down"); key(app, "Right"); key(app, "Left");
+        report.check("title.compact_left_selects_options", app.title_cursor_ == 2);
+        render::MenuRenderData view;
+        app.populate_title_render_data(view, "Fixture", {});
+        report.check("title.single_play_label", view.title.buttons[0].label == app.ui_text("Single Play", "싱글 플레이"));
+        app.title_cursor_ = saved_cursor;
+        app.publish_snapshot();
+    }
+    static void check_browser_sort_and_range(MenuApp& app, Report& report) {
+        const auto saved_songs = app.indexed_songs_;
+        const auto saved_ui = app.config_.ui;
+        const auto saved_sort = app.song_sort_mode_;
+        const auto saved_group = app.song_group_mode_;
+        const int saved_key = app.song_key_filter_, saved_min = app.song_level_min_filter_, saved_max = app.song_level_max_filter_;
+        const std::string saved_path = app.selected_song_path();
+        app.reset_screen(Screen::SongBrowser);
+        app.config_.ui.difficulty_table_path.clear();
+        app.config_.ui.song_collection_filter = "all";
+        app.song_key_filter_ = app.song_level_min_filter_ = app.song_level_max_filter_ = 0;
+        app.song_group_mode_ = MenuApp::SongGroupMode::None;
+        app.indexed_songs_.clear();
+        for (const auto& item : std::array<std::pair<const char*, int>, 4>{{{"Gamma", 30}, {"Alpha", 2}, {"Beta", 10}, {"Unknown", 0}}}) {
+            auto entry = saved_songs.front();
+            entry.title = item.first; entry.path = std::string(item.first) + ".bms";
+            entry.level = entry.native_level = item.second;
+            entry.difficulty_table_level.clear(); entry.difficulty_table_order = -1;
+            app.indexed_songs_.push_back(std::move(entry));
+        }
+        const auto levels = [&]() {
+            std::vector<int> result;
+            for (std::size_t i = 0; i < app.visible_song_count(); ++i) result.push_back(app.visible_song_entry(i)->level);
+            return result;
+        };
+        app.apply_song_sort(MenuApp::SongSortMode::DifficultyAsc);
+        app.settings_cursor_ = 0;
+        app.publish_snapshot();
+        report.check("filter.numeric_lv_ascending_missing_last", levels() == std::vector<int>({2, 10, 30, 0}));
+        app.selected_song_ = 1;
+        const std::string selected_path = app.selected_song_path();
+        key(app, "Enter");
+        report.check("filter.sort_enter_changes_order", app.song_sort_mode_ == MenuApp::SongSortMode::DifficultyDesc &&
+            levels() == std::vector<int>({30, 10, 2, 0}));
+        report.check("filter.sort_preserves_selected_chart", app.selected_song_path() == selected_path);
+        click(app, Kind::SettingsRow, 0);
+        report.check("filter.sort_value_click_changes_order", app.song_sort_mode_ == MenuApp::SongSortMode::TitleAsc &&
+            app.visible_song_entry(0)->title == "Alpha");
+        app.song_group_mode_ = MenuApp::SongGroupMode::Level;
+        app.apply_song_sort(MenuApp::SongSortMode::DifficultyDesc);
+        report.check("filter.grouped_desc_missing_lv_last", levels() == std::vector<int>({30, 10, 2, 0}));
+        app.song_group_mode_ = MenuApp::SongGroupMode::None;
+        app.publish_snapshot();
+        render::MenuRenderData view;
+        app.populate_song_browser_render_data(view);
+        const auto range = std::find_if(view.generic.rows.begin(), view.generic.rows.end(), [](const auto& row) { return row.row_index == 3; });
+        report.check("filter.range_is_one_row_two_endpoints", view.generic.rows.size() == 11 &&
+            range != view.generic.rows.end() && range->secondary_row_index == 4 && !range->secondary_value.empty());
+        click(app, Kind::SettingsRow, 3, Part::SelectOnly);
+        key(app, "Right");
+        report.check("filter.minimum_keyboard_adjust", app.song_level_min_filter_ == 1 && app.song_level_max_filter_ == 0);
+        key(app, "Enter"); key(app, "Right");
+        report.check("filter.maximum_keyboard_adjust", app.settings_cursor_ == 4 && app.song_level_max_filter_ == 1);
+        click(app, Kind::SettingsRow, 4, Part::Increment);
+        report.check("filter.maximum_mouse_adjust", app.song_level_max_filter_ == 2 && app.visible_song_count() == 1);
+        click(app, Kind::SettingsRow, 3, Part::Decrement);
+        report.check("filter.minimum_mouse_adjust", app.song_level_min_filter_ == 0 && app.song_level_max_filter_ == 2);
+        key(app, "Down");
+        report.check("filter.range_down_skips_duplicate_row", app.settings_cursor_ == 5);
+        key(app, "Up");
+        report.check("filter.range_up_selects_minimum", app.settings_cursor_ == 3);
+        const auto saved = config::ConfigLoader{}.load_profile(app.profile_dir_);
+        report.check("filter.range_saved_both_limits", saved.success() &&
+            saved.config.ui.song_level_min_filter == 0 && saved.config.ui.song_level_max_filter == 2);
+        app.indexed_songs_ = saved_songs;
+        app.config_.ui = saved_ui;
+        app.song_key_filter_ = saved_key; app.song_level_min_filter_ = saved_min; app.song_level_max_filter_ = saved_max;
+        app.song_sort_mode_ = saved_sort; app.song_group_mode_ = saved_group;
+        app.settings_cursor_ = 0;
+        app.rebuild_visible_song_list(&saved_path);
+        app.persist_runtime_config();
+        app.reset_screen(Screen::SongSelect);
+        app.publish_snapshot();
+    }
     static void check_keymap_palette(MenuApp& app, Report& report) {
         const auto saved_skin = app.config_.skin;
         const auto saved_controller = app.keymap_settings_controller_;
@@ -166,9 +256,17 @@ struct MenuAppVisualTestAccess {
         app.publish_snapshot();
     }
     static void select_hard_judge(MenuApp& app, Report& report) {
-        click(app, Kind::SettingsRow, 0, Part::Increment);
-        click(app, Kind::SettingsRow, 0, Part::Increment);
+        constexpr int judge_row = static_cast<int>(menu::settings::ModeSettingId::JudgeWindow);
+        click(app, Kind::SettingsRow, judge_row, Part::Increment);
         report.check("judge.menu_hard_selected", mode_mod_category_value("judge_window", app.config_.mode.mods) == "Judge Hard");
+        click(app, Kind::SettingsRow, judge_row);
+        report.check("judge.value_click_selects_ex", mode_judge_window_label(app.config_.mode.mods, ui::Language::English) == "EX");
+        key(app, "Right");
+        report.check("judge.ex_wraps_to_normal", mode_mod_category_value("judge_window", app.config_.mode.mods) == "Off");
+        key(app, "Left");
+        report.check("judge.normal_wraps_back_to_ex", mode_judge_window_label(app.config_.mode.mods, ui::Language::English) == "EX");
+        key(app, "Left");
+        report.check("judge.keyboard_returns_to_hard", mode_mod_category_value("judge_window", app.config_.mode.mods) == "Judge Hard");
         app.persist_runtime_config();
         const auto saved = config::ConfigLoader{}.load_profile(app.profile_dir_);
         report.check("judge.selection_stays_session_only", saved.success() &&
@@ -723,6 +821,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     report.check("library.indexed_exactly_one_synthetic_chart", indexed);
     if (!indexed) throw std::runtime_error("Synthetic library did not index");
+    Access::check_home_navigation(app, report);
 
     Access::click(app, Kind::TitleButton, 2);
     expect_screen(app, report, "options", Screen::OptionsHub);
@@ -737,11 +836,12 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
         Access::click(app, Kind::OptionsItem, page.index);
         expect_screen(app, report, page.name, page.screen);
         if (page.index == 0) {
+            Access::select_hard_judge(app, report);
             Access::click(app, Kind::SettingsRow,
                 static_cast<int>(tenriff::app::menu::settings::ModeSettingId::Mods), Part::SelectOnly);
             Access::key(app, "Enter");
             expect_screen(app, report, "mode.nested_mods", Screen::ModeMods);
-            Access::select_hard_judge(app, report);
+            report.check("mode.nested_mods_excludes_judge", Access::rows(app) == 7);
             Access::key(app, "Esc");
             expect_screen(app, report, "mode.nested_mods.back", Screen::ModeSelect);
             Access::click(app, Kind::SettingsRow,
@@ -782,6 +882,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
     Access::click(app, Kind::TitleButton, 0);
     expect_screen(app, report, "lobby", Screen::SongSelect);
     Access::check_table_input_and_filter(app, report);
+    Access::check_browser_sort_and_range(app, report);
     Access::check_loading_pacing(app, report);
 
     std::atomic<bool> observing{true};

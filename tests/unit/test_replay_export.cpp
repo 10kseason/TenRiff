@@ -90,15 +90,105 @@ TEST_CASE("native rank thresholds match the TenRiff accuracy ladder") {
         return tenriff::app::menu_records::calculate_rank(stats, false);
     };
 
-    CHECK(rank_for(74.999) == "F");
-    CHECK(rank_for(75.0) == "B");
-    CHECK(rank_for(80.5) == "A");
-    CHECK(rank_for(86.5) == "A+");
-    CHECK(rank_for(90.0) == "S");
-    CHECK(rank_for(95.5) == "S+");
-    CHECK(rank_for(98.0) == "AA");
-    CHECK(rank_for(99.0) == "SS");
-    CHECK(rank_for(99.75) == "SSS");
+    struct Boundary { double accuracy; const char* below; const char* at; };
+    for (const auto& boundary : std::array<Boundary, 7>{{
+             {80.0, "D", "C"}, {85.0, "C", "B"}, {90.0, "B", "A"},
+             {93.0, "A", "A+"}, {95.0, "A+", "S"}, {98.0, "S", "S+"}, {99.0, "S+", "S++"}}}) {
+        // UI rounding must not promote a value just below a grade boundary.
+        CHECK(rank_for(boundary.accuracy - 0.000001) == boundary.below);
+        CHECK(rank_for(boundary.accuracy) == boundary.at);
+        CHECK(rank_for(boundary.accuracy + 0.000001) == boundary.at);
+    }
+    CHECK(rank_for(0.0) == "D");
+    CHECK(rank_for(74.999) == "D");
+    CHECK(rank_for(75.0) == "D");
+    CHECK(rank_for(99.75) == "S++");
+    CHECK(rank_for(100.0) == "S++");
+}
+
+TEST_CASE("native rank separates survival failure abort and autoplay without changing scores") {
+    using tenriff::app::menu_records::calculate_rank;
+    tenriff::gameplay::ResultStats stats;
+    CHECK(calculate_rank(stats, false) == "--");
+    CHECK(calculate_rank(stats, true) == "F");
+
+    stats.counts.pr = 10;
+    stats.total_notes = 10;
+    CHECK(calculate_rank(stats, false) == "D");
+    CHECK(calculate_rank(stats, true) == "F");
+
+    stats.counts = {10, 0, 0, 0, 0};
+    stats.accuracy_points = 9.3;
+    stats.accuracy_weight = 10.0;
+    stats.detailed_accuracy_points = 10.0;
+    stats.detailed_accuracy_weight = 10.0;
+    stats.detail_score = 50;
+    for (const int64_t score : {int64_t{0}, int64_t{1}, int64_t{10'000}}) {
+        stats.raw_score = score;
+        CHECK(calculate_rank(stats, false) == "A+");
+        CHECK(calculate_rank(stats, true) == "F");
+        CHECK(calculate_rank(stats, true, "ABORTED") == "--");
+        CHECK(calculate_rank(stats, true, "ASSIST AUTO SCRATCH ABORTED") == "--");
+        CHECK(calculate_rank(stats, true, "FAILED", true) == "--");
+        CHECK(calculate_rank(stats, true, "AUTOPLAY") == "AUTO");
+        CHECK(calculate_rank(stats, true, "ASSIST AUTOPLAY EX-HARD CLEAR") == "AUTO");
+        CHECK(stats.raw_score == score);
+        CHECK(stats.detail_score == 50);
+        CHECK(stats.accuracy_points == 9.3);
+    }
+}
+
+TEST_CASE("native rank reclassifies legacy result statistics without rewriting source records") {
+    using tenriff::app::menu_records::calculate_rank;
+    const std::filesystem::path path = "legacy_rank_display_test.json";
+    const std::string content = R"JSON({
+      "chart_path":"Songs/test.bms", "game_over":false, "rank":"SSS",
+      "clear_status":"CLEAR", "stats":{
+        "counts":{"pg":95,"gr":5},"total_notes":100,"max_combo":100
+      }
+    })JSON";
+    write_file(path, content);
+    const auto parsed = tenriff::app::menu_records::parse_result_file(path, nullptr);
+    REQUIRE(parsed.has_value());
+    CHECK(parsed->stats.accuracy_percent() == doctest::Approx(99.0));
+    CHECK(calculate_rank(parsed->stats, parsed->game_over, parsed->clear_status, parsed->aborted) == "S++");
+    CHECK(read_file(path) == content);
+    std::error_code ec;
+    std::filesystem::remove(path, ec);
+}
+
+TEST_CASE("native rank reads current weighted accuracy and legacy explicit abort independently of stored score") {
+    using tenriff::app::menu_records::calculate_rank;
+    const std::filesystem::path path = "current_rank_display_test.json";
+    const std::string content = R"JSON({
+      "version":2, "chart_path":"Songs/test.bms", "game_over":false,
+      "clear_status":"CLEAR", "final_score":10000, "stats":{
+        "counts":{"pg":100}, "total_notes":100, "raw_score":10000,
+        "accuracy_points":98.999999, "accuracy_weight":100,
+        "detailed_accuracy_points":100, "detailed_accuracy_weight":100
+      }
+    })JSON";
+    write_file(path, content);
+    const auto parsed = tenriff::app::menu_records::parse_result_file(path, nullptr);
+    REQUIRE(parsed.has_value());
+    CHECK(parsed->final_score == 10'000);
+    CHECK(parsed->stats.detailed_accuracy_percent() == 100.0);
+    CHECK(calculate_rank(parsed->stats, parsed->game_over, parsed->clear_status, parsed->aborted) == "S+");
+    CHECK(read_file(path) == content);
+
+    const std::string aborted = R"JSON({
+      "chart_path":"Songs/test.bms", "game_over":true, "aborted":true,
+      "stats":{"counts":{"pg":2},"total_notes":100}
+    })JSON";
+    write_file(path, aborted);
+    const auto stopped = tenriff::app::menu_records::parse_result_file(path, nullptr);
+    REQUIRE(stopped.has_value());
+    CHECK(stopped->game_over);
+    CHECK(stopped->aborted);
+    CHECK(calculate_rank(stopped->stats, stopped->game_over, stopped->clear_status, stopped->aborted) == "--");
+    CHECK(read_file(path) == aborted);
+    std::error_code ec;
+    std::filesystem::remove(path, ec);
 }
 TEST_CASE("replay export writes JSON with trace events") {
     ReplayFile replay;
@@ -1434,5 +1524,156 @@ TEST_CASE("R5 identity selects chronological processing independently of replay 
         CHECK_FALSE(tenriff::app::is_supported_canonical_replay_ruleset(replay.ruleset_id));
         replay.ruleset_id = "custom";
         CHECK_FALSE(tenriff::app::replay_uses_chronological_judgement(replay));
+    }
+}
+
+TEST_CASE("R6 binds EX exclusively and preserves R1 through R5 judgement identities") {
+    using namespace tenriff::app;
+    const tenriff::config::JudgeConfig judge;
+    const tenriff::game::GaugeConfig gauge;
+    CHECK(replay_ruleset_id_for_runtime(judge, gauge, true, false, "off") == kCanonicalReplayRulesetId);
+    CHECK(replay_ruleset_id_for_runtime(judge, gauge, true, false, "off", {"judge_hard"}) ==
+          kCanonicalReplayRulesetId);
+    CHECK(replay_ruleset_id_for_runtime(judge, gauge, true, false, "off", {"judge_easy"}) ==
+          kCanonicalReplayRulesetId);
+    CHECK(replay_ruleset_id_for_runtime(judge, gauge, true, false, "off", {"judge_ex"}) == kExReplayRulesetId);
+    CHECK(replay_ruleset_id_for_runtime(judge, gauge, false, false, "off", {"judge_ex"}) == "custom-ruleset-6");
+    CHECK(replay_ruleset_id_for_runtime(judge, gauge, true, true, "off", {"judge_ex"}) == "custom-ruleset-6");
+    auto custom_judge = judge;
+    custom_judge.pg_ms = 20.0;
+    CHECK(replay_ruleset_id_for_runtime(custom_judge, gauge, true, false, "off", {"judge_ex"}) == "custom-ruleset-6");
+    CHECK(is_current_canonical_replay_ruleset(kCanonicalReplayRulesetId, {"judge_hard"}));
+    CHECK(is_current_canonical_replay_ruleset(kExReplayRulesetId, {"judge_ex", "no_ln_release"}));
+    CHECK_FALSE(is_current_canonical_replay_ruleset(kExReplayRulesetId, {}));
+    CHECK_FALSE(is_current_canonical_replay_ruleset(kCanonicalReplayRulesetId, {"judge_ex"}));
+    CHECK_FALSE(is_current_canonical_replay_ruleset(kExReplayRulesetId, {"judge_easy", "judge_ex"}));
+    CHECK_FALSE(is_current_canonical_replay_ruleset(kExReplayRulesetId, {"judge_ex", "judge_hard"}));
+    CHECK_FALSE(is_current_canonical_replay_ruleset("custom-ruleset-6", {"judge_ex"}));
+    CHECK(is_supported_canonical_replay_ruleset(kExReplayRulesetId));
+
+    ReplayFile replay;
+    replay.chart_sha256 = std::string(64, 'e');
+    replay.sample_rate = replay.trace.sample_rate = 48000;
+    replay.trace.lane_count = 1;
+    replay.trace.duration_samples = 48000 * 6;
+    replay.ruleset_id = std::string(kExReplayRulesetId);
+    tenriff::gameplay::GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 48000 * 3;
+    chart.notes = {{1, 48000, std::nullopt}};
+    for (const auto& mods : std::vector<std::vector<std::string>>{
+             {}, {"judge_hard"}, {"judge_easy", "judge_ex"}, {"judge_ex", "Judge Hard"}}) {
+        replay.mods = mods;
+        CHECK(verify_replay_against_chart(replay, chart, ChartFormat::Bms).status == ReplayVerificationStatus::Invalid);
+    }
+    replay.mods = {"judge_ex"};
+    for (const auto old : {kLegacyReplayRulesetId, kPreviousReplayRulesetId,
+                           kRuleset3ReplayRulesetId, kRuleset4ReplayRulesetId, kCanonicalReplayRulesetId}) {
+        replay.ruleset_id = old;
+        CHECK(verify_replay_against_chart(replay, chart, ChartFormat::Bms).status == ReplayVerificationStatus::Invalid);
+    }
+    for (int format : {0, 1, 2, tenriff::gameplay::kReplayFormatVersion}) {
+        replay.replay_format_version = format;
+        for (const auto id : {kExReplayRulesetId, std::string_view("custom-ruleset-6")}) {
+            replay.ruleset_id = id;
+            CHECK(replay_uses_chronological_judgement(replay));
+            CHECK_FALSE(replay_uses_legacy_hold_release(replay));
+            const auto policy = replay_judge_config_for_playback(replay, judge, 2);
+            CHECK(policy.pg_ms == doctest::Approx(12.0));
+            CHECK(policy.gr_ms == doctest::Approx(38.20408163265306));
+            CHECK(policy.gd_ms == doctest::Approx(67.59183673469388));
+            CHECK(policy.bd_ms == doctest::Approx(250.0));
+            CHECK(policy.indirect_miss_ms == doctest::Approx(340.0));
+        }
+    }
+}
+
+TEST_CASE("R6 EX replay verifies each RANK hit boundary and keeps the separate 340ms automatic miss") {
+    using namespace tenriff::app;
+    constexpr int sample_rate = 48000;
+    const double windows[][4] = {
+        {5.333333333333333, 16.97959183673469, 30.04081632653061, 250.0},
+        {10.0, 31.83673469387755, 56.32653061224490, 250.0},
+        {12.0, 38.20408163265306, 67.59183673469388, 250.0},
+        {14.0, 44.57142857142857, 78.85714285714286, 250.0}};
+    for (int rank = 0; rank <= 3; ++rank) {
+        tenriff::gameplay::GameplayChart source;
+        source.lane_count = 1;
+        source.bms_rank = rank;
+        source.duration_samples = sample_rate * 3;
+        source.notes = {{1, sample_rate, std::nullopt}};
+        tenriff::config::ModeConfig mode;
+        mode.key_mode = "auto";
+        mode.mods = {"judge_ex"};
+        const auto managed = manage_modes(source, ChartFormat::Bms, mode,
+                                          tenriff::config::JudgeConfig{}, 1.0, 120.0, sample_rate);
+        auto live_chart = managed.chart;
+        tenriff::gameplay::offset_gameplay_chart_samples(live_chart, sample_rate * 3);
+        tenriff::gameplay::GameplayConfig config;
+        config.sample_rate = sample_rate;
+        config.judge = managed.judge;
+        config.chronological_judgement = true;
+        config.gauge_shift_enabled = true;
+
+        for (std::size_t boundary = 0; boundary < 4; ++boundary) {
+            for (int outside : {0, 1}) for (int sign : {-1, 1}) {
+                if (boundary == 3 && outside && sign < 0) continue;
+                tenriff::gameplay::GameplayEngine live(live_chart, config);
+                const int64_t delta = sign * (static_cast<int64_t>(std::llround(windows[rank][boundary] * 48.0)) + outside);
+                (void)live.handle_input(1, InputState::Pressed, sample_rate * 4 + delta);
+                (void)live.handle_input(1, InputState::Released, sample_rate * 4 + delta + 1);
+                live.advance(live_chart.duration_samples);
+                ReplayFile replay;
+                replay.chart_sha256 = std::string(64, 'e');
+                replay.ruleset_id = std::string(kExReplayRulesetId);
+                replay.sample_rate = sample_rate;
+                replay.mods = managed.active_mods;
+                replay.mode.key_mode = "auto";
+                replay.mode.random = "off";
+                replay.mode.gauge = "normal";
+                replay.score_multiplier = managed.final_multiplier;
+                replay.trace = live.replay();
+                replay.stats = live.stats();
+                replay.final_score = tenriff::gameplay::scale_native_score(live.stats().raw_score, managed.final_multiplier);
+                const auto verified = verify_replay_against_chart(replay, source, ChartFormat::Bms, 120.0);
+                REQUIRE(verified.verified());
+                CHECK(verified.claims_match);
+                CHECK(verified.stats.raw_score == live.stats().raw_score);
+                CHECK(verified.final_gauge_value == doctest::Approx(live.gauge_state().value));
+                const auto& counts = verified.stats.counts;
+                const std::array<int, 5> actual{counts.pg, counts.gr, counts.gd, counts.bd, counts.pr};
+                const auto expected = boundary + outside;
+                for (std::size_t index = 0; index < actual.size(); ++index)
+                    CHECK(actual[index] == (index == expected ? 1 : 0));
+            }
+        }
+        tenriff::gameplay::GameplayEngine missed(live_chart, config);
+        missed.advance(sample_rate * 4 + 250 * 48 + 1);
+        CHECK(missed.stats().counts.pr == 0);
+        CHECK(missed.stats().counts.bd == 0);
+        missed.advance(sample_rate * 4 + 340 * 48);
+        CHECK(missed.stats().counts.pr == 0);
+        missed.advance(sample_rate * 4 + 340 * 48 + 1);
+        CHECK(missed.stats().counts.pr == 1);
+        CHECK(missed.stats().counts.bd == 0);
+    }
+}
+
+TEST_CASE("course replay accepts versioned custom identities without admitting canonical course scores") {
+    using namespace tenriff::gameplay;
+    ReplayFile replay;
+    replay.chart_sha256 = std::string(64, 'c');
+    replay.sample_rate = replay.trace.sample_rate = 48000;
+    replay.trace.lane_count = 1;
+    replay.trace.duration_samples = 48000;
+    replay.mode.course_gauge = kLr2CourseGaugeId;
+    replay.mode.course_gauge_initial_value = 37.5;
+    for (const auto id : {"custom", "custom-ruleset-5", "custom-ruleset-6"}) {
+        replay.ruleset_id = id;
+        CHECK(validate_replay_evidence(replay).success());
+    }
+    for (const auto id : {tenriff::app::kCanonicalReplayRulesetId, tenriff::app::kExReplayRulesetId}) {
+        replay.ruleset_id = id;
+        CHECK_FALSE(validate_replay_evidence(replay).success());
     }
 }

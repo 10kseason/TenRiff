@@ -1,12 +1,14 @@
 # TenRiff Docs Map
 
+**2026-10-14 · 1.9.0 / new fixed baseline:** Promotes the reviewed local candidate to the requested release line: independent BMS/TenRiff music volume, lobby/filter/skin controls, grades and SUBARTIST credits, localized mods, EX timing and upload status. Normal/Hard use R5, EX uses R6; historical R1–R5 records and saved settings are preserved. [Baseline](baseline-1.9.0.en.md) · [Release verification scope](release-1.9.0-gate.md). Dated entries below retain their historical release context.
+
 **2026-10-14 · 1.8.9.7:** Input threads request MMCSS Games/High and disable execution-speed power throttling. Home action borders share their icon colors with subtle cached glow. Only TenRiff scene music is reduced to 40%; BMS songs, keysounds and previews retain their original volume scale. The fixed baseline remains 1.8.7; physical input latency improvement is not established. [Scope / 검증](release-1.8.9.7-gate.md).
 
 **2026-10-13 · 1.8.9.6:** Reuse high-resolution timers for short input and gameplay/HUD waits; RawInput wakes on messages. Ships the B comparison behavior while preserving judgement windows, R1–R5, replays and the fixed 1.8.7 baseline. Manual impressions varied between runs; this does not guarantee removal of every stutter. [Scope / 검증](release-1.8.9.6-gate.md).
 
 **2026-10-13 · 1.8.9.5:** R5 processes LN tails and automatic judgements in time order, separates judgement from audio write-ahead, and aligns input/display timing with exact BPM/STOP scroll positions. Restores dark lobby cards with colored icons and moves Master Volume first. R1–R4 and the fixed 1.8.7 baseline are preserved. [Scope and verification](release-1.8.9.5-gate.md).
 
-**Fixed baseline: [1.8.7](baseline-1.8.7.en.md)** (2026-10-10). Use Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`; do not advance it automatically with `latest` or a new release.
+**Fixed baseline: [1.9.0](baseline-1.9.0.en.md)** (explicit user request, 2026-10-14). Use Git tag `1.9.0`; do not advance automatically with `main` or `latest`. Preserve the 1.8.7 baseline and previous releases as history.
 
 **2026-10-13 · 1.8.9.4:** Rearranges the large result rank and score, shows detail accuracy and distinguishes four Gauge Shift CLEAR colors. BGM/keysound volume move to the top of Audio with 100% defaults for new settings. Includes Korean skin-label revisions, explicit obj credits, BPM! changes and correction of duplicate identical audio at the same chart time. Author uploads are optional and existing record identities are retained. [Changes, compatibility and validation (Korean)](release-1.8.9.4-gate.md). Verification and game/web publication are tracked separately; the fixed baseline remains 1.8.7.
 
@@ -20,7 +22,7 @@
 
 **2026-10-12 · 1.8.8:** Combines result analysis, free window sizing and F9 PNG hints, long LN Mix, readability updates, table URL/filter fixes, skin lane shortcuts, preserved keysounds during key-count reduction, and solo start/instant-retry controls. See the [1.8.8 release gate](release-1.8.8-gate.md) for current validation, packages and publication status. The fixed baseline remains 1.8.7.
 
-**Analysis and extension plans:** Separate lane distributions, time-based accuracy and tap/LN-head/release/hold-failure events; unmeasurable misses are never zero-ms samples. Long LN Mix v2 keeps local history/replay only and is excluded from legacy BEST and Sites uploads. Plugins and 1.9.0 stabilization remain plans. [Analysis](result-analysis-1.8.8.ko.md), [display/menu/keysound changes](release-feedback-1.8.8.ko.md), [start/retry controls](gameplay-start-controls.ko.md) (Korean).
+**Analysis and extension plans:** Separate lane distributions, time-based accuracy and tap/LN-head/release/hold-failure events; unmeasurable misses are never zero-ms samples. Long LN Mix v2 keeps local history/replay only and is excluded from legacy BEST and Sites uploads. Plugins remain future work, outside 1.9.0. [Analysis](result-analysis-1.8.8.ko.md), [display/menu/keysound changes](release-feedback-1.8.8.ko.md), [start/retry controls](gameplay-start-controls.ko.md) (Korean).
 
 **2026-10-09 · TenRiff 1.8.7:** Improves input calibration and chart-loading audio, adds LR2 solo Studio Deck, 750ms FAST/SLOW retention, key reassignment, consolidated Options and complete song-title fitting. [1.8.7 release](release-1.8.7-gate.md).
 
@@ -64,8 +66,8 @@ When current-behavior descriptions conflict, check **implementation and regressi
 ## Recommended Reading Order
 1. `docs/current-state.en.md`
    - Current product state, core subsystems, validated commands, and remaining manual verification items
-2. [`docs/baseline-1.8.7.en.md`](baseline-1.8.7.en.md)
-   - The `1.8.7 fixed stable baseline` baseline document that defines what the current work should be stacked on top of
+2. [`docs/baseline-1.9.0.en.md`](baseline-1.9.0.en.md)
+   - The `1.9.0 fixed stable baseline` baseline document that defines what the current work should be stacked on top of
 3. `docs/gameplay-guide.en.md`
    - How to start playing, choose songs, handle controls, and understand the HUD, judgements, and result screen from a practical player perspective
 4. `docs/config.en.md`
@@ -84,8 +86,8 @@ When current-behavior descriptions conflict, check **implementation and regressi
 ## Which Docs Are Source Of Truth
 - `docs/current-state.en.md`
   - Summary of the current implementation state
-- [`docs/baseline-1.8.7.en.md`](baseline-1.8.7.en.md)
-  - The `1.8.7 fixed stable baseline` baseline document that follow-up work should preserve
+- [`docs/baseline-1.9.0.en.md`](baseline-1.9.0.en.md)
+  - The `1.9.0 fixed stable baseline` baseline document that follow-up work should preserve
 - `docs/config.en.md`
   - Based on the actual `config/config.json`, `profiles/<name>/config.json`, and `keymap.json`
 
@@ -111,7 +113,7 @@ When current-behavior descriptions conflict, check **implementation and regressi
 
 ## Practical Rule
 - When checking current behavior, start with `docs/current-state.en.md`.
-- When deciding what baseline to build on, read [`docs/baseline-1.8.7.en.md`](baseline-1.8.7.en.md) together with it.
+- When deciding what baseline to build on, read [`docs/baseline-1.9.0.en.md`](baseline-1.9.0.en.md) together with it.
 - Older design documents and current code can differ, so if there is a conflict, interpret things in the order of current code, then `docs/current-state.en.md`, then `docs/config.en.md`.
 
 ## Audio and Play Settings

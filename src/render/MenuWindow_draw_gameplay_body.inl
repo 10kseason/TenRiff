@@ -491,10 +491,14 @@
             adjusted_indicator.right += static_cast<float>(data.gameplay.timing_bar_offset_x);
             adjusted_indicator.top += static_cast<float>(data.gameplay.timing_bar_offset_y);
             adjusted_indicator.bottom += static_cast<float>(data.gameplay.timing_bar_offset_y);
+            const float bar_scale = hud_font_scale(data.gameplay.timing_bar_scale);
+            const auto bar_center = D2D1::Point2F((adjusted_indicator.left + adjusted_indicator.right) * 0.5f,
+                                                 (adjusted_indicator.top + adjusted_indicator.bottom) * 0.5f);
             ctx->SetTransform(D2D1::Matrix3x2F::Translation(-base_indicator.left,-base_indicator.top) *
                 D2D1::Matrix3x2F::Scale((adjusted_indicator.right-adjusted_indicator.left)/std::max(1.0f,base_indicator.right-base_indicator.left),
                                       (adjusted_indicator.bottom-adjusted_indicator.top)/48.0f) *
-                D2D1::Matrix3x2F::Translation(adjusted_indicator.left,adjusted_indicator.top) * timing_transform);
+                D2D1::Matrix3x2F::Translation(adjusted_indicator.left,adjusted_indicator.top) *
+                D2D1::Matrix3x2F::Scale(bar_scale, bar_scale, bar_center) * timing_transform);
             const float feedback_center_x = (indicator_left + indicator_right) * 0.5f;
             const D2D1_RECT_F indicator_rect =
                 D2D1::RectF(feedback_center_x - kGameplayTimingIndicatorHalfWidth,
@@ -1811,7 +1815,8 @@
             if (note_hold_fill) {
                 note_hold_fill->SetColor(gameplay_note_hold_color(lane_color, native_hold_body_opacity));
             }
-            ID2D1LinearGradientBrush* note_material = d2d_->lane_native_note_brushes[lane_index].Get();
+            ID2D1LinearGradientBrush* note_material = note_shape == "simple_rect" ? nullptr
+                : d2d_->lane_native_note_brushes[lane_index].Get();
             ID2D1LinearGradientBrush* hold_material = d2d_->lane_native_hold_brushes[lane_index].Get();
             ID2D1Bitmap* note_head_bitmap = d2d_->lane_note_head_bitmaps[lane_index].Get();
             ID2D1Bitmap* note_hold_head_bitmap =
@@ -2044,6 +2049,12 @@
                     text_rect.right += static_cast<float>(data.gameplay.timing_text_offset_x);
                     text_rect.top += static_cast<float>(data.gameplay.timing_text_offset_y);
                     text_rect.bottom += static_cast<float>(data.gameplay.timing_text_offset_y);
+                    D2D1_MATRIX_3X2_F saved_timing_text_transform{};
+                    ctx->GetTransform(&saved_timing_text_transform);
+                    const float text_scale = hud_font_scale(data.gameplay.timing_text_scale);
+                    ctx->SetTransform(D2D1::Matrix3x2F::Scale(text_scale, text_scale,
+                        D2D1::Point2F((text_rect.left + text_rect.right) * 0.5f,
+                                     (text_rect.top + text_rect.bottom) * 0.5f)) * saved_timing_text_transform);
                     const auto color = d2d_->text_brush->GetColor();
                     const auto opacity = d2d_->text_brush->GetOpacity();
                     d2d_->text_brush->SetOpacity(opacity);
@@ -2054,6 +2065,7 @@
                                               text_rect, d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
                     d2d_->text_brush->SetColor(color);
                     d2d_->text_brush->SetOpacity(opacity);
+                    ctx->SetTransform(saved_timing_text_transform);
                 }
                 if (show_timing_bar) {
                     draw_timing_indicator(feedback_field.left,
@@ -2469,7 +2481,8 @@
                 if (note_hold_fill) {
                     note_hold_fill->SetColor(gameplay_note_hold_color(lane_color, native_hold_body_opacity));
                 }
-                ID2D1LinearGradientBrush* note_material = d2d_->lane_native_note_brushes[lane_index].Get();
+                ID2D1LinearGradientBrush* note_material = note_shape == "simple_rect" ? nullptr
+                    : d2d_->lane_native_note_brushes[lane_index].Get();
                 ID2D1LinearGradientBrush* hold_material = d2d_->lane_native_hold_brushes[lane_index].Get();
                 ID2D1Bitmap* note_head_bitmap = d2d_->lane_note_head_bitmaps[lane_index].Get();
                 ID2D1Bitmap* note_hold_head_bitmap =

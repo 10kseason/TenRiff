@@ -164,6 +164,8 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.timing_text_offset_y = config_.skin.timing_text_offset_y;
     target.timing_bar_offset_x = config_.skin.timing_bar_offset_x;
     target.timing_bar_offset_y = config_.skin.timing_bar_offset_y;
+    target.timing_text_scale = config_.skin.timing_text_scale;
+    target.timing_bar_scale = config_.skin.timing_bar_scale;
 
     target.show_hold_tail = style_bool(
         manifest_style ? manifest_style->show_hold_tail : std::optional<bool>{},
@@ -603,7 +605,7 @@ bool MenuApp::start_song_preview_audio(const SongSelectScreen::PreviewDecodeResu
     song_select_screen_.preview_gain().store(
         static_cast<float>(menu_background_gain(
             config_.audio_ui.background_sound_enabled,
-            menu_output_master_gain(),
+            menu_output_master_gain() * gameplay_volume_gain(config_.audio_ui.gameplay_volume),
             config_.audio_ui.bgm_volume)),
         std::memory_order_release);
 
@@ -784,7 +786,7 @@ void MenuApp::service_song_preview() {
         song_select_screen_.preview_gain().store(
             static_cast<float>(menu_background_gain(
                 config_.audio_ui.background_sound_enabled,
-                menu_output_master_gain(),
+                menu_output_master_gain() * gameplay_volume_gain(config_.audio_ui.gameplay_volume),
                 config_.audio_ui.bgm_volume)),
             std::memory_order_release);
         return;
@@ -838,7 +840,7 @@ void MenuApp::sync_menu_music() {
         song_select_screen_.preview_gain().store(
             static_cast<float>(menu_background_gain(
                 true,
-                menu_output_master_gain(),
+                menu_output_master_gain() * gameplay_volume_gain(config_.audio_ui.gameplay_volume),
                 config_.audio_ui.bgm_volume)),
             std::memory_order_release);
         menu_music_.stop();
@@ -926,7 +928,7 @@ void MenuApp::sync_menu_music() {
     }
 
     const double gain = tenriff_music_gain(
-        true, config_.audio_ui.master_volume, config_.audio_ui.bgm_volume);
+        true, config_.audio_ui.master_volume, config_.audio_ui.menu_music_volume);
     menu_music_.play_looping_file(music_path, gain);
 }
 
@@ -1105,7 +1107,7 @@ void MenuApp::populate_title_render_data(render::MenuRenderData& render,
     const bool no_songs_indexed = visible_song_count() == 0;
     render.title.buttons = {
         render::MenuButtonData{no_songs_indexed ? ui_text("ADD SONGS FOLDER", "곡 폴더 추가")
-                                                : ui_text("PLAY", "플레이"),
+                                                : ui_text("Single Play", "싱글 플레이"),
                                no_songs_indexed ? u8"＋" : u8"▶",
                                title_cursor_ == 0,
                                no_songs_indexed ? ui_text("Choose a folder containing your BMS charts.", "BMS 차트가 들어 있는 폴더를 선택하세요.")
@@ -1118,7 +1120,7 @@ void MenuApp::populate_title_render_data(render::MenuRenderData& render,
                                ui_text("Close TenRiff.", "텐리프를 종료합니다.")},
     };
     render.title.guides = {
-        ui_text("UP / DOWN or mouse to move", "위 / 아래 또는 마우스로 이동"),
+        ui_text("Arrow keys or mouse to move", "방향키 또는 마우스로 이동"),
         ui_text("ENTER or double-click to open", "ENTER 또는 더블클릭으로 열기"),
         no_songs_indexed
             ? ui_text("PLAY becomes Add Songs Folder until a library is indexed",
@@ -1199,6 +1201,10 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
         render.result.native_level = last_chart_entry_.native_level;
         render.result.rating = last_chart_entry_.rating;
         render.result.bpm = last_chart_entry_.bpm;
+        render.result.has_bpm_changes = last_chart_entry_.has_bpm_changes;
+        render.result.difficulty_label = menu_song_select::song_difficulty_label(last_chart_entry_);
+        render.result.difficulty_is_aery_five_key =
+            menu_song_select::song_difficulty_is_aery_five_key(last_chart_entry_, config_.ui.difficulty_table_url);
         if (!last_chart_entry_.difficulty_table_level.empty()) {
             render.result.difficulty_table_label =
                 last_chart_entry_.difficulty_table_symbol +
@@ -1227,9 +1233,7 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
 
     const game::GaugeType final_gauge_type = gauge_type_from_mode_string(last_final_gauge_);
 
-    render.result.rank = last_clear_status_ == "AUTOPLAY"
-                             ? "AUTO"
-                             : menu_records::calculate_rank(last_result_, last_game_over_);
+    render.result.rank = menu_records::calculate_rank(last_result_, last_game_over_, last_clear_status_);
     render.result.status = !last_clear_status_.empty() ? last_clear_status_
                                                        : (last_game_over_ ? "GAME OVER" : "CLEAR");
     render.result.gauge_label = session_mix_active_
@@ -1270,6 +1274,7 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     render.result.slow_count = last_result_.positive_delta_count;
     render.result.shift_count = static_cast<int>(last_result_.shifts.size());
     render.result.export_warning_count = static_cast<int>(last_export_warnings_.size());
+    render.result.web_upload_status = sites_result_upload_status_;
     render.result.replay_file = filename_only(last_replay_path_);
     render.result.replay_available = false;
     render.result.result_file = filename_only(last_result_path_);
@@ -1709,6 +1714,8 @@ void MenuApp::publish_snapshot() {
     render.ui_text_scale = config::menu_text_scale(config_.ui.menu_font_size);
     render.profile_avatar_revision = profile_avatar_revision_;
     render.ui_font = config::normalize_skin_ui_font_token(config_.skin.ui_font);
+    render.ui_font_path = config_.skin.ui_font_path;
+    render.ui_font_revision = tenriff_skin_revision_;
     if (config::normalize_skin_source_token(config_.skin.source) == "tenriff" &&
         active_tenriff_skin_.found) {
         render.lobby_skin.enabled = true;
@@ -1817,7 +1824,7 @@ void MenuApp::publish_snapshot() {
         publish_start_ns - settings_change_flash_started_ns_ < 900'000'000LL) {
         for (auto& row : render.generic.rows) {
             if (row.target_kind == render::MenuHitTargetKind::SettingsRow &&
-                row.row_index == settings_change_flash_row_) {
+                (row.row_index == settings_change_flash_row_ || row.secondary_row_index == settings_change_flash_row_)) {
                 row.change_flash_started_ns = settings_change_flash_started_ns_;
                 break;
             }
@@ -2707,13 +2714,28 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         return;
     }
     const auto& result = session.result();
+    sites_result_replay_sha256_ = result.replay_sha256;
+    sites_result_upload_status_ = ui_text("Web ranking excluded for this play; local record only.",
+                                         "웹 등록 제외 플레이 · 기록은 로컬에 저장");
+    if (replay_playback) {
+        sites_result_upload_status_ = ui_text("Replay playback does not submit a new web record.",
+                                             "리플레이 재생 · 새 웹 기록을 등록하지 않습니다.");
+    } else if (result.replay_path.empty() || result.replay_sha256.empty()) {
+        sites_result_upload_status_ = ui_text("Web upload unavailable: replay export failed.",
+                                             "웹 등록 불가 · 리플레이 저장 결과 확인 필요");
+    }
     if (result.has_value && !session_aborted && (result.finished || result.game_over) &&
         !replay_playback && !session_mix_active_ && !bms_editor_practice_start_seconds_.has_value() &&
         !result.pause_used &&
         !result.replay_path.empty() && !result.replay_sha256.empty()) {
-        sites_leaderboard_service_.enqueue(path_from_utf8(result.replay_path),
+        const auto queued = sites_leaderboard_service_.enqueue(path_from_utf8(result.replay_path),
                                            result.replay_sha256, last_chart_title_, result.clear_status,
                                            last_chart_entry_valid_ ? last_chart_entry_.chart_author : std::string{});
+        sites_result_upload_status_ = queued == SitesLeaderboardService::EnqueueResult::Queued
+            ? ui_text("Web upload pending...", "웹 기록 전송 중…")
+            : queued == SitesLeaderboardService::EnqueueResult::NotConnected
+                ? ui_text("Web not connected; record saved locally. Connect via F10.", "웹 미연결 · 기록은 로컬에 저장 · F10에서 연결")
+                : ui_text("Web upload queue unavailable; record saved locally.", "웹 전송 대기열 사용 불가 · 로컬 저장");
     }
     std::string ranked_result_message;
     if (result.has_value && !session_aborted && ranked_authorization.valid() &&
@@ -3088,7 +3110,9 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                 ui_text("Autoplay is saved as AUTOPLAY but never awards a clear. Practice remains an ASSIST clear; neither is used as a default ghost best.",
                         "오토플레이 결과는 AUTOPLAY로 저장되지만 클리어로 인정되지 않습니다. 연습 모드는 ASSIST 클리어로 남으며 둘 다 기본 고스트 최고 기록으로 쓰이지 않습니다."),
                 ui_text("Enter on Mods opens the registry-backed Mod Manager for score-multiplier presets.",
-                        "Mods에서 Enter를 누르면 점수 배율 프리셋용 Mod Manager를 엽니다."),
+                        "모드에서 Enter를 누르면 노트·배치·스크래치 설정을 엽니다."),
+                ui_text("Judge Window selects Normal, Hard or EX with Left/Right, Enter or the value button.",
+                        "판정 범위에서 좌우 키·Enter·값 버튼으로 기본·Hard·EX를 고릅니다."),
             };
             target.footer = ui_text("Esc or Backspace saves and refreshes the library if needed.",
                                     "Esc 또는 Backspace로 저장하고, 필요하면 라이브러리를 새로고칩니다.");
@@ -3098,8 +3122,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
             target.lines = {
                 ui_text("Up / Down selects a mod category. Left / Right cycles Off and the registered preset for that category.",
                         "위 / 아래 키로 모드 카테고리를 선택하고, 좌 / 우 키로 끔과 해당 카테고리의 등록 프리셋을 순환합니다."),
-                ui_text("Judge Window, Note Structure, and Hold Rule normalize to one active preset per category.",
-                        "Judge Window, Note Structure, Hold Rule은 카테고리마다 하나의 활성 프리셋만 유지합니다."),
+                ui_text("Each pattern category keeps one active preset. Judge Window is in the parent Key Mode Settings.",
+                        "노트 구성·롱노트 규칙 등 각 항목은 하나의 설정만 적용합니다. 판정 범위는 상위 키 모드 설정에 있습니다."),
                 ui_text("Final score uses the lowest multiplier between the current Rate and all active mods.",
                         "최종 점수는 현재 Rate와 활성 모드 중 가장 낮은 배율을 사용합니다."),
             };

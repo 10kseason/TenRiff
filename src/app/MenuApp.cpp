@@ -958,6 +958,7 @@ std::string MenuApp::ui_skin_source_label(std::string_view token) const {
 
 std::string MenuApp::ui_skin_note_shape_label(std::string_view token) const {
     const std::string normalized = config::normalize_skin_note_shape_token(token);
+    if (normalized == "simple_rect") return ui_text("Rect (Simple)", "사각형(심플)");
     if (normalized == "circle") return ui_text("Circle", "\uC6D0\uD615");
     if (normalized == "triangle") return ui_text("Triangle", "\uC0BC\uAC01\uD615");
     if (normalized == "pentagon") return ui_text("Pentagon", "\uC624\uAC01\uD615");
@@ -1355,11 +1356,13 @@ void MenuApp::run() {
         service_ranked_account_request();
         const auto sites_messages = sites_leaderboard_service_.take_messages();
         if (!sites_messages.empty()) {
-            last_export_warnings_.insert(last_export_warnings_.end(),
-                                         sites_messages.begin(), sites_messages.end());
-            sites_last_upload_status_ = sites_messages.back() == "Sites community record uploaded."
-                ? ui_text("Last record uploaded to the web leaderboard.", "최근 기록을 웹 리더보드에 등록했습니다.")
-                : ui_text("Web upload incomplete. See the result message.", "웹 업로드 미완료. 결과 화면의 메시지를 확인하세요.");
+            for (const auto& message : sites_messages) {
+                const auto summary = sites_upload_status_text(message.text);
+                sites_last_upload_status_ = ui_text(summary.english, summary.korean);
+                if (message.applies_to_result(sites_result_replay_sha256_)) {
+                    sites_result_upload_status_ = sites_last_upload_status_;
+                }
+            }
             sites_connection_status_ = sites_last_upload_status_;
             publish_snapshot();
         }
@@ -2259,15 +2262,16 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
         if (snapshot_.screen != current_screen()) return;
         const auto& rows = snapshot_.render.generic.rows;
         const auto row = std::find_if(rows.begin(), rows.end(), [&](const auto& item) {
-            return item.target_kind == event.kind && item.row_index == event.index;
+            return item.target_kind == event.kind &&
+                (item.row_index == event.index ||
+                 (item.secondary_row_index >= 0 && item.secondary_row_index == event.index));
         });
         if (row == rows.end()) return;
         // Pointer bodies select/help only. Activation belongs to action rows;
         // keyboard Enter retains its existing, separately dispatched behavior.
-        const bool resolution_value = current_screen() == Screen::SettingsGraphics &&
-            event.index == static_cast<int>(menu::settings::GraphicsSettingId::Resolution) && row->value_activatable;
+        const bool value_action = row->value_activatable;
         if (!row->enabled || (event.part == render::MenuHitPart::Activate &&
-                              ((!resolution_value && row->adjustable) || row->slider || !row->activatable))) {
+                              ((!value_action && row->adjustable) || row->slider || !row->activatable))) {
             event.part = render::MenuHitPart::SelectOnly;
         }
     }
@@ -3254,7 +3258,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
             }
             {
                 const std::size_t target = static_cast<std::size_t>(event.index);
-                if (target > mode_mod_categories().size() + 1) {
+                if (target > visible_mode_mod_categories().size() + 1) {
                     return;
                 }
                 const std::size_t previous =
@@ -3351,6 +3355,8 @@ bool MenuApp::handle_settings_shortcut(uint32_t keycode, Screen return_screen) {
 }
 
 void MenuApp::handle_title_input(uint32_t keycode) {
+    const bool compact_actions = !(config::normalize_skin_source_token(config_.skin.source) == "tenriff" &&
+        active_tenriff_skin_.found && !active_tenriff_skin_.native_menu_renderer);
     if (keycode == key_f5_) {
         refresh_song_source(true);
         publish_snapshot();
@@ -3367,12 +3373,17 @@ void MenuApp::handle_title_input(uint32_t keycode) {
     }
 #endif
     if (keycode == key_up_) {
-        title_cursor_ = clamp_int(title_cursor_ - 1, 0, 3);
+        title_cursor_ = compact_actions && title_cursor_ >= 2 ? 1 : clamp_int(title_cursor_ - 1, 0, 3);
         publish_snapshot();
         return;
     }
     if (keycode == key_down_) {
-        title_cursor_ = clamp_int(title_cursor_ + 1, 0, 3);
+        title_cursor_ = clamp_int(title_cursor_ + (compact_actions && title_cursor_ >= 2 ? 0 : 1), 0, 3);
+        publish_snapshot();
+        return;
+    }
+    if (compact_actions && (keycode == key_left_ || keycode == key_right_) && title_cursor_ >= 2) {
+        title_cursor_ = keycode == key_left_ ? 2 : 3;
         publish_snapshot();
         return;
     }
@@ -4611,12 +4622,13 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
         return;
     }
     if (keycode == key_up_) {
-        settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
+        settings_cursor_ = settings_cursor_ == 5 ? 3 : (settings_cursor_ == 4 ? 2 :
+            clamp_int(settings_cursor_ - 1, 0, item_count - 1));
         publish_snapshot();
         return;
     }
     if (keycode == key_down_) {
-        settings_cursor_ = clamp_int(settings_cursor_ + 1, 0, item_count - 1);
+        settings_cursor_ = settings_cursor_ == 3 ? 5 : clamp_int(settings_cursor_ + 1, 0, item_count - 1);
         publish_snapshot();
         return;
     }
@@ -4634,9 +4646,14 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
         apply_filter_refresh();
     };
 
-    if (settings_cursor_ == 0 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 0 && (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
         apply_song_sort(cycle_song_sort_mode(song_sort_mode_, (keycode == key_left_) ? -1 : 1));
-        apply_filter_refresh();
+        publish_snapshot();
+        return;
+    }
+    if ((settings_cursor_ == 3 || settings_cursor_ == 4) && keycode == key_enter_) {
+        settings_cursor_ = settings_cursor_ == 3 ? 4 : 3;
+        publish_snapshot();
         return;
     }
     if (settings_cursor_ == 1 && (keycode == key_left_ || keycode == key_right_)) {

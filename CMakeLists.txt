@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.8.9.7 LANGUAGES C CXX)
+project(TenRiff VERSION 1.9.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -792,6 +792,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_skin_fullscreen_preview.cpp
         tests/unit/test_mode_settings_controller.cpp
         tests/unit/test_config.cpp
+        tests/unit/test_private_ui_font.cpp
         tests/unit/test_skin_preset.cpp
         tests/unit/test_song_source_history.cpp
         tests/unit/test_song_source_aggregate.cpp

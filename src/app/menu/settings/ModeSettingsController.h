@@ -29,9 +29,10 @@ enum class ModeSettingId : std::uint8_t {
     Rate = 15,
     HiSpeed = 16,
     Back = 17,
+    JudgeWindow = 18,
 };
 
-inline constexpr std::array<ModeSettingId, 18> kModeSettingOrder{
+inline constexpr std::array<ModeSettingId, 19> kModeSettingOrder{
     ModeSettingId::Indexing,
     ModeSettingId::IndexDifficulty,
     ModeSettingId::GhostBattle,
@@ -46,6 +47,7 @@ inline constexpr std::array<ModeSettingId, 18> kModeSettingOrder{
     ModeSettingId::Gauge,
     ModeSettingId::Random,
     ModeSettingId::RandomSeed,
+    ModeSettingId::JudgeWindow,
     ModeSettingId::Mods,
     ModeSettingId::Rate,
     ModeSettingId::HiSpeed,

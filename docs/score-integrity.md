@@ -1,5 +1,7 @@
 # 점수 무결성과 Replay 검증
 
+1.9.0 릴리스의 EX는 R6, 기본/Hard는 기존 R5를 사용합니다. 과거 R1–R5 결과를 다시 쓰지 않으며 EX와 이전 판정의 기록을 섞지 않습니다. [EX 정책과 호환 범위](judge-ex-1.9.0.ko.md).
+
 TenRiff의 공식 로컬 베스트는 새 evidence-format replay부터 저장된 점수 숫자를
 그대로 믿지 않습니다. 정확한 차트와 규칙을 다시 구성하고 sample-time 입력 trace를
 headless 게임 엔진에 재실행해 점수, 판정, 게이지, clear 상태를 다시 계산합니다.

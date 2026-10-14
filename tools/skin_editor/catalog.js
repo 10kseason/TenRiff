@@ -774,6 +774,7 @@
           "note_shape": {
             "enum": [
               "rect",
+              "simple_rect",
               "circle",
               "triangle",
               "pentagon",
@@ -1351,6 +1352,7 @@
           "note_shape": {
             "enum": [
               "rect",
+              "simple_rect",
               "circle",
               "triangle",
               "pentagon",

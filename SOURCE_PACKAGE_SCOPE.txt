@@ -1,8 +1,8 @@
-TenRiff 1.8.9 source scope
+TenRiff 1.9.0 source scope
 
-The fixed public baseline is the client-only 1.8.7 release. Its tag and published source archive remain unchanged.
-This 1.8.9 source tree retains the following client-only package scope and privacy boundary; inclusion here is not evidence of an upload or completed package verification. Current implementation, release checks and publication status belong in docs/release-1.8.9-gate.md. The published 1.8.8 tag and archives remain unchanged.
-The 1.8.8 result analysis and release feedback are retained. Lobby/HUD/result updates and the Judge Easy/Hard menu-to-session handoff are implemented in source; the 1.8.9 gate distinguishes completed local checks, performance results/residual limits and remaining package, CI and publication evidence. Plugin host/API/SDK and 1.9.0 stabilization remain plans only; see docs/result-analysis-1.8.8.ko.md. Long LN Mix v2 remains local-history/replay only, excluded from legacy BEST and Sites uploads.
+The fixed public baseline is the client-only 1.9.0 release, explicitly selected on 2026-10-14. Previous baseline documents, tags and published assets remain preserved history.
+This source includes the reviewed feedback candidate: volume, lobby/filter/skin controls, grades/SUBARTIST, localized mods, EX/R6 and upload diagnostics. Normal/Hard remain R5 and R1-R5 historical records are preserved. Implementation, verification and publication boundaries are in docs/release-1.9.0-gate.md and docs/baseline-1.9.0.en.md.
+Plugin runtime/API/SDK and major GameSession extraction are not implemented in this release. Long LN Mix v2 remains local-history/replay only, excluded from legacy BEST and Sites uploads.
 
 Included in versioned source bundles:
 - CHANGELOG.md

@@ -51,6 +51,7 @@
 #include <d3dcompiler.h>
 #include <dwrite.h>
 #include <dwrite_1.h>
+#include "render/PrivateUiFont.h"
 #include <dxgi1_5.h>
 #include <wincodec.h>
 #include <wrl/client.h>
@@ -512,6 +513,7 @@ std::string normalize_gameplay_note_shape(std::string_view value) {
     std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char ch) {
         return static_cast<char>(std::tolower(ch));
     });
+    if (normalized == "simple_rect") return normalized;
     if (normalized == "hex") return "hexagon";
     if (normalized == "circle" || normalized == "triangle" || normalized == "pentagon" ||
         normalized == "hexagon" || normalized == "square" || normalized == "diamond" ||
@@ -1974,6 +1976,23 @@ D2D1_COLOR_F color_from_rgb(uint32_t rgb, float alpha = 1.0f) {
     return D2D1::ColorF(r, g, b, alpha);
 }
 
+// Cache the simple face exactly like the built-in note art. It stays on the
+// existing ordered bitmap batch path and adds no drawing work per falling note.
+bool create_simple_note_bitmap(ID2D1DeviceContext* context, uint32_t lane_color,
+                               float outline, Microsoft::WRL::ComPtr<ID2D1Bitmap>& bitmap) {
+    Microsoft::WRL::ComPtr<ID2D1BitmapRenderTarget> target;
+    if (FAILED(context->CreateCompatibleRenderTarget(D2D1::SizeF(128.0f, 32.0f), &target))) return false;
+    Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> brush;
+    if (FAILED(target->CreateSolidColorBrush(color_from_rgb(lane_color), &brush))) return false;
+    target->BeginDraw();
+    target->Clear(color_from_rgb(lane_color));
+    if (outline > 0.0f) {
+        brush->SetColor(color_from_rgb(blend_rgb(lane_color, 0xFFFFFF, 0.55f), outline));
+        target->DrawRectangle(D2D1::RectF(0.5f, 0.5f, 127.5f, 31.5f), brush.Get(), 1.0f);
+    }
+    return SUCCEEDED(target->EndDraw()) && SUCCEEDED(target->GetBitmap(&bitmap));
+}
+
 float unit_hash_01(uint32_t seed) {
     seed ^= 2747636419u;
     seed *= 2654435769u;
@@ -2045,7 +2064,10 @@ void draw_note_primitive(ID2D1RenderTarget* target,
     const D2D1_ANTIALIAS_MODE saved_antialias = target->GetAntialiasMode();
     target->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
 
-    if (normalized_shape == "circle") {
+    if (normalized_shape == "simple_rect") {
+        target->FillRectangle(shape_rect, fill);
+        if (draw_border && border) target->DrawRectangle(shape_rect, border, border_width);
+    } else if (normalized_shape == "circle") {
         const float diameter = std::max(2.0f, shape_rect.right - shape_rect.left - 2.0f);
         const float radius = diameter * 0.5f;
         const D2D1_ELLIPSE ellipse = D2D1::Ellipse(
@@ -2323,6 +2345,9 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<IDWriteFactory> dwrite_factory;
     Microsoft::WRL::ComPtr<IWICImagingFactory> wic_factory;
     std::wstring ui_font_family;
+    PrivateUiFont private_ui_font;
+    std::string private_ui_font_path;
+    uint64_t private_ui_font_revision = 0;
     uint64_t applied_profile_avatar_revision = 0;
     std::string applied_profile_avatar_path;
     float requested_ui_text_scale = 1.0f;
@@ -2404,8 +2429,11 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<IDWriteTextFormat> result_action_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> grade_format;
     struct GradeBitmap {
+        float text_scale = 1.0f;
+        float fit = 1.0f;
         std::wstring text;
         Microsoft::WRL::ComPtr<IDWriteTextFormat> format;
+        Microsoft::WRL::ComPtr<IDWriteTextLayout> layout;
         Microsoft::WRL::ComPtr<ID2D1Bitmap1> bitmap;
         D2D1_COLOR_F color{};
         float width = 0, height = 0;
@@ -2433,6 +2461,7 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<IDWriteTextFormat> stats_value_format;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> text_brush;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> text_outline_brush;
+    Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> difficulty_prefix_brush;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> accent_brush;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> judgement_line_brush;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> muted_brush;
@@ -3002,6 +3031,14 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
                                    d2d_->lane_key_pressed_bitmaps[index]);
             // Shape selection and the existing outline controls remain authoritative.
             const float outline = data.note_border_enabled ? static_cast<float>(std::clamp(data.note_outline_opacity / 0.78, 0.0, 1.0)) : 0.0f;
+            if (note_shape == "simple_rect") {
+                const float simple_outline = data.note_border_enabled
+                    ? static_cast<float>(std::clamp(data.note_outline_opacity, 0.0, 1.0)) : 0.0f;
+                create_simple_note_bitmap(d2d_->d2d_context.Get(), color, simple_outline,
+                                          d2d_->lane_note_head_bitmaps[index]);
+                d2d_->lane_note_hold_head_bitmaps[index] = d2d_->lane_note_head_bitmaps[index];
+                d2d_->lane_note_tail_bitmaps[index] = d2d_->lane_note_head_bitmaps[index];
+            }
             if (note_shape == "rect" || native_style.sprites.count("note")) {
                 sprite("note", luma_keys_assets::kNote, 32.0f, color,
                                        d2d_->lane_note_head_bitmaps[index], outline);
@@ -5217,11 +5254,12 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family, const app::Native
     if (!d2d_ || !d2d_->dwrite_factory || !ui_family) {
         return false;
     }
-    auto create_text_format = [this, native_style](const wchar_t* family,
+    auto create_text_format = [this, native_style, ui_family](const wchar_t* family,
                                      DWRITE_FONT_WEIGHT weight,
                                      float size,
                                      Microsoft::WRL::ComPtr<IDWriteTextFormat>* out_format, bool preview_font = false) -> bool {
         Microsoft::WRL::ComPtr<IDWriteTextFormat> format;
+        const bool uses_ui_family = family == ui_family;
         std::wstring custom_family;
         if (native_style && !preview_font) {
             // ComPtr operator& releases its object. Role lookup must take the
@@ -5265,13 +5303,16 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family, const app::Native
             size *= d2d_->requested_ui_text_scale;
         }
         const HRESULT hr = d2d_->dwrite_factory->CreateTextFormat(family,
-                                                                  nullptr,
+                                                                  uses_ui_family && custom_family.empty()
+                                                                      ? d2d_->private_ui_font.collection.Get() : nullptr,
                                                                   weight,
                                                                   DWRITE_FONT_STYLE_NORMAL,
                                                                   DWRITE_FONT_STRETCH_NORMAL,
                                                                   size,
                                                                   L"",
                                                                   format.ReleaseAndGetAddressOf());
+        // No explicit font fallback is set: DirectWrite retains its system
+        // fallback list for characters absent from the chosen private font.
         if (FAILED(hr) || !format) {
             return false;
         }

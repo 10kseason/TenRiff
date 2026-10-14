@@ -1,10 +1,12 @@
 # TenRiff Development Roadmap (staged)
 
+**2026-10-14 · 1.9.0 / 새 고정 기준선:** 사용자가 검토한 로컬 후보를 정식 배포 버전으로 올립니다. BMS/텐리프 음악 음량 분리, 로비·필터·스킨 조작, 등급·SUBARTIST 표시, 한글 모드와 EX 판정, 업로드 상태 표시를 포함합니다. 기본/Hard는 R5, EX는 R6이며 R1–R5 기록·기존 설정을 보존합니다. [기준선](baseline-1.9.0.md) · [릴리스 검증 범위](release-1.9.0-gate.md). 아래 날짜별 항목은 당시 릴리스 이력입니다.
+
 **2026-10-14 · 1.8.9.7:** 입력 스레드에 MMCSS Games/High와 전원 스로틀링 해제를 적용하고, 로비 메뉴 테두리를 아이콘 색의 은은한 glow로 표시합니다. 텐리프 자체 메뉴·결과 음악만 기존의 40%로 낮추며 BMS 곡·키음·미리듣기는 원래 음량을 유지합니다. 고정 기준선은 1.8.7이며 물리 입력 지연 개선은 아직 입증되지 않았습니다. [Scope / 검증](release-1.8.9.7-gate.md).
 
 **2026-10-13 · 1.8.9.6:** 입력과 게임 진행/HUD의 짧은 대기에 재사용 고해상도 타이머를 적용하고, RawInput은 메시지가 오면 깨어납니다. B 비교 방식의 제품 적용이며, 수치 판정 창·R1~R5·리플레이·고정 기준 1.8.7을 유지합니다. 실제 체감은 회차마다 달라 모든 움찔의 해결을 보장하지 않습니다. [Scope / 검증](release-1.8.9.6-gate.md).
 
-**고정 기준선: [1.8.7](baseline-1.8.7.md)** (2026-10-10). Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`을 사용하며 `latest`나 새 릴리스로 자동 변경하지 않습니다.
+**고정 기준선: [1.9.0](baseline-1.9.0.md)** (2026-10-14 사용자 요청). Git tag `1.9.0`을 기준으로 하며 `main`이나 `latest`를 따라 자동 변경하지 않습니다. 1.8.7 기준선과 기존 릴리스는 이력으로 보존합니다.
 
 **2026-10-13 · 1.8.9.4:** 결과의 큰 등급·점수 배치와 상세 정확도를 정리하고 Gauge Shift CLEAR 4단계 색을 구분합니다. 오디오의 BGM·키음 음량을 맨 위로 옮기며 새 기본값은 모두 100%입니다. 한국어 스킨 명칭, 명시된 obj 채보자와 BPM! 변속 표시, 같은 시점의 동일 음원 중복 재생 보정을 포함합니다. 채보자 업로드는 선택 사항이며 기존 기록 식별자는 유지합니다. [변경·호환·검증 범위](release-1.8.9.4-gate.md). 검증과 게임·웹 공개 상태는 해당 문서에 별도로 기록하며 고정 기준은 1.8.7입니다.
 
@@ -20,27 +22,16 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current baseline
 - Windows GUI/runtime is the primary supported path.
-- The fixed baseline is `1.8.7` and this source targets `1.8.9.7`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
+- The fixed baseline is `1.9.0` and this source targets `1.9.0`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
 - The active menu/runtime is BMS-family only (`.bms/.bme/.bml/.pms`) and supports native, bundled/profile TenRiff `skin.json`, and LR2 skins.
 - For current shipped behavior, read `docs/current-state.md` first; this roadmap is about direction and remaining work.
 
-## 1.8.8–1.8.9 분석과 1.9.0 안정화 계획 (2026-10-12)
+## 1.9.0 안정화 범위와 이후 계획
 
-2026-10-12 당시 소스는 **1.8.9 릴리스 라인**입니다. 1.8.8의 분석·해상도·LN Mix·키음·시작 조작 위에서 로비·HUD·결과 가독성을 개선하고, 메뉴의 Judge Easy/Hard 선택을 새 세션에 전달하는 수정을 소스에 반영했습니다. 완료한 로컬 검사·성능 측정 결과와 한계, 남은 패키지·CI·공개 단계를 구분합니다. 확정된 동작과 새 검증·공개 상태는 [1.8.9 릴리스 검증](release-1.8.9-gate.md)에 기록합니다. 플러그인 실행 환경·API·SDK는 아직 구현하지 않았으며 `1.9.0`은 향후 안정화 목표입니다. 고정 기준 `1.8.7`, 기존 태그·배포 파일과 1.8.8 기록은 그대로 유지합니다. 뒤의 초기 단계 목록이 미완료 본체 기능 추가를 자동으로 승인하지는 않습니다.
+1.9.0은 현재 검증 후보의 배포와 고정 기준선 전환이다. 위의 음량·설정·화면·크레딧·EX/R6·업로드 진단이 이번 범위이며, 모든 PC의 지연 해결이나 새로운 플러그인 기능 완료를 뜻하지 않는다.
 
-| 단계 | 완료 조건 |
-| --- | --- |
-| 1.8.8 | 레인별 FAST/SLOW·시간대 정확도·단노트/LN 사건·분포와 표본 수, 자유 해상도·결과 PNG·긴 LN Mix, 화면 가독성·메뉴 입력·키음 보존·단독 시작/재시작을 [릴리스 조건](release-1.8.8-gate.md)에 따라 검증 |
-| 1.8.9 | S+ 색을 유지한 로비·Studio HUD·결과 UI와 Judge 세션 전달 수정은 소스에 반영. 극단 필드·성능 오버레이의 상단 정보 숨김을 포함한 [새 릴리스 조건](release-1.8.9-gate.md)의 완료한 로컬 검사·성능 한계와 남은 패키지·CI·공개 단계 구분 |
-| 1.9.0 이전 시험판 | 제한된 읽기 전용 플러그인 API로 대체 결과 분석 화면과 개인 선곡 필터를 본체 코드 수정 없이 구현·검증 |
-| 1.9.0 안정화 이후 | 본체 기능 범위를 유지하고 버그·보안·호환성 수정과 플러그인 계열 확장을 중심으로 관리 |
+이전 1.8.8–1.8.9 계획의 플러그인 선행 조건은 이번 사용자 지정 배포 범위로 대체한다. 플러그인 실행 환경/API/SDK와 GameSession의 큰 구조 분리는 아직 구현하지 않은 별도 후속 작업이다. 향후 플러그인은 입력·오디오·판정·공식 기록의 소유권을 침범하지 않는 읽기 전용 확장부터 검토한다. 본체 버그·호환성·보안 개선은 계속하며 다음 기준선 변경은 다시 명시적 요청과 문서·호환 검증을 필요로 한다.
 
-- **분석 원칙:** 적용 판정에서 의미 있는 LN 항목만 보여 주며 분석을 위해 판정·점수·콤보·게이지 규칙을 바꾸지 않습니다. 일반 LN의 자동 완료는 해제 타이밍 표본이 아닙니다. 측정할 수 없는 미스는 별도 집계하고 `0 ms` 표본으로 넣지 않습니다. 평균과 함께 분포·표본 수·흩어짐을 보여 주어 `−20 ms / +20 ms`가 서로 상쇄되어도 정확한 타건으로 오해하지 않게 합니다. [분석 기준과 상세 계획](result-analysis-1.8.8.ko.md)을 따릅니다.
-- **본체와 플러그인 경계 (계획):** 입력, 오디오 시계, 판정, 점수, 공식 기록 저장·검증, 멀티플레이 규칙·세션은 본체가 소유합니다. 첫 API는 읽기 전용 데이터, 별도 개인 설정·분석 결과 저장, 허용된 결과 화면·선곡 정렬/필터·HUD 영역 및 메뉴 확장만 제공합니다.
-- **실행 격리 (계획):** 외부 코드는 별도 실행 환경에서 처리합니다. 게임은 계산 완료를 기다리지 않고 입력·오디오 경로에서 외부 코드를 직접 호출하지 않습니다. 접근 권한 제한과 실행량/시간 제한을 각각 적용하고 오류·무한 루프·과도한 출력을 격리합니다. 실행 기술과 구체적인 예산은 시험판 검증 후 결정합니다.
-- **멀티플레이 (계획):** 본체가 외부 플러그인 실행과 결과 적용을 차단하고 플러그인이 영향을 준 플레이 상태를 기본 규칙으로 다시 구성합니다. 플러그인의 자발적 비활성화에 의존하지 않으며 개인 키 배치·오디오 오프셋은 유지합니다. 향후 싱글에서 판정·채보·입력을 바꾸는 확장을 허용한다면 해당 기록을 기본 기록과 분리합니다.
-- **API 고정 조건 (계획):** 위 두 샘플을 만들 때마다 엔진을 고쳐야 한다면 API는 아직 고정하지 않습니다. API 문서, 바로 실행되는 샘플, 오류 로그, 플러그인 없이 시작하는 안전 모드를 작은 SDK로 제공합니다. AI와 사용자가 정해진 API와 샘플만으로 모드를 만들 수 있는지 검증합니다.
-- **버전 정책 (계획):** `1.9.0`은 기능·호환성의 안정화선이며 숫자와 파일을 영구 동결한다는 뜻이 아닙니다. 본체 수정판, 플러그인, 공개 API 호환성 버전을 구분하고 기존 모드·기록의 호환성을 검증합니다. 향후 고정 기준 변경은 별도 승인과 문서 동기화를 거칩니다.
 
 ## 0) Fix the skeleton and master clock
 - Treat **AudioThread as the master clock** for all timing-sensitive work.

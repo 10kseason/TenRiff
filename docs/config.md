@@ -46,9 +46,12 @@
   - `none | default | random_bms | last_played`, 기본 `default`. 타이틀·빠른 설정 음악을 없음·기본·랜덤 BMS·마지막 플레이한 곡 중에서 선택합니다. 차트 오디오가 없으면 기본 음악으로 돌아갑니다. BMS는 키음 포함 최대 5분을 비동기로 합성해 반복합니다.
 - `volume` (double)
   - master volume
+- `gameplay_volume` (double)
+  - BMS 곡 전체(반주·키음)와 미리듣기 볼륨. 0–1, 기본 1.0. UI 효과음은 그대로입니다.
+- `menu_music_volume` (double)
+  - 텐리프 자체 메뉴·결과 음악 전용. 0–1, 기본 1.0. 기준 출력은 원음의 10%로, 1.8.9.7의 40%보다 75% 작습니다. BMS 곡과 독립적이며 Windows 볼륨 곡선을 복제하지 않습니다.
 - `bgm_volume` (double)
-  - 새 설정 기본값은 `1.0` (100%). 마스터 음량 바로 다음 행이며, 이미 저장된 프로필 값은 유지합니다.
-  - 1.8.9.7은 텐리프 자체 음악(타이틀·메뉴·선곡 화면·결과)의 기준 출력만 이전의 40%로 낮춥니다. BMS 곡의 배경음·키음·선곡 미리듣기·편집기 미리듣기와 UI 효과음은 원래 스케일을 유지합니다. 표시/저장값과 기존 음량 설정 범위는 그대로이며, Windows 볼륨 40%와 청감이 같다는 의미는 아닙니다.
+  - BMS background submix: 0–2, default 1.0.
 - `normalize_audio` (bool)
   - 인게임 RMS 음량 조절, 기본 false. ON은 기존 RMS→소프트 리미터→마스터 경로, OFF는 선형 마스터→최종 출력 범위 제한만 적용합니다. 메뉴 음악·선곡 미리듣기는 그대로 유지합니다.
 - `keysound_volume` (double)
@@ -90,21 +93,22 @@ ASIO 설정은 [장치 설정 안내](asio-audio.md)를 참고하세요. 선택 
   - 기본값은 `8ms`
 ### `judge`
 
-1.8.9는 메뉴의 Judge Easy/Hard를 새 세션에 명시 전달합니다. 프로필에는 저장하지 않아 앱 재시작 시 Normal로 돌아옵니다. 리플레이 원본과 멀티 공통 규칙이 우선하며 과거 기록·R1–R4 수치는 유지합니다. [원인과 기록·웹 범위](judge-session-handoff-1.8.9.ko.md), [검증 결과와 한계](release-1.8.9-gate.md).
+1.9.0 릴리스는 `옵션 > 키 모드 설정 > 판정 범위`에서 기본/Hard/EX를 선택합니다. Easy는 새 선택지에서 제거하며 예전 리플레이의 Easy는 유지합니다. 실행 중 선택은 프로필에 저장하지 않아 재시작하면 기본으로 돌아갑니다. [EX 수치와 호환 범위](judge-ex-1.9.0.ko.md).
 
 [최신 판정 범위·RANK별 표·롱노트 규칙](judgement-windows.md)
 
-- BMS `#RANK`는 기본 판정에 적용됩니다: `3/EASY` PG21ms, `2/NORMAL` PG18ms, `1/HARD` PG15ms, `0/VERYHARD` PG8ms. EASY의 GR/GD/BAD는 65/115/210ms로 유지하며 나머지 등급은 각각 18/21, 15/21, 8/21배로 줄입니다. 헤더 누락/미지원 값은 EASY입니다. `Judge Easy/Hard` 모드는 이 파일 판정에 추가 적용됩니다. `hold_grace`·`hold_break` 설정과 자동 미스 시점은 RANK로 변경하지 않습니다. 꼬리 PG/GR/GD 판정은 RANK를 반영합니다.
+- BMS `#RANK`는 기본 판정에 적용됩니다: `3/EASY` PG21ms, `2/NORMAL` PG18ms, `1/HARD` PG15ms, `0/VERYHARD` PG8ms. EASY의 GR/GD/BAD는 65/115/210ms로 유지하며 나머지 등급은 각각 18/21, 15/21, 8/21배로 줄입니다. 헤더 누락/미지원 값은 EASY입니다. `Judge Hard/EX` 모드는 이 파일 판정에 추가 적용됩니다. `hold_grace`·`hold_break` 설정과 자동 미스 시점은 RANK로 변경하지 않습니다. 꼬리 PG/GR/GD 판정은 RANK를 반영합니다.
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - 기본 `pg / gr / gd`는 각각 `21ms / 65ms / 115ms`
 - 기본 `bd`는 `210ms`
-- `Judge Easy`는 RANK 적용 후 PG/GR/GD와 홀드 허용창을 `1.35x`로 넓힘. EASY 기준 PG/GR/GD=`28.35/87.75/155.25ms`; BAD는 모든 RANK에서 `210ms` 고정이며 `mask` 유지
+- `Judge Easy` (과거 리플레이 전용)는 RANK 적용 후 PG/GR/GD와 홀드 허용창을 `1.35x`로 넓힘. EASY 기준 PG/GR/GD=`28.35/87.75/155.25ms`; BAD는 모든 RANK에서 `210ms` 고정이며 `mask` 유지
 - `Judge Hard`는 EASY 기준 PG/GR/GD=`17.5/55.714286/98.571429ms`. PG에는 `17.5/21`, GR/GD에는 `18/21`을 곱하여 RANK 비율을 유지하고 BAD는 모든 RANK에서 `225ms` 고정. 홀드 허용창 유지
+- `Judge EX`는 EASY 기준 PG/GR/GD=`14/44.571429/78.857143ms`로 Hard의 80%이며 기존 RANK 비율을 유지합니다. BAD는 모든 RANK 250ms, 자동 미스는 별도 340ms, 점수 배율은 Hard와 같은 1.10입니다.
 - `indirect_miss` (double, ms)
   - 현재 프로필에서는 `340ms`로 저장·정규화하며, BAD 판정창과 별도로 무입력 자동 미스 확정 시점을 정함
   - 기본 Normal/Easy/Hard 모두 노트 시각에서 `340ms`를 초과하면 자동 미스. Normal/Easy는 BAD, Hard는 콤보를 끊는 간접 `POOR`/OD8 `MISS`로 기록
   - BAD창 밖이지만 자동 미스 전인 늦은 입력은 BAD 적중으로 인정하지 않고 이전 노트를 미스 처리한 뒤 다음 노트를 검사함
-- 새 플레이는 `tenriff-native-score-v2-ruleset-5`를 기록합니다. R3는 이전 Easy/Hard 창과 RANK·LN 해제 규칙을 보존합니다. R1/R2는 PG20ms·RANK 미적용·이전 LN 해제, R1은 Easy1.25x/Hard BAD340ms/자동 미스=BAD를 유지합니다. 커스텀 판정은 비공식입니다.
+- 기본/Hard 새 플레이는 `tenriff-native-score-v2-ruleset-5`, EX만 `tenriff-native-score-v2-ruleset-6`을 기록합니다. R1–R5의 과거 판정·Easy·LN 정책을 보존하며 커스텀 판정은 비공식입니다.
 - R5는 수치 창을 바꾸지 않고 자동 사건을 시간순으로 처리하며 R1~R4의 이전 처리 순서를 보존합니다. [일관성 수정](release-1.8.9.5-gate.md).
 - `hold_grace` (double, ms; 기본 `80ms`)
   - 설정 호환용 값이며 현재 native 꼬리 PG/GR 경계로 사용하지 않음; `hold_break`의 하한으로 사용
@@ -192,6 +196,7 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
   - 세 값은 모두 상한이며, 실제 추가량은 원본 밀도와 안전창에 따라 더 낮게 나옴
 - `gauge` (string)
   - `normal | hard | ex_hard | easy | shift`
+  - 기본 `ex_hard` (EX). 기존에 저장한 시작 등급은 유지합니다.
 - `random` (string)
   - `off | mirror | rr | frns | sr` (`fr` = `frns`)
 - `random_seed` (int)
@@ -231,8 +236,8 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
   - `auto_scratch`: 실제 BMS 스크래치만 자동 입력. 점수 배율 0%, ASSIST 기록이며 공식 최고 기록·랭킹 제외
 - `song_index_profile` (string)
   - `safe | fast`
-  - `safe`는 대형 라이브러리에서 RAM high-water를 우선 줄이는 기본값
-  - `fast`는 곡 목록용 최소 메타데이터만 읽고 파일 해시, 미리보기, 난이도표, 자체 LV/CR을 생략하는 선택값
+  - 기본 `fast`(빠름·최소). 해시·미리보기·난이도 계산을 생략합니다.
+  - `safe`는 선택 가능한 전체 인덱싱 방식이며, 난이도표는 이 방식을 사용합니다.
 - `calculate_song_index_difficulty` (bool)
   - 기본값은 `false`
   - `false`면 BMS `#PLAYLEVEL`을 메뉴 LV로 유지하고 CPU 비용이 큰 자체 LV/CR 계산을 건너뜀
@@ -291,7 +296,7 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `scratch_position` | `left`, `right`; `left` | 7+1 스크래치 표시 순서만 변경. 입력·판정 레인은 유지. |
 | `lr2_resolution_mode` | `auto`, `sd`, `hd`, `fhd`; `auto` | LR2 좌표 기준 해상도 해석. auto는 파일명 대신 `#DST_NOTE` 좌표를 사용. |
 | `visual_preset` | `classic`, `neon`, `minimal`, `tenriff`; `tenriff` | 메뉴에서 선택하면 시각 옵션 묶음을 재설정. |
-| `note_shape` | `rect`, `circle`, `triangle`, `pentagon`, `hexagon`, `square`, `diamond`, `arrow`; `rect` | 기본 도형 노트 모양. `hex`는 `hexagon`의 호환 별칭. |
+| `note_shape` | `rect`, `simple_rect`, `circle`, `triangle`, `pentagon`, `hexagon`, `square`, `diamond`, `arrow`; `rect` | 기본 도형 노트 모양. `simple_rect`는 사각형(심플): 각진 모서리와 단색 면을 사용하며 기존 `rect` 디자인은 유지됨. 외부 이미지·명시한 벡터 스프라이트가 우선. `hex`는 `hexagon`의 호환 별칭. |
 | `note_image_aspect` | `stretch`, `contain`, `width`; `stretch` | 늘이기 / 비율 유지해 안에 맞추기 / 폭을 고정하고 높이를 비율로 계산. |
 | `preserve_note_image_aspect_ratio` | bool; `false` | 구버전 호환 필드. 명시된 `note_image_aspect`가 우선하며 저장 시 stretch 이외는 true. |
 | `note_border_enabled`, `show_lane_dividers`, `show_judgement_line` | bool; `true` | 각각 노트 테두리, 레인 구분선, 판정선 표시. |
@@ -303,6 +308,7 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `timing_feedback_override` | bool; `false` | 사용자가 표시 설정을 바꾼 후 스킨 매니페스트보다 프로필의 두 표시 값을 우선. |
 | `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | 글자/막대의 독립 X 이동. 기존 판정 주변 배치에 더하는 1920×1080 기준 픽셀. |
 | `timing_text_offset_y`, `timing_bar_offset_y` | double: `-400..400`; `0` | 글자/막대의 독립 Y 이동. 양수는 아래, 음수는 위. 기준 픽셀. |
+| `timing_text_scale`, `timing_bar_scale` | double: `0.50..2`; `1` | FAST/SLOW 글자·막대의 독립 크기 배율. 스킨 설정에서 50–200%, 5% 단위 또는 슬라이더로 조절하며 기본·Studio·Classic·가져온 스킨과 미리보기에 적용. 콤보·판정 크기 및 XY 위치는 그대로 유지. |
 | `show_hold_tail`, `hold_tail_taper_enabled` | bool; `false` | 각각 LN 꼬리 캡 표시, 꼬리 테이퍼. 판정 규칙은 변경하지 않음. |
 | `judgement_line_glow_enabled` | bool; `true` | 판정선 주변 빛 표시. |
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst 밝기. 0이면 끔. |

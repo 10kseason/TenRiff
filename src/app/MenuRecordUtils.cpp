@@ -272,40 +272,49 @@ bool infer_game_over(const gameplay::ResultStats& stats) {
     return false;
 }
 
-std::string calculate_rank(const gameplay::ResultStats& stats, bool game_over) {
+std::string calculate_rank(const gameplay::ResultStats& stats, bool game_over,
+                           std::string_view clear_status, bool aborted) {
+    const std::string status = to_lower_ascii(std::string(clear_status));
+    if (aborted || status == "aborted" ||
+        (status.size() > 8 && status.compare(status.size() - 8, 8, " aborted") == 0)) {
+        return "--";
+    }
+    if (clear_status_is_autoplay(clear_status)) {
+        return "AUTO";
+    }
     if (game_over) {
         return "F";
     }
     const int judged = judged_total(stats.counts);
-    if (judged <= 0) {
+    if (judged <= 0 && stats.counts.pr <= 0 && stats.accuracy_weight <= 0.0) {
         return "--";
     }
+    // Grade uses unrounded categorical accuracy, independently of score,
+    // score multipliers and detailed timing accuracy. Surviving low accuracy
+    // is D; F is reserved for failure after the non-play labels above.
     const double accuracy = calculate_accuracy(stats);
-    if (accuracy >= 99.75) {
-        return "SSS";
-    }
     if (accuracy >= 99.0) {
-        return "SS";
+        return "S++";
     }
     if (accuracy >= 98.0) {
-        return "AA";
-    }
-    if (accuracy >= 95.5) {
         return "S+";
     }
-    if (accuracy >= 90.0) {
+    if (accuracy >= 95.0) {
         return "S";
     }
-    if (accuracy >= 86.5) {
+    if (accuracy >= 93.0) {
         return "A+";
     }
-    if (accuracy >= 80.5) {
+    if (accuracy >= 90.0) {
         return "A";
     }
-    if (accuracy >= 75.0) {
+    if (accuracy >= 85.0) {
         return "B";
     }
-    return "F";
+    if (accuracy >= 80.0) {
+        return "C";
+    }
+    return "D";
 }
 
 bool is_better_record(int64_t candidate_score,

@@ -46,9 +46,12 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - `none | default | random_bms | last_played`、既定は `default`。タイトル・初期設定の音楽を「なし・標準・ランダム BMS・最後にプレイした曲」から選択します。曲の音声を読めない場合は標準に戻ります。BMS はキー音を含め最大 5 分を非同期合成し、繰り返し再生します。
 - `volume` (double)
   - master volume
+- `gameplay_volume` (double)
+  - BMS曲全体（伴奏・キー音）と試聴の音量。0–1、既定1.0。UI効果音の音量は維持します。
+- `menu_music_volume` (double)
+  - TenRiffメニュー・結果音楽専用。0–1、既定1.0。原音の10%を基準とし、1.8.9.7の40%基準より75%小さくなります。BMS曲とは独立し、Windowsの音量曲線とは異なります。
 - `bgm_volume` (double)
-  - 新規設定の既定値は `1.0`（100%）。マスター音量の直後に表示し、既存プロファイルの保存値は維持します。
-  - 1.8.9.7では、TenRiff独自の音楽（タイトル・メニュー・選曲画面の背景音楽・結果）の基準出力だけを従来の40%に下げます。BMS楽曲のBGM・キー音・選曲試聴・エディター試聴とUI効果音は元のスケールを維持します。表示値・保存値と音量範囲は変更せず、Windows音量40%と同じ聴感を意味しません。
+  - BMS background submix: 0–2, default 1.0.
 - `normalize_audio` (bool)
   - ゲーム内RMS音量調整。既定false。ONはRMS→ソフトリミッター→マスター、OFFは線形マスター音量→最終出力範囲制限のみ。メニュー音楽と選曲プレビューは変更しません。
 - `keysound_volume` (double)
@@ -90,21 +93,22 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - 既定値は `8ms`
 ### `judge`
 
-1.8.9ソースはメニューのJudge Easy/Hard選択を新しいセッションへ渡します。プロファイルには保存せず、アプリ再起動後はNormalへ戻ります。リプレイ原本とマルチ共通規則を優先し、過去の記録とR1–R4の数値を維持します。[原因・記録・ウェブの範囲](judge-session-handoff-1.8.9.ko.md)、[検証結果と制限](release-1.8.9-gate.md)（韓国語）を参照してください。
+1.9.0リリースでは `Options > Key Mode Settings > Judge Window` から通常/Hard/EXを選択します。Easyは新しい選択肢から外し、過去のリプレイでは維持します。選択は実行中のみ有効で、再起動後は通常に戻ります。[EX判定と互換性](judge-ex-1.9.0.ko.md)（韓国語）。
 
 [最新の判定幅・RANK表・LN規則（韓国語）](judgement-windows.md)
 
-- BMS `#RANK`: `3/EASY` PG21ms、`2/NORMAL` PG18ms、`1/HARD` PG15ms、`0/VERYHARD` PG8ms。EASYのGR/GD/BADは65/115/210msのまま、他の難度は18/21、15/21、8/21倍に縮小します。省略・未対応値はEASY。Judge Easy/Hard MODはその後に適用し、`hold_grace`・`hold_break`設定と自動ミス期限はRANKでは変更しません。終端PG/GR/GD判定にはRANKを適用します。
+- BMS `#RANK`: `3/EASY` PG21ms、`2/NORMAL` PG18ms、`1/HARD` PG15ms、`0/VERYHARD` PG8ms。EASYのGR/GD/BADは65/115/210msのまま、他の難度は18/21、15/21、8/21倍に縮小します。省略・未対応値はEASY。Judge Hard/EX MODはその後に適用し、`hold_grace`・`hold_break`設定と自動ミス期限はRANKでは変更しません。終端PG/GR/GD判定にはRANKを適用します。
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - 既定 `pg / gr / gd` は `21ms / 65ms / 115ms`
 - 既定 `bd` は `210ms`
-- `Judge Easy` はRANK適用後のPG/GR/GDとホールド許容幅を `1.35x` に拡大。EASYのPG/GR/GD=`28.35/87.75/155.25ms`。BADは全RANKで `210ms` 固定、maskは維持
+- `Judge Easy` (過去のリプレイ専用) はRANK適用後のPG/GR/GDとホールド許容幅を `1.35x` に拡大。EASYのPG/GR/GD=`28.35/87.75/155.25ms`。BADは全RANKで `210ms` 固定、maskは維持
 - `Judge Hard` はEASYのPG/GR/GD=`17.5/55.714286/98.571429ms`。RANK適用後にPGへ `17.5/21`、GR/GDへ `18/21` を掛ける。BADは全RANKで `225ms` 固定、ホールド許容幅は維持
+- `Judge EX` はEASY基準PG/GR/GD=`14/44.571429/78.857143ms`（Hardの80%）でRANK比率を維持。BADは全RANKで250ms固定、別の自動ミス期限は340ms、スコア倍率はHardと同じ1.10です。
 - `indirect_miss` (double, ms)
   - 現在のプロファイルでは `340ms` に保存・正規化し、BADの入力判定幅から独立した自動ミスの期限として使用する
   - 標準のNormal/Easy/Hardは未入力ノートが `340ms` を超えると自動ミス。Normal/EasyはBAD、Hardはコンボを切る間接 `POOR` / OD8 `MISS` を記録する
   - BAD範囲外から自動ミス期限までの遅い入力はBADヒットにせず、前のノートをミスにして次のノートを調べる
-- 新しいプレイは `tenriff-native-score-v2-ruleset-5`。R3は以前のEasy/Hard幅とRANK・LN解放規則を維持。R1/R2はPG20ms・RANK無効・旧LN解放、R1はEasy1.25x/Hard BAD340ms/自動ミス=BADも維持。カスタム判定は非公式。
+- 新しい通常/Hardは `tenriff-native-score-v2-ruleset-5`、EXは `tenriff-native-score-v2-ruleset-6` を記録します。過去のR1–R5・Easy・LN規則は維持し、カスタム判定は非公式です。
 - R5は数値の判定幅を変えず自動イベントを時刻順に処理し、R1–R4の旧処理順を保持します。[修正範囲](release-1.8.9.5-gate.md)。
 - `hold_grace` (double, ms; 既定 `80ms`)
   - 設定互換性と `hold_break` の下限のために保持。現在のnative終端PG/GR境界ではない
@@ -192,6 +196,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
   - 3 つとも上限であり、実際の追加量は原曲の密度と safety window によってさらに低くなる
 - `gauge` (string)
   - `normal | hard | ex_hard | easy | shift`
+  - 既定`ex_hard`（EX）。保存済みの開始段階は維持します。
 - `random` (string)
   - `off | mirror | rr | frns | sr` (`fr` = `frns`)
 - `random_seed` (int)
@@ -231,8 +236,8 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
   - `auto_scratch`: 実際のBMS皿だけを自動入力。スコア倍率0%、ASSIST記録で正式な最高記録・ランキングから除外
 - `song_index_profile` (string)
   - `safe | fast`
-  - `safe` は大規模ライブラリで RAM high-water を抑える既定値
-  - `fast` は file hash、preview、difficulty table、native LV/CR を省略する任意の最小 profile
+  - 既定は`fast`（最小）。ハッシュ・試聴・難易度計算を省略します。
+  - `safe`は難易度表で使用する完全スキャンの選択肢です。
 - `calculate_song_index_difficulty` (bool)
   - 既定値は `false`
   - `false` は BMS `#PLAYLEVEL` を menu LV として保持し、CPU 負荷の高い native LV/CR 計算を省略
@@ -291,7 +296,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | `scratch_position` | `left`, `right`; `left` | 7+1 の皿の表示順のみ変更。入力・判定レーンは維持。 |
 | `lr2_resolution_mode` | `auto`, `sd`, `hd`, `fhd`; `auto` | LR2 の座標解像度。auto はファイル名ではなく `#DST_NOTE` 座標を使用。 |
 | `visual_preset` | `classic`, `neon`, `minimal`, `tenriff`; `tenriff` | メニューで選ぶと視覚設定の組み合わせを再設定。 |
-| `note_shape` | `rect`, `circle`, `triangle`, `pentagon`, `hexagon`, `square`, `diamond`, `arrow`; `rect` | 標準図形ノートの形。`hex` は `hexagon` の互換用別名。 |
+| `note_shape` | `rect`, `simple_rect`, `circle`, `triangle`, `pentagon`, `hexagon`, `square`, `diamond`, `arrow`; `rect` | 標準図形ノートの形。`simple_rect` は角が直角の単色ノートで、既存の `rect` は維持。外部画像・明示したベクタースプライトが優先。`hex` は `hexagon` の互換用別名。 |
 | `note_image_aspect` | `stretch`, `contain`, `width`; `stretch` | 引き伸ばし / 比率を保って内側に収める / 幅を固定して比率から高さを計算。 |
 | `preserve_note_image_aspect_ratio` | bool; `false` | 旧版互換。明示的な `note_image_aspect` が優先。stretch 以外は true で保存。 |
 | `note_border_enabled`, `show_lane_dividers`, `show_judgement_line` | bool; `true` | ノート枠、レーン区切り線、判定線をそれぞれ表示。 |
@@ -303,6 +308,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | `timing_feedback_override` | bool; `false` | ユーザーが表示を変更した後はプロファイルの設定をスキンより優先。 |
 | `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | 文字とバーの独立X移動。従来の判定周辺配置に加える1920x1080基準ピクセル。 |
 | `timing_text_offset_y`, `timing_bar_offset_y` | double: `-400..400`; `0` | 文字とバーの独立Y移動。正は下、負は上。 |
+| `timing_text_scale`, `timing_bar_scale` | double: `0.50..2`; `1` | FAST/SLOW文字とバーの独立した倍率。50–200%を5%刻みまたはスライダーで調整。Studio、Classic、取り込んだスキンとプレビューに適用し、判定・コンボのサイズやXY位置は変更しない。 |
 | `show_hold_tail`, `hold_tail_taper_enabled` | bool; `false` | LN 尾端キャップ表示とテーパー。判定規則は変更しない。 |
 | `judgement_line_glow_enabled` | bool; `true` | 判定線周囲の発光。 |
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst の明るさ。0 で無効。 |

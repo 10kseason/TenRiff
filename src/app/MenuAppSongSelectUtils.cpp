@@ -8,6 +8,7 @@
 #include <sstream>
 
 #include "app/MenuAppSettingsUtils.h"
+#include "config/BuiltinDifficultyTables.h"
 #include "util/Utf8Compat.h"
 
 namespace tenriff::app::menu_song_select {
@@ -237,6 +238,14 @@ std::string song_difficulty_label(const SongEntry& entry) {
         return "LV " + std::to_string(entry.level);
     }
     return {};
+}
+
+bool song_difficulty_is_aery_five_key(const SongEntry& entry, std::string_view table_url) {
+    // A circled five can also belong to a custom table. Only the verified
+    // built-in 5K Aery identity opts into its mode-colored prefix.
+    return table_url == config::kBuiltinDifficultyTables[0].url && entry.key_count == 5 &&
+           !entry.difficulty_table_level.empty() &&
+           entry.difficulty_table_symbol.rfind("⑤", 0) == 0;
 }
 
 std::string song_index_stage_label(SongIndexProgressStage stage, ui::Language language) {
