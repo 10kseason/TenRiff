@@ -269,9 +269,22 @@ void MenuWindow::draw(const MenuRenderData& data) {
     d2d_->requested_ui_text_scale = menu_ui_text_scale(data.ui_text_scale, data.kind == MenuScreenKind::GameplayHud);
     // Rebuild the text formats when the player picks a different UI font.
     const bool custom_fonts = native_overrides && (!native_style.fonts.empty() || !native_style.metrics.empty());
-    if (const wchar_t* ui_family = data.ui_language == ui::Language::Japanese && data.ui_font == "default"
-                                     ? L"Yu Gothic UI" : ui_font_family_for_token(data.ui_font);
-        d2d_->ui_font_family != ui_family || custom_fonts != native_font_overrides_ ||
+    const std::string_view requested_font_path = data.ui_font == "custom"
+        ? std::string_view(data.ui_font_path) : std::string_view{};
+    const bool font_file_changed = d2d_->private_ui_font_path != requested_font_path ||
+        (!requested_font_path.empty() && d2d_->private_ui_font_revision != data.ui_font_revision);
+    if (font_file_changed) {
+        // Attempt once per selection, before BeginDraw. Missing or invalid files
+        // use the normal language fallback without retrying disk I/O each frame.
+        d2d_->private_ui_font_path = requested_font_path;
+        d2d_->private_ui_font_revision = data.ui_font_revision;
+        static_cast<void>(d2d_->private_ui_font.load(d2d_->dwrite_factory.Get(), d2d_->private_ui_font_path));
+    }
+    const wchar_t* ui_family = d2d_->private_ui_font.collection
+        ? d2d_->private_ui_font.family.c_str()
+        : data.ui_language == ui::Language::Japanese && (data.ui_font == "default" || data.ui_font == "custom")
+            ? L"Yu Gothic UI" : ui_font_family_for_token(data.ui_font);
+    if (font_file_changed || d2d_->ui_font_family != ui_family || custom_fonts != native_font_overrides_ ||
         d2d_->applied_ui_text_scale != d2d_->requested_ui_text_scale ||
         (custom_fonts && native_font_revision_ != data.lobby_skin.revision)) {
         if (create_text_formats(ui_family, custom_fonts ? &native_style : nullptr)) {
@@ -429,7 +442,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
                                          IDWriteTextLayout* layout,
                                          ID2D1Brush* brush,
                                          D2D1_DRAW_TEXT_OPTIONS options = D2D1_DRAW_TEXT_OPTIONS_NONE,
-                                         bool contour = true) {
+                                         bool contour = true,
+                                         ID2D1Brush* first_glyph_brush = nullptr) {
         if (!layout || !brush) return;
         auto* outline = d2d_->text_outline_brush.Get();
         if (outline && contour) {
@@ -446,14 +460,19 @@ void MenuWindow::draw(const MenuRenderData& data) {
                 ctx->DrawTextLayout(D2D1::Point2F(origin.x + offset.x, origin.y + offset.y),
                                     layout, outline, options);
         }
+        // Effects apply only to the fill: outlines keep their existing contrast
+        // color, and cached layouts must not leak a prefix tint to another row.
+        if (first_glyph_brush) layout->SetDrawingEffect(first_glyph_brush, DWRITE_TEXT_RANGE{0, 1});
         ctx->DrawTextLayout(origin, layout, brush, options);
+        if (first_glyph_brush) layout->SetDrawingEffect(nullptr, DWRITE_TEXT_RANGE{0, 1});
     };
     std::size_t menu_text_slot = 0;
     auto draw_text_exact = [&](const wchar_t* text, UINT32 length,
                                IDWriteTextFormat* format, const D2D1_RECT_F& rect,
                                ID2D1Brush* brush,
                                D2D1_DRAW_TEXT_OPTIONS options = D2D1_DRAW_TEXT_OPTIONS_NONE,
-                               DWRITE_MEASURING_MODE = DWRITE_MEASURING_MODE_NATURAL) {
+                               DWRITE_MEASURING_MODE = DWRITE_MEASURING_MODE_NATURAL,
+                               ID2D1Brush* first_glyph_brush = nullptr) {
         const float width = rect.right - rect.left, height = rect.bottom - rect.top;
         if (!text || !length || !format || !brush || width <= 0 || height <= 0) return;
         D2DResources::ReadableTextLayout transient;
@@ -485,13 +504,15 @@ void MenuWindow::draw(const MenuRenderData& data) {
             cached.trimming_sign = trimming_sign; cached.line_spacing_method = line_method;
             cached.line_spacing = line_spacing; cached.baseline = baseline;
         }
-        draw_text_layout_readable(D2D1::Point2F(rect.left, rect.top), cached.layout.Get(), brush, options);
+        draw_text_layout_readable(D2D1::Point2F(rect.left, rect.top), cached.layout.Get(), brush, options,
+                                  true, first_glyph_brush);
     };
 
     auto draw_text_clipped = [&](const std::wstring& text,
                                  IDWriteTextFormat* format,
                                  const D2D1_RECT_F& rect,
-                                 ID2D1Brush* brush) {
+                                 ID2D1Brush* brush,
+                                 ID2D1Brush* first_glyph_brush = nullptr) {
         const float width = rect.right - rect.left;
         const float height = rect.bottom - rect.top;
         if (text.empty() || !format || !brush || width <= 0.0f || height <= 0.0f) {
@@ -506,7 +527,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
         if (text_scale >= 0.995f) {
             draw_text_exact(text.c_str(), static_cast<UINT32>(text.size()),
                           format, rect, brush, D2D1_DRAW_TEXT_OPTIONS_CLIP,
-                          DWRITE_MEASURING_MODE_NATURAL);
+                          DWRITE_MEASURING_MODE_NATURAL, first_glyph_brush);
             return;
         }
 
@@ -522,7 +543,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
             rect.top + height / text_scale);
         draw_text_exact(text.c_str(), static_cast<UINT32>(text.size()),
                       format, expanded_rect, brush, D2D1_DRAW_TEXT_OPTIONS_CLIP,
-                      DWRITE_MEASURING_MODE_NATURAL);
+                      DWRITE_MEASURING_MODE_NATURAL, first_glyph_brush);
         ctx->SetTransform(saved_transform);
     };
 
@@ -537,6 +558,32 @@ void MenuWindow::draw(const MenuRenderData& data) {
         const auto saved_alignment = format->GetTextAlignment();
         format->SetTextAlignment(alignment);
         draw_text_clipped(text, format, rect, brush);
+        format->SetTextAlignment(saved_alignment);
+    };
+
+    auto draw_difficulty_label = [&](const std::wstring& text,
+                                     IDWriteTextFormat* format,
+                                     const D2D1_RECT_F& rect,
+                                     ID2D1Brush* base_brush,
+                                     bool aery_five_key,
+                                     DWRITE_TEXT_ALIGNMENT alignment) {
+        if (!format || !base_brush) return;
+        ID2D1Brush* prefix_brush = nullptr;
+        if (aery_five_key && !text.empty() && text.front() == L'\u2464') {
+            // A separate brush is required: semantic_color/key_count_brush
+            // share one mutable brush, which would recolor the whole label.
+            if (!d2d_->difficulty_prefix_brush) {
+                ctx->CreateSolidColorBrush(D2D1::ColorF(key_count_color(5)),
+                    d2d_->difficulty_prefix_brush.ReleaseAndGetAddressOf());
+            }
+            if (d2d_->difficulty_prefix_brush) {
+                d2d_->difficulty_prefix_brush->SetOpacity(base_brush->GetOpacity());
+                prefix_brush = d2d_->difficulty_prefix_brush.Get();
+            }
+        }
+        const auto saved_alignment = format->GetTextAlignment();
+        format->SetTextAlignment(alignment);
+        draw_text_clipped(text, format, rect, base_brush, prefix_brush);
         format->SetTextAlignment(saved_alignment);
     };
 

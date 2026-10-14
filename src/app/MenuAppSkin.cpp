@@ -31,6 +31,7 @@
 #include "app/PortableFileDialog.h"
 #include "config/KeycodeMap.h"
 #include "util/Utf8Compat.h"
+#include "render/PrivateUiFont.h"
 
 namespace tenriff::app {
 
@@ -96,6 +97,30 @@ fs::path tenriff_skin_import_root_path(std::string_view profile_dir) {
 }
 
 #ifdef _WIN32
+std::optional<std::string> pick_ui_font_dialog_utf8() {
+    struct Apartment {
+        HRESULT result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+        ~Apartment() { if (SUCCEEDED(result)) CoUninitialize(); }
+    } apartment;
+    Microsoft::WRL::ComPtr<IFileOpenDialog> dialog;
+    if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER,
+                                IID_PPV_ARGS(&dialog)))) return std::nullopt;
+    DWORD options = 0;
+    if (FAILED(dialog->GetOptions(&options))) return std::nullopt;
+    dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST | FOS_NOCHANGEDIR);
+    const COMDLG_FILTERSPEC filter{L"Fonts (*.ttf; *.otf)", L"*.ttf;*.otf"};
+    dialog->SetFileTypes(1, &filter);
+    dialog->SetTitle(L"Select UI font / UI 폰트 선택");
+    if (FAILED(dialog->Show(nullptr))) return std::nullopt;
+    Microsoft::WRL::ComPtr<IShellItem> item;
+    if (FAILED(dialog->GetResult(&item))) return std::nullopt;
+    PWSTR raw = nullptr;
+    if (FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, &raw)) || !raw) return std::nullopt;
+    const std::string path = fs::path(raw).u8string();
+    CoTaskMemFree(raw);
+    return path;
+}
+
 std::optional<std::string> pick_folder_dialog_utf8() {
     const HRESULT init_hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
     const bool should_uninitialize = SUCCEEDED(init_hr);
@@ -555,6 +580,27 @@ void MenuApp::apply_skin_settings_effects(
     }
 
     switch (effects.boundary_action) {
+        case menu::settings::SkinBoundaryAction::ChooseUiFont:
+#ifdef _WIN32
+            if (const auto picked = pick_ui_font_dialog_utf8()) {
+                Microsoft::WRL::ComPtr<IDWriteFactory> factory;
+                render::PrivateUiFont font;
+                const bool valid = SUCCEEDED(DWriteCreateFactory(DWRITE_FACTORY_TYPE_ISOLATED,
+                    __uuidof(IDWriteFactory), reinterpret_cast<IUnknown**>(factory.GetAddressOf()))) &&
+                    font.load(factory.Get(), *picked);
+                if (valid) {
+                    config_.skin.ui_font_path = *picked;
+                    config_.skin.ui_font = "custom";
+                    ++tenriff_skin_revision_;
+                    effects.merge(skin_settings_controller_.mark_external_change());
+                    skin_status_messages_ = {ui_text("Custom font applied.", "사용자 폰트를 적용했습니다.")};
+                } else {
+                    skin_status_messages_ = {ui_text("Could not load this font. The previous font is kept.",
+                        "폰트를 불러올 수 없습니다. 기존 폰트를 유지합니다.")};
+                }
+            }
+#endif
+            break;
         case menu::settings::SkinBoundaryAction::ExportPreset:
 #ifdef _WIN32
             {
@@ -952,9 +998,15 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     ui_on_off(config_.skin.black_playfield_enabled),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::BlackPlayfield), false, true);
     append_menu_row(render.generic, ui_text("UI Font", "UI 폰트"),
-                    config::skin_ui_font_label(config_.skin.ui_font),
+                    config_.skin.ui_font == "custom" ? ui_text("Custom", "사용자 지정")
+                        : config::skin_ui_font_label(config_.skin.ui_font),
                     false, render::MenuHitTargetKind::SettingsRow,
                     static_cast<int>(SkinSettingsRowId::UiFont), false, true);
+    append_menu_row(render.generic, ui_text("Choose Font File", "폰트 파일 선택"),
+                    config_.skin.ui_font_path.empty() ? ui_text("TTF / OTF", "TTF / OTF")
+                        : path_from_utf8(config_.skin.ui_font_path).filename().u8string(),
+                    false, render::MenuHitTargetKind::SettingsRow,
+                    static_cast<int>(SkinSettingsRowId::UiFontFile), true, false);
     append_menu_row(render.generic, ui_text("Visual Latency", "비주얼 레이턴시"),
                     format_signed_offset_ms(config_.visual_offset_ms),
                     false, render::MenuHitTargetKind::SettingsRow,
@@ -982,6 +1034,16 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TimingBarMode), false, true);
     append_menu_row(render.generic, ui_text("FAST/SLOW Indicator X", "FAST/SLOW 인디케이터 X"), std::to_string(static_cast<int>(config_.skin.timing_text_offset_x)) + " px",
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TimingTextX), false, true);
+    append_slider_menu_row(render.generic, ui_text("FAST/SLOW Indicator Size", "FAST/SLOW 인디케이터 크기"),
+                           format_percent(config_.skin.timing_text_scale),
+                           (config_.skin.timing_text_scale - config::kSkinHudFontScaleMin) /
+                               (config::kSkinHudFontScaleMax - config::kSkinHudFontScaleMin), false,
+                           render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TimingTextSize));
+    append_slider_menu_row(render.generic, ui_text("FAST/SLOW Bar Size", "FAST/SLOW 막대 크기"),
+                           format_percent(config_.skin.timing_bar_scale),
+                           (config_.skin.timing_bar_scale - config::kSkinHudFontScaleMin) /
+                               (config::kSkinHudFontScaleMax - config::kSkinHudFontScaleMin), false,
+                           render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TimingBarSize));
     append_menu_row(render.generic, ui_text("FAST/SLOW Indicator Y", "FAST/SLOW 인디케이터 Y"), std::to_string(static_cast<int>(config_.skin.timing_text_offset_y)) + " px",
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TimingTextY), false, true);
     append_menu_row(render.generic, ui_text("FAST/SLOW Bar X", "FAST/SLOW 막대 X"), std::to_string(static_cast<int>(config_.skin.timing_bar_offset_x)) + " px",
@@ -1094,6 +1156,8 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.skin_preview.timing_text_offset_y = config_.skin.timing_text_offset_y;
     render.generic.skin_preview.timing_bar_offset_x = config_.skin.timing_bar_offset_x;
     render.generic.skin_preview.timing_bar_offset_y = config_.skin.timing_bar_offset_y;
+    render.generic.skin_preview.timing_text_scale = config_.skin.timing_text_scale;
+    render.generic.skin_preview.timing_bar_scale = config_.skin.timing_bar_scale;
 
     render.generic.skin_preview.judgement_offset_x = config_.skin.judgement_offset_x;
     render.generic.skin_preview.combo_offset_x = config_.skin.combo_offset_x;

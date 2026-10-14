@@ -15,6 +15,7 @@
 #include "app/ModeManager.h"
 #include "config/Config.h"
 #include "config/GraphicsResolution.h"
+#include "ui/Localization.h"
 
 namespace tenriff::app {
 
@@ -142,6 +143,86 @@ inline std::string format_decimal(double value) {
 
 inline std::string mode_score_summary(const std::vector<std::string>& mods, double rate) {
     return mode_mod_summary(mods) + " / " + format_multiplier(final_score_multiplier(mods, rate));
+}
+
+// The registry retains legacy judge presets for replay compatibility. Only the
+// nested settings view filters that category; row indices share this one list.
+inline const std::vector<ModeModCategoryDescriptor>& visible_mode_mod_categories() {
+    static const std::vector<ModeModCategoryDescriptor> categories = [] {
+        std::vector<ModeModCategoryDescriptor> result;
+        for (const auto& category : mode_mod_categories())
+            if (category.token != "judge_window") result.push_back(category);
+        return result;
+    }();
+    return categories;
+}
+
+inline std::string mode_judge_window_label(const std::vector<std::string>& mods, ui::Language language) {
+    const auto normalized = normalize_mode_mod_tokens(mods);
+    if (std::find(normalized.begin(), normalized.end(), "judge_ex") != normalized.end()) return "EX";
+    if (std::find(normalized.begin(), normalized.end(), "judge_hard") != normalized.end()) return "Hard";
+    return ui::text(language, "Normal", "기본");
+}
+
+inline std::vector<std::string> cycle_mode_judge_window(const std::vector<std::string>& mods, int direction) {
+    auto normalized = normalize_mode_mod_tokens(mods);
+    int index = 0;
+    for (const auto& token : normalized) {
+        if (token == "judge_hard") index = 1;
+        else if (token == "judge_ex") index = 2;
+    }
+    normalized.erase(std::remove_if(normalized.begin(), normalized.end(), [](const std::string& token) {
+        const auto* descriptor = find_mode_mod_descriptor(token);
+        return descriptor && descriptor->category_token == "judge_window";
+    }), normalized.end());
+    index = (index + (direction < 0 ? 2 : 1)) % 3;
+    if (index == 1) normalized.push_back("judge_hard");
+    else if (index == 2) normalized.push_back("judge_ex");
+    return normalize_mode_mod_tokens(normalized);
+}
+
+inline std::string mode_mod_category_label(const ModeModCategoryDescriptor& category, ui::Language language) {
+    if (category.token == "dp_layout") return ui::text(language, "DP Layout", "더블 플레이 배치");
+    if (category.token == "note_add") return ui::text(language, "Note Add", "노트 추가");
+    if (category.token == "note_structure") return ui::text(language, "Note Structure", "노트 구성");
+    if (category.token == "hold_rule") return ui::text(language, "Hold Rule", "롱노트 규칙");
+    if (category.token == "scratch_assist") return ui::text(language, "Scratch Assist", "스크래치 보조");
+    return std::string(category.label);
+}
+
+inline std::string mode_mod_value_label(const ModeModDescriptor& mod, ui::Language language) {
+    if (mod.token == "dp_flip") return ui::text(language, "DP Flip", "좌우 필드 교환");
+    if (mod.note_add_percent > 0)
+        return ui::text(language, "Note Add ", "노트 추가 ") + std::to_string(mod.note_add_percent) + "%";
+    if (mod.long_note_mix_percent > 0)
+        return ui::text(language, "LN Mix ", "롱노트 혼합 ") + std::to_string(mod.long_note_mix_percent) + "%";
+    if (mod.token == "full_long_notes") return ui::text(language, "Full Long Notes", "모두 롱노트");
+    if (mod.token == "full_short_notes") return ui::text(language, "Full Short Notes", "모두 단노트");
+    if (mod.token == "no_ln_release") return ui::text(language, "No LN Release", "떼기 판정 없음");
+    if (mod.token == "auto_scratch") return ui::text(language, "Auto Scratch (Practice)", "자동 스크래치 (연습)");
+    return std::string(mod.label);
+}
+
+inline std::string mode_mod_category_ui_value(std::string_view category, const std::vector<std::string>& mods,
+                                              ui::Language language) {
+    for (const auto& token : normalize_mode_mod_tokens(mods)) {
+        const auto* mod = find_mode_mod_descriptor(token);
+        if (mod && mod->category_token == category) return mode_mod_value_label(*mod, language);
+    }
+    return ui::text(language, "Off", "끔");
+}
+
+inline std::string mode_patterns_score_summary(const std::vector<std::string>& mods, double rate,
+                                                ui::Language language) {
+    std::string summary;
+    for (const auto& token : normalize_mode_mod_tokens(mods)) {
+        const auto* mod = find_mode_mod_descriptor(token);
+        if (!mod || mod->category_token == "judge_window") continue;
+        if (!summary.empty()) summary += " + ";
+        summary += mode_mod_value_label(*mod, language);
+    }
+    if (summary.empty()) summary = ui::text(language, "Off", "끔");
+    return summary + " / " + format_multiplier(final_score_multiplier(mods, rate));
 }
 
 inline std::vector<std::string> cycle_mode_mod_category(const std::vector<std::string>& active_mods,

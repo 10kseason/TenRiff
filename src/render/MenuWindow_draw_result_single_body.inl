@@ -217,6 +217,7 @@
         };
         if (data.result.analysis_page != 0) {
 #include "MenuWindow_draw_result_analysis.inl"
+            draw_web_upload_status();
             return;
         }
 
@@ -377,30 +378,38 @@
         }
 
         const int display_level = data.result.level > 0 ? data.result.level : data.result.native_level;
-        const std::string mode_label =
-            data.result.key_count > 0 ? std::to_string(data.result.key_count) + "KEY" : "--";
-        const std::array<std::pair<std::string, std::string>, 4> chart_metadata = {{
-            {"BPM", data.result.bpm > 0.0 ? format_decimal(data.result.bpm) : "--"},
-            {result_loc("MODE", "키 모드"), mode_label},
-            {result_loc("LEVEL", "레벨"), display_level > 0 ? std::to_string(display_level) : "--"},
-            {result_loc("GAUGE", "게이지"), localized_result_gauge()},
+        const std::string difficulty_label = !data.result.difficulty_label.empty()
+                                                 ? data.result.difficulty_label
+                                                 : (display_level > 0 ? "LV " + std::to_string(display_level) : "--");
+        const std::array<std::pair<std::string, std::string>, 2> chart_metadata = {{
+            {data.result.has_bpm_changes ? "BPM!" : "BPM",
+             data.result.bpm > 0.0 ? format_decimal(data.result.bpm) : "--"},
+            {"LV", difficulty_label},
         }};
-        const float metadata_width = (song_panel.right - song_panel.left - 88.0f) / 4.0f;
+        const float metadata_width = (song_panel.right - song_panel.left - 88.0f) / 2.0f;
         for (std::size_t index = 0; index < chart_metadata.size(); ++index) {
             const float left = song_panel.left + 44.0f + metadata_width * static_cast<float>(index);
+            auto* value_brush = index == 1 ? semantic_brush(0xC2A0FF) : d2d_->text_brush.Get();
             draw_result_text(chart_metadata[index].first,
                              d2d_->result_label_format.Get(),
                              native_rect("result_single.rect.015", D2D1::RectF(left, song_panel.top + 494.0f,
                                          left + metadata_width - 8.0f, song_panel.top + 522.0f)),
-                             d2d_->muted_brush.Get(),
+                             index == 1 ? value_brush : d2d_->muted_brush.Get(),
                              presentation.information, DWRITE_TEXT_ALIGNMENT_CENTER);
-            draw_result_text(chart_metadata[index].second,
-                             d2d_->song_metadata_value_format.Get(),
-                             native_rect("result_single.rect.016", D2D1::RectF(left, song_panel.top + 522.0f,
-                                         left + metadata_width - 8.0f, song_panel.top + 568.0f)),
-                             modern_library_screen && index == 1 ? key_count_brush(data.result.key_count)
-                                                                  : d2d_->text_brush.Get(),
-                             presentation.information, DWRITE_TEXT_ALIGNMENT_CENTER);
+            const auto value_rect = native_rect("result_single.rect.016", D2D1::RectF(left, song_panel.top + 522.0f,
+                                               left + metadata_width - 8.0f, song_panel.top + 568.0f));
+            if (index == 1) {
+                const float saved_opacity = value_brush->GetOpacity();
+                value_brush->SetOpacity(saved_opacity * presentation.information);
+                draw_difficulty_label(to_wide(chart_metadata[index].second), d2d_->song_metadata_value_format.Get(),
+                                      value_rect, value_brush, data.result.difficulty_is_aery_five_key,
+                                      DWRITE_TEXT_ALIGNMENT_CENTER);
+                value_brush->SetOpacity(saved_opacity);
+            } else {
+                draw_result_text(chart_metadata[index].second, d2d_->song_metadata_value_format.Get(),
+                                 value_rect, value_brush, presentation.information,
+                                 DWRITE_TEXT_ALIGNMENT_CENTER);
+            }
         }
 
         const float prism_bottom = native_metric("result_single.prism_bottom", 715.0f);
@@ -516,8 +525,8 @@
                         158.0f - 5.0f * presentation.score_pulse,
                         prism_center.x + 260.0f,
                         230.0f + 5.0f * presentation.score_pulse));
-        draw_result_text(format_int_with_commas(counted_score) + " / " +
-                             format_int_with_commas(data.result.max_score),
+        draw_result_text(std::to_string(counted_score) + " / " +
+                             std::to_string(data.result.max_score),
                          d2d_->title_format.Get(),
                          score_rect,
                          modern_library_screen ? native_color(0xFFFFFF, 1) : d2d_->text_brush.Get(),
@@ -531,8 +540,8 @@
                          score_alpha,
                          DWRITE_TEXT_ALIGNMENT_CENTER);
         draw_result_text(result_loc("DETAIL SCORE", "상세 점수") + "  " +
-                             format_int_with_commas(data.result.detail_score) + " / " +
-                             format_int_with_commas(data.result.max_detail_score),
+                             std::to_string(data.result.detail_score) + " / " +
+                             std::to_string(data.result.max_detail_score),
                          d2d_->result_label_format.Get(),
                          native_rect("result_single.rect.019", D2D1::RectF(prism_center.x - 180.0f, 238.0f,
                                      prism_center.x + 180.0f, 268.0f)),
@@ -845,7 +854,7 @@
             {"GOOD", std::to_string(data.result.good), percent_for(data.result.good), D2D1::ColorF(0xFFAA60)},
             {"POOR", std::to_string(data.result.poor), percent_for(data.result.poor), D2D1::ColorF(0xFF647A)},
             {"FAIL", std::to_string(data.result.bad), percent_for(data.result.bad), D2D1::ColorF(0xC399FF)},
-            {result_loc("MAX COMBO", "최대 콤보"), format_int_with_commas(data.result.max_combo),
+            {result_loc("MAX COMBO", "최대 콤보"), std::to_string(data.result.max_combo),
              data.result.full_combo ? result_loc("FULL COMBO", "풀 콤보") : "COMBO / " + std::to_string(data.result.total_notes), D2D1::ColorF(0xCBEF6B)},
             {result_loc("ACCURACY", "정확도"), format_decimal(data.result.accuracy) + "%",
              result_loc("DETAIL", "상세") + " " + format_decimal(data.result.detailed_accuracy) + "%", D2D1::ColorF(0x63E9FF)},

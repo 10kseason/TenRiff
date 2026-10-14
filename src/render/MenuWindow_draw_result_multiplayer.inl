@@ -31,7 +31,7 @@
                 const std::string name = (player.rank > 0 ? std::to_string(player.rank) : "--") +
                     "   " + player.name + (player.local ? loc(" / YOU", " / 나") : "");
                 column_text(to_wide(name), 96, 600, y + 16, d2d_->body_format.Get(), ink);
-                column_text(to_wide(player.has_score ? format_int_with_commas(player.score) : "--"),
+                column_text(to_wide(player.has_score ? std::to_string(player.score) : "--"),
                     620, 875, y + 14, d2d_->title_format.Get(), ink);
                 column_text(to_wide(player.has_score ? std::to_string(player.max_combo) : "--"),
                     890, 1070, y + 16, d2d_->body_format.Get(), d2d_->text_brush.Get());

@@ -70,23 +70,26 @@
         return brush;
     };
     // Stable mode accents shared by the library and result metadata.
-    auto key_count_brush = [&](int keys) -> ID2D1SolidColorBrush* {
+    auto key_count_color = [](int keys) -> uint32_t {
         switch (keys) {
-            case 4: return semantic_color(0xFF9BC5);
-            case 5: return semantic_color(0x7EE2A8);
-            case 6: return semantic_color(0x8FB8FF);
-            case 7: return semantic_color(0xC2A0FF);
-            case 8: return semantic_color(0xFFD479);
-            case 9: return semantic_color(0xA9DB72);
-            case 10: return semantic_color(0x63E9F2);
-            case 11: return semantic_color(0xDAC89A);
-            case 12: return semantic_color(0xFFAB75);
-            case 13: return semantic_color(0x9EA7F5);
-            case 14: return semantic_color(0x81D5CF);
-            case 15: return semantic_color(0xE4B4EF);
-            case 16: return semantic_color(0xFF7F8C);
-            default: return semantic_color(0xECF6FF);
+            case 4: return 0xFF9BC5;
+            case 5: return 0x7EE2A8;
+            case 6: return 0x8FB8FF;
+            case 7: return 0xC2A0FF;
+            case 8: return 0xFFD479;
+            case 9: return 0xA9DB72;
+            case 10: return 0x63E9F2;
+            case 11: return 0xDAC89A;
+            case 12: return 0xFFAB75;
+            case 13: return 0x9EA7F5;
+            case 14: return 0x81D5CF;
+            case 15: return 0xE4B4EF;
+            case 16: return 0xFF7F8C;
+            default: return 0xECF6FF;
         }
+    };
+    auto key_count_brush = [&](int keys) -> ID2D1SolidColorBrush* {
+        return semantic_color(key_count_color(keys));
     };
     auto draw_native_asset = [&](native_menu_assets::Asset asset, const D2D1_RECT_F& rect,
                                  float alpha = 1.0f, float rotation = 0.0f,

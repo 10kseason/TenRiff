@@ -217,19 +217,30 @@
                 text_rect.right += static_cast<float>(data.gameplay.timing_text_offset_x);
                 text_rect.top += static_cast<float>(data.gameplay.timing_text_offset_y);
                 text_rect.bottom += static_cast<float>(data.gameplay.timing_text_offset_y);
+                D2D1_MATRIX_3X2_F saved{}; ctx->GetTransform(&saved);
+                const float text_scale = hud_font_scale(data.gameplay.timing_text_scale);
+                ctx->SetTransform(D2D1::Matrix3x2F::Scale(text_scale, text_scale,
+                    D2D1::Point2F((text_rect.left + text_rect.right) * .5f,
+                                 (text_rect.top + text_rect.bottom) * .5f)) * saved);
                 studio_text(timing_text, ng_font("timing", studio_fonts.studio_timing.Get()), text_rect, timing_color, DWRITE_TEXT_ALIGNMENT_CENTER);
+                ctx->SetTransform(saved);
             }
             if (data.gameplay.show_timing_bar && (data.gameplay.timing_bar_always_visible || has_non_pg_feedback)) {
                 auto timing_rect = ng_rect("timing", D2D1::RectF(center_x - 100, anchor + 16, center_x + 100, anchor + 18));
                 const float cx = (timing_rect.left + timing_rect.right) * .5f + static_cast<float>(data.gameplay.timing_bar_offset_x);
                 const float by = timing_rect.top + static_cast<float>(data.gameplay.timing_bar_offset_y);
                 const float half_width = std::max(1.0f, (timing_rect.right - timing_rect.left) * .5f);
+                D2D1_MATRIX_3X2_F saved{}; ctx->GetTransform(&saved);
+                const float bar_scale = hud_font_scale(data.gameplay.timing_bar_scale);
+                ctx->SetTransform(D2D1::Matrix3x2F::Scale(bar_scale, bar_scale,
+                    D2D1::Point2F(cx, by + 1)) * saved);
                 fill->SetColor(D2D1::ColorF(0x6E7A8C)); ctx->FillRectangle(D2D1::RectF(cx - half_width, by, cx + half_width, by + 2), fill);
                 fill->SetColor(D2D1::ColorF(0xC9CED6)); ctx->FillRectangle(D2D1::RectF(cx - 1, by - 5, cx + 1, by + 7), fill);
                 if (has_timing_feedback) {
                     fill->SetColor(timing_color);
                     ctx->FillEllipse(D2D1::Ellipse(D2D1::Point2F(cx + static_cast<float>(std::clamp(delta / 80.0, -1.0, 1.0)) * half_width, by + 1), 4, 4), fill);
                 }
+                ctx->SetTransform(saved);
             }
             fill->SetColor(saved_color);
         };

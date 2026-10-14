@@ -1,12 +1,14 @@
 # TenRiff 文档地图
 
+**2026-10-14 · 1.9.0 / 新固定基准：** 将已检查的本地候选版提升为指定正式版本，包括BMS/菜单音量分离、大厅/筛选/皮肤操作、等级与SUBARTIST、韩文模式界面、EX判定和上传状态。普通/Hard使用R5，EX使用R6；保留旧R1–R5记录及已保存设置。[固定基准](baseline-1.9.0.zh-CN.md) · [验证范围](release-1.9.0-gate.md)。下方带日期的条目保留当时发布历史。
+
 **2026-10-14 · 1.8.9.7:** 输入线程请求MMCSS Games/High并关闭执行速度电源节流，主页菜单边框使用与图标一致的颜色和柔和缓存辉光。仅将TenRiff自带菜单、结果音乐降至原来的40%，BMS曲目、键音和试听保持原有音量比例。固定基线仍为1.8.7，物理输入延迟改善尚未证实。 [Scope / 검증](release-1.8.9.7-gate.md).
 
 **2026-10-13 · 1.8.9.6:** 输入和游戏推进/HUD的短等待使用可复用的高分辨率计时器，RawInput由消息唤醒。采用对比版本B的方式，保留判定范围、R1–R5、回放和固定基线1.8.7。手动试玩感受随轮次变化，不能保证消除所有卡顿。 [Scope / 검증](release-1.8.9.6-gate.md).
 
 **2026-10-13 · 1.8.9.5:** R5按时间顺序处理LN尾部和自动判定，将判定与音频提前写入分离，并统一输入/显示时间及BPM/STOP边界位置。恢复深色大厅卡片与彩色图标，主音量移至顶部。保留R1–R4及固定基线1.8.7。[范围与验证](release-1.8.9.5-gate.md)。
 
-**固定基准：[1.8.7](baseline-1.8.7.zh-CN.md)**（2026-10-10）。使用 Git tag `1.8.7`、commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`，不随 `latest` 或新版本自动更新。
+**固定基准：[1.9.0](baseline-1.9.0.zh-CN.md)**（2026-10-14明确请求）。使用Git tag `1.9.0`，不随`main`或`latest`自动更新；旧1.8.7基准和既有发布版本保留为历史。
 
 **2026-10-13 · 1.8.9.4:** 调整结果页面的大等级与分数布局，显示详细准确率，并区分四种Gauge Shift CLEAR颜色。将BGM和键音音量移到音频设置顶部，新设置均默认为100%。包含韩文皮肤名称调整、明确标注的obj谱师与BPM!变速提示，以及同一谱面时刻相同音源的重复播放修正。谱师上传为可选项，保留现有记录ID。[变更、兼容性及验证范围（韩文）](release-1.8.9.4-gate.md)。验证和游戏、网页发布状态分别记录，固定基准仍为1.8.7。
 
@@ -20,7 +22,7 @@
 
 **2026-10-12 · 1.8.8：**整合结果分析、自由窗口大小及F9 PNG提示、长LN Mix，并改善显示可读性、难度表URL与筛选、皮肤轨道快捷键、减少键数时的键音保留，以及单人开始和立即重试操作。当前验证、软件包及公开状态见[1.8.8发布说明](release-1.8.8-gate.md)。固定基准仍为1.8.7。
 
-**分析与扩展计划：**区分各轨道分布、时间分段准确度和单键/LN起始、松键、保持失败，无法测量的漏击不作为0ms样本。长LN Mix v2仅保留本地记录与回放，不计入旧BEST或Sites上传。插件与1.9.0稳定化仍为计划。参见[分析标准](result-analysis-1.8.8.ko.md)、[显示/菜单/键音变更](release-feedback-1.8.8.ko.md)、[开始与重试操作](gameplay-start-controls.ko.md)（韩语）。
+**分析与扩展计划：**区分各轨道分布、时间分段准确度和单键/LN起始、松键、保持失败，无法测量的漏击不作为0ms样本。长LN Mix v2仅保留本地记录与回放，不计入旧BEST或Sites上传。插件仍为后续计划，不属于1.9.0。参见[分析标准](result-analysis-1.8.8.ko.md)、[显示/菜单/键音变更](release-feedback-1.8.8.ko.md)、[开始与重试操作](gameplay-start-controls.ko.md)（韩语）。
 
 **2026-10-09 · TenRiff 1.8.7:** 改善输入校准和谱面加载音频，支持LR2单人Studio Deck、750ms FAST/SLOW保留、按键重新分配、选项整合及完整曲名自动缩放。 [1.8.7 release](release-1.8.7-gate.md).
 
@@ -64,8 +66,8 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 ## 推荐阅读顺序
 1. [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)
    - 当前产品状态、核心子系统、已验证命令和仍待手动验证的项目
-2. [`docs/baseline-1.8.7.zh-CN.md`](baseline-1.8.7.zh-CN.md)
-   - 规定当前工作应从哪里继续叠加的 `1.8.7 fixed stable baseline` 基准文档
+2. [`docs/baseline-1.9.0.zh-CN.md`](baseline-1.9.0.zh-CN.md)
+   - 规定当前工作应从哪里继续叠加的 `1.9.0 fixed stable baseline` 基准文档
 3. [`docs/gameplay-guide.zh-CN.md`](gameplay-guide.zh-CN.md)
    - 面向真实游玩的启动方式、选歌、操作、HUD、判定、结果说明
 4. [`docs/config.zh-CN.md`](config.zh-CN.md)
@@ -84,8 +86,8 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 ## 哪些文档算作权威来源
 - [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)
   - 当前实现状态的总结文档
-- [`docs/baseline-1.8.7.zh-CN.md`](baseline-1.8.7.zh-CN.md)
-  - 后续工作必须保持的 `1.8.7 fixed stable baseline` 基准文档
+- [`docs/baseline-1.9.0.zh-CN.md`](baseline-1.9.0.zh-CN.md)
+  - 后续工作必须保持的 `1.9.0 fixed stable baseline` 基准文档
 - [`docs/config.zh-CN.md`](config.zh-CN.md)
   - 以实际的 `config/config.json`、`profiles/<name>/config.json`、`keymap.json` 为准
 
@@ -111,7 +113,7 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 
 ## 实用规则
 - 在确认当前行为时，优先看 [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)。
-- 在确认应当在哪个基准上继续叠加工作时，要同时看 [`docs/baseline-1.8.7.zh-CN.md`](baseline-1.8.7.zh-CN.md)。
+- 在确认应当在哪个基准上继续叠加工作时，要同时看 [`docs/baseline-1.9.0.zh-CN.md`](baseline-1.9.0.zh-CN.md)。
 - 由于较旧的设计文档和当前代码可能不同，若出现冲突，请优先按当前代码、[`docs/current-state.zh-CN.md`](current-state.zh-CN.md)、[`docs/config.zh-CN.md`](config.zh-CN.md) 的顺序解释。
 
 ## 音频与游玩设置

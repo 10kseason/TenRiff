@@ -64,6 +64,22 @@ TEST_CASE("Sites board labels distinguish known timing profiles without claiming
     CHECK(distinct.size() == 5);
 }
 
+TEST_CASE("Sites board display distinguishes EX R6 from historical R5") {
+    using namespace tenriff;
+    const config::JsonValue profile{"bms-easy"};
+    auto payload = sites_timing_board_fixture(&profile, "judge_ex");
+    const auto at = payload.find("tenriff-native-score-v2-ruleset-3");
+    REQUIRE(at != std::string::npos);
+    payload.replace(at, std::string("tenriff-native-score-v2-ruleset-3").size(),
+                    "tenriff-native-score-v2-ruleset-6");
+    std::vector<app::SitesRecordBoard> boards;
+    std::string error;
+    REQUIRE(app::parse_sites_record_boards(payload, "Fixture", boards, error));
+    REQUIRE(boards.size() == 1);
+    CHECK(boards.front().conditions_label.find("RULESET 6 / BMS EASY") != std::string::npos);
+    CHECK(boards.front().conditions_label.find("judge_ex") != std::string::npos);
+}
+
 TEST_CASE("Sites board timing metadata allows old and future profiles but rejects malformed values") {
     using namespace tenriff;
     std::vector<app::SitesRecordBoard> boards;

@@ -52,6 +52,7 @@ struct ModeManagerResult {
                                                const std::vector<std::string>& rhs);
 [[nodiscard]] bool mode_mod_adds_notes(const std::vector<std::string>& tokens);
 [[nodiscard]] bool mode_mod_auto_scratch(const std::vector<std::string>& tokens);
+[[nodiscard]] bool mode_mod_judge_ex(const std::vector<std::string>& tokens);
 [[nodiscard]] bool mode_mod_long_note_mix(const std::vector<std::string>& tokens);
 [[nodiscard]] std::string mode_mod_summary(const std::vector<std::string>& tokens);
 [[nodiscard]] std::string mode_mod_category_value(std::string_view category_token,

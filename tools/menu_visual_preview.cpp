@@ -44,11 +44,14 @@ namespace tenriff::app {
 // MenuApp is never initialized: no profiles, indexing, services or input start.
 struct MenuAppVisualTestAccess {
     static void populate_inner_settings(render::MenuRenderData& source, bool graphics, int selected,
-                                        bool edit_resolution = false, bool invalid_resolution = false) {
+                                         bool edit_resolution = false, bool invalid_resolution = false,
+                                         bool mods = false, std::string_view judge_window = "normal") {
         auto app = std::make_unique<MenuApp>();
         app->config_.ui.language = ui::language_token(source.ui_language);
         source.generic.rows.clear();
         source.generic.notes.clear();
+        if (judge_window == "hard") app->config_.mode.mods = {"judge_hard"};
+        else if (judge_window == "ex") app->config_.mode.mods = {"judge_ex"};
         if (graphics) {
             if (edit_resolution) {
                 using namespace menu::settings;
@@ -65,6 +68,11 @@ struct MenuAppVisualTestAccess {
                     app->graphics_settings_controller_.reset(*id);
             }
             app->populate_graphics_settings_render_data(source);
+        } else if (mods) {
+            app->settings_cursor_ = std::max(0, selected);
+            app->config_.mode.mods.insert(app->config_.mode.mods.end(),
+                {"dp_flip", "note_add_20", "ln_mix_30", "no_ln_release", "auto_scratch"});
+            app->populate_mode_mods_render_data(source);
         } else {
             app->settings_cursor_ = std::max(0, selected);
             app->populate_mode_settings_render_data(source);
@@ -134,6 +142,8 @@ struct MenuAppVisualTestAccess {
         skin.timing_text_offset_y = preview.timing_text_offset_y;
         skin.timing_bar_offset_x = preview.timing_bar_offset_x;
         skin.timing_bar_offset_y = preview.timing_bar_offset_y;
+        skin.timing_text_scale = preview.timing_text_scale;
+        skin.timing_bar_scale = preview.timing_bar_scale;
         skin.show_lane_dividers = preview.show_lane_dividers;
         skin.note_divider_gap_px = preview.note_divider_gap_px;
         skin.show_judgement_line = preview.show_judgement_line;
@@ -308,7 +318,9 @@ struct MenuWindowVisualTestAccess {
             source.generic.heading == ui::text(source.ui_language, "Skin Settings", "스킨 설정");
         const bool inner_settings_fixture = source.kind == MenuScreenKind::GenericList &&
             (source.generic.heading == ui::text(source.ui_language, "Key Mode Settings", "키 모드 설정") ||
-             source.generic.heading == ui::text(source.ui_language, "Graphics Settings", "그래픽 설정"));
+             source.generic.heading == ui::text(source.ui_language, "Graphics Settings", "그래픽 설정") ||
+             source.generic.heading == ui::text(source.ui_language, "Mod Manager", "모드 관리자") ||
+             source.generic.heading == ui::text(source.ui_language, "Filter", "필터"));
         const bool song_fixture = source.kind == MenuScreenKind::SongSelect;
         const bool result_fixture = source.kind == MenuScreenKind::ResultScreen;
         // Sample before the verification render: crossing the reveal boundary
@@ -354,7 +366,8 @@ struct MenuWindowVisualTestAccess {
                     fixture.generic.keymap_keyboard;
                 if (verify && (!control || (!preview_button && visits > 1 &&
                     (region.kind != fixture.generic.rows[visit].target_kind ||
-                     region.index != fixture.generic.rows[visit].row_index)))) continue;
+                     (region.index != fixture.generic.rows[visit].row_index &&
+                      region.index != fixture.generic.rows[visit].secondary_row_index))))) continue;
                 const float x = (region.left + region.right) * 0.5f;
                 const float y = (region.top + region.bottom) * 0.5f;
                 const int window_x = static_cast<int>(std::lround(window.offset_x_ + x * window.scale_));
@@ -462,6 +475,12 @@ struct MenuWindowVisualTestAccess {
                         (source.generic.heading == ui::text(source.ui_language, "Graphics Settings", "그래픽 설정") &&
                          row.row_index == static_cast<int>(app::menu::settings::GraphicsSettingId::Resolution)))
                         require_part(MenuHitPart::Activate);
+                    if (row.secondary_row_index >= 0) {
+                        for (const auto part : {MenuHitPart::SelectOnly, MenuHitPart::Decrement, MenuHitPart::Increment}) {
+                            if (!verified_targets.count({row.secondary_row_index, static_cast<int>(part)}))
+                                failures.emplace_back("required range endpoint hit missing: id=" + std::to_string(row.secondary_row_index));
+                        }
+                    }
                 } else if (row.activatable) require_part(MenuHitPart::Activate);
             }
         }
@@ -473,6 +492,7 @@ struct MenuWindowVisualTestAccess {
         for (const auto& row : source.generic.rows) rows.emplace_back(JsonObject{
             {"id", JsonValue(static_cast<double>(row.row_index))}, {"label", JsonValue(row.label)},
             {"value", JsonValue(row.value)}, {"category", JsonValue(row.category)},
+            {"secondary_id", JsonValue(static_cast<double>(row.secondary_row_index))}, {"secondary_value", JsonValue(row.secondary_value)},
             {"enabled", JsonValue(row.enabled)},
             {"hit_eligible", JsonValue(row.activatable || row.adjustable)}, {"slider", JsonValue(row.slider)}});
         JsonArray notes;
@@ -535,7 +555,9 @@ int main(int argc, char** argv) {
     bool gauge_ramp = false;
     std::string result_grade;
     std::string result_status;
+    std::string web_upload_status;
     std::string chart_author;
+    std::string artist = "TenRiff UI Preview";
     bool bpm_change = false;
     int analysis_page = 0;
     bool analysis_unavailable = false;
@@ -565,6 +587,7 @@ int main(int argc, char** argv) {
     bool indicator_background_off = false;
     bool timing_bar_always = false;
     double timing_text_x = 0, timing_text_y = 0, timing_bar_x = 0, timing_bar_y = 0;
+    double timing_text_scale = 1.0, timing_bar_scale = 1.0;
     bool search_active = false;
     std::string search_query;
     bool skin_scene = false;
@@ -614,7 +637,10 @@ int main(int argc, char** argv) {
     bool result_perfect = false;
     bool reveal = false;
     bool settings = false;
+    bool filter_settings = false;
     bool mode_settings = false;
+    bool mode_mods_settings = false;
+    std::string judge_window = "normal";
     bool graphics_settings = false;
     bool edit_resolution = false;
     bool invalid_resolution = false;
@@ -626,6 +652,7 @@ int main(int argc, char** argv) {
     std::string title_music_mode = "default";
     std::string sites_records_title;
     std::string display_level = "12";
+    bool aery_five_key = false;
     bool backdrop_off = false;
     double backdrop_opacity = -1.0;
     double backdrop_brightness = -1.0;
@@ -662,12 +689,20 @@ int main(int argc, char** argv) {
     data.ui_language = tenriff::ui::Language::Korean;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
+        if (arg == "--ui-font" && i + 1 < argc) {
+            data.ui_font = tenriff::config::normalize_skin_ui_font_token(argv[++i]); continue;
+        }
+        if (arg == "--ui-font-file" && i + 1 < argc) {
+            data.ui_font = "custom"; data.ui_font_path = argv[++i]; continue;
+        }
         if (arg == "--indicator-background-off") { indicator_background_off = true; continue; }
         if (arg == "--result-perfect") { result = result_perfect = true; continue; }
         if (arg == "--gauge-ramp") { result = gauge_ramp = true; continue; }
         if (arg == "--result-grade" && i + 1 < argc) { result_grade = argv[++i]; continue; }
         if (arg == "--result-status" && i + 1 < argc) { result = true; result_status = argv[++i]; continue; }
+        if (arg == "--web-upload-status" && i + 1 < argc) { result = true; web_upload_status = argv[++i]; continue; }
         if (arg == "--chart-author" && i + 1 < argc) { chart_author = argv[++i]; continue; }
+        if (arg == "--artist" && i + 1 < argc) { artist = argv[++i]; continue; }
         if (arg == "--bpm-change") { bpm_change = true; continue; }
         // Keep new fixture switches out of the long legacy else-if chain:
         // MSVC counts those branches against its nested-block limit.
@@ -676,9 +711,19 @@ int main(int argc, char** argv) {
         }
         if (arg == "--analysis-unavailable") { analysis_unavailable = true; continue; }
         if (arg == "--display-level" && i + 1 < argc) { display_level = argv[++i]; continue; }
+        if (arg == "--aery-five-key") { aery_five_key = true; menu_keys = 5; continue; }
         if (arg == "--analysis-no-samples") { analysis_no_samples = true; continue; }
         if (arg == "--edit-resolution") { settings = graphics_settings = edit_resolution = true; continue; }
         if (arg == "--invalid-resolution") { settings = graphics_settings = edit_resolution = invalid_resolution = true; continue; }
+        if (arg == "--timing-text-scale" && i + 1 < argc) { timing_text_scale = std::clamp(std::stod(argv[++i]), 0.5, 2.0); continue; }
+        if (arg == "--timing-bar-scale" && i + 1 < argc) { timing_bar_scale = std::clamp(std::stod(argv[++i]), 0.5, 2.0); continue; }
+        if (arg == "--filter-settings") { settings = filter_settings = true; continue; }
+        if (arg == "--mods-settings") { settings = mode_mods_settings = true; continue; }
+        if (arg == "--judge-window" && i + 1 < argc) {
+            judge_window = argv[++i];
+            if (judge_window != "normal" && judge_window != "hard" && judge_window != "ex") return 2;
+            continue;
+        }
         if (arg == "--fullscreen-preview") fullscreen_skin_preview = settings = skin_settings = true;
         else if (arg == "--no-vsync") config.vsync = false;
         else if (arg == "--menu-roundtrip") menu_roundtrip = true;
@@ -916,7 +961,7 @@ int main(int argc, char** argv) {
             preview.key_labels[i] = std::to_string(i + 1);
         }
     }
-    if (settings && !skin_settings && !mode_settings && !graphics_settings) {
+    if (settings && !skin_settings && !mode_settings && !mode_mods_settings && !graphics_settings) {
         using namespace tenriff::app::menu::settings;
         tenriff::config::RuntimeConfig runtime;
         runtime.audio.backend = tenriff::audio::AudioBackend::ASIO;
@@ -942,11 +987,12 @@ int main(int argc, char** argv) {
             data.generic.rows.push_back(std::move(row));
         }
     }
-    if (mode_settings || graphics_settings) {
-        data.generic.heading = graphics_settings ? loc("Graphics Settings", "그래픽 설정")
+    if (mode_settings || graphics_settings || mode_mods_settings) {
+        data.generic.heading = mode_mods_settings ? loc("Mod Manager", "모드 관리자") :
+                               graphics_settings ? loc("Graphics Settings", "그래픽 설정")
                                                 : loc("Key Mode Settings", "키 모드 설정");
         tenriff::app::MenuAppVisualTestAccess::populate_inner_settings(data, graphics_settings, selected_setting,
-            edit_resolution, invalid_resolution);
+            edit_resolution, invalid_resolution, mode_mods_settings, judge_window);
     }
     if (keymap_settings) {
         using namespace tenriff::app::menu::settings;
@@ -1028,13 +1074,42 @@ int main(int argc, char** argv) {
             loc("Nickname is shown in saved records and multiplayer. Avatar Image accepts local PNG/JPG files.",
                 "닉네임은 저장 기록과 멀티플레이에 표시됩니다. 프로필 사진은 로컬 PNG/JPG 파일을 사용합니다.")};
     }
+    if (filter_settings) {
+        data.kind = MenuScreenKind::GenericList;
+        data.generic.heading = loc("Filter", "필터");
+        data.generic.rows.clear();
+        const std::array<std::string, 11> labels{
+            loc("Sort", "정렬"), loc("Group", "그룹"), loc("Key Filter", "키 필터"),
+            loc("Difficulty Range", "난이도 범위"), loc("Difficulty Table", "난이도표"),
+            loc("Online Records Server", "인랭 기록 서버"), loc("Collection Filter", "컬렉션 필터"),
+            loc("Toggle Favorite", "페이보릿 토글"), loc("New Collection", "새 컬렉션"),
+            loc("Clear Filters", "필터 지우기"), loc("Back", "뒤로")};
+        const std::array<std::string, 11> values{
+            loc("LV ASC", "LV 오름"), loc("None", "없음"), loc("All Keys", "전체 키"),
+            loc("MIN ", "최소 ") + "8", loc("Native LV", "기본 LV"), "https://fixture.invalid",
+            loc("All", "전체"), loc("Not Favorite", "페이보릿 아님"), loc("Create", "생성"), "", ""};
+        for (int i = 0; i < static_cast<int>(labels.size()); ++i) {
+            MenuRowData row;
+            row.label = labels[i]; row.value = values[i]; row.row_index = i < 4 ? i : i + 1;
+            row.target_kind = MenuHitTargetKind::SettingsRow;
+            row.selected = i == 3; row.adjustable = i < 7;
+            row.activatable = i == 0 || i >= 7;
+            row.increment_enabled = row.decrement_enabled = row.adjustable;
+            row.value_activatable = i == 0;
+            if (i == 3) { row.secondary_row_index = 4; row.secondary_value = loc("MAX ", "최대 ") + "12"; }
+            data.generic.rows.push_back(std::move(row));
+        }
+        data.generic.notes = {
+            loc("Difficulty Range: Enter switches MIN/MAX, Left/Right adjusts. Each endpoint has its own mouse controls; Any removes that limit.",
+                "난이도 범위: Enter로 최소/최대를 선택하고 좌/우로 조절합니다. 마우스는 각 값의 -/+를 사용하며 없음은 해당 제한을 해제합니다.")};
+    }
     if (title) {
         data.kind = MenuScreenKind::TitleMenu;
         data.title.profile = "PLAYER";
         data.title.profile_avatar_path = avatar_path;
         data.title.track = empty ? "" : "Luminous Horizon [Another]";
         data.title.buttons = {
-            {empty ? loc("ADD SONGS FOLDER", "곡 폴더 추가") : loc("PLAY", "플레이"), "+", !focus_options,
+            {empty ? loc("ADD SONGS FOLDER", "곡 폴더 추가") : loc("Single Play", "싱글 플레이"), "+", !focus_options,
              empty ? loc("Choose a folder containing your BMS charts.", "BMS 차트가 있는 폴더를 선택합니다.")
                    : loc("Open your library and choose a track.", "라이브러리에서 플레이할 곡을 고릅니다.")},
             {loc("MULTIPLAYER", "멀티플레이"), "P2P", false,
@@ -1044,7 +1119,7 @@ int main(int argc, char** argv) {
             {loc("EXIT", "종료"), "\xE2\x8F\xBB", false, loc("Close TenRiff.", "TenRiff를 종료합니다.")},
         };
         data.title.guides = {
-            loc("UP / DOWN or mouse to move", "위아래 키 또는 마우스로 이동"),
+            loc("Arrow keys or mouse to move", "방향키 또는 마우스로 이동"),
             loc("ENTER or double-click to open", "ENTER 또는 더블클릭으로 열기"),
             empty ? loc("PLAY becomes Add Songs Folder until a library is indexed", "라이브러리가 없으면 곡 폴더 추가를 표시합니다")
                   : loc("F2 selects a songs folder; -/+ adjusts Rate", "F2 곡 폴더 선택 / -/+ 배속 조절"),
@@ -1056,12 +1131,13 @@ int main(int argc, char** argv) {
     songs.profile = "PLAYER";
     songs.profile_avatar_path = avatar_path;
     songs.selected_song_title = "Luminous Horizon / A very long chart title [Another]";
-    songs.selected_song_artist = "TenRiff UI Preview";
+    songs.selected_song_artist = artist;
     songs.selected_song_chart_author = chart_author;
     songs.selected_song_has_bpm_changes = bpm_change;
     songs.selected_song_key_count = menu_keys;
     songs.selected_song_layout = std::to_string(menu_keys) + " KEYS";
-    songs.selected_song_difficulty = display_level;
+    songs.selected_song_difficulty = aery_five_key && display_level == "12" ? "⑤LEVEL 12" : display_level;
+    songs.selected_song_difficulty_is_aery_five_key = aery_five_key && menu_keys == 5;
     songs.selected_song_bpm = 180;
     songs.selected_song_note_count = 1824;
     songs.selected_song_nps_min = 3;
@@ -1072,7 +1148,8 @@ int main(int argc, char** argv) {
     songs.current_hi_speed = "3.50";
     songs.current_visual_latency = "+0 ms";
     songs.current_random = loc("Off", "꺼짐");
-    songs.difficulty_table_name = empty ? loc("Native LV", "기본 LV") : "発狂BMS難易度表";
+    songs.difficulty_table_name = empty ? loc("Native LV", "기본 LV") :
+        (aery_five_key ? "5K Aery" : "発狂BMS難易度表");
     songs.difficulty_table_active = !empty;
     songs.difficulty_table_editing = table_editor;
     songs.difficulty_table_url_input = "https://example.com/table/header.json";
@@ -1088,7 +1165,7 @@ int main(int argc, char** argv) {
     songs.result_available = !empty;
     songs.search_active = search_active;
     songs.search_query = search_query;
-    songs.rank = result_grade.empty() ? "S+" : result_grade;
+    songs.rank = empty ? "--" : (result_grade.empty() ? "S+" : result_grade);
     songs.best_score = 9452;
     songs.detail_score = 8901;
     songs.max_detail_score = 9120;
@@ -1114,10 +1191,11 @@ int main(int argc, char** argv) {
         for (int i = 0; i < 7; ++i) {
             SongCardData card;
             card.title = titles[i];
-            card.artist = "TenRiff UI Preview";
-            card.detail = "7K  /  ANOTHER  /  180 BPM";
+            card.artist = artist;
+            card.detail = aery_five_key ? "5K  /  ANOTHER  /  180 BPM" : "7K  /  ANOTHER  /  180 BPM";
             card.level = 12 + i;
             card.level_label = "⑤" + loc("LEVEL", "레벨") + " " + std::to_string(12 + i);
+            card.difficulty_is_aery_five_key = songs.selected_song_difficulty_is_aery_five_key;
             card.song_index = i;
             card.selected = i == 0;
             card.favorite = i == 1;
@@ -1147,8 +1225,12 @@ int main(int argc, char** argv) {
     score.key_count = menu_keys;
     score.level = 12;
     score.bpm = 180;
+    score.has_bpm_changes = bpm_change;
+    score.difficulty_label = songs.selected_song_difficulty;
+    score.difficulty_is_aery_five_key = songs.selected_song_difficulty_is_aery_five_key;
     score.rank = result_grade.empty() ? (failed ? "F" : "S+") : result_grade;
     score.status = result_status.empty() ? (failed ? "FAILED" : "CLEAR") : result_status;
+    score.web_upload_status = web_upload_status;
     score.cleared = !failed;
     score.score = failed ? 4230 : 9452;
     score.detail_score = 8901;
@@ -1427,6 +1509,8 @@ int main(int argc, char** argv) {
     data.gameplay.timing_text_offset_y = data.generic.skin_preview.timing_text_offset_y = timing_text_y;
     data.gameplay.timing_bar_offset_x = data.generic.skin_preview.timing_bar_offset_x = timing_bar_x;
     data.gameplay.timing_bar_offset_y = data.generic.skin_preview.timing_bar_offset_y = timing_bar_y;
+    data.gameplay.timing_text_scale = data.generic.skin_preview.timing_text_scale = timing_text_scale;
+    data.gameplay.timing_bar_scale = data.generic.skin_preview.timing_bar_scale = timing_bar_scale;
     data.gameplay.note_fade_in = data.generic.skin_preview.note_fade_in = fade_in;
     data.gameplay.note_fade_out = data.generic.skin_preview.note_fade_out = fade_out;
     if (!preview_note_shape.empty()) data.gameplay.note_shape = data.generic.skin_preview.note_shape = preview_note_shape;
@@ -1442,15 +1526,19 @@ int main(int argc, char** argv) {
             data.generic.rows[i].selected = static_cast<int>(i) == selected_row;
     }
     if (selected_setting >= 0) {
-        for (auto& row : data.generic.rows) row.selected = row.row_index == selected_setting;
+        for (auto& row : data.generic.rows) {
+            row.selected = row.row_index == selected_setting || row.secondary_row_index == selected_setting;
+            row.secondary_selected = row.secondary_row_index == selected_setting;
+        }
     }
     if (disabled_setting >= 0) for (auto& row : data.generic.rows)
         if (row.row_index == disabled_setting) row.enabled = false;
     if (data.kind == MenuScreenKind::GenericList) {
         using tenriff::app::menu::Screen;
         const auto help_screen = options_grid ? Screen::OptionsHub : skin_settings ? Screen::SettingsSkins :
-            mode_settings ? Screen::ModeSelect : graphics_settings ? Screen::SettingsGraphics :
-            keymap_test ? Screen::KeymapTest : keymap_settings ? Screen::Keymap : profile_settings ? Screen::QuickSetup : Screen::SettingsAudio;
+            mode_mods_settings ? Screen::ModeMods : mode_settings ? Screen::ModeSelect : graphics_settings ? Screen::SettingsGraphics :
+            keymap_test ? Screen::KeymapTest : keymap_settings ? Screen::Keymap : profile_settings ? Screen::QuickSetup :
+            filter_settings ? Screen::SongBrowser : Screen::SettingsAudio;
         tenriff::app::menu::settings::apply_settings_help(help_screen, data.generic, data.ui_language);
     }
     if (!sites_records_title.empty() &&

@@ -9,7 +9,8 @@ bool is_session_only_mode_mod(std::string_view token) {
     if (!descriptor) {
         return false;
     }
-    return descriptor->token == "judge_easy" || descriptor->token == "judge_hard";
+    return descriptor->token == "judge_easy" || descriptor->token == "judge_hard" ||
+           descriptor->token == "judge_ex";
 }
 
 bool strip_session_only_mode_mods(config::RuntimeConfig& config) {

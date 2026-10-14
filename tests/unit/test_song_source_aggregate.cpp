@@ -38,6 +38,9 @@ struct MenuAppSongSourceTestAccess {
         render::MenuRenderData render;
         menu->populate_song_select_render_data(render, {}, {}, nullptr);
         CHECK(render.song_select.selected_song_chart_author == entry.chart_author);
+        CHECK(render.song_select.selected_song_artist == entry.artist);
+        REQUIRE(render.song_select.songs.size() == 1);
+        CHECK(render.song_select.songs.front().artist == entry.artist);
         CHECK(render.song_select.selected_song_has_bpm_changes == entry.has_bpm_changes);
         menu->update_last_chart_metadata((std::filesystem::u8path(root) / entry.path).u8string(), &entry);
         menu->populate_result_render_data(render, {});
@@ -273,12 +276,13 @@ TEST_CASE("ALL SONG skips deleted folders inside a valid cache and continues wit
 TEST_CASE("1.8.9.4 metadata passes indexed author and BPM changes into lobby and result without stale credits") {
     AggregateFixture f;
     const auto root = f.source("metadata");
-    write_text(root / "chart.bms", u8"#TITLE Metadata fixture\n#ARTIST Composer\n#SUBARTIST obj: パターン作者\n"
+    write_text(root / "chart.bms", u8"#TITLE Metadata fixture\n#ARTIST Composer\n#SUBARTIST obj: パターン作者 / BGA: Guest\n"
                "#BPM 120\n#00103:96\n#00211:01\n");
     std::vector<std::string> warnings;
     const auto index = scan_songs(root.u8string(), nullptr, warnings);
     REQUIRE(index.entries.size() == 1);
     REQUIRE(index.entries.front().chart_author == u8"パターン作者");
+    REQUIRE(index.entries.front().artist == "Composer / BGA: Guest");
     REQUIRE(index.entries.front().has_bpm_changes);
     MenuAppSongSourceTestAccess::check_metadata_handoff(index.entries.front(), root.u8string());
 }

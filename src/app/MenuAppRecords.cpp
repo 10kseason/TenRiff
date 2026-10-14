@@ -128,7 +128,8 @@ void MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
     BestResultRecord candidate;
     candidate.has_value = true;
     candidate.replay_verified = replay_verified;
-    candidate.rank = menu_records::calculate_rank(effective_stats, effective_game_over);
+    candidate.rank = menu_records::calculate_rank(effective_stats, effective_game_over,
+                                                   effective_clear_status, parsed.aborted);
     candidate.best_score = effective_score;
     candidate.detail_score = menu_records::calculate_detail_score(effective_stats);
     candidate.total_notes = effective_stats.total_notes;
@@ -369,7 +370,7 @@ void MenuApp::cache_current_session_result(const std::string& chart_path,
                parsed->ruleset_id.empty() || replay_sha256.empty() || resolved_replay.empty()) {
         verification.status = ReplayVerificationStatus::MissingEvidence;
         verification.detail = "Current result is missing replay, chart, or ruleset evidence.";
-    } else if (parsed->ruleset_id != kCanonicalReplayRulesetId) {
+    } else if (!is_current_canonical_replay_ruleset(parsed->ruleset_id, parsed->mods)) {
         verification.status = ReplayVerificationStatus::CustomRuleset;
         verification.detail = "Current result used a non-canonical score ruleset.";
     } else {
@@ -575,7 +576,9 @@ bool MenuApp::open_result_record(const std::string& result_path,
 
     last_result_ = parsed->stats;
     last_game_over_ = parsed->game_over;
-    last_clear_status_ = parsed->clear_status;
+    // This is display state only. Older exports can carry an explicit abort
+    // flag without the ABORTED label; do not present them as a gauge death.
+    last_clear_status_ = parsed->aborted ? "ABORTED" : parsed->clear_status;
     last_final_gauge_ = parsed->final_gauge;
     has_result_ = true;
     last_result_mods_ = parsed->mods;
@@ -590,6 +593,9 @@ bool MenuApp::open_result_record(const std::string& result_path,
     last_replay_path_ = replay_path.empty() ? parsed->replay_path : replay_path;
     last_result_path_ = result_path;
     last_export_warnings_.clear();
+    sites_result_replay_sha256_.clear();
+    sites_result_upload_status_ = ui_text("Local history: web upload status was not saved.",
+                                         "로컬 기록 보기 · 당시 웹 등록 상태는 저장되지 않았습니다.");
     last_session_replay_playback_ = false;
     const SongEntry* entry = (selected_song_ >= 0)
                                  ? visible_song_entry(static_cast<std::size_t>(selected_song_))

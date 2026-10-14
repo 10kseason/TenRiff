@@ -120,6 +120,8 @@ std::optional<AudioSettingId> audio_setting_id_at(std::size_t index) noexcept {
 std::optional<NumericSettingRange> audio_setting_numeric_range(AudioSettingId id) noexcept {
     switch (id) {
         case AudioSettingId::MasterVolume:
+        case AudioSettingId::GameplayVolume:
+        case AudioSettingId::MenuMusicVolume:
             return kMasterVolumeRange;
         case AudioSettingId::BgmVolume:
         case AudioSettingId::KeysoundVolume:
@@ -331,6 +333,19 @@ MenuEffectFlags AudioSettingsController::apply_selected_action(
                     kMasterVolumeRange);
             }
             break;
+        case AudioSettingId::GameplayVolume:
+        case AudioSettingId::MenuMusicVolume: {
+            double& value = selected_id_ == AudioSettingId::GameplayVolume
+                ? runtime.audio_ui.gameplay_volume : runtime.audio_ui.menu_music_volume;
+            if (is_adjust) {
+                changed = set_numeric_value(value, value + action.direction * kMasterVolumeRange.step,
+                                            kMasterVolumeRange);
+            } else if (is_set_ratio) {
+                changed = set_numeric_value(value, value_from_ratio(action.ratio, kMasterVolumeRange),
+                                            kMasterVolumeRange);
+            }
+            break;
+        }
         case AudioSettingId::BgmVolume:
             if (is_adjust) {
                 changed = set_numeric_value(

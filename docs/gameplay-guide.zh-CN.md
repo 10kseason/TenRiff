@@ -1,5 +1,9 @@
 # TenRiff 游玩指南
 
+1.9.0发布版在 `Options > Key Mode Settings > Judge Window` 中提供默认/Hard/EX。Easy从新选择中移除，但保留旧回放的判定。选择仅在本次运行有效，重启后恢复默认。[EX判定与兼容范围](judge-ex-1.9.0.ko.md)（韩语）。
+- 新的默认/Hard仍使用 `tenriff-native-score-v2-ruleset-5`，EX使用 `tenriff-native-score-v2-ruleset-6`。保留旧R1–R5、Easy与LN规则，自定义判定仍为非官方。
+- `Judge EX` 的EASY基准PG/GR/GD=`14/44.571429/78.857143ms`（Hard的80%），保留RANK比例。BAD对所有RANK固定为250ms，独立的自动漏键时限仍为340ms，分数倍率与Hard相同为1.10。
+
 这份文档专注于“第一次启动 TenRiff 的人，如何实际选歌、开始游玩并查看结果”的用户指南。
 
 更细的配置结构请参考 [`docs/config.zh-CN.md`](config.zh-CN.md)，当前实现范围请参考 [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)。
@@ -179,7 +183,7 @@ Rate 只改变歌曲播放速度和谱面时间轴；在相同 Hi-Speed 下，�
 
 ## 9. 判定与 Gauge
 
-1.8.9源码会把`Options > Key Mode Settings > Mods`中选择的Judge Easy/Hard明确传入新会话。选择仅在本次应用运行期间有效，不保存到配置，重启应用后回到Normal。回放优先采用原始模组和ruleset，多人采用共同规则。不修改历史Normal记录和R1–R4数值。参见[原因、记录与网页显示范围](judge-session-handoff-1.8.9.ko.md)、[验证结果与限制](release-1.8.9-gate.md)（韩语）。
+1.9.0发布版在 `Options > Key Mode Settings > Judge Window` 中提供默认/Hard/EX。Easy从新选择中移除，但保留旧回放的判定。选择仅在本次运行有效，重启后恢复默认。[EX判定与兼容范围](judge-ex-1.9.0.ko.md)（韩语）。
 
 ### 判定
 当前默认判定显示使用下列缩写：
@@ -190,7 +194,7 @@ Rate 只改变歌曲播放速度和谱面时间轴；在相同 Hi-Speed 下，�
 - `BD`：Bad
 - `PR`：Poor / Miss
 
-BMS RANK EASY/NORMAL/HARD/VERYHARD的基础PG分别为 **±21/18/15/8ms**。EASY的GR/GD/BAD保持±65/115/210ms，其他RANK按相同比例缩小。`Judge Easy/Hard` 是在RANK之后应用的独立模组。完整范围及包含边界的规则见[判定范围（韩语）](judgement-windows.md)。
+BMS RANK EASY/NORMAL/HARD/VERYHARD的基础PG分别为 **±21/18/15/8ms**。EASY的GR/GD/BAD保持±65/115/210ms，其他RANK按相同比例缩小。`Judge Hard/EX` 是在RANK之后应用的独立模组。完整范围及包含边界的规则见[判定范围（韩语）](judgement-windows.md)。
 
 空 POOR 只会出现在下一颗 note 的提前侧。已经消费或已经越过判定线的 note 后方输入不会再追加后空 POOR。
 
@@ -200,9 +204,11 @@ OD8 换算统计为 Sudden Death 与旧 replay 兼容保留在 JSON 内部，但
 
 Casual Score 最高为 10,000 分，判定权重为 `PG 6 / GR 3 / GD 1 / PR 0 / FAIL 0`。LN 视为一个对象，head / tail 各按 0.5 权重计算；Detail Score 保持独立计算。
 
-Accuracy 以 `PG / GR / GD / BD = 100 / 80 / 50 / 20%` 为基础，并根据每个判定区间内的 timing 最多再扣 0.5 个百分点。即使全 `PG`，只要 PG timing span 超过 8ms，也不会高于 99.5%。
+普通 Accuracy 是 `PG / GR / GD / BD / PR = 100 / 80 / 50 / 20 / 0%` 的判定加权平均值，与反映判定区间内具体时机的详细准确率不同。普通准确率不额外扣除时机分散带来的分数，也没有99.5%的上限。
 
-Rank 使用 `<75 F`、`75 B`、`80.5 A`、`86.5 A+`、`90 S`、`95.5 S+`、`98 AA`、`99 SS`、`99.75 SSS` 边界。
+**1.9.0 发布版的 Rank：** 存活完赛按普通准确率使用 `99%以上 S++ / 98%以上 S+ / 95%以上 S / 93%以上 A+ / 90%以上 A / 85%以上 B / 80%以上 C / 低于80% D`，各上档门槛均包含该数值。低于75%但存活完赛也为D，失败为F。等级比较使用显示四舍五入之前的准确率。
+
+明确中止（`ABORTED` 或 `aborted`）显示 `--`，自动演奏显示 `AUTO`，没有记录显示 `--`。缺少信息、无法区分死亡与中止的旧失败记录仍按原失败状态显示F。结果、历史和BEST仅根据统计重新计算显示等级，不重写原始记录，也不改变分数计算或数字排名。固定基线1.8.7保持不变。[等级显示与兼容范围（韩文）](grade-display.ko.md)。
 
 ### Gauge
 

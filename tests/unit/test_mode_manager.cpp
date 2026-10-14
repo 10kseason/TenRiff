@@ -1223,3 +1223,55 @@ TEST_CASE("R4 judge mods preserve RANK timing but use absolute Easy and Hard BAD
         }
     }
 }
+
+TEST_CASE("Judge EX scales authored RANK windows while retaining Hard miss and score policies") {
+    // Literal design examples, ordered VERYHARD/HARD/NORMAL/EASY. Neither rate
+    // nor audio sample rate changes the configured millisecond policy.
+    const double expected[][3] = {
+        {5.333333333333333, 16.97959183673469, 30.04081632653061},
+        {10.0, 31.83673469387755, 56.32653061224490},
+        {12.0, 38.20408163265306, 67.59183673469388},
+        {14.0, 44.57142857142857, 78.85714285714286}};
+    tenriff::config::ModeConfig mode;
+    mode.mods = {"Judge EX"};
+    CHECK(tenriff::app::mode_mod_judge_ex(mode.mods));
+    CHECK_FALSE(tenriff::app::mode_mod_judge_ex({"judge_ex", "judge_hard"}));
+    CHECK(tenriff::app::normalize_mode_mod_tokens({"judge_easy", "judge_ex"}) ==
+          std::vector<std::string>{"judge_ex"});
+    CHECK(tenriff::app::mod_score_multiplier(mode.mods) == doctest::Approx(1.10));
+    CHECK(tenriff::app::final_score_multiplier(mode.mods, 1.0) == doctest::Approx(1.0));
+    CHECK(tenriff::app::final_score_multiplier(mode.mods, 2.0) == doctest::Approx(1.10));
+    for (int rank = 0; rank <= 3; ++rank) {
+        for (int sample_rate : {44100, 48000, 96000}) {
+            for (double rate : {0.75, 1.0, 1.5}) {
+                tenriff::gameplay::GameplayChart chart;
+                chart.lane_count = 4;
+                chart.bms_rank = rank;
+                const auto managed = tenriff::app::manage_modes(
+                    chart, tenriff::app::ChartFormat::Bms, mode,
+                    tenriff::config::JudgeConfig{}, rate, 180.0, sample_rate);
+                CHECK(managed.active_mods == std::vector<std::string>{"judge_ex"});
+                CHECK(managed.judge.pg_ms == doctest::Approx(expected[rank][0]));
+                CHECK(managed.judge.gr_ms == doctest::Approx(expected[rank][1]));
+                CHECK(managed.judge.gd_ms == doctest::Approx(expected[rank][2]));
+                CHECK(managed.judge.bd_ms == doctest::Approx(250.0));
+                CHECK(managed.judge.indirect_miss_ms == doctest::Approx(340.0));
+                CHECK(managed.judge.indirect_miss_enabled);
+                CHECK(managed.judge.hold_grace_ms == doctest::Approx(80.0));
+                CHECK(managed.judge.hold_break_ms == doctest::Approx(200.0));
+                CHECK(managed.judge.mask_ms == doctest::Approx(30.0));
+                CHECK(managed.final_multiplier ==
+                      tenriff::app::final_score_multiplier({"judge_hard"}, rate));
+            }
+        }
+    }
+    tenriff::gameplay::GameplayChart chart;
+    chart.lane_count = 4;
+    for (auto format : {tenriff::app::ChartFormat::Bms, tenriff::app::ChartFormat::Unknown}) {
+        const auto managed = tenriff::app::manage_modes(
+            chart, format, mode, tenriff::config::JudgeConfig{}, 1.0);
+        CHECK(managed.judge.pg_ms == doctest::Approx(14.0));
+        CHECK(managed.judge.gr_ms == doctest::Approx(expected[3][1]));
+        CHECK(managed.judge.gd_ms == doctest::Approx(expected[3][2]));
+    }
+}

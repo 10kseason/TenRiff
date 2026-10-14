@@ -1,5 +1,9 @@
 # TenRiff Gameplay Guide
 
+The 1.9.0 release selects Normal / Hard / EX under `Options > Key Mode Settings > Judge Window`. Easy is removed from new selections but retained for historical replays. The session-only choice is not profile-persisted and resets to Normal on restart. See [EX timing and compatibility](judge-ex-1.9.0.ko.md) (Korean).
+- New Normal/Hard plays retain `tenriff-native-score-v2-ruleset-5`; EX uses `tenriff-native-score-v2-ruleset-6`. Historical R1–R5 timing, Easy and LN policies remain unchanged; custom timing is unofficial.
+- `Judge EX` uses EASY PG/GR/GD=`14/44.571429/78.857143ms` (80% of Hard), retaining BMS RANK scaling. BAD is fixed at 250ms; the separate automatic-miss deadline remains 340ms and the score factor remains Hard's 1.10.
+
 This document is a user guide focused on how a first-time TenRiff player actually chooses a song, plays it, and checks the result.
 
 For the detailed config structure, see [`docs/config.en.md`](config.en.md); for the current implementation scope, see [`docs/current-state.en.md`](current-state.en.md).
@@ -178,7 +182,7 @@ If you enable `Graphics > Performance HUD`, you can also see the frame graph, av
 
 ## 9. Judgement and Gauge
 
-The 1.8.9 source explicitly passes Judge Easy/Hard selected in `Options > Key Mode Settings > Mods` into a new session. This choice lasts only while the app runs and is not saved in the profile, so restarting the app returns it to Normal. Replays prioritize their recorded mods/ruleset; multiplayer uses shared rules. Old Normal records and R1–R4 values are unchanged. See [cause, records and web display scope](judge-session-handoff-1.8.9.ko.md) and [verification and limits](release-1.8.9-gate.md) (Korean).
+The 1.9.0 release selects Normal / Hard / EX under `Options > Key Mode Settings > Judge Window`. Easy is removed from new selections but retained for historical replays. The session-only choice is not profile-persisted and resets to Normal on restart. See [EX timing and compatibility](judge-ex-1.9.0.ko.md) (Korean).
 
 ### Judgement
 The current default judgement labels use the following abbreviations:
@@ -189,7 +193,7 @@ The current default judgement labels use the following abbreviations:
 - `BD`: Bad
 - `PR`: Poor / Miss
 
-Base PG is **±21/18/15/8ms** for BMS RANK EASY/NORMAL/HARD/VERYHARD. EASY keeps GR/GD/BAD at ±65/115/210ms; other ranks scale these proportionally. `Judge Easy/Hard` are separate mods applied after RANK. See [timing windows (Korean)](judgement-windows.md) for the full tables and inclusive boundaries.
+Base PG is **±21/18/15/8ms** for BMS RANK EASY/NORMAL/HARD/VERYHARD. EASY keeps GR/GD/BAD at ±65/115/210ms; other ranks scale these proportionally. `Judge Hard/EX` are separate mods applied after RANK. See [timing windows (Korean)](judgement-windows.md) for the full tables and inclusive boundaries.
 
 Empty POOR applies only on the early side of the next note. Input behind a consumed or already-passed note never adds a rear empty POOR.
 
@@ -199,9 +203,11 @@ OD8 conversion statistics remain inside JSON for Sudden Death and legacy replay 
 
 Casual Score has a 10,000 maximum and uses `PG 6 / GR 3 / GD 1 / PR 0 / FAIL 0` judgement weights. An LN is one object whose head and tail each carry 0.5 weight, while Detail Score keeps its separate calculation.
 
-Accuracy starts from `PG / GR / GD / BD = 100 / 80 / 50 / 20%` and removes up to another 0.5 percentage points according to timing inside each judgement band. Even an all-`PG` run cannot exceed 99.5% when its PG timing span is wider than 8ms.
+Standard Accuracy is the judgement-weighted average of `PG / GR / GD / BD / PR = 100 / 80 / 50 / 20 / 0%`. It is separate from Detailed Accuracy, which reflects timing within each judgement band. Standard Accuracy has no extra timing-spread deduction or 99.5% cap.
 
-Rank uses `<75 F`, `75 B`, `80.5 A`, `86.5 A+`, `90 S`, `95.5 S+`, `98 AA`, `99 SS`, and `99.75 SSS` boundaries.
+**Rank in the local 1.9.0 candidate:** surviving completions use standard accuracy thresholds of `99% S++ / 98% S+ / 95% S / 93% A+ / 90% A / 85% B / 80% C`, with each threshold inclusive. Every surviving completion below 80%, including below 75%, receives D; failure receives F. Thresholds use accuracy before display rounding.
+
+Explicit aborts (`ABORTED` or `aborted`) show `--`, autoplay shows `AUTO`, and missing records show `--`. Legacy failed records without enough information to distinguish death from abort retain F. Results, history and BEST recalculate the displayed grade from statistics without rewriting raw records or changing score calculation or numeric standings. The fixed 1.8.7 baseline is unchanged. [Grade display and compatibility (Korean)](grade-display.ko.md).
 
 ### Gauge
 

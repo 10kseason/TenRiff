@@ -291,7 +291,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         const config::RuntimeConfig persisted = build_persisted_runtime_config(config_);
         config_loader.save_profile(profile_dir_, persisted);
     }
-    // Judge Easy/Hard intentionally do not persist. Carry the menu's current
+    // Judge selection intentionally does not persist. Carry the menu's current
     // selection across the profile reload, but never into replay or peer rules.
     if (!peer_battle_mode_ && options.replay_path.empty()) {
         apply_session_only_mode_mods(config_, session_mode_mods_);
@@ -2336,6 +2336,13 @@ void GameSession::finish_audio_output(float* output, uint32_t frames, bool foreg
     if (normalize_mix && normalize_audio) mix_normalizer_.process(output, frames);
     if (settings_click_requested_.exchange(false, std::memory_order_acq_rel))
         settings_click_.trigger(sample_rate_);
+    // Apply the chart-wide slider after normalization, before UI feedback. At
+    // 100% the chart mix is byte-for-byte unchanged; menu music never enters here.
+    const float chart_gain = gameplay_volume_gain(config_.audio_ui.gameplay_volume);
+    if (chart_gain != 1.0f) {
+        for (std::size_t i = 0; i < static_cast<std::size_t>(frames) * 2; ++i)
+            output[i] *= chart_gain;
+    }
     // Keep UI feedback out of automatic loudness tracking.
     settings_click_.mix(output, frames);
     const double master_gain = focused_audio_master_gain(
@@ -2444,8 +2451,10 @@ void GameSession::shutdown() {
                                                               config_.gauge,
                                                               gauge_shift_enabled_,
                                                               course_gauge_enabled_,
-                                                              "off");
-            if (auto_scratch_enabled_ || stale_input_catchup_used_) replay.ruleset_id = "custom-ruleset-5";
+                                                              "off", result_.mods);
+            if (auto_scratch_enabled_ || stale_input_catchup_used_) {
+                replay.ruleset_id = mode_mod_judge_ex(result_.mods) ? "custom-ruleset-6" : "custom-ruleset-5";
+            }
             if (stale_input_catchup_used_) {
                 const std::string warning = "Official scoring disabled: stale input state catch-up is not represented in the replay trace.";
                 result_.export_warnings.push_back(warning);

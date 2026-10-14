@@ -44,9 +44,20 @@
             return data.result.gauge_label;
         };
 
+        // Result notes are not part of the visual layout. This explicit footer
+        // keeps asynchronous upload outcomes visible on every result page.
+        const auto draw_web_upload_status = [&]() {
+            if (!data.result.web_upload_status.empty() && d2d_->hud_format && d2d_->muted_brush) {
+                draw_text_clipped_aligned(to_wide(data.result.web_upload_status), d2d_->hud_format.Get(),
+                    D2D1::RectF(64.0f, 1050.0f, 1856.0f, 1078.0f), d2d_->muted_brush.Get(),
+                    DWRITE_TEXT_ALIGNMENT_CENTER);
+            }
+        };
         if (data.result.peer_battle) {
 #include "MenuWindow_draw_result_multiplayer.inl"
+            draw_web_upload_status();
             return;
         }
 
 #include "MenuWindow_draw_result_single_body.inl"
+        draw_web_upload_status();

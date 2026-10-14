@@ -5,6 +5,10 @@
 
 namespace tenriff::app {
 
+[[nodiscard]] inline float gameplay_volume_gain(double volume) {
+    return std::isfinite(volume) ? static_cast<float>(std::clamp(volume, 0.0, 1.0)) : 0.0f;
+}
+
 inline constexpr float kOutputSoftLimitThreshold = 0.92f;
 
 [[nodiscard]] inline float soft_limit_audio_sample(float sample) {
@@ -70,8 +74,9 @@ inline constexpr float kOutputSoftLimitThreshold = 0.92f;
 // gameplay, song previews and editor auditions retain their original gains.
 [[nodiscard]] inline double tenriff_music_gain(bool enabled,
                                                double master_volume,
-                                               double bgm_volume) {
-    return menu_background_gain(enabled, master_volume, bgm_volume) * 0.4;
+                                               double menu_music_volume) {
+    // The 100% slider uses a quiet 10% reference level (1.8.9.7 used 40%).
+    return menu_background_gain(enabled, master_volume, menu_music_volume) * 0.1;
 }
 
 }  // namespace tenriff::app

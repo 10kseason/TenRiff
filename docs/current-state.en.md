@@ -1,12 +1,20 @@
 # TenRiff Current State
 
+**2026-10-14 · 1.9.0 / new fixed baseline:** Promotes the reviewed local candidate to the requested release line: independent BMS/TenRiff music volume, lobby/filter/skin controls, grades and SUBARTIST credits, localized mods, EX timing and upload status. Normal/Hard use R5, EX uses R6; historical R1–R5 records and saved settings are preserved. [Baseline](baseline-1.9.0.en.md) · [Release verification scope](release-1.9.0-gate.md). Dated entries below retain their historical release context.
+
+The 1.9.0 release selects Normal / Hard / EX under `Options > Key Mode Settings > Judge Window`. Easy is removed from new selections but retained for historical replays. The session-only choice is not profile-persisted and resets to Normal on restart. See [EX timing and compatibility](judge-ex-1.9.0.ko.md) (Korean).
+- New Normal/Hard plays retain `tenriff-native-score-v2-ruleset-5`; EX uses `tenriff-native-score-v2-ruleset-6`. Historical R1–R5 timing, Easy and LN policies remain unchanged; custom timing is unofficial.
+- `Judge EX` uses EASY PG/GR/GD=`14/44.571429/78.857143ms` (80% of Hard), retaining BMS RANK scaling. BAD is fixed at 250ms; the separate automatic-miss deadline remains 340ms and the score factor remains Hard's 1.10.
+
+**2026-10-14 · 1.9.0 release:** The new grade description below applies to 1.9.0. Earlier version entries are historical; the former 1.8.7 baseline tag and commit are preserved. [Grade display and compatibility (Korean)](grade-display.ko.md).
+
 **2026-10-14 · 1.8.9.7:** Input threads request MMCSS Games/High and disable execution-speed power throttling. Home action borders share their icon colors with subtle cached glow. Only TenRiff scene music is reduced to 40%; BMS songs, keysounds and previews retain their original volume scale. The fixed baseline remains 1.8.7; physical input latency improvement is not established. [Scope / 검증](release-1.8.9.7-gate.md).
 
 **2026-10-13 · 1.8.9.6:** Reuse high-resolution timers for short input and gameplay/HUD waits; RawInput wakes on messages. Ships the B comparison behavior while preserving judgement windows, R1–R5, replays and the fixed 1.8.7 baseline. Manual impressions varied between runs; this does not guarantee removal of every stutter. [Scope / 검증](release-1.8.9.6-gate.md).
 
 **2026-10-13 · 1.8.9.5:** R5 processes LN tails and automatic judgements in time order, separates judgement from audio write-ahead, and aligns input/display timing with exact BPM/STOP scroll positions. Restores dark lobby cards with colored icons and moves Master Volume first. R1–R4 and the fixed 1.8.7 baseline are preserved. [Scope and verification](release-1.8.9.5-gate.md).
 
-**Fixed baseline: [1.8.7](baseline-1.8.7.en.md)** (2026-10-10). Use Git tag `1.8.7`, commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347`; do not advance it automatically with `latest` or a new release.
+**Fixed baseline: [1.9.0](baseline-1.9.0.en.md)** (explicit user request, 2026-10-14). Use Git tag `1.9.0`; do not advance automatically with `main` or `latest`. Preserve the 1.8.7 baseline and previous releases as history.
 
 **2026-10-13 · 1.8.9.4:** Rearranges the large result rank and score, shows detail accuracy and distinguishes four Gauge Shift CLEAR colors. BGM/keysound volume move to the top of Audio with 100% defaults for new settings. Includes Korean skin-label revisions, explicit obj credits, BPM! changes and correction of duplicate identical audio at the same chart time. Author uploads are optional and existing record identities are retained. [Changes, compatibility and validation (Korean)](release-1.8.9.4-gate.md). Verification and game/web publication are tracked separately; the fixed baseline remains 1.8.7.
 
@@ -22,7 +30,7 @@
 
 **2026-10-12 · 1.8.8:** Combines result analysis, free window sizing and F9 PNG hints, long LN Mix, readability updates, table URL/filter fixes, skin lane shortcuts, preserved keysounds during key-count reduction, and solo start/instant-retry controls. See the [1.8.8 release gate](release-1.8.8-gate.md) for current validation, packages and publication status. The fixed baseline remains 1.8.7.
 
-**Analysis and extension plans:** Separate lane distributions, time-based accuracy and tap/LN-head/release/hold-failure events; unmeasurable misses are never zero-ms samples. Long LN Mix v2 keeps local history/replay only and is excluded from legacy BEST and Sites uploads. Plugins and 1.9.0 stabilization remain plans. [Analysis](result-analysis-1.8.8.ko.md), [display/menu/keysound changes](release-feedback-1.8.8.ko.md), [start/retry controls](gameplay-start-controls.ko.md) (Korean).
+**Analysis and extension plans:** Separate lane distributions, time-based accuracy and tap/LN-head/release/hold-failure events; unmeasurable misses are never zero-ms samples. Long LN Mix v2 keeps local history/replay only and is excluded from legacy BEST and Sites uploads. Plugins remain future work, outside 1.9.0. [Analysis](result-analysis-1.8.8.ko.md), [display/menu/keysound changes](release-feedback-1.8.8.ko.md), [start/retry controls](gameplay-start-controls.ko.md) (Korean).
 
 **2026-10-09 · TenRiff 1.8.7:** Improves input calibration and chart-loading audio, adds LR2 solo Studio Deck, 750ms FAST/SLOW retention, key reassignment, consolidated Options and complete song-title fitting. [1.8.7 release](release-1.8.7-gate.md).
 
@@ -45,14 +53,14 @@
 - 1.7.10 hardens ALL SONG against deleted cached entries and adds merge progress and consistent completion-state publication. [Verification and unreproduced symptom](release-1.7.10-gate.md).
 - 1.7.8 adds modern native menus, Luma Keys digital keyboard skins for every 4K–16K layout, Japanese UI, and web/offline skin editing. Menu and gameplay visual controls are stored separately in `native` and `gameplay.native`. [Validation](release-1.7.8-gate.md).
 
-The fixed baseline is **1.8.7**; this source version is **1.8.9.4**. Audio → Song Ending offers **Listen** (default) or **Skip Outro**; completed plays save and submit without another key. New plays use R4 timing based on BMS RANK and a timing profile for web submissions; existing R1/R2/R3 records are preserved. WASAPI remains the default. See the [1.8.9.4 release gate](release-1.8.9.4-gate.md) for this release's validation status and remaining limits.
+The fixed baseline is **1.9.0**. This checkout is the **1.9.0 release**: Normal/Hard retain R5 and EX uses R6, preserving earlier records. See [candidate scope and verification limits](controls-1.9.0.ko.md) (Korean). Dated entries below describe earlier releases.
 
 The 749/739 checks in the [local 1.7.1 r2 report](local-1.7.1-r2.ko.md) are historical, not the new release's results. See [library management](library-management.md), [reference BPM](reference-bpm.md), [skin presets](skin-presets.md) and [ASIO](asio-audio.md).
 
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- User-pinned baseline version: `1.8.7`; current source targets `1.8.9.4`
+- User-pinned baseline version: `1.9.0`; current source targets `1.9.0`
 - 1.7.1 provides full-room HUD/results for up to eight players, tied ranks/missing-score states, P-GREAT-only effects, independent judgement/combo placement, ten Options cards, audio normalization and the Song Select difficulty-table card. See [follow-up details](gameplay-polish-followup.md) and [verification](release-1.7.1-gate.md).
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
 - Native Result now emphasizes score, grade and accuracy; the prism remains in custom skins. The existing 2.2-second reveal, Space skip and control readiness rules are preserved.
@@ -76,7 +84,7 @@ This is the document that the next agent or any new contributor should read firs
 - `1.2.92` adds selectable default Krrcream and deterministic `nK2 Native 50/50` paths to the standalone BMS key converter.
 - `1.2.93` adds an in-game `Key Converter` row for `Krrcream`/`KeyWeaver nK2`, persists the choice in config/replay metadata, and applies it to runtime key-mode conversion.
 - `1.2.95` briefly restored 4K-10K osu!mania `.osu` indexing and play through `OSU Charts`; that path is removed again in 1.3.1.
-- Baseline companion document for follow-up work: [`docs/baseline-1.8.7.en.md`](baseline-1.8.7.en.md)
+- Baseline companion document for follow-up work: [`docs/baseline-1.9.0.en.md`](baseline-1.9.0.en.md)
 - Windows GUI build is the main target
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`
 - The supported chart surface is limited to the BMS family (`.bms/.bme/.bml/.pms`)
@@ -151,7 +159,7 @@ This is the document that the next agent or any new contributor should read firs
   - the separate `Conversion Note Add` option is removed: Krrcream only remaps source notes, while nK2 creates safe support notes directly in the converted target layout when expanding the key count.
   - nK2 offers `Native (12%)` by default, `Transform (35%)` and `Remaster (65%)`; `Remaster` raises the budget while locking the anchor so the source placement survives, and fills LN sections with holds of the same length. All three are caps - the source density and the safety windows decide how much actually lands. The row is locked for Krrcream, and the standalone converter GUI also locks Krrcream Max/Min/Speed/Seed tuning.
   - NK3 always combines bundled P64 with host beam32. It adds the generalized pattern MLP only when a non-10K source is converted to 10K; 10K-to-10K and every other target use P64 alone. The default `AUTO` backend runs both P64 and the MLP on AMD/NVIDIA GPUs through ncnn Vulkan, retaining the optional OpenVINO compatibility path as fallback. `TENRIFF_NK3_BACKEND` and `TENRIFF_NK3_VULKAN_DEVICE` can force the selection.
-  - official 1.8.7 builds/Windows archives do not build or ship the standalone BMS key-converter CLI/GUI; its top-level CMake option defaults `OFF` and the source is retained only for development regression
+  - official 1.9.0 builds/Windows archives do not build or ship the standalone BMS key-converter CLI/GUI; its top-level CMake option defaults `OFF` and the source is retained only for development regression
   - `mode.key_mode=none` keeps the chart's original key count and base pattern layout intact
 - Native difficulty:
   - BMS LV/CR calculation evaluates only LN head/tail miss-ms at 0.5x, so `300ms` is treated as `150ms`; runtime gameplay judgement windows remain unchanged
@@ -179,14 +187,14 @@ This is the document that the next agent or any new contributor should read firs
   - eased future-note entry from above the field
   - after the last judged note, Audio → Song Ending either listens to the remaining audio (default) or skips the outro after the normal result delay; Listen also retains the lane-key manual skip
 - Judge:
-  - 1.8.9 passes session-only menu Judge Easy/Hard into new sessions. It remains absent from profiles and resets to Normal after app restart; recorded replay rules, shared multiplayer rules, old records and R1–R4 values are preserved. [Cause, records and web display scope](judge-session-handoff-1.8.9.ko.md); runtime verification is tracked separately in the release gate
+  - The 1.9.0 release selects Normal / Hard / EX under `Options > Key Mode Settings > Judge Window`. Easy is removed from new selections but retained for historical replays. The session-only choice is not profile-persisted and resets to Normal on restart. See [EX timing and compatibility](judge-ex-1.9.0.ko.md) (Korean).
   - default `PG / GR / GD` windows are `21ms / 65ms / 115ms` (BMS RANK EASY)
   - BMS `#RANK` EASY (including missing)/NORMAL/HARD/VERYHARD uses PG `21/18/15/8ms`; NORMAL/HARD/VERYHARD scales all EASY PG/GR/GD/BAD windows by `18/21`, `15/21`, `8/21`, leaving the automatic miss deadline unchanged
   - [Current timing windows, RANK tables and LN rules (Korean)](judgement-windows.md)
   - `Judge Easy` scales RANK-adjusted PG/GR/GD and hold tolerances by `1.35x`. EASY PG/GR/GD=`28.35/87.75/155.25ms`; BAD is fixed at `210ms` for every RANK; mask is unchanged
   - `Judge Hard` uses EASY PG/GR/GD=`17.5/55.714286/98.571429ms`: multiply PG by `17.5/21` and GR/GD by `18/21` after RANK. BAD is fixed at `225ms` for every RANK; hold tolerances are unchanged
   - default Normal/Easy/Hard automatically miss unplayed notes after `340ms`. A late press outside BAD misses the expired note and checks the next one, so the hit window does not expand to the automatic deadline
-  - New plays record `tenriff-native-score-v2-ruleset-5`. R3 retains its previous Easy/Hard windows and RANK/LN release behavior. R1/R2 retain PG20ms, no RANK and older LN releases; R1 also keeps Easy1.25x/Hard BAD340ms/automatic miss=BAD. Custom timing remains unofficial.
+  - New Normal/Hard plays retain `tenriff-native-score-v2-ruleset-5`; EX uses `tenriff-native-score-v2-ruleset-6`. Historical R1–R5 timing, Easy and LN policies remain unchanged; custom timing is unofficial.
   - if the pending same-lane note is already a `BAD` while the immediate next note is clearly `GOOD` or better, the pending note is recorded as a miss and the current press scores the next note instead of locking the stream into repeated `BAD`s
   - under `Judge Hard`, an unplayed object becomes a combo-breaking indirect `POOR` and OD8 `MISS`; other note-consuming failures stay `BAD`
   - very early non-consuming presses are handled as LR2-style `POOR` and are visible again in result / replay / UI paths
@@ -196,8 +204,9 @@ This is the document that the next agent or any new contributor should read firs
   - `Sudden Death (1 MISS)` fails immediately on the first OD8-converted object `MISS`; native `BAD` timing alone and empty-key `POOR` are ignored, and the option is mutually exclusive with Practice No-Fail
   - OD8 conversion remains internal for Sudden Death and legacy replay compatibility; Gameplay and Result show only the native TenRiff score
   - casual score is normalized to a 10,000 maximum with `PG 6 / GR 3 / GD 1 / PR 0 / FAIL 0` judgement weights; LN heads and tails each carry 0.5 weight and form one object, while detail score remains separate
-  - accuracy starts from PG/GR/GD/BD bases of 100/80/50/20%, removes up to 0.5 percentage points across each judgement band, and caps an all-PG run at 99.5% when its PG timing span exceeds 8ms
-  - rank boundaries are `<75 F / 75 B / 80.5 A / 86.5 A+ / 90 S / 95.5 S+ / 98 AA / 99 SS / 99.75 SSS`
+  - standard accuracy is the judgement-weighted average of `PG / GR / GD / BD / PR = 100 / 80 / 50 / 20 / 0%`, separate from timing-based detailed accuracy; standard accuracy has no extra timing-spread deduction or 99.5% cap
+  - 1.9.0 grades surviving completions using unrounded standard accuracy: `99% S++ / 98% S+ / 95% S / 93% A+ / 90% A / 85% B / 80% C`, with inclusive thresholds, and D below 80%; surviving completions below 75% also receive D, while failure receives F
+  - explicit aborts (`ABORTED`/`aborted`) and missing records show `--`; autoplay shows `AUTO`. Legacy failures without information distinguishing death from abort retain F. Raw records, score calculation and numeric standings are unchanged
   - live gameplay `ClockSync` uses centered anchor regression instead of large absolute Windows QPC values and automatically rebases after sustained clock discontinuities
   - stale backlog is classified from QPC event age and the `BAD` window; a fresh input whose sample mapping drifts far from the current playback anchor falls back to that anchor instead of becoming permanently non-scoring catch-up
   - in R3, releasing an ordinary LN or `#LNMODE 2` CN too early immediately commits BAD, a combo break and gauge loss; regrabbing cannot cancel it. Ordinary LN still completes automatically when held, and CN retains tail release timing

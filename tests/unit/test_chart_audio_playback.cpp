@@ -320,11 +320,11 @@ TEST_CASE("TenRiff scene music is quieter while BMS gameplay and previews keep t
             CHECK(gameplay[i] == doctest::Approx(clip[i] * volume));
             CHECK(preview[i] == doctest::Approx(gameplay[i]));
         }
-        CHECK(tenriff::app::tenriff_music_gain(true, 1.0, volume) == doctest::Approx(volume * 0.4));
-        CHECK(tenriff::app::tenriff_music_gain(true, 0.5, volume) == doctest::Approx(volume * 0.2));
+        CHECK(tenriff::app::tenriff_music_gain(true, 1.0, volume) == doctest::Approx(volume * 0.1));
+        CHECK(tenriff::app::tenriff_music_gain(true, 0.5, volume) == doctest::Approx(volume * 0.05));
     }
     CHECK(tenriff::app::tenriff_music_gain(false, 1.0, 1.0) == doctest::Approx(0.0));
-    CHECK(tenriff::app::tenriff_music_gain(true, 1.0, 2.0) == doctest::Approx(0.4));
+    CHECK(tenriff::app::tenriff_music_gain(true, 1.0, 2.0) == doctest::Approx(0.1));
     CHECK(tenriff::app::gameplay_bgm_gain(2.0) == doctest::Approx(2.0));
 }
 

@@ -46,9 +46,12 @@
   - `none | default | random_bms | last_played`，默认 `default`。为标题和快速设置选择无音乐、默认音乐、随机 BMS 或最后游玩的歌曲。无法读取歌曲音频时回退到默认音乐。BMS 包含键音，异步合成最多 5 分钟并循环播放。
 - `volume` (double)
   - master volume
+- `gameplay_volume` (double)
+  - 整个BMS曲目（伴奏和按键音）及试听音量。0–1，默认1.0。UI音效保持原有音量。
+- `menu_music_volume` (double)
+  - 仅用于TenRiff菜单和结果音乐。0–1，默认1.0。基准为原音的10%，比1.8.9.7的40%基准再降低75%。独立于BMS曲目，不模拟Windows音量曲线。
 - `bgm_volume` (double)
-  - 新设置默认值为 `1.0`（100%）。位于主音量之后，保留已有配置的保存值。
-  - 1.8.9.7仅将TenRiff自带音乐（标题、菜单、选曲界面背景音乐和结果）的基准输出降至原来的40%。BMS曲目的BGM、键音、选曲试听、编辑器试听及UI音效保持原有比例。显示值、保存值及音量范围不变，不代表听感等同于Windows音量40%。
+  - BMS background submix: 0–2, default 1.0.
 - `normalize_audio` (bool)
   - 游戏内RMS音量调整，默认false。ON保留RMS→软限幅→主音量；OFF仅应用线性主音量与最终输出范围限制。菜单音乐及选曲试听不变。
 - `keysound_volume` (double)
@@ -90,21 +93,22 @@
   - 默认值为 `8ms`
 ### `judge`
 
-1.8.9源码会把菜单中的Judge Easy/Hard选择传入新会话。选择不保存到配置，重启应用后回到Normal。回放原始规则和多人共同规则优先，保留历史记录与R1–R4数值。参见[原因、记录与网页范围](judge-session-handoff-1.8.9.ko.md)、[验证结果与限制](release-1.8.9-gate.md)（韩语）。
+1.9.0发布版在 `Options > Key Mode Settings > Judge Window` 中提供默认/Hard/EX。Easy从新选择中移除，但保留旧回放的判定。选择仅在本次运行有效，重启后恢复默认。[EX判定与兼容范围](judge-ex-1.9.0.ko.md)（韩语）。
 
 [最新判定范围、RANK表与LN规则（韩语）](judgement-windows.md)
 
-- BMS `#RANK`：`3/EASY` PG21ms、`2/NORMAL` PG18ms、`1/HARD` PG15ms、`0/VERYHARD` PG8ms。EASY的GR/GD/BAD保持65/115/210ms，其他难度分别缩小至18/21、15/21、8/21倍。缺失或不支持的值使用EASY。Judge Easy/Hard模组随后应用；RANK不改变 `hold_grace`/`hold_break` 设置与自动漏键时限；尾端PG/GR/GD判定会应用RANK。
+- BMS `#RANK`：`3/EASY` PG21ms、`2/NORMAL` PG18ms、`1/HARD` PG15ms、`0/VERYHARD` PG8ms。EASY的GR/GD/BAD保持65/115/210ms，其他难度分别缩小至18/21、15/21、8/21倍。缺失或不支持的值使用EASY。Judge Hard/EX模组随后应用；RANK不改变 `hold_grace`/`hold_break` 设置与自动漏键时限；尾端PG/GR/GD判定会应用RANK。
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - 默认 `pg / gr / gd` 分别为 `21ms / 65ms / 115ms`
 - 默认 `bd` 为 `210ms`
-- `Judge Easy` 将RANK之后的PG/GR/GD和长按容差扩大为 `1.35x`。EASY的PG/GR/GD=`28.35/87.75/155.25ms`；BAD在所有RANK固定为 `210ms`，mask不变
+- `Judge Easy` (仅用于旧回放) 将RANK之后的PG/GR/GD和长按容差扩大为 `1.35x`。EASY的PG/GR/GD=`28.35/87.75/155.25ms`；BAD在所有RANK固定为 `210ms`，mask不变
 - `Judge Hard` 的EASY基准PG/GR/GD=`17.5/55.714286/98.571429ms`。RANK之后PG乘 `17.5/21`，GR/GD乘 `18/21`；BAD在所有RANK固定为 `225ms`，长按容差不变
+- `Judge EX` 的EASY基准PG/GR/GD=`14/44.571429/78.857143ms`（Hard的80%），保留RANK比例。BAD对所有RANK固定为250ms，独立的自动漏键时限仍为340ms，分数倍率与Hard相同为1.10。
 - `indirect_miss` (double, ms)
   - 当前配置将此值保存并归一化为 `340ms`，自动漏键判定时限独立于BAD命中窗口
   - 默认Normal/Easy/Hard在未输入音符超过 `340ms` 后自动判漏键；Normal/Easy记BAD，Hard记断连的间接 `POOR` / OD8 `MISS`
   - BAD窗口外、自动判漏键前的迟到输入不会命中BAD，而是先将过期音符记为漏键，再检查下一音符
-- 新游玩记录 `tenriff-native-score-v2-ruleset-5`。R3保留旧Easy/Hard范围与RANK、LN松键规则。R1/R2保留PG20ms、不应用RANK和旧LN松键；R1还保留Easy1.25x/Hard BAD340ms/自动漏键=BAD。自定义判定仍非官方。
+- 新的默认/Hard仍使用 `tenriff-native-score-v2-ruleset-5`，EX使用 `tenriff-native-score-v2-ruleset-6`。保留旧R1–R5、Easy与LN规则，自定义判定仍为非官方。
 - R5保持原判定时间范围，按时间顺序处理自动事件，并保留R1–R4的原处理顺序。[修正范围](release-1.8.9.5-gate.md)。
 - `hold_grace` (double, ms；默认 `80ms`)
   - 为配置兼容性及 `hold_break` 下限保留；不是当前native尾端PG/GR的判定边界
@@ -192,6 +196,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
   - 三者均为上限，实际增加量会因原谱密度与安全窗口而更低
 - `gauge` (string)
   - `normal | hard | ex_hard | easy | shift`
+  - 默认`ex_hard`（EX）。保留已保存的起始档位。
 - `random` (string)
   - `off | mirror | rr | frns | sr` (`fr` = `frns`)
 - `random_seed` (int)
@@ -231,8 +236,8 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
   - `auto_scratch`：只自动处理实际BMS转盘。分数倍率0%，标为ASSIST，不计入正式最佳记录和排名
 - `song_index_profile` (string)
   - `safe | fast`
-  - `safe` 是优先降低大型曲库 RAM high-water 的默认值
-  - `fast` 是跳过文件 hash、preview、难度表和原生 LV/CR 的可选最小 profile
+  - 默认`fast`（最小），跳过哈希、试听和难度计算。
+  - `safe`是难度表使用的完整索引选项。
 - `calculate_song_index_difficulty` (bool)
   - 默认值为 `false`
   - `false` 保留 BMS `#PLAYLEVEL` 作为菜单 LV，并跳过 CPU 开销较高的原生 LV/CR 计算
@@ -291,7 +296,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `scratch_position` | `left`, `right`; `left` | 仅改变 7+1 皿键的显示顺序，不改变输入与判定轨道。 |
 | `lr2_resolution_mode` | `auto`, `sd`, `hd`, `fhd`; `auto` | LR2 坐标分辨率；auto 使用 `#DST_NOTE` 坐标，而非文件名。 |
 | `visual_preset` | `classic`, `neon`, `minimal`, `tenriff`; `tenriff` | 在菜单选择预设时重设对应的视觉选项组合。 |
-| `note_shape` | `rect`, `circle`, `triangle`, `pentagon`, `hexagon`, `square`, `diamond`, `arrow`; `rect` | 程序绘制的音符形状。`hex` 是 `hexagon` 的兼容别名。 |
+| `note_shape` | `rect`, `simple_rect`, `circle`, `triangle`, `pentagon`, `hexagon`, `square`, `diamond`, `arrow`; `rect` | 程序绘制的音符形状。`simple_rect` 使用直角和纯色表面，保留原有 `rect`。外部图片和明确指定的矢量精灵优先。`hex` 是 `hexagon` 的兼容别名。 |
 | `note_image_aspect` | `stretch`, `contain`, `width`; `stretch` | 拉伸填充 / 保持比例完整容纳 / 固定宽度并按比例计算高度。 |
 | `preserve_note_image_aspect_ratio` | bool; `false` | 旧版兼容字段；显式 `note_image_aspect` 优先，非 stretch 模式保存为 true。 |
 | `note_border_enabled`, `show_lane_dividers`, `show_judgement_line` | bool; `true` | 分别显示音符边框、轨道分隔线与判定线。 |
@@ -303,6 +308,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `timing_feedback_override` | bool; `false` | 用户修改开关后，配置中的显示选项优先于皮肤。 |
 | `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | 文字和条的独立 X 偏移，叠加于原判定布局，以 1920x1080 像素为基准。 |
 | `timing_text_offset_y`, `timing_bar_offset_y` | double: `-400..400`; `0` | 文字和条的独立 Y 偏移；正值向下。 |
+| `timing_text_scale`, `timing_bar_scale` | double: `0.50..2`; `1` | FAST/SLOW文字与条的独立缩放，支持50–200%、5%步长或滑块。适用于Studio、Classic、导入皮肤与预览，不改变判定、连击大小或XY位置。 |
 | `show_hold_tail`, `hold_tail_taper_enabled` | bool; `false` | 分别控制长条尾部端帽与渐缩，不改变判定规则。 |
 | `judgement_line_glow_enabled` | bool; `true` | 判定线周围发光。 |
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst 亮度；0 为关闭。 |

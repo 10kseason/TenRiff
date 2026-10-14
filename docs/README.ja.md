@@ -1,12 +1,14 @@
 # TenRiff Docs Map
 
+**2026-10-14 · 1.9.0 / 新しい固定基準:** 確認済みのローカル候補を指定された正式版へ昇格します。BMS/メニュー音量分離、ロビー・フィルター・スキン操作、ランク・SUBARTIST、韓国語モード表示、EX判定、送信状態を含みます。通常/HardはR5、EXはR6。旧R1–R5記録と保存設定を保持します。[固定基準](baseline-1.9.0.ja.md) · [検証範囲](release-1.9.0-gate.md)。以下の日付付き項目は当時の履歴です。
+
 **2026-10-14 · 1.8.9.7:** 入力スレッドにMMCSS Games/Highと実行速度の電力スロットリング無効化を適用し、ホームのメニュー枠にアイコン色の控えめなglowを加えます。TenRiff独自のメニュー・結果音楽だけを従来の40%に下げ、BMS楽曲・キー音・試聴は元の音量を維持します。固定基準は1.8.7のままで、物理入力遅延の改善は未確認です。 [Scope / 검증](release-1.8.9.7-gate.md).
 
 **2026-10-13 · 1.8.9.6:** 入力とゲーム進行/HUDの短い待機に再利用する高分解能タイマーを使い、RawInputはメッセージで起床します。比較版Bの方式を適用し、判定幅・R1–R5・リプレイ・固定基準1.8.7を維持します。実プレイの感触は回ごとに異なり、すべての引っ掛かりの解消を保証しません。 [Scope / 검증](release-1.8.9.6-gate.md).
 
 **2026-10-13 · 1.8.9.5:** R5でLN終端・自動判定を時刻順に処理し、音声の先行書き込みと判定を分離。入力・表示時刻とBPM/STOP境界の表示位置を合わせます。ロビーは暗いカードと色付きアイコン、音声設定はマスター音量を先頭に戻します。R1–R4と固定基準1.8.7を保持。[変更と検証](release-1.8.9.5-gate.md)。
 
-**固定基準: [1.8.7](baseline-1.8.7.ja.md)**（2026-10-10）。Git tag `1.8.7`、commit `6b060ad47b950ad9e0dbc516fbb40189e8e21347` を使い、`latest` や新しいリリースに合わせて自動変更しません。
+**固定基準: [1.9.0](baseline-1.9.0.ja.md)**（2026-10-14の明示的な依頼）。Git tag `1.9.0`を使い、`main`や`latest`に合わせて自動更新しません。旧1.8.7基準と既存リリースは履歴として保持します。
 
 **2026-10-13 · 1.8.9.4:** リザルトの大きなランクとスコアの配置・詳細精度を整理し、Gauge Shift CLEARの4色を区別します。BGM・キー音の音量をAudioの先頭に移し、新規設定では両方100%にします。韓国語スキン名称、明記されたobjクレジットとBPM!変速表示、同じ譜面時刻の同一音源の重複再生補正を含みます。譜面作者の送信は任意で、既存の記録IDを維持します。[変更・互換性・検証範囲（韓国語）](release-1.8.9.4-gate.md)。検証とゲーム・ウェブ公開の状態は別途記録し、固定基準は1.8.7です。
 
@@ -20,7 +22,7 @@
 
 **2026-10-12 · 1.8.8:** 結果分析、自由なウィンドウサイズとF9 PNG案内、長いLN Mixに加え、表示の読みやすさ、難易度表URL・フィルター、スキンのレーンショートカット、キー数削減時のキー音保全、ソロ開始・即時再試行を改善します。現在の検証・パッケージ・公開状況は[1.8.8リリース案内](release-1.8.8-gate.md)を参照してください。固定基準は1.8.7を維持します。
 
-**分析と拡張計画:** レーン別分布・時間帯別精度・単ノート/LN開始・離鍵・維持失敗を区別し、測定不能のミスを0ms標本にしません。長いLN Mix v2はローカル記録・リプレイ専用で、従来BEST・Sites送信から除外します。プラグインと1.9.0安定化は計画です。[分析基準](result-analysis-1.8.8.ko.md)、[画面・メニュー・キー音](release-feedback-1.8.8.ko.md)、[開始・再試行操作](gameplay-start-controls.ko.md)（韓国語）。
+**分析と拡張計画:** レーン別分布・時間帯別精度・単ノート/LN開始・離鍵・維持失敗を区別し、測定不能のミスを0ms標本にしません。長いLN Mix v2はローカル記録・リプレイ専用で、従来BEST・Sites送信から除外します。プラグインは今後の計画で、1.9.0には含みません。[分析基準](result-analysis-1.8.8.ko.md)、[画面・メニュー・キー音](release-feedback-1.8.8.ko.md)、[開始・再試行操作](gameplay-start-controls.ko.md)（韓国語）。
 
 **2026-10-09 · TenRiff 1.8.7:** 入力補正と読み込み時の音声処理を改善し、LR2ソロのスタジオデッキ、750msのFAST/SLOW表示、キー再割り当て、設定統合と曲名の自動サイズ調整を追加します。 [1.8.7 release](release-1.8.7-gate.md).
 
@@ -64,8 +66,8 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 ## Recommended Reading Order
 1. `docs/current-state.ja.md`
    - 現在の製品状態、主要サブシステム、確認済みコマンド、残る手動検証項目
-2. [`docs/baseline-1.8.7.ja.md`](baseline-1.8.7.ja.md)
-   - 現在の作業をどの基準の上に積み重ねるべきかを定義する `1.8.7 fixed stable baseline` ベースライン文書
+2. [`docs/baseline-1.9.0.ja.md`](baseline-1.9.0.ja.md)
+   - 現在の作業をどの基準の上に積み重ねるべきかを定義する `1.9.0 fixed stable baseline` ベースライン文書
 3. `docs/gameplay-guide.ja.md`
    - プレイ開始方法、曲選択、操作、HUD、判定、結果画面を実際の利用者視点で説明する文書
 4. `docs/config.ja.md`
@@ -84,8 +86,8 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 ## Which Docs Are Source Of Truth
 - `docs/current-state.ja.md`
   - 現在の実装状態の要約
-- [`docs/baseline-1.8.7.ja.md`](baseline-1.8.7.ja.md)
-  - 後続作業が維持すべき `1.8.7 fixed stable baseline` ベースライン文書
+- [`docs/baseline-1.9.0.ja.md`](baseline-1.9.0.ja.md)
+  - 後続作業が維持すべき `1.9.0 fixed stable baseline` ベースライン文書
 - `docs/config.ja.md`
   - 実際の `config/config.json`、`profiles/<name>/config.json`、`keymap.json` に基づく文書
 
@@ -111,7 +113,7 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 
 ## Practical Rule
 - 現在の挙動を確認するときは `docs/current-state.ja.md` から見始めます。
-- どの基準の上に作業を積み上げるか判断するときは [`docs/baseline-1.8.7.ja.md`](baseline-1.8.7.ja.md) を一緒に読みます。
+- どの基準の上に作業を積み上げるか判断するときは [`docs/baseline-1.9.0.ja.md`](baseline-1.9.0.ja.md) を一緒に読みます。
 - 古い設計文書と現在のコードは食い違うことがあるため、衝突したら現在のコード、`docs/current-state.ja.md`、`docs/config.ja.md` の順で解釈します。
 
 ## オーディオとプレイ設定

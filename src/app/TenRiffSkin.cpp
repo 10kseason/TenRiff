@@ -852,7 +852,7 @@ void parse_gameplay_style(const config::JsonObject& gameplay,
     style.key_label_position = optional_enum(gameplay, "key_label_position", {"off", "top", "bottom"},
                                              definition, "gameplay.");
     style.note_shape = optional_enum(gameplay, "note_shape",
-                                     {"rect", "circle", "triangle", "pentagon", "hexagon",
+                                     {"rect", "simple_rect", "circle", "triangle", "pentagon", "hexagon",
                                       "square", "diamond", "arrow", "hex"},
                                      definition, "gameplay.");
     if (style.note_shape == "hex") style.note_shape = "hexagon";

@@ -61,6 +61,8 @@ inline GameplayHudData make_skin_gameplay_preview(const SkinPreviewData& preview
     hud.timing_text_offset_y = preview.timing_text_offset_y;
     hud.timing_bar_offset_x = preview.timing_bar_offset_x;
     hud.timing_bar_offset_y = preview.timing_bar_offset_y;
+    hud.timing_text_scale = preview.timing_text_scale;
+    hud.timing_bar_scale = preview.timing_bar_scale;
 
 
     hud.judgement_line_position = preview.judgement_line_position;

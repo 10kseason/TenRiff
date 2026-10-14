@@ -264,9 +264,12 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
         return mark_changed();
     }
     if (action.kind == MenuActionKind::SetRatio &&
-        (selected_id_ == SkinSettingsRowId::ComboFontSize || selected_id_ == SkinSettingsRowId::JudgementFontSize)) {
+        (selected_id_ == SkinSettingsRowId::ComboFontSize || selected_id_ == SkinSettingsRowId::JudgementFontSize ||
+         selected_id_ == SkinSettingsRowId::TimingTextSize || selected_id_ == SkinSettingsRowId::TimingBarSize)) {
         auto& value = selected_id_ == SkinSettingsRowId::ComboFontSize
-            ? runtime.skin.combo_font_scale : runtime.skin.judgement_font_scale;
+            ? runtime.skin.combo_font_scale : selected_id_ == SkinSettingsRowId::JudgementFontSize
+            ? runtime.skin.judgement_font_scale : selected_id_ == SkinSettingsRowId::TimingTextSize
+            ? runtime.skin.timing_text_scale : runtime.skin.timing_bar_scale;
         value = clamp_step_value(config::kSkinHudFontScaleMin +
                     action.ratio * (config::kSkinHudFontScaleMax - config::kSkinHudFontScaleMin),
                 config::kSkinHudFontScaleMin, config::kSkinHudFontScaleMax, config::kSkinHudFontScaleStep);
@@ -296,6 +299,9 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
                 return effects;
             case SkinSettingsRowId::OpenSkinEditor:
                 effects.boundary_action = SkinBoundaryAction::OpenSkinEditor;
+                return effects;
+            case SkinSettingsRowId::UiFontFile:
+                effects.boundary_action = SkinBoundaryAction::ChooseUiFont;
                 return effects;
             case SkinSettingsRowId::ReloadSkin:
                 effects.boundary_action = SkinBoundaryAction::ReloadSkin;
@@ -411,8 +417,8 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
             return mark_changed();
         }
         case SkinSettingsRowId::NoteShape: {
-            static constexpr std::array<std::string_view, 8> kShapes{
-                "rect", "square", "circle", "diamond", "arrow", "triangle", "pentagon", "hexagon"};
+            static constexpr std::array<std::string_view, 9> kShapes{
+                "rect", "simple_rect", "square", "circle", "diamond", "arrow", "triangle", "pentagon", "hexagon"};
             const std::string current = config::normalize_skin_note_shape_token(runtime.skin.note_shape);
             auto found = std::find(kShapes.begin(), kShapes.end(), current);
             std::size_t index = found == kShapes.end()
@@ -665,6 +671,16 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
         case SkinSettingsRowId::TimingTextX:
             runtime.skin.timing_text_offset_x = std::clamp(runtime.skin.timing_text_offset_x + direction * 10.0, -600.0, 600.0);
             return mark_changed();
+        case SkinSettingsRowId::TimingTextSize:
+            runtime.skin.timing_text_scale = clamp_step_value(
+                runtime.skin.timing_text_scale + direction * config::kSkinHudFontScaleStep,
+                config::kSkinHudFontScaleMin, config::kSkinHudFontScaleMax, config::kSkinHudFontScaleStep);
+            return mark_changed();
+        case SkinSettingsRowId::TimingBarSize:
+            runtime.skin.timing_bar_scale = clamp_step_value(
+                runtime.skin.timing_bar_scale + direction * config::kSkinHudFontScaleStep,
+                config::kSkinHudFontScaleMin, config::kSkinHudFontScaleMax, config::kSkinHudFontScaleStep);
+            return mark_changed();
         case SkinSettingsRowId::TimingTextY:
             runtime.skin.timing_text_offset_y = std::clamp(runtime.skin.timing_text_offset_y + direction * 10.0, -400.0, 400.0);
             return mark_changed();
@@ -681,6 +697,7 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
         case SkinSettingsRowId::CreateSkin:
         case SkinSettingsRowId::OpenSkinFolder:
         case SkinSettingsRowId::OpenSkinEditor:
+        case SkinSettingsRowId::UiFontFile:
         case SkinSettingsRowId::ReloadSkin:
         case SkinSettingsRowId::Back:
             return {};

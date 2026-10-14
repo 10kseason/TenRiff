@@ -572,6 +572,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 const BestResultRecord best = best_result_for_song_entry(*entry);
                 card.lamp = best.has_value ? best.clear_status : std::string{};
                 card.level_label = song_difficulty_label(*entry);
+                card.difficulty_is_aery_five_key =
+                    song_difficulty_is_aery_five_key(*entry, config_.ui.difficulty_table_url);
                 card.level = entry->level;
                 card.rating = entry->rating;
                 card.song_index = i;
@@ -625,6 +627,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 "--");
             render.song_select.selected_song_chart_name = safe_ui_text(entry->chart_name);
             render.song_select.selected_song_difficulty = safe_ui_text(song_difficulty_label(*entry));
+            render.song_select.selected_song_difficulty_is_aery_five_key =
+                song_difficulty_is_aery_five_key(*entry, config_.ui.difficulty_table_url);
             render.song_select.selected_song_key_count = entry->key_count;
             render.song_select.selected_song_bpm = entry->bpm;
             render.song_select.selected_song_has_bpm_changes = entry->has_bpm_changes;
@@ -748,8 +752,9 @@ void MenuApp::populate_song_browser_render_data(render::MenuRenderData& render) 
                     settings_cursor_ == 0,
                     render::MenuHitTargetKind::SettingsRow,
                     0,
-                    false,
+                    true,
                     true);
+    render.generic.rows.back().value_activatable = true;
     append_menu_row(render.generic,
                     ui_text("Group", "그룹"),
                     song_group_detail_label(song_group_mode_, ui_language()),
@@ -767,21 +772,17 @@ void MenuApp::populate_song_browser_render_data(render::MenuRenderData& render) 
                     false,
                     true);
     append_menu_row(render.generic,
-                    ui_text("Difficulty Min", "난이도 최소"),
-                    song_level_min_filter_ > 0 ? std::to_string(song_level_min_filter_) : ui_text("Any", "제한 없음"),
-                    settings_cursor_ == 3,
+                    ui_text("Difficulty Range", "난이도 범위"),
+                    ui_text("MIN ", "최소 ") + (song_level_min_filter_ > 0 ? std::to_string(song_level_min_filter_) : ui_text("Any", "없음")),
+                    settings_cursor_ == 3 || settings_cursor_ == 4,
                     render::MenuHitTargetKind::SettingsRow,
                     3,
                     false,
                     true);
-    append_menu_row(render.generic,
-                    ui_text("Difficulty Max", "난이도 최대"),
-                    song_level_max_filter_ > 0 ? std::to_string(song_level_max_filter_) : ui_text("Any", "제한 없음"),
-                    settings_cursor_ == 4,
-                    render::MenuHitTargetKind::SettingsRow,
-                    4,
-                    false,
-                    true);
+    render.generic.rows.back().secondary_value = ui_text("MAX ", "최대 ") +
+        (song_level_max_filter_ > 0 ? std::to_string(song_level_max_filter_) : ui_text("Any", "없음"));
+    render.generic.rows.back().secondary_row_index = 4;
+    render.generic.rows.back().secondary_selected = settings_cursor_ == 4;
     append_menu_row(render.generic,
                     ui_text("Difficulty Table", "난이도표"),
                     difficulty_table_url_editing_
@@ -857,6 +858,12 @@ void MenuApp::populate_song_browser_render_data(render::MenuRenderData& render) 
                                            "검색은 Song Select에 있습니다. 제목, 아티스트, 경로 검색은 SEARCH 항목을 사용하세요."));
     render.generic.notes.push_back(ui_text("Sort and Group moved here so the left rail only separates Songs, Sources, Search, Filter, Records, and Options.",
                                            "왼쪽 레일이 곡/소스/검색/필터/기록/옵션만 남도록 정렬과 그룹을 이 화면으로 옮겼습니다."));
+    render.generic.notes.push_back(ui_text(
+        "Sort: Enter or click the value to cycle; -/+ changes direction. With Group enabled, sorting applies inside each group.",
+        "정렬: Enter 또는 값을 클릭해 순환하고 -/+로 앞뒤 선택합니다. 그룹을 켜면 각 그룹 안에서 정렬됩니다."));
+    render.generic.notes.push_back(ui_text(
+        "Difficulty Range: Enter switches MIN/MAX, Left/Right adjusts. Each endpoint has its own mouse controls; Any removes that limit.",
+        "난이도 범위: Enter로 최소/최대를 선택하고 좌/우로 조절합니다. 마우스는 각 값의 -/+를 사용하며 없음은 해당 제한을 해제합니다."));
     render.generic.notes.push_back(ui_text(
         "Difficulty Table: copy an http(s) BMSTable link and press Enter, or use Ctrl+V while editing. Right selects local JSON; Left clears it.",
         "난이도표: http(s) BMSTable 링크를 복사하고 Enter를 누르거나 편집 중 Ctrl+V를 누르세요. 오른쪽은 로컬 JSON 선택, 왼쪽은 해제입니다."));

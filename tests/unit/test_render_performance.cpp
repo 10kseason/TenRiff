@@ -962,6 +962,9 @@ TEST_CASE("skin preview carries independent timing switches and positions") {
     preview.timing_text_offset_y = -70;
     preview.timing_bar_offset_x = -80;
     preview.timing_bar_offset_y = 140;
+    preview.timing_text_scale = 1.75;
+    preview.timing_bar_scale = 0.5;
+    preview.note_shape = "simple_rect";
     auto hud = tenriff::render::make_skin_gameplay_preview(preview);
     CHECK_FALSE(hud.show_timing_feedback);
     CHECK(hud.show_timing_bar);
@@ -974,6 +977,9 @@ TEST_CASE("skin preview carries independent timing switches and positions") {
     CHECK(hud.timing_text_offset_y == -70);
     CHECK(hud.timing_bar_offset_x == -80);
     CHECK(hud.timing_bar_offset_y == 140);
+    CHECK(hud.timing_text_scale == 1.75);
+    CHECK(hud.timing_bar_scale == 0.5);
+    CHECK(hud.note_shape == "simple_rect");
 }
 
 TEST_CASE("skin preview drives real lane activity for each hit burst style") {

@@ -427,7 +427,8 @@ void MenuApp::service_bms_editor_preview() {
     const auto samples = result.stereo_samples;
     bms_editor_preview_finished_ = std::make_shared<std::atomic<bool>>(false);
     const auto finished = bms_editor_preview_finished_;
-    const float gain = static_cast<float>(menu_background_gain(true, config_.audio_ui.master_volume,
+    const float gain = static_cast<float>(menu_background_gain(true, config_.audio_ui.master_volume *
+        gameplay_volume_gain(config_.audio_ui.gameplay_volume),
         one_shot ? config_.audio_ui.keysound_volume : config_.audio_ui.bgm_volume));
     const auto initialized = audio_thread_.initialize(
         preview_config,

@@ -751,7 +751,7 @@ TEST_CASE("cached song index load drops non-BMS menu entries") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 16,\n"
+               "  \"version\": 17,\n"
                "  \"entries\": [\n"
                "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"chart_name\":\"MX\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
                "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"chart_name\":\"Another\",\"format\":\"bms\",\"layout_label\":\"5+1 SP\",\"key_count\":6,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1},\n"
@@ -786,7 +786,7 @@ TEST_CASE("cached song index filters non-BMS entries") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 16,\n"
+               "  \"version\": 17,\n"
                "  \"entries\": [\n"
                 "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"chart_name\":\"MX\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
                 "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"format\":\"bms\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
@@ -801,14 +801,14 @@ TEST_CASE("cached song index filters non-BMS entries") {
     CHECK(result.index.entries.front().path == "legacy.bms");
 }
 
-TEST_CASE("streaming song index loader parses compact single-line schema 13 caches") {
+TEST_CASE("streaming song index loader parses compact single-line current caches") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
 
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
-               "{\"version\":16,\"entries\":["
+               "{\"version\":17,\"entries\":["
                "{\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"Composer\",\"chart_name\":\"Hyper\",\"format\":\"bms\",\"layout_label\":\"7+1 SP\",\"key_count\":8,\"level\":12,\"rating\":7.5,\"bpm\":150,\"mtime\":1},"
                "{\"path\":\"ignored.osu\",\"title\":\"Ignored\",\"artist\":\"Mapper\",\"format\":\"osu\",\"key_count\":10,\"level\":13,\"rating\":8.5,\"bpm\":180,\"mtime\":2}"
                "]}");
@@ -960,7 +960,7 @@ TEST_CASE("cached song index sanitizes control heavy metadata on load") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 16,\n"
+               "  \"version\": 17,\n"
                "  \"entries\": [\n"
                 "    {\"path\":\"legacy.bms\",\"title\":\"Bad\\nTitle\",\"artist\":\"Artist\\tName\",\"chart_name\":\"Hyper\\r\",\"format\":\"bms\\r\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
                "  ]\n"
@@ -1133,7 +1133,7 @@ TEST_CASE("stale song index version triggers silent rescan instead of using cach
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 15,\n"
+               "  \"version\": 16,\n"
                "  \"entries\": [\n"
                 "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"format\":\"bms\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
                "  ]\n"
@@ -1255,6 +1255,87 @@ TEST_CASE("1.8.9.4 metadata extracts explicit OBJ credits with header priority a
         REQUIRE(reused.entries.size() == index.entries.size());
         for (std::size_t i = 0; i < index.entries.size(); ++i)
             CHECK(reused.entries[i].chart_author == index.entries[i].chart_author);
+    }
+}
+
+TEST_CASE("SUBARTIST credits remain visible without duplicating explicit OBJ authors or changing chart bytes") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    struct CreditFixture {
+        std::string headers;
+        std::string artist;
+        std::string author;
+    };
+    const std::vector<CreditFixture> cases = {
+        {"#TITLE Nidhoggr\n#ARTIST LucaProject\n#SUBTITLE [AERY NORMAL]\n#SUBARTIST obj:3cchobo\n",
+         "LucaProject", "3cchobo"},
+        {"#ARTIST Silentroom ? iimo / obj: ARAiN\n", "Silentroom ? iimo", "ARAiN"},
+        {"#ARTIST Composer\n#SUBARTIST Unlabelled Collaborator\n", "Composer / Unlabelled Collaborator", ""},
+        {u8"#ARTIST Composer\n#SUBARTIST oBj \t: 茜 あかね / BGA: Movie\n", "Composer / BGA: Movie", u8"茜 あかね"},
+        {"#ARTIST Composer (obj: Pattern)\n#SUBARTIST Vocal: Guest\n", "Composer / Vocal: Guest", "Pattern"},
+        {"#ARTIST Composer / obj: Pattern / BGA: Movie\n", "Composer / BGA: Movie", "Pattern"},
+        {"#ARTIST Composer [obj: Pattern]\n#SUBARTIST Composer\n", "Composer", "Pattern"},
+        {"#ARTIST Subjectobj: Name / Object: Person / AC/DC\n#SUBARTIST DJ (Guest)\n",
+         "Subjectobj: Name / Object: Person / AC/DC / DJ (Guest)", ""},
+        {"#SUBARTIST Guest\n", "Guest", ""},
+        {"#ARTIST Composer\n#SETRANDOM 1\n#IF 2\n#SUBARTIST Inactive\n#ELSE\n#SUBARTIST Active\n#ENDIF\n",
+         "Composer / Active", ""},
+        {"#ARTIST Composer (obj: Pattern / BGA: Movie)\n", "Composer (BGA: Movie)", "Pattern"},
+        {"#ARTIST Composer\n#SUBARTIST obj:   \n", "Composer / obj:", ""},
+        {"#ARTIST Composer\n#SUBARTIST obj: / BGA: Guest\n", "Composer / obj: / BGA: Guest", ""},
+        {"#ARTIST Composer\n#SUBARTIST obj: Alice / obj: Bob / BGA: Guest\n",
+         "Composer / obj: Bob / BGA: Guest", "Alice"},
+        {"#ARTIST Composer (obj: Bob)\n#SUBARTIST obj: Alice / BGA: Guest\n",
+         "Composer (obj: Bob) / BGA: Guest", "Alice"},
+        {"#ARTIST Composer [obj: Alice] / Vocal: Guest (JP)\n#SUBARTIST obj: Alice / BGA: Movie\n",
+         "Composer / Vocal: Guest (JP) / BGA: Movie", "Alice"},
+        {"#ARTIST Composer\n#SUBARTIST obj: / obj: Alice / BGA: Guest\n",
+         "Composer / obj: / BGA: Guest", "Alice"},
+        {"#ARTIST Composer [obj: ] / BGA: Guest\n", "Composer [obj: ] / BGA: Guest", ""},
+        {"#ARTIST Composer\n#SUBARTIST obj: " + std::string(500, 'A') + " / BGA: Guest\n",
+         "Composer / BGA: Guest", std::string(480, 'A')},
+    };
+    std::vector<tenriff::app::ChartFileHashes> originals;
+    for (std::size_t i = 0; i < cases.size(); ++i) {
+        const auto path = temp.path / (std::to_string(i) + ".bms");
+        write_file(path, "#TITLE Credit fixture\n#BPM 120\n#00111:01\n" + cases[i].headers);
+        originals.push_back(tenriff::app::hash_chart_file(path));
+        REQUIRE(originals.back().valid());
+    }
+    for (const auto profile : {tenriff::app::SongIndexProfile::Safe, tenriff::app::SongIndexProfile::Fast}) {
+        SongIndexOptions options;
+        options.profile = profile;
+        std::vector<std::string> warnings;
+        const auto index = scan_songs(temp.path.u8string(), nullptr, warnings, {}, options);
+        REQUIRE(index.entries.size() == cases.size());
+        for (const auto& entry : index.entries) {
+            const auto fixture = static_cast<std::size_t>(std::stoi(entry.path));
+            CHECK(entry.artist == cases[fixture].artist);
+            CHECK(entry.chart_author == cases[fixture].author);
+            if (fixture == 0) {
+                CHECK(entry.title == "Nidhoggr");
+                CHECK(entry.chart_name == "[AERY NORMAL]");
+            }
+            const auto after = tenriff::app::hash_chart_file(temp.path / entry.path);
+            CHECK(after.sha256 == originals[fixture].sha256);
+            CHECK(after.md5 == originals[fixture].md5);
+            if (profile == tenriff::app::SongIndexProfile::Safe)
+                CHECK(entry.sha256 == originals[fixture].sha256);
+        }
+        const auto cache_path = temp.path / "subartist-cache.json";
+        REQUIRE(save_song_index(cache_path.u8string(), index, options));
+        const auto cached = load_song_index(cache_path.u8string(), options);
+        REQUIRE(cached.loaded_from_file);
+        REQUIRE(cached.index.entries.size() == index.entries.size());
+        const auto reused = scan_songs(temp.path.u8string(), &cached.index, warnings, {}, options);
+        REQUIRE(reused.entries.size() == index.entries.size());
+        for (std::size_t i = 0; i < index.entries.size(); ++i) {
+            CHECK(cached.index.entries[i].artist == index.entries[i].artist);
+            CHECK(cached.index.entries[i].chart_author == index.entries[i].chart_author);
+            CHECK(reused.entries[i].artist == index.entries[i].artist);
+            CHECK(reused.entries[i].chart_author == index.entries[i].chart_author);
+        }
     }
 }
 

@@ -837,6 +837,8 @@ private:
     std::string sites_connection_url_{};
     std::string sites_connection_status_{};
     std::string sites_last_upload_status_{};
+    std::string sites_result_replay_sha256_{};
+    std::string sites_result_upload_status_{};
     bool ranked_account_use_private_server_ = false;
     int ranked_account_focused_field_ = 1;
     std::string ranked_account_main_server_url_{};

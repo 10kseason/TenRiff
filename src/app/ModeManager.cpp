@@ -34,6 +34,7 @@ const std::vector<ModeModDescriptor>& registry_storage() {
     static const std::vector<ModeModDescriptor> kRegistry = {
         {"judge_easy", "Judge Easy", "Judge Easy", "judge_window", "Judge Window", 0.85},
         {"judge_hard", "Judge Hard", "Judge Hard", "judge_window", "Judge Window", 1.10},
+        {"judge_ex", "Judge EX", "Judge EX", "judge_window", "Judge Window", 1.10},
         {"dp_flip", "DP Flip", "DP Flip", "dp_layout", "DP Layout", 1.00},
         {"note_add_10", "Note Add 10%", "Add 10%", "note_add", "Note Add", 1.00, 0, 10},
         {"note_add_20", "Note Add 20%", "Add 20%", "note_add", "Note Add", 1.00, 0, 20},
@@ -786,6 +787,10 @@ bool mode_mod_auto_scratch(const std::vector<std::string>& tokens) {
     return has_mod_token(normalize_mode_mod_tokens(tokens), "auto_scratch");
 }
 
+bool mode_mod_judge_ex(const std::vector<std::string>& tokens) {
+    return has_mod_token(normalize_mode_mod_tokens(tokens), "judge_ex");
+}
+
 bool mode_mod_long_note_mix(const std::vector<std::string>& tokens) {
     return selected_long_note_mix_percent(normalize_mode_mod_tokens(tokens)) > 0;
 }
@@ -907,12 +912,14 @@ ModeManagerResult manage_modes(const gameplay::GameplayChart& chart,
 
     const bool judge_easy = has_mod_token(result.active_mods, "judge_easy");
     const bool judge_hard = has_mod_token(result.active_mods, "judge_hard");
+    const bool judge_ex = has_mod_token(result.active_mods, "judge_ex");
     // Key conversion may rebuild a chart: retain its authored timing policy.
     result.chart.bms_rank = chart.bms_rank;
     const auto chart_judge = chart_format == ChartFormat::Bms && chart.bms_rank.has_value()
         ? judge_timing_for_bms_rank(judge, *chart.bms_rank) : judge;
     result.judge_window_scale = judge_easy ? kCurrentEasyJudgeScale : 1.0;
-    result.judge = judge_timing_for_policy(chart_judge, judge_easy, judge_hard);
+    result.judge = judge_ex ? judge_timing_for_ex(chart_judge)
+                           : judge_timing_for_policy(chart_judge, judge_easy, judge_hard);
 
     result.rate_multiplier = rate_score_multiplier(rate);
     result.mod_multiplier = mod_score_multiplier(result.active_mods);

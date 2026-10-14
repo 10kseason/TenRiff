@@ -422,6 +422,10 @@ SkinPresetResult export_skin_preset(std::string_view destination_utf8,
         require(!fs::exists(destination), "The preset file already exists; choose a new filename.");
         require(fs::is_directory(destination.parent_path()), "The preset destination folder does not exist.");
         auto skin = settings;
+        // A selected desktop font is a local preference, not a licensed skin
+        // asset to redistribute or a machine path to expose in a shared preset.
+        skin.ui_font_path.clear();
+        if (skin.ui_font == "custom") skin.ui_font = "default";
         skin.source = config::normalize_skin_source_token(skin.source);
         std::vector<fs::path> assets;
         fs::path source_folder;
@@ -499,6 +503,8 @@ SkinPresetResult import_skin_preset(std::string_view source_utf8,
         config::SkinConfig skin;
         std::string parse_error;
         require(config::deserialize_skin_config(json, skin, &parse_error), "Invalid skin preset settings.");
+        skin.ui_font_path.clear();
+        if (skin.ui_font == "custom") skin.ui_font = "default";
         const auto count = read_u32(in);
         require(count <= kMaxFiles, "Skin preset contains too many files.");
         require(skin.source != "native" || count == 0, "Native skin presets cannot include files.");
@@ -573,6 +579,8 @@ config::RuntimeConfig portable_runtime(config::RuntimeConfig value) {
     ui.instant_restart_key = value.ui.instant_restart_key;
     value.ui = std::move(ui);
     value.graphics.background_upscale_model_path.clear();
+    value.skin.ui_font_path.clear();
+    if (value.skin.ui_font == "custom") value.skin.ui_font = "default";
     return value;
 }
 

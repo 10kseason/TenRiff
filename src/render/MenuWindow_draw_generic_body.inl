@@ -389,7 +389,9 @@
 
                 const std::wstring label_w = to_wide(row.label);
                 float label_right = row_right - value_width - 18.0f;
-                if (row.slider) {
+                if (row.secondary_row_index >= 0) {
+                    label_right = row_left + (row_right - row_left) * 0.40f - 18.0f;
+                } else if (row.slider) {
                     label_right = row_right - value_width - 18.0f;
                 } else if (row.adjustable) {
                     label_right = row_right - value_width - action_width * 2.0f - action_gap * 2.0f - 18.0f;
@@ -404,7 +406,36 @@
 
                 if (!row.value.empty() && row_format && d2d_->text_brush) {
                     const std::wstring value_w = to_wide(row.value);
-                    if (row.slider) {
+                    if (row.secondary_row_index >= 0) {
+                        const float range_left = row_left + (row_right - row_left) * 0.40f;
+                        const float endpoint_gap = 16.0f;
+                        const float endpoint_width = (row_right - range_left - endpoint_gap) * 0.5f;
+                        const float control_width = std::min(40.0f, action_width);
+                        for (int endpoint = 0; endpoint < 2; ++endpoint) {
+                            const int hit_index = endpoint == 0 ? row.row_index : row.secondary_row_index;
+                            const float cell_left = range_left + endpoint * (endpoint_width + endpoint_gap);
+                            const float cell_right = cell_left + endpoint_width;
+                            const auto value_rect = D2D1::RectF(cell_left, row_y + 8.0f,
+                                cell_right - control_width * 2.0f - 12.0f, row_y + row_height - 8.0f);
+                            const bool active_endpoint = row.selected && (row.secondary_selected == (endpoint == 1));
+                            draw_text_clipped_aligned(to_wide(endpoint == 0 ? row.value : row.secondary_value),
+                                row_format, value_rect, active_endpoint ? d2d_->accent_brush.Get() : d2d_->text_brush.Get(),
+                                DWRITE_TEXT_ALIGNMENT_CENTER);
+                            if (row.enabled) register_hit(value_rect, row.target_kind, hit_index, MenuHitPart::SelectOnly);
+                            for (int direction = 0; direction < 2; ++direction) {
+                                const float control_left = cell_right - control_width * (2 - direction) - (direction == 0 ? 6.0f : 0.0f);
+                                const auto control_rect = D2D1::RectF(control_left, row_y + 6.0f,
+                                    control_left + control_width, row_y + row_height - 6.0f);
+                                const auto control_round = D2D1::RoundedRect(control_rect, 8.0f, 8.0f);
+                                if (d2d_->button_brush) ctx->FillRoundedRectangle(control_round, d2d_->button_brush.Get());
+                                if (d2d_->button_border_brush) ctx->DrawRoundedRectangle(control_round, d2d_->button_border_brush.Get(), 1.0f);
+                                draw_text_clipped_aligned(direction == 0 ? L"−" : L"+", row_format, control_rect,
+                                    d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+                                if (row.enabled) register_hit(control_rect, row.target_kind, hit_index,
+                                    direction == 0 ? MenuHitPart::Decrement : MenuHitPart::Increment);
+                            }
+                        }
+                    } else if (row.slider) {
                         const float slider_group_left = row_right - value_width;
                         const float value_left = row_right - 92.0f;
                         const float track_left = slider_group_left + 12.0f;

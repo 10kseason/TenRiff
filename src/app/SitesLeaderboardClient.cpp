@@ -55,7 +55,8 @@ bool build_sites_score_json(const gameplay::ReplayFile& replay,
         error = "Sites upload skipped: LN Mix v2 needs a separate leaderboard condition; this score remains local.";
         return false;
     }
-    if (replay.ruleset_id != kCanonicalReplayRulesetId || replay.replay_format_version != gameplay::kReplayFormatVersion ||
+    if (!is_current_canonical_replay_ruleset(replay.ruleset_id, replay.mods) ||
+        replay.replay_format_version != gameplay::kReplayFormatVersion ||
         replay.aborted || replay.pause_used || replay.mode.autoplay_enabled ||
         replay.mode.practice_no_fail_enabled || replay.mode.one_miss_fail_enabled ||
         !replay.mode.course_gauge.empty() || mode_mod_adds_notes(replay.mods) ||
@@ -142,22 +143,23 @@ bool build_sites_score_json(const gameplay::ReplayFile& replay,
 
 SitesLeaderboardService::~SitesLeaderboardService() { shutdown(); }
 
-void SitesLeaderboardService::enqueue(std::filesystem::path replay_path, std::string replay_sha256,
+SitesLeaderboardService::EnqueueResult SitesLeaderboardService::enqueue(std::filesystem::path replay_path, std::string replay_sha256,
                                       std::string chart_title, std::string clear_status, std::string chart_author) {
     std::error_code ec;
     const bool protected_file = std::filesystem::is_regular_file("config/sites-leaderboard.dpapi", ec);
     ec.clear();
-    if (!protected_file && !std::filesystem::is_regular_file("config/sites-leaderboard.json", ec)) return;
+    if (!protected_file && !std::filesystem::is_regular_file("config/sites-leaderboard.json", ec)) return EnqueueResult::NotConnected;
     std::lock_guard<std::mutex> lock(mutex_);
-    if (stopping_) return;
+    if (stopping_) return EnqueueResult::Unavailable;
     if (pending_.size() >= 16) {
-        messages_.push_back("Sites upload queue is full; this result remains saved locally.");
-        return;
+        messages_.push_back({std::move(replay_sha256), "Sites upload queue is full; this result remains saved locally."});
+        return EnqueueResult::Unavailable;
     }
     pending_.push_back({std::move(replay_path), std::move(replay_sha256), std::move(chart_title),
                         std::move(clear_status), std::move(chart_author)});
     if (!worker_.joinable()) worker_ = std::thread(&SitesLeaderboardService::worker_main, this);
     wake_.notify_one();
+    return EnqueueResult::Queued;
 }
 
 void SitesLeaderboardService::worker_main() {
@@ -182,7 +184,7 @@ void SitesLeaderboardService::worker_main() {
             if (ec || replay_size > 32 * 1024 * 1024) {
                 message = "Sites upload skipped: replay evidence is missing or too large.";
             } else if (!load_sites_leaderboard_connection("config", connection, missing, error) || missing) {
-                message = error;
+                message = error.empty() ? "Sites connection is missing; result saved locally." : error;
             } else {
                 const auto hashes = hash_chart_file(pending.replay_path, &error);
                 const auto loaded = gameplay::load_replay_json(pending.replay_path.u8string());
@@ -217,13 +219,13 @@ void SitesLeaderboardService::worker_main() {
             std::lock_guard<std::mutex> lock(mutex_);
             if (generation != generation_) continue;
             if (messages_.size() >= 16) messages_.erase(messages_.begin());
-            messages_.push_back(std::move(message));
+            messages_.push_back({std::move(pending.replay_sha256), std::move(message)});
         }
     }
 }
-std::vector<std::string> SitesLeaderboardService::take_messages() {
+std::vector<SitesUploadMessage> SitesLeaderboardService::take_messages() {
     std::lock_guard<std::mutex> lock(mutex_);
-    std::vector<std::string> messages;
+    std::vector<SitesUploadMessage> messages;
     messages.swap(messages_);
     return messages;
 }

@@ -1,5 +1,9 @@
 # TenRiff Gameplay Guide
 
+1.9.0リリースでは `Options > Key Mode Settings > Judge Window` から通常/Hard/EXを選択します。Easyは新しい選択肢から外し、過去のリプレイでは維持します。選択は実行中のみ有効で、再起動後は通常に戻ります。[EX判定と互換性](judge-ex-1.9.0.ko.md)（韓国語）。
+- 新しい通常/Hardは `tenriff-native-score-v2-ruleset-5`、EXは `tenriff-native-score-v2-ruleset-6` を記録します。過去のR1–R5・Easy・LN規則は維持し、カスタム判定は非公式です。
+- `Judge EX` はEASY基準PG/GR/GD=`14/44.571429/78.857143ms`（Hardの80%）でRANK比率を維持。BADは全RANKで250ms固定、別の自動ミス期限は340ms、スコア倍率はHardと同じ1.10です。
+
 この文書は、TenRiff を初めて触るプレイヤーが実際にどうやって曲を選び、プレイし、結果を確認するかに焦点を当てたユーザーガイドです。
 
 詳細な設定構造は [`docs/config.ja.md`](config.ja.md)、現在の実装範囲は [`docs/current-state.ja.md`](current-state.ja.md) を参照してください。
@@ -171,7 +175,7 @@ Rate は曲の再生速度と譜面スケジュールだけを変え、同じ Hi
 
 ## 9. 判定とゲージ
 
-1.8.9ソースは`Options > Key Mode Settings > Mods`で選んだJudge Easy/Hardを新しいセッションへ明示的に渡します。選択はアプリ実行中のみ有効でプロファイルには保存せず、アプリ再起動後はNormalへ戻ります。リプレイは記録済みMOD・ruleset、マルチは共通規則を優先します。過去のNormal記録とR1–R4の数値は変更しません。[原因・記録・ウェブ表示の範囲](judge-session-handoff-1.8.9.ko.md)、[検証結果と制限](release-1.8.9-gate.md)（韓国語）を参照してください。
+1.9.0リリースでは `Options > Key Mode Settings > Judge Window` から通常/Hard/EXを選択します。Easyは新しい選択肢から外し、過去のリプレイでは維持します。選択は実行中のみ有効で、再起動後は通常に戻ります。[EX判定と互換性](judge-ex-1.9.0.ko.md)（韓国語）。
 
 ### Judgement
 - `PG`: Perfect Great
@@ -180,7 +184,7 @@ Rate は曲の再生速度と譜面スケジュールだけを変え、同じ Hi
 - `BD`: Bad
 - `PR`: Poor / Miss
 
-基本PGはBMS RANK EASY/NORMAL/HARD/VERYHARDでそれぞれ **±21/18/15/8ms** です。EASYのGR/GD/BADは±65/115/210msを維持し、他のRANKでは同比率で縮小します。`Judge Easy/Hard` はRANK適用後の別MODです。全判定幅と境界を含む条件は[判定範囲（韓国語）](judgement-windows.md)を参照してください。
+基本PGはBMS RANK EASY/NORMAL/HARD/VERYHARDでそれぞれ **±21/18/15/8ms** です。EASYのGR/GD/BADは±65/115/210msを維持し、他のRANKでは同比率で縮小します。`Judge Hard/EX` はRANK適用後の別MODです。全判定幅と境界を含む条件は[判定範囲（韓国語）](judgement-windows.md)を参照してください。
 
 空POOR は次の note より早い側だけに適用します。消費済み、または判定線を通過済みの note の後ろで入力しても後ろ空POORは追加しません。
 
@@ -190,9 +194,11 @@ OD8 換算統計は Sudden Death と既存 replay 互換のため JSON 内部に
 
 Casual Score は最大 10,000 点で、judgement weight は `PG 6 / GR 3 / GD 1 / PR 0 / FAIL 0` です。LN は head / tail を各 0.5 weight とする 1 object で、Detail Score は別の計算を維持します。
 
-Accuracy は `PG / GR / GD / BD = 100 / 80 / 50 / 20%` を基準に、各 judgement band 内の timing に応じて最大 0.5 percentage point を追加減算します。全 `PG` でも PG timing span が 8ms を超えると 99.5% を超えません。
+通常の Accuracy は `PG / GR / GD / BD / PR = 100 / 80 / 50 / 20 / 0%` の判定加重平均です。判定区間内のタイミングを反映する詳細精度とは別で、通常の Accuracy にタイミングのばらつきによる追加減点や99.5%の上限は適用しません。
 
-Rank は `<75 F`, `75 B`, `80.5 A`, `86.5 A+`, `90 S`, `95.5 S+`, `98 AA`, `99 SS`, `99.75 SSS` の境界を使います。
+**1.9.0 リリースの Rank:** 生存して完走した場合、通常の Accuracy が `99%以上 S++ / 98%以上 S+ / 95%以上 S / 93%以上 A+ / 90%以上 A / 85%以上 B / 80%以上 C / 80%未満 D` です。75%未満でも生存完走ならD、失敗はFです。境界には表示用の丸め前の精度を使います。
+
+明示的な中断（`ABORTED` または `aborted`）は `--`、自動演奏は `AUTO`、記録なしは `--` と表示します。死亡と中断を区別する情報がない旧失敗記録は、従来の失敗状態に従ってFのままです。結果・履歴・BESTの表示ランクだけを統計から再計算し、元の記録・得点計算・数字の順位は変更しません。固定基準1.8.7も維持します。[表示と互換性の詳細（韓国語）](grade-display.ko.md)。
 
 ### Gauge
 

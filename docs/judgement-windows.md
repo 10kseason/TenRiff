@@ -1,10 +1,10 @@
 # TenRiff 판정 범위
 
-기준: **1.8.9.5 / 2026-10-13 / `tenriff-native-score-v2-ruleset-5`**. 이 문서는 현재 기본 설정의 native 판정 범위입니다. 결과 화면의 별도 osu!mania OD8 환산 판정과 구분합니다.
+기준: **1.9.0 릴리스 / 2026-10-14 / 기본·Hard R5, EX R6**. 이 문서는 현재 기본 설정의 native 판정 범위입니다. 결과 화면의 별도 osu!mania OD8 환산 판정과 구분합니다.
 
 ## BMS RANK별 기본 범위
 
-`Judge Normal`(판정 MOD 없음) 기준입니다. BMS 파일의 `#RANK` 이름과 옵션의 `Judge Easy / Normal / Hard`는 서로 다른 설정입니다. 게이지의 Easy / Normal / Hard도 이 표를 선택하지 않습니다.
+`Judge Normal`(판정 MOD 없음) 기준입니다. BMS 파일의 `#RANK` 이름과 옵션의 `기본 / Hard / EX`는 서로 다른 설정입니다. 게이지의 Easy / Normal / Hard도 이 표를 선택하지 않습니다.
 
 | BMS `#RANK` | 파일 판정 등급 | PG | GR | GD | BAD |
 | --- | --- | ---: | ---: | ---: | ---: |
@@ -32,18 +32,21 @@
 
 1. 프로필의 기본 `judge.pg/gr/gd/bd`를 읽습니다. 정식 기본값은 `21/65/115/210ms`입니다.
 2. BMS `#RANK` 비율을 적용합니다.
-3. `Judge Easy / Normal / Hard` 정책을 적용합니다.
+3. `기본 / Hard / EX` 정책을 적용합니다. Easy는 과거 리플레이에서만 재현합니다.
 4. 최종 경계를 오디오 샘플 단위로 변환합니다.
 
 | Judge 모드 | PG / GR / GD | BAD | 별도 설정 |
 | --- | --- | --- | --- |
 | Normal | RANK별 기본 표 그대로 | RANK별 기본 표 그대로 | 기본값 유지 |
-| Easy | RANK 적용 후 세 경계를 `1.35배` | 모든 RANK에서 **210ms 고정** | `hold_grace`·`hold_break`도 1.35배; `mask` 유지 |
+| Easy (과거 리플레이 전용) | RANK 적용 후 세 경계를 `1.35배` | 모든 RANK에서 **210ms 고정** | `hold_grace`·`hold_break`도 1.35배; `mask` 유지 |
 | Hard | PG는 `17.5/21배`, GR/GD는 `18/21배` | 모든 RANK에서 **225ms 고정** | 홀드 설정 유지; 자동 미스를 간접 POOR로 기록 |
+| EX | Hard의 PG/GR/GD를 `0.8배` | 모든 RANK에서 **250ms 고정** | 홀드 설정 유지; 자동 미스 340ms 초과, 간접 POOR |
 
 Hard의 EASY 기준 PG는 17.5ms이며 GR/GD는 일반 판정의 BMS NORMAL과 같은 55.714286/98.571429ms입니다. 이 세 경계는 다른 RANK에서 기존 비율로 줄어듭니다. Easy/Hard의 BAD는 RANK와 기존 BAD 값에 곱하거나 상한을 씌우지 않고 각각 210/225ms로 설정합니다. 임의 커스텀 PG/GR/GD에도 모드 비율을 적용하되 커스텀 기록은 계속 비공식입니다.
 
-기본 설정에서 모드 적용 후의 수치는 다음과 같습니다. 모두 **±ms**입니다.
+EX는 EASY 기준 PG14ms, GR44.571429ms, GD78.857143ms이며 RANK 비율을 유지합니다. BAD 입력 범위를 넓히는 것과 무입력 자동 미스 시점은 별개입니다. 점수 배율은 Hard와 같은 1.10이며 추가 보너스는 없습니다. [선택 UI와 R6 호환](judge-ex-1.9.0.ko.md).
+
+기본 설정에서 모드 적용 후의 수치는 다음과 같습니다. Easy 표는 과거 리플레이 참고용입니다. 모두 **±ms**입니다.
 
 | BMS RANK | Judge Easy PG | GR | GD | BAD |
 | --- | ---: | ---: | ---: | ---: |
@@ -58,6 +61,13 @@ Hard의 EASY 기준 PG는 17.5ms이며 GR/GD는 일반 판정의 BMS NORMAL과 �
 | NORMAL | 15 | 47.755102 | 84.489796 | 225 |
 | HARD | 12.5 | 39.795918 | 70.408163 | 225 |
 | VERYHARD | 6.666667 | 21.22449 | 37.55102 | 225 |
+
+| BMS RANK | Judge EX PG | GR | GD | BAD |
+| --- | ---: | ---: | ---: | ---: |
+| EASY | 14 | 44.571429 | 78.857143 | 250 |
+| NORMAL | 12 | 38.204082 | 67.591837 | 250 |
+| HARD | 10 | 31.836735 | 56.326531 | 250 |
+| VERYHARD | 5.333333 | 16.979592 | 30.040816 | 250 |
 
 Rate는 음악·차트 진행 속도를 바꾸지만 판정 창은 **실제 재생 시간 기준 ms**를 유지합니다. Hi-Speed와 스킨의 Visual Latency는 판정 창을 변경하지 않습니다.
 
@@ -94,12 +104,13 @@ R5의 수치 창은 R4와 동일합니다. 기존 `ruleset_id` 값으로 처리 
 | R1 | 20ms | 미적용 | 1.25배 | 340ms | 해당 BAD 초과 | 이전 해제 동작 복원 |
 | R2 | 20ms | 미적용 | 1.35배 | 최대 180ms | 340ms 초과 | 이전 해제 동작 복원 |
 | R3 (1.8.3/1.8.4) | RANK별 21/18/15/8ms | 적용 | 1.35배 | 최대 180ms | 340ms 초과 | 즉시 해제 판정 |
+| R6 EX (1.9.0 후보) | EASY PG14ms, RANK 비례 | 적용 | 선택 불가 | EX BAD250ms 고정 | 340ms 초과, 시간순 | R5와 동일 |
 | R5 (1.8.9.5) | R4와 동일 | 적용 | R4와 동일 | 225ms 고정 | 340ms 초과, 시간순 | 일반 LN 꼬리 자동 완료 / CN 해제 |
 | R4 (1.8.41) | RANK별 21/18/15/8ms | 적용 | PG/GR/GD 1.35배, BAD210ms 고정 | 225ms 고정 | 340ms 초과 | 즉시 해제 판정 |
 
 R1/R2 기본 GR/GD/BAD는 65/115/210ms이며 해당 Judge 모드가 추가 적용됩니다. 이 표는 정식 규칙의 동작 비교입니다. 메타데이터가 오래된 리플레이는 별도로 `legacy-unverified`일 수 있습니다. R3/R4를 명시한 리플레이는 검증 메타데이터가 부족해도 각각 당시 판정으로 재생합니다. R3의 Easy BAD 1.35배·Hard PG/GR/GD 유지/BAD 최대180ms를 보존하며, R4의 Hard PG/GR/GD 비율을 과거 기록에 소급 적용하지 않습니다. 판정 규칙과 기록의 검증 상태를 구분해야 합니다.
 
-커스텀 기본 판정에도 같은 RANK 비율을 적용하지만 정식 규칙 기록으로 인정하지 않습니다. 기존 기록을 R5로 소급 계산하지 않으며, 웹에서는 R3/R4/R5의 `ruleset_id`와 `timing_profile`로 `bms-easy / bms-normal / bms-hard / bms-veryhard`를 구분합니다. 자세한 기록 계약은 [점수 무결성](score-integrity.md)과 [RANK·웹 호환 설명](audio-ln-rank.ko.md)을 참고하세요.
+커스텀 기본 판정에도 같은 RANK 비율을 적용하지만 정식 규칙 기록으로 인정하지 않습니다. 기존 기록을 R5로 소급 계산하지 않으며, 웹에서는 R3/R4/R5/R6의 `ruleset_id`와 `timing_profile`로 `bms-easy / bms-normal / bms-hard / bms-veryhard`를 구분합니다. 자세한 기록 계약은 [점수 무결성](score-integrity.md)과 [RANK·웹 호환 설명](audio-ln-rank.ko.md)을 참고하세요.
 
 ## 구현 근거와 갱신 위치
 

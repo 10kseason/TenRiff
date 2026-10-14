@@ -48,11 +48,11 @@
         draw_result_text(result_loc("YOUR SCORE", "이번 플레이 점수"), d2d_->result_label_format.Get(),
                          native_rect("result_summary.rect.009", D2D1::RectF(summary_left, 424.0f, summary_left + 230.0f, 452.0f)),
                          d2d_->muted_brush.Get(), presentation.score);
-        draw_result_text(format_int_with_commas(result_counted_score(data.result.score, presentation.score)),
+        draw_result_text(std::to_string(result_counted_score(data.result.score, presentation.score)),
                          d2d_->result_score_format.Get(),
                          native_rect("result_summary.rect.010", D2D1::RectF(summary_left, 458.0f, summary_left + 250.0f, 536.0f)),
                          d2d_->text_brush.Get(), presentation.score);
-        draw_result_text(result_loc("OUT OF ", "최대 ") + format_int_with_commas(data.result.max_score),
+        draw_result_text(result_loc("OUT OF ", "최대 ") + std::to_string(data.result.max_score),
                          d2d_->result_label_format.Get(),
                          native_rect("result_summary.rect.008", D2D1::RectF(summary_left, 526.0f, summary_left + 250.0f, 554.0f)),
                          d2d_->muted_brush.Get(), presentation.score);
@@ -80,8 +80,8 @@
                                                            : static_cast<ID2D1Brush*>(d2d_->text_brush.Get())),
                          presentation.status);
         const std::string summary_detail = result_loc("DETAIL SCORE  ", "상세 점수  ") +
-                  format_int_with_commas(data.result.detail_score) + " / " +
-                  format_int_with_commas(data.result.max_detail_score);
+                  std::to_string(data.result.detail_score) + " / " +
+                  std::to_string(data.result.max_detail_score);
         draw_result_text(summary_detail, d2d_->body_format.Get(),
                          native_rect("result_summary.rect.015", D2D1::RectF(summary_left, 634.0f, summary_left + 300.0f, 666.0f)),
                          d2d_->muted_brush.Get(), presentation.status);

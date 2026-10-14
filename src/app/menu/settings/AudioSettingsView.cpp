@@ -175,13 +175,24 @@ AudioSettingsViewModel AudioSettingsView::build(
         runtime.audio_ui.master_volume,
         controller));
     view.rows.push_back(make_slider_row(
+        AudioSettingId::GameplayVolume,
+        localized(language, "BMS / In-game Volume", "BMS 인게임 볼륨"),
+        runtime.audio_ui.gameplay_volume, controller));
+    view.rows.push_back(make_slider_row(
+        AudioSettingId::MenuMusicVolume,
+        localized(language, "TenRiff Menu Music", "텐리프 메뉴 배경음 볼륨"),
+        runtime.audio_ui.menu_music_volume, controller));
+    view.notes.push_back(localized(language,
+        "BMS volume controls the whole song and previews. TenRiff menu music has its own slider and a quiet 10% reference level.",
+        "BMS 인게임 볼륨은 곡 전체와 미리듣기를 조절합니다. 텐리프 메뉴 배경음은 별도 볼륨과 기본 10% 음량을 사용합니다."));
+    view.rows.push_back(make_slider_row(
         AudioSettingId::BgmVolume,
-        localized(language, "BGM Volume", "BGM 볼륨"),
+        localized(language, "BMS Background Balance", "BMS 반주 볼륨"),
         runtime.audio_ui.bgm_volume,
         controller));
     view.rows.push_back(make_slider_row(
         AudioSettingId::KeysoundVolume,
-        localized(language, "Keysound Volume", "키음 볼륨"),
+        localized(language, "BMS Keysound Balance", "BMS 키음 볼륨"),
         runtime.audio_ui.keysound_volume,
         controller));
     view.rows.push_back(make_row(
@@ -283,6 +294,8 @@ AudioSettingsViewModel AudioSettingsView::build(
                 row.category = localized(language, "Playback", "재생");
                 break;
             case AudioSettingId::MasterVolume:
+            case AudioSettingId::GameplayVolume:
+            case AudioSettingId::MenuMusicVolume:
             case AudioSettingId::BgmVolume:
             case AudioSettingId::KeysoundVolume:
             case AudioSettingId::Normalize:

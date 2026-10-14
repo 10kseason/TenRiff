@@ -83,11 +83,14 @@ enum class SkinSettingsRowId {
     TimingBarMode,
     HudRiffMapVisible,
     IndicatorBackground,
+    TimingTextSize,
+    TimingBarSize,
+    UiFontFile,
 };
 
 // The same order drives keyboard navigation, rendered rows and mouse hit targets.
 // Keep related controls adjacent instead of deriving positions from row labels.
-inline constexpr std::array<SkinSettingsRowId, 66> kSkinSettingsRowOrder = {
+inline constexpr std::array<SkinSettingsRowId, 69> kSkinSettingsRowOrder = {
     SkinSettingsRowId::KeyMode,
     SkinSettingsRowId::ScratchPosition,
     SkinSettingsRowId::SkinSource,
@@ -141,8 +144,10 @@ inline constexpr std::array<SkinSettingsRowId, 66> kSkinSettingsRowOrder = {
     SkinSettingsRowId::TimingFeedback,
     SkinSettingsRowId::TimingBar,
     SkinSettingsRowId::TimingBarMode,
+    SkinSettingsRowId::TimingTextSize,
     SkinSettingsRowId::TimingTextX,
     SkinSettingsRowId::TimingTextY,
+    SkinSettingsRowId::TimingBarSize,
     SkinSettingsRowId::TimingBarX,
     SkinSettingsRowId::TimingBarY,
 
@@ -153,6 +158,7 @@ inline constexpr std::array<SkinSettingsRowId, 66> kSkinSettingsRowOrder = {
     SkinSettingsRowId::ComboFontSize,
     SkinSettingsRowId::JudgementFontSize,
     SkinSettingsRowId::UiFont,
+    SkinSettingsRowId::UiFontFile,
     SkinSettingsRowId::GameplayCursor,
     SkinSettingsRowId::Back,
 };
@@ -197,6 +203,8 @@ enum class SkinSettingsCategory { Source, Geometry, Notes, LongNotes, Effects, H
         case SkinSettingsRowId::GearBoundary: case SkinSettingsRowId::KeyLabelPosition:
         case SkinSettingsRowId::TimingBar:
         case SkinSettingsRowId::TimingBarMode:
+        case SkinSettingsRowId::TimingTextSize:
+        case SkinSettingsRowId::TimingBarSize:
         case SkinSettingsRowId::IndicatorBackground:
         case SkinSettingsRowId::TimingTextX:
         case SkinSettingsRowId::TimingTextY:
@@ -208,6 +216,7 @@ enum class SkinSettingsCategory { Source, Geometry, Notes, LongNotes, Effects, H
         case SkinSettingsRowId::JudgementFontSize:
             return SkinSettingsCategory::Hud;
         case SkinSettingsRowId::UiFont:
+        case SkinSettingsRowId::UiFontFile:
         case SkinSettingsRowId::GameplayCursor:
             return SkinSettingsCategory::Other;
         case SkinSettingsRowId::Back:
@@ -520,8 +529,8 @@ inline std::string cycle_skin_note_image_aspect(std::string_view value, int dire
 }
 
 inline std::string cycle_skin_ui_font(std::string_view value, int direction) {
-    static constexpr const char* kFonts[] = {"default", "malgun", "bahnschrift", "consolas"};
-    constexpr int kCount = 4;
+    static constexpr const char* kFonts[] = {"default", "malgun", "bahnschrift", "consolas", "custom"};
+    constexpr int kCount = 5;
     int index = 0;
     const std::string normalized = config::normalize_skin_ui_font_token(value);
     for (int i = 0; i < kCount; ++i) {

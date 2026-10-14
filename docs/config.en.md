@@ -46,9 +46,12 @@ If a profile does not exist, it is created automatically on first launch.
   - `none | default | random_bms | last_played`; default `default`. Selects no music, the bundled theme, a random loaded BMS, or the last played chart for Title and Quick Setup. Unavailable chart audio falls back to the default theme. BMS audio includes keysounds and is prepared asynchronously, capped at five minutes and looped.
 - `volume` (double)
   - master volume
+- `gameplay_volume` (double)
+  - Whole BMS song (background and keysounds) and preview volume. 0–1, default 1.0. UI effects keep their original gain.
+- `menu_music_volume` (double)
+  - TenRiff menu/result music only. 0–1, default 1.0. The reference gain is 10% of source, 75% quieter than the 40% reference in 1.8.9.7. Independent of BMS songs; not a Windows volume-curve emulation.
 - `bgm_volume` (double)
-  - New-settings default: `1.0` (100%). Immediately after Master volume; existing saved profile values are preserved.
-  - Version 1.8.9.7 lowers only TenRiff scene music (title, menus, song-selection background and results) to 40% of its former reference output. BMS chart BGM, keysounds, song/editor previews and UI effects keep their original scale. Displayed/saved values and existing volume ranges are unchanged; this does not reproduce the perceived loudness of Windows volume 40%.
+  - BMS background submix: 0–2, default 1.0.
 - `normalize_audio` (bool)
   - In-game RMS loudness control, default false. ON retains RMS → soft limiter → master; OFF applies linear master gain and only guards final output overflow. Menu music and song previews are unchanged.
 - `keysound_volume` (double)
@@ -90,21 +93,22 @@ Version 1.8.9.7 requests MMCSS `Games`/High and disables execution-speed power t
   - default value is `8ms`
 ### `judge`
 
-The 1.8.9 source explicitly passes menu Judge Easy/Hard choices into new sessions. They are not profile-persisted and return to Normal after app restart. Recorded replay rules and shared multiplayer rules take precedence; old records and R1–R4 values are preserved. See [cause, records and web scope](judge-session-handoff-1.8.9.ko.md) and [verification and limits](release-1.8.9-gate.md) (Korean).
+The 1.9.0 release selects Normal / Hard / EX under `Options > Key Mode Settings > Judge Window`. Easy is removed from new selections but retained for historical replays. The session-only choice is not profile-persisted and resets to Normal on restart. See [EX timing and compatibility](judge-ex-1.9.0.ko.md) (Korean).
 
 [Current timing windows, RANK tables and LN rules (Korean)](judgement-windows.md)
 
-- BMS `#RANK` selects chart timing: `3/EASY` PG21ms, `2/NORMAL` PG18ms, `1/HARD` PG15ms, `0/VERYHARD` PG8ms. EASY keeps GR/GD/BAD at 65/115/210ms; the other ranks scale these by 18/21, 15/21 and 8/21. Missing/unsupported headers use EASY. Judge Easy/Hard mods apply afterward. RANK does not change `hold_grace`/`hold_break` settings or automatic-miss deadlines; tail PG/GR/GD boundaries do follow RANK.
+- BMS `#RANK` selects chart timing: `3/EASY` PG21ms, `2/NORMAL` PG18ms, `1/HARD` PG15ms, `0/VERYHARD` PG8ms. EASY keeps GR/GD/BAD at 65/115/210ms; the other ranks scale these by 18/21, 15/21 and 8/21. Missing/unsupported headers use EASY. Judge Hard/EX mods apply afterward. RANK does not change `hold_grace`/`hold_break` settings or automatic-miss deadlines; tail PG/GR/GD boundaries do follow RANK.
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - default `pg / gr / gd` values are `21ms / 65ms / 115ms`
 - default `bd` is `210ms`
-- `Judge Easy` scales RANK-adjusted PG/GR/GD and hold tolerances by `1.35x`. EASY PG/GR/GD=`28.35/87.75/155.25ms`; BAD is fixed at `210ms` for every RANK; mask is unchanged
+- `Judge Easy` (historical replays only) scales RANK-adjusted PG/GR/GD and hold tolerances by `1.35x`. EASY PG/GR/GD=`28.35/87.75/155.25ms`; BAD is fixed at `210ms` for every RANK; mask is unchanged
 - `Judge Hard` uses EASY PG/GR/GD=`17.5/55.714286/98.571429ms`: multiply PG by `17.5/21` and GR/GD by `18/21` after RANK. BAD is fixed at `225ms` for every RANK; hold tolerances are unchanged
+- `Judge EX` uses EASY PG/GR/GD=`14/44.571429/78.857143ms` (80% of Hard), retaining BMS RANK scaling. BAD is fixed at 250ms; the separate automatic-miss deadline remains 340ms and the score factor remains Hard's 1.10.
 - `indirect_miss` (double, ms)
   - current profiles save and normalize this value to `340ms`, independently of the BAD hit window
   - default Normal/Easy/Hard automatically miss an unplayed note once it is more than `340ms` late. Normal/Easy record BAD; Hard records a combo-breaking indirect `POOR` / OD8 `MISS`
   - a late press outside BAD but before automatic timeout misses the expired note, then checks the next note; it cannot score a BAD hit outside the hit window
-- New plays record `tenriff-native-score-v2-ruleset-5`. R3 retains its previous Easy/Hard windows and RANK/LN release behavior. R1/R2 retain PG20ms, no RANK and older LN releases; R1 also keeps Easy1.25x/Hard BAD340ms/automatic miss=BAD. Custom timing remains unofficial.
+- New Normal/Hard plays retain `tenriff-native-score-v2-ruleset-5`; EX uses `tenriff-native-score-v2-ruleset-6`. Historical R1–R5 timing, Easy and LN policies remain unchanged; custom timing is unofficial.
 - R5 keeps the numerical timing windows, processes automatic events chronologically, and preserves R1–R4 processing order. [Timing fix](release-1.8.9.5-gate.md).
 - `hold_grace` (double, ms; default `80ms`)
   - retained for configuration compatibility and as the lower bound of `hold_break`; not the current native tail PG/GR boundary
@@ -190,6 +194,7 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
   - all three are caps; how much actually lands depends on the source density and the safety windows
 - `gauge` (string)
   - `normal | hard | ex_hard | easy | shift`
+  - Default `ex_hard` (EX). Explicit saved starting tiers are preserved.
 - `random` (string)
   - `off | mirror | rr | frns | sr` (`fr` = `frns`)
 - `random_seed` (int)
@@ -229,8 +234,8 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
   - `auto_scratch`: automatically plays actual BMS scratches only. Score multiplier 0%, ASSIST record, excluded from official best records and rankings
 - `song_index_profile` (string)
   - `safe | fast`
-  - `safe` is the default that prioritizes lower RAM high-water usage on large libraries
-  - `fast` is the optional minimal profile that skips file hashes, previews, difficulty tables, and native LV/CR
+  - Default `fast` (minimal), skipping hashes, previews and difficulty calculation.
+  - `safe` is the optional full indexing profile used by difficulty tables.
 - `calculate_song_index_difficulty` (bool)
   - defaults to `false`
   - `false` keeps BMS `#PLAYLEVEL` as the menu LV and skips the CPU-heavy native LV/CR calculation
@@ -289,7 +294,7 @@ These are profile `config.json` skin settings. For a skin package's `skin.json` 
 | `scratch_position` | `left`, `right`; `left` | Changes only 7+1 scratch display order; input/judgement lanes stay unchanged. |
 | `lr2_resolution_mode` | `auto`, `sd`, `hd`, `fhd`; `auto` | LR2 coordinate resolution; auto uses `#DST_NOTE` coordinates, not filenames. |
 | `visual_preset` | `classic`, `neon`, `minimal`, `tenriff`; `tenriff` | Selecting a preset in the menu resets its visual option bundle. |
-| `note_shape` | `rect`, `circle`, `triangle`, `pentagon`, `hexagon`, `square`, `diamond`, `arrow`; `rect` | Procedural note shape. `hex` is a legacy alias for `hexagon`. |
+| `note_shape` | `rect`, `simple_rect`, `circle`, `triangle`, `pentagon`, `hexagon`, `square`, `diamond`, `arrow`; `rect` | Procedural note shape. `simple_rect` uses sharp corners and a flat face; the existing `rect` design is preserved. Imported images and explicit vector sprites take precedence. `hex` is a legacy alias for `hexagon`. |
 | `note_image_aspect` | `stretch`, `contain`, `width`; `stretch` | Fill the rectangle / fit inside with aspect preserved / keep width and derive height from aspect. |
 | `preserve_note_image_aspect_ratio` | bool; `false` | Legacy field; explicit `note_image_aspect` wins. Saved true for non-stretch modes. |
 | `note_border_enabled`, `show_lane_dividers`, `show_judgement_line` | bool; `true` | Show note borders, lane dividers, and the judgement line respectively. |
@@ -301,6 +306,7 @@ These are profile `config.json` skin settings. For a skin package's `skin.json` 
 | `timing_feedback_override` | bool; `false` | After the user edits a switch, profile visibility choices take priority over the skin manifest. |
 | `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | Independent text/bar X offsets added to the existing judgement-area layout, in 1920x1080 base pixels. |
 | `timing_text_offset_y`, `timing_bar_offset_y` | double: `-400..400`; `0` | Independent text/bar Y offsets in base pixels; positive moves down. |
+| `timing_text_scale`, `timing_bar_scale` | double: `0.50..2`; `1` | Independent FAST/SLOW text and bar scales, adjustable from 50–200% in 5% steps or with sliders. Apply to Studio, Classic, imported skins and previews without changing judgement/combo size or XY offsets. |
 | `show_hold_tail`, `hold_tail_taper_enabled` | bool; `false` | LN tail-cap visibility and taper respectively; no judgement-rule change. |
 | `judgement_line_glow_enabled` | bool; `true` | Judgement-line glow. |
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst brightness; zero disables it. |

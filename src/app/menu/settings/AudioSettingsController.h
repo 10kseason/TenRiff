@@ -32,10 +32,14 @@ enum class AudioSettingId : std::uint8_t {
     MuteWhenInactive = 13,
     TitleMusic = 14,
     PlayToEnd = 15,
+    GameplayVolume = 16,
+    MenuMusicVolume = 17,
 };
 
-inline constexpr std::array<AudioSettingId, 16> kAudioSettingOrder{
+inline constexpr std::array<AudioSettingId, 18> kAudioSettingOrder{
     AudioSettingId::MasterVolume,
+    AudioSettingId::GameplayVolume,
+    AudioSettingId::MenuMusicVolume,
     AudioSettingId::BgmVolume,
     AudioSettingId::KeysoundVolume,
     AudioSettingId::KeysoundMode,

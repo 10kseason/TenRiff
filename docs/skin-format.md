@@ -313,8 +313,10 @@ MySkin/
 누락한 값만 플레이어 설정을 사용한다. 허용 값과 범위는
 [`tenriff-skin.schema.json`](tenriff-skin.schema.json)에 정의돼 있다.
 
-`note_shape`는 `rect`, `circle`, `triangle`, `pentagon`, `hexagon`, `square`,
+`note_shape`는 `rect`, `simple_rect`, `circle`, `triangle`, `pentagon`, `hexagon`, `square`,
 `diamond`, `arrow`를 지원하며 기존 `hex`는 `hexagon`의 호환 별칭이다.
+`simple_rect`(사각형(심플))는 각진 모서리와 단색 면을 사용한다. 기존 `rect`는 그대로 유지되며,
+가져온 이미지나 명시한 벡터 스프라이트의 우선순위도 유지된다.
 삼각형·오각형·육각형·마름모·화살표는 노트 테두리를 켜면 머리와 롱노트 꼬리에
 검은 외곽선을 그린다. 롱노트 몸통은 각 끝부분 중심까지 뒤로 겹쳐 그려,
 도형의 경사면이나 이미지의 투명 여백에서 연결부가 끊기지 않게 한다.
