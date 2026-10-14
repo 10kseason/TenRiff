@@ -374,6 +374,8 @@ TEST_CASE("portable profile round trip preserves keys skin settings and backs up
     config.ui.language = "ko";
     config.ui.skip_start_countdown = true;
     config.ui.instant_restart_key = "F12";
+    config.ui.hispeed_decrease_key = "Q";
+    config.ui.hispeed_increase_key.clear();
     config.ui.active_song_source = "private-source-do-not-export";
     config.ui.private_server_url = "https://private.example.test";
     config.ui.profile_avatar_path = "private-avatar-do-not-export";
@@ -413,6 +415,8 @@ TEST_CASE("portable profile round trip preserves keys skin settings and backs up
     CHECK(reloaded.config.ui.language == "ko");
     CHECK(reloaded.config.ui.skip_start_countdown);
     CHECK(reloaded.config.ui.instant_restart_key == "F12");
+    CHECK(reloaded.config.ui.hispeed_decrease_key == "Q");
+    CHECK(reloaded.config.ui.hispeed_increase_key.empty());
     const auto reloaded_keys = manager.load_profile(profile.u8string());
     REQUIRE(reloaded_keys.success());
     CHECK(reloaded_keys.keymap.mode_bindings.at("7k").at("lane1") == "A");

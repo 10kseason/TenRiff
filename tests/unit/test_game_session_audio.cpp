@@ -1278,9 +1278,23 @@ struct GameSessionAudioTestAccess {
         session->f7_keycode_ = 118; session->f8_keycode_ = 119;
         session->config_.speed.hi_speed = 4.0;
         control(*session, 116);
-        CHECK(session->config_.speed.hi_speed == 2.0);
+        CHECK(session->config_.speed.hi_speed == 0.5);
         control(*session, 117);
-        CHECK(session->config_.speed.hi_speed == 4.0);
+        CHECK(session->config_.speed.hi_speed == 10.5);
+        control(*session, 117); // Duplicate pressed edges cannot repeat a coarse step.
+        CHECK(session->config_.speed.hi_speed == 10.5);
+        session->f5_keycode_ = 123; // Assigned F12 / Q, unrelated to the Shift lane.
+        session->f6_keycode_ = 'Q';
+        session->hispeed_coarse_decrease_held_ = false;
+        session->hispeed_coarse_increase_held_ = false;
+        session->config_.speed.hi_speed = 49.0;
+        control(*session, 'Q');
+        CHECK(session->config_.speed.hi_speed == 50.0);
+        control(*session, 123);
+        CHECK(session->config_.speed.hi_speed == 40.0);
+        input::InputEvent unassigned_f5{116, input::InputState::Pressed};
+        CHECK_FALSE(session->handle_control_input(unassigned_f5));
+        CHECK(session->config_.speed.hi_speed == 40.0);
         control(*session, 118);
         CHECK(session->config_.visual_offset_ms == -1.0);
         control(*session, 119);
@@ -1292,7 +1306,7 @@ struct GameSessionAudioTestAccess {
         session->request_pause_adjust(2, 1);
         session->process_paused_input_queue();
         CHECK(session->config_.skin.judgement_line_position == doctest::Approx(original_line - 0.01));
-        CHECK(session->config_.speed.hi_speed == 4.25);
+        CHECK(session->config_.speed.hi_speed == 40.25);
         CHECK(session->config_.visual_offset_ms == 1.0);
         session->request_pause_action(0);
         session->process_paused_input_queue();
@@ -1491,9 +1505,11 @@ struct GameSessionAudioTestAccess {
         if (held) queue_physical_edge(*session, key, input::InputState::Pressed, 48000);
         if (paused) control(*session, 27);
         control(*session, 116);
-        CHECK(session->config_.speed.hi_speed == 2.0);
+        CHECK(session->config_.speed.hi_speed == 0.5);
         control(*session, 117);
-        CHECK(session->config_.speed.hi_speed == 4.0);
+        CHECK(session->config_.speed.hi_speed == 10.5);
+        control(*session, 117); // Duplicate pressed edges cannot repeat a coarse step.
+        CHECK(session->config_.speed.hi_speed == 10.5);
         control(*session, 119);
         CHECK(session->config_.visual_offset_ms == 1.0);
         input::InputEvent release{};
@@ -2136,6 +2152,9 @@ struct GameSessionAudioTestAccess {
         session->config_.audio_ui.play_to_end = !skip_outro;
         session->config_.mode.key_mode = "4k";
         session->chart_format_ = ChartFormat::Bms;
+        // This direct fixture bypasses initialize(), which keeps unaffected
+        // BPM-only charts on the historical timing identity for web records.
+        session->bms_timing_version_ = 1;
         session->key_to_lane_[32] = 1;
         session->lane_binding_state_.configure(session->key_to_lane_);
         session->lane_activity_.assign(4, 0);
@@ -2213,6 +2232,7 @@ struct GameSessionAudioTestAccess {
         session->shutdown();
         const auto& result = session->result();
         REQUIRE(result.has_value);
+        CHECK(result.bms_timing_version == 1);
         CHECK(result.finished);
         REQUIRE_FALSE(result.replay_path.empty());
         REQUIRE_FALSE(result.result_path.empty());
@@ -2223,6 +2243,7 @@ struct GameSessionAudioTestAccess {
         REQUIRE(result.replay_sha256.size() == 64);
         const auto replay = gameplay::load_replay_json(result.replay_path);
         REQUIRE(replay.success());
+        CHECK(replay.replay->mode.bms_timing_version == 1);
         REQUIRE(replay.replay->trace.events.size() == recorded_events.size());
         for (std::size_t i = 0; i < recorded_events.size(); ++i) {
             CHECK(replay.replay->trace.events[i].lane == recorded_events[i].lane);
@@ -2894,7 +2915,7 @@ TEST_CASE("HUD old LN survivors preserve missed and active bodies across rewind 
 TEST_CASE("ghost replay backlog preserves player callback order samples keysound and feedback") {
     tenriff::app::GameSessionAudioTestAccess::check_ghost_backlog_player_callback();
 }
-TEST_CASE("pause mouse commands and explicit latency and multiplicative speed keys reach session") {
+TEST_CASE("pause mouse commands and explicit latency and assignable coarse speed keys reach session") {
     tenriff::app::GameSessionAudioTestAccess::check_pause_mouse_and_hotkeys();
 }
 TEST_CASE("live pacemaker keeps ordinary completed record and community submission eligibility") {

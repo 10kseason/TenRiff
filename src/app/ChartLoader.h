@@ -20,6 +20,7 @@ struct ChartLoadResult {
     double base_bpm = 0.0;
     // Display/Hi-Speed reference only; base_bpm preserves replay/conversion input.
     double reference_bpm = 0.0;
+    bool has_bpm_stop_timing_difference = false;
     std::vector<std::string> messages;
     std::string error;
 
@@ -32,7 +33,8 @@ public:
                                        int sample_rate,
                                        double rate,
                                        std::string_view bms_keysound_policy = "ignore",
-                                       uint32_t bms_random_seed = 0) const;
+                                       uint32_t bms_random_seed = 0,
+                                       int bms_timing_version = 2) const;
 };
 
 }  // namespace tenriff::app

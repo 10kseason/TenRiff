@@ -1,5 +1,7 @@
 # TenRiff 当前状态
 
+**2026-10-15 · 1.9.0.1:** 提供试听×0.75、个人档案指定F5/F6 -10/+10、Xbox/XInput按钮输入、文件选择框防重复，以及BMS BPM/STOP顺序修正与旧回放兼容。固定基准保持1.9.0。 [变更说明](feedback-20261015.zh-CN.md) · [发布验证范围](release-1.9.0.1-gate.md).
+
 **2026-10-14 · 1.9.0 / 新固定基准：** 将已检查的本地候选版提升为指定正式版本，包括BMS/菜单音量分离、大厅/筛选/皮肤操作、等级与SUBARTIST、韩文模式界面、EX判定和上传状态。普通/Hard使用R5，EX使用R6；保留旧R1–R5记录及已保存设置。[固定基准](baseline-1.9.0.zh-CN.md) · [验证范围](release-1.9.0-gate.md)。下方带日期的条目保留当时发布历史。
 
 1.9.0发布版在 `Options > Key Mode Settings > Judge Window` 中提供默认/Hard/EX。Easy从新选择中移除，但保留旧回放的判定。选择仅在本次运行有效，重启后恢复默认。[EX判定与兼容范围](judge-ex-1.9.0.ko.md)（韩语）。
@@ -53,14 +55,15 @@
 - 1.7.10 改善 ALL SONG 的已删除缓存项处理、合并进度和完成状态通知。[验证及未复现症状](release-1.7.10-gate.md)。
 - 1.7.8 新增默认菜单动画、4 至 16 键 Luma Keys、日语界面及网页/离线皮肤编辑。菜单与游戏内视觉设置分别保存在 `native` 和 `gameplay.native`。[验证范围](release-1.7.8-gate.md)。
 
-固定基准为 **1.9.0**，本工作副本是 **1.9.0发布版**。默认/Hard保留R5，EX使用R6，旧记录不变。[候选版范围与验证限制](controls-1.9.0.ko.md)（韩语）。带日期条目为以往发布历史。
+固定基准为 **1.9.0**，本工作副本属于 **1.9.0.1发布线**。默认/Hard保留R5，EX使用R6，旧记录不变。[候选版范围与验证限制](release-1.9.0.1-gate.md)（韩语）。带日期条目为以往发布历史。
 
 [本地 1.7.1 r2 报告](local-1.7.1-r2.ko.md)中的 749/739 项是旧构建的记录，不作为新版本的结果。参见[曲库管理](library-management.md)、[基准 BPM](reference-bpm.md)、[皮肤预设](skin-presets.md)和 [ASIO](asio-audio.md)。
 
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 用户固定基准为 `1.9.0`，当前源码版本为 `1.9.0`
+- 用户固定基准为 `1.9.0`，当前源码版本为 `1.9.0.1`
+- XInput数字按钮与扳机可在Keymap/个人档案中绑定。专用工作线程执行系统查询，现有InputThread读取内部队列并写入RawInput/Polling共用的输入队列。工作线程生命周期随输入启动和停止。4个手柄聚合、断开和焦点行为见[1.9.0.1说明](feedback-20261015.zh-CN.md)。实体手柄验证与模拟输入测试需分开说明。
 - 1.7.1 提供最多8人的 HUD 与结果、并列名次与分数等待状态、P-GREAT 专属效果、判定与连击独立位置、10张选项卡、音量标准化及选曲难度表卡片。见[变更详情](gameplay-polish-followup.md)和[验证范围](release-1.7.1-gate.md)。
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
 - 默认结果页面突出分数、等级和准确率；棱镜演出保留在自定义皮肤中。保留现有2.2秒展示流程、Space跳过和按钮启用规则。
@@ -158,7 +161,7 @@
   - 游戏内 Mode Settings 的 `Key Converter` 可选择 `Krrcream`、内置确定性 `KeyWeaver nK2` 或 `KeyWeaver NK3 ONNX`，并写入设置与 replay metadata
   - 已移除独立的 `Conversion Note Add` 选项：Krrcream 只重排原始 note，nK2 在扩展键数时直接向转换后的目标 layout 生成安全的辅助 note。
   - nK2 preset 可选择默认 `Native (12%)`、`Transform (35%)` 或 `Remaster (65%)`；`Remaster` 在提高预算的同时锁定 anchor 以保留原曲排布，并用等长长条填充 LN 区间。三者均为上限，实际增加量取决于原谱密度与安全窗口。Krrcream 下锁定该行，standalone converter GUI 的 Krrcream Max/Min/Speed/Seed 也不可修改。
-  - 1.9.0 官方 build/Windows ZIP 不构建或附带 standalone BMS key-converter CLI/GUI；顶层 CMake 选项默认 `OFF`，源码仅保留用于开发回归
+  - 1.9.0.1 官方 build/Windows ZIP 不构建或附带 standalone BMS key-converter CLI/GUI；顶层 CMake 选项默认 `OFF`，源码仅保留用于开发回归
   - NK3 始终将随包提供的 P64 与 host beam32 结合。仅当非 10K 源谱面转换为 10K 时才加入 generalized pattern MLP；10K→10K 与其他所有目标仅使用 P64。默认 `AUTO` 后端通过 ncnn Vulkan 在 AMD/NVIDIA GPU 上运行 P64 与 MLP，并保留可选 OpenVINO 兼容路径作为回退；可通过 `TENRIFF_NK3_BACKEND` 和 `TENRIFF_NK3_VULKAN_DEVICE` 强制选择。
   - `mode.key_mode=none` 表示保持谱面的原始键数与基础 pattern 布局不变
 - Native difficulty：

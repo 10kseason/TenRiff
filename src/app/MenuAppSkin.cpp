@@ -1,3 +1,4 @@
+#include "app/NativeFileDialog.h"
 #include "app/MenuApp.h"
 
 #include <algorithm>
@@ -111,7 +112,7 @@ std::optional<std::string> pick_ui_font_dialog_utf8() {
     const COMDLG_FILTERSPEC filter{L"Fonts (*.ttf; *.otf)", L"*.ttf;*.otf"};
     dialog->SetFileTypes(1, &filter);
     dialog->SetTitle(L"Select UI font / UI 폰트 선택");
-    if (FAILED(dialog->Show(nullptr))) return std::nullopt;
+    if (FAILED(show_native_file_dialog(dialog.Get()))) return std::nullopt;
     Microsoft::WRL::ComPtr<IShellItem> item;
     if (FAILED(dialog->GetResult(&item))) return std::nullopt;
     PWSTR raw = nullptr;
@@ -145,7 +146,7 @@ std::optional<std::string> pick_folder_dialog_utf8() {
     }
     dialog->SetOptions(options | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST);
 
-    if (FAILED(dialog->Show(nullptr))) {
+    if (FAILED(show_native_file_dialog(dialog.Get()))) {
         if (should_uninitialize) {
             CoUninitialize();
         }

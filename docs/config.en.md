@@ -1,5 +1,7 @@
 # TenRiff Config Schema (current)
 
+**2026-10-15 · 1.9.0.1:** Preview ×0.75, profile-assigned F5/F6 -10/+10, Xbox/XInput button input, single modal file pickers, and corrected BMS BPM/STOP order with historical replay compatibility. The fixed baseline remains 1.9.0. [Changes](feedback-20261015.en.md) · [Release verification scope](release-1.9.0.1-gate.md).
+
 **1.8.8:** Includes result analysis, freely resizable windows and direct width/height entry, result `F9` PNG hints, long LN Mix, and menu, keysound and start-control improvements. See the [release guide (Korean)](release-1.8.8-gate.md) for current verification and delivery status. The user-pinned baseline remains 1.8.7; its existing tag and release files are preserved.
 
 Reference: [Config.h](../src/config/Config.h), [Config.cpp](../src/config/Config.cpp), [default JSON](../config/config.json), and [keymaps](../src/config/Keymap.cpp). Missing values use code defaults; bounds below describe load/save normalization.
@@ -258,6 +260,8 @@ These controls do not change Sites submission policy. Long LN Mix v2 exclusion f
 | `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | Profile and first-run menu text at 100%, 115%, or 130%. Gameplay fonts remain skin-controlled. |
 | `skip_start_countdown` | bool; `false` | Skip the initial `3 / 2 / 1` display in solo play, including normal starts, menu restarts and result retries. |
 | `instant_restart_key` | string; `""` (unassigned) | Key name for restarting an active solo chart from the beginning. The new attempt always skips the initial countdown; the interrupted attempt saves no result or replay. |
+| `hispeed_decrease_key` | string; `"F5"` | Hi-Speed -10 key, assigned in Profile; empty disables. |
+| `hispeed_increase_key` | string; `"F6"` | Hi-Speed +10 key, assigned in Profile; empty disables. |
 | `all_song_sources` | bool; `false` | Restore ALL SONG, combining registered folder caches and deduplicating identical chart paths. |
 | `result_tail_ms` | double; `500` ms | Extra result-transition delay after judgement completion; the chart audio end is also considered when `audio.play_to_end=true`. |
 | `require_enter_to_exit` | bool; `true` | Retained for read/write compatibility; the current Windows result-input path does not use it to auto-exit. |
@@ -357,6 +361,8 @@ Text readability applies across menus, options, the song library, results, help/
   - positive values delay chart BGM/autoplay keysounds and negative values advance them; judgement, note/BGA timing, and hit-triggered `follow` keysounds do not move
 
 ## `keymap.json`
+
+Xbox/XInput buttons use existing key-token fields: `PadUp`, `PadDown`, `PadLeft`, `PadRight`, `PadStart`, `PadBack`, `PadLS`, `PadRS`, `PadLB`, `PadRB`, `PadA`, `PadB`, `PadX`, `PadY`, `PadLT`, `PadRT`. Press the physical button during Keymap capture; the same names work for Profile restart/Hi-Speed controls. LT/RT press above 30/255, and LS/RS are stick clicks. Matching buttons across four controllers share one logical input; analog axes and vibration are outside this release. [Controls, connection and compatibility](feedback-20261015.en.md).
 
 ### Shape
 - `layout` (string)

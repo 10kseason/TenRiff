@@ -1,3 +1,4 @@
+#include "app/NativeFileDialog.h"
 #include "app/MenuApp.h"
 
 #include <algorithm>
@@ -86,7 +87,7 @@ std::optional<std::filesystem::path> pick_sites_connection_file(std::string& err
         const COMDLG_FILTERSPEC filter[] = {{L"TenRiff connection (*.json)", L"*.json"}};
         if (SUCCEEDED(hr)) hr = dialog->SetFileTypes(1, filter);
         if (SUCCEEDED(hr)) hr = dialog->SetTitle(L"Select TenRiff leaderboard connection");
-        if (SUCCEEDED(hr)) hr = dialog->Show(nullptr);
+        if (SUCCEEDED(hr)) hr = show_native_file_dialog(dialog.Get());
         if (SUCCEEDED(hr)) {
             Microsoft::WRL::ComPtr<IShellItem> item;
             hr = dialog->GetResult(&item);

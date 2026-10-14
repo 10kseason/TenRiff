@@ -577,6 +577,8 @@ config::RuntimeConfig portable_runtime(config::RuntimeConfig value) {
     ui.show_cursor_in_gameplay = value.ui.show_cursor_in_gameplay;
     ui.skip_start_countdown = value.ui.skip_start_countdown;
     ui.instant_restart_key = value.ui.instant_restart_key;
+    ui.hispeed_decrease_key = value.ui.hispeed_decrease_key;
+    ui.hispeed_increase_key = value.ui.hispeed_increase_key;
     value.ui = std::move(ui);
     value.graphics.background_upscale_model_path.clear();
     value.skin.ui_font_path.clear();
@@ -594,6 +596,8 @@ void restore_local_preferences(config::RuntimeConfig& loaded, const config::Runt
     loaded.ui.show_cursor_in_gameplay = portable.show_cursor_in_gameplay;
     loaded.ui.skip_start_countdown = portable.skip_start_countdown;
     loaded.ui.instant_restart_key = portable.instant_restart_key;
+    loaded.ui.hispeed_decrease_key = portable.hispeed_decrease_key;
+    loaded.ui.hispeed_increase_key = portable.hispeed_increase_key;
     loaded.graphics.background_upscale_model_path = current.graphics.background_upscale_model_path;
 }
 

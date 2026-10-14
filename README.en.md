@@ -1,5 +1,7 @@
 # TenRiff
 
+**2026-10-15 · 1.9.0.1:** Preview ×0.75, profile-assigned F5/F6 -10/+10, Xbox/XInput button input, single modal file pickers, and corrected BMS BPM/STOP order with historical replay compatibility. The fixed baseline remains 1.9.0. [Changes](docs/feedback-20261015.en.md) · [Release verification scope](docs/release-1.9.0.1-gate.md).
+
 **2026-10-14 · 1.9.0 / new fixed baseline:** Promotes the reviewed local candidate to the requested release line: independent BMS/TenRiff music volume, lobby/filter/skin controls, grades and SUBARTIST credits, localized mods, EX timing and upload status. Normal/Hard use R5, EX uses R6; historical R1–R5 records and saved settings are preserved. [Baseline](docs/baseline-1.9.0.en.md) · [Release verification scope](docs/release-1.9.0-gate.md). Dated entries below retain their historical release context.
 
 **1.9.0 release:** Independent BMS/menu volume, quieter menu music, compact lobby, range/sort fixes, indicator scales, simple rectangle notes and local UI fonts. New defaults: EX, Fast indexing, Ghost off. Saved choices are preserved; the fixed baseline is explicitly updated to 1.9.0. [Scope](docs/controls-1.9.0.ko.md).
@@ -46,13 +48,13 @@
 
 **Multiplayer Rate build:** the leader sets a shared Room Rate in the lobby. All participants must use this protocol v6 build; previous v5 clients cannot join. [Guide (Korean)](docs/multiplayer.md).
 
-Release and downloads: [**1.9.0 Sites integrated**](https://github.com/10kseason/TenRiff/releases/tag/1.9.0). Actual package/publication status is tracked in the [release record](docs/release-1.9.0-gate.md); the fixed baseline remains 1.9.0. Extract to a new folder, run `launch_win.bat`, then press F10 and link your web account once. Eligible new plays upload score, detail score, accuracy, and detailed accuracy. New plays use ruleset-5 (Normal/Hard), ruleset-6 (EX) with a required timing profile for web submissions; ruleset-1/2/3/4 replays retain their original timing and LN behavior, and existing web records keep their IDs and scores. See the [connection guide](docs/sites-leaderboard.md) (Korean).
+Release and downloads: [**1.9.0.1**](https://github.com/10kseason/TenRiff/releases/tag/1.9.0.1). Actual package/publication status is tracked in the [release record](docs/release-1.9.0.1-gate.md); the fixed baseline remains 1.9.0. Extract to a new folder, run `launch_win.bat`, then press F10 and link your web account once. Eligible new plays upload score, detail score, accuracy, and detailed accuracy. New plays use ruleset-5 (Normal/Hard), ruleset-6 (EX) with a required timing profile for web submissions; ruleset-1/2/3/4 replays retain their original timing and LN behavior, and existing web records keep their IDs and scores. See the [connection guide](docs/sites-leaderboard.md) (Korean). New timing-version-2 records affected by the BPM/STOP correction remain local until web support is added.
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The fixed baseline is `1.9.0` and this source targets `1.9.0`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The fixed baseline is `1.9.0` and this source targets `1.9.0.1`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-This README explains what to read first when opening the project. For current behavior, the `1.9.0` release line, the fixed `1.9.0` baseline, configuration and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
+This README explains what to read first when opening the project. For current behavior, the `1.9.0.1` release line, the fixed `1.9.0` baseline, configuration and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
 
 TenRiff should also be read as a `vibe coding` work: it was shaped through fast iteration and experimentation rather than only through a traditional long-form design-first process.
 
@@ -94,7 +96,7 @@ Adjust lanes and notes while checking the live preview.
 - Supported charts: BMS family only (`.bms/.bme/.bml/.pms`)
 - Graphics path: D3D11 + Direct2D/DirectWrite
 - Audio path: WASAPI (default), native ASIO (requires a Windows x64 driver)
-- Input path: RawInput or high-rate polling
+- Input path: RawInput or high-rate polling + Xbox/XInput digital buttons and triggers
 - Direct-IP/headless-server multiplayer: fixed TCP coordinator for up to 8 players, BMS-only shared charts, and `F8` chat (default `27301/TCP`; see [usage](docs/multiplayer.md))
 - License: [MIT](LICENSE)
 - Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)

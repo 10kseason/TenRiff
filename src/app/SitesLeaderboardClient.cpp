@@ -49,6 +49,10 @@ bool build_sites_score_json(const gameplay::ReplayFile& replay,
     std::string_view chart_author) {
     payload.clear();
     error.clear();
+    if (replay.mode.bms_timing_version != 1) {
+        error = "Sites upload skipped: BMS timing v2 needs a separate leaderboard condition; this score remains local.";
+        return false;
+    }
     if (mode_mod_long_note_mix(replay.mods) && replay.mode.long_note_mix_version != 1) {
         // Existing boards do not distinguish conversion versions. Keep a new
         // multi-beat chart out of the legacy chart-condition leaderboard.

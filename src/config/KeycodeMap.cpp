@@ -1,4 +1,5 @@
 #include "config/KeycodeMap.h"
+#include "input/GamepadInput.h"
 
 #include <algorithm>
 #include <array>
@@ -294,6 +295,10 @@ uint32_t normalize_layout_sensitive_key(uint32_t fallback_vkey, uint16_t scan_co
 
 std::optional<uint32_t> KeycodeMap::to_keycode(std::string_view name) {
     std::string normalized = normalize(name);
+    for (std::size_t i = 0; i < input::gamepad::kControlCount; ++i) {
+        if (normalized == normalize(input::gamepad::kKeyNames[i]))
+            return input::gamepad::kKeycodeBase + static_cast<uint32_t>(i);
+    }
     if (normalized.empty()) {
         return std::nullopt;
     }
@@ -413,6 +418,8 @@ std::optional<uint32_t> KeycodeMap::to_keycode(std::string_view name) {
 }
 
 std::string KeycodeMap::to_name(uint32_t keycode) {
+    if (const auto index = input::gamepad::keycode_index(keycode))
+        return std::string(input::gamepad::kKeyNames[*index]);
 #ifdef _WIN32
     if (is_scancode_keycode(keycode)) {
         return name_from_scan_code(decode_scancode_keycode(keycode));

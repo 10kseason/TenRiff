@@ -204,6 +204,16 @@ TEST_CASE("Sites keeps musical LN Mix v2 out of unversioned legacy boards") {
     CHECK(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
 }
 
+TEST_CASE("Sites keeps corrected BMS timing out of historical timing boards") {
+    auto replay = score_fixture();
+    std::string payload, error;
+    REQUIRE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
+    replay.mode.bms_timing_version = 2;
+    CHECK_FALSE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
+    CHECK(payload.empty());
+    CHECK(error.find("BMS timing v2") != std::string::npos);
+}
+
 TEST_CASE("Sites EX payload requires its own R6 policy and excludes mixed judge modes") {
     auto replay = score_fixture();
     replay.ruleset_id = std::string(app::kExReplayRulesetId);

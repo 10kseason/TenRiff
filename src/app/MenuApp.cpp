@@ -1,3 +1,4 @@
+#include "app/NativeFileDialog.h"
 #include "app/MenuApp.h"
 #include "render/SkinGameplayPreview.h"
 #include "app/menu/settings/SettingsHelp.h"
@@ -287,7 +288,7 @@ std::string browse_for_folder(const std::string& title) {
             pFileDialog->SetTitle(wide_title.c_str());
         }
 
-        hr = pFileDialog->Show(nullptr);
+        hr = show_native_file_dialog(pFileDialog);
         if (SUCCEEDED(hr)) {
             IShellItem* pItem = nullptr;
             hr = pFileDialog->GetResult(&pItem);
@@ -351,7 +352,7 @@ std::string browse_for_image_file(const std::string& title) {
             dialog->SetTitle(wide_title.c_str());
         }
 
-        if (SUCCEEDED(dialog->Show(nullptr))) {
+        if (SUCCEEDED(show_native_file_dialog(dialog))) {
             IShellItem* item = nullptr;
             if (SUCCEEDED(dialog->GetResult(&item)) && item) {
                 PWSTR path = nullptr;
@@ -410,7 +411,7 @@ std::string browse_for_json_file(const std::string& title) {
             dialog->SetTitle(wide_title.c_str());
         }
 
-        hr = dialog->Show(nullptr);
+        hr = show_native_file_dialog(dialog);
         if (SUCCEEDED(hr)) {
             IShellItem* item = nullptr;
             hr = dialog->GetResult(&item);
@@ -473,7 +474,7 @@ std::string browse_for_lr2_course_file(const std::string& title) {
             dialog->SetTitle(wide_title.c_str());
         }
 
-        if (SUCCEEDED(dialog->Show(nullptr))) {
+        if (SUCCEEDED(show_native_file_dialog(dialog))) {
             IShellItem* item = nullptr;
             if (SUCCEEDED(dialog->GetResult(&item)) && item) {
                 PWSTR path = nullptr;
@@ -531,7 +532,7 @@ std::string browse_for_lr2_course_save_file(const std::string& title) {
             }
         }
 
-        if (SUCCEEDED(dialog->Show(nullptr))) {
+        if (SUCCEEDED(show_native_file_dialog(dialog))) {
             IShellItem* item = nullptr;
             if (SUCCEEDED(dialog->GetResult(&item)) && item) {
                 PWSTR path = nullptr;
@@ -717,32 +718,32 @@ std::string format_signed_ms(double value) {
 }  // namespace
 
 void MenuApp::reset_screen(Screen screen) noexcept {
-    profile_restart_key_capture_active_ = false;
-    profile_restart_key_status_.clear();
+    profile_control_key_capture_active_ = false;
+    profile_control_key_status_.clear();
     close_skin_fullscreen_preview();
     reset_song_select_repeat();
     menu_navigator_.reset(screen);
 }
 
 void MenuApp::push_screen(Screen screen) {
-    profile_restart_key_capture_active_ = false;
-    profile_restart_key_status_.clear();
+    profile_control_key_capture_active_ = false;
+    profile_control_key_status_.clear();
     close_skin_fullscreen_preview();
     reset_song_select_repeat();
     menu_navigator_.push(screen);
 }
 
 void MenuApp::replace_screen(Screen screen) noexcept {
-    profile_restart_key_capture_active_ = false;
-    profile_restart_key_status_.clear();
+    profile_control_key_capture_active_ = false;
+    profile_control_key_status_.clear();
     close_skin_fullscreen_preview();
     reset_song_select_repeat();
     menu_navigator_.replace(screen);
 }
 
 bool MenuApp::pop_screen() noexcept {
-    profile_restart_key_capture_active_ = false;
-    profile_restart_key_status_.clear();
+    profile_control_key_capture_active_ = false;
+    profile_control_key_status_.clear();
     close_skin_fullscreen_preview();
     reset_song_select_repeat();
     return menu_navigator_.back();
@@ -1436,6 +1437,7 @@ void MenuApp::shutdown() {
 
 void MenuApp::start_menu_threads() {
     pressed_keys_.clear();
+    menu_key_owners_.clear();
     reset_song_select_repeat();
     reset_input_backend_probe();
     const bool use_rawinput = input_backend_fallback_policy_.rawinput_enabled(config_.input.rawinput);
@@ -1511,6 +1513,7 @@ void MenuApp::start_menu_threads() {
 
 void MenuApp::stop_menu_threads() {
     pressed_keys_.clear();
+    menu_key_owners_.clear();
     reset_song_select_repeat();
     render_thread_.stop();
     menu_music_.stop();
@@ -1521,6 +1524,7 @@ void MenuApp::stop_menu_threads() {
 
 void MenuApp::restart_input_thread(bool retry_configured_backend) {
     pressed_keys_.clear();
+    menu_key_owners_.clear();
     reset_song_select_repeat();
     reset_input_backend_probe();
     if (retry_configured_backend) {
@@ -1646,7 +1650,7 @@ std::vector<uint32_t> MenuApp::current_menu_probe_keycodes() const {
         current_screen() == Screen::Keymap || current_screen() == Screen::KeymapTest;
     const bool capture_all_keys =
         (current_screen() == Screen::Keymap && keymap_settings_controller_.capture_active()) ||
-        (current_screen() == Screen::QuickSetup && profile_restart_key_capture_active_);
+        (current_screen() == Screen::QuickSetup && profile_control_key_capture_active_);
     return build_menu_probe_keycodes(fixed_menu_keys,
                                      working_keymap_,
                                      std::string(keymap_settings_controller_.edit_mode()),
@@ -1664,12 +1668,22 @@ void MenuApp::refresh_menu_input_polling_scope() {
 
 void MenuApp::rebuild_pressed_keys_from_polling_snapshot() {
     pressed_keys_.clear();
+    menu_key_owners_.clear();
+    for (std::size_t i = 0; i < input::gamepad::kControlCount; ++i) {
+        const auto key = input::gamepad::kKeycodeBase + static_cast<uint32_t>(i);
+        if (input_thread_.gamepad_key_pressed(key)) {
+            const auto alias = menu_key_alias(key);
+            menu_key_owners_[key] = alias;
+            pressed_keys_.insert(alias);
+        }
+    }
     for (uint32_t keycode : current_menu_probe_keycodes()) {
         const auto poll_vk = config::KeycodeMap::polling_vk_for_keycode(keycode);
         if (!poll_vk.has_value()) {
             continue;
         }
         if ((GetAsyncKeyState(static_cast<int>(*poll_vk)) & 0x8000) != 0) {
+            menu_key_owners_[keycode] = keycode;
             pressed_keys_.insert(keycode);
         }
     }
@@ -2073,8 +2087,82 @@ void MenuApp::switch_song_source(const std::string& new_songs_path, bool force_r
     sync_song_select_state();
 }
 
-void MenuApp::handle_input_event(const input::InputEvent& event) {
+uint32_t MenuApp::menu_key_alias(uint32_t keycode) const {
+    // Capture and the key tester see actual Pad names. Ordinary menus use the
+    // familiar D-pad/A/B controls without changing saved keyboard bindings.
+    const bool capture = (current_screen() == Screen::Keymap && keymap_settings_controller_.capture_active()) ||
+        (current_screen() == Screen::QuickSetup && profile_control_key_capture_active_) ||
+        current_screen() == Screen::KeymapTest;
+    if (!capture) {
+        if (const auto index = input::gamepad::keycode_index(keycode)) {
+            switch (*index) {
+                case 0: keycode = key_up_; break;
+                case 1: keycode = key_down_; break;
+                case 2: keycode = key_left_; break;
+                case 3: keycode = key_right_; break;
+                case 4: case 10: keycode = key_enter_; break;
+                case 5: case 11: keycode = key_escape_; break;
+                default: break;
+            }
+        }
+    }
+    return keycode;
+}
+
+bool MenuApp::aggregate_menu_key(input::InputEvent& event) {
+    const auto physical = event.keycode;
+    const auto owner = menu_key_owners_.find(physical);
+    // Keep the alias chosen at press time through navigation/capture changes.
+    event.keycode = owner == menu_key_owners_.end() ? menu_key_alias(physical) : owner->second;
+    if (event.state == input::InputState::Pressed) {
+        if (owner != menu_key_owners_.end()) return true; // Existing keyboard repeat policy owns repeats.
+        const bool held = std::any_of(menu_key_owners_.begin(), menu_key_owners_.end(),
+            [&](const auto& entry) { return entry.second == event.keycode; });
+        menu_key_owners_[physical] = event.keycode;
+        return !held;
+    }
+    if (owner != menu_key_owners_.end()) menu_key_owners_.erase(owner);
+    return std::none_of(menu_key_owners_.begin(), menu_key_owners_.end(),
+        [&](const auto& entry) { return entry.second == event.keycode; });
+}
+
+void MenuApp::discard_native_dialog_input() {
+    while (input_thread_.queue().pop()) {}
+    while (menu_window_.poll_click_event()) {}
+    while (menu_window_.poll_text_input()) {}
+    reset_song_select_repeat();
+    bms_editor_repeat_key_ = 0;
+    bms_editor_repeat_next_ns_ = 0;
+    pressed_keys_.clear();
+    menu_key_owners_.clear();
+    native_dialog_held_keys_.clear();
+#ifdef _WIN32
+    // A key used to close the picker must be released before it can activate
+    // the menu. Timestamp filtering also catches late-published queued edges.
+    for (uint32_t vk = 1; vk < 256; ++vk) {
+        if ((GetAsyncKeyState(static_cast<int>(vk)) & 0x8000) != 0)
+            native_dialog_held_keys_.insert(config::KeycodeMap::normalize_windows_polling_keycode(vk));
+    }
+#endif
+    for (std::size_t i = 0; i < input::gamepad::kControlCount; ++i) {
+        const auto key = input::gamepad::kKeycodeBase + static_cast<uint32_t>(i);
+        if (input_thread_.gamepad_key_pressed(key)) native_dialog_held_keys_.insert(key);
+    }
+    native_dialog_closed_ns_ = timing::HighResClock::now_ns();
+}
+
+void MenuApp::handle_input_event(const input::InputEvent& incoming_event) {
+    auto event = incoming_event;
+    const NativeFileDialogInputScope dialog_input(this, [](void* owner) {
+        static_cast<MenuApp*>(owner)->discard_native_dialog_input();
+    });
+    if (event.input_time_ns > 0 && event.input_time_ns <= native_dialog_closed_ns_) return;
+    if (native_dialog_held_keys_.count(event.keycode) != 0) {
+        if (event.state == input::InputState::Released) native_dialog_held_keys_.erase(event.keycode);
+        return;
+    }
     note_runtime_input_event_source(event);
+    if (!aggregate_menu_key(event)) return;
     const bool duplicate_capture_press = current_screen() == Screen::Keymap &&
         keymap_settings_controller_.capture_active() && event.state == input::InputState::Pressed &&
         pressed_keys_.count(event.keycode) != 0;
@@ -2086,7 +2174,7 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
     if (duplicate_adjustment_press || duplicate_capture_press) return;
     // Key capture owns reserved keys too, so F9/F10/F11 cannot open an overlay
     // or take a screenshot instead of reporting a binding conflict.
-    if (current_screen() == Screen::QuickSetup && profile_restart_key_capture_active_) {
+    if (current_screen() == Screen::QuickSetup && profile_control_key_capture_active_) {
         if (event.state == input::InputState::Pressed) handle_quick_setup_input(event.keycode);
         return;
     }
@@ -2252,7 +2340,10 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
 }
 
 void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
-    if (current_screen() == Screen::QuickSetup && profile_restart_key_capture_active_) return;
+    const NativeFileDialogInputScope dialog_input(this, [](void* owner) {
+        static_cast<MenuApp*>(owner)->discard_native_dialog_input();
+    });
+    if (current_screen() == Screen::QuickSetup && profile_control_key_capture_active_) return;
     auto event = incoming;
     // Result buttons use render.result, not the generic settings-row snapshot.
     // Validate their own activation contract in the Result branch below.
@@ -3426,7 +3517,7 @@ void MenuApp::handle_title_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_text_input(std::string_view text) {
-    if (current_screen() == Screen::QuickSetup && profile_restart_key_capture_active_) return;
+    if (current_screen() == Screen::QuickSetup && profile_control_key_capture_active_) return;
     if (ranked_account_overlay_visible_ && ranked_account_sites_mode_) return;
     if (ranked_account_overlay_visible_ &&
         ranked_account_signed_in_username_.empty() &&
@@ -3532,7 +3623,15 @@ bool MenuApp::control_modifier_pressed() const {
 void MenuApp::handle_quick_setup_input(uint32_t keycode) {
     const auto setup_entry = profile_setup::entry(first_run_profile_);
     const int item_count = profile_setup::row_count(setup_entry);
-    if (profile_restart_key_capture_active_) {
+    if (profile_control_key_capture_active_) {
+        const bool decrease = profile_control_key_capture_row_ == profile_setup::kHispeedDecreaseKeyRow;
+        const bool increase = profile_control_key_capture_row_ == profile_setup::kHispeedIncreaseKeyRow;
+        auto& binding = decrease ? config_.ui.hispeed_decrease_key :
+            increase ? config_.ui.hispeed_increase_key : config_.ui.instant_restart_key;
+        const bool control_conflict =
+            (!decrease && config::KeycodeMap::to_keycode(config_.ui.hispeed_decrease_key).value_or(0) == keycode) ||
+            (!increase && config::KeycodeMap::to_keycode(config_.ui.hispeed_increase_key).value_or(0) == keycode) ||
+            ((decrease || increase) && config::KeycodeMap::to_keycode(config_.ui.instant_restart_key).value_or(0) == keycode);
         // This is one physical key, not a chord. In particular, returning from
         // Alt+Tab or Ctrl shortcuts must not accidentally assign the next key.
         bool modifier_held = false;
@@ -3546,15 +3645,16 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
 #endif
         }
         if (keycode == key_escape_) {
-            profile_restart_key_capture_active_ = false;
-            profile_restart_key_status_.clear();
+            profile_control_key_capture_active_ = false;
+            profile_control_key_status_.clear();
         } else if (keycode == key_delete_) {
-            config_.ui.instant_restart_key.clear();
-            profile_restart_key_capture_active_ = false;
-            profile_restart_key_status_.clear();
+            binding.clear();
+            profile_control_key_capture_active_ = false;
+            profile_control_key_status_.clear();
             persist_runtime_config();
-        } else if (instant_restart_key_reserved(keycode) || modifier_held) {
-            profile_restart_key_status_ = ui_text("Reserved key. Choose an unused key, such as F12.",
+        } else if (((decrease || increase) ? hispeed_key_reserved(keycode) : instant_restart_key_reserved(keycode)) ||
+                   modifier_held || control_conflict) {
+            profile_control_key_status_ = ui_text("Reserved key. Choose an unused key, such as F12.",
                                                   "예약된 키입니다. F12 등 사용하지 않는 키를 고르세요.");
         } else {
             const config::KeymapManager manager;
@@ -3569,12 +3669,12 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
                 }
             }
             if (lane_conflict) {
-                profile_restart_key_status_ = ui_text("This key is bound to a lane. Choose an unused key.",
+                profile_control_key_status_ = ui_text("This key is bound to a lane. Choose an unused key.",
                                                       "레인에 지정된 키입니다. 사용하지 않는 키를 고르세요.");
             } else {
-                config_.ui.instant_restart_key = config::KeycodeMap::to_name(keycode);
-                profile_restart_key_capture_active_ = false;
-                profile_restart_key_status_.clear();
+                binding = config::KeycodeMap::to_name(keycode);
+                profile_control_key_capture_active_ = false;
+                profile_control_key_status_.clear();
                 persist_runtime_config();
             }
         }
@@ -3582,9 +3682,12 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == profile_setup::kInstantRestartKeyRow && keycode == key_enter_) {
-        profile_restart_key_capture_active_ = true;
-        profile_restart_key_status_.clear();
+    if ((settings_cursor_ == profile_setup::kInstantRestartKeyRow ||
+         settings_cursor_ == profile_setup::kHispeedDecreaseKeyRow ||
+         settings_cursor_ == profile_setup::kHispeedIncreaseKeyRow) && keycode == key_enter_) {
+        profile_control_key_capture_row_ = settings_cursor_;
+        profile_control_key_capture_active_ = true;
+        profile_control_key_status_.clear();
         reset_song_select_repeat();
         publish_snapshot();
         return;

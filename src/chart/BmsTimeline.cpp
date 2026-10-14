@@ -46,9 +46,14 @@ bool BmsTimelineResult::success() const {
     });
 }
 
-BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart, int sample_rate_hz) const {
+BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart, int sample_rate_hz,
+                                             int bms_timing_version) const {
     BmsTimelineResult result;
 
+    if (bms_timing_version != 1 && bms_timing_version != 2) {
+        add_message(result.messages, BmsParseSeverity::Error, 0, "Unsupported BMS timing version.");
+        return result;
+    }
     if (sample_rate_hz <= 0) {
         add_message(result.messages, BmsParseSeverity::Error, 0,
                     "Sample rate must be a positive integer.");
@@ -138,6 +143,7 @@ BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart, int
         }
 
         double stop_accumulated = 0.0;
+        std::vector<std::pair<double, double>> stops; // ticks and the historical BPM
         for (std::size_t i = index; i < group_end; ++i) {
             const auto& event = events[i];
             if (event.type == BmsNormalizedEventType::BpmChange) {
@@ -178,9 +184,23 @@ BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart, int
                     continue;
                 }
                 stop_accumulated += stop_ticks_to_seconds(stop_value, current_bpm);
+                stops.emplace_back(stop_value, current_bpm);
             }
         }
 
+        // Coincident notes sound first, then BPM changes, then STOP uses that
+        // final BPM. Normalized slice counts are storage details, not timing
+        // precedence. Version 1 preserves old replay scheduling exactly.
+        bool changed_stop_bpm = false;
+        double corrected_stop = 0.0;
+        for (const auto& [ticks, historical_bpm] : stops) {
+            changed_stop_bpm |= ticks > 0.0 && historical_bpm != current_bpm;
+            corrected_stop += stop_ticks_to_seconds(ticks, current_bpm);
+        }
+        // Preserve accumulation order exactly on unaffected charts: even an
+        // epsilon-sized floating difference can cross a half-sample boundary.
+        result.timeline.has_bpm_stop_timing_difference |= changed_stop_bpm;
+        if (bms_timing_version == 2 && changed_stop_bpm) stop_accumulated = corrected_stop;
         const double stop_samples = stop_accumulated * sample_rate;
         if (stop_samples > 0.0) {
             append_scroll_segment(current_time_samples, current_time_samples + stop_samples,

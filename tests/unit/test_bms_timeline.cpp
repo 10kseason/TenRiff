@@ -7,11 +7,65 @@
 #include "chart/BmsChartNorm.h"
 #include "chart/BmsParser.h"
 #include "chart/BmsTimeline.h"
+#include "bms_timing_fixture.h"
 
 using tenriff::chart::BmsChart;
 using tenriff::chart::BmsChartNormalizer;
 using tenriff::chart::BmsNormalizedEventType;
 using tenriff::chart::BmsTimelineBuilder;
+
+TEST_CASE("BMS timing v2 applies coincident BPM before STOP independent of slice storage") {
+    auto parsed = tenriff::chart::BmsParser{}.parse(bpm_stop_mine_fixture());
+    REQUIRE(parsed.success());
+    auto norm = BmsChartNormalizer{}.normalize(parsed.chart);
+    REQUIRE(norm.success());
+    for (int rate : {44100, 48000, 96000}) {
+        auto legacy = BmsTimelineBuilder{}.build(norm.chart, rate, 1);
+        auto fixed = BmsTimelineBuilder{}.build(norm.chart, rate, 2);
+        REQUIRE(legacy.success()); REQUIRE(fixed.success());
+        CHECK(fixed.timeline.has_bpm_stop_timing_difference);
+        CHECK(legacy.timeline.has_bpm_stop_timing_difference);
+        const double delta_ms = (fixed.timeline.duration_samples - legacy.timeline.duration_samples) * 1000.0 / rate;
+        CHECK(std::abs(delta_ms - (60.0 / 186.0 - 60.0 / 65535.9999) * 1000.0) <= 1000.0 / rate);
+        REQUIRE(fixed.timeline.events.size() == legacy.timeline.events.size());
+        for (size_t i=0; i<fixed.timeline.events.size(); ++i) {
+            const auto& event = fixed.timeline.events[i];
+            CHECK(event.event.type == legacy.timeline.events[i].event.type);
+            if (event.event.position <= 0.5)
+                CHECK(event.time_samples == legacy.timeline.events[i].time_samples);
+        }
+        const auto stop = std::find_if(fixed.timeline.scroll_segments.begin(), fixed.timeline.scroll_segments.end(),
+            [](const auto& s) { return s.start_position == s.end_position; });
+        REQUIRE(stop != fixed.timeline.scroll_segments.end());
+        CHECK(std::abs((stop->end_sample-stop->start_sample)*1.0/rate - 60.0/186.0) <= 1.0/rate);
+    }
+    CHECK_FALSE(BmsTimelineBuilder{}.build(norm.chart, 48000, 3).success());
+    // Both same-position storage orders use the final BPM in v2.
+    std::reverse(norm.chart.events.begin(), norm.chart.events.end());
+    std::stable_sort(norm.chart.events.begin(), norm.chart.events.end(),
+        [](const auto& a, const auto& b) { return a.position < b.position; });
+    const auto reordered = BmsTimelineBuilder{}.build(norm.chart, 48000);
+    REQUIRE(reordered.success());
+    CHECK_FALSE(reordered.timeline.has_bpm_stop_timing_difference);
+}
+
+TEST_CASE("BMS timing preserves exact legacy rounding for coincident unchanged STOPs") {
+    const auto parsed = tenriff::chart::BmsParser{}.parse(
+        "#BPM 8.99977500562486\n#STOP01 1\n#STOP02 2\n#00009:01\n#00009:02\n#00111:01\n");
+    REQUIRE(parsed.success());
+    const auto norm = BmsChartNormalizer{}.normalize(parsed.chart);
+    REQUIRE(norm.success());
+    const auto legacy = BmsTimelineBuilder{}.build(norm.chart, 48000, 1);
+    const auto fixed = BmsTimelineBuilder{}.build(norm.chart, 48000, 2);
+    REQUIRE(legacy.success()); REQUIRE(fixed.success());
+    CHECK_FALSE(fixed.timeline.has_bpm_stop_timing_difference);
+    CHECK(fixed.timeline.duration_samples == legacy.timeline.duration_samples);
+    REQUIRE(fixed.timeline.events.size() == legacy.timeline.events.size());
+    for (size_t i=0; i<fixed.timeline.events.size(); ++i)
+        CHECK(fixed.timeline.events[i].time_samples == legacy.timeline.events[i].time_samples);
+    REQUIRE_FALSE(fixed.timeline.scroll_segments.empty());
+    CHECK(fixed.timeline.scroll_segments[0].end_sample == legacy.timeline.scroll_segments[0].end_sample);
+}
 
 TEST_CASE("timeline builder converts normalized events to samples") {
     BmsChart chart;

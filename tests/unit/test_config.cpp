@@ -345,9 +345,13 @@ TEST_CASE("profile start controls retain legacy defaults and roundtrip without c
     REQUIRE(legacy.success());
     CHECK_FALSE(legacy.config.ui.skip_start_countdown);
     CHECK(legacy.config.ui.instant_restart_key.empty());
+    CHECK(legacy.config.ui.hispeed_decrease_key == "F5");
+    CHECK(legacy.config.ui.hispeed_increase_key == "F6");
     auto edited = legacy.config;
     edited.ui.skip_start_countdown = true;
     edited.ui.instant_restart_key = "F12";
+    edited.ui.hispeed_decrease_key = "Q";
+    edited.ui.hispeed_increase_key.clear();
     edited.input_offset_ms = 12.5;
     edited.sound_offset_ms = -8.0;
     REQUIRE(loader.save_profile("profiles/test", edited));
@@ -355,6 +359,8 @@ TEST_CASE("profile start controls retain legacy defaults and roundtrip without c
     REQUIRE(loaded.success());
     CHECK(loaded.config.ui.skip_start_countdown);
     CHECK(loaded.config.ui.instant_restart_key == "F12");
+    CHECK(loaded.config.ui.hispeed_decrease_key == "Q");
+    CHECK(loaded.config.ui.hispeed_increase_key.empty());
     CHECK(loaded.config.input_offset_ms == doctest::Approx(12.5));
     CHECK(loaded.config.sound_offset_ms == doctest::Approx(-8.0));
     write_file(temp.path / "profiles" / "test" / "config.json",

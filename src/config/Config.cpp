@@ -732,6 +732,10 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.ui.skip_start_countdown = get_bool(*ui, "skip_start_countdown", config.ui.skip_start_countdown);
         config.ui.instant_restart_key = get_string(*ui, "instant_restart_key", config.ui.instant_restart_key);
         if (config.ui.instant_restart_key.size() > 32) config.ui.instant_restart_key.clear();
+        config.ui.hispeed_decrease_key = get_string(*ui, "hispeed_decrease_key", config.ui.hispeed_decrease_key);
+        config.ui.hispeed_increase_key = get_string(*ui, "hispeed_increase_key", config.ui.hispeed_increase_key);
+        if (config.ui.hispeed_decrease_key.size() > 32) config.ui.hispeed_decrease_key.clear();
+        if (config.ui.hispeed_increase_key.size() > 32) config.ui.hispeed_increase_key.clear();
         config.ui.active_song_source =
             get_string(*ui, "active_song_source", config.ui.active_song_source);
         config.ui.last_played_chart_path =
@@ -1245,6 +1249,8 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     ui.emplace("show_cursor_in_gameplay", JsonValue{config.ui.show_cursor_in_gameplay});
     ui.emplace("skip_start_countdown", JsonValue{config.ui.skip_start_countdown});
     ui.emplace("instant_restart_key", JsonValue{config.ui.instant_restart_key});
+    ui.emplace("hispeed_decrease_key", JsonValue{config.ui.hispeed_decrease_key});
+    ui.emplace("hispeed_increase_key", JsonValue{config.ui.hispeed_increase_key});
     ui.emplace("active_song_source", JsonValue{config.ui.active_song_source});
     ui.emplace("last_played_chart_path", JsonValue{config.ui.last_played_chart_path});
     ui.emplace("song_sources_initialized", JsonValue{config.ui.song_sources_initialized});

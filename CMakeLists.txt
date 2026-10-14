@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.9.0 LANGUAGES C CXX)
+project(TenRiff VERSION 1.9.0.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -752,6 +752,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_clock_sync.cpp
         tests/unit/test_precise_wait.cpp
         tests/unit/test_key_state_tracker.cpp
+        tests/unit/test_gamepad_input.cpp
         tests/unit/test_input_thread.cpp
         tests/unit/test_raw_input_health_probe.cpp
         tests/unit/test_keycode_map.cpp

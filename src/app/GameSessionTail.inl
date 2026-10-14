@@ -367,8 +367,10 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     f2_keycode_ = config::KeycodeMap::to_keycode("F2").value_or(0);
     f3_keycode_ = config::KeycodeMap::to_keycode("F3").value_or(0);
     f4_keycode_ = config::KeycodeMap::to_keycode("F4").value_or(0);
-    f5_keycode_ = config::KeycodeMap::to_keycode("F5").value_or(0);
-    f6_keycode_ = config::KeycodeMap::to_keycode("F6").value_or(0);
+    f5_keycode_ = 0;
+    f6_keycode_ = 0;
+    hispeed_coarse_decrease_held_ = false;
+    hispeed_coarse_increase_held_ = false;
     f7_keycode_ = config::KeycodeMap::to_keycode("F7").value_or(0);
     f8_keycode_ = config::KeycodeMap::to_keycode("F8").value_or(0);
     f9_keycode_ = config::KeycodeMap::to_keycode("F9").value_or(0);
@@ -500,11 +502,12 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         return true;
     };
 
+    bms_timing_version_ = replay_playback_enabled_ ? replay_source_.mode.bms_timing_version : 2;
     auto load_chart_for_session_rate = [this](ChartLoadResult& out_result) -> bool {
         ChartLoader loader;
         out_result = loader.load(chart_path_, sample_rate_, config_.speed.rate,
                                   config_.audio_ui.bms_keysound_policy,
-                                  config_.mode.random_seed);
+                                  config_.mode.random_seed, bms_timing_version_);
         for (const auto& message : out_result.messages) {
             std::cerr << "[warn] " << message << std::endl;
         }
@@ -584,6 +587,10 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         return false;
     }
 
+    // Equivalent timelines keep the historical policy identity, preserving
+    // existing boards/ghosts. Only corrected charts export the new policy.
+    if (!replay_playback_enabled_ && !chart_result.has_bpm_stop_timing_difference)
+        bms_timing_version_ = 1;
     chart_format_ = chart_result.format;
     chart_base_bpm_ = chart_result.reference_bpm > 0.0 ? chart_result.reference_bpm : chart_result.base_bpm;
     report_loading_progress(78, "Applying gameplay mode");
@@ -746,6 +753,13 @@ bool GameSession::initialize(const CommandLineOptions& options) {
             !equivalent_mode_mod_tokens(ghost_replay_source_.mods, active_mods_)) {
             ghost_compatible = false;
         }
+        if (ghost_compatible && chart_result.has_bpm_stop_timing_difference &&
+            ghost_replay_source_.mode.bms_timing_version != bms_timing_version_) {
+            // Shared fields cannot mix two different note/mine schedules.
+            // Keep old replays playable on their own; never revert a new run.
+            ghost_compatible = false;
+            std::cerr << "[warn] Legacy ghost disabled: this chart has corrected BPM/STOP timing." << std::endl;
+        }
         if (ghost_compatible && key_conversion_version_ == 3 && ghost_replay_source_.mode.key_conversion_version < 3) {
             // A legacy ghost must not undo the new player's duplicate-head fix.
             // Both fields currently share one chart, so exclude only affected charts.
@@ -836,6 +850,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
                   << std::endl;
     }
     instant_restart_keycode_ = resolve_instant_restart_key(config_.ui.instant_restart_key, key_to_lane_);
+    f5_keycode_ = resolve_hispeed_key(config_.ui.hispeed_decrease_key, key_to_lane_, instant_restart_keycode_);
+    f6_keycode_ = resolve_hispeed_key(config_.ui.hispeed_increase_key, key_to_lane_, instant_restart_keycode_);
+    if (f5_keycode_ == f6_keycode_) f5_keycode_ = f6_keycode_ = 0;
     if (!config_.ui.instant_restart_key.empty() && instant_restart_keycode_ == 0) {
         std::cerr << "[warn] Instant Restart Key is invalid, reserved or bound to a lane; disabled for this chart." << std::endl;
     }
@@ -2399,6 +2416,7 @@ void GameSession::shutdown() {
         result_.final_gauge_value = final_gauge_value;
         result_.mods = active_mods_;
         result_.key_conversion_version = key_conversion_version_;
+        result_.bms_timing_version = bms_timing_version_;
         result_.long_note_mix_version = mode_mod_long_note_mix(active_mods_) ? long_note_mix_version_ : 1;
         result_.player_name = config::normalize_profile_nickname(config_.ui.profile_nickname);
         if (result_.player_name.empty()) {
@@ -2473,6 +2491,7 @@ void GameSession::shutdown() {
             replay.mode.key_mode = config_.mode.key_mode;
             replay.mode.long_note_mix_version = result_.long_note_mix_version;
             replay.mode.key_conversion_version = result_.key_conversion_version;
+            replay.mode.bms_timing_version = result_.bms_timing_version;
             replay.mode.key_conversion_algorithm = config_.mode.key_conversion_algorithm;
             replay.mode.key_conversion_nk2_preset = config_.mode.key_conversion_nk2_preset;
             replay.mode.random = config_.mode.random;
@@ -2535,6 +2554,7 @@ void GameSession::shutdown() {
             exported_result.mods = result_.mods;
             exported_result.long_note_mix_version = result_.long_note_mix_version;
             exported_result.key_conversion_version = result_.key_conversion_version;
+            exported_result.bms_timing_version = result_.bms_timing_version;
             exported_result.rate_multiplier = result_.rate_multiplier;
             exported_result.score_multiplier = result_.score_multiplier;
             exported_result.final_score = result_.final_score;
@@ -3017,6 +3037,7 @@ void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
     if (instant_restart_keycode_ != 0) {
         const auto vk = config::KeycodeMap::polling_vk_for_keycode(instant_restart_keycode_);
         if (vk) instant_restart_key_armed_ = (GetAsyncKeyState(static_cast<int>(*vk)) & 0x8000) == 0;
+        else instant_restart_key_armed_ = !input_thread_.gamepad_key_pressed(instant_restart_keycode_);
     }
 
     hispeed_decrease_held_ = false;
@@ -3025,10 +3046,12 @@ void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
     hispeed_increase_next_repeat_ns_ = 0;
 
     std::fill(lane_pressed_.begin(), lane_pressed_.end(), 0);
+    hispeed_coarse_decrease_held_ = false;
+    hispeed_coarse_increase_held_ = false;
     lane_binding_state_.reset();
     const int64_t baseline_time_ns = timing::HighResClock::now_ns();
     for (auto& tracked : polled_gameplay_keys_) {
-        bool pressed = false;
+        bool pressed = input_thread_.gamepad_key_pressed(tracked.keycode);
         if (const auto poll_vk = config::KeycodeMap::polling_vk_for_keycode(tracked.keycode); poll_vk.has_value()) {
             pressed = (GetAsyncKeyState(static_cast<int>(*poll_vk)) & 0x8000) != 0;
         }
@@ -3041,6 +3064,8 @@ void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
         baseline_event.state = input::InputState::Pressed;
         baseline_event.input_time_ns = baseline_time_ns;
 
+        if (tracked.keycode == f5_keycode_) hispeed_coarse_decrease_held_ = true;
+        if (tracked.keycode == f6_keycode_) hispeed_coarse_increase_held_ = true;
         if (tracked.keycode == f3_keycode_) {
             hispeed_decrease_held_ = true;
             hispeed_decrease_next_repeat_ns_ = baseline_time_ns + ms_to_ns(kHispeedRepeatInitialDelayMs);
@@ -3068,7 +3093,27 @@ void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
     std::fill(lane_activity_.begin(), lane_activity_.end(), 0.0f);
 }
 
-bool GameSession::handle_control_input(const input::InputEvent& event) {
+bool GameSession::handle_control_input(const input::InputEvent& incoming_event) {
+    auto event = incoming_event;
+    if (const auto index = input::gamepad::keycode_index(event.keycode)) {
+        const bool assigned = key_to_lane_.count(event.keycode) != 0 ||
+            event.keycode == instant_restart_keycode_ || event.keycode == f5_keycode_ || event.keycode == f6_keycode_;
+        if (!assigned && *index == 4) event.keycode = escape_keycode_;
+        else if (paused_.load(std::memory_order_acquire) && !assigned) {
+            if (*index == 0) event.keycode = up_keycode_;
+            if (*index == 1) event.keycode = down_keycode_;
+            if (*index == 10) event.keycode = enter_keycode_;
+            if (*index == 11 || *index == 5) event.keycode = escape_keycode_;
+        }
+    }
+    const bool decrease = f5_keycode_ != 0 && event.keycode == f5_keycode_;
+    const bool increase = f6_keycode_ != 0 && event.keycode == f6_keycode_;
+    bool coarse_press = false;
+    if (decrease || increase) {
+        auto& held = decrease ? hispeed_coarse_decrease_held_ : hispeed_coarse_increase_held_;
+        coarse_press = event.state == input::InputState::Pressed && !held;
+        held = event.state == input::InputState::Pressed;
+    }
     const bool restart_key = instant_restart_keycode_ != 0 && event.keycode == instant_restart_keycode_;
     if (restart_key && event.state == input::InputState::Released) instant_restart_key_armed_ = true;
     if (control_input_callback_ && control_input_callback_(event)) {
@@ -3142,11 +3187,11 @@ bool GameSession::handle_control_input(const input::InputEvent& event) {
             return true;
         }
         if (f5_keycode_ != 0 && event.keycode == f5_keycode_) {
-            adjust_hispeed(-config_.speed.hi_speed * 0.5);
+            if (coarse_press) adjust_hispeed(-10.0);
             return true;
         }
         if (f6_keycode_ != 0 && event.keycode == f6_keycode_) {
-            adjust_hispeed(config_.speed.hi_speed);
+            if (coarse_press) adjust_hispeed(10.0);
             return true;
         }
         if (f7_keycode_ != 0 && event.keycode == f7_keycode_) {
@@ -3199,11 +3244,11 @@ bool GameSession::handle_control_input(const input::InputEvent& event) {
     }
     if (event.state == input::InputState::Pressed) {
         if (f5_keycode_ != 0 && event.keycode == f5_keycode_) {
-            adjust_hispeed(-config_.speed.hi_speed * 0.5);
+            if (coarse_press) adjust_hispeed(-10.0);
             return true;
         }
         if (f6_keycode_ != 0 && event.keycode == f6_keycode_) {
-            adjust_hispeed(config_.speed.hi_speed);
+            if (coarse_press) adjust_hispeed(10.0);
             return true;
         }
         if (f9_keycode_ != 0 && event.keycode == f9_keycode_) {

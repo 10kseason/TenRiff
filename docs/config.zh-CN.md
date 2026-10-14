@@ -1,5 +1,7 @@
 # TenRiff 配置模式（当前）
 
+**2026-10-15 · 1.9.0.1:** 提供试听×0.75、个人档案指定F5/F6 -10/+10、Xbox/XInput按钮输入、文件选择框防重复，以及BMS BPM/STOP顺序修正与旧回放兼容。固定基准保持1.9.0。 [变更说明](feedback-20261015.zh-CN.md) · [发布验证范围](release-1.9.0.1-gate.md).
+
 **1.8.8：**包含结果分析、自由调整窗口大小与直接输入宽高、结果页的 `F9` PNG 保存提示、长 LN Mix，以及菜单、键音和开始操作改进。当前验证与交付状态见[发布说明（韩语）](release-1.8.8-gate.md)。用户固定基准仍为 1.8.7，保留其现有标签和发布文件。
 
 依据：[Config.h](../src/config/Config.h)、[Config.cpp](../src/config/Config.cpp)、[默认 JSON](../config/config.json) 与[键位](../src/config/Keymap.cpp)。省略字段使用代码默认值；以下范围描述加载、保存时的规范化规则。
@@ -260,6 +262,8 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | 配置档和首次设置中的菜单字号：100%、115%、130%。游戏内字体继续由皮肤控制。 |
 | `skip_start_countdown` | bool; `false` | 跳过单人游玩开始时的 `3 / 2 / 1` 显示；适用于正常开始、菜单重新开始及结果页重试。 |
 | `instant_restart_key` | string; `""`（未分配） | 从头重新开始正在进行的单人谱面的键名。新一轮始终跳过初始倒计时；中断的尝试不保存结果或回放。 |
+| `hispeed_decrease_key` | string; `"F5"` | Hi-Speed -10按键。在档案中绑定，空字符串禁用。 |
+| `hispeed_increase_key` | string; `"F6"` | Hi-Speed +10按键。在档案中绑定，空字符串禁用。 |
 | `all_song_sources` | bool; `false` | 恢复 ALL SONG，合并已登记文件夹的缓存并去除相同谱面路径的重复项。 |
 | `result_tail_ms` | double; `500` ms | 判定完成后结果切换的额外等待时间。`audio.play_to_end=true` 时同时考虑谱面音频结束时刻。 |
 | `require_enter_to_exit` | bool; `true` | 为读写兼容保留；当前 Windows 结果输入路径不使用此值自动退出。 |
@@ -358,6 +362,8 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
   - 正值延后 chart BGM/autoplay keysound，负值提前；判定、note/BGA timing 和按键触发的 `follow` keysound 不会移动
 
 ## `keymap.json`
+
+Xbox/XInput按钮使用现有按键名称字段：`PadUp`, `PadDown`, `PadLeft`, `PadRight`, `PadStart`, `PadBack`, `PadLS`, `PadRS`, `PadLB`, `PadRB`, `PadA`, `PadB`, `PadX`, `PadY`, `PadLT`, `PadRT`。在Keymap捕获时按实际按钮；个人档案的重试、Hi-Speed操作也使用相同名称。LT/RT超过30/255即按下，LS/RS为摇杆按下。4个手柄的相同按钮共用一个逻辑输入；不包含轴与震动。[操作、连接与兼容范围](feedback-20261015.zh-CN.md)。
 
 ### 结构
 - `layout` (string)

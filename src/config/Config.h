@@ -143,6 +143,8 @@ struct UiConfig {
     bool show_cursor_in_gameplay = true;
     bool skip_start_countdown = false;
     std::string instant_restart_key;
+    std::string hispeed_decrease_key = "F5";
+    std::string hispeed_increase_key = "F6";
     std::string active_song_source;
     std::string last_played_chart_path;
     // The aggregate library preserves the last individual source for switching back.

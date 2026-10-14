@@ -1,5 +1,7 @@
 # TenRiff
 
+**2026-10-15 · 1.9.0.1:** 미리듣기 ×0.75, 프로필에서 지정하는 F5/F6 -10/+10, Xbox/XInput 버튼 입력, 파일 선택창 중복 방지, BMS BPM/STOP 순서 수정과 옛 리플레이 호환을 제공합니다. 고정 기준은 1.9.0을 유지합니다. [변경 안내](docs/feedback-20261015.ko.md) · [릴리스 검증 범위](docs/release-1.9.0.1-gate.md).
+
 **2026-10-14 · 1.9.0 / 새 고정 기준선:** 사용자가 검토한 로컬 후보를 정식 배포 버전으로 올립니다. BMS/텐리프 음악 음량 분리, 로비·필터·스킨 조작, 등급·SUBARTIST 표시, 한글 모드와 EX 판정, 업로드 상태 표시를 포함합니다. 기본/Hard는 R5, EX는 R6이며 R1–R5 기록·기존 설정을 보존합니다. [기준선](docs/baseline-1.9.0.md) · [릴리스 검증 범위](docs/release-1.9.0-gate.md). 아래 날짜별 항목은 당시 릴리스 이력입니다.
 
 **1.9.0 릴리스:** BMS/메뉴 음악 개별 음량, 더 조용한 메뉴 음악, 묶음 로비, 난이도 범위·정렬 수정, 인디케이터 크기·심플 사각 노트·사용자 폰트, EX/빠름/고스트 끔 기본값. 기존 저장값과 기존 저장값은 유지하며 기준선은 1.9.0으로 올립니다. [변경과 검증 범위](docs/controls-1.9.0.ko.md).
@@ -47,13 +49,13 @@
 
 **멀티 Rate 지원 빌드:** 로비 `대전 Rate`에서 리더가 공통 배속을 설정합니다. 참가자 모두 이 protocol v6 빌드를 사용해야 합니다. [사용 방법과 호환성](docs/multiplayer-rate-build.ko.md).
 
-버전 안내·다운로드: [**1.9.0**](https://github.com/10kseason/TenRiff/releases/tag/1.9.0). 실제 패키지·공개 검증 상태는 [릴리스 기록](docs/release-1.9.0-gate.md)을 확인하세요.
+버전 안내·다운로드: [**1.9.0.1**](https://github.com/10kseason/TenRiff/releases/tag/1.9.0.1). 실제 패키지·공개 검증 상태는 [릴리스 기록](docs/release-1.9.0.1-gate.md)을 확인하세요. BPM/STOP 수정의 영향을 받는 새 타이밍 버전 2 기록은 웹 지원 전까지 로컬에만 저장합니다.
 
 Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff는 Windows GUI 기반 BMS 리듬게임 런타임/런처 프로젝트입니다. 고정 기준은 `1.9.0`, 이 소스의 버전은 `1.9.0`이며, 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용입니다. Graphics Settings에서 권리 정리된 외부 ONNX 모델을 선택해 BGA/BGI 확대에 사용할 수 있습니다. 공개 패키지에는 BGA 업스케일러 모델을 넣지 않으며, 키 모드 변환용 NK3 P64 결정 모델과 일반화 패턴 MLP만 포함합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
+TenRiff는 Windows GUI 기반 BMS 리듬게임 런타임/런처 프로젝트입니다. 고정 기준은 `1.9.0`, 이 소스의 버전은 `1.9.0.1`이며, 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용입니다. Graphics Settings에서 권리 정리된 외부 ONNX 모델을 선택해 BGA/BGI 확대에 사용할 수 있습니다. 공개 패키지에는 BGA 업스케일러 모델을 넣지 않으며, 키 모드 변환용 NK3 P64 결정 모델과 일반화 패턴 MLP만 포함합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
 
-이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, `1.9.0` 릴리스 라인과 고정 `1.9.0` 기준, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽으세요.
+이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, `1.9.0.1` 릴리스 라인과 고정 `1.9.0` 기준, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽으세요.
 
 TenRiff 코드는 전통적인 장기 설계 문서 중심 개발만으로 쌓인 프로젝트가 아니라, 빠른 반복과 실험을 중시한 `vibe coding` 성격이 강한 작품이라는 점을 명시합니다.
 
@@ -95,7 +97,7 @@ TenRiff 코드는 전통적인 장기 설계 문서 중심 개발만으로 쌓�
 - 지원 차트: BMS 계열(`.bms/.bme/.bml/.pms`) 전용
 - 그래픽 경로: D3D11 + Direct2D/DirectWrite
 - 오디오 경로: WASAPI(기본), 네이티브 ASIO(Windows x64 드라이버 필요)
-- 입력 경로: RawInput 또는 고주사율 polling
+- 입력 경로: RawInput 또는 고주사율 polling + Xbox/XInput 디지털 버튼·트리거
 - 직접 IP/헤드리스 서버 멀티플레이: 고정 코디네이터 기반 최대 8인 TCP 대전, BMS 전용 공통곡과 `F8` 채팅(기본 `27301/TCP`, [사용 안내](docs/multiplayer.md))
 - 라이선스: [MIT](LICENSE)
 - 서드파티 고지: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
