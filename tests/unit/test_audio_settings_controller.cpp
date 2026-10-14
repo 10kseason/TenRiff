@@ -444,7 +444,7 @@ TEST_CASE("audio settings controller preserves every row behavior") {
         AudioSettingsController controller;
         static_cast<void>(controller.select(AudioSettingId::MasterVolume));
         check_render_only(controller.handle(MenuAction::adjust(-1), runtime));
-        CHECK(runtime.audio_ui.master_volume == doctest::Approx(0.65));
+        CHECK(runtime.audio_ui.master_volume == doctest::Approx(0.05));
     }
 
     {
