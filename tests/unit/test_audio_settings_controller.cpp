@@ -946,6 +946,6 @@ TEST_CASE("audio outro choice toggles with keyboard and pointer without changing
     CHECK_FALSE(runtime.audio_ui.play_to_end);
     check_render_only(controller.handle(MenuAction::adjust(-1), runtime, AudioSettingId::PlayToEnd));
     CHECK(runtime.audio_ui.play_to_end);
-    CHECK(runtime.audio_ui.master_volume == doctest::Approx(0.70));
+    CHECK(runtime.audio_ui.master_volume == doctest::Approx(0.10));
     CHECK(controller.handle(MenuAction::back(), runtime).persist_config);
 }

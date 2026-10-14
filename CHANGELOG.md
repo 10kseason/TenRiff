@@ -2,6 +2,8 @@
 
 ## [1.9.0.1] - 2026-10-15
 
+- New profiles and missing volume settings default to 10% master volume. Preserve explicitly saved volumes and the individual BMS, TenRiff music, background and keysound defaults.
+- Align the visible centers of the lobby Play arrow and Multiplayer icon on one vertical line, preserving button and text positions.
 - Multiply song-preview gain by 0.75, including volume changes and focus restoration. Preserve gameplay audio and TenRiff scene-music gains.
 - Replace F5/F6 half/double Hi-Speed with -10/+10 and expose both bindings in Profile and `.trprofile`. Preserve F3/F4 ±0.25, the 0.50–50.00 range, held-key suppression and binding-conflict checks.
 - Add Xbox/XInput digital buttons and triggers to lane/profile binding capture, gameplay and menu navigation with either keyboard backend. Run system queries on a scoped worker to avoid blocking keyboard capture; the existing InputThread remains the sole producer of the shared input queue. Start/stop the worker with input collection, without installing a service. Aggregate up to four controllers, release disconnected holds, suppress buttons held across connection/focus changes, and rescan empty slots every two seconds. Use system XInput 1.4 with 9.1.0 fallback; do not bundle drivers or DLLs. Analog stick axes and vibration are outside this release.

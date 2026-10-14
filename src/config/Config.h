@@ -120,7 +120,7 @@ struct AudioUiConfig {
     std::string bms_keysound_policy = "follow";
     bool background_sound_enabled = true;
     std::string title_music = "default";
-    double master_volume = 0.70;
+    double master_volume = 0.10;
     // Chart-wide gain is independent of TenRiff menu/scene music.
     double gameplay_volume = 1.0;
     double menu_music_volume = 1.0;

@@ -1,6 +1,6 @@
 # TenRiff Config Schema (current)
 
-**2026-10-15 · 1.9.0.1:** Preview ×0.75, profile-assigned F5/F6 -10/+10, Xbox/XInput button input, single modal file pickers, and corrected BMS BPM/STOP order with historical replay compatibility. The fixed baseline remains 1.9.0. [Changes](feedback-20261015.en.md) · [Release verification scope](release-1.9.0.1-gate.md).
+**2026-10-15 · 1.9.0.1:** Includes 10% default master volume and aligned lobby icon centers. Preview ×0.75, profile-assigned F5/F6 -10/+10, Xbox/XInput button input, single modal file pickers, and corrected BMS BPM/STOP order with historical replay compatibility. The fixed baseline remains 1.9.0. [Changes](feedback-20261015.en.md) · [Release verification scope](release-1.9.0.1-gate.md).
 
 **1.8.8:** Includes result analysis, freely resizable windows and direct width/height entry, result `F9` PNG hints, long LN Mix, and menu, keysound and start-control improvements. See the [release guide (Korean)](release-1.8.8-gate.md) for current verification and delivery status. The user-pinned baseline remains 1.8.7; its existing tag and release files are preserved.
 
@@ -385,7 +385,7 @@ Xbox/XInput buttons use existing key-token fields: `PadUp`, `PadDown`, `PadLeft`
 
 ## Settings usability and audio synchronization
 
-New profiles default `audio.volume` to `0.7`; explicitly saved volumes remain intact. `audio.mute_when_inactive` defaults to `false` and gates output while another window is active, preserving music position and saved gain. ASIO Buffer Size is displayed in samples per channel; the internal `frames_per_buffer` API name stays compatible.
+New profiles default `audio.volume` to `0.1`; explicitly saved volumes remain intact. `audio.mute_when_inactive` defaults to `false` and gates output while another window is active, preserving music position and saved gain. ASIO Buffer Size is displayed in samples per channel; the internal `frames_per_buffer` API name stays compatible.
 
 Key Settings presents horizontal Key 1… keys with separate primary and secondary bindings. Optional `keymap.json` `secondary_modes` follows the existing mode/lane structure. Either held input keeps the logical key held; × or Delete during capture clears only the secondary slot. The initial Options editor mode is 4K; opening from a chart uses its actual key count.
 

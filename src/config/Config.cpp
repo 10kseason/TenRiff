@@ -2071,7 +2071,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.audio_ui.preset = "high";
     config.audio_ui.bms_keysound_policy = "follow";
     config.audio_ui.background_sound_enabled = true;
-    config.audio_ui.master_volume = 0.70;
+    config.audio_ui.master_volume = 0.10;
     config.audio_ui.bgm_volume = 1.0;
     config.audio_ui.keysound_volume = 1.0;
 

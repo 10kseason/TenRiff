@@ -1,6 +1,6 @@
 # TenRiff Current State
 
-**2026-10-15 · 1.9.0.1:** Preview ×0.75, profile-assigned F5/F6 -10/+10, Xbox/XInput button input, single modal file pickers, and corrected BMS BPM/STOP order with historical replay compatibility. The fixed baseline remains 1.9.0. [Changes](feedback-20261015.en.md) · [Release verification scope](release-1.9.0.1-gate.md).
+**2026-10-15 · 1.9.0.1:** Includes 10% default master volume and aligned lobby icon centers. Preview ×0.75, profile-assigned F5/F6 -10/+10, Xbox/XInput button input, single modal file pickers, and corrected BMS BPM/STOP order with historical replay compatibility. The fixed baseline remains 1.9.0. [Changes](feedback-20261015.en.md) · [Release verification scope](release-1.9.0.1-gate.md).
 
 **2026-10-14 · 1.9.0 / new fixed baseline:** Promotes the reviewed local candidate to the requested release line: independent BMS/TenRiff music volume, lobby/filter/skin controls, grades and SUBARTIST credits, localized mods, EX timing and upload status. Normal/Hard use R5, EX uses R6; historical R1–R5 records and saved settings are preserved. [Baseline](baseline-1.9.0.en.md) · [Release verification scope](release-1.9.0-gate.md). Dated entries below retain their historical release context.
 

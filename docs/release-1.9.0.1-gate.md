@@ -4,6 +4,8 @@ Requested release line: **1.9.0.1**, 2026-10-15. The user-pinned baseline remain
 
 ## Changes and compatibility
 
+- New profiles and missing volume settings default to 10% master volume. Preserve explicitly saved volumes and the individual BMS, TenRiff music, background and keysound defaults.
+- Align the visible centers of the lobby Play arrow and Multiplayer icon on one vertical line, preserving button and text positions.
 - Song previews use 0.75 of their previous gain. Gameplay audio and TenRiff scene-music gains remain unchanged.
 - Profile assigns Hi-Speed -10/+10, defaulting to F5/F6 instead of half/double. F3/F4 remain ±0.25, range 0.50–50.00. Persist the two bindings in the existing profile/preset structure and reject conflicting controls.
 - Xbox/XInput digital buttons and triggers work alongside either keyboard backend. A scoped worker owns potentially blocking system queries; the existing InputThread drains its internal queue and remains the sole producer of the shared input queue. The worker starts/stops with input collection, without installing an always-running service. Support Keymap/Profile capture, D-pad/A/B menu navigation and pause on otherwise unassigned Start. Use system XInput 1.4 with 9.1.0 fallback, four-controller aggregation, disconnect releases, held-button suppression at connection/focus transitions and two-second empty-slot rescans. Analog stick axes and vibration are not included.

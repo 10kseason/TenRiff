@@ -2396,14 +2396,14 @@ TEST_CASE("every 4K through 16K skin mode preserves its own palette and geometry
     }
 }
 
-TEST_CASE("new profiles start at 70 percent while explicit volume and mute persist") {
+TEST_CASE("new profiles start at 10 percent while explicit volume and mute persist") {
     TempDirGuard temp{make_temp_dir()};
     REQUIRE_FALSE(temp.path.empty());
     CurrentPathGuard cwd;
     std::filesystem::current_path(temp.path);
     std::filesystem::create_directories("profiles/player");
     ConfigLoader loader;
-    CHECK(loader.defaults().audio_ui.master_volume == doctest::Approx(0.70));
+    CHECK(loader.defaults().audio_ui.master_volume == doctest::Approx(0.10));
     write_file("profiles/player/config.json", R"({"audio":{"volume":1.0,"mute_when_inactive":true}})");
     auto loaded = loader.load_profile("profiles/player");
     REQUIRE(loaded.success());
@@ -2423,7 +2423,7 @@ TEST_CASE("new profiles start at 70 percent while explicit volume and mute persi
     write_file("profiles/player/config.json", "{}");
     loaded = loader.load_profile("profiles/player");
     REQUIRE(loaded.success());
-    CHECK(loaded.config.audio_ui.master_volume == doctest::Approx(0.70));
+    CHECK(loaded.config.audio_ui.master_volume == doctest::Approx(0.10));
     CHECK_FALSE(loaded.config.audio_ui.mute_when_inactive);
 }
 
