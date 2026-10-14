@@ -6,7 +6,7 @@ The 1.9.0 release selects Normal / Hard / EX under `Options > Key Mode Settings 
 - New Normal/Hard plays retain `tenriff-native-score-v2-ruleset-5`; EX uses `tenriff-native-score-v2-ruleset-6`. Historical R1–R5 timing, Easy and LN policies remain unchanged; custom timing is unofficial.
 - `Judge EX` uses EASY PG/GR/GD=`14/44.571429/78.857143ms` (80% of Hard), retaining BMS RANK scaling. BAD is fixed at 250ms; the separate automatic-miss deadline remains 340ms and the score factor remains Hard's 1.10.
 
-**2026-10-14 · local 1.9.0 candidate:** The new grade description below applies to this unpublished release. Earlier version entries are historical; the fixed 1.8.7 baseline tag and commit are unchanged. [Grade display and compatibility (Korean)](grade-display.ko.md).
+**2026-10-14 · 1.9.0 release:** The new grade description below applies to 1.9.0. Earlier version entries are historical; the former 1.8.7 baseline tag and commit are preserved. [Grade display and compatibility (Korean)](grade-display.ko.md).
 
 **2026-10-14 · 1.8.9.7:** Input threads request MMCSS Games/High and disable execution-speed power throttling. Home action borders share their icon colors with subtle cached glow. Only TenRiff scene music is reduced to 40%; BMS songs, keysounds and previews retain their original volume scale. The fixed baseline remains 1.8.7; physical input latency improvement is not established. [Scope / 검증](release-1.8.9.7-gate.md).
 
@@ -205,7 +205,7 @@ This is the document that the next agent or any new contributor should read firs
   - OD8 conversion remains internal for Sudden Death and legacy replay compatibility; Gameplay and Result show only the native TenRiff score
   - casual score is normalized to a 10,000 maximum with `PG 6 / GR 3 / GD 1 / PR 0 / FAIL 0` judgement weights; LN heads and tails each carry 0.5 weight and form one object, while detail score remains separate
   - standard accuracy is the judgement-weighted average of `PG / GR / GD / BD / PR = 100 / 80 / 50 / 20 / 0%`, separate from timing-based detailed accuracy; standard accuracy has no extra timing-spread deduction or 99.5% cap
-  - the local 1.9.0 candidate grades surviving completions using unrounded standard accuracy: `99% S++ / 98% S+ / 95% S / 93% A+ / 90% A / 85% B / 80% C`, with inclusive thresholds, and D below 80%; surviving completions below 75% also receive D, while failure receives F
+  - 1.9.0 grades surviving completions using unrounded standard accuracy: `99% S++ / 98% S+ / 95% S / 93% A+ / 90% A / 85% B / 80% C`, with inclusive thresholds, and D below 80%; surviving completions below 75% also receive D, while failure receives F
   - explicit aborts (`ABORTED`/`aborted`) and missing records show `--`; autoplay shows `AUTO`. Legacy failures without information distinguishing death from abort retain F. Raw records, score calculation and numeric standings are unchanged
   - live gameplay `ClockSync` uses centered anchor regression instead of large absolute Windows QPC values and automatically rebases after sustained clock discontinuities
   - stale backlog is classified from QPC event age and the `BAD` window; a fresh input whose sample mapping drifts far from the current playback anchor falls back to that anchor instead of becoming permanently non-scoring catch-up
