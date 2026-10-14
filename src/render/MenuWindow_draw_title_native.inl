@@ -60,7 +60,7 @@
         const float compact_bottom = compact_top + 104.0f * button_scale_y;
         const float compact_gap = 18.0f;
         const float compact_width = (buttons.right - buttons.left - compact_gap) * 0.5f;
-        const std::array<uint32_t, 4> action_colors = {0x79D8FA, 0xF06B7B, 0xF2F4F7, 0xF2F4F7};
+        const std::array<uint32_t, 4> action_colors = {0x79D8FA, 0xF06B7B, 0x77E8A2, 0xF2F4F7};
         for (std::size_t index = 0; index < data.title.buttons.size(); ++index) {
             const auto& button = data.title.buttons[index];
             const bool primary = index == 0;
@@ -126,7 +126,7 @@
                 ctx->DrawLine(D2D1::Point2F(tip - 18.0f, cy + 16.0f), D2D1::Point2F(tip, cy), arrow_brush, 3.4f);
             } else {
                 const float cy = (rect.top + rect.bottom) * 0.5f;
-                const bool colored_icon = index == 1 || index == 3;
+                const bool colored_icon = index >= 1;
                 const auto icon_color = D2D1::ColorF(action_color);
                 const float icon_half = index == 1 ? 30.0f : 24.0f;
                 draw_native_asset(button_assets[std::min<std::size_t>(index, 3)],

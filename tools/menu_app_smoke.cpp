@@ -787,6 +787,141 @@ struct MenuAppVisualTestAccess {
         }
         app.publish_snapshot();
     }
+    static void check_level_search_input(MenuApp& app, Report& report) {
+        const auto saved_songs = app.indexed_songs_;
+        const auto saved_ui = app.config_.ui;
+        const auto saved_speed = app.config_.speed;
+        const auto saved_sort = app.song_sort_mode_;
+        const auto saved_group = app.song_group_mode_;
+        const auto saved_view = app.song_select_view_;
+        const auto saved_focus = app.song_select_focus_;
+        const auto saved_query = app.song_search_query_;
+        const bool saved_search_active = app.song_select_search_active_;
+        const int saved_nav = app.song_select_nav_cursor_;
+        const int saved_key = app.song_key_filter_, saved_min = app.song_level_min_filter_, saved_max = app.song_level_max_filter_;
+        const auto saved_pressed = app.pressed_keys_;
+        const auto saved_owners = app.menu_key_owners_;
+        const std::string saved_path = app.selected_song_path();
+        app.pressed_keys_.clear();
+        app.menu_key_owners_.clear();
+        app.config_.ui.difficulty_table_path = "fixture-level-search.json";
+        app.config_.ui.all_song_sources = true;
+        app.config_.ui.song_collection_filter = "all";
+        app.song_key_filter_ = app.song_level_min_filter_ = app.song_level_max_filter_ = 0;
+        app.song_group_mode_ = MenuApp::SongGroupMode::None;
+        app.song_sort_mode_ = MenuApp::SongSortMode::DifficultyDesc;
+        app.indexed_songs_.clear();
+        for (const int level : {15, 16, 18, 19, 20, 21}) {
+            SongEntry entry;
+            entry.title = level == 20 ? "Blue Fixture" : "Other Fixture";
+            entry.path = "search-" + std::to_string(level) + ".bms";
+            entry.format = "bms";
+            entry.key_count = 7;
+            entry.level = entry.native_level = 50;
+            entry.difficulty_table_level = "st" + std::to_string(level);
+            entry.difficulty_table_order = level;
+            app.indexed_songs_.push_back(std::move(entry));
+        }
+        for (const std::string label : {"?", ""}) {
+            SongEntry entry;
+            entry.title = "Unranked Fixture";
+            entry.path = label.empty() ? "search-nonmember.bms" : "search-unranked.bms";
+            entry.format = "bms";
+            entry.key_count = 7;
+            entry.level = entry.native_level = 18;
+            entry.difficulty_table_level = label;
+            app.indexed_songs_.push_back(std::move(entry));
+        }
+        app.song_search_query_.clear();
+        app.song_select_search_active_ = false;
+        app.song_select_view_ = MenuApp::SongSelectView::Songs;
+        app.song_select_focus_ = MenuApp::SongSelectFocus::LeftNav;
+        app.song_select_nav_cursor_ = 2;
+        app.rebuild_visible_song_list();
+        key(app, "Enter");
+        report.check("search.enter_starts_editing", app.song_select_search_active_);
+
+        const auto chord = [&](const char* modifier, const char* name) {
+            const auto code = config::KeycodeMap::to_keycode(modifier).value();
+            app.handle_input_event({code, input::InputState::Pressed, timing::HighResClock::now_ns()});
+            key(app, name);
+            app.handle_input_event({code, input::InputState::Released, timing::HighResClock::now_ns()});
+        };
+        const auto type_query = [&](std::string_view query, const char* shift = "LShift") {
+            key(app, "Delete");
+            for (const char ch : query) {
+                if (ch == ':') chord(shift, "Semicolon");
+                else if (ch == '+') chord(shift, "Plus");
+                else if (ch == '-') key(app, "Minus");
+                else if (ch == ' ') key(app, "Space");
+                else {
+                    const char name[]{static_cast<char>(ch >= 'a' && ch <= 'z' ? ch - ('a' - 'A') : ch), 0};
+                    key(app, name);
+                }
+            }
+        };
+        const auto table_levels = [&]() {
+            std::vector<int> result;
+            for (std::size_t i = 0; i < app.visible_song_count(); ++i)
+                result.push_back(app.visible_song_entry(i)->difficulty_table_order);
+            return result;
+        };
+        type_query("lv:16to20");
+        report.check("search.raw_range_inclusive_preserves_sort", app.song_search_query_ == "lv:16to20" &&
+            app.song_select_search_active_ && table_levels() == std::vector<int>({20, 19, 18, 16}) &&
+            app.song_sort_mode_ == MenuApp::SongSortMode::DifficultyDesc);
+        app.handle_text_input("lv:16to20");
+        report.check("search.wm_char_does_not_duplicate_raw_keys", app.song_search_query_ == "lv:16to20");
+        type_query("lv:16", "RShift");
+        report.check("search.raw_exact_right_shift", app.song_search_query_ == "lv:16" &&
+            app.song_select_search_active_ && table_levels() == std::vector<int>({16}));
+        type_query("lv:19-");
+        report.check("search.raw_upper_inclusive", app.song_search_query_ == "lv:19-" &&
+            app.song_select_search_active_ && table_levels() == std::vector<int>({19, 18, 16, 15}),
+            "query=" + app.song_search_query_ + "; minus=" +
+            config::KeycodeMap::to_name(config::KeycodeMap::to_keycode("Minus").value()));
+        type_query("lv:18+", "RShift");
+        report.check("search.raw_lower_inclusive", app.song_search_query_ == "lv:18+" &&
+            app.song_select_search_active_ && table_levels() == std::vector<int>({21, 20, 19, 18}));
+        type_query("blue lv:16to20");
+        report.check("search.raw_text_and_level_intersect", app.song_search_query_ == "blue lv:16to20" &&
+            app.song_select_search_active_ && table_levels() == std::vector<int>({20}));
+        type_query("lv:18");
+        report.check("search.table_excludes_native_only_matches", table_levels() == std::vector<int>({18}));
+        app.config_.ui.difficulty_table_path.clear();
+        app.rebuild_visible_song_list();
+        report.check("search.native_selection_uses_native_level", app.visible_song_count() == 2 &&
+            app.visible_song_entry(0)->level == 18 && app.visible_song_entry(1)->level == 18);
+        type_query("lv:50");
+        report.check("search.native_query_ignores_retained_table_labels", app.visible_song_count() == 6);
+        app.song_level_max_filter_ = 19;
+        app.rebuild_visible_song_list();
+        report.check("search.existing_level_filter_still_intersects", app.visible_song_count() == 0);
+        app.song_level_max_filter_ = 0;
+        for (const char* modifier : {"LShift", "RShift", "LControl", "RControl", "LAlt", "RAlt", "LWin", "RWin"}) {
+            key(app, modifier);
+            report.check(std::string("search.modifier_keeps_editing.") + modifier,
+                app.song_select_search_active_ && app.song_search_query_ == "lv:50");
+        }
+        key(app, "Delete"); key(app, "Semicolon"); key(app, "Plus");
+        report.check("search.unshifted_punctuation_is_literal", app.song_search_query_ == ";=" && app.song_select_search_active_);
+        report.check("search.punctuation_does_not_change_speed", app.config_.speed.rate == saved_speed.rate &&
+            app.config_.speed.hi_speed == saved_speed.hi_speed);
+        key(app, "Esc");
+        report.check("search.escape_finishes_editing", !app.song_select_search_active_ && screen(app) == Screen::SongSelect);
+
+        app.indexed_songs_ = saved_songs;
+        app.config_.ui = saved_ui;
+        app.config_.speed = saved_speed;
+        app.song_sort_mode_ = saved_sort; app.song_group_mode_ = saved_group;
+        app.song_key_filter_ = saved_key; app.song_level_min_filter_ = saved_min; app.song_level_max_filter_ = saved_max;
+        app.song_search_query_ = saved_query; app.song_select_search_active_ = saved_search_active;
+        app.song_select_view_ = saved_view; app.song_select_focus_ = saved_focus; app.song_select_nav_cursor_ = saved_nav;
+        app.pressed_keys_ = saved_pressed; app.menu_key_owners_ = saved_owners;
+        app.rebuild_visible_song_list(&saved_path);
+        app.persist_runtime_config();
+        app.publish_snapshot();
+    }
     static void check_lane_shortcuts(MenuApp& app, Report& report) {
         const auto saved_controller = app.skin_settings_controller_;
         const auto shortcut_state = [&]() {
@@ -1100,6 +1235,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
     Access::click(app, Kind::TitleButton, 0);
     expect_screen(app, report, "lobby", Screen::SongSelect);
     Access::check_table_input_and_filter(app, report);
+    Access::check_level_search_input(app, report);
     Access::check_browser_sort_and_range(app, report);
     Access::check_loading_pacing(app, report);
 

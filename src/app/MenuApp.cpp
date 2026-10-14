@@ -658,7 +658,7 @@ MenuApp::SongSortMode cycle_song_sort_mode(MenuApp::SongSortMode mode, int direc
     return kModes[index];
 }
 
-std::optional<char> search_character_from_keycode(uint32_t keycode) {
+std::optional<char> search_character_from_keycode(uint32_t keycode, bool shift_pressed) {
     const std::string name = config::KeycodeMap::to_name(keycode);
     if (name.size() == 1) {
         const char ch = name[0];
@@ -667,7 +667,12 @@ std::optional<char> search_character_from_keycode(uint32_t keycode) {
         }
     }
     if (name == "Space") return ' ';
-    if (name == "Minus") return '-';
+    // The physical OEM minus key is serialized as SC_0C on Windows.
+    // Recognize its code here without changing saved key-binding names.
+    const auto minus_key = config::KeycodeMap::to_keycode("Minus");
+    if (name == "Minus" || (minus_key && keycode == *minus_key)) return '-';
+    if (name == "Semicolon") return shift_pressed ? ':' : ';';
+    if (name == "Plus") return shift_pressed ? '+' : '=';
     if (name == "Period") return '.';
     if (name == "Comma") return ',';
     if (name == "Slash") return '/';
@@ -4100,6 +4105,20 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
     };
     const bool search_nav_selected =
         song_select_focus_ == SongSelectFocus::LeftNav && song_select_nav_cursor_ == 2;
+    bool search_shift_pressed = false;
+    if (song_select_search_active_ || search_nav_selected) {
+        const std::string name = config::KeycodeMap::to_name(keycode);
+        if (name == "LShift" || name == "RShift" || name == "LControl" || name == "RControl" ||
+            name == "LAlt" || name == "RAlt" || name == "LWin" || name == "RWin") {
+            return;
+        }
+        // Search text follows the ordered key queue. Physical keyboard polling
+        // can already reflect a later Shift release; WM_CHAR must not append it again.
+        for (const char* shift_name : {"LShift", "RShift"}) {
+            const auto shift = config::KeycodeMap::to_keycode(shift_name);
+            search_shift_pressed |= shift.has_value() && pressed_keys_.count(*shift) != 0;
+        }
+    }
     if (!song_select_search_active_ && !search_nav_selected &&
         (keycode == key_minus_ || keycode == key_plus_)) {
         const double direction = keycode == key_minus_ ? -1.0 : 1.0;
@@ -4138,7 +4157,7 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
             }
             return;
         }
-        if (auto ch = search_character_from_keycode(keycode)) {
+        if (auto ch = search_character_from_keycode(keycode, search_shift_pressed)) {
             song_search_query_.push_back(*ch);
             apply_song_search_refresh();
             return;
@@ -4161,7 +4180,7 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
             apply_song_search_refresh();
             return;
         }
-        if (auto ch = search_character_from_keycode(keycode)) {
+        if (auto ch = search_character_from_keycode(keycode, search_shift_pressed)) {
             song_select_search_active_ = true;
             song_search_query_.push_back(*ch);
             apply_song_search_refresh();

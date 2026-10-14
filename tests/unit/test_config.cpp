@@ -213,7 +213,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.input.backend == "rawinput");
     CHECK(config.input.polling_hz == 1000);
     CHECK(config.input.judgement_hz == 4000);
-    CHECK(config.input.debounce_ms == doctest::Approx(8.0));
+    CHECK(config.input.debounce_ms == doctest::Approx(0.0));
     CHECK_FALSE(config.mode.ghost_battle_enabled);
     CHECK(config.mode.pacemaker_mode == "off");
     CHECK(config.mode.pacemaker_target_accuracy == doctest::Approx(90.0));
@@ -554,17 +554,55 @@ TEST_CASE("config save and load preserve input debounce setting") {
     auto config = loader.defaults();
     config.input.polling_hz = 2000;
     config.input.judgement_hz = 8000;
-    config.input.debounce_ms = 12.0;
+    for (const double saved_debounce : {0.0, 2.5, 8.0, 12.0, 25.0}) {
+        config.input.debounce_ms = saved_debounce;
+        std::string error;
+        REQUIRE(loader.save_profile("profiles/test", config, &error));
+        CHECK(error.empty());
 
-    std::string error;
-    REQUIRE(loader.save_profile("profiles/test", config, &error));
-    CHECK(error.empty());
+        const auto result = loader.load_profile("profiles/test");
+        REQUIRE(result.success());
+        CHECK(result.config.input.polling_hz == 2000);
+        CHECK(result.config.input.judgement_hz == 8000);
+        CHECK(result.config.input.debounce_ms == doctest::Approx(saved_debounce));
+    }
+}
 
-    const auto result = loader.load_profile("profiles/test");
-    REQUIRE(result.success());
-    CHECK(result.config.input.polling_hz == 2000);
-    CHECK(result.config.input.judgement_hz == 8000);
-    CHECK(result.config.input.debounce_ms == doctest::Approx(12.0));
+TEST_CASE("input debounce defaults off while explicit global and profile values remain") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE_FALSE(temp.path.empty());
+    CurrentPathGuard cwd;
+    std::filesystem::current_path(temp.path);
+    std::filesystem::create_directories("config");
+    std::filesystem::create_directories("profiles/player");
+
+    ConfigLoader loader;
+    CHECK(tenriff::config::RuntimeConfig{}.input.debounce_ms == doctest::Approx(0.0));
+    CHECK(loader.defaults().input.debounce_ms == doctest::Approx(0.0));
+    write_file("config/config.json", "{}");
+    auto loaded = loader.load_profile("profiles/player");
+    REQUIRE(loaded.success());
+    CHECK(loaded.config.input.debounce_ms == doctest::Approx(0.0));
+    write_file("profiles/player/config.json", R"({"input":{"polling_hz":1000}})");
+    loaded = loader.load_profile("profiles/player");
+    REQUIRE(loaded.success());
+    CHECK(loaded.config.input.debounce_ms == doctest::Approx(0.0));
+
+    // An older global config is an explicit saved value, even if the profile omits it.
+    write_file("config/config.json", R"({"input":{"debounce_ms":8.0}})");
+    loaded = loader.load_profile("profiles/player");
+    REQUIRE(loaded.success());
+    CHECK(loaded.config.input.debounce_ms == doctest::Approx(8.0));
+    write_file("profiles/player/config.json", R"({"input":{"debounce_ms":0.0}})");
+    loaded = loader.load_profile("profiles/player");
+    REQUIRE(loaded.success());
+    CHECK(loaded.config.input.debounce_ms == doctest::Approx(0.0));
+
+    write_file("config/config.json", R"({"input":{"debounce_ms":0.0}})");
+    write_file("profiles/player/config.json", R"({"input":{"debounce_ms":8.0}})");
+    loaded = loader.load_profile("profiles/player");
+    REQUIRE(loaded.success());
+    CHECK(loaded.config.input.debounce_ms == doctest::Approx(8.0));
 }
 
 TEST_CASE("audio presets do not override explicit sample rate") {
@@ -704,11 +742,11 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     ConfigLoader loader;
     auto config = loader.defaults();
     config.audio_ui.background_sound_enabled = false;
-    config.audio_ui.master_volume = 0.65;
-    config.audio_ui.bgm_volume = 0.55;
-    config.audio_ui.gameplay_volume = 0.45;
-    config.audio_ui.menu_music_volume = 0.25;
-    config.audio_ui.keysound_volume = 1.35;
+    config.audio_ui.master_volume = 0.634; // Saved precision is not quantized by loading.
+    config.audio_ui.bgm_volume = 0.57;
+    config.audio_ui.gameplay_volume = 0.43;
+    config.audio_ui.menu_music_volume = 0.27;
+    config.audio_ui.keysound_volume = 1.37;
     config.audio_ui.normalize_audio = true;
     config.skin.judgement_position = 0.4;
     config.skin.judgement_offset_x = -120;
@@ -735,11 +773,11 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     const auto result = loader.load_profile("profiles/test");
     REQUIRE(result.success());
     CHECK_FALSE(result.config.audio_ui.background_sound_enabled);
-    CHECK(result.config.audio_ui.master_volume == doctest::Approx(0.65));
-    CHECK(result.config.audio_ui.bgm_volume == doctest::Approx(0.55));
-    CHECK(result.config.audio_ui.gameplay_volume == doctest::Approx(0.45));
-    CHECK(result.config.audio_ui.menu_music_volume == doctest::Approx(0.25));
-    CHECK(result.config.audio_ui.keysound_volume == doctest::Approx(1.35));
+    CHECK(result.config.audio_ui.master_volume == doctest::Approx(0.634));
+    CHECK(result.config.audio_ui.bgm_volume == doctest::Approx(0.57));
+    CHECK(result.config.audio_ui.gameplay_volume == doctest::Approx(0.43));
+    CHECK(result.config.audio_ui.menu_music_volume == doctest::Approx(0.27));
+    CHECK(result.config.audio_ui.keysound_volume == doctest::Approx(1.37));
     CHECK(result.config.audio_ui.normalize_audio);
     CHECK(result.config.skin.judgement_position == doctest::Approx(0.4));
     CHECK(result.config.skin.judgement_offset_x == -120);

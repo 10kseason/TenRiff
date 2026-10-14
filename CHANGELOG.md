@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0.2] - Local candidate, 2026-10-15
+
+- Add case-insensitive `lv:16to20`, `Lv:16`, `lv:19-`, and `lv:18+` song-search filters. Bounds are inclusive and combine with ordinary text and existing filters; selected difficulty tables supply the level, while Native LV uses the chart level.
+- Make the lobby Options accent green; remove the decorative circled-five prefix from song selection, use red levels and white scores. Stored table labels and result displays retain their identities.
+- Default new input configurations to 0ms debounce and adjust all five audio volume controls in 1% steps, including sliders. Keep the 10% master default and saved values, with the historical 5-to-8ms migration unchanged.
+- Preserve 1.9.0.1 fixes, R1-R6/replay contracts and the pinned 1.9.0 baseline. This is a local candidate; see [changes and limits](docs/feedback-1.9.0.2.en.md).
+
 ## [1.9.0.1] - 2026-10-15
 
 - New profiles and missing volume settings default to 10% master volume. Preserve explicitly saved volumes and the individual BMS, TenRiff music, background and keysound defaults.

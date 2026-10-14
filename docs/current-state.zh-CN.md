@@ -1,5 +1,9 @@
 # TenRiff 当前状态
 
+**2026-10-15 · 1.9.0.2 本地候选版 — 本地检查通过·未发布：**基于已发布的1.9.0.1，将Options改为绿色，移除选曲中的⑤并将等级设为红色、分数设为白色，新增`lv:`等级搜索、新建配置debounce默认0ms和音量1%步长。主音量默认10%，固定基准仍为1.9.0。尚未发布。[变更与用法](feedback-1.9.0.2.zh-CN.md)。
+
+搜索不区分大小写：`lv:16to20`包含16至20两端，`Lv:16`精确匹配16，`lv:19-`表示19及以下，`lv:18+`表示18及以上。使用当前选择的难度表等级；默认Lv使用谱面/BMS等级。
+
 **2026-10-15 · 1.9.0.1:** 包含默认主音量10%和大厅图标中心对齐。提供试听×0.75、个人档案指定F5/F6 -10/+10、Xbox/XInput按钮输入、文件选择框防重复，以及BMS BPM/STOP顺序修正与旧回放兼容。固定基准保持1.9.0。 [变更说明](feedback-20261015.zh-CN.md) · [发布验证范围](release-1.9.0.1-gate.md).
 
 **2026-10-14 · 1.9.0 / 新固定基准：** 将已检查的本地候选版提升为指定正式版本，包括BMS/菜单音量分离、大厅/筛选/皮肤操作、等级与SUBARTIST、韩文模式界面、EX判定和上传状态。普通/Hard使用R5，EX使用R6；保留旧R1–R5记录及已保存设置。[固定基准](baseline-1.9.0.zh-CN.md) · [验证范围](release-1.9.0-gate.md)。下方带日期的条目保留当时发布历史。
@@ -55,14 +59,14 @@
 - 1.7.10 改善 ALL SONG 的已删除缓存项处理、合并进度和完成状态通知。[验证及未复现症状](release-1.7.10-gate.md)。
 - 1.7.8 新增默认菜单动画、4 至 16 键 Luma Keys、日语界面及网页/离线皮肤编辑。菜单与游戏内视觉设置分别保存在 `native` 和 `gameplay.native`。[验证范围](release-1.7.8-gate.md)。
 
-固定基准为 **1.9.0**，本工作副本属于 **1.9.0.1发布线**。默认/Hard保留R5，EX使用R6，旧记录不变。[候选版范围与验证限制](release-1.9.0.1-gate.md)（韩语）。带日期条目为以往发布历史。
+固定基准为 **1.9.0**，本工作副本是基于已发布1.9.0.1的 **1.9.0.2本地候选版**，本地检查已通过，尚未发布。默认/Hard保留R5，EX使用R6，旧记录不变。参见[当前变更](feedback-1.9.0.2.zh-CN.md)。带日期条目为以往发布历史。
 
 [本地 1.7.1 r2 报告](local-1.7.1-r2.ko.md)中的 749/739 项是旧构建的记录，不作为新版本的结果。参见[曲库管理](library-management.md)、[基准 BPM](reference-bpm.md)、[皮肤预设](skin-presets.md)和 [ASIO](asio-audio.md)。
 
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 用户固定基准为 `1.9.0`，当前源码版本为 `1.9.0.1`
+- 用户固定基准为 `1.9.0`，当前源码版本为 `1.9.0.2`
 - XInput数字按钮与扳机可在Keymap/个人档案中绑定。专用工作线程执行系统查询，现有InputThread读取内部队列并写入RawInput/Polling共用的输入队列。工作线程生命周期随输入启动和停止。4个手柄聚合、断开和焦点行为见[1.9.0.1说明](feedback-20261015.zh-CN.md)。实体手柄验证与模拟输入测试需分开说明。
 - 1.7.1 提供最多8人的 HUD 与结果、并列名次与分数等待状态、P-GREAT 专属效果、判定与连击独立位置、10张选项卡、音量标准化及选曲难度表卡片。见[变更详情](gameplay-polish-followup.md)和[验证范围](release-1.7.1-gate.md)。
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.

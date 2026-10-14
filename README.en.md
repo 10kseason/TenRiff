@@ -1,5 +1,7 @@
 # TenRiff
 
+**2026-10-15 · 1.9.0.2 local candidate — local checks passed, unpublished:** Based on published 1.9.0.1, this candidate makes Options green, removes ⑤ from Song Select and uses red levels/white scores, adds `lv:` searches, changes the new debounce default to 0ms, and uses 1% audio-volume steps. Master volume still defaults to 10%; the fixed baseline remains 1.9.0. Not published yet. [Changes and usage](docs/feedback-1.9.0.2.en.md).
+
 **2026-10-15 · 1.9.0.1:** Includes 10% default master volume and aligned lobby icon centers. Preview ×0.75, profile-assigned F5/F6 -10/+10, Xbox/XInput button input, single modal file pickers, and corrected BMS BPM/STOP order with historical replay compatibility. The fixed baseline remains 1.9.0. [Changes](docs/feedback-20261015.en.md) · [Release verification scope](docs/release-1.9.0.1-gate.md).
 
 **2026-10-14 · 1.9.0 / new fixed baseline:** Promotes the reviewed local candidate to the requested release line: independent BMS/TenRiff music volume, lobby/filter/skin controls, grades and SUBARTIST credits, localized mods, EX timing and upload status. Normal/Hard use R5, EX uses R6; historical R1–R5 records and saved settings are preserved. [Baseline](docs/baseline-1.9.0.en.md) · [Release verification scope](docs/release-1.9.0-gate.md). Dated entries below retain their historical release context.
@@ -52,9 +54,9 @@ Release and downloads: [**1.9.0.1**](https://github.com/10kseason/TenRiff/releas
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The fixed baseline is `1.9.0` and this source targets `1.9.0.1`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The fixed baseline is `1.9.0` and this source targets `1.9.0.2`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-This README explains what to read first when opening the project. For current behavior, the `1.9.0.1` release line, the fixed `1.9.0` baseline, configuration and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
+This README explains what to read first when opening the project. For current behavior, the `1.9.0.2` local candidate, the fixed `1.9.0` baseline, configuration and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
 
 TenRiff should also be read as a `vibe coding` work: it was shaped through fast iteration and experimentation rather than only through a traditional long-form design-first process.
 

@@ -1,5 +1,7 @@
 # TenRiff 开发路线图（分阶段）
 
+**2026-10-15 · 1.9.0.2 本地候选版 — 本地检查通过·未发布：**基于已发布的1.9.0.1，将Options改为绿色，移除选曲中的⑤并将等级设为红色、分数设为白色，新增`lv:`等级搜索、新建配置debounce默认0ms和音量1%步长。主音量默认10%，固定基准仍为1.9.0。尚未发布。[变更与用法](feedback-1.9.0.2.zh-CN.md)。
+
 **2026-10-15 · 1.9.0.1:** 包含默认主音量10%和大厅图标中心对齐。提供试听×0.75、个人档案指定F5/F6 -10/+10、Xbox/XInput按钮输入、文件选择框防重复，以及BMS BPM/STOP顺序修正与旧回放兼容。固定基准保持1.9.0。 [变更说明](feedback-20261015.zh-CN.md) · [发布验证范围](release-1.9.0.1-gate.md).
 
 **2026-10-14 · 1.9.0 / 新固定基准：** 将已检查的本地候选版提升为指定正式版本，包括BMS/菜单音量分离、大厅/筛选/皮肤操作、等级与SUBARTIST、韩文模式界面、EX判定和上传状态。普通/Hard使用R5，EX使用R6；保留旧R1–R5记录及已保存设置。[固定基准](baseline-1.9.0.zh-CN.md) · [验证范围](release-1.9.0-gate.md)。下方带日期的条目保留当时发布历史。
@@ -24,9 +26,15 @@
 
 ## 当前基线
 - Windows GUI/runtime 是主要受支持路径。
-- 固定基准为 `1.9.0`，此源码版本为 `1.9.0.1`；公开包附带 NK3 P64 与 generalized pattern MLP inference 模型，但不附带 BGA upscaler 模型。选择兼容且权利已厘清的 upscaler ONNX 只会保存路径，BGA Upscaler 会一直保持 off，直到用户手动开启并确认 high-spec warning；不存在自动 benchmark gate。
+- 固定基准为 `1.9.0`，此源码为本地候选版 `1.9.0.2`；公开包附带 NK3 P64 与 generalized pattern MLP inference 模型，但不附带 BGA upscaler 模型。选择兼容且权利已厘清的 upscaler ONNX 只会保存路径，BGA Upscaler 会一直保持 off，直到用户手动开启并确认 high-spec warning；不存在自动 benchmark gate。
 - 当前菜单/runtime 仅支持 BMS family（`.bms/.bme/.bml/.pms`），并支持 native、bundle/profile TenRiff `skin.json` 与 LR2 skin。
 - 关于当前已发布的行为，请先看 [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)；这份路线图主要讲方向和剩余工作。
+
+## 1.9.0.2本地候选版验证范围
+
+Release构建、最终CTest 3/3（1,224项，integration skips 0）、编辑器35/35、native MenuApp/GameSession 307/307（含22项搜索按键处理检查）全部通过。6个native渲染fixture/360 Presents和geometry 86 hit checks也通过；FHD/960×540截图检查确认了绿色Options、红色等级、白色分数及⑤的移除。
+
+软件包和独立解压源码构建结果以单独的本地验证记录为准。尚未发布。详细结果与日志单独记录在本地evidence中。内部按键dispatch检查不能代替实体设备输入验证；实体设备、输入延迟、长时间游玩和其他PC仍未验证。固定基准保持1.9.0。
 
 ## 1.9.0.1之后的验证范围
 

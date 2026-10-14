@@ -1,5 +1,7 @@
 # TenRiff
 
+**2026-10-15 · 1.9.0.2 ローカル候補 — ローカル検査通過・未公開:** 公開済み1.9.0.1を基に、Optionsを緑色、選曲の⑤を削除してレベルを赤・スコアを白にし、`lv:` レベル検索、新規debounce既定値0ms、音量の1%刻み調整を追加します。マスター既定値10%と固定基準1.9.0は維持します。まだ公開していません。[変更・使い方](docs/feedback-1.9.0.2.ja.md)。
+
 **2026-10-15 · 1.9.0.1:** マスター音量の既定値10%とロビーアイコンの中心揃えを含みます。プレビュー×0.75、プロフィールで指定するF5/F6 -10/+10、Xbox/XInputボタン入力、ファイル選択の重複防止、BMS BPM/STOP順序修正と旧リプレイ互換を提供します。固定基準は1.9.0を維持します。 [変更内容](docs/feedback-20261015.ja.md) · [リリース検証範囲](docs/release-1.9.0.1-gate.md).
 
 **2026-10-14 · 1.9.0 / 新しい固定基準:** 確認済みのローカル候補を指定された正式版へ昇格します。BMS/メニュー音量分離、ロビー・フィルター・スキン操作、ランク・SUBARTIST、韓国語モード表示、EX判定、送信状態を含みます。通常/HardはR5、EXはR6。旧R1–R5記録と保存設定を保持します。[固定基準](docs/baseline-1.9.0.ja.md) · [検証範囲](docs/release-1.9.0-gate.md)。以下の日付付き項目は当時の履歴です。
@@ -52,9 +54,9 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | 日本語
 
-TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。固定基準は `1.9.0`、このソースのバージョンは `1.9.0.1` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
+TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。固定基準は `1.9.0`、このソースのバージョンは `1.9.0.2` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
 
-この README は導入文書です。現在の挙動、`1.9.0.1` のリリースラインと固定 `1.9.0` の基準、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
+この README は導入文書です。現在の挙動、`1.9.0.2` のローカル候補と固定 `1.9.0` の基準、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
 
 TenRiff のコードベースは、伝統的な長文設計書主導だけで積み上がったものではなく、高速な反復と実験を重視した `vibe coding` 的な性格を持つ作品でもあります。
 

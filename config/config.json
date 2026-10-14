@@ -28,7 +28,7 @@
     "grab": false,
     "queue_size": 2048,
     "polling_hz": 1000,
-    "debounce_ms": 8.0
+    "debounce_ms": 0.0
   },
   "judge": {
     "pg": 21.0,

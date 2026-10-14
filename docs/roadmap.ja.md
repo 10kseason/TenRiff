@@ -1,5 +1,7 @@
 # TenRiff Development Roadmap (staged)
 
+**2026-10-15 · 1.9.0.2 ローカル候補 — ローカル検査通過・未公開:** 公開済み1.9.0.1を基に、Optionsを緑色、選曲の⑤を削除してレベルを赤・スコアを白にし、`lv:` レベル検索、新規debounce既定値0ms、音量の1%刻み調整を追加します。マスター既定値10%と固定基準1.9.0は維持します。まだ公開していません。[変更・使い方](feedback-1.9.0.2.ja.md)。
+
 **2026-10-15 · 1.9.0.1:** マスター音量の既定値10%とロビーアイコンの中心揃えを含みます。プレビュー×0.75、プロフィールで指定するF5/F6 -10/+10、Xbox/XInputボタン入力、ファイル選択の重複防止、BMS BPM/STOP順序修正と旧リプレイ互換を提供します。固定基準は1.9.0を維持します。 [変更内容](feedback-20261015.ja.md) · [リリース検証範囲](release-1.9.0.1-gate.md).
 
 **2026-10-14 · 1.9.0 / 新しい固定基準:** 確認済みのローカル候補を指定された正式版へ昇格します。BMS/メニュー音量分離、ロビー・フィルター・スキン操作、ランク・SUBARTIST、韓国語モード表示、EX判定、送信状態を含みます。通常/HardはR5、EXはR6。旧R1–R5記録と保存設定を保持します。[固定基準](baseline-1.9.0.ja.md) · [検証範囲](release-1.9.0-gate.md)。以下の日付付き項目は当時の履歴です。
@@ -24,9 +26,15 @@
 
 ## Current Baseline
 - Windows GUI / runtime が主なサポート経路です。
-- 固定基準は `1.9.0`、このソースは `1.9.0.1`。公開 package は NK3 P64 と generalized pattern MLP inference model を同梱するが、BGA upscaler model は同梱しない。互換性と権利を確認済みの upscaler ONNX を選択しても path を保存するだけで、BGA Upscaler は user が有効化して high-spec warning を確認するまで off のまま。自動 benchmark gate はない。
+- 固定基準は `1.9.0`、このソースはローカル候補 `1.9.0.2`。公開 package は NK3 P64 と generalized pattern MLP inference model を同梱するが、BGA upscaler model は同梱しない。互換性と権利を確認済みの upscaler ONNX を選択しても path を保存するだけで、BGA Upscaler は user が有効化して high-spec warning を確認するまで off のまま。自動 benchmark gate はない。
 - 現行 menu / runtime は BMS family（`.bms/.bme/.bml/.pms`）専用で、native、bundle/profile の TenRiff `skin.json`、LR2 skin をサポート。
 - 現在出荷されている挙動は [`docs/current-state.ja.md`](current-state.ja.md) を先に見てください。この roadmap は方向と残作業を示す文書です。
+
+## 1.9.0.2ローカル候補の検証範囲
+
+Releaseビルド、最終CTest 3/3（1,224件、integration skips 0）、エディター35/35、native MenuApp/GameSession 307/307（検索キー処理22件を含む）が通過しました。native描画6 fixture/360 Presentsとgeometry 86 hit checksも通過し、FHD/960×540キャプチャで緑のOptions・赤いレベル・白いスコア・⑤の削除を確認しました。
+
+パッケージと独立した展開ソースのビルド結果は別のローカル検証記録を参照してください。まだ公開していません。詳細結果とログはローカルevidenceに別途記録します。内部キーdispatch検査は実機入力の検証を代替しません。物理デバイス・入力遅延・長時間プレイ・別PCは未検証です。固定基準は1.9.0を維持します。
 
 ## 1.9.0.1以降の確認範囲
 
