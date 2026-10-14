@@ -383,7 +383,8 @@ ChartLoadResult ChartLoader::load(const std::string& path,
                                   int sample_rate,
                                   double rate,
                                   std::string_view bms_keysound_policy,
-                                  uint32_t bms_random_seed) const {
+                                  uint32_t bms_random_seed,
+                                  int bms_timing_version) const {
     ChartLoadResult result;
     AssetLookupIndex asset_lookup;
 
@@ -417,7 +418,7 @@ ChartLoadResult ChartLoader::load(const std::string& path,
     }
 
     chart::BmsTimelineBuilder timeline_builder;
-    auto timeline_result = timeline_builder.build(norm_result.chart, sample_rate);
+    auto timeline_result = timeline_builder.build(norm_result.chart, sample_rate, bms_timing_version);
     append_timeline_messages(result.messages, timeline_result.messages);
     if (!timeline_result.success()) {
         result.error = "Failed to build BMS timeline.";
@@ -428,6 +429,7 @@ ChartLoadResult ChartLoader::load(const std::string& path,
     result.chart = std::move(built_chart.chart);
     result.base_bpm = parse_result.chart.base_bpm;
     result.reference_bpm = timeline_result.timeline.reference_bpm;
+    result.has_bpm_stop_timing_difference = timeline_result.timeline.has_bpm_stop_timing_difference;
     result.messages.insert(result.messages.end(), built_chart.messages.begin(), built_chart.messages.end());
     const BmsKeysoundPolicy keysound_policy = parse_bms_keysound_policy(bms_keysound_policy);
     std::unordered_map<std::string, std::optional<std::string>> resolved_wav_cache;

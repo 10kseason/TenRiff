@@ -12,7 +12,7 @@
     "bms_keysound_policy": "follow",
     "background_sound_enabled": true,
     "title_music": "default",
-    "volume": 0.7,
+    "volume": 0.1,
     "gameplay_volume": 1.0,
     "menu_music_volume": 1.0,
     "bgm_volume": 1.0,
@@ -105,6 +105,8 @@
     "calculate_song_index_difficulty": false
   },
   "ui": {
+    "hispeed_decrease_key": "F5",
+    "hispeed_increase_key": "F6",
     "profile_nickname": "",
     "language": "en",
     "menu_font_size": "normal",

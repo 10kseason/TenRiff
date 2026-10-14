@@ -70,8 +70,13 @@ inline constexpr float kOutputSoftLimitThreshold = 0.92f;
            std::clamp(bgm_volume, 0.0, 1.0);
 }
 
-// Only TenRiff's own scene music gets the quieter reference level. BMS
-// gameplay, song previews and editor auditions retain their original gains.
+// Song previews have a separate reference gain; gameplay/editor mixes stay unchanged.
+[[nodiscard]] inline double song_preview_gain(bool enabled, double master_volume,
+                                               double bgm_volume) {
+    return menu_background_gain(enabled, master_volume, bgm_volume) * 0.75;
+}
+
+// Only TenRiff's own scene music gets the quieter reference level.
 [[nodiscard]] inline double tenriff_music_gain(bool enabled,
                                                double master_volume,
                                                double menu_music_volume) {

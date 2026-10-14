@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "input/InputEvent.h"
+#include "input/GamepadInput.h"
 #include "input/KeyStateTracker.h"
 #include "input/RawInputHandler.h"
 #include "input/SPSCQueue.h"
@@ -92,13 +93,13 @@ public:
     [[nodiscard]] const EventQueue& queue() const { return event_queue_; }
 
     /// Get the number of events processed.
-    [[nodiscard]] uint64_t events_processed() const { 
-        return events_processed_.load(std::memory_order_acquire); 
+    [[nodiscard]] uint64_t events_processed() const {
+        return events_processed_.load(std::memory_order_acquire);
     }
 
     /// Get the number of events dropped due to queue overflow.
-    [[nodiscard]] uint64_t events_dropped() const { 
-        return events_dropped_.load(std::memory_order_acquire); 
+    [[nodiscard]] uint64_t events_dropped() const {
+        return events_dropped_.load(std::memory_order_acquire);
     }
 
     [[nodiscard]] InputBackend current_backend() const {
@@ -106,11 +107,17 @@ public:
     }
 
     [[nodiscard]] InputThreadHealthSnapshot health_snapshot() const;
+    [[nodiscard]] uint16_t gamepad_mask() const { return gamepad_mask_.load(std::memory_order_acquire); }
+    [[nodiscard]] bool gamepad_key_pressed(uint32_t keycode) const {
+        const auto index = gamepad::keycode_index(keycode);
+        return index && (gamepad_mask() & (uint16_t{1} << *index)) != 0;
+    }
 
     /// Reset all key states (call on focus loss).
     void reset_key_states();
 
 private:
+    friend struct InputThreadGamepadTestAccess;
     void thread_main();
     [[nodiscard]] bool thread_main_rawinput();
     void thread_main_polling(bool reconcile_existing_state = false);
@@ -125,8 +132,20 @@ private:
     [[nodiscard]] bool is_input_allowed() const;
     void sync_input_gate(bool allowed);
 
+    struct GamepadRuntime;
+    // Private per-instance hooks let native tests block/release a fake driver.
+    // They are not configuration, environment overrides, or a public input API.
+    struct GamepadTestHooks {
+        void* context = nullptr;
+        bool (*read)(void*, uint32_t, gamepad::GamepadState&) = nullptr;
+        bool (*allowed)(void*) = nullptr;
+    } gamepad_test_hooks_;
+    std::unique_ptr<GamepadRuntime> gamepad_runtime_;
+    std::atomic<uint16_t> gamepad_mask_{0};
+    void poll_gamepads();
+
     InputThreadConfig config_{};
-    
+
     std::unique_ptr<RawInputHandler> raw_input_handler_;
     std::unique_ptr<KeyStateTracker> key_state_tracker_;
     EventQueue event_queue_;
@@ -148,6 +167,8 @@ private:
     std::atomic<int64_t> last_queue_push_time_ns_{0};
     std::atomic<uint64_t> allowed_event_count_{0};
     std::atomic<uint64_t> events_processed_{0};
+    // Keyboard liveness must not be masked by unrelated gamepad traffic.
+    std::atomic<uint64_t> keyboard_events_processed_{0};
     std::atomic<uint64_t> events_dropped_{0};
 };
 

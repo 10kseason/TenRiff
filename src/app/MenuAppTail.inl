@@ -603,7 +603,7 @@ bool MenuApp::start_song_preview_audio(const SongSelectScreen::PreviewDecodeResu
     // gameplay session still follows the user's exclusive/shared setting.
     preview_config.exclusive_mode = false;
     song_select_screen_.preview_gain().store(
-        static_cast<float>(menu_background_gain(
+        static_cast<float>(song_preview_gain(
             config_.audio_ui.background_sound_enabled,
             menu_output_master_gain() * gameplay_volume_gain(config_.audio_ui.gameplay_volume),
             config_.audio_ui.bgm_volume)),
@@ -784,7 +784,7 @@ void MenuApp::service_song_preview() {
 
     if (!song_select_screen_.preview_active_path().empty() && audio_thread_.is_running()) {
         song_select_screen_.preview_gain().store(
-            static_cast<float>(menu_background_gain(
+            static_cast<float>(song_preview_gain(
                 config_.audio_ui.background_sound_enabled,
                 menu_output_master_gain() * gameplay_volume_gain(config_.audio_ui.gameplay_volume),
                 config_.audio_ui.bgm_volume)),
@@ -838,7 +838,7 @@ void MenuApp::sync_menu_music() {
             return;
         }
         song_select_screen_.preview_gain().store(
-            static_cast<float>(menu_background_gain(
+            static_cast<float>(song_preview_gain(
                 true,
                 menu_output_master_gain() * gameplay_volume_gain(config_.audio_ui.gameplay_volume),
                 config_.audio_ui.bgm_volume)),
@@ -1051,14 +1051,26 @@ void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
                     settings_cursor_ == profile_setup::kSkipStartCountdownRow, render::MenuHitTargetKind::SettingsRow,
                     profile_setup::kSkipStartCountdownRow, false, true);
     append_menu_row(render.generic, ui_text("Instant Restart Key", "즉시 재시작 키"),
-                    profile_restart_key_capture_active_
-                        ? (profile_restart_key_status_.empty()
+                    (profile_control_key_capture_active_ && profile_control_key_capture_row_ == profile_setup::kInstantRestartKeyRow)
+                        ? (profile_control_key_status_.empty()
                             ? ui_text("Press a key (Esc cancels, Delete clears)", "키 입력 (Esc 취소, Delete 해제)")
-                            : profile_restart_key_status_)
+                            : profile_control_key_status_)
                         : (config_.ui.instant_restart_key.empty() ? ui_text("Unassigned", "미지정")
                                                                   : config_.ui.instant_restart_key),
                     settings_cursor_ == profile_setup::kInstantRestartKeyRow, render::MenuHitTargetKind::SettingsRow,
                     profile_setup::kInstantRestartKeyRow, true, false);
+    for (const bool decrease : {true, false}) {
+        const int row = decrease ? profile_setup::kHispeedDecreaseKeyRow : profile_setup::kHispeedIncreaseKeyRow;
+        const auto& binding = decrease ? config_.ui.hispeed_decrease_key : config_.ui.hispeed_increase_key;
+        const bool capturing = profile_control_key_capture_active_ && profile_control_key_capture_row_ == row;
+        append_menu_row(render.generic,
+            decrease ? ui_text("Hi-Speed -10 Key", "배속 -10 키") : ui_text("Hi-Speed +10 Key", "배속 +10 키"),
+            capturing ? (profile_control_key_status_.empty()
+                ? ui_text("Press a key (Esc cancels, Delete clears)", "키 입력 (Esc 취소, Delete 해제)")
+                : profile_control_key_status_)
+                : (binding.empty() ? ui_text("Unassigned", "미지정") : binding),
+            settings_cursor_ == row, render::MenuHitTargetKind::SettingsRow, row, true, false);
+    }
     append_menu_row(render.generic,
                     first_run ? ui_text("Continue to Song Select", "곡 선택으로 계속")
                               : ui_text("Done", "완료"),
@@ -2051,6 +2063,7 @@ void MenuApp::service_song_select_repeat(int64_t now_ns, bool foreground) {
         // InputThread drops background releases and resets its own tracker at
         // the focus boundary; discard the matching menu-side state as well.
         pressed_keys_.clear();
+        menu_key_owners_.clear();
         reset_song_select_repeat();
         return;
     }
@@ -2806,6 +2819,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         last_result_mods_ = result.mods;
         last_result_long_note_mix_version_ = result.long_note_mix_version;
         last_result_key_conversion_version_ = result.key_conversion_version;
+        last_result_bms_timing_version_ = result.bms_timing_version;
         last_result_rate_multiplier_ = result.rate_multiplier;
         last_result_score_multiplier_ = result.score_multiplier;
         last_result_final_score_ = result.final_score;

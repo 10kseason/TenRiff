@@ -1,8 +1,11 @@
 #include "doctest/doctest.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <cmath>
 #include <fstream>
+#include <cstdlib>
+#include <iostream>
 #include <string>
 #include <string_view>
 
@@ -10,6 +13,7 @@
 #include "app/ModeManager.h"
 #include "gameplay/GameplayEngine.h"
 #include "gameplay/GameplayChart.h"
+#include "bms_timing_fixture.h"
 
 using tenriff::app::ChartLoader;
 using tenriff::app::ChartLoadResult;
@@ -72,6 +76,62 @@ bool refers_to_same_existing_file(std::string_view actual, const std::filesystem
 }
 
 }  // namespace
+
+namespace {
+void check_bpm_stop_mine_input(const std::string& path, bool reporter) {
+    for (int sample_rate : {44100, 48000, 96000}) for (double rate : {0.5, 1.0, 2.0}) {
+        const auto legacy = ChartLoader{}.load(path, sample_rate, rate, "ignore", 0, 1);
+        const auto fixed = ChartLoader{}.load(path, sample_rate, rate, "ignore", 0, 2);
+        REQUIRE(legacy.success()); REQUIRE(fixed.success());
+        REQUIRE(fixed.has_bpm_stop_timing_difference);
+        REQUIRE(legacy.chart.notes.size() == fixed.chart.notes.size());
+        REQUIRE(legacy.chart.mines.size() == fixed.chart.mines.size());
+        REQUIRE_FALSE(fixed.chart.mines.empty());
+        const auto first_lane_mine = std::find_if(legacy.chart.mines.begin(), legacy.chart.mines.end(),
+            [](const auto& mine) { return mine.lane == 2; });
+        REQUIRE(first_lane_mine != legacy.chart.mines.end());
+        const auto note = std::find_if(legacy.chart.notes.rbegin(), legacy.chart.notes.rend(),
+            [&](const auto& n) { return n.lane == 2 && n.start_sample < first_lane_mine->sample; });
+        REQUIRE(note != legacy.chart.notes.rend());
+        for (int version : {1, 2}) {
+            auto isolated = version == 1 ? legacy.chart : fixed.chart;
+            // Keep the real mine schedule and the reported tap, plus a far
+            // future note so the test cannot end before evaluating the mines.
+            isolated.notes = {*note, {1, isolated.duration_samples, std::nullopt}};
+            tenriff::gameplay::GameplayConfig config;
+            config.sample_rate = sample_rate;
+            config.rate = rate;
+            config.initial_gauge = tenriff::game::GaugeType::ExHard;
+            tenriff::gameplay::GameplayEngine engine(isolated, config);
+            (void)engine.handle_input(2, tenriff::input::InputState::Pressed, note->start_sample);
+            (void)engine.handle_input(2, tenriff::input::InputState::Released,
+                                     note->start_sample + sample_rate / 20); // 50 ms physical tap
+            engine.advance(isolated.mines.back().sample + 1);
+            CHECK(engine.is_game_over() == (version == 1));
+            CHECK(engine.stats().counts.pg == 1);
+            if (reporter && sample_rate == 48000 && rate == 1.0) {
+                std::cout << "reported BMS timing v" << version << " notes=" << isolated.notes.size()
+                    << " mines=" << isolated.mines.size() << " game_over=" << engine.is_game_over() << '\n';
+            }
+        }
+    }
+}
+}
+
+TEST_CASE("BPM STOP mine timing preserves a normal physical tap at multiple rates") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    const auto path = temp.path / "timing.bms";
+    { std::ofstream file(path); file << bpm_stop_mine_fixture(); }
+    check_bpm_stop_mine_input(path.u8string(), false);
+}
+
+TEST_CASE("feedback real BMS timing mine reproduction") {
+    const char* path = std::getenv("TENRIFF_BMS_TIMING_CHART");
+    if (!path || !*path) return; // Local reporter input is intentionally not shipped.
+    check_bpm_stop_mine_input(path, true);
+}
 
 TEST_CASE("BMS RANK chooses real-time judgement windows while Easy keeps other windows") {
     TempDirGuard temp{make_temp_dir()};

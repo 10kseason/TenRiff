@@ -1,6 +1,7 @@
 #include "doctest/doctest.h"
 
 #include "app/MenuAppSettingsUtils.h"
+#include "app/ProfileSetupFlow.h"
 #include "app/MenuAppSkinUtils.h"
 #include "app/menu/settings/SettingsHelp.h"
 #include "app/menu/settings/AudioSettingsController.h"
@@ -21,7 +22,8 @@ TEST_CASE("Every settings ID has localized contextual help independent of row or
     check(Screen::SettingsInput, kInputSettingOrder);
     check(Screen::SettingsCalibration, kCalibrationSettingOrder);
     check(Screen::SettingsSkins, tenriff::app::kSkinSettingsRowOrder);
-    for (const auto [screen, count] : {std::pair{Screen::ModeSelect, 19}, {Screen::ModeMods, 7}, {Screen::OptionsHub, 10}, {Screen::QuickSetup, 13}})
+    for (const auto [screen, count] : {std::pair{Screen::ModeSelect, 19}, {Screen::ModeMods, 7}, {Screen::OptionsHub, 10},
+             {Screen::QuickSetup, tenriff::app::profile_setup::row_count(tenriff::app::profile_setup::Entry::FirstRun)}})
         for (int id = 0; id < count; ++id) CHECK_FALSE(setting_help(screen, id, tenriff::ui::Language::Korean).empty());
     tenriff::render::GenericMenuData data;
     data.rows.resize(2);

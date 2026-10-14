@@ -329,6 +329,7 @@ ReplayVerificationResult verify_replay_against_chart(
     ReplayVerificationResult result;
     result.status = ReplayVerificationStatus::Verified;
     result.ruleset_id = replay.ruleset_id;
+    result.bms_timing_version = replay.mode.bms_timing_version;
     result.stats = engine.stats();
     result.rate_multiplier = managed.rate_multiplier;
     result.score_multiplier = managed.final_multiplier;
@@ -412,7 +413,8 @@ ReplayVerificationResult verify_replay_file(
                                                      replay.sample_rate,
                                                      replay.rate,
                                                      "ignore",
-                                                     bms_random_seed);
+                                                     bms_random_seed,
+                                                     replay.mode.bms_timing_version);
     if (!loaded_chart.success()) {
         return invalid_result(loaded_chart.error.empty()
                                   ? "Bound chart could not be reconstructed."

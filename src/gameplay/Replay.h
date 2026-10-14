@@ -32,6 +32,8 @@ struct ReplayTrace {
 };
 
 struct ReplayModeSettings {
+    // Missing in historical files: v1 slice-order STOP; v2 BPM before STOP.
+    int bms_timing_version = 1;
     // Absent in older files: retain the exact historical conversion policy.
     int key_conversion_version = 1;
     // Missing on old evidence: v1 short subdivisions; v2 musical multi-beat holds.
@@ -82,6 +84,7 @@ struct ReplayFile {
 };
 
 struct ResultFile {
+    int bms_timing_version = 1;
     int key_conversion_version = 1;
     int long_note_mix_version = 1;
     int version = kNativeScoreVersion;

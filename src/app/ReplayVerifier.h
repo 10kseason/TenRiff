@@ -51,6 +51,7 @@ struct ReplayVerificationResult {
     bool game_over = true;
     bool claims_match = false;
     bool official_eligible = false;
+    int bms_timing_version = 1;
 
     [[nodiscard]] bool verified() const {
         return status == ReplayVerificationStatus::Verified;

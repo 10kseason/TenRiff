@@ -1,3 +1,4 @@
+#include "app/NativeFileDialog.h"
 #include "app/MenuApp.h"
 #include "app/AudioMixPolicy.h"
 #include "app/SongPreviewPlayback.h"
@@ -95,7 +96,7 @@ std::string browse_bms_save_file(const std::string& title, const std::string& su
         if (!wide_name.empty()) dialog->SetFileName(wide_name.c_str());
         const std::wstring wide_title = utf8_to_wide(title);
         if (!wide_title.empty()) dialog->SetTitle(wide_title.c_str());
-        if (SUCCEEDED(dialog->Show(nullptr))) {
+        if (SUCCEEDED(show_native_file_dialog(dialog))) {
             IShellItem* item = nullptr;
             if (SUCCEEDED(dialog->GetResult(&item)) && item) {
                 PWSTR path = nullptr;

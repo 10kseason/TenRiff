@@ -193,6 +193,7 @@ public:
         std::vector<std::string> mods;
         int long_note_mix_version = 1;
         int key_conversion_version = 3;
+        int bms_timing_version = 2;
         double rate_multiplier = 1.0;
         double score_multiplier = 1.0;
         int64_t final_score = 0;
@@ -489,6 +490,7 @@ private:
     std::vector<std::string> session_mode_mods_{};
     int long_note_mix_version_ = 2;
     int key_conversion_version_ = 3;
+    int bms_timing_version_ = 2;
     double rate_multiplier_ = 1.0;
     double score_multiplier_ = 1.0;
     gameplay::ReplayFile replay_source_{};
@@ -570,6 +572,9 @@ private:
     uint32_t f2_keycode_ = 0;
     uint32_t f3_keycode_ = 0;
     uint32_t f4_keycode_ = 0;
+    // These store the profile's assignable coarse Hi-Speed keys.
+    bool hispeed_coarse_decrease_held_ = false;
+    bool hispeed_coarse_increase_held_ = false;
     uint32_t f5_keycode_ = 0;
     uint32_t f6_keycode_ = 0;
     uint32_t f7_keycode_ = 0;

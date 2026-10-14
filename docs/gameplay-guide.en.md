@@ -1,5 +1,7 @@
 # TenRiff Gameplay Guide
 
+In 1.9.0.1, assign Hi-Speed -10/+10 in Profile (defaults F5/F6, range 0.50–50.00). Press Xbox/XInput digital buttons or LT/RT in Keymap to bind lanes, or in Profile to bind restart and Hi-Speed controls. Use the D-pad to navigate menus, A to select and B to go back; an otherwise unassigned Start pauses gameplay. LT/RT count as pressed above 30/255. Analog stick axes and vibration are outside this release. [Changes and compatibility](feedback-20261015.en.md).
+
 The 1.9.0 release selects Normal / Hard / EX under `Options > Key Mode Settings > Judge Window`. Easy is removed from new selections but retained for historical replays. The session-only choice is not profile-persisted and resets to Normal on restart. See [EX timing and compatibility](judge-ex-1.9.0.ko.md) (Korean).
 - New Normal/Hard plays retain `tenriff-native-score-v2-ruleset-5`; EX uses `tenriff-native-score-v2-ruleset-6`. Historical R1–R5 timing, Easy and LN policies remain unchanged; custom timing is unofficial.
 - `Judge EX` uses EASY PG/GR/GD=`14/44.571429/78.857143ms` (80% of Hard), retaining BMS RANK scaling. BAD is fixed at 250ms; the separate automatic-miss deadline remains 340ms and the score factor remains Hard's 1.10.
@@ -134,8 +136,8 @@ If this is not the layout you want, you can change it in `Options > Keymap`.
 - Session Mix ignores Esc during play; its between-stage result exits remain available. Multiplayer retains its Esc abort behavior.
 - `F3`: decrease Hi-Speed
 - `F4`: increase Hi-Speed
-- `F5`: halve Hi-Speed
-- `F6`: double Hi-Speed
+- `F5` (default): Hi-Speed -10; reassign in Profile
+- `F6` (default): Hi-Speed +10; reassign in Profile
 - `F7` / `F8`: decrease / increase visual latency
 - `F11`: open / close in-game chat (also F11 in menus)
 - Left/right `LShift` / `RShift` can be assigned as play keys. The shortcuts above do not require Shift.
@@ -205,7 +207,7 @@ Casual Score has a 10,000 maximum and uses `PG 6 / GR 3 / GD 1 / PR 0 / FAIL 0` 
 
 Standard Accuracy is the judgement-weighted average of `PG / GR / GD / BD / PR = 100 / 80 / 50 / 20 / 0%`. It is separate from Detailed Accuracy, which reflects timing within each judgement band. Standard Accuracy has no extra timing-spread deduction or 99.5% cap.
 
-**Rank in the local 1.9.0 candidate:** surviving completions use standard accuracy thresholds of `99% S++ / 98% S+ / 95% S / 93% A+ / 90% A / 85% B / 80% C`, with each threshold inclusive. Every surviving completion below 80%, including below 75%, receives D; failure receives F. Thresholds use accuracy before display rounding.
+**Rank from 1.9.0 onward:** surviving completions use standard accuracy thresholds of `99% S++ / 98% S+ / 95% S / 93% A+ / 90% A / 85% B / 80% C`, with each threshold inclusive. Every surviving completion below 80%, including below 75%, receives D; failure receives F. Thresholds use accuracy before display rounding.
 
 Explicit aborts (`ABORTED` or `aborted`) show `--`, autoplay shows `AUTO`, and missing records show `--`. Legacy failed records without enough information to distinguish death from abort retain F. Results, history and BEST recalculate the displayed grade from statistics without rewriting raw records or changing score calculation or numeric standings. The fixed 1.8.7 baseline is unchanged. [Grade display and compatibility (Korean)](grade-display.ko.md).
 

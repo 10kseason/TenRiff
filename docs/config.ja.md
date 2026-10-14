@@ -1,5 +1,7 @@
 # TenRiff Config Schema (current)
 
+**2026-10-15 · 1.9.0.1:** マスター音量の既定値10%とロビーアイコンの中心揃えを含みます。プレビュー×0.75、プロフィールで指定するF5/F6 -10/+10、Xbox/XInputボタン入力、ファイル選択の重複防止、BMS BPM/STOP順序修正と旧リプレイ互換を提供します。固定基準は1.9.0を維持します。 [変更内容](feedback-20261015.ja.md) · [リリース検証範囲](release-1.9.0.1-gate.md).
+
 **1.8.8:** 結果分析、ウィンドウの自由なサイズ変更と幅・高さの直接入力、結果画面の `F9` PNG 保存案内、長い LN Mix、メニュー・キー音・開始操作の改善を含みます。現在の検証・配布状況は[リリース案内（韓国語）](release-1.8.8-gate.md)を参照してください。ユーザーの固定基準は 1.8.7 のままで、既存のタグ・配布ファイルを保持します。
 
 確認元: [Config.h](../src/config/Config.h)、[Config.cpp](../src/config/Config.cpp)、[既定 JSON](../config/config.json)、[キーマップ](../src/config/Keymap.cpp)。省略値にはコード既定値を使い、以下の範囲は読込・保存時の正規化規則です。
@@ -260,6 +262,8 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | プロファイル・初回設定のメニュー文字サイズ（100%・115%・130%）。プレイ中の文字サイズはスキン設定を維持。 |
 | `skip_start_countdown` | bool; `false` | ソロプレイ開始時の `3 / 2 / 1` 表示を省略。通常の開始、メニューからの再開始、結果画面からの再試行に適用。 |
 | `instant_restart_key` | string; `""`（未割当） | 進行中のソロ譜面を最初から再開始するキー名。新しい試行では初期カウントダウンを常に省略し、中断した試行の結果・リプレイは保存しない。 |
+| `hispeed_decrease_key` | string; `"F5"` | Hi-Speed -10キー。プロフィールで指定、空文字で解除。 |
+| `hispeed_increase_key` | string; `"F6"` | Hi-Speed +10キー。プロフィールで指定、空文字で解除。 |
 | `all_song_sources` | bool; `false` | 登録フォルダーを統合する ALL SONG を復元。同一チャートパスの重複を除外。 |
 | `result_tail_ms` | double; `500` ms | 判定完了後の結果遷移の追加待機時間。`audio.play_to_end=true` の場合は譜面音声の終了時刻も考慮します。 |
 | `require_enter_to_exit` | bool; `true` | 読込・保存互換用。現在の Windows 結果入力経路はこの値で自動終了しません。 |
@@ -359,6 +363,8 @@ BGA全体の暗幕フィルターは適用せず、黒いフィールド・レ�
 
 ## `keymap.json`
 
+Xbox/XInputボタンは既存のキー名欄に保存します: `PadUp`, `PadDown`, `PadLeft`, `PadRight`, `PadStart`, `PadBack`, `PadLS`, `PadRS`, `PadLB`, `PadRB`, `PadA`, `PadB`, `PadX`, `PadY`, `PadLT`, `PadRT`。Keymapの入力待ちで実際のボタンを押します。同じ名前をプロフィールの再試行・Hi-Speed操作にも使用できます。LT/RTは30/255超で押下、LS/RSはスティック押込みです。4台の同じボタンは1つの論理入力となり、軸・振動は範囲外です。[操作・接続・互換性](feedback-20261015.ja.md)。
+
 ### Shape
 - `layout` (string)
 - `bindings`
@@ -380,7 +386,7 @@ BGA全体の暗幕フィルターは適用せず、黒いフィールド・レ�
 
 ## 設定操作とオーディオ同期
 
-新しいプロファイルの `audio.volume` は `0.7` です。保存済みの音量を維持します。`audio.mute_when_inactive` は既定で `false`。有効にすると別のウィンドウの使用中は出力のみミュートし、曲の進行を維持します。ASIO バッファサイズはチャンネル当たりのサンプルで表示します。
+新しいプロファイルの `audio.volume` は `0.1` です。保存済みの音量を維持します。`audio.mute_when_inactive` は既定で `false`。有効にすると別のウィンドウの使用中は出力のみミュートし、曲の進行を維持します。ASIO バッファサイズはチャンネル当たりのサンプルで表示します。
 
 キー設定は横並びの Key 1… です。基本キーと補助キーを指定でき、どちらかを押している間は押下状態が続きます。補助キーの × または入力待ち中の Delete で補助設定を解除します。`keymap.json` の任意の `secondary_modes` は既存のモード・レイン構造を使います。オプションの初期編集モードは 4K、譜面から開く場合は実際のキー数です。
 

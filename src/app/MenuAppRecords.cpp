@@ -85,11 +85,13 @@ bool live_result_claims_match(const menu_records::ParsedResultRecord& parsed,
                               double rate_multiplier,
                               double score_multiplier,
                               int long_note_mix_version,
-                              int key_conversion_version) {
+                              int key_conversion_version,
+                              int bms_timing_version) {
     const auto& stored = parsed.stats;
     return parsed.final_score == final_score &&
            parsed.long_note_mix_version == long_note_mix_version &&
            parsed.key_conversion_version == key_conversion_version &&
+           parsed.bms_timing_version == bms_timing_version &&
            parsed.game_over == game_over &&
            parsed.clear_status == clear_status &&
            parsed.final_gauge == final_gauge &&
@@ -128,6 +130,7 @@ void MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
     BestResultRecord candidate;
     candidate.has_value = true;
     candidate.replay_verified = replay_verified;
+    candidate.bms_timing_version = parsed.bms_timing_version;
     candidate.rank = menu_records::calculate_rank(effective_stats, effective_game_over,
                                                    effective_clear_status, parsed.aborted);
     candidate.best_score = effective_score;
@@ -154,6 +157,7 @@ void MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
                                             effective_final_gauge);
 
     LocalPlayRecord record;
+    record.bms_timing_version = parsed.bms_timing_version;
     record.chart_path = parsed.chart_path;
     record.chart_format = parsed.chart_format;
     record.created_utc = parsed.created_utc;
@@ -213,6 +217,14 @@ void MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
         auto existing = chart_best_results_.find(key);
         if (existing == chart_best_results_.end()) {
             chart_best_results_.emplace(key, candidate);
+            continue;
+        }
+
+        // A corrected chart's BEST starts with its first verified v2 play.
+        // Legacy scores remain in history and cannot outrank different timing.
+        if (candidate.bms_timing_version != existing->second.bms_timing_version) {
+            if (candidate.bms_timing_version > existing->second.bms_timing_version)
+                existing->second = candidate;
             continue;
         }
 
@@ -308,7 +320,8 @@ void MenuApp::reload_chart_best_results() {
                                               parsed->replay_sha256);
             if (verification.verified() &&
                 (verification.chart_sha256 != parsed->chart_sha256 ||
-                 parsed->ruleset_id != verification.ruleset_id)) {
+                 parsed->ruleset_id != verification.ruleset_id ||
+                 parsed->bms_timing_version != verification.bms_timing_version)) {
                 verification.status = ReplayVerificationStatus::Invalid;
                 verification.detail = "Result metadata does not match the verified replay evidence.";
                 verification.official_eligible = false;
@@ -399,7 +412,8 @@ void MenuApp::cache_current_session_result(const std::string& chart_path,
                                                            last_result_rate_multiplier_,
                                                            last_result_score_multiplier_,
                                                            last_result_long_note_mix_version_,
-                                                           last_result_key_conversion_version_);
+                                                           last_result_key_conversion_version_,
+                                                           last_result_bms_timing_version_);
         if (!evidence_matches || !claims_match) {
             verification.status = ReplayVerificationStatus::Invalid;
             verification.detail = !evidence_matches
@@ -413,6 +427,7 @@ void MenuApp::cache_current_session_result(const std::string& chart_path,
             verification.detail =
                 "Current session outcome accepted from the live engine; replay reconstruction deferred.";
             verification.stats = last_result_;
+            verification.bms_timing_version = last_result_bms_timing_version_;
             verification.clear_status = last_clear_status_;
             verification.final_gauge = last_final_gauge_;
             verification.rate_multiplier = last_result_rate_multiplier_;
@@ -584,6 +599,7 @@ bool MenuApp::open_result_record(const std::string& result_path,
     last_result_mods_ = parsed->mods;
     last_result_long_note_mix_version_ = parsed->long_note_mix_version;
     last_result_key_conversion_version_ = parsed->key_conversion_version;
+    last_result_bms_timing_version_ = parsed->bms_timing_version;
     last_result_rate_multiplier_ = parsed->rate_multiplier;
     last_result_score_multiplier_ = parsed->score_multiplier;
     last_result_final_score_ = parsed->final_score;
@@ -653,6 +669,7 @@ bool MenuApp::launch_last_result_replay() {
 }
 
 std::string MenuApp::best_replay_path_for_selected_song() const {
+    const LocalPlayRecord* best = nullptr;
     for (std::size_t record_index : current_song_record_indices_) {
         if (record_index >= local_play_records_.size()) {
             continue;
@@ -665,10 +682,12 @@ std::string MenuApp::best_replay_path_for_selected_song() const {
             menu_records::default_ghost_replay_allowed(record.autoplay_enabled,
                                                        record.practice_no_fail_enabled,
                                                        record.clear_status)) {
-            return record.replay_path;
+            // Histories are score-sorted. Prefer a compatible corrected replay
+            // over a higher-scoring legacy schedule, preserving order within it.
+            if (!best || record.bms_timing_version > best->bms_timing_version) best = &record;
         }
     }
-    return {};
+    return best ? best->replay_path : std::string{};
 }
 
 bool MenuApp::launch_selected_record_replay() {

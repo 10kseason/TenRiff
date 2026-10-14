@@ -1,5 +1,7 @@
 # TenRiff 游玩指南
 
+1.9.0.1可在个人档案中指定Hi-Speed -10/+10（默认F5/F6，范围0.50–50.00）。在Keymap中按Xbox/XInput数字按钮或LT/RT可绑定轨道，在个人档案中可绑定重试和Hi-Speed操作。菜单使用方向键移动、A确认、B返回；未绑定其他操作的Start可暂停游戏。LT/RT超过30/255即视为按下。本次不包含摇杆轴与震动。[变更与兼容范围](feedback-20261015.zh-CN.md)。
+
 1.9.0发布版在 `Options > Key Mode Settings > Judge Window` 中提供默认/Hard/EX。Easy从新选择中移除，但保留旧回放的判定。选择仅在本次运行有效，重启后恢复默认。[EX判定与兼容范围](judge-ex-1.9.0.ko.md)（韩语）。
 - 新的默认/Hard仍使用 `tenriff-native-score-v2-ruleset-5`，EX使用 `tenriff-native-score-v2-ruleset-6`。保留旧R1–R5、Easy与LN规则，自定义判定仍为非官方。
 - `Judge EX` 的EASY基准PG/GR/GD=`14/44.571429/78.857143ms`（Hard的80%），保留RANK比例。BAD对所有RANK固定为250ms，独立的自动漏键时限仍为340ms，分数倍率与Hard相同为1.10。
@@ -134,8 +136,8 @@ Discord 客户端的设置方法请参考[官方 Game Overlay 指南](https://su
 - Session Mix 游玩中忽略 Esc；保留曲间结果画面的退出操作和多人模式的 Esc 中止操作。
 - `F3`：降低 Hi-Speed
 - `F4`：提高 Hi-Speed
-- `F5`: Hi-Speed减半
-- `F6`: Hi-Speed加倍
+- `F5`（默认）: Hi-Speed -10，可在个人档案中重新绑定
+- `F6`（默认）: Hi-Speed +10，可在个人档案中重新绑定
 - `F7` / `F8`: 减少 / 增加视觉延迟
 - `F11`: 打开 / 关闭游戏内聊天（菜单中也是F11）
 - 左右 `LShift` / `RShift` 可绑定为游玩按键。上述快捷键无需Shift组合。

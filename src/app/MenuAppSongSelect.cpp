@@ -159,6 +159,12 @@ MenuApp::BestResultRecord MenuApp::best_result_for_song_entry(const SongEntry& e
                 continue;
             }
 
+            // Relative/canonical aliases may retain different generations of
+            // BEST. Apply the same timing boundary used when storing records.
+            if (found->second.bms_timing_version != best.bms_timing_version) {
+                if (found->second.bms_timing_version > best.bms_timing_version) best = found->second;
+                continue;
+            }
             const int best_judged = best.perfect + best.great + best.good + best.bad;
             const int found_judged = found->second.perfect + found->second.great + found->second.good +
                                      found->second.bad;

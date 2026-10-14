@@ -38,7 +38,7 @@ namespace {
 
 // v16 did not retain general SUBARTIST credits, so its derived display strings
 // need one rescan. The cache keys and source chart bytes remain unchanged.
-constexpr int kSongIndexVersion = 17;
+constexpr int kSongIndexVersion = 18; // BPM/STOP timing changes duration and difficulty.
 constexpr std::uintmax_t kMaxMetadataChartFileBytes = 8u * 1024u * 1024u;
 
 bool cancel_requested(const SongIndexCancelCallback& cancel) {

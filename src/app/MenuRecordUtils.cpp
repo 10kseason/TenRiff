@@ -481,6 +481,13 @@ std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path&
     out.stats.negative_delta_count = read_json_int(*stats_obj, "negative_delta_count", 0);
     const double stddev_delta_ms = read_json_number(*stats_obj, "stddev_delta_ms", 0.0);
     out.mods = read_json_string_array(*root, "mods");
+    if (const auto* version = find_json_value(*root, "bms_timing_version")) {
+        if (!version->is_number() || (version->as_number() != 1.0 && version->as_number() != 2.0)) {
+            if (error) *error = "Unsupported BMS timing version in result.";
+            return std::nullopt;
+        }
+        out.bms_timing_version = static_cast<int>(version->as_number());
+    }
     if (const auto* version = find_json_value(*root, "long_note_mix_version")) {
         if (!version->is_number() || (version->as_number() != 1.0 && version->as_number() != 2.0)) {
             if (error) *error = "Unsupported long-note mix version in result.";
@@ -583,6 +590,7 @@ std::optional<ParsedReplayRecord> parse_replay_file(const std::filesystem::path&
     out.mods = replay.mods;
     out.long_note_mix_version = replay.mode.long_note_mix_version;
     out.key_conversion_version = replay.mode.key_conversion_version;
+    out.bms_timing_version = replay.mode.bms_timing_version;
     out.rate_multiplier = replay.rate_multiplier;
     out.score_multiplier = replay.score_multiplier;
     out.pause_used = replay.pause_used;

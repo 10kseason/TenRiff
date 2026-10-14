@@ -125,3 +125,16 @@ TEST_CASE("keycode map recovers raw process keys from scan code under IME-like i
     CHECK(raw == a_key.value());
 }
 #endif
+
+TEST_CASE("gamepad key names round trip independently of keyboard layout") {
+    for (const char* name : {"PadUp", "PadDown", "PadLeft", "PadRight", "PadStart", "PadBack",
+                            "PadLS", "PadRS", "PadLB", "PadRB", "PadA", "PadB", "PadX", "PadY", "PadLT", "PadRT"}) {
+        const auto key = tenriff::config::KeycodeMap::to_keycode(name);
+        REQUIRE(key.has_value());
+        CHECK(tenriff::config::KeycodeMap::to_name(*key) == name);
+#ifdef _WIN32
+        CHECK_FALSE(tenriff::config::KeycodeMap::polling_vk_for_keycode(*key).has_value());
+#endif
+    }
+    CHECK(tenriff::config::KeycodeMap::to_keycode("padlt") == tenriff::config::KeycodeMap::to_keycode("PadLT"));
+}

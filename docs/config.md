@@ -1,5 +1,7 @@
 # TenRiff Config Schema (current)
 
+**2026-10-15 · 1.9.0.1:** 마스터 기본 음량 10%, 로비 아이콘 중심 정렬을 포함합니다. 미리듣기 ×0.75, 프로필에서 지정하는 F5/F6 -10/+10, Xbox/XInput 버튼 입력, 파일 선택창 중복 방지, BMS BPM/STOP 순서 수정과 옛 리플레이 호환을 제공합니다. 고정 기준은 1.9.0을 유지합니다. [변경 안내](feedback-20261015.ko.md) · [릴리스 검증 범위](release-1.9.0.1-gate.md).
+
 **1.8.8:** 결과 분석, 자유 해상도와 가로·세로 직접 입력, 결과의 `F9` PNG 저장 안내, 긴 LN Mix, 메뉴·키음·시작 조작 개선을 포함합니다. 현재 검증·배포 상태는 [릴리스 안내](release-1.8.8-gate.md)를 따릅니다. 사용자 고정 기준은 계속 1.8.7이며 기존 태그·배포 파일은 유지합니다.
 
 확인 기준: [Config.h](../src/config/Config.h), [Config.cpp](../src/config/Config.cpp), [기본 JSON](../config/config.json), [키맵](../src/config/Keymap.cpp). 생략된 값은 코드 기본값을 사용하며, 아래 범위는 로드·저장 시 정규화 규칙입니다.
@@ -260,6 +262,8 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | 프로필/첫 실행에서 보통·크게·더 크게 선택. 메뉴 글자 100%·115%·130%, 게임플레이 스킨 글자는 별도 유지. |
 | `skip_start_countdown` | bool; `false` | 단독 플레이의 초기 `3 / 2 / 1` 표시 생략. 일반 곡 시작과 메뉴 재시작·결과 재시도에 적용. |
 | `instant_restart_key` | string; `""` (미지정) | 진행 중인 단독 곡을 처음부터 다시 시작할 키 이름. 새 시도의 초기 카운트다운은 항상 생략하며, 중단한 시도는 결과·리플레이로 저장하지 않음. |
+| `hispeed_decrease_key` | string; `"F5"` | Hi-Speed -10 키. 프로필에서 지정; 빈 문자열로 해제. |
+| `hispeed_increase_key` | string; `"F6"` | Hi-Speed +10 키. 프로필에서 지정; 빈 문자열로 해제. |
 | `all_song_sources` | bool; `false` | `ALL SONG` 통합 목록을 다음 실행에서도 복원. 등록된 폴더 캐시를 순서대로 읽고 경로가 같은 차트는 한 번만 표시. |
 | `result_tail_ms` | double; `500` ms | 판정 완료 후 결과 전환 시 추가 대기 시간. `audio.play_to_end=true`이면 차트 오디오 종료 시점도 함께 고려합니다. |
 | `require_enter_to_exit` | bool; `true` | 읽기·저장 호환 필드. 현재 Windows 결과 입력 경로는 이 값으로 자동 종료하지 않습니다. |
@@ -363,6 +367,8 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 
 ## `keymap.json`
 
+Xbox/XInput 버튼은 기존 키 이름 자리에 저장합니다: `PadUp`, `PadDown`, `PadLeft`, `PadRight`, `PadStart`, `PadBack`, `PadLS`, `PadRS`, `PadLB`, `PadRB`, `PadA`, `PadB`, `PadX`, `PadY`, `PadLT`, `PadRT`. 키 설정에서 실제 버튼을 눌러 지정하며 같은 이름을 프로필의 재시작·배속 조작에도 사용할 수 있습니다. LT/RT는 30/255 초과를 눌림으로 처리하고 LS/RS는 스틱 클릭입니다. 네 패드의 같은 버튼은 한 입력으로 합치며 스틱 축·진동은 포함하지 않습니다. [조작·연결·호환 범위](feedback-20261015.ko.md).
+
 ### Shape
 - `layout` (string)
 - `bindings`
@@ -387,7 +393,7 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 
 ## 설정 조작성과 오디오 동기
 
-새 프로필의 `audio.volume` 기본값은 `0.7`입니다. 기존에 저장한 값은 유지합니다. `audio.mute_when_inactive` 기본값은 `false`이며, 켜면 다른 창이 활성화된 동안 출력만 음소거합니다. 곡 진행과 저장 음량은 유지합니다. ASIO 버퍼 사이즈는 채널당 **샘플** 단위로 표시합니다. 내부 API의 `frames_per_buffer` 이름은 유지합니다.
+새 프로필의 `audio.volume` 기본값은 `0.1`입니다. 기존에 저장한 값은 유지합니다. `audio.mute_when_inactive` 기본값은 `false`이며, 켜면 다른 창이 활성화된 동안 출력만 음소거합니다. 곡 진행과 저장 음량은 유지합니다. ASIO 버퍼 사이즈는 채널당 **샘플** 단위로 표시합니다. 내부 API의 `frames_per_buffer` 이름은 유지합니다.
 
 키 설정은 가로 건반의 `Key 1`, `Key 2` 방식이며 기본·보조 입력을 각각 지정합니다. `keymap.json`의 선택적 `secondary_modes`는 기존 `modes`와 같은 모드/레인 구조입니다. 두 키 중 하나가 눌려 있으면 해당 키는 계속 눌린 상태로 처리합니다. 보조 키의 × 또는 입력 대기 중 Delete로 보조 지정만 해제합니다. 옵션에서 처음 열면 키·스킨 편집 모드는 4K입니다. 곡에서 키 설정을 열면 실제 차트 키 수를 사용합니다.
 

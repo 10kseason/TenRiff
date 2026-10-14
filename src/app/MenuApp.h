@@ -283,6 +283,9 @@ private:
     static void advance_gameplay_hud_revisions(GameplayHudState& state, bool motion_changed, bool text_changed);
     static void reset_gameplay_hud_state(GameplayHudState& state, bool preserve_loading = false);
 
+    [[nodiscard]] uint32_t menu_key_alias(uint32_t keycode) const;
+    bool aggregate_menu_key(input::InputEvent& event);
+    void discard_native_dialog_input();
     void handle_input_event(const input::InputEvent& event);
     void handle_menu_click(const render::MenuClickEvent& event);
     void handle_text_input(std::string_view text);
@@ -549,6 +552,7 @@ private:
     struct BestResultRecord {
         bool has_value = false;
         bool replay_verified = false;
+        int bms_timing_version = 1;
         std::string rank = "--";
         int64_t best_score = 0;
         int64_t detail_score = 0;
@@ -570,6 +574,7 @@ private:
     };
 
     struct LocalPlayRecord {
+        int bms_timing_version = 1;
         std::string chart_path;
         std::string chart_format;
         std::string created_utc;
@@ -658,6 +663,7 @@ private:
     std::vector<std::string> last_result_mods_{};
     int last_result_long_note_mix_version_ = 1;
     int last_result_key_conversion_version_ = 1;
+    int last_result_bms_timing_version_ = 1;
     double last_result_rate_multiplier_ = 1.0;
     double last_result_score_multiplier_ = 1.0;
     int64_t last_result_final_score_ = 0;
@@ -765,8 +771,9 @@ private:
     uint64_t profile_avatar_revision_ = 0;
     bool profile_nickname_edit_active_ = false;
     std::string profile_nickname_before_edit_;
-    bool profile_restart_key_capture_active_ = false;
-    std::string profile_restart_key_status_;
+    bool profile_control_key_capture_active_ = false;
+    int profile_control_key_capture_row_ = -1;
+    std::string profile_control_key_status_;
     bool help_overlay_visible_ = false;
     std::string available_lr2_skin_root_;
     std::vector<std::string> available_lr2_skin_names_{};
@@ -871,6 +878,9 @@ private:
     render::MenuRenderData render_cache_{};
 
     std::unordered_set<uint32_t> pressed_keys_{};
+    std::unordered_map<uint32_t, uint32_t> menu_key_owners_{};
+    std::unordered_set<uint32_t> native_dialog_held_keys_{};
+    int64_t native_dialog_closed_ns_ = 0;
     std::unordered_map<std::string, int> source_song_counts_{};
     std::vector<LocalPlayRecord> local_play_records_{};
     std::unordered_map<std::string, std::vector<std::size_t>> chart_play_record_indices_{};

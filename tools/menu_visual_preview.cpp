@@ -1043,7 +1043,7 @@ int main(int argc, char** argv) {
         data.generic.heading = loc("Profile Setup", "프로필 설정");
         data.generic.profile_preview_visible = true;
         data.generic.profile_avatar_path = avatar_path;
-        const std::array<std::string, 16> labels{
+        const std::array<std::string, 18> labels{
             loc("Language", "언어"), loc("Menu Font Size", "메뉴 글자 크기"),
             loc("Songs Folder", "곡 폴더"), loc("Gauge", "게이지"), "Rate",
             loc("Visual Latency", "비주얼 레이턴시"), loc("Keysound", "키음"),
@@ -1051,14 +1051,15 @@ int main(int argc, char** argv) {
             loc("Avatar Image", "프로필 사진"), loc("Clear Avatar", "사진 지우기"),
             loc("Export All Settings", "전체 설정 내보내기"), loc("Import All Settings", "전체 설정 가져오기"),
             loc("Skip Start Countdown", "시작 카운트다운 생략"), loc("Instant Restart Key", "즉시 재시작 키"),
+            loc("Hi-Speed -10 Key", "배속 -10 키"), loc("Hi-Speed +10 Key", "배속 +10 키"),
             loc("Done", "완료")};
-        const std::array<std::string, 16> values{
+        const std::array<std::string, 18> values{
             data.ui_language == tenriff::ui::Language::Japanese ? "日本語" : loc("English", "한국어"),
             data.ui_text_scale > 1.2f ? loc("Extra Large", "더 크게") :
                 data.ui_text_scale > 1.0f ? loc("Large", "크게") : loc("Normal", "보통"),
             "ALL SONG", "NORMAL", "1.00x", "0 ms", "Follow", "RawInput", "PLAYER",
             avatar_path.empty() ? loc("Not set", "설정 안 됨") : "preview-avatar.png",
-            loc("Clear", "지우기"), ".trprofile", ".trprofile", loc("Off", "꺼짐"), "F12", loc("Back", "돌아가기")};
+            loc("Clear", "지우기"), ".trprofile", ".trprofile", loc("Off", "꺼짐"), "F12", "F5", "F6", loc("Back", "돌아가기")};
         for (int i = 0; i < static_cast<int>(labels.size()); ++i) {
             MenuRowData row;
             row.label = labels[i]; row.value = values[i]; row.row_index = i;

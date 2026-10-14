@@ -1,5 +1,7 @@
 # TenRiff Gameplay Guide
 
+1.9.0.1ではプロフィールでHi-Speed -10/+10を指定します（既定F5/F6、範囲0.50–50.00）。Xbox/XInputのデジタルボタンとLT/RTをKeymapで押すとレーンに、プロフィールでは再試行・Hi-Speed操作に割り当てられます。メニューは方向パッドで移動、Aで選択、Bで戻り、他の操作に未割当のStartでゲームを一時停止します。LT/RTは30/255を超えると押下です。スティック軸と振動は今回の範囲外です。[変更・互換性](feedback-20261015.ja.md)。
+
 1.9.0リリースでは `Options > Key Mode Settings > Judge Window` から通常/Hard/EXを選択します。Easyは新しい選択肢から外し、過去のリプレイでは維持します。選択は実行中のみ有効で、再起動後は通常に戻ります。[EX判定と互換性](judge-ex-1.9.0.ko.md)（韓国語）。
 - 新しい通常/Hardは `tenriff-native-score-v2-ruleset-5`、EXは `tenriff-native-score-v2-ruleset-6` を記録します。過去のR1–R5・Easy・LN規則は維持し、カスタム判定は非公式です。
 - `Judge EX` はEASY基準PG/GR/GD=`14/44.571429/78.857143ms`（Hardの80%）でRANK比率を維持。BADは全RANKで250ms固定、別の自動ミス期限は340ms、スコア倍率はHardと同じ1.10です。
@@ -128,8 +130,8 @@ client 側の設定は Discord の [公式 Game Overlay guide](https://support.d
 - Session Mix のプレイ中は Esc を無視します。曲間の結果画面の終了操作と multiplayer の Esc 中止は維持します。
 - `F3`: Hi-Speed を下げる
 - `F4`: Hi-Speed を上げる
-- `F5`: Hi-Speedを半分にする
-- `F6`: Hi-Speedを2倍にする
+- `F5`（既定）: Hi-Speed -10。プロフィールで変更可能
+- `F6`（既定）: Hi-Speed +10。プロフィールで変更可能
 - `F7` / `F8`: 表示レイテンシーを減らす / 増やす
 - `F11`: ゲーム中のチャットを開く / 閉じる（メニューもF11）
 - 左右の `LShift` / `RShift` をプレイキーに設定できます。上記ショートカットにShiftは不要です。

@@ -9,6 +9,7 @@
 #include "app/MenuAppSettingsUtils.h"
 #include "app/GameSession.h"
 #include "app/MenuRecordUtils.h"
+#include "app/MenuSongUtils.h"
 #include "app/ReplayVerifier.h"
 #include "app/ModeManager.h"
 #include "app/PersistedRuntimeConfig.h"
@@ -17,6 +18,7 @@
 #include "config/KeycodeMap.h"
 #include "config/SimpleJson.h"
 #include "timing/HighResClock.h"
+#include "../tests/unit/bms_timing_fixture.h"
 
 #include <algorithm>
 #include <array>
@@ -249,6 +251,26 @@ struct MenuAppVisualTestAccess {
             app.keymap_settings_controller_.secondary_selected() && app.keymap_settings_controller_.capture_active());
         key(app, "Delete");
         report.check("keymap.secondary_delete_stops_capture", !app.keymap_settings_controller_.capture_active());
+        click(app, Kind::SettingsRow, 1);
+        for (const char* name : {"PadA", "PadB", "PadLT", "PadRT"}) key(app, name);
+        const auto gamepad_saved = manager.load_profile(app.profile_dir_);
+        const auto gamepad_bindings = manager.bindings_for_mode(gamepad_saved.keymap, "4k");
+        report.check("xinput.capture_and_profile_roundtrip", gamepad_saved.success() &&
+            gamepad_bindings.at("lane1") == "PadA" && gamepad_bindings.at("lane2") == "PadB" &&
+            gamepad_bindings.at("lane3") == "PadLT" && gamepad_bindings.at("lane4") == "PadRT" &&
+            !app.keymap_settings_controller_.capture_active());
+        key(app, "PadUp");
+        report.check("xinput.dpad_menu_navigation", app.keymap_settings_controller_.selected_row() == 3);
+        const auto pad_up = config::KeycodeMap::to_keycode("PadUp").value();
+        const auto stamp = timing::HighResClock::now_ns();
+        app.handle_input_event({app.key_up_, input::InputState::Pressed, stamp});
+        app.handle_input_event({pad_up, input::InputState::Pressed, stamp + 1});
+        app.handle_input_event({pad_up, input::InputState::Released, stamp + 2});
+        report.check("xinput.menu_keyboard_owner_survives_pad_release", app.pressed_keys_.count(app.key_up_) == 1);
+        app.handle_input_event({app.key_up_, input::InputState::Released, stamp + 3});
+        report.check("xinput.menu_last_owner_releases", app.pressed_keys_.count(app.key_up_) == 0);
+
+
         std::string error;
         report.check("keymap.fixture_restored", manager.save_profile(app.profile_dir_, original, &error), error);
         app.keymap_ = app.working_keymap_ = original;
@@ -424,34 +446,123 @@ struct MenuAppVisualTestAccess {
         report.check("graphics.explicit_size_after_resize_present", present(app, detail), detail);
     }
     static void check_start_controls(MenuApp& app, Report& report) {
+        for (int attempt = 0; attempt < 2; ++attempt) {
+            HWND game = nullptr;
+            EnumWindows([](HWND hwnd, LPARAM data) -> BOOL {
+                DWORD pid = 0; GetWindowThreadProcessId(hwnd, &pid);
+                wchar_t type[64]{}; GetClassNameW(hwnd, type, 64);
+                if (pid == GetCurrentProcessId() && std::wstring(type) == L"TenRiffMenuWindow") {
+                    *reinterpret_cast<HWND*>(data) = hwnd; return FALSE;
+                }
+                return TRUE;
+            }, reinterpret_cast<LPARAM>(&game));
+            if (game) SetForegroundWindow(game);
+            std::atomic<bool> done{false}, observed{false}, owned{false};
+            std::thread dismiss([&]() {
+                const auto deadline = Clock::now() + std::chrono::seconds(10);
+                while (!done.load() && Clock::now() < deadline) {
+                    HWND picker = nullptr;
+                    EnumWindows([](HWND hwnd, LPARAM data) -> BOOL {
+                        DWORD pid = 0; GetWindowThreadProcessId(hwnd, &pid);
+                        wchar_t type[64]{}; GetClassNameW(hwnd, type, 64);
+                        if (pid == GetCurrentProcessId() && IsWindowVisible(hwnd) &&
+                            std::wstring(type) == L"#32770") {
+                            *reinterpret_cast<HWND*>(data) = hwnd; return FALSE;
+                        }
+                        return TRUE;
+                    }, reinterpret_cast<LPARAM>(&picker));
+                    if (picker) {
+                        observed = true;
+                        if (GetWindow(picker, GW_OWNER) == game && game && !IsWindowEnabled(game)) owned = true;
+                        // Cancel only this smoke process's own file picker.
+                        PostMessageW(picker, WM_COMMAND, IDCANCEL, 0);
+                    }
+                    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+                }
+            });
+            const auto closed_before = app.native_dialog_closed_ns_;
+            APTTYPE apartment{}; APTTYPEQUALIFIER qualifier{};
+            const auto apartment_hr = CoGetApartmentType(&apartment, &qualifier);
+            click(app, Kind::SettingsRow, profile_setup::kAvatarRow);
+            done = true; dismiss.join();
+            report.check("dialog.native_avatar_cancel_" + std::to_string(attempt),
+                observed && owned && app.native_dialog_closed_ns_ > closed_before &&
+                app.config_.ui.profile_avatar_path.empty() && !app.menu_window_.poll_click_event(),
+                "observed=" + std::to_string(observed.load()) + "; owned=" + std::to_string(owned.load()) +
+                "; input_reset=" + std::to_string(app.native_dialog_closed_ns_ > closed_before) +
+                "; apartment_hr=" + std::to_string(apartment_hr) + "; apartment=" + std::to_string(apartment));
+        }
+        const auto decrease = app.config_.ui.hispeed_decrease_key;
+        const auto increase = app.config_.ui.hispeed_increase_key;
+        click(app, Kind::SettingsRow, profile_setup::kHispeedDecreaseKeyRow);
+        key(app, "F6");
+        report.check("profile.speed_conflict_rejected", app.profile_control_key_capture_active_ &&
+            app.config_.ui.hispeed_decrease_key == decrease);
+        key(app, "F12");
+        report.check("profile.speed_key_assigned", !app.profile_control_key_capture_active_ &&
+            app.config_.ui.hispeed_decrease_key == "F12");
+        auto saved_speed = config::ConfigLoader{}.load_profile(app.profile_dir_);
+        report.check("profile.speed_key_persisted", saved_speed.success() &&
+            saved_speed.config.ui.hispeed_decrease_key == "F12");
+        click(app, Kind::SettingsRow, profile_setup::kHispeedDecreaseKeyRow);
+        key(app, "Delete");
+        report.check("profile.speed_key_cleared", app.config_.ui.hispeed_decrease_key.empty());
+        click(app, Kind::SettingsRow, profile_setup::kHispeedDecreaseKeyRow);
+        key(app, "PadLB");
+        const auto pad_profile = config::ConfigLoader{}.load_profile(app.profile_dir_);
+        report.check("xinput.profile_speed_capture", !app.profile_control_key_capture_active_ &&
+            pad_profile.success() && pad_profile.config.ui.hispeed_decrease_key == "PadLB");
+
+        click(app, Kind::SettingsRow, profile_setup::kHispeedDecreaseKeyRow);
+        key(app, "F5");
+        click(app, Kind::SettingsRow, profile_setup::kHispeedIncreaseKeyRow);
+        key(app, "Escape");
+        report.check("profile.speed_capture_cancel", app.config_.ui.hispeed_increase_key == increase &&
+            !app.profile_control_key_capture_active_);
+        // Synthetic stale Enter edges model input collected inside a modal
+        // picker. The real picker smoke below checks native ownership too.
+        app.input_thread_.queue().push({app.key_enter_, input::InputState::Pressed, 1});
+        app.song_select_repeat_key_ = app.key_right_;
+        app.discard_native_dialog_input();
+        report.check("dialog.queued_keyboard_drained", !app.input_thread_.queue().pop().has_value() &&
+            app.song_select_repeat_key_ == 0 && app.pressed_keys_.empty());
+        click(app, Kind::SettingsRow, profile_setup::kNicknameRow, Part::SelectOnly);
+        app.handle_input_event({app.key_enter_, input::InputState::Pressed, app.native_dialog_closed_ns_ - 1});
+        report.check("dialog.delayed_stale_edge_ignored", !app.profile_nickname_edit_active_);
+        app.native_dialog_held_keys_.insert(app.key_enter_);
+        key(app, "Enter");
+        report.check("dialog.held_close_key_ignored", !app.profile_nickname_edit_active_);
+        key(app, "Enter");
+        report.check("dialog.fresh_press_after_release", app.profile_nickname_edit_active_);
+        key(app, "Escape");
         click(app, Kind::SettingsRow, profile_setup::kSkipStartCountdownRow, Part::SelectOnly);
         key(app, "Enter");
         report.check("profile.skip_countdown_toggle", app.config_.ui.skip_start_countdown);
         click(app, Kind::SettingsRow, profile_setup::kInstantRestartKeyRow);
-        report.check("profile.restart_key_capture", app.profile_restart_key_capture_active_);
+        report.check("profile.restart_key_capture", app.profile_control_key_capture_active_);
         key(app, "F9"); key(app, "F10"); key(app, "F11");
-        report.check("profile.restart_reserved_rejected", app.profile_restart_key_capture_active_ &&
-            !app.profile_restart_key_status_.empty() && !app.ranked_account_overlay_visible_ && !app.chat_overlay_visible_);
+        report.check("profile.restart_reserved_rejected", app.profile_control_key_capture_active_ &&
+            !app.profile_control_key_status_.empty() && !app.ranked_account_overlay_visible_ && !app.chat_overlay_visible_);
         const auto bindings = config::KeymapManager{}.bindings_for_mode(app.keymap_, "10k");
         if (!bindings.empty()) key(app, bindings.begin()->second.c_str());
-        report.check("profile.restart_lane_conflict", app.profile_restart_key_capture_active_ &&
-            !app.profile_restart_key_status_.empty());
+        report.check("profile.restart_lane_conflict", app.profile_control_key_capture_active_ &&
+            !app.profile_control_key_status_.empty());
         for (const char* modifier : {"LControl", "LAlt"}) {
             const auto code = config::KeycodeMap::to_keycode(modifier).value();
             app.handle_input_event({code, input::InputState::Pressed, timing::HighResClock::now_ns()});
             key(app, "F12");
             report.check(std::string("profile.restart_rejects_chord_") + modifier,
-                app.profile_restart_key_capture_active_ && app.config_.ui.instant_restart_key.empty());
+                app.profile_control_key_capture_active_ && app.config_.ui.instant_restart_key.empty());
             app.handle_input_event({code, input::InputState::Released, timing::HighResClock::now_ns()});
         }
         key(app, "F12");
-        report.check("profile.restart_key_assigned", !app.profile_restart_key_capture_active_ &&
+        report.check("profile.restart_key_assigned", !app.profile_control_key_capture_active_ &&
             app.config_.ui.instant_restart_key == "F12");
         key(app, "Enter"); key(app, "Esc");
-        report.check("profile.restart_capture_cancel", !app.profile_restart_key_capture_active_ &&
+        report.check("profile.restart_capture_cancel", !app.profile_control_key_capture_active_ &&
             app.config_.ui.instant_restart_key == "F12" && screen(app) == Screen::QuickSetup);
         key(app, "Enter"); key(app, "Delete");
-        report.check("profile.restart_capture_clear", !app.profile_restart_key_capture_active_ &&
+        report.check("profile.restart_capture_clear", !app.profile_control_key_capture_active_ &&
             app.config_.ui.instant_restart_key.empty());
         key(app, "Enter"); key(app, "F12");
         const auto saved = config::ConfigLoader{}.load_profile(app.profile_dir_);
@@ -462,8 +573,14 @@ struct MenuAppVisualTestAccess {
         report.check("profile.start_controls_restored", !app.config_.ui.skip_start_countdown);
         click(app, Kind::SettingsRow, profile_setup::kInstantRestartKeyRow);
         app.replace_screen(Screen::QuickSetup);
-        report.check("profile.capture_cleared_on_navigation", !app.profile_restart_key_capture_active_);
+        report.check("profile.capture_cleared_on_navigation", !app.profile_control_key_capture_active_);
         app.publish_snapshot();
+        render::MenuRenderData profile_view;
+        app.populate_quick_setup_render_data(profile_view);
+        report.check("profile.has_assignable_speed_rows", profile_view.generic.rows.size() == 18);
+        app.menu_window_.request_screenshot();
+        std::string detail;
+        report.check("profile.final_controls_present", present(app, detail), detail);
     }
     static bool resize_owned_window(int width, int height) {
         // Only the fixture's own window receives this native sizing sequence.
@@ -584,6 +701,40 @@ struct MenuAppVisualTestAccess {
         report.check("records.auto_ghost_skips_legacy_mix", app.best_replay_path_for_selected_song().empty());
         app.current_song_record_indices_ = {0, 1};
         report.check("records.auto_ghost_uses_current_mix", app.best_replay_path_for_selected_song() == "fixture-v2-replay");
+        record.mods.clear();
+        record.bms_timing_version = 2;
+        verified.final_score = 50;
+        app.append_chart_result_record(record, "timing-v2-result", "timing-v2-replay", verified);
+        bool corrected_best = !app.chart_best_results_.empty();
+        for (const auto& [key, best] : app.chart_best_results_)
+            corrected_best &= best.bms_timing_version == 2 && best.best_score == 50;
+        report.check("records.corrected_timing_starts_separate_best", corrected_best);
+        record.bms_timing_version = 1;
+        verified.final_score = 300;
+        app.append_chart_result_record(record, "timing-v1-result", "timing-v1-replay", verified);
+        for (const auto& [key, best] : app.chart_best_results_)
+            corrected_best &= best.bms_timing_version == 2 && best.best_score == 50;
+        report.check("records.legacy_timing_cannot_replace_corrected_best", corrected_best);
+        app.config_.mode.mods.clear();
+        app.current_song_record_indices_ = {3, 2}; // Higher legacy score first.
+        report.check("records.ghost_prefers_corrected_timing", app.best_replay_path_for_selected_song() == "timing-v2-replay");
+        SongEntry alias_entry;
+        alias_entry.path = "alias-fixture/chart.bms";
+        const auto alias_keys = menu_songs::build_chart_path_keys(alias_entry.path, app.songs_path_);
+        report.check("records.timing_alias_fixture_has_two_keys", alias_keys.size() >= 2);
+        if (alias_keys.size() >= 2) {
+            for (int order = 0; order < 2; ++order) {
+                auto legacy = app.chart_best_results_.begin()->second;
+                auto corrected = legacy;
+                legacy.bms_timing_version = 1; legacy.best_score = 300;
+                corrected.bms_timing_version = 2; corrected.best_score = 50;
+                app.chart_best_results_[alias_keys[order]] = legacy;
+                app.chart_best_results_[alias_keys[1 - order]] = corrected;
+                const auto best = app.best_result_for_song_entry(alias_entry);
+                report.check("records.timing_alias_prefers_corrected_" + std::to_string(order),
+                    best.bms_timing_version == 2 && best.best_score == 50);
+            }
+        }
         app.local_play_records_ = saved_records;
         app.chart_best_results_ = saved_best;
         app.chart_play_record_indices_ = saved_indices;
@@ -638,6 +789,29 @@ struct MenuAppVisualTestAccess {
     }
     static void check_lane_shortcuts(MenuApp& app, Report& report) {
         const auto saved_controller = app.skin_settings_controller_;
+        const auto shortcut_state = [&]() {
+            std::string state = "mode=" + std::string(app.skin_settings_controller_.edit_mode()) +
+                "; lane=" + std::to_string(app.skin_settings_controller_.edit_lane()) +
+                "; capture=" + std::to_string(app.keymap_settings_controller_.capture_active()) +
+                "; preview=" + std::to_string(app.skin_preview_fullscreen_) +
+                "; help=" + std::to_string(app.help_overlay_visible_) +
+                "; chat=" + std::to_string(app.chat_overlay_visible_) +
+                "; account=" + std::to_string(app.ranked_account_overlay_visible_) +
+                "; warning=" + std::to_string(app.chat_url_warning_visible_) +
+                "; nickname=" + std::to_string(app.profile_nickname_edit_active_) +
+                "; table_url=" + std::to_string(app.difficulty_table_url_editing_) +
+                "; records_url=" + std::to_string(app.online_records_url_editing_);
+            state += "; held=";
+            for (const auto key : app.pressed_keys_) state += config::KeycodeMap::to_name(key) + ",";
+            state += "; owners=";
+            for (const auto& [physical, alias] : app.menu_key_owners_)
+                state += config::KeycodeMap::to_name(physical) + ":" + config::KeycodeMap::to_name(alias) + ",";
+            state += "; physical_modifiers=";
+            for (const auto key : {VK_SHIFT, VK_LSHIFT, VK_RSHIFT, VK_CONTROL, VK_LCONTROL,
+                                   VK_RCONTROL, VK_MENU, VK_LMENU, VK_RMENU, VK_LWIN, VK_RWIN})
+                if ((GetAsyncKeyState(key) & 0x8000) != 0) state += std::to_string(key) + ",";
+            return state;
+        };
         render::MenuRenderData skin_view;
         app.populate_skin_settings_render_data(skin_view);
         bool removed = true;
@@ -654,15 +828,16 @@ struct MenuAppVisualTestAccess {
         app.skin_settings_controller_.reset("16k");
         (void)app.skin_settings_controller_.select(SkinSettingsRowId::LaneWidth, false);
         key(app, "0");
-        report.check("skin.lane_zero_selects_ten", app.skin_settings_controller_.edit_lane() == 9);
+        report.check("skin.lane_zero_selects_ten", app.skin_settings_controller_.edit_lane() == 9, shortcut_state());
         const auto shift = config::KeycodeMap::to_keycode("RShift").value();
         app.handle_input_event({shift, input::InputState::Pressed, timing::HighResClock::now_ns()});
         key(app, "6");
         app.handle_input_event({shift, input::InputState::Released, timing::HighResClock::now_ns()});
         report.check("skin.lane_shift_six_selects_sixteen", app.skin_settings_controller_.edit_lane() == 15 &&
-            app.skin_settings_controller_.selected_id() == SkinSettingsRowId::LaneWidth && !app.skin_settings_controller_.dirty());
+            app.skin_settings_controller_.selected_id() == SkinSettingsRowId::LaneWidth && !app.skin_settings_controller_.dirty(),
+            shortcut_state());
         key(app, "Numpad2");
-        report.check("skin.lane_numpad_selects_two", app.skin_settings_controller_.edit_lane() == 1);
+        report.check("skin.lane_numpad_selects_two", app.skin_settings_controller_.edit_lane() == 1, shortcut_state());
         std::string detail;
         report.check("skin.lane_shortcut_present", present(app, detail), std::move(detail));
         app.skin_settings_controller_ = saved_controller;
@@ -710,6 +885,49 @@ struct MenuAppVisualTestAccess {
 };
 
 struct MenuAppFeedbackTestAccess {
+    static void check_gamepad_session(GameSession& session, Report& report) {
+        const auto a = config::KeycodeMap::to_keycode("PadA").value();
+        const auto lt = config::KeycodeMap::to_keycode("PadLT").value();
+        const auto lb = config::KeycodeMap::to_keycode("PadLB").value();
+        const auto rb = config::KeycodeMap::to_keycode("PadRB").value();
+        report.check("xinput.session_resolves_bindings", session.key_to_lane_.count(a) &&
+            session.key_to_lane_.count(lt) && session.f5_keycode_ == lb && session.f6_keycode_ == rb);
+        const double initial = session.config_.speed.hi_speed;
+        static_cast<void>(session.handle_control_input({rb, input::InputState::Pressed, 1}));
+        static_cast<void>(session.handle_control_input({rb, input::InputState::Pressed, 2}));
+        report.check("xinput.coarse_speed_once", session.config_.speed.hi_speed == std::min(50.0, initial + 10.0));
+        static_cast<void>(session.handle_control_input({rb, input::InputState::Released, 3}));
+        static_cast<void>(session.handle_control_input({lb, input::InputState::Pressed, 4}));
+        report.check("xinput.coarse_speed_decrease", session.config_.speed.hi_speed == initial);
+        static_cast<void>(session.handle_control_input({lb, input::InputState::Released, 5}));
+        // The portable native-state decoder feeds the same binding aggregator
+        // used by gameplay; both primary and secondary ownership are retained.
+        input::gamepad::GamepadTracker tracker;
+        std::array<std::optional<input::gamepad::GamepadState>, 4> states{};
+        states[0] = input::gamepad::GamepadState{};
+        static_cast<void>(tracker.update(states, true, 0));
+        states[0]->buttons = 0x1000;
+        auto events = tracker.update(states, true, 10);
+        for (const auto& event : events) static_cast<void>(session.lane_binding_state_.apply(event.keycode, event.state));
+        report.check("xinput.session_button_reaches_lane", session.lane_binding_state_.pressed(session.key_to_lane_.at(a)));
+        states[0].reset();
+        events = tracker.update(states, true, 20);
+        for (const auto& event : events) static_cast<void>(session.lane_binding_state_.apply(event.keycode, event.state));
+        report.check("xinput.session_disconnect_releases_lane", !session.lane_binding_state_.pressed(session.key_to_lane_.at(a)));
+    }
+    static bool timing_state(const GameSession& session, int version, bool ghost) {
+        return session.bms_timing_version_ == version && session.ghost_replay_enabled_ == ghost &&
+            static_cast<bool>(session.ghost_engine_) == ghost;
+    }
+    static std::vector<gameplay::ReplayEvent> timing_inputs(const GameSession& session) {
+        std::vector<gameplay::ReplayEvent> events;
+        for (const auto& note : session.chart_.notes) {
+            events.push_back({note.lane, input::InputState::Pressed, note.start_sample});
+            events.push_back({note.lane, input::InputState::Released, note.start_sample + session.sample_rate_ / 20});
+        }
+        std::stable_sort(events.begin(), events.end(), [](const auto& a, const auto& b) { return a.sample < b.sample; });
+        return events;
+    }
     static bool corrected_without_legacy_ghost(const GameSession& session) {
         return session.key_conversion_version_ == 3 && !session.ghost_replay_enabled_ &&
                !session.ghost_engine_ && session.chart_.notes.size() == 4;
@@ -1273,6 +1491,103 @@ void separate_delta_flow(tenriff::app::CommandLineOptions options, Report& repor
         }
     }
 }
+void separate_gamepad_flow(tenriff::app::CommandLineOptions options, Report& report) {
+    using namespace tenriff;
+    using SessionAccess = app::MenuAppFeedbackTestAccess;
+    options.profile = "gamepad_fixture";
+    options.chart_path = "delta-fixture/duplicate.bms";
+    const auto profile = std::filesystem::current_path() / "profiles" / options.profile;
+    std::filesystem::copy(std::filesystem::current_path() / "profiles" / "delta-smoke", profile,
+                          std::filesystem::copy_options::recursive);
+    auto loaded = config::ConfigLoader{}.load_profile(profile.u8string());
+    loaded.config.mode.key_mode = "4k";
+    loaded.config.ui.hispeed_decrease_key = "PadLB";
+    loaded.config.ui.hispeed_increase_key = "PadRB";
+    std::string error;
+    if (!config::ConfigLoader{}.save_profile(profile.u8string(), loaded.config, &error)) throw std::runtime_error(error);
+    config::KeymapManager manager;
+    auto keymap = manager.load_profile(profile.u8string());
+    manager.assign_binding(keymap.keymap, "4k", "lane1", "PadA", false);
+    manager.assign_binding(keymap.keymap, "4k", "lane2", "PadLT", false);
+    if (!manager.save_profile(profile.u8string(), keymap.keymap, &error)) throw std::runtime_error(error);
+    auto session = std::make_unique<app::GameSession>();
+    const bool ready = session->initialize(options);
+    report.check("xinput.session_initialize", ready);
+    if (ready) {
+        SessionAccess::stop_physical_input(*session);
+        SessionAccess::check_gamepad_session(*session, report);
+    }
+    session->shutdown();
+}
+
+void separate_timing_flow(tenriff::app::CommandLineOptions options, Report& report) {
+    using namespace tenriff;
+    using SessionAccess = app::MenuAppFeedbackTestAccess;
+    std::filesystem::create_directory("timing-fixture");
+    { std::ofstream file("timing-fixture/timing.bms"); file << bpm_stop_mine_fixture(); }
+    options.chart_path = "timing-fixture/timing.bms";
+    options.profile = "timing-smoke";
+    config::ConfigLoader loader;
+    auto config = loader.load_profile("profiles/delta-smoke").config;
+    config.ui.skip_start_countdown = true;
+    config.mode.gauge = "exhard";
+    const std::string profile = "profiles/" + options.profile;
+    if (!loader.save_profile(profile, app::build_persisted_runtime_config(config)) ||
+        !config::KeymapManager{}.save_profile(profile, config::KeymapManager{}.default_keymap()))
+        throw std::runtime_error("Cannot seed timing profile");
+    auto session = std::make_unique<app::GameSession>();
+    std::vector<gameplay::ReplayEvent> events;
+    std::size_t submitted = 0;
+    bool timed_out = false;
+    const auto deadline = Clock::now() + std::chrono::seconds(15);
+    session->set_hud_callback([&](const app::GameSession::HudSnapshot& hud) {
+        if (Clock::now() > deadline) { timed_out = true; SessionAccess::timeout(*session); return; }
+        if (session->did_start_gameplay()) SessionAccess::submit_delta_inputs(*session, events, submitted, hud.current_sample);
+    });
+    const bool initialized = session->initialize(options);
+    report.check("timing.corrected_live_initialize", initialized && SessionAccess::timing_state(*session, 2, false));
+    if (initialized) {
+        events = SessionAccess::timing_inputs(*session);
+        SessionAccess::stop_physical_input(*session);
+        session->run();
+    }
+    session->shutdown();
+    const auto result = session->result();
+    report.check("timing.corrected_live_50ms_tap_survives", !timed_out && result.has_value && result.finished &&
+        !result.game_over && result.stats.counts.pg == 2 && result.stats.counts.pr == 0);
+    report.check("timing.result_exports_v2", result.bms_timing_version == 2);
+    const auto replay = gameplay::load_replay_json(result.replay_path);
+    report.check("timing.replay_exports_v2", replay.success() && replay.replay->mode.bms_timing_version == 2);
+    if (!replay.success()) return;
+    std::string error;
+    const auto parsed = app::menu_records::parse_result_file(std::filesystem::u8path(result.result_path), &error);
+    report.check("timing.saved_result_v2", parsed && parsed->bms_timing_version == 2, error);
+    const auto verified = app::verify_replay_file(std::filesystem::u8path(result.replay_path), std::filesystem::u8path(options.chart_path));
+    report.check("timing.live_replay_verifies", verified.verified() && verified.claims_match, verified.detail);
+    for (int version : {1, 2}) {
+        auto fixture = *replay.replay;
+        fixture.mode.bms_timing_version = version;
+        const auto path = std::filesystem::absolute("timing-fixture/v" + std::to_string(version) + ".json").u8string();
+        report.check("timing.ghost_fixture_" + std::to_string(version), gameplay::save_replay_json(path, fixture).success());
+        auto ghost_options = options;
+        ghost_options.ghost_replay_path = path;
+        auto ghost = std::make_unique<app::GameSession>();
+        const bool ready = ghost->initialize(ghost_options);
+        report.check("timing.ghost_compatibility_" + std::to_string(version), ready && SessionAccess::timing_state(*ghost, 2, version == 2));
+        ghost->shutdown();
+        auto playback_options = options;
+        playback_options.replay_path = path;
+        auto playback = std::make_unique<app::GameSession>();
+        const bool playable = playback->initialize(playback_options);
+        report.check("timing.replay_initializes_original_policy_" + std::to_string(version), playable && SessionAccess::timing_state(*playback, version, false));
+        playback->shutdown();
+    }
+    options.chart_path = "songs/fixture/smoke.bms";
+    auto unchanged = std::make_unique<app::GameSession>();
+    const bool ready = unchanged->initialize(options);
+    report.check("timing.unchanged_chart_keeps_v1", ready && SessionAccess::timing_state(*unchanged, 1, false));
+    unchanged->shutdown();
+}
 }  // namespace
 
 int wmain(int argc, wchar_t** argv) {
@@ -1360,6 +1675,8 @@ int wmain(int argc, wchar_t** argv) {
         separate_restart_flow(options, report);
         separate_judge_flow(options, report);
         separate_delta_flow(options, report);
+        separate_gamepad_flow(options, report);
+        separate_timing_flow(options, report);
         report.check("sandbox.no_account_or_sites_connection",
             !std::filesystem::exists("config/sites-leaderboard.json") &&
             !std::filesystem::exists("config/sites-leaderboard.dpapi") &&

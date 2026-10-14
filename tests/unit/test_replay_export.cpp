@@ -22,6 +22,7 @@
 #include "gameplay/GameplayChart.h"
 #include "gameplay/GameplayEngine.h"
 #include "gameplay/Replay.h"
+#include "bms_timing_fixture.h"
 
 using tenriff::config::parse_json;
 using tenriff::gameplay::ReplayEvent;
@@ -80,6 +81,103 @@ void write_file(const std::filesystem::path& path, const std::string& content) {
 }
 
 }  // namespace
+
+TEST_CASE("BMS timing policy replays retain historical scheduling and verify corrected scheduling") {
+#ifdef _WIN32
+    const wchar_t* evidence = _wgetenv(L"TENRIFF_TIMING_REPLAY_EVIDENCE_DIR");
+    const auto directory = evidence && *evidence ? std::filesystem::path(evidence)
+#else
+    const char* evidence = std::getenv("TENRIFF_TIMING_REPLAY_EVIDENCE_DIR");
+    const auto directory = evidence && *evidence ? std::filesystem::u8path(evidence)
+#endif
+        : std::filesystem::current_path() / "timing-replay-fixture";
+    REQUIRE(std::filesystem::create_directory(directory));
+    const auto path = directory / "timing.bms";
+    write_file(path, bpm_stop_mine_fixture());
+    const auto hash = tenriff::app::hash_chart_file(path);
+    REQUIRE(hash.valid());
+    for (int version : {1, 2}) for (const std::string judge : {"", "judge_hard", "judge_ex"}) {
+        const auto loaded = tenriff::app::ChartLoader{}.load(path.u8string(), 48000, 1.0, "ignore", 0, version);
+        REQUIRE(loaded.success());
+        tenriff::config::ModeConfig mode;
+        mode.key_mode = "auto"; mode.random = "off"; mode.gauge = "normal";
+        if (!judge.empty()) mode.mods = {judge};
+        const auto managed = tenriff::app::manage_modes(loaded.chart, loaded.format, mode,
+            tenriff::config::JudgeConfig{}, 1.0, loaded.base_bpm, 48000,
+            tenriff::app::LongNoteMixVersion::LegacyShort, 3);
+        auto played = managed.chart;
+        tenriff::gameplay::offset_gameplay_chart_samples(played, 144000);
+        ReplayFile replay;
+        replay.chart_path = path.u8string(); replay.chart_format = "bms"; replay.chart_sha256 = hash.sha256;
+        replay.ruleset_id = std::string(judge == "judge_ex" ? tenriff::app::kExReplayRulesetId : tenriff::app::kCanonicalReplayRulesetId);
+        replay.sample_rate = 48000; replay.mods = managed.active_mods;
+        replay.mode.key_mode = "auto"; replay.mode.random = "off"; replay.mode.gauge = "normal";
+        replay.mode.bms_timing_version = version; replay.mode.key_conversion_version = 3;
+        tenriff::gameplay::GameplayConfig config;
+        config.judge = tenriff::app::replay_judge_config_for_playback(replay, {}, played.bms_rank);
+        config.gauge_shift_enabled = true;
+        tenriff::gameplay::GameplayEngine engine(played, config);
+        for (const auto& note : played.notes) {
+            engine.advance(note.start_sample - 1);
+            (void)engine.handle_input(note.lane, InputState::Pressed, note.start_sample);
+            (void)engine.handle_input(note.lane, InputState::Released, note.start_sample + 1);
+        }
+        engine.advance(played.duration_samples + 240000);
+        replay.trace = engine.replay(); replay.stats = engine.stats();
+        replay.rate_multiplier = managed.rate_multiplier; replay.score_multiplier = managed.final_multiplier;
+        replay.final_score = tenriff::gameplay::scale_native_score(replay.stats.raw_score, replay.score_multiplier);
+        const auto replay_path = directory / ("timing-v" + std::to_string(version) + "-" + (judge.empty() ? "normal" : judge) + ".json");
+        REQUIRE(save_replay_json(replay_path.u8string(), replay).success());
+        const auto readback = load_replay_json(replay_path.u8string());
+        REQUIRE(readback.success());
+        CHECK(readback.replay->mode.bms_timing_version == version);
+        CHECK((read_file(replay_path).find("bms_timing_version") != std::string::npos) == (version == 2));
+        auto result = tenriff::app::verify_replay_file(replay_path, path);
+        CHECK(result.verified()); CHECK(result.claims_match);
+        CHECK(result.bms_timing_version == version);
+        CHECK(result.stats.counts.pg == 2);
+        // Mislabelling the policy must not silently validate a shifted chart.
+        replay.mode.bms_timing_version = 3-version;
+        const auto wrong = directory / "wrong-policy.json";
+        REQUIRE(save_replay_json(wrong.u8string(), replay).success());
+        result = tenriff::app::verify_replay_file(wrong, path);
+        CHECK_FALSE(result.verified() && result.claims_match);
+        std::filesystem::remove(wrong);
+    }
+    ReplayFile bad; bad.mode.bms_timing_version = 99;
+    CHECK_FALSE(tenriff::gameplay::validate_replay_evidence(bad).success());
+    CHECK_FALSE(save_replay_json((directory / "bad.json").u8string(), bad).success());
+    for (int version : {1, 2}) {
+        ResultFile result; result.bms_timing_version = version;
+        result.chart_path = path.u8string();
+        const auto result_path = directory / "result-policy.json";
+        REQUIRE(save_result_json(result_path.u8string(), result).success());
+        auto parsed = tenriff::app::menu_records::parse_result_file(result_path, nullptr);
+        REQUIRE(parsed.has_value());
+        CHECK(parsed->bms_timing_version == version);
+        CHECK((read_file(result_path).find("bms_timing_version") != std::string::npos) == (version == 2));
+        if (version == 2) {
+            const std::string valid_result = read_file(result_path);
+            const auto replay_path = directory / "timing-v2-normal.json";
+            const std::string valid_replay = read_file(replay_path);
+            for (const std::string invalid : {"0", "3", "1.5", "null", "\"2\""}) {
+                for (const bool is_replay : {false, true}) {
+                    std::string content = is_replay ? valid_replay : valid_result;
+                    const auto field = content.find("\"bms_timing_version\": 2");
+                    REQUIRE(field != std::string::npos);
+                    content.replace(field + std::string("\"bms_timing_version\": ").size(), 1, invalid);
+                    const auto path = directory / "invalid-policy.json";
+                    write_file(path, content);
+                    if (is_replay) CHECK_FALSE(load_replay_json(path.u8string()).success());
+                    else CHECK_FALSE(tenriff::app::menu_records::parse_result_file(path, nullptr).has_value());
+                    std::filesystem::remove(path);
+                }
+            }
+        }
+        std::filesystem::remove(result_path);
+    }
+    if (!evidence || !*evidence) std::filesystem::remove_all(directory);
+}
 
 TEST_CASE("native rank thresholds match the TenRiff accuracy ladder") {
     const auto rank_for = [](double accuracy) {

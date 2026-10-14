@@ -113,9 +113,11 @@
             const std::array<native_menu_assets::Asset, 4> button_assets = {
                 native_menu_assets::kChevron, native_menu_assets::kNetwork,
                 native_menu_assets::kSliders, native_menu_assets::kExit};
+            // The drawn arrow and the asset icons share the same visual column.
+            const float icon_center_x = rect.right - 54.0f;
             if (primary) {
                 // Icons and edges share a color while the card face stays dark.
-                const auto arrow = native_rect("title_native.rect.020", D2D1::RectF(rect.right - 108, rect.top, rect.right - 28, rect.bottom));
+                const auto arrow = native_rect("title_native.rect.020", D2D1::RectF(icon_center_x - 40.0f, rect.top, icon_center_x + 40.0f, rect.bottom));
                 const float cy = (arrow.top + arrow.bottom) * 0.5f;
                 const float tip = arrow.right - 8.0f;
                 auto* arrow_brush = semantic_color(action_color);
@@ -128,7 +130,7 @@
                 const auto icon_color = D2D1::ColorF(action_color);
                 const float icon_half = index == 1 ? 30.0f : 24.0f;
                 draw_native_asset(button_assets[std::min<std::size_t>(index, 3)],
-                    native_rect("title_native.rect.021", D2D1::RectF(rect.right - 54.0f - icon_half, cy - icon_half, rect.right - 54.0f + icon_half, cy + icon_half)),
+                    native_rect("title_native.rect.021", D2D1::RectF(icon_center_x - icon_half, cy - icon_half, icon_center_x + icon_half, cy + icon_half)),
                     colored_icon || button.selected ? 1.0f : 0.65f, 0.0f, &icon_color);
             }
             d2d_->menu_icon_format->SetParagraphAlignment(saved_paragraph);

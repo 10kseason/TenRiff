@@ -1,14 +1,20 @@
 #include "input/InputThread.h"
 
+#include <algorithm>
 #include <chrono>
+#include <exception>
 #include <iostream>
 #include <unordered_set>
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #include <avrt.h>
+#include <xinput.h>
 
 #include "config/KeycodeMap.h"
 #include "timing/HighResClock.h"
@@ -135,6 +141,161 @@ bool is_current_process_foreground() {
 
 }  // namespace
 
+// Even an empty XInput slot can block for milliseconds. The owned worker does
+// all driver calls; the existing keyboard producer alone writes event_queue_.
+struct InputThread::GamepadRuntime {
+    using GetState = DWORD(WINAPI*)(DWORD, XINPUT_STATE*);
+    InputThread& owner;
+    const GamepadTestHooks hooks;
+    const int64_t interval_ns;
+    HMODULE module = nullptr;
+    GetState get_state = nullptr;
+    gamepad::GamepadTracker tracker;
+    std::array<int64_t, 4> next_probe{};
+    std::array<std::optional<gamepad::GamepadState>, 4> states{};
+    SPSCQueue<InputEvent, InputThread::kQueueCapacity> events;
+    std::optional<InputEvent> pending_event; // Read/written only by InputThread.
+    uint16_t queued_mask = 0; // Read/written only by the gamepad worker.
+    std::atomic<bool> stopping{false};
+    std::mutex wait_mutex;
+    std::condition_variable wait_cv;
+    std::thread worker;
+
+    explicit GamepadRuntime(InputThread& input)
+        : owner(input), hooks(input.gamepad_test_hooks_),
+          interval_ns(1'000'000'000LL / (input.config_.polling_hz > 0 ? input.config_.polling_hz : 1000)) {
+        worker = std::thread([this] { run(); });
+    }
+
+    ~GamepadRuntime() {
+        {
+            std::lock_guard<std::mutex> lock(wait_mutex);
+            stopping.store(true, std::memory_order_release);
+        }
+        wait_cv.notify_one();
+        if (worker.joinable()) worker.join();
+        if (module) FreeLibrary(module);
+    }
+
+    void load_api() {
+        for (const wchar_t* name : {L"xinput1_4.dll", L"xinput9_1_0.dll"}) {
+            module = LoadLibraryExW(name, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+            if (!module) continue;
+            get_state = reinterpret_cast<GetState>(GetProcAddress(module, "XInputGetState"));
+            if (get_state) break;
+            FreeLibrary(module);
+            module = nullptr;
+        }
+    }
+
+    bool read(DWORD slot, gamepad::GamepadState& result) {
+        if (hooks.read) return hooks.read(hooks.context, slot, result);
+        XINPUT_STATE native{};
+        if (get_state(slot, &native) != ERROR_SUCCESS) return false;
+        result = {native.Gamepad.wButtons, native.Gamepad.bLeftTrigger, native.Gamepad.bRightTrigger};
+        return true;
+    }
+
+    bool publish_mask(uint16_t mask, int64_t observed_ns) noexcept {
+        owner.gamepad_mask_.store(mask, std::memory_order_release);
+        // Retain ordinary edges in order. If the internal queue is full,
+        // retry its unsent state changes on the next poll; in particular a
+        // dropped release must not leave a held lane stuck indefinitely.
+        for (std::size_t index = 0; index < gamepad::kControlCount; ++index) {
+            const auto bit = static_cast<uint16_t>(1u << index);
+            if (((queued_mask ^ mask) & bit) == 0) continue;
+            const InputEvent event{gamepad::kKeycodeBase + static_cast<uint32_t>(index),
+                (mask & bit) != 0 ? InputState::Pressed : InputState::Released,
+                observed_ns, kPollingAggregateDeviceId};
+            if (events.push(event)) queued_mask ^= bit;
+            else owner.events_dropped_.fetch_add(1, std::memory_order_relaxed);
+        }
+        return queued_mask == mask;
+    }
+
+    void run() noexcept {
+        try {
+            run_loop();
+        } catch (...) {
+            // An allocation or test-driver failure must not terminate the
+            // keyboard producer. Preserve queued order, then release its pads.
+            std::cerr << "[warn] XInput worker stopped after an internal error.\n";
+            timing::PreciseWait precise_wait;
+            while (!stopping.load(std::memory_order_acquire) &&
+                   !publish_mask(0, timing::HighResClock::now_ns())) {
+                precise_wait.wait_for_ns(1'000'000);
+            }
+        }
+    }
+
+    void run_loop() {
+        if (!hooks.read) {
+            load_api();
+            if (!get_state) return;
+        }
+        timing::PreciseWait precise_wait;
+        while (!stopping.load(std::memory_order_acquire)) {
+            const auto cycle_start = timing::HighResClock::now_ns();
+            for (DWORD slot = 0; slot < states.size(); ++slot) {
+                if (stopping.load(std::memory_order_acquire)) return;
+                if (cycle_start < next_probe[slot]) continue;
+                gamepad::GamepadState state;
+                if (read(slot, state)) {
+                    states[slot] = state;
+                    next_probe[slot] = 0;
+                } else {
+                    states[slot].reset();
+                    next_probe[slot] = timing::HighResClock::now_ns() + 2'000'000'000LL;
+                }
+            }
+            // Focus can change during a slow driver call. Gate and timestamp
+            // the completed observation, not the state before entering XInput.
+            const bool allowed = hooks.allowed ? hooks.allowed(hooks.context) : owner.is_input_allowed();
+            const auto observed_ns = timing::HighResClock::now_ns();
+            static_cast<void>(tracker.update(states, allowed, observed_ns));
+            const auto mask = tracker.current_mask();
+            publish_mask(mask, observed_ns);
+
+            const bool connected = std::any_of(states.begin(), states.end(),
+                [](const auto& state) { return state.has_value(); });
+            const auto now_ns = timing::HighResClock::now_ns();
+            const auto wake_ns = connected || queued_mask != mask
+                ? std::max(cycle_start + interval_ns, now_ns + 1)
+                : *std::min_element(next_probe.begin(), next_probe.end());
+            if (connected || queued_mask != mask) {
+                // Keep sub-millisecond polling off Windows' coarse CV timer.
+                // Small chunks also bound shutdown when a low rate is chosen.
+                while (!stopping.load(std::memory_order_acquire)) {
+                    const auto remaining_ns = wake_ns - timing::HighResClock::now_ns();
+                    if (remaining_ns <= 0) break;
+                    precise_wait.wait_for_ns(std::min<int64_t>(remaining_ns, 2'000'000));
+                }
+            } else {
+                std::unique_lock<std::mutex> lock(wait_mutex);
+                wait_cv.wait_for(lock, std::chrono::nanoseconds(std::max<int64_t>(1, wake_ns - now_ns)),
+                    [this] { return stopping.load(std::memory_order_acquire); });
+            }
+        }
+    }
+};
+
+void InputThread::poll_gamepads() {
+    if (!gamepad_runtime_) return;
+    auto& pad = *gamepad_runtime_;
+    while (true) {
+        const auto event = pad.pending_event ? pad.pending_event : pad.events.pop();
+        if (!event) return;
+        if (!event_queue_.push(*event)) {
+            // Keep one deferred edge while the gameplay consumer catches up.
+            // No worker ever writes this outer queue or its keyboard counters.
+            pad.pending_event = event;
+            return;
+        }
+        pad.pending_event.reset();
+        events_processed_.fetch_add(1, std::memory_order_relaxed);
+    }
+}
+
 InputThread::InputThread() = default;
 
 InputThread::~InputThread() {
@@ -144,14 +305,16 @@ InputThread::~InputThread() {
 bool InputThread::initialize(const InputThreadConfig& config) {
     config_ = config;
     last_input_allowed_ = false;
+    gamepad_mask_.store(0, std::memory_order_release);
     active_backend_.store(static_cast<uint8_t>(config_.backend), std::memory_order_release);
     last_allowed_event_time_ns_.store(0, std::memory_order_release);
     last_queue_push_time_ns_.store(0, std::memory_order_release);
     allowed_event_count_.store(0, std::memory_order_release);
     events_processed_.store(0, std::memory_order_release);
+    keyboard_events_processed_.store(0, std::memory_order_release);
     events_dropped_.store(0, std::memory_order_release);
     event_queue_.reset();
-    
+
     // Create components (will be used by the thread).
     key_state_tracker_ = std::make_unique<KeyStateTracker>(config.key_state);
     if (config_.backend == InputBackend::RawInput) {
@@ -193,6 +356,8 @@ bool InputThread::start() {
         if (thread_.joinable()) {
             thread_.join();
         }
+        gamepad_runtime_.reset();
+        gamepad_mask_.store(0, std::memory_order_release);
         is_running_.store(false, std::memory_order_release);
         return false;
     }
@@ -223,11 +388,13 @@ void InputThread::stop() {
         key_state_tracker_->reset();
     }
     last_input_allowed_ = false;
+    gamepad_runtime_.reset();
+    gamepad_mask_.store(0, std::memory_order_release);
 }
 
 void InputThread::shutdown() {
     stop();
-    
+
     raw_input_handler_.reset();
     key_state_tracker_.reset();
 }
@@ -248,7 +415,7 @@ InputThreadHealthSnapshot InputThread::health_snapshot() const {
     snapshot.last_allowed_event_time_ns = last_allowed_event_time_ns_.load(std::memory_order_acquire);
     snapshot.last_queue_push_time_ns = last_queue_push_time_ns_.load(std::memory_order_acquire);
     snapshot.allowed_event_count = allowed_event_count_.load(std::memory_order_acquire);
-    snapshot.queue_push_count = events_processed_.load(std::memory_order_acquire);
+    snapshot.queue_push_count = keyboard_events_processed_.load(std::memory_order_acquire);
     snapshot.dropped_count = events_dropped_.load(std::memory_order_acquire);
     return snapshot;
 }
@@ -280,7 +447,7 @@ void InputThread::on_input_event(const InputEvent& event) {
 
     // Process through key state tracker for debouncing.
     auto filtered = key_state_tracker_->process(event);
-    
+
     if (!filtered.has_value()) {
         return;  // Filtered out.
     }
@@ -292,6 +459,7 @@ void InputThread::on_input_event(const InputEvent& event) {
     }
 
     last_queue_push_time_ns_.store(filtered->input_time_ns, std::memory_order_release);
+    keyboard_events_processed_.fetch_add(1, std::memory_order_relaxed);
     events_processed_.fetch_add(1, std::memory_order_relaxed);
 }
 
@@ -308,9 +476,16 @@ void InputThread::signal_start_result(bool success) {
 void InputThread::thread_main() {
     ScopedInputScheduling scheduling;
     g_input_thread = this;
+    try {
+        gamepad_runtime_ = std::make_unique<GamepadRuntime>(*this);
+    } catch (const std::exception& error) {
+        std::cerr << "[warn] XInput worker unavailable: " << error.what() << std::endl;
+    }
     if (config_.backend == InputBackend::Polling) {
         signal_start_result(true);
         thread_main_polling(false);
+        gamepad_runtime_.reset();
+        gamepad_mask_.store(0, std::memory_order_release);
         g_input_thread = nullptr;
         is_running_.store(false, std::memory_order_release);
         return;
@@ -325,6 +500,8 @@ void InputThread::thread_main() {
         active_backend_.store(static_cast<uint8_t>(InputBackend::Polling), std::memory_order_release);
         thread_main_polling(true);
     }
+    gamepad_runtime_.reset();
+    gamepad_mask_.store(0, std::memory_order_release);
     g_input_thread = nullptr;
     is_running_.store(false, std::memory_order_release);
 }
@@ -336,6 +513,7 @@ std::vector<uint32_t> InputThread::build_polling_key_list() const {
         std::unordered_set<uint32_t> seen_keys;
         std::unordered_set<uint32_t> warned_unpollable_keys;
         for (uint32_t keycode : config_.polling_keys) {
+            if (gamepad::is_gamepad_keycode(keycode)) continue;
 #ifdef _WIN32
             const auto poll_vk = config::KeycodeMap::polling_vk_for_keycode(keycode);
             if (!poll_vk.has_value()) {
@@ -514,6 +692,8 @@ bool InputThread::thread_main_rawinput() {
             }
         }
 
+        poll_gamepads();
+
         if (!polling_shadow_enabled) {
             next_poll_ns = now_ns + interval_ns;
         } else if (!allowed) {
@@ -590,6 +770,8 @@ void InputThread::thread_main_polling(bool reconcile_existing_state) {
             sync_input_gate(allowed);
             refresh_polling_key_state(keys, last_state);
         }
+
+        poll_gamepads();
 
         if (!allowed) {
             next_tick_ns += interval_ns;

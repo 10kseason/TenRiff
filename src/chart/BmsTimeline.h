@@ -26,6 +26,8 @@ struct BmsTimeline {
     // Tempo with the longest accumulated running time (STOP waits excluded).
     // Kept separate from the initial BPM used to schedule the chart.
     double reference_bpm = 0.0;
+    // True only when historical STOP-before-BPM ordering changes this chart.
+    bool has_bpm_stop_timing_difference = false;
     std::vector<BmsScheduledEvent> events;
     std::vector<BmsScrollSegment> scroll_segments;
 };
@@ -45,7 +47,8 @@ struct BmsTimelineResult {
 
 class BmsTimelineBuilder {
 public:
-    BmsTimelineResult build(const BmsNormalizedChart& chart, int sample_rate_hz) const;
+    BmsTimelineResult build(const BmsNormalizedChart& chart, int sample_rate_hz,
+                            int bms_timing_version = 2) const;
 };
 
 }  // namespace tenriff::chart

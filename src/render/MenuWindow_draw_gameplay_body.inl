@@ -1168,8 +1168,8 @@
 
             if (scene_body_format && d2d_->muted_brush) {
                 const std::wstring hispeed_hint_w =
-                    wloc("HI-SPEED  F3/F4  +/-0.25   F5/F6  HALF/DOUBLE",
-                         "노트 배속  F3/F4  +/-0.25   F5/F6  절반/두 배");
+                    wloc("HI-SPEED  F3/F4  +/-0.25   PROFILE KEYS  +/-10",
+                         "노트 배속  F3/F4  +/-0.25   프로필 지정 키  +/-10");
                 draw_readable_text_aligned(
                     hispeed_hint_w,
                     scene_body_format.Get(),

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "app/NativeFileDialog.h"
 #include <filesystem>
 #include <string>
 
@@ -40,7 +41,7 @@ inline PortableFileChoice choose_portable_file(bool save, bool profile = false) 
         if (SUCCEEDED(hr)) hr = dialog->SetFileTypes(1, &filter);
         if (SUCCEEDED(hr)) hr = dialog->SetDefaultExtension(extension);
         if (save && SUCCEEDED(hr)) hr = dialog->SetFileName(profile ? L"TenRiff Settings.trprofile" : L"My Skin Preset.trskin");
-        if (SUCCEEDED(hr)) hr = dialog->Show(nullptr);
+        if (SUCCEEDED(hr)) hr = show_native_file_dialog(dialog.Get());
         if (hr == HRESULT_FROM_WIN32(ERROR_CANCELLED)) { result.cancelled = true; return result; }
         Microsoft::WRL::ComPtr<IShellItem> item;
         if (SUCCEEDED(hr)) hr = dialog->GetResult(&item);

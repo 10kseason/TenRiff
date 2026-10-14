@@ -35,8 +35,10 @@ inline constexpr int kExportSettingsRow = 11;
 inline constexpr int kImportSettingsRow = 12;
 inline constexpr int kSkipStartCountdownRow = 13;
 inline constexpr int kInstantRestartKeyRow = 14;
-inline constexpr int kDoneRow = 15;
-inline constexpr int kFirstRunSkipRow = 16;
+inline constexpr int kHispeedDecreaseKeyRow = 15;
+inline constexpr int kHispeedIncreaseKeyRow = 16;
+inline constexpr int kDoneRow = 17;
+inline constexpr int kFirstRunSkipRow = 18;
 
 [[nodiscard]] inline constexpr Entry entry(bool first_run_profile) {
     return first_run_profile ? Entry::FirstRun : Entry::Options;

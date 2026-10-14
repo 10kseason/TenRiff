@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.9.0.1] - 2026-10-15
+
+- New profiles and missing volume settings default to 10% master volume. Preserve explicitly saved volumes and the individual BMS, TenRiff music, background and keysound defaults.
+- Align the visible centers of the lobby Play arrow and Multiplayer icon on one vertical line, preserving button and text positions.
+- Multiply song-preview gain by 0.75, including volume changes and focus restoration. Preserve gameplay audio and TenRiff scene-music gains.
+- Replace F5/F6 half/double Hi-Speed with -10/+10 and expose both bindings in Profile and `.trprofile`. Preserve F3/F4 ±0.25, the 0.50–50.00 range, held-key suppression and binding-conflict checks.
+- Add Xbox/XInput digital buttons and triggers to lane/profile binding capture, gameplay and menu navigation with either keyboard backend. Run system queries on a scoped worker to avoid blocking keyboard capture; the existing InputThread remains the sole producer of the shared input queue. Start/stop the worker with input collection, without installing a service. Aggregate up to four controllers, release disconnected holds, suppress buttons held across connection/focus changes, and rescan empty slots every two seconds. Use system XInput 1.4 with 9.1.0 fallback; do not bundle drivers or DLLs. Analog stick axes and vibration are outside this release.
+- Give all native file pickers an owning application window, prevent nested opening and clear queued/held closing input so one action cannot reopen the picker repeatedly.
+- Apply coincident BMS BPM changes before STOP duration calculation. In the reported DEATH_SENTENCE chart, a shortened STOP brought authored mines within an ordinary tap; preserve all 32 mines, extreme BPM effects and original chart/audio files.
+- Add optional `bms_timing_version` to result/replay metadata: absent/1 preserves historical scheduling, 2 identifies affected corrected plays. Preserve replay format 3 and numerical R1–R6 rules; support old standalone replays, exclude incompatible ghosts and prefer verified corrected local BEST records while retaining old history. Affected v2 scores remain local until online support exists. Cache 18 refreshes derived timing data.
+- Keep the user-pinned baseline at 1.9.0 and previous releases/assets intact. See [changes and compatibility](docs/feedback-20261015.en.md) and the [release verification gate](docs/release-1.9.0.1-gate.md). Simulated input checks do not establish physical-gamepad, latency, long-play or other-PC behavior.
+
 ## [1.9.0] - 2026-10-14
 
 - Promote the reviewed feedback candidate to 1.9.0 and explicitly pin the fixed baseline to this release. Preserve previous releases; plugin runtime/API/SDK remain future work.

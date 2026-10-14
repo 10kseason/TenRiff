@@ -1,5 +1,7 @@
 # TenRiff
 
+**2026-10-15 · 1.9.0.1:** 包含默认主音量10%和大厅图标中心对齐。提供试听×0.75、个人档案指定F5/F6 -10/+10、Xbox/XInput按钮输入、文件选择框防重复，以及BMS BPM/STOP顺序修正与旧回放兼容。固定基准保持1.9.0。 [变更说明](docs/feedback-20261015.zh-CN.md) · [发布验证范围](docs/release-1.9.0.1-gate.md).
+
 **2026-10-14 · 1.9.0 / 新固定基准：** 将已检查的本地候选版提升为指定正式版本，包括BMS/菜单音量分离、大厅/筛选/皮肤操作、等级与SUBARTIST、韩文模式界面、EX判定和上传状态。普通/Hard使用R5，EX使用R6；保留旧R1–R5记录及已保存设置。[固定基准](docs/baseline-1.9.0.zh-CN.md) · [验证范围](docs/release-1.9.0-gate.md)。下方带日期的条目保留当时发布历史。
 
 **1.9.0 发布版：** 独立BMS/菜单音量、更轻的菜单音乐、紧凑大厅、难度范围与排序修复、指示器缩放、简易矩形音符和本地UI字体。新设置默认EX、快速索引、关闭幽灵对战。保留已有设置，固定基准更新为1.9.0。[范围](docs/controls-1.9.0.ko.md)。
@@ -46,13 +48,13 @@
 
 **多人Rate支持版本：**选曲者在大厅设置全员共用的Rate。所有玩家必须使用本protocol v6版本，不能与旧v5客户端连接。[指南](docs/multiplayer-rate-build.ko.md)（韩语）。
 
-版本与下载：[**1.9.0 Sites 集成版**](https://github.com/10kseason/TenRiff/releases/tag/1.9.0)；实际软件包／公开状态见[发布记录](docs/release-1.9.0-gate.md)，固定基准仍为1.9.0。解压到新文件夹，运行 `launch_win.bat`，然后按 F10 连接一次网页账号。符合条件的新游玩记录会上传分数、详细分数、准确率和详细准确率。新游玩使用 ruleset-5 (Normal/Hard), ruleset-6 (EX)，网页提交必须包含判定配置。ruleset-1/2/3/4回放保留原判定与LN行为，现有网页记录保留ID和分数。请参阅[连接指南](docs/sites-leaderboard.md)（韩语）。
+版本与下载：[**1.9.0.1**](https://github.com/10kseason/TenRiff/releases/tag/1.9.0.1)；实际软件包／公开状态见[发布记录](docs/release-1.9.0.1-gate.md)，固定基准仍为1.9.0。解压到新文件夹，运行 `launch_win.bat`，然后按 F10 连接一次网页账号。符合条件的新游玩记录会上传分数、详细分数、准确率和详细准确率。新游玩使用 ruleset-5 (Normal/Hard), ruleset-6 (EX)，网页提交必须包含判定配置。ruleset-1/2/3/4回放保留原判定与LN行为，现有网页记录保留ID和分数。请参阅[连接指南](docs/sites-leaderboard.md)（韩语）。 受BPM/STOP修正影响的新时间版本2记录，在网页支持前仅保存在本地。
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。固定基准为 `1.9.0`，此源码版本为 `1.9.0`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
+TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。固定基准为 `1.9.0`，此源码版本为 `1.9.0.1`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
 
-这份 README 是入门文档。关于当前行为、`1.9.0` 发布分支和固定 `1.9.0` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
+这份 README 是入门文档。关于当前行为、`1.9.0.1` 发布分支和固定 `1.9.0` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
 
 TenRiff 也明确属于一种 `vibe coding` 作品：它更多是在快速迭代和实验中成形，而不是只按照传统的长篇设计先行流程推进。
 
@@ -94,7 +96,7 @@ TenRiff 也明确属于一种 `vibe coding` 作品：它更多是在快速迭代
 - 支持谱面：仅 BMS family（`.bms/.bme/.bml/.pms`）
 - 图形路径：D3D11 + Direct2D/DirectWrite
 - 音频路径：WASAPI（默认）、原生 ASIO（需要 Windows x64 驱动）
-- 输入路径：RawInput 或高轮询率键盘 polling
+- 输入路径：RawInput 或高轮询率键盘 polling，加Xbox/XInput数字按钮与扳机
 - direct-IP multiplayer：固定 host 的 TCP coordinator，最多8人；multiplayer 仅可选择 BMS（默认 `27301/TCP`，见[使用说明](docs/multiplayer.md)）
 - 许可证：[MIT](LICENSE)
 - 第三方说明：[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)

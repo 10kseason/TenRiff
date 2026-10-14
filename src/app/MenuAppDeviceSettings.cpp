@@ -1,3 +1,4 @@
+#include "app/NativeFileDialog.h"
 #include "app/MenuApp.h"
 
 #include <filesystem>
@@ -63,7 +64,7 @@ std::optional<std::string> pick_onnx_model_dialog_utf8() {
     dialog->SetTitle(L"Select external ONNX upscaler");
 
     std::optional<std::string> result;
-    if (SUCCEEDED(dialog->Show(nullptr))) {
+    if (SUCCEEDED(show_native_file_dialog(dialog.Get()))) {
         Microsoft::WRL::ComPtr<IShellItem> item;
         if (SUCCEEDED(dialog->GetResult(&item)) && item) {
             PWSTR raw_path = nullptr;
