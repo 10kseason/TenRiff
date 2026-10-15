@@ -1,5 +1,7 @@
 #include "doctest/doctest.h"
 #include <chrono>
+#include <atomic>
+#include <future>
 #include <fstream>
 #include <iterator>
 #include <iostream>
@@ -106,6 +108,7 @@ bool json_values_equal(const config::JsonValue& lhs, const config::JsonValue& rh
 
 gameplay::ReplayFile score_fixture() {
     gameplay::ReplayFile replay;
+    replay.record_play_mode = "online";
     replay.ruleset_id = std::string(app::kCanonicalReplayRulesetId);
     replay.chart_format = "bms";
     replay.bms_rank = 3;
@@ -147,6 +150,151 @@ struct SitesChartFixture {
     }
 };
 }  // namespace
+
+TEST_CASE("Sites never promotes guest historical or unknown origins when online is later enabled") {
+    auto replay = score_fixture();
+    app::SitesLeaderboardService service;
+    service.set_online_enabled(true);
+    for (const std::string origin : {"", "guest", "unknown", "ONLINE"}) {
+        replay.record_play_mode = origin;
+        std::string payload = "must clear", error;
+        CHECK_FALSE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
+        CHECK(payload.empty());
+        CHECK(error.find("remain local permanently") != std::string::npos);
+    }
+    replay.record_play_mode = "online";
+    std::string payload, error;
+    REQUIRE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
+    CHECK(payload.find("record_play_mode") == std::string::npos);
+}
+
+namespace tenriff::app {
+struct SitesLeaderboardServiceTestAccess {
+    struct Transport {
+        std::atomic_int calls{0};
+        std::promise<void> entered;
+        std::shared_future<void> release;
+    };
+    inline static Transport* transport = nullptr;
+    static bool submit(const std::string&, const std::string&, const std::string&, bool&, std::string&) {
+        auto& active = *transport;
+        if (active.calls.fetch_add(1) == 0) active.entered.set_value();
+        if (active.release.valid()) active.release.wait_for(std::chrono::seconds(3));
+        return true;
+    }
+    static bool attempt(SitesLeaderboardService& service, std::uint64_t generation) {
+        bool retryable = true;
+        std::string error;
+        return service.submit_if_current(generation, {}, "synthetic payload", retryable, error);
+    }
+    static void queue_worker_record(SitesLeaderboardService& service, const std::filesystem::path& path,
+                                    const std::string& hash) {
+        std::lock_guard<std::mutex> lock(service.mutex_);
+        service.pending_.push_back({path, hash, "Fixture", "CLEAR", {}});
+        if (!service.worker_.joinable()) service.worker_ = std::thread(&SitesLeaderboardService::worker_main, &service);
+        service.wake_.notify_all();
+    }
+    static void check_permission_barrier() {
+        Transport state;
+        transport = &state;
+        SitesLeaderboardService service(submit);
+        // No connection file or credentials are read while guest mode owns the service.
+        CHECK(service.enqueue({}, {}, {}, {}) == SitesLeaderboardService::EnqueueResult::Disabled);
+        CHECK_FALSE(attempt(service, 0));
+        CHECK(state.calls == 0);
+        service.set_online_enabled(true);
+        std::promise<void> release;
+        state.release = release.get_future().share();
+        auto entered = state.entered.get_future();
+        auto submission = std::async(std::launch::async, [&] { return attempt(service, 0); });
+        CHECK(entered.wait_for(std::chrono::seconds(2)) == std::future_status::ready);
+        // Queued work is discarded even if online mode is enabled again later.
+        {
+            std::lock_guard<std::mutex> lock(service.mutex_);
+            service.pending_.push_back({});
+        }
+        std::promise<void> changing;
+        auto changing_started = changing.get_future();
+        auto transition = std::async(std::launch::async, [&] {
+            changing.set_value();
+            service.set_online_enabled(false);
+        });
+        changing_started.wait();
+        CHECK(transition.wait_for(std::chrono::milliseconds(10)) == std::future_status::timeout);
+        release.set_value();
+        CHECK(submission.get());
+        transition.get();
+        CHECK(service.pending_.empty());
+        CHECK_FALSE(attempt(service, service.generation_));
+        CHECK(service.enqueue({}, {}, {}, {}) == SitesLeaderboardService::EnqueueResult::Disabled);
+        service.set_online_enabled(true);
+        CHECK_FALSE(attempt(service, 0));
+        CHECK(state.calls == 1);
+        CHECK(attempt(service, service.generation_));
+        CHECK(state.calls == 2);
+        service.shutdown();
+        transport = nullptr;
+    }
+};
+}  // namespace tenriff::app
+
+TEST_CASE("Sites guest transition fences in-flight submissions and invalidates every pending generation") {
+    app::SitesLeaderboardServiceTestAccess::check_permission_barrier();
+}
+
+TEST_CASE("Sites worker rejects persisted guest history before loading connection credentials") {
+    using Access = app::SitesLeaderboardServiceTestAccess;
+    SitesChartFixture fixture;
+    const auto path = fixture.directory / "replay.json";
+    auto replay = score_fixture();
+    replay.replay_format_version = 0;
+    Access::Transport transport;
+    Access::transport = &transport;
+    app::SitesLeaderboardService service(Access::submit);
+    service.set_online_enabled(true);
+    for (const std::string origin : {"guest", ""}) {
+        replay.record_play_mode = origin;
+        REQUIRE(gameplay::save_replay_json(path.u8string(), replay).success());
+        const auto hashes = app::hash_chart_file(path);
+        REQUIRE(hashes.valid());
+        Access::queue_worker_record(service, path, hashes.sha256);
+        std::vector<app::SitesUploadMessage> messages;
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        do {
+            messages = service.take_messages();
+            if (!messages.empty()) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        } while (std::chrono::steady_clock::now() < deadline);
+        CHECK(messages.size() == 1);
+        if (!messages.empty()) CHECK(messages.front().text == "Sites upload skipped: guest or historical records remain local permanently.");
+        CHECK(transport.calls == 0);
+        service.set_online_enabled(false);
+        service.set_online_enabled(true);
+    }
+    service.shutdown();
+    Access::transport = nullptr;
+    std::filesystem::remove(path);
+}
+
+#ifdef _WIN32
+TEST_CASE("Ranked rejects guest and historical replay files before any HTTP request") {
+    SitesChartFixture fixture;
+    const auto path = fixture.directory / "replay.json";
+    auto replay = score_fixture();
+    replay.replay_format_version = 0;
+    app::RankedPlayAuthorization authorization{"synthetic-token", "synthetic-id", "synthetic-nonce", "fixture"};
+    for (const std::string origin : {"", "guest", "unknown"}) {
+        replay.record_play_mode = origin;
+        REQUIRE(gameplay::save_replay_json(path.u8string(), replay).success());
+        std::string receipt, error;
+        CHECK_FALSE(app::submit_ranked_replay("not-a-server", authorization, path, receipt, error));
+        CHECK(receipt.empty());
+        // This exact preflight failure precedes URL handling and credential use.
+        CHECK(error == "Ranked upload skipped: guest or historical records remain local permanently.");
+    }
+    std::filesystem::remove(path);
+}
+#endif
 
 TEST_CASE("Sites payload preserves all four native metrics without display rounding") {
     const auto replay = score_fixture();
@@ -533,6 +681,7 @@ TEST_CASE("Sites connection accepts only an HTTPS Site origin and header-safe up
 }
 TEST_CASE("Sites score payload omits private evidence and rejects assisted or noncanonical play") {
     gameplay::ReplayFile replay;
+    replay.record_play_mode = "online";
     replay.ruleset_id = std::string(app::kCanonicalReplayRulesetId);
     replay.chart_format = "bms";
     replay.bms_rank = 3;

@@ -210,6 +210,10 @@ namespace tenriff::render {
 // geometry resolver. Native dispatch is checked only while its own window has
 // foreground focus; no desktop pointer or keyboard is synthesized.
 struct MenuWindowVisualTestAccess {
+    static bool restored_background_ready(const MenuWindow& window, bool gameplay) {
+        return gameplay ? window.gameplay_background_cache_.base_is_upscaled
+                        : window.song_select_preview_cache_.is_upscaled;
+    }
     static bool owns_foreground(const MenuWindow& window) {
         return GetForegroundWindow() == static_cast<HWND>(window.hwnd_);
     }
@@ -647,7 +651,10 @@ int main(int argc, char** argv) {
     double preview_note_width = 1.0;
     double combo_font_scale = 1.0;
     double judgement_font_scale = 1.0;
-    std::string bga_path, bga_next_path, bga_overlay_path;
+    int bga_brightness_percent = 100;
+    int loading_fixture = 0;
+    int loading_percent = 42;
+    std::string bga_path, bga_next_path, bga_overlay_path, bga_upscale_model;
     bool opaque_field = false;
     double fixture_seconds = -1.0;
     bool fixture_idle = false;
@@ -691,6 +698,8 @@ int main(int argc, char** argv) {
     bool profile_settings = false;
     bool title = false;
     bool focus_options = false;
+    bool mode_selection = false;
+    bool mode_choice_online = false;
     bool sites_account = false;
     bool sites_connected = false;
     bool help_overlay = false;
@@ -714,6 +723,14 @@ int main(int argc, char** argv) {
     data.ui_language = tenriff::ui::Language::Korean;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
+        if (arg == "--language" && i + 1 < argc) { data.ui_language = tenriff::ui::language_from_token(argv[++i]); continue; }
+        if (arg == "--bga-brightness" && i + 1 < argc) { bga_brightness_percent = std::clamp(std::stoi(argv[++i]), 0, 100); continue; }
+        if (arg == "--play-mode") { mode_selection = true; sites_account = true; continue; }
+        if (arg == "--play-mode-online") { mode_selection = true; mode_choice_online = true; sites_account = true; continue; }
+        if (arg == "--bga-upscale-model" && i + 1 < argc) { bga_upscale_model = argv[++i]; continue; }
+        if (arg == "--loading-panel") { loading_fixture = 1; continue; }
+        if (arg == "--chart-loading-panel") { loading_fixture = 2; continue; }
+        if (arg == "--loading-percent" && i + 1 < argc) { loading_percent = std::clamp(std::stoi(argv[++i]), -1, 100); continue; }
         if (arg == "--chinese") {
             data.ui_language = tenriff::ui::Language::Chinese;
             continue;
@@ -962,6 +979,9 @@ int main(int argc, char** argv) {
     };
     const std::string preview_backend = loc("Input backend: ", "입력 백엔드: ") + "Preview";
     data.account_overlay.visible = sites_account;
+    data.account_overlay.mode_selection = mode_selection;
+    data.account_overlay.mode_choice_online = mode_choice_online;
+    data.account_overlay.online_mode = sites_connected;
     data.account_overlay.sites_mode = sites_account;
     data.account_overlay.sites_connected = sites_connected;
     data.account_overlay.sites_url = "https://tenriff-leaderboard.lastestarcorp.chatgpt.site";
@@ -1655,8 +1675,28 @@ int main(int argc, char** argv) {
         data.url_warning_overlay.visible = true;
         data.url_warning_overlay.url = "https://example.com/preview";
     }
+    data.gameplay.bga_brightness = bga_brightness_percent / 100.0f;
+    if (loading_fixture == 1) {
+        data.loading_progress.visible = true;
+        data.loading_progress.percent = loading_percent;
+        data.loading_progress.stage = loc("Importing LR2 skins", "LR2 스킨 가져오는 중");
+    } else if (loading_fixture == 2) {
+        data.kind = MenuScreenKind::GameplayHud;
+        data.gameplay.active = false;
+        data.gameplay.loading = true;
+        data.gameplay.loading_percent = loading_percent;
+        data.gameplay.loading_stage = loc("Loading profile", "프로필 불러오는 중");
+    }
     data.gameplay.background_base_path = bga_path;
     data.gameplay.background_overlay_path = bga_overlay_path;
+    if (!bga_path.empty()) data.song_select.selected_song_background_path = bga_path;
+    if (!bga_upscale_model.empty()) {
+        data.gameplay.background_upscale_mode = "onnx";
+        data.gameplay.background_upscale_model_path = bga_upscale_model;
+        data.song_select.selected_song_background_path = bga_path;
+        data.song_select.background_upscale_mode = "onnx";
+        data.song_select.background_upscale_model_path = bga_upscale_model;
+    }
     if (opaque_field) data.gameplay.black_playfield_enabled = true;
     // Keep the menu snapshot immutable across the actual gameplay draw path.
     // Only this tool switches snapshots: no MenuApp session or input is started.
@@ -2076,6 +2116,12 @@ int main(int argc, char** argv) {
             benchmark_successful_presents != benchmark_frames || window.had_fatal_error()) {
             window.shutdown(); return 6;
         }
+    }
+    if (!bga_upscale_model.empty()) {
+        const bool restored = MenuWindowVisualTestAccess::restored_background_ready(
+            window, data.kind == MenuScreenKind::GameplayHud);
+        std::cout << "Native x2 background uploaded: " << restored << '\n';
+        if (!restored) { window.shutdown(); return 7; }
     }
     window.shutdown();
 }

@@ -1,4 +1,12 @@
+**2026-10-16 · Current release 1.9.2:** Adds the startup F10 Guest/Online choice, permanent Guest/historical-record upload exclusion, dynamic original-resolution AI with FFmpeg deblock, and removal of the skin-export row. Runtime/source packages contain no BGA model; the model path is empty and upscaling OFF by default. The fixed baseline stays 1.9.0. [Changes and compatibility](docs/release-1.9.2.en.md) · [Verification gate](docs/release-1.9.2-gate.md). Dated entries below retain their historical scope; this 1.9.2 note defines current behavior.
+
+> 2026-10-16: [FFmpeg deblock and external ONNX x2](docs/deblock-lunasr-20261016.en.md)
+
+> 2026-10-16: [Restore BGA at its original resolution before fitting](docs/native-upscale-20261016.en.md)
+
 # TenRiff
+
+**2026-10-16 · 1.9.1.1 UI:** [Home, graphics, loading and fixed grades — 1.9.1.1 follow-up](docs/ui-feedback-20261016.en.md).
 
 **2026-10-15 · 1.9.1.1 online BMS follow-up:** Submit new BMS gauge/timing/RANDOM-branch records to the Sites community leaderboard, with rankings separated by policy and selected branch content. The updated client and corresponding web deployment are required; Sites records remain `client_submitted`, and the separate Ranked verifier gate stays in place. The 1.9.1 local-only note below describes that release; published files and the fixed 1.9.0 baseline are preserved. [Scope, compatibility and verification](docs/feedback-1.9.1.1.en.md).
 
@@ -60,13 +68,13 @@ This unreleased follow-up also shows difficulty-table loading status and changes
 
 **Multiplayer Rate build:** the leader sets a shared Room Rate in the lobby. All participants must use this protocol v6 build; previous v5 clients cannot join. [Guide (Korean)](docs/multiplayer.md).
 
-Publication status and downloads: [**1.9.1 release page**](https://github.com/10kseason/TenRiff/releases/tag/1.9.1). See the release page for current availability and the [verification gate](docs/release-1.9.1-gate.md). **New BMS gauge/branch records and existing timing-v2 records stay local until server support exists.** No web/API deployment is included.
+Publication status and downloads: [**1.9.2 release page**](https://github.com/10kseason/TenRiff/releases/tag/1.9.2). See the release page for availability and the [verification gate](docs/release-1.9.2-gate.md). Guest and unmarked historical records remain local; only fresh Online plays can submit under existing eligibility checks. No server/DB change is included.
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The fixed baseline is `1.9.0` and this source targets `1.9.1`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The fixed baseline is `1.9.0` and this source targets `1.9.2`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-This README explains what to read first when opening the project. For current behavior, the `1.9.1` release, the fixed `1.9.0` baseline, configuration and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
+This README explains what to read first when opening the project. For current behavior, the `1.9.2` release, the fixed `1.9.0` baseline, configuration and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
 
 TenRiff should also be read as a `vibe coding` work: it was shaped through fast iteration and experimentation rather than only through a traditional long-form design-first process.
 

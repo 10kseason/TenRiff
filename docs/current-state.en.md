@@ -1,4 +1,12 @@
+**2026-10-16 · Current release 1.9.2:** Adds the startup F10 Guest/Online choice, permanent Guest/historical-record upload exclusion, dynamic original-resolution AI with FFmpeg deblock, and removal of the skin-export row. Runtime/source packages contain no BGA model; the model path is empty and upscaling OFF by default. The fixed baseline stays 1.9.0. [Changes and compatibility](release-1.9.2.en.md) · [Verification gate](release-1.9.2-gate.md). Dated entries below retain their historical scope; this 1.9.2 note defines current behavior.
+
+> 2026-10-16: [FFmpeg deblock and external ONNX x2](deblock-lunasr-20261016.en.md)
+
+> 2026-10-16: [Restore BGA at its original resolution before fitting](native-upscale-20261016.en.md)
+
 # TenRiff Current State
+
+**2026-10-16 · 1.9.1.1 UI:** [Home, graphics, loading and fixed grades — 1.9.1.1 follow-up](ui-feedback-20261016.en.md).
 
 **2026-10-15 · 1.9.1.1 online BMS follow-up:** Submit new BMS gauge/timing/RANDOM-branch records to the Sites community leaderboard, with rankings separated by policy and selected branch content. The updated client and corresponding web deployment are required; Sites records remain `client_submitted`, and the separate Ranked verifier gate stays in place. The 1.9.1 local-only note below describes that release; published files and the fixed 1.9.0 baseline are preserved. [Scope, compatibility and verification](feedback-1.9.1.1.en.md).
 
@@ -69,14 +77,14 @@ The 1.9.0 release selects Normal / Hard / EX under `Options > Key Mode Settings 
 - 1.7.10 hardens ALL SONG against deleted cached entries and adds merge progress and consistent completion-state publication. [Verification and unreproduced symptom](release-1.7.10-gate.md).
 - 1.7.8 adds modern native menus, Luma Keys digital keyboard skins for every 4K–16K layout, Japanese UI, and web/offline skin editing. Menu and gameplay visual controls are stored separately in `native` and `gameplay.native`. [Validation](release-1.7.8-gate.md).
 
-The fixed baseline is **1.9.0**. This checkout is a **1.9.0.2 release candidate** based on published 1.9.0.1, with local checks passed; the linked release page determines publication status. Normal/Hard retain R5 and EX uses R6, preserving earlier records. See the [current changes](feedback-1.9.0.2.en.md). Dated entries below describe earlier releases.
+The fixed baseline is **1.9.0**. This checkout targets **1.9.2**, based on the user-selected 1.9.1.1 release. See [current changes](release-1.9.2.en.md) and the [verification gate](release-1.9.2-gate.md) for scope and publication boundaries. Normal/Hard retain R5 and EX retains R6; local history/replay playback is preserved. Dated entries below describe earlier releases.
 
 The 749/739 checks in the [local 1.7.1 r2 report](local-1.7.1-r2.ko.md) are historical, not the new release's results. See [library management](library-management.md), [reference BPM](reference-bpm.md), [skin presets](skin-presets.md) and [ASIO](asio-audio.md).
 
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- User-pinned baseline version: `1.9.0`; current source targets `1.9.0.2`
+- User-pinned baseline version: `1.9.0`; current source targets `1.9.2`
 - XInput digital buttons/triggers can be assigned in Keymap/Profile. A dedicated worker owns system queries; the existing InputThread drains its internal queue into the shared RawInput/Polling input queue. The worker lifetime follows input start/stop. Four-controller aggregation and disconnect/focus behavior follow the [1.9.0.1 notes](feedback-20261015.en.md). Physical-controller verification is separate from simulated input tests.
 - 1.7.1 provides full-room HUD/results for up to eight players, tied ranks/missing-score states, P-GREAT-only effects, independent judgement/combo placement, ten Options cards, audio normalization and the Song Select difficulty-table card. See [follow-up details](gameplay-polish-followup.md) and [verification](release-1.7.1-gate.md).
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
@@ -297,7 +305,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- This source uses P2P version `TenRiff 1.8.9`; see the [release record](release-1.8.9-gate.md) for compatibility checks and actual package/publication status
+- This source uses P2P version `TenRiff 1.9.2`; see the [release record](release-1.9.2-gate.md) for compatibility checks and actual package/publication status
 - Distribution packages do not include `Songs`
 - Distribution packages include the `Mainmusic/` scene slots `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed`; each `Name.mp3` plus numbered `Name 2.mp3` through `Name 64.mp3` siblings is discovered automatically and rotates on scene re-entry
 - Distribution updates include only built artifacts and required runtime assets

@@ -372,6 +372,9 @@ ExportResult save_replay_json(const std::string& path, const ReplayFile& replay,
     obj.emplace("chart_sha256", config::JsonValue{replay.chart_sha256});
     obj.emplace("ruleset_id", config::JsonValue{replay.ruleset_id});
     obj.emplace("created_utc", config::JsonValue{replay.created_utc});
+    if (!replay.record_play_mode.empty()) {
+        obj.emplace("record_play_mode", config::JsonValue{replay.record_play_mode});
+    }
     if (!replay.server_challenge_id.empty()) {
         obj.emplace("server_challenge_id", config::JsonValue{replay.server_challenge_id});
     }
@@ -439,6 +442,9 @@ ExportResult save_result_json(const std::string& path, const ResultFile& result_
     obj.emplace("chart_sha256", config::JsonValue{result_file.chart_sha256});
     obj.emplace("ruleset_id", config::JsonValue{result_file.ruleset_id});
     obj.emplace("created_utc", config::JsonValue{result_file.created_utc});
+    if (!result_file.record_play_mode.empty()) {
+        obj.emplace("record_play_mode", config::JsonValue{result_file.record_play_mode});
+    }
     obj.emplace("player_name", config::JsonValue{result_file.player_name});
     obj.emplace("replay_path", config::JsonValue{result_file.replay_path});
     obj.emplace("replay_sha256", config::JsonValue{result_file.replay_sha256});
@@ -515,6 +521,7 @@ ReplayLoadResult load_replay_json(const std::string& path) {
     replay.chart_sha256 = read_json_string(*root, "chart_sha256");
     replay.ruleset_id = read_json_string(*root, "ruleset_id");
     replay.created_utc = read_json_string(*root, "created_utc");
+    replay.record_play_mode = read_json_string(*root, "record_play_mode");
     replay.server_challenge_id = read_json_string(*root, "server_challenge_id");
     replay.server_challenge_nonce = read_json_string(*root, "server_challenge_nonce");
     replay.sample_rate = read_json_int(*root, "sample_rate", read_json_int(*trace, "sample_rate", 0));

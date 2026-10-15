@@ -301,6 +301,7 @@ private:
     void populate_multiplayer_chat_overlay(render::ChatOverlayData& target);
     [[nodiscard]] bool send_multiplayer_chat_input();
     [[nodiscard]] std::string now_playing_chat_message() const;
+    void choose_play_mode(bool online);
     void toggle_ranked_account_overlay();
     void set_ranked_account_overlay(bool visible);
     [[nodiscard]] bool handle_ranked_account_overlay_input(uint32_t keycode);
@@ -467,6 +468,19 @@ private:
                                        uint64_t* out_motion_revision = nullptr,
                                        uint64_t* out_text_revision = nullptr);
     void update_gameplay_loading_state(int percent, std::string_view stage);
+    // Main-thread owned. Snapshots let the existing render thread animate during
+    // synchronous imports, and nested scopes restore the surrounding operation.
+    render::LoadingProgressData menu_loading_;
+    class MenuLoadingScope {
+    public:
+        MenuLoadingScope(MenuApp& app, std::string stage);
+        ~MenuLoadingScope() noexcept;
+        MenuLoadingScope(const MenuLoadingScope&) = delete;
+        MenuLoadingScope& operator=(const MenuLoadingScope&) = delete;
+    private:
+        MenuApp& app_;
+        render::LoadingProgressData previous_;
+    };
     void refresh_available_lr2_skins();
     void refresh_available_tenriff_skins();
     [[nodiscard]] const TenRiffSkinDefinition* active_tenriff_skin_for_keys(int keys) const;
@@ -853,6 +867,10 @@ private:
     std::vector<GameplayChatControlAction> gameplay_chat_control_actions_{};
     std::atomic_bool gameplay_overlay_capture_active_{false};
     bool chat_overlay_visible_ = false;
+    bool online_play_mode_ = false;
+    bool account_mode_selection_ = false;
+    bool account_mode_choice_online_ = false;
+    std::shared_ptr<std::atomic_bool> active_recording_permission_{};
     bool ranked_account_overlay_visible_ = false;
     bool ranked_account_register_mode_ = false;
     bool ranked_account_sites_mode_ = true;

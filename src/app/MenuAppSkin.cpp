@@ -369,6 +369,7 @@ bool MenuApp::import_lr2_skin_path(std::string_view source_path) {
         return false;
     }
 
+    const MenuLoadingScope loading(*this, ui_text("Importing LR2 skins", "LR2 스킨 가져오는 중"));
     const fs::path import_root = lr2_skin_import_root_path(profile_dir_);
     const Lr2SkinImportResult imported =
         import_lr2_skin_tree(normalized_source, import_root.u8string());
@@ -401,6 +402,7 @@ bool MenuApp::import_lr2_skin_path(std::string_view source_path) {
 }
 
 bool MenuApp::import_tenriff_skin_path(std::string_view source_path) {
+    const MenuLoadingScope loading(*this, ui_text("Importing TenRiff skin", "텐리프 스킨 가져오는 중"));
     const TenRiffSkinImportResult imported = import_tenriff_skin(
         source_path, tenriff_skin_import_root_path(profile_dir_).u8string());
     for (const auto& warning : imported.warnings) {
@@ -598,21 +600,6 @@ void MenuApp::apply_skin_settings_effects(
                 } else {
                     skin_status_messages_ = {ui_text("Could not load this font. The previous font is kept.",
                         "폰트를 불러올 수 없습니다. 기존 폰트를 유지합니다.")};
-                }
-            }
-#endif
-            break;
-        case menu::settings::SkinBoundaryAction::ExportPreset:
-#ifdef _WIN32
-            {
-                const auto picked = choose_portable_file(true);
-                if (!picked.path.empty()) {
-                    const auto exported = export_skin_preset(picked.path, config_.skin, active_external_skin_root());
-                    skin_status_messages_ = {exported.success()
-                        ? ui_text("Saved portable preset: ", "프리셋 저장 완료: ") + exported.path
-                        : ui_text("Preset export failed: ", "프리셋 내보내기 실패: ") + exported.error};
-                } else if (!picked.cancelled) {
-                    skin_status_messages_ = {ui_text("Preset export failed: ", "프리셋 내보내기 실패: ") + picked.error};
                 }
             }
 #endif
@@ -1057,9 +1044,6 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::JudgementX), false, true);
     append_menu_row(render.generic, ui_text("Combo X", "콤보 X"), std::to_string(static_cast<int>(config_.skin.combo_offset_x)) + " px",
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::ComboX), false, true);
-    append_menu_row(render.generic, ui_text("Export Skin Preset", "스킨 프리셋 내보내기"), ".trskin", false,
-                    render::MenuHitTargetKind::SettingsRow,
-                    static_cast<int>(SkinSettingsRowId::ExportPreset), true, false);
     append_menu_row(render.generic, ui_text("Import Skin Preset", "스킨 프리셋 가져오기"), ".trskin", false,
                     render::MenuHitTargetKind::SettingsRow,
                     static_cast<int>(SkinSettingsRowId::ImportPreset), true, false);

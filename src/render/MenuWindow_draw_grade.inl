@@ -2,7 +2,7 @@
     // Rasterize two Gaussian bloom layers and the crisp glyph once per slot;
     // steady frames (including gameplay) never run a blur or rebuild a layout.
     auto grade_color = [](std::wstring_view grade) {
-        if (grade == L"S++" || grade == L"S+" || grade == L"SS" || grade == L"SSS" || grade == L"AA" || grade == L"AAA") return D2D1::ColorF(0xFFD66B);
+        if (grade == L"S+++" || grade == L"S++" || grade == L"S+" || grade == L"SS" || grade == L"SSS" || grade == L"AA" || grade == L"AAA") return D2D1::ColorF(0xFFD66B);
         if (grade == L"S") return D2D1::ColorF(0x70ECFF);
         if (grade == L"A+" || grade == L"A") return D2D1::ColorF(0x9DB3FF);
         if (grade == L"B+" || grade == L"B") return D2D1::ColorF(0x78E3A9);

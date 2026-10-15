@@ -1,0 +1,9 @@
+ffmpeg version 7.1 Copyright (c) 2000-2024 the FFmpeg developers
+built with gcc 15.1.0 (Rev5, Built by MSYS2 project)
+configuration: --prefix=/ffmpeg-runtime --target-os=mingw32 --arch=x86_64 --cc=gcc --cxx=g++ --ar=ar --ranlib=ranlib --strip=strip --disable-autodetect --disable-everything --disable-network --disable-gpl --disable-nonfree --disable-doc --disable-debug --disable-x86asm --disable-shared --enable-static --extra-ldflags=-static --disable-avdevice --disable-postproc --disable-programs --enable-ffmpeg --enable-decoder=rawvideo --enable-encoder=rawvideo --enable-demuxer=rawvideo --enable-muxer=rawvideo --enable-protocol=pipe --enable-filter='deblock,format,scale,buffer,buffersink'
+libavutil      59. 39.100 / 59. 39.100
+libavcodec     61. 19.100 / 61. 19.100
+libavformat    61.  7.100 / 61.  7.100
+libavfilter    10.  4.100 / 10.  4.100
+libswscale      8.  3.100 /  8.  3.100
+libswresample   5.  3.100 /  5.  3.100

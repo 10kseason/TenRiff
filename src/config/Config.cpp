@@ -656,6 +656,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.graphics.refresh_hz = static_cast<int>(fallback_refresh);
         config.graphics.performance_overlay =
             get_bool(*graphics, "performance_overlay", config.graphics.performance_overlay);
+        config.graphics.bga_brightness_percent = static_cast<int>(clamp_finite(
+            get_number(*graphics, "bga_brightness_percent", config.graphics.bga_brightness_percent), 0.0, 100.0, 100.0));
         config.graphics.bga_enabled =
             get_bool(*graphics, "bga_enabled", config.graphics.bga_enabled);
         config.graphics.background_upscale_mode = normalize_background_upscale_mode(
@@ -1195,6 +1197,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     graphics.emplace("vsync", JsonValue{config.graphics.vsync});
     graphics.emplace("refresh_hz", JsonValue{static_cast<double>(config.graphics.refresh_hz)});
     graphics.emplace("performance_overlay", JsonValue{config.graphics.performance_overlay});
+    graphics.emplace("bga_brightness_percent", JsonValue{static_cast<double>(std::clamp(config.graphics.bga_brightness_percent, 0, 100))});
     graphics.emplace("bga_enabled", JsonValue{config.graphics.bga_enabled});
     graphics.emplace("background_upscale_mode",
                      JsonValue{normalize_background_upscale_mode(

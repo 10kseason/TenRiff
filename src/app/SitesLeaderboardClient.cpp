@@ -119,6 +119,10 @@ bool build_sites_score_json(const gameplay::ReplayFile& replay,
     std::string_view chart_author, std::string_view bms_branch_sha256) {
     payload.clear();
     error.clear();
+    if (replay.record_play_mode != "online") {
+        error = "Sites upload skipped: guest or historical records remain local permanently.";
+        return false;
+    }
     if (!valid_bms_policy(replay, error)) return false;
     if ((replay.mode.bms_control_flow_version == 2 && !is_hash(bms_branch_sha256)) ||
         (replay.mode.bms_control_flow_version == 1 && !bms_branch_sha256.empty())) {
@@ -231,11 +235,19 @@ SitesLeaderboardService::~SitesLeaderboardService() { shutdown(); }
 
 SitesLeaderboardService::EnqueueResult SitesLeaderboardService::enqueue(std::filesystem::path replay_path, std::string replay_sha256,
                                       std::string chart_title, std::string clear_status, std::string chart_author) {
+    std::uint64_t generation = 0;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (!online_enabled_) return EnqueueResult::Disabled;
+        if (stopping_) return EnqueueResult::Unavailable;
+        generation = generation_;
+    }
     std::error_code ec;
     const bool protected_file = std::filesystem::is_regular_file("config/sites-leaderboard.dpapi", ec);
     ec.clear();
     if (!protected_file && !std::filesystem::is_regular_file("config/sites-leaderboard.json", ec)) return EnqueueResult::NotConnected;
     std::lock_guard<std::mutex> lock(mutex_);
+    if (!online_enabled_ || generation != generation_) return EnqueueResult::Disabled;
     if (stopping_) return EnqueueResult::Unavailable;
     if (pending_.size() >= 16) {
         messages_.push_back({std::move(replay_sha256), "Sites upload queue is full; this result remains saved locally."});
@@ -269,8 +281,6 @@ void SitesLeaderboardService::worker_main() {
             const auto replay_size = std::filesystem::file_size(pending.replay_path, ec);
             if (ec || replay_size > 32 * 1024 * 1024) {
                 message = "Sites upload skipped: replay evidence is missing or too large.";
-            } else if (!load_sites_leaderboard_connection("config", connection, missing, error) || missing) {
-                message = error.empty() ? "Sites connection is missing; result saved locally." : error;
             } else {
                 const auto hashes = hash_chart_file(pending.replay_path, &error);
                 const auto loaded = gameplay::load_replay_json(pending.replay_path.u8string());
@@ -278,18 +288,20 @@ void SitesLeaderboardService::worker_main() {
                     message = "Sites upload skipped: replay evidence no longer matches the result.";
                 } else if (!loaded.success()) {
                     message = "Sites upload skipped: " + loaded.error;
+                } else if (loaded.replay->record_play_mode != "online") {
+                    message = "Sites upload skipped: guest or historical records remain local permanently.";
                 } else if (!prepare_sites_bms_branch_identity(*loaded.replay, branch_sha256, error)) {
                     message = error;
                 } else if (!build_sites_score_json(*loaded.replay, pending.replay_sha256,
                            pending.chart_title, pending.clear_status, payload, error, pending.chart_author, branch_sha256)) {
                     message = error;
+                } else if (!load_sites_leaderboard_connection("config", connection, missing, error) || missing) {
+                    message = error.empty() ? "Sites connection is missing; result saved locally." : error;
                 } else {
                     bool accepted = false;
                     for (int attempt = 0; attempt < 3; ++attempt) {
-                        { std::lock_guard<std::mutex> lock(mutex_); if (stopping_ || generation != generation_) break; }
                         bool retryable = false;
-                        accepted = submit_sites_leaderboard_score(connection.site_url, connection.upload_token,
-                                                                  payload, retryable, error);
+                        accepted = submit_if_current(generation, connection, payload, retryable, error);
                         if (accepted || !retryable) break;
                         std::unique_lock<std::mutex> lock(mutex_);
                         wake_.wait_for(lock, std::chrono::seconds(attempt + 1), [this, generation] { return stopping_ || generation != generation_; });
@@ -311,6 +323,33 @@ void SitesLeaderboardService::worker_main() {
         }
     }
 }
+bool SitesLeaderboardService::submit_if_current(std::uint64_t generation,
+    const SitesLeaderboardConnection& connection, const std::string& payload,
+    bool& retryable, std::string& error) {
+    retryable = false;
+    std::lock_guard<std::mutex> submission_lock(submission_mutex_);
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (stopping_ || !online_enabled_ || generation != generation_) return false;
+    }
+    // Guest transition takes this same lock. Checking a generation then
+    // releasing every lock before HTTP would leave a check/send race.
+    return submit_score_ && submit_score_(connection.site_url, connection.upload_token,
+                                          payload, retryable, error);
+}
+void SitesLeaderboardService::set_online_enabled(bool enabled) {
+    {
+        std::lock_guard<std::mutex> submission_lock(submission_mutex_);
+        std::lock_guard<std::mutex> lock(mutex_);
+        online_enabled_ = enabled && !stopping_;
+        if (!online_enabled_) {
+            ++generation_;
+            pending_.clear();
+            messages_.clear();
+        }
+    }
+    wake_.notify_all();
+}
 std::vector<SitesUploadMessage> SitesLeaderboardService::take_messages() {
     std::lock_guard<std::mutex> lock(mutex_);
     std::vector<SitesUploadMessage> messages;
@@ -318,11 +357,14 @@ std::vector<SitesUploadMessage> SitesLeaderboardService::take_messages() {
     return messages;
 }
 void SitesLeaderboardService::cancel_pending() {
-    { std::lock_guard<std::mutex> lock(mutex_); ++generation_; pending_.clear(); messages_.clear(); }
+    { std::lock_guard<std::mutex> submission_lock(submission_mutex_);
+      std::lock_guard<std::mutex> lock(mutex_); ++generation_; pending_.clear(); messages_.clear(); }
     wake_.notify_all();
 }
 void SitesLeaderboardService::shutdown() {
-    { std::lock_guard<std::mutex> lock(mutex_); stopping_ = true; pending_.clear(); }
+    { std::lock_guard<std::mutex> submission_lock(submission_mutex_);
+      std::lock_guard<std::mutex> lock(mutex_); stopping_ = true; online_enabled_ = false;
+      ++generation_; pending_.clear(); }
     wake_.notify_all();
     if (worker_.joinable()) worker_.join();
 }

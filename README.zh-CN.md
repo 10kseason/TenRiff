@@ -1,4 +1,12 @@
+**2026-10-16 · 当前发行版1.9.2：** 加入启动F10访客/在线选择、访客及历史记录永久禁止上传、动态原始分辨率AI与FFmpeg去块，并移除皮肤导出行。运行包和源码包均不含BGA模型，路径默认为空、功能默认为OFF。固定基准仍为1.9.0。[变更与兼容性](docs/release-1.9.2.zh-CN.md) · [验证流程](docs/release-1.9.2-gate.md)。下方带日期条目保留当时历史，当前范围以本1.9.2说明为准。
+
+> 2026-10-16: [FFmpeg去块与外部ONNX x2](docs/deblock-lunasr-20261016.zh-CN.md)
+
+> 2026-10-16: [先以原始分辨率修复BGA，再适配显示区域](docs/native-upscale-20261016.zh-CN.md)
+
 # TenRiff
+
+**2026-10-16 · 1.9.1.1 UI:** [主页、图形、加载与固定评级 — 1.9.1.1后续候选版](docs/ui-feedback-20261016.zh-CN.md).
 
 **2026-10-15 · 1.9.1.1 BMS在线支持：** 将新BMS血条、时间计算及RANDOM分支记录提交到Sites社区排行榜，并按规则和选中的分支内容隔离排名。需要新版客户端及对应网页部署；Sites仍是`client_submitted`记录，独立Ranked验证服务器的限制保持不变。下方1.9.1仅限本地的说明保留该版本历史；保留已发布文件及固定基准1.9.0。 [范围、兼容性与验证](docs/feedback-1.9.1.1.zh-CN.md)。
 
@@ -60,13 +68,13 @@
 
 **多人Rate支持版本：**选曲者在大厅设置全员共用的Rate。所有玩家必须使用本protocol v6版本，不能与旧v5客户端连接。[指南](docs/multiplayer-rate-build.ko.md)（韩语）。
 
-发布状态与下载：[**1.9.1 发布页面**](https://github.com/10kseason/TenRiff/releases/tag/1.9.1)。公开状态以该页面为准，请参阅[验证流程](docs/release-1.9.1-gate.md)。**新BMS血条/分支记录及已有时序v2记录在服务器支持前仅存本地**，不包含网站/API部署。
+发布状态与下载：[**1.9.2 发布页面**](https://github.com/10kseason/TenRiff/releases/tag/1.9.2)。请参阅[验证流程](docs/release-1.9.2-gate.md)。访客及无来源标记的历史记录只留本地，仅在线模式下新开始的游戏按现有条件提交。不包含服务器或数据库修改。
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。固定基准为 `1.9.0`，此源码版本为 `1.9.1`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
+TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。固定基准为 `1.9.0`，此源码版本为 `1.9.2`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
 
-这份 README 是入门文档。关于当前行为、`1.9.1` 发行版和固定 `1.9.0` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
+这份 README 是入门文档。关于当前行为、`1.9.2` 发行版和固定 `1.9.0` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
 
 TenRiff 也明确属于一种 `vibe coding` 作品：它更多是在快速迭代和实验中成形，而不是只按照传统的长篇设计先行流程推进。
 

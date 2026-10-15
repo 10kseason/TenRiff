@@ -130,9 +130,6 @@ GraphicsSettingsViewModel GraphicsSettingsView::build(
         localized(language, "Refresh Hz", "주사율"), refresh_hz_label,
         controller, false, true));
     view.rows.push_back(make_row(
-        GraphicsSettingId::VSync, SettingsRowKind::Toggle, "VSync",
-        on_off(runtime.graphics.vsync, language), controller, false, true));
-    view.rows.push_back(make_row(
         GraphicsSettingId::PerformanceHud, SettingsRowKind::Toggle,
         localized(language, "Performance HUD", "성능 HUD"),
         on_off(runtime.graphics.performance_overlay, language),
@@ -141,6 +138,11 @@ GraphicsSettingsViewModel GraphicsSettingsView::build(
         GraphicsSettingId::Bga, SettingsRowKind::Toggle,
         localized(language, "BGA", "BGA 표시"),
         on_off(runtime.graphics.bga_enabled, language), controller, false, true));
+    view.rows.push_back(make_row(
+        GraphicsSettingId::BgaBrightness, SettingsRowKind::Choice,
+        localized(language, "BGA Brightness", "BGA 밝기"),
+        std::to_string(std::clamp(runtime.graphics.bga_brightness_percent, 0, 100)) + "%",
+        controller, false, true));
     view.rows.push_back(make_row(
         GraphicsSettingId::BgaBehindNotes, SettingsRowKind::Toggle,
         localized(language, "BGA Behind Notes", "기어 뒤 BGA"),
@@ -178,7 +180,6 @@ GraphicsSettingsViewModel GraphicsSettingsView::build(
                 row.category = localized(language, "Display", "화면");
                 break;
             case GraphicsSettingId::RefreshHz:
-            case GraphicsSettingId::VSync:
             case GraphicsSettingId::PerformanceHud:
                 row.category = localized(language, "Rendering", "렌더링");
                 break;
@@ -224,8 +225,8 @@ GraphicsSettingsViewModel GraphicsSettingsView::build(
         "BGA Behind Notes blocks bright backgrounds only under the playfield while keeping BGA visible outside it.",
         "기어 뒤 BGA를 가리면 바깥 BGA는 유지하면서 노트 영역 아래의 밝은 배경만 차단합니다."));
     view.notes.push_back(localized(language,
-        "Menu rendering stays capped at 300 FPS. Unlimited caps gameplay rendering at 1500 FPS when VSync is off.",
-        "메뉴 렌더링은 300 FPS로 유지됩니다. 무제한은 VSync가 꺼진 게임플레이 렌더링을 1500 FPS로 제한합니다."));
+        "Menu rendering stays capped at 300 FPS. Unlimited caps gameplay rendering at 1500 FPS with legacy synchronization off.",
+        "메뉴 렌더링은 300 FPS로 유지됩니다. 무제한은 기존 동기화가 꺼진 게임플레이 렌더링을 1500 FPS로 제한합니다."));
     view.notes.push_back(localized(language,
         "The ONNX upscaler has no automatic performance benchmark. It is intended for high-spec systems and may cause stutter or heavy accelerator load.",
         "ONNX 업스케일러는 자동 성능 벤치마크 없이 실행됩니다. 고사양 시스템용이며 끊김이나 높은 가속기 부하가 생길 수 있습니다."));
@@ -239,8 +240,8 @@ GraphicsSettingsViewModel GraphicsSettingsView::build(
         "Language and menu font size are in Profile Setup. Visual Latency is in Skin Settings.",
         "언어와 메뉴 글자 크기는 프로필 설정에, 비주얼 레이턴시는 스킨 설정에 있습니다."));
     view.notes.push_back(localized(language,
-        "Display, Resolution, Refresh Hz, and VSync apply immediately. Back saves and returns.",
-        "표시 모드, 해상도, 주사율, VSync는 즉시 적용됩니다. 뒤로 가면 저장 후 돌아갑니다."));
+        "Display, Resolution, and Refresh Hz apply immediately. Back saves and returns.",
+        "표시 모드, 해상도, 주사율은 즉시 적용됩니다. 뒤로 가면 저장 후 돌아갑니다."));
     return view;
 }
 

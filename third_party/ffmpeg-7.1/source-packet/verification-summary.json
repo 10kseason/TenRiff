@@ -1,0 +1,9 @@
+{
+  "source_archive_sha256": "40973d44970dbc83ef302b0609f2e74982be2d85916dd2ee7472d30678a7abe6",
+  "unmodified_source_files_checked": 8540,
+  "binary_bytes": 1762816,
+  "binary_sha256": "7b2989b3ad0fca77359e58e271b3ac52311b988e95d97fd8113dbf143bc334b1",
+  "pixel_reference_cases": 6,
+  "checked_channels": 11935048,
+  "reference_binary_sha256": "2ce797a0f88d7f067180338fb227f7b1928ea727bd9a4d7a1d022f7c52af71a3"
+}

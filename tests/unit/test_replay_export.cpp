@@ -83,6 +83,48 @@ void write_file(const std::filesystem::path& path, const std::string& content) {
 
 }  // namespace
 
+TEST_CASE("record play origin remains optional for local playback and roundtrips without promotion") {
+    const auto directory = std::filesystem::temp_directory_path() /
+        ("tenriff-record-origin-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(std::filesystem::create_directory(directory));
+    const auto replay_path = directory / "replay.json";
+    const auto result_path = directory / "result.json";
+    ReplayFile replay;
+    replay.replay_format_version = 0;
+    replay.chart_path = "fixture.bms";
+    replay.sample_rate = replay.trace.sample_rate = 1000;
+    replay.trace.lane_count = 1;
+    replay.trace.duration_samples = 10000;
+    ResultFile result;
+    result.chart_path = replay.chart_path;
+    for (const std::string origin : {"", "guest", "online", "unknown", "ONLINE"}) {
+        replay.record_play_mode = result.record_play_mode = origin;
+        REQUIRE(save_replay_json(replay_path.u8string(), replay).success());
+        REQUIRE(save_result_json(result_path.u8string(), result).success());
+        const auto loaded = load_replay_json(replay_path.u8string());
+        REQUIRE(loaded.success());
+        CHECK(loaded.replay->record_play_mode == origin);
+        for (const auto& path : {replay_path, result_path}) {
+            const auto parsed = parse_json(read_file(path));
+            REQUIRE(parsed.success());
+            const auto& object = *parsed.root->as_object();
+            CHECK(object.count("record_play_mode") == (origin.empty() ? 0u : 1u));
+            if (!origin.empty()) CHECK(object.at("record_play_mode").as_string() == origin);
+        }
+    }
+    // A malformed optional marker must not make an old replay unplayable or
+    // silently become an online origin through a truthy conversion.
+    for (const auto marker : {tenriff::config::JsonValue{true}, tenriff::config::JsonValue{1.0}}) {
+        auto root = *parse_json(read_file(replay_path)).root->as_object();
+        root["record_play_mode"] = marker;
+        write_file(replay_path, tenriff::config::json_stringify(tenriff::config::JsonValue{std::move(root)}));
+        const auto loaded = load_replay_json(replay_path.u8string());
+        REQUIRE(loaded.success());
+        CHECK(loaded.replay->record_play_mode.empty());
+    }
+    std::filesystem::remove_all(directory);
+}
+
 TEST_CASE("BMS gauge and control-flow metadata roundtrips legacy policies and full uint32 seeds") {
     const auto directory = std::filesystem::temp_directory_path() /
         ("tenriff-bms-policy-records-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
@@ -277,19 +319,19 @@ TEST_CASE("native rank thresholds match the TenRiff accuracy ladder") {
     };
 
     struct Boundary { double accuracy; const char* below; const char* at; };
-    for (const auto& boundary : std::array<Boundary, 7>{{
-             {80.0, "D", "C"}, {85.0, "C", "B"}, {90.0, "B", "A"},
-             {93.0, "A", "A+"}, {95.0, "A+", "S"}, {98.0, "S", "S+"}, {99.0, "S+", "S++"}}}) {
+    for (const auto& boundary : std::array<Boundary, 9>{{
+             {70.0, "E", "D"}, {80.0, "D", "C"}, {85.0, "C", "B"}, {90.0, "B", "A"},
+             {93.0, "A", "A+"}, {95.0, "A+", "S"}, {97.0, "S", "S+"}, {98.0, "S+", "S++"}, {99.0, "S++", "S+++"}}}) {
         // UI rounding must not promote a value just below a grade boundary.
         CHECK(rank_for(boundary.accuracy - 0.000001) == boundary.below);
         CHECK(rank_for(boundary.accuracy) == boundary.at);
         CHECK(rank_for(boundary.accuracy + 0.000001) == boundary.at);
     }
-    CHECK(rank_for(0.0) == "D");
+    CHECK(rank_for(0.0) == "E");
     CHECK(rank_for(74.999) == "D");
     CHECK(rank_for(75.0) == "D");
-    CHECK(rank_for(99.75) == "S++");
-    CHECK(rank_for(100.0) == "S++");
+    CHECK(rank_for(99.75) == "S+++");
+    CHECK(rank_for(100.0) == "S+++");
 }
 
 TEST_CASE("native rank separates survival failure abort and autoplay without changing scores") {
@@ -300,7 +342,7 @@ TEST_CASE("native rank separates survival failure abort and autoplay without cha
 
     stats.counts.pr = 10;
     stats.total_notes = 10;
-    CHECK(calculate_rank(stats, false) == "D");
+    CHECK(calculate_rank(stats, false) == "E");
     CHECK(calculate_rank(stats, true) == "F");
 
     stats.counts = {10, 0, 0, 0, 0};
@@ -337,7 +379,7 @@ TEST_CASE("native rank reclassifies legacy result statistics without rewriting s
     const auto parsed = tenriff::app::menu_records::parse_result_file(path, nullptr);
     REQUIRE(parsed.has_value());
     CHECK(parsed->stats.accuracy_percent() == doctest::Approx(99.0));
-    CHECK(calculate_rank(parsed->stats, parsed->game_over, parsed->clear_status, parsed->aborted) == "S++");
+    CHECK(calculate_rank(parsed->stats, parsed->game_over, parsed->clear_status, parsed->aborted) == "S+++");
     CHECK(read_file(path) == content);
     std::error_code ec;
     std::filesystem::remove(path, ec);
@@ -359,7 +401,7 @@ TEST_CASE("native rank reads current weighted accuracy and legacy explicit abort
     REQUIRE(parsed.has_value());
     CHECK(parsed->final_score == 10'000);
     CHECK(parsed->stats.detailed_accuracy_percent() == 100.0);
-    CHECK(calculate_rank(parsed->stats, parsed->game_over, parsed->clear_status, parsed->aborted) == "S+");
+    CHECK(calculate_rank(parsed->stats, parsed->game_over, parsed->clear_status, parsed->aborted) == "S++");
     CHECK(read_file(path) == content);
 
     const std::string aborted = R"JSON({

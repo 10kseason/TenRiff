@@ -1,4 +1,12 @@
+**2026-10-16 · 当前发行版1.9.2：** 加入启动F10访客/在线选择、访客及历史记录永久禁止上传、动态原始分辨率AI与FFmpeg去块，并移除皮肤导出行。运行包和源码包均不含BGA模型，路径默认为空、功能默认为OFF。固定基准仍为1.9.0。[变更与兼容性](release-1.9.2.zh-CN.md) · [验证流程](release-1.9.2-gate.md)。下方带日期条目保留当时历史，当前范围以本1.9.2说明为准。
+
+> 2026-10-16: [FFmpeg去块与外部ONNX x2](deblock-lunasr-20261016.zh-CN.md)
+
+> 2026-10-16: [先以原始分辨率修复BGA，再适配显示区域](native-upscale-20261016.zh-CN.md)
+
 # TenRiff 当前状态
+
+**2026-10-16 · 1.9.1.1 UI:** [主页、图形、加载与固定评级 — 1.9.1.1后续候选版](ui-feedback-20261016.zh-CN.md).
 
 **2026-10-15 · 1.9.1.1 BMS在线支持：** 将新BMS血条、时间计算及RANDOM分支记录提交到Sites社区排行榜，并按规则和选中的分支内容隔离排名。需要新版客户端及对应网页部署；Sites仍是`client_submitted`记录，独立Ranked验证服务器的限制保持不变。下方1.9.1仅限本地的说明保留该版本历史；保留已发布文件及固定基准1.9.0。 [范围、兼容性与验证](feedback-1.9.1.1.zh-CN.md)。
 
@@ -69,14 +77,14 @@
 - 1.7.10 改善 ALL SONG 的已删除缓存项处理、合并进度和完成状态通知。[验证及未复现症状](release-1.7.10-gate.md)。
 - 1.7.8 新增默认菜单动画、4 至 16 键 Luma Keys、日语界面及网页/离线皮肤编辑。菜单与游戏内视觉设置分别保存在 `native` 和 `gameplay.native`。[验证范围](release-1.7.8-gate.md)。
 
-固定基准为 **1.9.0**，本工作副本是基于已发布1.9.0.1的 **1.9.0.2发布候选版**，本地检查已通过；公开状态以链接中的发布页面为准。默认/Hard保留R5，EX使用R6，旧记录不变。参见[当前变更](feedback-1.9.0.2.zh-CN.md)。带日期条目为以往发布历史。
+固定基准为 **1.9.0**，本工作副本基于用户选定的1.9.1.1，目标版本为 **1.9.2**。范围与公开状态见[当前变更](release-1.9.2.zh-CN.md)及[验证流程](release-1.9.2-gate.md)。默认/Hard保留R5、EX保留R6，并保留本地历史与回放。带日期条目为以往版本历史。
 
 [本地 1.7.1 r2 报告](local-1.7.1-r2.ko.md)中的 749/739 项是旧构建的记录，不作为新版本的结果。参见[曲库管理](library-management.md)、[基准 BPM](reference-bpm.md)、[皮肤预设](skin-presets.md)和 [ASIO](asio-audio.md)。
 
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 用户固定基准为 `1.9.0`，当前源码版本为 `1.9.0.2`
+- 用户固定基准为 `1.9.0`，当前源码版本为 `1.9.2`
 - XInput数字按钮与扳机可在Keymap/个人档案中绑定。专用工作线程执行系统查询，现有InputThread读取内部队列并写入RawInput/Polling共用的输入队列。工作线程生命周期随输入启动和停止。4个手柄聚合、断开和焦点行为见[1.9.0.1说明](feedback-20261015.zh-CN.md)。实体手柄验证与模拟输入测试需分开说明。
 - 1.7.1 提供最多8人的 HUD 与结果、并列名次与分数等待状态、P-GREAT 专属效果、判定与连击独立位置、10张选项卡、音量标准化及选曲难度表卡片。见[变更详情](gameplay-polish-followup.md)和[验证范围](release-1.7.1-gate.md)。
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
@@ -297,7 +305,7 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 本源码的P2P版本为`TenRiff 1.8.9`；兼容性检查及实际软件包／公开状态以[发布记录](release-1.8.9-gate.md)为准
+- 本源码的P2P版本为`TenRiff 1.9.2`；兼容性检查及实际软件包／公开状态以[发布记录](release-1.9.2-gate.md)为准
 - 发布包不包含 `Songs`
 - 发布包包含 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 这些 `Mainmusic/` 场景槽位；每个 `Name.mp3` 及 `Name 2.mp3`～`Name 64.mp3` 会自动发现，并在重新进入场景时轮换
 - 发布更新只包含已构建产物和必要的运行时资源

@@ -3,7 +3,7 @@ param(
     [string]$BuildReleaseDirectory,
     [Parameter(Mandatory = $true)]
     [string]$OutputDirectory,
-    [string]$Version = "1.9.1.1",
+    [string]$Version = "1.9.2",
     [switch]$BinaryOnly
 )
 
@@ -80,8 +80,17 @@ foreach ($relative in $topFiles) {
     Copy-Item -LiteralPath (Join-Path $repoRoot $relative) -Destination $binaryRoot
 }
 
-foreach ($directory in @("Mainmusic", "config", "docs", "examples", "models", "skins")) {
+foreach ($directory in @("Mainmusic", "config", "docs", "examples", "skins")) {
     Copy-Item -LiteralPath (Join-Path $repoRoot $directory) -Destination $binaryRoot -Recurse
+}
+# BGA restoration weights are user-provided. Only versioned NK3 converter
+# assets belong in a release; ignored local models must never be swept up.
+$modelFiles = & git -C $repoRoot ls-files -- models
+if ($LASTEXITCODE -ne 0 -or -not $modelFiles) { throw "Could not enumerate NK3 assets." }
+foreach ($relative in $modelFiles) {
+    $destination = Join-Path $binaryRoot $relative
+    New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $repoRoot $relative) -Destination $destination
 }
 New-Item -ItemType Directory -Path (Join-Path $binaryRoot "assets") -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repoRoot "assets\menu") -Destination (Join-Path $binaryRoot "assets\menu") -Recurse
@@ -129,6 +138,11 @@ foreach ($runtime in $runtimeFiles) {
     }
     Copy-Item -LiteralPath $runtimePath -Destination $binaryRoot
 }
+$ffmpegRuntime = Join-Path $buildRoot "tools\ffmpeg-deblock"
+if (-not (Test-Path -LiteralPath (Join-Path $ffmpegRuntime "ffmpeg.exe") -PathType Leaf)) {
+    throw "Required FFmpeg deblock helper is missing. Rebuild the release target."
+}
+Copy-Item -LiteralPath $ffmpegRuntime -Destination (Join-Path $binaryRoot "tools\ffmpeg-deblock") -Recurse
 
 $archives = @($binaryZip)
 if (-not $BinaryOnly) {
@@ -152,6 +166,7 @@ if (-not $BinaryOnly) {
     $sourceExtras = @(
         "third_party\ncnn-20260526\x64\bin\ncnn.dll",
         "third_party\ncnn-20260526\x64\lib\ncnn.lib"
+        "third_party\ffmpeg-7.1\runtime\ffmpeg.exe"
     )
     foreach ($relative in $sourceExtras) {
         $sourcePath = Join-Path $repoRoot $relative
@@ -165,6 +180,25 @@ if (-not $BinaryOnly) {
         Copy-Item -LiteralPath $sourcePath -Destination $destination
     }
     $archives += $sourceZip
+}
+
+# Fail closed even if a user-selected BGA model was accidentally staged in Git.
+# Existing, separately shipped NK3 converter models retain their exact hashes.
+$allowedOnnx = @{}
+foreach ($line in Get-Content -LiteralPath (Join-Path $repoRoot "models\NK3-ONNX-SHA256SUMS.txt")) {
+    if ($line -match '^([A-Fa-f0-9]{64})\s+(NK3-[^\\/]+\.onnx)$') {
+        $allowedOnnx["models/$($Matches[2])"] = $Matches[1]
+    }
+}
+foreach ($deliveryRoot in @($binaryRoot, $sourceRoot)) {
+    if (-not (Test-Path -LiteralPath $deliveryRoot)) { continue }
+    foreach ($model in Get-ChildItem -LiteralPath $deliveryRoot -Recurse -File -Filter '*.onnx') {
+        $relative = [System.IO.Path]::GetRelativePath($deliveryRoot, $model.FullName).Replace('\', '/')
+        if (-not $allowedOnnx.ContainsKey($relative) -or
+            (Get-FileHash -LiteralPath $model.FullName -Algorithm SHA256).Hash -ne $allowedOnnx[$relative]) {
+            throw "Unapproved model in release: $relative"
+        }
+    }
 }
 
 Compress-Archive -LiteralPath $binaryRoot -DestinationPath $binaryZip -CompressionLevel Optimal

@@ -20,7 +20,8 @@
         }
 
         const float width = native_metric("account.width", 820.0f);
-        const float height = data.account_overlay.signed_in && !data.account_overlay.sites_mode ? 470.0f : 700.0f;
+        const float height = data.account_overlay.mode_selection ? 400.0f :
+            (data.account_overlay.signed_in && !data.account_overlay.sites_mode ? 470.0f : 700.0f);
         const float scale = 0.96f + 0.04f * eased;
         const float left = (kBaseWidth - width * scale) * 0.5f;
         const float top = (kBaseHeight - height * scale) * 0.5f;
@@ -53,13 +54,41 @@
         };
 
         if (d2d_->title_format && d2d_->text_brush) {
-            draw_text_clipped(to_wide(loc("TENRIFF ACCOUNT", "텐리프 계정")),
+            draw_text_clipped(to_wide(data.account_overlay.mode_selection
+                                  ? loc("PLAY MODE", "플레이 모드") : loc("TENRIFF ACCOUNT", "텐리프 계정")),
                               d2d_->title_format.Get(),
                               native_rect("account.rect.003", D2D1::RectF(modal.left + 38.0f, modal.top + 24.0f,
-                                          modal.right - 38.0f, modal.top + 72.0f)),
+                                          modal.right - 220.0f, modal.top + 72.0f)),
                               d2d_->text_brush.Get());
         }
 
+        if (data.account_overlay.mode_selection) {
+            const float middle = (modal.left + modal.right) * 0.5f;
+            account_button(D2D1::RectF(modal.left + 38.0f, modal.top + 100.0f, middle - 8.0f, modal.top + 170.0f),
+                loc("GUEST MODE", "게스트 모드"), !data.account_overlay.mode_choice_online,
+                MenuHitTargetKind::AccountPlayMode, 0);
+            account_button(D2D1::RectF(middle + 8.0f, modal.top + 100.0f, modal.right - 38.0f, modal.top + 170.0f),
+                loc("ONLINE MODE", "온라인 모드"), data.account_overlay.mode_choice_online,
+                MenuHitTargetKind::AccountPlayMode, 1);
+            if (d2d_->body_format && d2d_->text_brush) {
+                draw_text_clipped(to_wide(loc("Guest records stay local and are never uploaded later.",
+                    "게스트 기록은 로컬에만 저장하며 나중에도 업로드하지 않습니다.")),
+                    d2d_->body_format.Get(), D2D1::RectF(modal.left + 38.0f, modal.top + 198.0f,
+                        modal.right - 38.0f, modal.top + 250.0f), d2d_->text_brush.Get());
+                draw_text_clipped(to_wide(loc("Online mode uploads eligible new plays to the connected leaderboard.",
+                    "온라인 모드는 연결된 리더보드에 새 플레이 기록을 등록합니다.")),
+                    d2d_->body_format.Get(), D2D1::RectF(modal.left + 38.0f, modal.top + 258.0f,
+                        modal.right - 38.0f, modal.top + 310.0f), d2d_->text_brush.Get());
+            }
+            if (d2d_->hud_format && d2d_->muted_brush)
+                draw_text_clipped(to_wide(loc("Left / Right: select   Enter: confirm   F10 / ESC: close",
+                    "좌우: 선택   Enter: 확인   F10 / ESC: 닫기")), d2d_->hud_format.Get(),
+                    D2D1::RectF(modal.left + 38.0f, modal.bottom - 52.0f, modal.right - 38.0f, modal.bottom - 14.0f),
+                    d2d_->muted_brush.Get());
+            return;
+        }
+        account_button(D2D1::RectF(modal.right - 188.0f, modal.top + 24.0f, modal.right - 38.0f, modal.top + 72.0f),
+            loc("PLAY MODE", "플레이 모드"), false, MenuHitTargetKind::AccountPlayMode, 2);
         const float server_top = modal.top + 88.0f;
         const float server_button_width = (modal.right - modal.left - 96.0f) / 3.0f;
         for (int tab = 0; tab < 3; ++tab) {
@@ -78,7 +107,7 @@
                         native_rect("account.rect.005", D2D1::RectF(modal.left + 40.0f, modal.top + y, modal.right - 40.0f, modal.top + y + 40.0f)),
                         accent && d2d_->accent_brush ? d2d_->accent_brush.Get() : d2d_->text_brush.Get());
             };
-            sites_text(159.0f, data.account_overlay.sites_connected
+            sites_text(159.0f, !data.account_overlay.online_mode ? loc("GUEST MODE", "게스트 모드") : data.account_overlay.sites_connected
                 ? loc("AUTO UPLOAD: ON", "자동 업로드: 사용 중") : loc("NOT CONNECTED", "아직 연결되지 않음"), true);
             sites_text(204.0f, data.account_overlay.sites_url);
             sites_text(260.0f, loc("1. Sign in on the website and copy connection information.",
@@ -99,13 +128,16 @@
                 draw_text_clipped(to_wide(data.account_overlay.sites_status), d2d_->hud_format.Get(),
                     D2D1::RectF(modal.left + 40.0f, modal.top + 511.0f, modal.right - 40.0f, modal.top + 565.0f),
                     d2d_->text_brush.Get());
-            if (data.account_overlay.sites_connected)
-                account_button(native_rect("account.rect.009", D2D1::RectF(modal.left + 40.0f, modal.top + 569.0f, modal.right - 40.0f, modal.top + 619.0f)),
+            if (data.account_overlay.sites_connected) {
+                account_button(native_rect("account.rect.009", D2D1::RectF(modal.left + 40.0f, modal.top + 569.0f, middle - 5.0f, modal.top + 619.0f)),
                     loc("DISCONNECT THIS PC", "이 PC 연결 해제"), false,
                     MenuHitTargetKind::SitesLeaderboardAction, static_cast<int>(SitesLeaderboardAction::Disconnect));
+                account_button(D2D1::RectF(middle + 5.0f, modal.top + 569.0f, modal.right - 40.0f, modal.top + 619.0f),
+                    loc("CONTINUE", "계속"), true, MenuHitTargetKind::AccountPlayMode, 3);
+            }
             if (d2d_->hud_format && d2d_->muted_brush)
-                draw_text_clipped(to_wide(loc("Ctrl+Tab: switch account / web   Enter: import file   F10 / ESC: close",
-                    "Ctrl+Tab 계정 / 웹 전환   Enter 파일 불러오기   F10 / ESC 닫기")),
+                draw_text_clipped(to_wide(loc("Ctrl+Tab: account / web   Enter: continue or connect   F10 / ESC: close",
+                    "Ctrl+Tab 계정 / 웹 전환   Enter 계속 또는 연결   F10 / ESC 닫기")),
                     d2d_->hud_format.Get(), native_rect("account.rect.010", D2D1::RectF(modal.left + 40.0f, modal.bottom - 48.0f, modal.right - 40.0f, modal.bottom - 16.0f)),
                     d2d_->muted_brush.Get());
             return;

@@ -1,4 +1,12 @@
+**2026-10-16 · 現行リリース1.9.2:** 起動時F10のゲスト/オンライン選択、ゲスト・過去記録の送信禁止、動的原寸AIとFFmpegデブロック、スキン書き出し行の削除を含みます。実行・ソースパッケージにBGAモデルは含まず、パスは空、機能はOFFが初期値です。固定基準は1.9.0です。[変更と互換性](release-1.9.2.ja.md) · [検証手順](release-1.9.2-gate.md)。下の日付付き記録は当時の履歴であり、現在の範囲はこの1.9.2の案内に従います。
+
+> 2026-10-16: [FFmpegデブロックと外部ONNX x2](deblock-lunasr-20261016.ja.md)
+
+> 2026-10-16: [BGAを元の解像度で復元してから表示領域に合わせる](native-upscale-20261016.ja.md)
+
 # TenRiff Current State
+
+**2026-10-16 · 1.9.1.1 UI:** [ホーム・グラフィック・読み込み・固定等級 — 1.9.1.1後続候補](ui-feedback-20261016.ja.md).
 
 **2026-10-15 · 1.9.1.1 BMSオンライン対応:** 新しいBMSゲージ・タイミング・RANDOM分岐の記録をSitesコミュニティランキングへ送信し、規則と選択された分岐内容ごとに順位を分けます。新クライアントと対応するWeb配信が必要です。Sitesは引き続き`client_submitted`記録であり、別系統のRanked検証サーバーの制限は維持します。下の1.9.1のローカル専用表記は同版の履歴です。公開済みファイルと固定基準1.9.0を保持します。 [範囲・互換性・検証](feedback-1.9.1.1.ja.md)。
 
@@ -69,14 +77,14 @@
 - 1.7.10 は ALL SONG の削除済みキャッシュ項目、統合進捗、完了状態の通知を改善します。[検証と未再現の症状](release-1.7.10-gate.md)。
 - 1.7.8 は新しい標準メニュー、4〜16キー対応 Luma Keys、日本語 UI とウェブ/オフラインスキン編集を追加します。メニューとゲームプレイの設定は `native` と `gameplay.native` に分けます。[検証範囲](release-1.7.8-gate.md)。
 
-固定基準は **1.9.0**、この作業本は公開済み1.9.0.1に基づく **1.9.0.2リリース候補** で、ローカル検査は通過済みです。公開状況はリンク先のリリースページに従います。通常/HardはR5、EXはR6を使い、過去の記録を維持します。[今回の変更](feedback-1.9.0.2.ja.md)を参照してください。日付付きの項目は過去の公開版の履歴です。
+固定基準は **1.9.0**、この作業本はユーザー選択の1.9.1.1に基づく **1.9.2** です。[今回の変更](release-1.9.2.ja.md)と[検証手順](release-1.9.2-gate.md)で範囲・公開状況を確認してください。通常/HardはR5、EXはR6で、ローカル履歴・リプレイ再生を維持します。日付付きの項目は過去版の履歴です。
 
 [ローカル 1.7.1 r2 レポート](local-1.7.1-r2.ko.md)の 749/739 件は以前のビルドの記録です。新リリースの結果として再利用しません。[曲管理](library-management.md)、[基準 BPM](reference-bpm.md)、[スキンプリセット](skin-presets.md)、[ASIO](asio-audio.md)を参照してください。
 
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- ユーザー固定基準は `1.9.0`、現在のソースは `1.9.0.2`
+- ユーザー固定基準は `1.9.0`、現在のソースは `1.9.2`
 - XInputのデジタルボタン・トリガーはKeymap/プロフィールに割り当てます。専用ワーカーがシステム照会を行い、既存InputThreadが内部キューからRawInput/Polling共通の入力キューへ渡します。ワーカーの寿命は入力開始・終了に従います。4台の統合と切断・フォーカス動作は[1.9.0.1案内](feedback-20261015.ja.md)を参照。実機パッドと模擬入力の検証は区別します。
 - 1.7.1 は最大8人の HUD・結果、同点順位・スコア待機状態、P-GREAT 専用演出、判定・コンボの独立位置、10個の設定カード、音量ノーマライズ、選曲の難易度表カードを提供します。[変更詳細](gameplay-polish-followup.md)と[検証範囲](release-1.7.1-gate.md)を参照。
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
@@ -297,7 +305,7 @@
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- このソースのP2P版は`TenRiff 1.8.9`。[リリース記録](release-1.8.9-gate.md)で互換性検査と実際のパッケージ・公開状況を確認
+- このソースのP2P版は`TenRiff 1.9.2`。[リリース記録](release-1.9.2-gate.md)で互換性検査と実際のパッケージ・公開状況を確認
 - distribution package には `Songs` を含めない
 - distribution package には `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` の `Mainmusic/` scene slot を含め、各 `Name.mp3` と `Name 2.mp3`～`Name 64.mp3` を自動検出して scene 再入場ごとに循環する
 - distribution 更新には built artifact と必要な runtime asset だけを含める

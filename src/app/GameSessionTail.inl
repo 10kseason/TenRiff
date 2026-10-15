@@ -2502,6 +2502,12 @@ void GameSession::shutdown() {
                 std::cerr << "[warn] " << warning << std::endl;
             }
             replay.created_utc = created_utc;
+            // The copied session options cannot be promoted by a later F10
+            // mode change. This origin also survives exported-file retries.
+            const bool online_origin = options_.online_recording_enabled &&
+                (!options_.online_recording_permission ||
+                 options_.online_recording_permission->load(std::memory_order_acquire));
+            replay.record_play_mode = online_origin ? "online" : "guest";
             replay.sample_rate = sample_rate_;
             replay.rate = config_.speed.rate;
             replay.input_offset_ms = config_.input_offset_ms;
@@ -2569,6 +2575,7 @@ void GameSession::shutdown() {
             exported_result.chart_sha256 = replay.chart_sha256;
             exported_result.ruleset_id = replay.ruleset_id;
             exported_result.created_utc = created_utc;
+            exported_result.record_play_mode = replay.record_play_mode;
             exported_result.player_name = result_.player_name;
             exported_result.replay_path = result_.replay_path;
             exported_result.replay_sha256 = result_.replay_sha256;

@@ -11,12 +11,14 @@
 #include "render/RenderPacing.h"
 #include "render/RenderThread.h"
 #include "render/OnnxBackgroundUpscaler.h"
+#include "render/OnnxUpscaleImage.h"
 #include "render/MenuWindow.h"
 #include "render/SkinGameplayPreview.h"
 #include "timing/HighResClock.h"
 #include <cstdlib>
 #include <iostream>
 #include <numeric>
+#include <limits>
 
 TEST_CASE("feedback regression indicator backing visibility reaches fullscreen skin preview") {
     tenriff::render::SkinPreviewData preview;
@@ -492,17 +494,160 @@ TEST_CASE("skin preview long-note placement never reverses at extreme judgement 
 }
 
 }  // namespace
-TEST_CASE("external ONNX background policy only targets low-resolution images in ONNX mode") {
+TEST_CASE("external ONNX background policy restores original image sizes in ONNX mode") {
     using tenriff::render::OnnxBackgroundUpscaler;
 
     CHECK(OnnxBackgroundUpscaler::should_upscale(640, 480, "onnx"));
     CHECK(OnnxBackgroundUpscaler::should_upscale(1280, 720, "onnx"));
-    CHECK_FALSE(OnnxBackgroundUpscaler::should_upscale(1920, 1080, "onnx"));
+    CHECK(OnnxBackgroundUpscaler::should_upscale(1920, 1080, "onnx"));
+    CHECK(OnnxBackgroundUpscaler::should_upscale(3840, 2160, "onnx"));
+    CHECK_FALSE(OnnxBackgroundUpscaler::should_upscale(4097, 1080, "onnx"));
+    CHECK_FALSE(OnnxBackgroundUpscaler::should_upscale(640, 0, "onnx"));
     CHECK_FALSE(OnnxBackgroundUpscaler::should_upscale(1280, 720, "off"));
 
     // Asynchronous video results must not overwrite newer native frames.
     CHECK_FALSE(OnnxBackgroundUpscaler::should_upscale_realtime_video("onnx"));
     CHECK_FALSE(OnnxBackgroundUpscaler::should_upscale_realtime_video("off"));
+}
+
+TEST_CASE("ONNX shape contract accepts dynamic spatial RGB and rejects unsafe boundaries") {
+    using namespace tenriff::render::onnx_image;
+    CHECK(model_shape({1, 3, 540, 960}, {1, 3, 1080, 1920}) == ModelShape::Fixed);
+    CHECK(model_shape({1, 3, -1, -1}, {1, 3, -1, -1}) == ModelShape::Dynamic);
+    for (const auto& bad : std::vector<std::vector<std::int64_t>>{
+             {}, {3, -1, -1}, {2, 3, -1, -1}, {-1, 3, -1, -1}, {1, 4, -1, -1},
+             {1, -1, -1, -1}, {1, 3, 0, 0}, {1, 3, -1, 960}, {1, 3, 540, -1},
+             {1, 3, -2, -2}, {1, 3, 1080, 1920}}) {
+        CHECK(model_shape(bad, {1, 3, -1, -1}) == ModelShape::Unsupported);
+        CHECK(model_shape({1, 3, -1, -1}, bad) == ModelShape::Unsupported);
+    }
+    CHECK(model_shape({1, 3, 540, 960}, {1, 3, 540, 960}) == ModelShape::Unsupported);
+    CHECK(model_shape({1, 3, -1, -1}, {1, 3, 1080, 1920}) == ModelShape::Unsupported);
+    CHECK(valid_residual_shape({1, 3, 26, 38}, 19, 13));
+    CHECK(valid_residual_shape({1, 3, 8192, 8192}, 4096, 4096));
+    CHECK_FALSE(valid_residual_shape({1, 3, 13, 19}, 19, 13));
+    CHECK_FALSE(valid_residual_shape({1, 3, 38, 26}, 19, 13));
+    CHECK_FALSE(valid_residual_shape({1, 4, 26, 38}, 19, 13));
+    CHECK_FALSE(valid_residual_shape({1, 3, 26, 38, 1}, 19, 13));
+    CHECK_FALSE(valid_residual_shape({1, 3, 0, 38}, 19, 0));
+    CHECK_FALSE(valid_residual_shape({1, 3, 8194, 8194}, 4097, 4097));
+}
+
+TEST_CASE("dynamic ONNX composition preserves original coordinates without fixed-size padding") {
+    using namespace tenriff::render::onnx_image;
+    for (const auto size : {std::pair{19u, 13u}, {1003u, 7u}, {7u, 601u}}) {
+        const auto [width, height] = size;
+        const auto plane = std::size_t(width * 2) * height * 2;
+        std::vector<std::uint8_t> source(std::size_t(width) * height * 4, 0);
+        for (std::size_t i = 3; i < source.size(); i += 4) source[i] = 128;
+        std::vector<std::uint8_t> output(plane * 4, 19);
+        std::vector<float> residual(plane * 3);
+        for (std::uint32_t y = 0; y < height * 2; ++y) for (std::uint32_t x = 0; x < width * 2; ++x) {
+            const auto pixel = std::size_t(y) * width * 2 + x;
+            residual[pixel] = (x % 251) / 255.0f;
+            residual[plane + pixel] = (y % 251) / 255.0f;
+            residual[plane * 2 + pixel] = 0.25f;
+        }
+        const Tile full_image{0, 0, width, height, 0, 0};
+        REQUIRE(compose_tile(source, width, height, full_image, residual, output, width, height));
+        bool exact = true;
+        for (std::uint32_t y = 0; y < height * 2; ++y) for (std::uint32_t x = 0; x < width * 2; ++x) {
+            const auto pixel = (std::size_t(y) * width * 2 + x) * 4;
+            exact &= output[pixel] == 32 && output[pixel + 1] == std::lround((y % 251) * 128.0 / 255) &&
+                     output[pixel + 2] == std::lround((x % 251) * 128.0 / 255) && output[pixel + 3] == 128;
+        }
+        CHECK(exact);
+        residual[0] = std::numeric_limits<float>::quiet_NaN();
+        CHECK_FALSE(compose_tile(source, width, height, full_image, residual, output, width, height));
+        residual.clear();
+        CHECK_FALSE(compose_tile(source, width, height, full_image, residual, output, width, height));
+    }
+}
+
+TEST_CASE("native ONNX tiles retain every source pixel and only pad model input") {
+    using namespace tenriff::render::onnx_image;
+    for (const auto size : {std::pair{4u, 3u}, {640u, 480u}, {961u, 541u}, {1003u, 601u}}) {
+        const auto [width, height] = size;
+        std::vector<std::uint8_t> source(std::size_t(width) * height * 4);
+        for (std::uint32_t y = 0; y < height; ++y) {
+            for (std::uint32_t x = 0; x < width; ++x) {
+                const auto offset = (std::size_t(y) * width + x) * 4;
+                source[offset] = x % 251;
+                source[offset + 1] = y % 251;
+                source[offset + 2] = (x + y) % 251;
+                source[offset + 3] = 255;
+            }
+        }
+        std::vector<std::uint8_t> coverage(std::size_t(width) * height);
+        for (const auto& tile : plan_tiles(width, height)) {
+            const auto input = extract_tile(source, width, height, tile);
+            REQUIRE(input.size() == std::size_t(960) * 540 * 4);
+            bool exact = true;
+            for (std::uint32_t y = 0; y < tile.height; ++y) {
+                for (std::uint32_t x = 0; x < tile.width; ++x) {
+                    const auto pixel = std::size_t(tile.y + y) * width + tile.x + x;
+                    ++coverage[pixel];
+                    const auto from = (std::size_t(tile.y + y - tile.input_y) * 960 + tile.x + x - tile.input_x) * 4;
+                    exact &= std::equal(source.data() + pixel * 4, source.data() + pixel * 4 + 4, input.data() + from);
+                }
+            }
+            CHECK(exact);
+            // Model padding repeats the nearest edge instead of stretching content.
+            CHECK(input.front() == source[(std::size_t(std::max(0, tile.input_y)) * width + std::max(0, tile.input_x)) * 4]);
+        }
+        CHECK(std::all_of(coverage.begin(), coverage.end(), [](auto count) { return count == 1; }));
+    }
+    CHECK(plan_tiles(0, 8).empty());
+    CHECK(plan_tiles(4097, 1).empty());
+    CHECK_FALSE(plan_tiles(4096, 4096).empty());
+}
+
+TEST_CASE("native ONNX restoration composes residuals at original x2 coordinates across seams") {
+    using namespace tenriff::render::onnx_image;
+    constexpr std::uint32_t width = 1003, height = 601;
+    std::vector<std::uint8_t> source(std::size_t(width) * height * 4, 0);
+    for (std::size_t i = 3; i < source.size(); i += 4) source[i] = 255;
+    std::vector<std::uint8_t> output(std::size_t(width * 2) * (height * 2) * 4, 19);
+    constexpr std::size_t plane = std::size_t(1920) * 1080;
+    std::vector<float> residual(plane * 3);
+    for (const auto& tile : plan_tiles(width, height)) {
+        // A coordinate-dependent residual detects missing/duplicated pixels and
+        // model-padding offsets, independently of the RGB source image.
+        for (int y = 0; y < 1080; ++y) for (int x = 0; x < 1920; ++x) {
+            const auto pixel = std::size_t(y) * 1920 + x;
+            const int gx = std::max(0, tile.input_x * 2 + x);
+            const int gy = std::max(0, tile.input_y * 2 + y);
+            residual[pixel] = (gx % 251) / 255.0f;
+            residual[plane + pixel] = (gy % 251) / 255.0f;
+            residual[2 * plane + pixel] = 0.25f;
+        }
+        REQUIRE(compose_tile(source, width, height, tile, residual, output));
+    }
+    bool exact = true;
+    for (std::uint32_t y = 0; y < height * 2; ++y) for (std::uint32_t x = 0; x < width * 2; ++x) {
+        const auto p = (std::size_t(y) * width * 2 + x) * 4;
+        exact &= output[p] == 64 && output[p + 1] == y % 251 && output[p + 2] == x % 251 && output[p + 3] == 255;
+    }
+    CHECK(exact);
+}
+
+TEST_CASE("native ONNX composition preserves bilinear base alpha and rejects invalid residuals") {
+    using namespace tenriff::render::onnx_image;
+    const std::vector<std::uint8_t> source{0, 0, 0, 128, 200, 0, 0, 128};
+    const auto tile = plan_tiles(2, 1).front();
+    std::vector<float> residual(std::size_t(1920) * 1080 * 3, 0.0f);
+    std::vector<std::uint8_t> output(4 * 2 * 4);
+    REQUIRE(compose_tile(source, 2, 1, tile, residual, output));
+    CHECK(output[0] == 0);
+    CHECK(output[4] == 25);
+    CHECK(output[8] == 75);
+    CHECK(output[12] == 100);
+    CHECK(output[3] == 128);
+    CHECK(output[31] == 128);
+    residual[0] = std::numeric_limits<float>::quiet_NaN();
+    CHECK_FALSE(compose_tile(source, 2, 1, tile, residual, output));
+    residual.clear();
+    CHECK_FALSE(compose_tile(source, 2, 1, tile, residual, output));
 }
 
 TEST_CASE("gameplay BGA policy supports off and on transitions") {
