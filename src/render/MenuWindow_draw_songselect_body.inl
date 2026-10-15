@@ -14,6 +14,8 @@
         };
         const bool selected_aery_badge = data.song_select.difficulty_table_active &&
             data.song_select.selected_song_difficulty_is_aery_five_key;
+        const int selected_prefix_keys = data.song_select.difficulty_table_active
+            ? data.song_select.selected_song_difficulty_prefix_key_count : 0;
         const float selection_pulse = static_cast<float>(pulse_wave_01(render_now_ns, 4.2, 0.46));
         const std::size_t jacket_identity = std::hash<std::string>{}(data.song_select.selected_song_title) ^
             static_cast<std::size_t>(data.song_select.list_selected_index + 1);
@@ -448,7 +450,8 @@
                                    modern_library_screen ? semantic_color(0xF06B7B)
                                        : static_cast<ID2D1Brush*>(d2d_->text_brush.Get()),
                                    modern_library_screen && aery_badge,
-                                   DWRITE_TEXT_ALIGNMENT_TRAILING);
+                                   DWRITE_TEXT_ALIGNMENT_TRAILING,
+                                   data.song_select.difficulty_table_active ? song.difficulty_prefix_key_count : 0);
             }
             if (song.favorite && d2d_->hud_format && d2d_->accent_brush) {
                 draw_trailing_text(L"FAV", d2d_->hud_format.Get(),
@@ -911,7 +914,7 @@
                                 difficulty_card.bottom - 14.0f)),
                     modern_library_screen ? semantic_color(0xF06B7B) : d2d_->text_brush.Get(),
                     modern_library_screen && selected_aery_badge,
-                    DWRITE_TEXT_ALIGNMENT_CENTER);
+                    DWRITE_TEXT_ALIGNMENT_CENTER, selected_prefix_keys);
                 draw_centered_text(to_wide(data.song_select.selected_song_layout),
                                    d2d_->title_format.Get(),
                                    native_rect("songselect.rect.066", D2D1::RectF(difficulty_split + 12.0f,
@@ -999,7 +1002,7 @@
                         D2D1::RectF(cell.left, cell.top + 24.0f, cell.right, cell.bottom),
                         semantic_color(metadata_colors[i]),
                         i == 1 && selected_aery_badge,
-                        DWRITE_TEXT_ALIGNMENT_LEADING);
+                        DWRITE_TEXT_ALIGNMENT_LEADING, i == 1 ? selected_prefix_keys : 0);
                 } else {
                     draw_meta_pair(metadata_cells[i], metadata_values[i].first, metadata_values[i].second, i == 1);
                 }

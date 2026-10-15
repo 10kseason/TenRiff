@@ -7,6 +7,20 @@ This **1.9.0.2 release candidate** is based on published 1.9.0.1. The fixed base
 - Display Options in green.
 - Show green ⑤ only when the built-in 5K Aery difficulty table is selected. Default Lv and other tables omit ⑤; levels stay red and scores stay white. Original chart and difficulty-table data are preserved.
 
+### Registered difficulty-table symbol colors
+
+Apply the existing key-mode color to the full symbol only when the registered table URL, exact symbol and a nonempty level match. Numeric levels remain red. Revive10 uses `Ⓡ`, not the number `10`.
+
+| Table symbol | Key mode | Color |
+| --- | --- | --- |
+| `4UE` | 4K | `#FF9BC5` |
+| `6UE` | 6K | `#8FB8FF` |
+| `8UE` | 8K | `#FFD479` |
+| `Ⓡ` (Revive10) | 10K | `#63E9F2` |
+
+Keep the green ⑤ for 5K Aery and the existing 7K Aery, Stella and Satellite presentation. Default Lv and unrecognized custom tables do not receive this color mapping.
+
+
 ## Level search
 
 Use these expressions in the search box. Both `lv` and `to` are case-insensitive, and range endpoints are inclusive.
@@ -37,7 +51,7 @@ Saved volumes and existing output multipliers, including preview ×0.75, are ret
 
 ## Validation and compatibility
 
-These results describe the candidate before the final Aery ⑤ restoration. The development build and independently extracted source build each passed the Release build, CTest 3/3 (1,224 cases each, 0 integration skips), editor 35/35 and native MenuApp/GameSession 307/307. Native smoke includes 22 search key-handling checks. The earlier render passed six fixtures/360 Presents/86 geometry hit checks. Post-restoration build and Aery FHD/small-window, default Lv and custom-table display checks remain separate release gates.
+These results describe the candidate before the final Aery ⑤ restoration and registered-table symbol-color follow-up. The development build and independently extracted source build each passed the Release build, CTest 3/3 (1,224 cases each, 0 integration skips), editor 35/35 and native MenuApp/GameSession 307/307. Native smoke includes 22 search key-handling checks. The earlier render passed six fixtures/360 Presents/86 geometry hit checks. Final build and display checks for Aery ⑤ and 4UE/6UE/8UE/Ⓡ colors remain release gates, including Aery FHD/small-window captures, red numeric levels, and default Lv/other/custom-table exclusions.
 
 The initial build failed on unsupported test diagnostic CAPTURE; those diagnostic lines were removed. The first native search run missed the minus key SC_0C; a search-specific key-code comparison corrected it before the final passing checks above. Initial failure logs, original inputs and existing records are preserved.
 

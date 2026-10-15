@@ -7,6 +7,20 @@
 - 将Options显示为绿色。
 - 仅在选择内置5K Aery难度表时显示绿色⑤。默认Lv和其他表省略⑤；等级保持红色，分数保持白色。不修改原始谱面或难度表数据。
 
+### 已注册难度表的符号颜色
+
+仅在注册表URL、准确符号和非空等级匹配时，对整个符号应用现有键模式颜色。数字等级仍为红色。Revive10使用`Ⓡ`符号，而非数字`10`。
+
+| 表符号 | 键模式 | 颜色 |
+| --- | --- | --- |
+| `4UE` | 4K | `#FF9BC5` |
+| `6UE` | 6K | `#8FB8FF` |
+| `8UE` | 8K | `#FFD479` |
+| `Ⓡ` (Revive10) | 10K | `#63E9F2` |
+
+保留5K Aery的绿色⑤以及7K Aery、Stella和Satellite的既有显示。默认Lv和无法识别的自定义表不应用此配色。
+
+
 ## 等级搜索
 
 在搜索框中使用以下语法。`lv`和`to`均不区分大小写，范围包含两端。
@@ -37,7 +51,7 @@
 
 ## 验证与兼容范围
 
-以下结果对应最终恢复Aery ⑤之前的候选版。开发构建与ZIP解压源码的独立构建均通过Release构建、CTest 3/3（各1,224项，integration skips 0）、编辑器35/35及native MenuApp/GameSession 307/307。native检查含22项搜索按键处理检查。恢复前的渲染通过6个fixture/360 Presents/86 geometry hit checks。恢复后的构建及Aery FHD/小窗口、默认Lv、自定义表的显示检查作为独立发布验证项确认。
+以下结果对应最终恢复Aery ⑤及注册表符号配色补充之前的候选版。开发构建与ZIP解压源码的独立构建均通过Release构建、CTest 3/3（各1,224项，integration skips 0）、编辑器35/35及native MenuApp/GameSession 307/307。native检查含22项搜索按键处理检查。恢复前的渲染通过6个fixture/360 Presents/86 geometry hit checks。Aery ⑤及4UE/6UE/8UE/Ⓡ配色补充后的构建和显示检查仍是发布验证项，包括Aery FHD/小窗口、数字等级保持红色，以及默认Lv、其他表和自定义表的排除规则。
 
 首次构建因不支持的测试诊断CAPTURE而失败，随后移除了这些诊断行。首次native搜索检查遗漏了minus键SC_0C，使用搜索专用键码比较修正后，上述最终检查通过。保留初始失败日志、原始输入和现有记录。
 

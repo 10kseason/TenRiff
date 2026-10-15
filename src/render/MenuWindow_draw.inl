@@ -443,7 +443,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
                                          ID2D1Brush* brush,
                                          D2D1_DRAW_TEXT_OPTIONS options = D2D1_DRAW_TEXT_OPTIONS_NONE,
                                          bool contour = true,
-                                         ID2D1Brush* first_glyph_brush = nullptr) {
+                                         ID2D1Brush* first_glyph_brush = nullptr,
+                                         UINT32 prefix_length = 1) {
         if (!layout || !brush) return;
         auto* outline = d2d_->text_outline_brush.Get();
         if (outline && contour) {
@@ -462,9 +463,9 @@ void MenuWindow::draw(const MenuRenderData& data) {
         }
         // Effects apply only to the fill: outlines keep their existing contrast
         // color, and cached layouts must not leak a prefix tint to another row.
-        if (first_glyph_brush) layout->SetDrawingEffect(first_glyph_brush, DWRITE_TEXT_RANGE{0, 1});
+        if (first_glyph_brush) layout->SetDrawingEffect(first_glyph_brush, DWRITE_TEXT_RANGE{0, prefix_length});
         ctx->DrawTextLayout(origin, layout, brush, options);
-        if (first_glyph_brush) layout->SetDrawingEffect(nullptr, DWRITE_TEXT_RANGE{0, 1});
+        if (first_glyph_brush) layout->SetDrawingEffect(nullptr, DWRITE_TEXT_RANGE{0, prefix_length});
     };
     std::size_t menu_text_slot = 0;
     auto draw_text_exact = [&](const wchar_t* text, UINT32 length,
@@ -472,7 +473,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
                                ID2D1Brush* brush,
                                D2D1_DRAW_TEXT_OPTIONS options = D2D1_DRAW_TEXT_OPTIONS_NONE,
                                DWRITE_MEASURING_MODE = DWRITE_MEASURING_MODE_NATURAL,
-                               ID2D1Brush* first_glyph_brush = nullptr) {
+                               ID2D1Brush* first_glyph_brush = nullptr,
+                               UINT32 prefix_length = 1) {
         const float width = rect.right - rect.left, height = rect.bottom - rect.top;
         if (!text || !length || !format || !brush || width <= 0 || height <= 0) return;
         D2DResources::ReadableTextLayout transient;
@@ -505,14 +507,15 @@ void MenuWindow::draw(const MenuRenderData& data) {
             cached.line_spacing = line_spacing; cached.baseline = baseline;
         }
         draw_text_layout_readable(D2D1::Point2F(rect.left, rect.top), cached.layout.Get(), brush, options,
-                                  true, first_glyph_brush);
+                                  true, first_glyph_brush, prefix_length);
     };
 
     auto draw_text_clipped = [&](const std::wstring& text,
                                  IDWriteTextFormat* format,
                                  const D2D1_RECT_F& rect,
                                  ID2D1Brush* brush,
-                                 ID2D1Brush* first_glyph_brush = nullptr) {
+                                 ID2D1Brush* first_glyph_brush = nullptr,
+                                 UINT32 prefix_length = 1) {
         const float width = rect.right - rect.left;
         const float height = rect.bottom - rect.top;
         if (text.empty() || !format || !brush || width <= 0.0f || height <= 0.0f) {
@@ -527,7 +530,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
         if (text_scale >= 0.995f) {
             draw_text_exact(text.c_str(), static_cast<UINT32>(text.size()),
                           format, rect, brush, D2D1_DRAW_TEXT_OPTIONS_CLIP,
-                          DWRITE_MEASURING_MODE_NATURAL, first_glyph_brush);
+                          DWRITE_MEASURING_MODE_NATURAL, first_glyph_brush, prefix_length);
             return;
         }
 
@@ -543,7 +546,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
             rect.top + height / text_scale);
         draw_text_exact(text.c_str(), static_cast<UINT32>(text.size()),
                       format, expanded_rect, brush, D2D1_DRAW_TEXT_OPTIONS_CLIP,
-                      DWRITE_MEASURING_MODE_NATURAL, first_glyph_brush);
+                      DWRITE_MEASURING_MODE_NATURAL, first_glyph_brush, prefix_length);
         ctx->SetTransform(saved_transform);
     };
 
@@ -566,24 +569,28 @@ void MenuWindow::draw(const MenuRenderData& data) {
                                      const D2D1_RECT_F& rect,
                                      ID2D1Brush* base_brush,
                                      bool aery_five_key,
-                                     DWRITE_TEXT_ALIGNMENT alignment) {
+                                     DWRITE_TEXT_ALIGNMENT alignment,
+                                     int table_prefix_key_count = 0) {
         if (!format || !base_brush) return;
+        const auto prefix = difficulty_label_prefix(text, aery_five_key, table_prefix_key_count);
         ID2D1Brush* prefix_brush = nullptr;
-        if (aery_five_key && !text.empty() && text.front() == L'\u2464') {
+        if (prefix.length > 0) {
             // A separate brush is required: semantic_color/key_count_brush
             // share one mutable brush, which would recolor the whole label.
             if (!d2d_->difficulty_prefix_brush) {
-                ctx->CreateSolidColorBrush(D2D1::ColorF(key_count_color(5)),
+                ctx->CreateSolidColorBrush(D2D1::ColorF(key_count_color(prefix.key_count)),
                     d2d_->difficulty_prefix_brush.ReleaseAndGetAddressOf());
             }
             if (d2d_->difficulty_prefix_brush) {
+                // A list may mix modes; refresh the shared brush for every row.
+                d2d_->difficulty_prefix_brush->SetColor(D2D1::ColorF(key_count_color(prefix.key_count)));
                 d2d_->difficulty_prefix_brush->SetOpacity(base_brush->GetOpacity());
                 prefix_brush = d2d_->difficulty_prefix_brush.Get();
             }
         }
         const auto saved_alignment = format->GetTextAlignment();
         format->SetTextAlignment(alignment);
-        draw_text_clipped(text, format, rect, base_brush, prefix_brush);
+        draw_text_clipped(text, format, rect, base_brush, prefix_brush, prefix.length);
         format->SetTextAlignment(saved_alignment);
     };
 

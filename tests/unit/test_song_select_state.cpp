@@ -21,6 +21,7 @@ using tenriff::app::menu_song_select::count_song_membership_matches;
 using tenriff::app::menu_song_select::song_collection_membership_contains;
 using tenriff::app::menu_song_select::song_difficulty_label;
 using tenriff::app::menu_song_select::song_difficulty_is_aery_five_key;
+using tenriff::app::menu_song_select::song_difficulty_prefix_key_count;
 using tenriff::app::menu_song_select::song_entry_less_by_difficulty_asc;
 using tenriff::app::menu_song_select::song_entry_less_by_difficulty_desc;
 using tenriff::app::menu_song_select::song_entry_matches_level_filter;
@@ -329,6 +330,77 @@ TEST_CASE("only the built-in 5K Aery table opts into a mode-colored circled-five
     entry.difficulty_table_symbol = "⑤";
     entry.difficulty_table_level.clear();
     CHECK_FALSE(song_difficulty_is_aery_five_key(entry, aery_url));
+}
+
+TEST_CASE("registered difficulty table prefixes require the exact table and symbol") {
+    struct PrefixCase {
+        std::string_view url;
+        std::string_view symbol;
+        int prefix_key_count;
+    };
+    constexpr PrefixCase cases[]{
+        {"https://classmaterma.github.io/4UE/table.html", "4UE", 4},
+        {"https://classmaterma.github.io/UE/table.html", "6UE", 6},
+        {"https://classmaterma.github.io/8UE/table.html", "8UE", 8},
+        {"https://calc.10k-revive.cloud/table.html", "Ⓡ", 10},
+    };
+    for (const auto& expected : cases) {
+        SongEntry entry;
+        entry.difficulty_table_symbol = expected.symbol;
+        entry.difficulty_table_level = "13+";
+        for (const int chart_keys : {0, 4, 5, 6, 8, 10, 16}) {
+            entry.key_count = chart_keys;
+            CHECK(song_difficulty_prefix_key_count(entry, expected.url) == expected.prefix_key_count);
+        }
+        CHECK(song_difficulty_label(entry) == std::string(expected.symbol) + "13+");
+        for (const auto& other : cases) {
+            if (other.url != expected.url) {
+                CHECK(song_difficulty_prefix_key_count(entry, other.url) == 0);
+            }
+        }
+        CHECK(song_difficulty_prefix_key_count(entry, "") == 0);
+        CHECK(song_difficulty_prefix_key_count(entry, "https://example.com/custom/table.html") == 0);
+        CHECK(song_difficulty_prefix_key_count(entry, std::string(expected.url) + "?custom=1") == 0);
+        CHECK(song_difficulty_prefix_key_count(entry, "https://asumatoki.kr/table/aery/header.json") == 0);
+        entry.difficulty_table_symbol = std::string(expected.symbol) + "LEVEL";
+        CHECK(song_difficulty_prefix_key_count(entry, expected.url) == 0);
+        entry.difficulty_table_symbol = " " + std::string(expected.symbol);
+        CHECK(song_difficulty_prefix_key_count(entry, expected.url) == 0);
+        entry.difficulty_table_symbol.clear();
+        CHECK(song_difficulty_prefix_key_count(entry, expected.url) == 0);
+        entry.difficulty_table_symbol = expected.symbol;
+        entry.difficulty_table_level.clear();
+        CHECK(song_difficulty_prefix_key_count(entry, expected.url) == 0);
+    }
+}
+
+TEST_CASE("numeric chart and table difficulties cannot select a colored table prefix") {
+    constexpr std::string_view ue_url = "https://classmaterma.github.io/4UE/table.html";
+    SongEntry entry;
+    CHECK(song_difficulty_prefix_key_count(entry, "") == 0);
+    CHECK(song_difficulty_prefix_key_count(entry, ue_url) == 0);
+    for (const int level : {4, 6, 8, 10}) {
+        entry.level = level;
+        entry.key_count = level;
+        CHECK(song_difficulty_prefix_key_count(entry, ue_url) == 0);
+        entry.difficulty_table_level = std::to_string(level);
+        entry.difficulty_table_symbol = "LV ";
+        CHECK(song_difficulty_prefix_key_count(entry, ue_url) == 0);
+        entry.difficulty_table_symbol = std::to_string(level);
+        CHECK(song_difficulty_prefix_key_count(entry, ue_url) == 0);
+        entry.difficulty_table_symbol = "4UE";
+        CHECK(song_difficulty_prefix_key_count(entry, ue_url) == 4);
+        CHECK(song_difficulty_prefix_key_count(entry, "") == 0);
+        entry.difficulty_table_symbol.clear();
+        entry.difficulty_table_level.clear();
+    }
+
+    entry.key_count = 5;
+    entry.difficulty_table_symbol = "⑤";
+    entry.difficulty_table_level = "LEVEL 10";
+    constexpr std::string_view aery_url = "https://asumatoki.kr/table/aery/header.json";
+    CHECK(song_difficulty_is_aery_five_key(entry, aery_url));
+    CHECK(song_difficulty_prefix_key_count(entry, aery_url) == 0);
 }
 
 TEST_CASE("difficulty table levels without level_order use natural numeric ordering") {

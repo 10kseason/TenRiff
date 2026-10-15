@@ -27,6 +27,7 @@ std::string song_group_folder_key(const SongEntry& entry);
 std::string song_group_folder_label(const SongEntry& entry);
 std::string song_difficulty_label(const SongEntry& entry);
 bool song_difficulty_is_aery_five_key(const SongEntry& entry, std::string_view table_url);
+int song_difficulty_prefix_key_count(const SongEntry& entry, std::string_view table_url);
 std::string song_detail_label(const SongEntry& entry);
 std::string song_index_stage_label(SongIndexProgressStage stage, ui::Language language = ui::Language::English);
 std::string format_eta_seconds(int64_t seconds);

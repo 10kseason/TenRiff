@@ -574,6 +574,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 card.level_label = song_difficulty_label(*entry);
                 card.difficulty_is_aery_five_key =
                     song_difficulty_is_aery_five_key(*entry, config_.ui.difficulty_table_url);
+                card.difficulty_prefix_key_count =
+                    song_difficulty_prefix_key_count(*entry, config_.ui.difficulty_table_url);
                 card.level = entry->level;
                 card.rating = entry->rating;
                 card.song_index = i;
@@ -629,6 +631,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             render.song_select.selected_song_difficulty = safe_ui_text(song_difficulty_label(*entry));
             render.song_select.selected_song_difficulty_is_aery_five_key =
                 song_difficulty_is_aery_five_key(*entry, config_.ui.difficulty_table_url);
+            render.song_select.selected_song_difficulty_prefix_key_count =
+                song_difficulty_prefix_key_count(*entry, config_.ui.difficulty_table_url);
             render.song_select.selected_song_key_count = entry->key_count;
             render.song_select.selected_song_bpm = entry->bpm;
             render.song_select.selected_song_has_bpm_changes = entry->has_bpm_changes;

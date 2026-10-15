@@ -1,6 +1,6 @@
 TenRiff 1.9.0.2 source scope
 
-Release candidate: table-aware lv search, lobby colors, green ⑤ only for the selected built-in 5K Aery table (omitted under default Lv and other tables), 0ms debounce defaults and 1% audio controls. Only the version-specific release page determines publication status. See docs/release-1.9.0.2-gate.md for delivery verification requirements.
+Release candidate: table-aware lv search, lobby colors, green ⑤ only for the selected built-in 5K Aery table (omitted under default Lv and other tables), registered 4UE/6UE/8UE/Revive10 Ⓡ symbol colors, 0ms debounce defaults and 1% audio controls. Only the version-specific release page determines publication status. See docs/release-1.9.0.2-gate.md for delivery verification requirements.
 
 The fixed public baseline is the client-only 1.9.0 release, explicitly selected on 2026-10-14. Previous baseline documents, tags and published assets remain preserved history.
 This source adds preview attenuation, assignable Hi-Speed -10/+10, Xbox/XInput buttons, single owned file pickers and BMS BPM-before-STOP correction. Optional timing-version metadata preserves historical replays; affected new v2 records remain local until online support exists. Normal/Hard remain R5 and EX remains R6. Implementation, verification and publication boundaries are in docs/release-1.9.0.2-gate.md, docs/feedback-1.9.0.2.en.md and docs/baseline-1.9.0.en.md.

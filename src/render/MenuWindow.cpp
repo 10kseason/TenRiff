@@ -1,4 +1,5 @@
 #include "render/SettingsListLayout.h"
+#include "render/DifficultyLabel.h"
 #include "render/MenuWindow.h"
 #include "render/GameplaySpriteBatch.h"
 #include "config/BuiltinDifficultyTables.h"

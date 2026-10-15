@@ -8,6 +8,7 @@ Requested release line: **1.9.0.2**, 2026-10-15, based on published 1.9.0.1. The
 
 - Make the lobby Options icon, border and glow green while retaining its white text and existing icon alignment.
 - Show green ⑤ only when the built-in 5K Aery difficulty table is selected. Omit it under default Lv and other/custom tables; levels stay red and scores stay white. Preserve stored difficulty-table labels, original charts and record identities.
+- Color the complete registered symbols `4UE`, `6UE`, `8UE` and Revive10 `Ⓡ` with existing key-mode colors: 4K `#FF9BC5`, 6K `#8FB8FF`, 8K `#FFD479`, 10K `#63E9F2`. Eligibility requires the registered URL, exact table symbol and a nonempty level; numeric row levels remain red. Revive10 uses `Ⓡ`, not `10`. Preserve green Aery 5K ⑤ and the existing 7K Aery/Stella/Satellite presentation. Exclude default Lv and unrecognized custom symbols.
 - Add case-insensitive `lv:16to20`, `Lv:16`, `lv:19-` and `lv:18+` searches for inclusive range, exact level, maximum and minimum. Combine them with ordinary search terms and existing filters. Use the selected table's numeric level, or the chart/BMS level under default Lv; unranked/nonnumeric table entries do not fall back to native levels. Share the numeric filter's integer interpretation: `st18` and `18+` both mean level 18. Incomplete/malformed expressions remain literal search terms.
 - Accept shifted `:` and `+` and the minus key through the menu search input path without letting modifiers cancel editing or punctuation change gameplay speed. Stored key names and global keymap format remain unchanged.
 - Default new/missing debounce settings to 0ms. Preserve saved values and the historical 5ms-to-8ms migration independently of the new default.
@@ -17,7 +18,7 @@ Retain the [1.9.0.1 changes and compatibility policy](release-1.9.0.1-gate.md), 
 
 ## Recorded local evidence
 
-Before the final Aery ⑤ restoration, the development candidate and a fresh, independently extracted source build both passed:
+Before the final Aery ⑤ restoration and registered-table symbol-color follow-up, the development candidate and a fresh, independently extracted source build both passed:
 
 | Check | Development build | Independent extracted-source build |
 | --- | --- | --- |
@@ -26,9 +27,9 @@ Before the final Aery ⑤ restoration, the development candidate and a fresh, in
 | Skin editor | 35/35 | 35/35 |
 | Native MenuApp/GameSession | 307/307 | 307/307 |
 
-Native smoke includes 22 search key-handling checks through the actual MenuApp internal input path. It uses internal input dispatch, not physical OS key or controller input. Before that follow-up, six native render fixtures passed 360 Presents and 86 geometry hit checks. Those captures predate the Aery-specific restoration and do not establish its final behavior. Geometry checks do not establish OS click delivery; Presents do not establish pixel equality across all configurations.
+Native smoke includes 22 search key-handling checks through the actual MenuApp internal input path. It uses internal input dispatch, not physical OS key or controller input. Before that follow-up, six native render fixtures passed 360 Presents and 86 geometry hit checks. Those captures predate both display follow-ups and do not establish their final behavior. Geometry checks do not establish OS click delivery; Presents do not establish pixel equality across all configurations.
 
-Local package CRC, extracted-file hashes, source-file-set, clean-default-profile and defined privacy-pattern checks passed before publication preparation. Source comparison allowed CRLF/LF normalization; it was not a claim that every source file matched raw Git blob bytes. The independent build used the exact extracted ZIP bytes. Refresh the final source package after the Aery follow-up and documentation changes and record its final source correspondence and hashes separately.
+Local package CRC, extracted-file hashes, source-file-set, clean-default-profile and defined privacy-pattern checks passed before publication preparation. Source comparison allowed CRLF/LF normalization; it was not a claim that every source file matched raw Git blob bytes. The independent build used the exact extracted ZIP bytes. Refresh the final source package after the Aery/table-symbol follow-ups and documentation changes and record its final source correspondence and hashes separately.
 
 Complete logs and initial failures remain in local evidence outside the public source bundle. Local checks do not substitute for the remaining publication gates below.
 
@@ -40,7 +41,7 @@ Complete logs and initial failures remain in local evidence outside the public s
 
 ## Remaining publication gates
 
-- Final Release build and relevant regression checks after restoring Aery ⑤; native captures for built-in 5K Aery at FHD/small sizes, plus default Lv and custom tables to verify suppression elsewhere.
+- Final Release build and relevant regression checks after the Aery/table-symbol follow-ups; native captures for built-in 5K Aery at FHD/small sizes, all four registered symbol colors with red numeric levels, and default Lv/7K Aery/Stella/Satellite/custom-table exclusions. Keep the eight-table live header/data hashes and counts in separate local audit evidence; do not bundle full remote table data.
 - Final client/source ZIP CRC, exact extracted-file hashes, source-to-final-Git correspondence, safe defaults and privacy checks after publication preparation; retain independent-build source equivalence evidence.
 - Successful PR and post-merge main CI for ASan and OpenVINO, recorded against their exact revisions.
 - Fresh draft and anonymous public downloads of client ZIP, source ZIP and SHA256SUMS; compare hashes, sizes and CRC.

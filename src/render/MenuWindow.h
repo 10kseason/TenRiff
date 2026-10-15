@@ -159,6 +159,7 @@ struct SongCardData {
     std::string lamp;
     std::string level_label;
     bool difficulty_is_aery_five_key = false;
+    int difficulty_prefix_key_count = 0;
     int level = 0;
     double rating = 0.0;
     int song_index = -1;
@@ -200,6 +201,7 @@ struct SongSelectData {
     std::string selected_song_chart_name;
     std::string selected_song_difficulty;
     bool selected_song_difficulty_is_aery_five_key = false;
+    int selected_song_difficulty_prefix_key_count = 0;
     int selected_song_key_count = 0;
     double selected_song_bpm = 0.0;
     bool selected_song_has_bpm_changes = false;

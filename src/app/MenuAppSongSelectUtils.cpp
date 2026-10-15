@@ -298,6 +298,26 @@ bool song_difficulty_is_aery_five_key(const SongEntry& entry, std::string_view t
            entry.difficulty_table_symbol.rfind("⑤", 0) == 0;
 }
 
+int song_difficulty_prefix_key_count(const SongEntry& entry, std::string_view table_url) {
+    if (entry.difficulty_table_level.empty()) {
+        return 0;
+    }
+    // Color the registered table's exact prefix, independently of chart keys or level digits.
+    if (table_url == config::kBuiltinDifficultyTables[5].url && entry.difficulty_table_symbol == "4UE") {
+        return 4;
+    }
+    if (table_url == config::kBuiltinDifficultyTables[6].url && entry.difficulty_table_symbol == "6UE") {
+        return 6;
+    }
+    if (table_url == config::kBuiltinDifficultyTables[7].url && entry.difficulty_table_symbol == "8UE") {
+        return 8;
+    }
+    if (table_url == config::kBuiltinDifficultyTables[2].url && entry.difficulty_table_symbol == "Ⓡ") {
+        return 10;
+    }
+    return 0;
+}
+
 std::string song_index_stage_label(SongIndexProgressStage stage, ui::Language language) {
     switch (stage) {
     case SongIndexProgressStage::ScanningFiles:
