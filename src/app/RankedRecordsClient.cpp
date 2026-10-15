@@ -779,6 +779,10 @@ bool submit_ranked_replay(const std::string& base_url,
         error = "Ranked replay could not be parsed.";
         return false;
     }
+    if (replay.replay->record_play_mode != "online") {
+        error = "Ranked upload skipped: guest or historical records remain local permanently.";
+        return false;
+    }
     if (replay.replay->mode.bms_gauge_version != 1 ||
         replay.replay->mode.bms_control_flow_version != 1 || replay.replay->mode.bms_random_seed) {
         // The deployed verifier/boards have not negotiated these optional policies.
@@ -791,6 +795,16 @@ bool submit_ranked_replay(const std::string& base_url,
                  std::istreambuf_iterator<char>());
     if (input.bad() || bytes.size() != replay_size) {
         error = "Could not read the ranked replay file.";
+        return false;
+    }
+    // Check the bytes actually sent too: a file replaced between replay
+    // validation and this read must not smuggle a guest record into the POST.
+    const auto uploaded_json = config::parse_json(std::string(bytes.begin(), bytes.end()));
+    const auto* uploaded_root = uploaded_json.root ? uploaded_json.root->as_object() : nullptr;
+    const auto origin = uploaded_root ? uploaded_root->find("record_play_mode") : config::JsonObject::const_iterator{};
+    if (!uploaded_json.success() || !uploaded_root || origin == uploaded_root->end() ||
+        !origin->second.is_string() || origin->second.as_string() != "online") {
+        error = "Ranked upload skipped: guest or historical records remain local permanently.";
         return false;
     }
     const std::string body =

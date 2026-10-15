@@ -107,6 +107,59 @@ namespace tenriff::app {
 // These existing test friends are defined only in this executable. Menu actions
 // run on their owner thread; the observer reads only mutex-protected HUD data.
 struct MenuAppVisualTestAccess {
+    static bool online_mode(MenuApp& app) { return app.online_play_mode_; }
+    static void check_play_mode(MenuApp& app, Report& report) {
+        report.check("playmode.startup_guest_selector", app.ranked_account_overlay_visible_ &&
+            app.account_mode_selection_ && !app.online_play_mode_);
+        key(app, "Enter");
+        report.check("playmode.guest_enter_closes", !app.ranked_account_overlay_visible_ && !app.online_play_mode_);
+        key(app, "F10"); key(app, "Right"); key(app, "Enter");
+        report.check("playmode.online_opens_connection", app.online_play_mode_ &&
+            app.ranked_account_overlay_visible_ && !app.account_mode_selection_ && app.ranked_account_sites_mode_);
+        app.active_recording_permission_ = std::make_shared<std::atomic_bool>(true);
+        app.handle_menu_click({Kind::AccountPlayMode, 2, Part::Activate});
+        app.handle_menu_click({Kind::AccountPlayMode, 0, Part::Activate});
+        report.check("playmode.guest_revokes_active_play", !app.online_play_mode_ &&
+            !app.ranked_account_overlay_visible_ && !app.active_recording_permission_->load());
+        key(app, "F10");
+        app.handle_menu_click({Kind::AccountPlayMode, 1, Part::Activate});
+        report.check("playmode.online_never_promotes_guest_record", app.online_play_mode_ &&
+            !app.active_recording_permission_->load());
+        app.choose_play_mode(false);
+        app.active_recording_permission_.reset();
+    }
+
+    static void check_import_loading(MenuApp& app, Report& report) {
+        const auto original = app.config_;
+        const auto visible = [&]() {
+            std::lock_guard<std::mutex> lock(app.snapshot_mutex_);
+            return app.snapshot_.render.loading_progress.visible;
+        };
+        {
+            MenuApp::MenuLoadingScope loading(app, "Importing LR2 skins");
+            report.check("loading.snapshot_visible", visible());
+            std::string detail;
+            report.check("loading.renderer_remains_live", present(app, detail), detail);
+            try {
+                MenuApp::MenuLoadingScope nested(app, "Nested fixture");
+                throw std::runtime_error("fixture");
+            } catch (const std::runtime_error&) {}
+            report.check("loading.exception_restores_outer", visible() && app.menu_loading_.stage == "Importing LR2 skins");
+        }
+        report.check("loading.completion_clears_snapshot", !visible());
+        report.check("loading.failed_import_clears_snapshot",
+            !app.import_lr2_skin_path("missing-lr2-fixture") && !visible());
+        const std::filesystem::path skin = "import-fixture/LR2";
+        std::filesystem::create_directories(skin);
+        const std::string content = "#INFORMATION,0,Loading fixture,Tester\n";
+        { std::ofstream file(skin / "play.lr2skin"); file << content; }
+        report.check("loading.successful_import_clears_snapshot",
+            app.import_lr2_skin_path(std::filesystem::absolute(skin).u8string()) && !visible());
+        app.config_ = original;
+        app.refresh_available_lr2_skins();
+        app.persist_runtime_config();
+        app.publish_snapshot();
+    }
     static void check_home_navigation(MenuApp& app, Report& report) {
         const int saved_cursor = app.title_cursor_;
         app.title_cursor_ = 0;
@@ -828,7 +881,9 @@ struct MenuAppVisualTestAccess {
                             const auto& table = app.snapshot_.render.song_select;
                             published = table.difficulty_table_name == app.ui_text("Loading...", "로딩 중") &&
                                 table.difficulty_table_status == app.ui_text("Loading...", "로딩 중") &&
-                                table.difficulty_table_editing == editor;
+                                table.difficulty_table_editing == editor &&
+                                app.snapshot_.render.loading_progress.visible &&
+                                app.snapshot_.render.loading_progress.percent == -1;
                         }
                         report.check(prefix + ".published_before_fetch", published);
                         const auto before = present_probe.table_loading_presents.load(std::memory_order_acquire);
@@ -1094,7 +1149,7 @@ struct MenuAppVisualTestAccess {
         for (std::size_t i = 0; i < skin_view.generic.rows.size(); ++i) {
             const auto id = static_cast<SkinSettingsRowId>(skin_view.generic.rows[i].row_index);
             removed = removed && id != SkinSettingsRowId::TargetGap && id != SkinSettingsRowId::VisualPreset &&
-                id != SkinSettingsRowId::IndicatorBackground;
+                id != SkinSettingsRowId::IndicatorBackground && id != SkinSettingsRowId::ExportPreset;
             if (id == SkinSettingsRowId::TargetLane && i + 1 < skin_view.generic.rows.size())
                 adjacent = skin_view.generic.rows[i + 1].row_index == static_cast<int>(SkinSettingsRowId::LaneColor);
         }
@@ -1324,6 +1379,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
     if (!indexed) throw std::runtime_error("Synthetic library did not index");
     Access::check_home_navigation(app, report);
     Access::check_home_language_cycle(app, report);
+    Access::check_import_loading(app, report);
 
     Access::click(app, Kind::TitleButton, 2);
     expect_screen(app, report, "options", Screen::OptionsHub);
@@ -1606,6 +1662,8 @@ void separate_restart_flow(tenriff::app::CommandLineOptions options, Report& rep
 }
 void separate_judge_flow(tenriff::app::CommandLineOptions options, Report& report) {
     using namespace tenriff;
+    // This fixture builds an eligible payload locally; it never sends HTTP.
+    options.online_recording_enabled = true;
     using Session = app::GameSession;
     using SessionAccess = app::MenuAppFeedbackTestAccess;
     std::filesystem::create_directories("judge-fixture");
@@ -1970,6 +2028,7 @@ int wmain(int argc, wchar_t** argv) {
             try {
                 if (initialized) {
                     Access::attach_present_probe(*app);
+                    Access::check_play_mode(*app, report);
                     menu_flow(*app, report);
                 }
             } catch (const std::exception& exception) {
@@ -1987,6 +2046,7 @@ int wmain(int argc, wchar_t** argv) {
                 Access::config(*restarted).graphics.resolution == "1439x809" &&
                 Access::config(*restarted).graphics.display_mode == "windowed");
             if (initialized) {
+                report.check("playmode.restart_defaults_guest", !Access::online_mode(*restarted));
                 Access::isolate(*restarted);
                 Access::attach_present_probe(*restarted);
                 std::string detail;

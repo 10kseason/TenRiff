@@ -1,4 +1,12 @@
+**2026-10-16 · 현재 릴리스 1.9.2:** 시작 F10 게스트/온라인 선택, 게스트·과거 기록 업로드 차단, 동적 원본 해상도 AI 처리와 FFmpeg 디블록, 스킨 내보내기 행 제거를 포함합니다. BGA 모델은 실행·소스 패키지에 넣지 않으며 경로는 빈 값, 기능은 OFF가 기본입니다. 고정 기준은 1.9.0입니다. [변경·호환성](docs/release-1.9.2.ko.md) · [검증 절차](docs/release-1.9.2-gate.md). 아래 날짜별 항목은 당시 이력이며 현재 범위는 이 1.9.2 안내를 따릅니다.
+
+> 2026-10-16: [FFmpeg 디블록과 외부 ONNX x2](docs/deblock-lunasr-20261016.ko.md)
+
+> 2026-10-16: [원본 해상도에서 먼저 복원하는 BGA 업스케일](docs/native-upscale-20261016.ko.md)
+
 # TenRiff
+
+**2026-10-16 · 1.9.1.1 UI:** [홈·그래픽·로딩 및 고정 등급 — 1.9.1.1 후속 후보](docs/ui-feedback-20261016.ko.md).
 
 **2026-10-15 · 1.9.1.1 BMS 온라인 후속 버전:** 새 BMS 게이지·타이밍·RANDOM 분기 기록을 Sites 커뮤니티 리더보드에 제출하고, 규칙과 실제 분기 내용별로 순위를 분리합니다. 새 클라이언트와 대응 웹 배포가 필요하며, Sites는 계속 `client_submitted` 기록입니다. 별도 Ranked 검증 서버의 차단은 유지합니다. 아래 1.9.1의 로컬 전용 안내는 그 버전의 이력이며 기존 공개 파일과 고정 기준 1.9.0은 보존합니다. [범위·호환성·검증](docs/feedback-1.9.1.1.ko.md).
 
@@ -61,13 +69,13 @@
 
 **멀티 Rate 지원 빌드:** 로비 `대전 Rate`에서 리더가 공통 배속을 설정합니다. 참가자 모두 이 protocol v6 빌드를 사용해야 합니다. [사용 방법과 호환성](docs/multiplayer-rate-build.ko.md).
 
-공개 여부·다운로드: [**1.9.1 릴리스 페이지**](https://github.com/10kseason/TenRiff/releases/tag/1.9.1). 공개 상태와 파일은 해당 페이지를 기준으로 확인합니다. [검증 절차](docs/release-1.9.1-gate.md)를 확인하세요. **새 BMS 게이지·분기 기록과 기존 타이밍 v2 기록은 서버 지원 전까지 로컬 전용**이며 웹/API 배포는 포함하지 않습니다.
+공개 여부·다운로드: [**1.9.2 릴리스 페이지**](https://github.com/10kseason/TenRiff/releases/tag/1.9.2). 공개 상태와 파일은 해당 페이지를 기준으로 확인합니다. [검증 절차](docs/release-1.9.2-gate.md)를 확인하세요. 게스트·출처 없는 과거 기록은 로컬 전용이며, 온라인에서 새로 시작한 플레이만 기존 지원 조건에 따라 제출합니다. 서버·DB 변경은 포함하지 않습니다.
 
 Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff는 Windows GUI 기반 BMS 리듬게임 런타임/런처 프로젝트입니다. 고정 기준은 `1.9.0`, 이 소스의 버전은 `1.9.1`이며, 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용입니다. Graphics Settings에서 권리 정리된 외부 ONNX 모델을 선택해 BGA/BGI 확대에 사용할 수 있습니다. 공개 패키지에는 BGA 업스케일러 모델을 넣지 않으며, 키 모드 변환용 NK3 P64 결정 모델과 일반화 패턴 MLP만 포함합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
+TenRiff는 Windows GUI 기반 BMS 리듬게임 런타임/런처 프로젝트입니다. 고정 기준은 `1.9.0`, 이 소스의 버전은 `1.9.2`이며, 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용입니다. Graphics Settings에서 권리 정리된 외부 ONNX 모델을 선택해 BGA/BGI 확대에 사용할 수 있습니다. 공개 패키지에는 BGA 업스케일러 모델을 넣지 않으며, 키 모드 변환용 NK3 P64 결정 모델과 일반화 패턴 MLP만 포함합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
 
-이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, `1.9.1` 릴리스와 고정 `1.9.0` 기준, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽으세요.
+이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, `1.9.2` 릴리스와 고정 `1.9.0` 기준, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽으세요.
 
 TenRiff 코드는 전통적인 장기 설계 문서 중심 개발만으로 쌓인 프로젝트가 아니라, 빠른 반복과 실험을 중시한 `vibe coding` 성격이 강한 작품이라는 점을 명시합니다.
 

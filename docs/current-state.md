@@ -1,4 +1,12 @@
+**2026-10-16 · 현재 릴리스 1.9.2:** 시작 F10 게스트/온라인 선택, 게스트·과거 기록 업로드 차단, 동적 원본 해상도 AI 처리와 FFmpeg 디블록, 스킨 내보내기 행 제거를 포함합니다. BGA 모델은 실행·소스 패키지에 넣지 않으며 경로는 빈 값, 기능은 OFF가 기본입니다. 고정 기준은 1.9.0입니다. [변경·호환성](release-1.9.2.ko.md) · [검증 절차](release-1.9.2-gate.md). 아래 날짜별 항목은 당시 이력이며 현재 범위는 이 1.9.2 안내를 따릅니다.
+
+> 2026-10-16: [FFmpeg 디블록과 외부 ONNX x2](deblock-lunasr-20261016.ko.md)
+
+> 2026-10-16: [원본 해상도에서 먼저 복원하는 BGA 업스케일](native-upscale-20261016.ko.md)
+
 # TenRiff Current State
+
+**2026-10-16 · 1.9.1.1 UI:** [홈·그래픽·로딩 및 고정 등급 — 1.9.1.1 후속 후보](ui-feedback-20261016.ko.md).
 
 **2026-10-15 · 1.9.1.1 BMS 온라인 후속 버전:** 새 BMS 게이지·타이밍·RANDOM 분기 기록을 Sites 커뮤니티 리더보드에 제출하고, 규칙과 실제 분기 내용별로 순위를 분리합니다. 새 클라이언트와 대응 웹 배포가 필요하며, Sites는 계속 `client_submitted` 기록입니다. 별도 Ranked 검증 서버의 차단은 유지합니다. 아래 1.9.1의 로컬 전용 안내는 그 버전의 이력이며 기존 공개 파일과 고정 기준 1.9.0은 보존합니다. [범위·호환성·검증](feedback-1.9.1.1.ko.md).
 
@@ -69,7 +77,7 @@
 - 1.7.10: ALL SONG의 삭제된 캐시 항목 건너뛰기, 캐시 통합 진행률과 완료 상태 전달을 보강했습니다. [검증 범위 및 미재현 증상](release-1.7.10-gate.md).
 - 1.7.8: 새 기본 메뉴 에셋·애니메이션, 4~16키 Luma Keys 디지털 건반, 일본어 UI와 웹/오프라인 스킨 에디터를 제공합니다. 메뉴는 `native`, 인게임은 `gameplay.native`에서 도형·색·위치·글꼴·모션을 편집합니다. [검증 범위](release-1.7.8-gate.md).
 
-고정 기준은 **1.9.0**, 이 작업본은 공개 1.9.0.1 기반의 **1.9.0.2 릴리스 후보**이며 로컬 검사를 통과했습니다. 공개 상태는 위 릴리스 검증 안내에서 연결한 릴리스 페이지를 따릅니다. 기본/Hard는 R5, EX는 R6이며 이전 기록을 유지합니다. [현재 변경 안내](feedback-1.9.0.2.ko.md)를 참고하세요. 아래 날짜별 항목은 과거 공개 버전 이력입니다.
+고정 기준은 **1.9.0**, 이 작업본은 사용자 선택 1.9.1.1 기반의 **1.9.2**입니다. 공개 상태와 검증 범위는 [1.9.2 안내](release-1.9.2.ko.md)와 [검증 절차](release-1.9.2-gate.md)를 따릅니다. 기본/Hard는 R5, EX는 R6이며 기존 로컬 기록·리플레이를 유지합니다. 아래 날짜별 항목은 과거 버전 이력입니다.
 
 [로컬 1.7.1 r2 보고서](local-1.7.1-r2.ko.md)의 749/739 검사 횟수는 이전 빌드의 기록입니다. 현재 릴리스 검사 횟수로 재사용하지 않습니다. 기능별 안내는 [곡 소스와 난이도표](library-management.md), [대표 BPM](reference-bpm.md), [스킨 프리셋](skin-presets.md), [ASIO](asio-audio.md)를 참고하세요.
 
@@ -80,7 +88,7 @@
 - BMS landmines (`D1-D9`, `E1-E9`) are playable, including `#WAV00`, base-36 damage tokens, `ZZ` instant fail, exact press/release boundary behavior, and lane-mod/key-converter remapping.
 - Results and local records expose fixed native score separately from detail score, and categorical native accuracy separately from continuous timing-based detailed accuracy.
 - 새 replay evidence v3는 차트 SHA-256, canonical ruleset, result-to-replay SHA-256을 저장하고 입력 trace를 headless 엔진으로 재실행합니다. 공식 로컬 best는 재계산된 verified 결과만 사용하며 legacy/custom/assist 기록은 히스토리에 `unverified`로 남습니다.
-- 사용자 고정 기준 버전은 `1.9.0`; 현재 소스는 `1.9.0.2`
+- 사용자 고정 기준 버전은 `1.9.0`; 현재 소스는 `1.9.2`
 - XInput 디지털 버튼·트리거는 키 설정·프로필 조작에 지정한다. 전용 작업 스레드가 시스템 조회를 맡고 기존 InputThread가 내부 큐를 받아 RawInput/Polling 공통 입력 큐에 전달한다. 작업 스레드 수명은 입력 시작·종료에 묶인다. 네 패드 합산, 연결 해제·포커스 복귀 처리는 [1.9.0.1 안내](feedback-20261015.ko.md)를 따른다. 물리 패드 검증은 모의 입력 테스트와 구분한다.
 - 1.7.9 UI 개선: 프로필/첫 실행의 언어·3단계 글자 크기, 사진 미리보기/시작 메뉴 사진, ALL SONG 통합 소스, 선곡 경계와 디지털 탭, 정적인 TI와 홀로그램 TENRIFF. [사용 및 구현 안내](menu-profile-library-polish.ko.md).
 - 1.7.1은 최대 8인 HUD·결과, 동점 순위·점수 대기 상태, P-GREAT 전용 연출, 독립 판정·콤보 위치, 옵션 10개, 오디오 노멀라이즈와 선곡 난이도표 카드를 제공합니다. [변경 설명](gameplay-polish-followup.md), [검증 범위](release-1.7.1-gate.md) 참고.
@@ -321,7 +329,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 이 소스의 P2P 버전은 `TenRiff 1.8.9`; 호환성 검사와 실제 공개·패키지 상태는 [릴리스 기록](release-1.8.9-gate.md)으로 확인
+- 이 소스의 P2P 버전은 `TenRiff 1.9.2`; 호환성 검사와 실제 공개·패키지 상태는 [릴리스 기록](release-1.9.2-gate.md)으로 확인
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 이름의 `Mainmusic/` 화면 슬롯을 포함하며, 각 `이름.mp3`와 번호가 붙은 `이름 2.mp3`~`이름 64.mp3`를 자동 수집해 화면 재진입마다 순환
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함

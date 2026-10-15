@@ -2,10 +2,15 @@
 
 For 1.8.8 target-lane number shortcuts and their visual left-to-right order, see [skin lane controls (Korean)](release-feedback-1.8.8.ko.md#스킨의-숫자-레인-선택). These shortcuts select an editing target; the `.trskin` format is unchanged.
 
-`Options > Skins` now includes **Export Skin Preset** and **Import Skin Preset**.
-Export writes one `.trskin` file. Send that file to another player, then import it
-on their computer. Dropping a `.trskin` onto the Skins screen also imports it.
-The imported appearance is applied immediately and saved to the active profile.
+In **1.9.2**, `Options > Skins` retains **Import Skin Preset** and removes
+**Export Skin Preset**. Existing `.trskin` files remain supported; dropping one
+onto the Skins screen also imports it. The imported appearance is applied
+immediately and saved to the active profile. Full-profile export and its internal
+skin packaging remain available; the container format is unchanged.
+
+**1.9.2에서는 스킨 화면의 스킨 프리셋 내보내기를 제거합니다.** 기존 `.trskin`
+가져오기·파일 드롭과 전체 프로필 내보내기는 유지합니다. 아래 내용은 기존 파일과
+프로필 내부 스킨 패키징의 형식·검증 규칙입니다.
 
 프리셋 파일 하나에 모든 키 모드의 스킨 설정과 현재 활성 스킨의 이미지가 함께
 들어갑니다. 받는 컴퓨터에서 **스킨 프리셋 가져오기**를 선택하면 같은 설정을
@@ -26,8 +31,8 @@ LR2 renderer features.
 Imports reserve a new directory under `profiles/<profile>/skins/tenriff` or `lr2`;
 name collisions get a numeric suffix. Existing skins remain selectable. The new
 configuration is applied only after extraction and validation succeed. Native
-presets have no external assets. Export also requires a new filename and never
-replaces an existing preset.
+presets have no external assets. The internal skin-container writer requires a
+new filename and never replaces an existing preset.
 
 LR2 includes/images must resolve inside the selected skin folder. Internal
 `../` references are supported when they remain inside that folder; missing,

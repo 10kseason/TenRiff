@@ -1,0 +1,2 @@
+# Preserve upstream notices, build recipe checksums and executable bytes.
+* -text whitespace=cr-at-eol,-blank-at-eol,-blank-at-eof,-space-before-tab

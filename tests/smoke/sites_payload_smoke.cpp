@@ -35,6 +35,7 @@ int main(int argc, char** argv) {
         return 0;
     }
     tenriff::gameplay::ReplayFile replay;
+    replay.record_play_mode = "online"; // Synthetic contract fixture, never a historical record.
     replay.ruleset_id = std::string(tenriff::app::kCanonicalReplayRulesetId);
     replay.chart_format = "bms";
     replay.bms_rank = 3;

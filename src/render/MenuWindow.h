@@ -86,6 +86,7 @@ enum class MenuHitTargetKind {
     AccountField,
     AccountAction,
     SitesLeaderboardAction,
+    AccountPlayMode,
     UrlWarningButton,
     GenericHelpPage,
     SongDifficultyTable,
@@ -481,6 +482,7 @@ struct GameplayHudData {
     uint32_t audio_buffer_frames = 0;
     int64_t lookahead_samples = 0;
     int64_t past_samples = 0;
+    float bga_brightness = 1.0f;
     std::string background_base_path;
     std::string background_overlay_path;
     int64_t background_base_start_sample = 0;
@@ -801,6 +803,9 @@ enum class SitesLeaderboardAction { OpenWebsite, PasteConnection, ImportFile, Di
 
 struct RankedAccountOverlayData {
     bool visible = false;
+    bool mode_selection = false;
+    bool online_mode = false;
+    bool mode_choice_online = false;
     bool register_mode = false;
     bool busy = false;
     bool signed_in = false;

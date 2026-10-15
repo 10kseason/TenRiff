@@ -1,4 +1,12 @@
+**2026-10-16 · 当前发行版1.9.2：** 加入启动F10访客/在线选择、访客及历史记录永久禁止上传、动态原始分辨率AI与FFmpeg去块，并移除皮肤导出行。运行包和源码包均不含BGA模型，路径默认为空、功能默认为OFF。固定基准仍为1.9.0。[变更与兼容性](release-1.9.2.zh-CN.md) · [验证流程](release-1.9.2-gate.md)。下方带日期条目保留当时历史，当前范围以本1.9.2说明为准。
+
+> 2026-10-16: [FFmpeg去块与外部ONNX x2](deblock-lunasr-20261016.zh-CN.md)
+
+> 2026-10-16: [先以原始分辨率修复BGA，再适配显示区域](native-upscale-20261016.zh-CN.md)
+
 # TenRiff 开发路线图（分阶段）
+
+**2026-10-16 · 1.9.1.1 UI:** [主页、图形、加载与固定评级 — 1.9.1.1后续候选版](ui-feedback-20261016.zh-CN.md).
 
 **2026-10-15 · 1.9.1.1 BMS在线支持：** 将新BMS血条、时间计算及RANDOM分支记录提交到Sites社区排行榜，并按规则和选中的分支内容隔离排名。需要新版客户端及对应网页部署；Sites仍是`client_submitted`记录，独立Ranked验证服务器的限制保持不变。下方1.9.1仅限本地的说明保留该版本历史；保留已发布文件及固定基准1.9.0。 [范围、兼容性与验证](feedback-1.9.1.1.zh-CN.md)。
 
@@ -36,7 +44,7 @@
 
 ## 当前基线
 - Windows GUI/runtime 是主要受支持路径。
-- 固定基准为 `1.9.0`，此源码为发布候选版 `1.9.0.2`；公开包附带 NK3 P64 与 generalized pattern MLP inference 模型，但不附带 BGA upscaler 模型。选择兼容且权利已厘清的 upscaler ONNX 只会保存路径，BGA Upscaler 会一直保持 off，直到用户手动开启并确认 high-spec warning；不存在自动 benchmark gate。
+- 固定基准为 `1.9.0`，此源码版本为 `1.9.2`；公开包附带 NK3 P64 与 generalized pattern MLP inference 模型，但不附带 BGA upscaler 模型。选择兼容且权利已厘清的 upscaler ONNX 只会保存路径，BGA Upscaler 会一直保持 off，直到用户手动开启并确认 high-spec warning；不存在自动 benchmark gate。
 - 当前菜单/runtime 仅支持 BMS family（`.bms/.bme/.bml/.pms`），并支持 native、bundle/profile TenRiff `skin.json` 与 LR2 skin。
 - 关于当前已发布的行为，请先看 [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)；这份路线图主要讲方向和剩余工作。
 

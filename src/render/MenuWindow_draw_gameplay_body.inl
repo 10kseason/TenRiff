@@ -1003,73 +1003,11 @@
             draw_gameplay_header();
             const bool waiting_for_peer_result =
                 data.gameplay.finished && data.gameplay.peer_visible;
-            const D2D1_RECT_F panel_rect =
-                fit_rect_below_performance_overlay(D2D1::RectF(620.0f, 360.0f, 1300.0f, 620.0f),
-                                                   kBaseHeight - 140.0f,
-                                                   22.0f);
-            const D2D1_ROUNDED_RECT panel_rr = D2D1::RoundedRect(panel_rect, 24.0f, 24.0f);
-            if (d2d_->panel_brush) {
-                d2d_->panel_brush->SetOpacity(0.92f);
-                ctx->FillRoundedRectangle(panel_rr, d2d_->panel_brush.Get());
-                d2d_->panel_brush->SetOpacity(1.0f);
-            }
-            if (d2d_->button_border_brush) {
-                ctx->DrawRoundedRectangle(panel_rr, d2d_->button_border_brush.Get(), 1.6f);
-            }
-
-            const std::wstring loading_w =
-                waiting_for_peer_result
-                    ? wloc("WAITING FOR OPPONENT", "상대 결과 대기 중")
-                    : wloc("LOADING CHART", "차트 로딩 중");
-            const std::wstring stage_w =
-                to_wide(data.gameplay.loading_stage.empty() ? loc("Preparing gameplay", "게임 준비 중")
-                                                            : data.gameplay.loading_stage);
-            const std::wstring percent_w =
-                waiting_for_peer_result
-                    ? wloc("RESULT SYNC", "결과 동기화")
-                    : to_wide(std::to_string(std::clamp(data.gameplay.loading_percent, 0, 100)) + "%");
-            if (scene_title_format && d2d_->text_brush) {
-                draw_readable_text_aligned(loading_w,
-                                          scene_title_format.Get(),
-                                          D2D1::RectF(panel_rect.left + 32.0f, panel_rect.top + 24.0f,
-                                                      panel_rect.right - 32.0f, panel_rect.top + 72.0f),
-                                          d2d_->text_brush.Get(),
-                                          DWRITE_TEXT_ALIGNMENT_CENTER);
-                draw_readable_text_aligned(percent_w,
-                                          scene_title_format.Get(),
-                                          D2D1::RectF(panel_rect.left + 32.0f, panel_rect.top + 74.0f,
-                                                      panel_rect.right - 32.0f, panel_rect.top + 124.0f),
-                                          d2d_->text_brush.Get(),
-                                          DWRITE_TEXT_ALIGNMENT_CENTER);
-            }
-            if (scene_body_format && d2d_->muted_brush) {
-                draw_readable_text_aligned(stage_w,
-                                          scene_body_format.Get(),
-                                          D2D1::RectF(panel_rect.left + 32.0f, panel_rect.top + 134.0f,
-                                                      panel_rect.right - 32.0f, panel_rect.top + 174.0f),
-                                          d2d_->muted_brush.Get(),
-                                          DWRITE_TEXT_ALIGNMENT_CENTER);
-            }
-
-            const D2D1_RECT_F progress_track =
-                D2D1::RectF(panel_rect.left + 74.0f, panel_rect.bottom - 82.0f,
-                            panel_rect.right - 74.0f, panel_rect.bottom - 54.0f);
-            if (d2d_->card_brush) {
-                d2d_->card_brush->SetOpacity(0.78f);
-                ctx->FillRoundedRectangle(D2D1::RoundedRect(progress_track, 10.0f, 10.0f), d2d_->card_brush.Get());
-                d2d_->card_brush->SetOpacity(1.0f);
-            }
-            if (d2d_->accent_brush) {
-                const float fill_ratio =
-                    std::clamp(static_cast<float>(data.gameplay.loading_percent) / 100.0f, 0.0f, 1.0f);
-                const D2D1_RECT_F progress_fill =
-                    D2D1::RectF(progress_track.left + 4.0f,
-                                progress_track.top + 4.0f,
-                                progress_track.left + 4.0f +
-                                    (progress_track.right - progress_track.left - 8.0f) * fill_ratio,
-                                progress_track.bottom - 4.0f);
-                ctx->FillRoundedRectangle(D2D1::RoundedRect(progress_fill, 8.0f, 8.0f), d2d_->accent_brush.Get());
-            }
+            draw_loading_panel(
+                waiting_for_peer_result ? loc("WAITING FOR OPPONENT", "상대 결과 대기 중") : loc("LOADING CHART", "차트 로딩 중"),
+                data.gameplay.loading_stage.empty() ? loc("Preparing gameplay", "게임 준비 중") : data.gameplay.loading_stage,
+                waiting_for_peer_result ? -1 : data.gameplay.loading_percent,
+                waiting_for_peer_result ? loc("RESULT SYNC", "결과 동기화") : "");
             return;
         }
 

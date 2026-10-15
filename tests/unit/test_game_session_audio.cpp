@@ -4,6 +4,7 @@
 #include "app/ReplayVerifier.h"
 #include "app/SitesLeaderboardClient.h"
 #include "app/PersistedRuntimeConfig.h"
+#include "config/SimpleJson.h"
 #include "gameplay/ModeApplier.h"
 #include "timing/HighResClock.h"
 #include "../support/MockAsioDriver.h"
@@ -2137,8 +2138,11 @@ struct GameSessionAudioTestAccess {
     static void check_automatic_result(bool delayed_bgm, bool manual_skip, bool silent,
                                        bool failed_audio = false, bool skip_outro = false, bool pacemaker = false,
                                        bool auto_scratch = false, bool stale_catchup = false,
-                                       uint32_t skip_key = 32, bool future_skip = false, bool bms_policy = false) {
+                                       uint32_t skip_key = 32, bool future_skip = false, bool bms_policy = false,
+                                       bool online_origin = true, bool revoke_online = false) {
         auto session = std::make_unique<GameSession>();
+        session->options_.online_recording_enabled = online_origin;
+        session->options_.online_recording_permission = std::make_shared<std::atomic_bool>(online_origin);
         session->sample_rate_ = 48000;
         session->chart_.lane_count = 4;
         session->chart_.bms_rank = 3; // BMS loader resolves absent #RANK to EASY.
@@ -2263,6 +2267,7 @@ struct GameSessionAudioTestAccess {
         }
         session->chart_path_ = chart_path.u8string();
         session->profile_dir_ = directory.path.u8string();
+        if (revoke_online) session->options_.online_recording_permission->store(false);
         session->shutdown();
         const auto& result = session->result();
         REQUIRE(result.has_value);
@@ -2280,6 +2285,15 @@ struct GameSessionAudioTestAccess {
         REQUIRE(result.replay_sha256.size() == 64);
         const auto replay = gameplay::load_replay_json(result.replay_path);
         REQUIRE(replay.success());
+        const bool can_upload_origin = online_origin && !revoke_online;
+        CHECK(replay.replay->record_play_mode == (can_upload_origin ? "online" : "guest"));
+        {
+            std::ifstream saved_result(std::filesystem::u8path(result.result_path));
+            const std::string saved((std::istreambuf_iterator<char>(saved_result)), std::istreambuf_iterator<char>());
+            const auto json = config::parse_json(saved);
+            REQUIRE(json.success());
+            CHECK(json.root->as_object()->at("record_play_mode").as_string() == replay.replay->record_play_mode);
+        }
         CHECK(replay.replay->mode.bms_timing_version == 1);
         CHECK(replay.replay->mode.bms_gauge_version == result.bms_gauge_version);
         CHECK(replay.replay->mode.bms_control_flow_version == result.bms_control_flow_version);
@@ -2295,9 +2309,10 @@ struct GameSessionAudioTestAccess {
         CHECK(branch_sha256.empty() == !bms_policy);
         const bool accepted = build_sites_score_json(*replay.replay, result.replay_sha256,
                                     "Completion fixture", result.clear_status, payload, error, {}, branch_sha256);
-        CHECK(accepted == !(auto_scratch || stale_catchup));
-        CHECK(payload.empty() == (auto_scratch || stale_catchup));
-        CHECK(error.empty() == !(auto_scratch || stale_catchup));
+        const bool upload_eligible = can_upload_origin && !(auto_scratch || stale_catchup);
+        CHECK(accepted == upload_eligible);
+        CHECK(payload.empty() == !upload_eligible);
+        CHECK(error.empty() == upload_eligible);
         if (stale_catchup) {
             CHECK(replay.replay->ruleset_id == "custom-ruleset-5");
             CHECK_FALSE(is_supported_canonical_replay_ruleset(replay.replay->ruleset_id));
@@ -2884,6 +2899,14 @@ TEST_CASE("completed play exports an eligible record without another key after r
 
 TEST_CASE("completed silent play exports automatically after its minimum result delay") {
     tenriff::app::GameSessionAudioTestAccess::check_automatic_result(false, false, true);
+}
+
+TEST_CASE("guest and revoked online plays export permanently local replay and result origins") {
+    for (const bool online_at_start : {false, true}) {
+        tenriff::app::GameSessionAudioTestAccess::check_automatic_result(
+            false, false, true, false, false, false, false, false,
+            32, false, false, online_at_start, true);
+    }
 }
 
 TEST_CASE("post-note skip still exports without adding an input or aborting the score") {

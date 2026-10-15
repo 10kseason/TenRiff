@@ -41,6 +41,18 @@ TenRiff uses ncnn as the default NK3 inference runtime. Its built-in Vulkan
 loader runs the converted P64 and generalized pattern models on Vulkan-capable
 AMD or NVIDIA GPUs without a separate Vulkan SDK installation.
 
+5. FFmpeg 7.1 minimal raw-image filter helper (Windows x64)
+   Upstream: <https://ffmpeg.org/>
+   Copyright: FFmpeg developers and contributors
+   License: GNU Lesser General Public License 2.1 or later
+   Runtime notices: `tools/ffmpeg-deblock/`
+   Corresponding unmodified source, complete build recipe and licenses:
+   `third_party/ffmpeg-7.1/source-packet/` in the same version's source package.
+   This separate executable exchanges raw pixels through pipes. It enables
+   rawvideo and the deblock/format/scale filters; GPL, nonfree, networking and
+   external library autodetection are disabled. No AI restoration weights are
+   included. It does not replace a general FFmpeg installation for BGA videos.
+
 OpenVINO remains an optional source-build compatibility backend when it is
 found at configure time. Official Windows 1.5.1 packages use ncnn Vulkan and
 ship `ncnn.dll` with the upstream license.

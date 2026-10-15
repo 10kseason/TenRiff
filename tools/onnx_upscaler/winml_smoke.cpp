@@ -7,9 +7,11 @@
 #include <iostream>
 #include <stdexcept>
 #include <thread>
+#include <type_traits>
 #include <vector>
 
 #include "render/OnnxBackgroundUpscaler.h"
+#include "render/OnnxUpscaleImage.h"
 
 #include <winrt/Windows.AI.MachineLearning.h>
 #include <winrt/Windows.Foundation.Collections.h>
@@ -63,7 +65,7 @@ int wmain(int argc, wchar_t** argv) {
         winrt::init_apartment(winrt::apartment_type::multi_threaded);
 
         if (argc < 2) {
-            std::wcerr << L"usage: onnx_upscaler_winml_smoke <model.onnx>\n";
+            std::wcerr << L"usage: onnx_upscaler_winml_smoke <model.onnx> [image output-prefix]\n";
             return 2;
         }
         const std::filesystem::path model_path(argv[1]);
@@ -75,9 +77,6 @@ int wmain(int argc, wchar_t** argv) {
         namespace ml = winrt::Windows::AI::MachineLearning;
         const auto load_started = std::chrono::steady_clock::now();
         const ml::LearningModel model = ml::LearningModel::LoadFromFilePath(model_path.c_str());
-        const ml::LearningModelDevice device(ml::LearningModelDeviceKind::DirectXHighPerformance);
-        const ml::LearningModelSession session(model, device);
-        const auto session_ready = std::chrono::steady_clock::now();
         const auto find_tensor_descriptor =
             [](const auto& features, const wchar_t* expected_name) {
                 for (const auto& feature : features) {
@@ -87,10 +86,20 @@ int wmain(int argc, wchar_t** argv) {
                 }
                 throw std::runtime_error("required ONNX tensor is missing");
             };
-        const ml::TensorKind input_kind =
-            find_tensor_descriptor(model.InputFeatures(), L"rgb_lr").TensorKind();
-        const ml::TensorKind output_kind =
-            find_tensor_descriptor(model.OutputFeatures(), L"rgb_residual_x2").TensorKind();
+        const auto input_descriptor = find_tensor_descriptor(model.InputFeatures(), L"rgb_lr");
+        const auto output_descriptor = find_tensor_descriptor(model.OutputFeatures(), L"rgb_residual_x2");
+        const ml::TensorKind input_kind = input_descriptor.TensorKind();
+        const ml::TensorKind output_kind = output_descriptor.TensorKind();
+        const auto in_shape = input_descriptor.Shape();
+        const auto out_shape = output_descriptor.Shape();
+        namespace onnx_image = tenriff::render::onnx_image;
+        const auto model_shape = onnx_image::model_shape(
+            std::vector<std::int64_t>(in_shape.begin(), in_shape.end()),
+            std::vector<std::int64_t>(out_shape.begin(), out_shape.end()));
+        if (model_shape == onnx_image::ModelShape::Unsupported) {
+            std::cerr << "unsupported ONNX tensor shape contract\n";
+            return 3;
+        }
         std::string quantization;
         const auto metadata = model.Metadata();
         if (metadata.HasKey(L"tenriff.quantization")) {
@@ -104,17 +113,31 @@ int wmain(int argc, wchar_t** argv) {
             return 3;
         }
 
-        const std::vector<std::int64_t> input_shape{1, 3, 540, 960};
-        const std::vector<std::int64_t> output_shape{1, 3, 1080, 1920};
-        std::vector<float> input(3u * 540u * 960u, 0.5f);
+        const ml::LearningModelDevice device(ml::LearningModelDeviceKind::DirectXHighPerformance);
+        const ml::LearningModelSession session(model, device);
+        const auto session_ready = std::chrono::steady_clock::now();
+
+        const bool dynamic_spatial = model_shape == onnx_image::ModelShape::Dynamic;
+        const std::uint32_t input_width = dynamic_spatial ? 19 : 960;
+        const std::uint32_t input_height = dynamic_spatial ? 13 : 540;
+        const std::vector<std::int64_t> input_shape{1, 3, input_height, input_width};
+        const std::vector<std::int64_t> output_shape{1, 3, input_height * 2, input_width * 2};
+        std::vector<float> input(std::size_t(input_width) * input_height * 3, 0.5f);
         const auto evaluate_started = std::chrono::steady_clock::now();
         const auto bind_and_evaluate =
             [&](const auto& input_tensor, const auto& output_tensor) {
                 ml::LearningModelBinding binding(session);
                 binding.Bind(L"rgb_lr", input_tensor);
                 binding.Bind(L"rgb_residual_x2", output_tensor);
-                session.Evaluate(binding, L"onnx-upscaler-smoke");
-                return output_tensor.GetAsVectorView();
+                const auto result = session.Evaluate(binding, L"onnx-upscaler-smoke");
+                const auto evaluated = result.Outputs().Lookup(L"rgb_residual_x2")
+                    .template as<std::decay_t<decltype(output_tensor)>>();
+                const auto evaluated_shape = evaluated.Shape();
+                if (!onnx_image::valid_residual_shape(
+                        std::vector<std::int64_t>(evaluated_shape.begin(), evaluated_shape.end()),
+                        input_width, input_height))
+                    throw std::runtime_error("evaluated ONNX output is not RGB residual x2");
+                return evaluated.GetAsVectorView();
             };
         winrt::Windows::Foundation::Collections::IVectorView<float> values{nullptr};
         if (input_kind == ml::TensorKind::Float16) {
@@ -139,7 +162,7 @@ int wmain(int argc, wchar_t** argv) {
         }
         const auto evaluate_finished = std::chrono::steady_clock::now();
 
-        if (values.Size() != 3u * 1080u * 1920u) {
+        if (values.Size() != std::size_t(input_width) * input_height * 12) {
             std::cerr << "unexpected output size: " << values.Size() << '\n';
             return 3;
         }
@@ -150,6 +173,7 @@ int wmain(int argc, wchar_t** argv) {
         }
         std::cout << "External ONNX upscaler WinML smoke passed: values=" << values.Size()
                   << " max_abs=" << max_abs
+                  << " spatial=" << (dynamic_spatial ? "dynamic" : "fixed")
                   << " quantization="
                   << (quantization.empty() ? "unspecified" : quantization)
                   << " session_ms="
@@ -237,17 +261,17 @@ int wmain(int argc, wchar_t** argv) {
         remove_error.clear();
         std::filesystem::remove(warm_image_path, remove_error);
         if (!frame || !warm_frame ||
-            frame->width != tenriff::render::kOnnxUpscaleTargetWidth ||
-            frame->height != tenriff::render::kOnnxUpscaleTargetHeight ||
+            frame->width != 8 || frame->height != 8 ||
             frame->bgra.size() != static_cast<std::size_t>(frame->width) * frame->height * 4 ||
             warm_frame->bgra.size() != frame->bgra.size()) {
-            std::cerr << "External ONNX upscaler WIC-to-BGRA pipeline did not produce an FHD frame\n";
+            std::cerr << "External ONNX upscaler WIC-to-BGRA pipeline did not preserve original x2 size\n";
             return 5;
         }
         if (!first_video_request_accepted || !video_overwrite_rejected ||
             !next_video_request_accepted || !video_frame ||
             video_frame->source_path != "video-smoke|0" ||
-            video_frame->bgra.size() != frame->bgra.size()) {
+            video_frame->width != 1920 || video_frame->height != 1080 ||
+            video_frame->bgra.size() != std::size_t(1920) * 1080 * 4) {
             std::cerr << "External ONNX upscaler video backpressure smoke failed\n";
             return 6;
         }
@@ -262,6 +286,27 @@ int wmain(int argc, wchar_t** argv) {
                          warm_finished - warm_started).count()
                   << " video_backpressure=passed"
                   << '\n';
+        if (argc == 4) {
+            tenriff::render::OnnxBackgroundUpscaler upscaler(model_path.u8string());
+            upscaler.request(std::filesystem::path(argv[2]).u8string());
+            std::shared_ptr<const tenriff::render::OnnxUpscaleFrame> native;
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+            while (!native && std::chrono::steady_clock::now() < deadline) {
+                native = upscaler.take_ready();
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            }
+            if (!native) { std::cerr << "Native image restoration timed out\n"; return 7; }
+            const std::filesystem::path prefix(argv[3]);
+            const auto raw_path = std::filesystem::path(prefix.wstring() + L".bgra");
+            const auto json_path = std::filesystem::path(prefix.wstring() + L".json");
+            if (std::filesystem::exists(raw_path) || std::filesystem::exists(json_path)) return 8;
+            std::ofstream raw(raw_path, std::ios::binary);
+            raw.write(reinterpret_cast<const char*>(native->bgra.data()), native->bgra.size());
+            std::ofstream json(json_path);
+            json << "{\"width\":" << native->width << ",\"height\":" << native->height << "}\n";
+            if (!raw.good() || !json.good()) return 8;
+            std::cout << "Native image restored: " << native->width << 'x' << native->height << '\n';
+        }
         return 0;
     } catch (const winrt::hresult_error& error) {
         std::wcerr << L"WinML error 0x" << std::hex

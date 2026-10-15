@@ -619,11 +619,12 @@ TEST_CASE("Skin settings retain stable IDs while grouping lane selection with no
     using namespace tenriff::app;
     for (const bool lr2 : {false, true}) {
         const SkinSettingsRows rows{lr2};
-        CHECK(rows.count() == (lr2 ? 69 : 68));
+        CHECK(rows.count() == (lr2 ? 68 : 67));
         CHECK(rows.index_of(SkinSettingsRowId::Lr2Resolution) == (lr2 ? 5 : -1));
         CHECK(rows.index_of(SkinSettingsRowId::TargetGap) == -1);
         CHECK(rows.index_of(SkinSettingsRowId::VisualPreset) == -1);
         CHECK(rows.index_of(SkinSettingsRowId::IndicatorBackground) == -1);
+        CHECK(rows.index_of(SkinSettingsRowId::ExportPreset) == -1);
         CHECK(rows.index_of(SkinSettingsRowId::TargetLane) + 1 == rows.index_of(SkinSettingsRowId::LaneColor));
         CHECK(rows.index_of(SkinSettingsRowId::UiFont) + 1 == rows.index_of(SkinSettingsRowId::UiFontFile));
         CHECK(rows.index_of(SkinSettingsRowId::TimingTextSize) + 1 == rows.index_of(SkinSettingsRowId::TimingTextX));

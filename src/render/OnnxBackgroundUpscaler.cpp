@@ -1,4 +1,6 @@
 #include "render/OnnxBackgroundUpscaler.h"
+#include "render/OnnxUpscaleImage.h"
+#include "render/FfmpegImageFilter.h"
 
 #include <algorithm>
 #include <array>
@@ -12,6 +14,7 @@
 #include <optional>
 #include <stdexcept>
 #include <thread>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 
@@ -37,9 +40,10 @@ namespace tenriff::render {
 
 namespace {
 
-constexpr std::uint32_t kModelInputWidth = 960;
-constexpr std::uint32_t kModelInputHeight = 540;
+constexpr std::uint32_t kModelInputWidth = onnx_image::kInputWidth;
+constexpr std::uint32_t kModelInputHeight = onnx_image::kInputHeight;
 constexpr std::size_t kCachedFrameLimit = 3;
+constexpr std::size_t kCachedByteLimit = 96u * 1024u * 1024u;
 
 std::string lower_ascii(std::string_view value) {
     std::string result(value);
@@ -87,159 +91,31 @@ std::optional<std::filesystem::path> resolve_model_path(std::string_view configu
     return std::nullopt;
 }
 
-bool decode_cover_frame(IWICImagingFactory* factory,
-                        std::string_view path,
-                        std::vector<std::uint8_t>& out_bgra) {
-    if (!factory || path.empty()) {
-        return false;
-    }
-
-    const std::wstring wide_path = util::path_from_utf8_lossy(path).native();
+bool decode_native_frame(IWICImagingFactory* factory, std::string_view path,
+                         std::uint32_t& width, std::uint32_t& height,
+                         std::vector<std::uint8_t>& bgra) {
+    if (!factory || path.empty()) return false;
+    const auto wide_path = util::path_from_utf8_lossy(path).native();
     Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
-    if (FAILED(factory->CreateDecoderFromFilename(wide_path.c_str(),
-                                                   nullptr,
-                                                   GENERIC_READ,
-                                                   WICDecodeMetadataCacheOnLoad,
-                                                   &decoder)) ||
-        !decoder) {
-        return false;
-    }
-
+    if (FAILED(factory->CreateDecoderFromFilename(wide_path.c_str(), nullptr, GENERIC_READ,
+            WICDecodeMetadataCacheOnLoad, &decoder)) || !decoder) return false;
     Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
-    if (FAILED(decoder->GetFrame(0, &frame)) || !frame) {
-        return false;
-    }
-
-    UINT source_width = 0;
-    UINT source_height = 0;
-    if (FAILED(frame->GetSize(&source_width, &source_height)) ||
-        source_width == 0 || source_height == 0) {
-        return false;
-    }
-
-    const double source_aspect = static_cast<double>(source_width) /
-                                 static_cast<double>(source_height);
-    constexpr double kTargetAspect = static_cast<double>(kModelInputWidth) /
-                                     static_cast<double>(kModelInputHeight);
-    WICRect crop{0, 0, static_cast<INT>(source_width), static_cast<INT>(source_height)};
-    if (source_aspect > kTargetAspect) {
-        crop.Width = std::max(1, static_cast<INT>(std::llround(source_height * kTargetAspect)));
-        crop.X = (static_cast<INT>(source_width) - crop.Width) / 2;
-    } else if (source_aspect < kTargetAspect) {
-        crop.Height = std::max(1, static_cast<INT>(std::llround(source_width / kTargetAspect)));
-        crop.Y = (static_cast<INT>(source_height) - crop.Height) / 2;
-    }
-
-    Microsoft::WRL::ComPtr<IWICBitmapClipper> clipper;
-    if (FAILED(factory->CreateBitmapClipper(&clipper)) || !clipper ||
-        FAILED(clipper->Initialize(frame.Get(), &crop))) {
-        return false;
-    }
-
-    Microsoft::WRL::ComPtr<IWICBitmapScaler> scaler;
-    if (FAILED(factory->CreateBitmapScaler(&scaler)) || !scaler ||
-        FAILED(scaler->Initialize(clipper.Get(),
-                                  kModelInputWidth,
-                                  kModelInputHeight,
-                                  WICBitmapInterpolationModeFant))) {
-        return false;
-    }
-
+    if (FAILED(decoder->GetFrame(0, &frame)) || !frame ||
+        FAILED(frame->GetSize(&width, &height)) || !onnx_image::valid_size(width, height)) return false;
+    // Decode at authored dimensions. Display fitting and cropping happen only
+    // when the renderer draws the completed native-resolution x2 bitmap.
     Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
     if (FAILED(factory->CreateFormatConverter(&converter)) || !converter ||
-        FAILED(converter->Initialize(scaler.Get(),
-                                     GUID_WICPixelFormat32bppBGRA,
-                                     WICBitmapDitherTypeNone,
-                                     nullptr,
-                                     0.0,
-                                     WICBitmapPaletteTypeCustom))) {
-        return false;
-    }
-
-    constexpr UINT kStride = kModelInputWidth * 4;
-    out_bgra.resize(static_cast<std::size_t>(kStride) * kModelInputHeight);
-    return SUCCEEDED(converter->CopyPixels(nullptr,
-                                           kStride,
-                                           static_cast<UINT>(out_bgra.size()),
-                                           out_bgra.data()));
+        FAILED(converter->Initialize(frame.Get(), GUID_WICPixelFormat32bppBGRA,
+            WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom))) return false;
+    bgra.resize(std::size_t(width) * height * 4);
+    return SUCCEEDED(converter->CopyPixels(nullptr, width * 4,
+                                           static_cast<UINT>(bgra.size()), bgra.data()));
 }
 
-bool resize_cover_bgra(const std::vector<std::uint8_t>& source,
-                       std::uint32_t source_width,
-                       std::uint32_t source_height,
-                       std::vector<std::uint8_t>& out_bgra) {
-    if (source_width == 0 || source_height == 0 ||
-        source.size() != static_cast<std::size_t>(source_width) * source_height * 4) {
-        return false;
-    }
-    if (source_width == kModelInputWidth && source_height == kModelInputHeight) {
-        out_bgra = source;
-        return true;
-    }
-
-    const double source_aspect = static_cast<double>(source_width) / source_height;
-    constexpr double kTargetAspect = static_cast<double>(kModelInputWidth) / kModelInputHeight;
-    double crop_x = 0.0;
-    double crop_y = 0.0;
-    double crop_width = source_width;
-    double crop_height = source_height;
-    if (source_aspect > kTargetAspect) {
-        crop_width = source_height * kTargetAspect;
-        crop_x = (source_width - crop_width) * 0.5;
-    } else if (source_aspect < kTargetAspect) {
-        crop_height = source_width / kTargetAspect;
-        crop_y = (source_height - crop_height) * 0.5;
-    }
-
-    out_bgra.resize(static_cast<std::size_t>(kModelInputWidth) * kModelInputHeight * 4);
-    const auto resize_row = [&](std::uint32_t y) {
-        const double source_y = crop_y +
-            (static_cast<double>(y) + 0.5) * crop_height / kModelInputHeight - 0.5;
-        const int y0_raw = static_cast<int>(std::floor(source_y));
-        const int y1_raw = y0_raw + 1;
-        const std::uint32_t y0 = static_cast<std::uint32_t>(
-            std::clamp(y0_raw, 0, static_cast<int>(source_height) - 1));
-        const std::uint32_t y1 = static_cast<std::uint32_t>(
-            std::clamp(y1_raw, 0, static_cast<int>(source_height) - 1));
-        const float wy = static_cast<float>(source_y - std::floor(source_y));
-        for (std::uint32_t x = 0; x < kModelInputWidth; ++x) {
-            const double source_x = crop_x +
-                (static_cast<double>(x) + 0.5) * crop_width / kModelInputWidth - 0.5;
-            const int x0_raw = static_cast<int>(std::floor(source_x));
-            const int x1_raw = x0_raw + 1;
-            const std::uint32_t x0 = static_cast<std::uint32_t>(
-                std::clamp(x0_raw, 0, static_cast<int>(source_width) - 1));
-            const std::uint32_t x1 = static_cast<std::uint32_t>(
-                std::clamp(x1_raw, 0, static_cast<int>(source_width) - 1));
-            const float wx = static_cast<float>(source_x - std::floor(source_x));
-            const std::size_t p00 = (static_cast<std::size_t>(y0) * source_width + x0) * 4;
-            const std::size_t p10 = (static_cast<std::size_t>(y0) * source_width + x1) * 4;
-            const std::size_t p01 = (static_cast<std::size_t>(y1) * source_width + x0) * 4;
-            const std::size_t p11 = (static_cast<std::size_t>(y1) * source_width + x1) * 4;
-            const std::size_t output =
-                (static_cast<std::size_t>(y) * kModelInputWidth + x) * 4;
-            for (std::size_t channel = 0; channel < 4; ++channel) {
-                const float top = source[p00 + channel] * (1.0f - wx) +
-                                  source[p10 + channel] * wx;
-                const float bottom = source[p01 + channel] * (1.0f - wx) +
-                                     source[p11 + channel] * wx;
-                out_bgra[output + channel] = static_cast<std::uint8_t>(
-                    std::clamp(std::lround(top * (1.0f - wy) + bottom * wy), 0l, 255l));
-            }
-        }
-    };
-#ifdef _MSC_VER
-    concurrency::parallel_for<std::uint32_t>(0, kModelInputHeight, resize_row);
-#else
-    for (std::uint32_t y = 0; y < kModelInputHeight; ++y) {
-        resize_row(y);
-    }
-#endif
-    return true;
-}
-
-std::vector<float> bgra_to_nchw_rgb(const std::vector<std::uint8_t>& bgra) {
-    const std::size_t pixels = static_cast<std::size_t>(kModelInputWidth) * kModelInputHeight;
+std::vector<float> bgra_to_nchw_rgb(const std::vector<std::uint8_t>& bgra,
+                                   std::uint32_t width, std::uint32_t height) {
+    const std::size_t pixels = static_cast<std::size_t>(width) * height;
     if (bgra.size() != pixels * 4) {
         return {};
     }
@@ -252,77 +128,6 @@ std::vector<float> bgra_to_nchw_rgb(const std::vector<std::uint8_t>& bgra) {
     return rgb;
 }
 
-std::vector<std::uint8_t> compose_onnx_residual_bgra(
-    const std::vector<std::uint8_t>& input,
-    const std::vector<float>& residual) {
-    const std::size_t expected = static_cast<std::size_t>(kModelInputWidth) *
-                                 kModelInputHeight * 4;
-    const std::size_t target_pixels = static_cast<std::size_t>(kOnnxUpscaleTargetWidth) *
-                                      kOnnxUpscaleTargetHeight;
-    if (input.size() != expected || residual.size() != target_pixels * 3) {
-        return {};
-    }
-
-    std::vector<std::uint8_t> output(static_cast<std::size_t>(kOnnxUpscaleTargetWidth) *
-                                     kOnnxUpscaleTargetHeight * 4);
-    const auto compose_row = [&](std::uint32_t y) {
-        const float source_y = (static_cast<float>(y) + 0.5f) * 0.5f - 0.5f;
-        const int y0_raw = static_cast<int>(std::floor(source_y));
-        const int y1_raw = y0_raw + 1;
-        const std::uint32_t y0 = static_cast<std::uint32_t>(
-            std::clamp(y0_raw, 0, static_cast<int>(kModelInputHeight) - 1));
-        const std::uint32_t y1 = static_cast<std::uint32_t>(
-            std::clamp(y1_raw, 0, static_cast<int>(kModelInputHeight) - 1));
-        const float wy = source_y - std::floor(source_y);
-
-        for (std::uint32_t x = 0; x < kOnnxUpscaleTargetWidth; ++x) {
-            const float source_x = (static_cast<float>(x) + 0.5f) * 0.5f - 0.5f;
-            const int x0_raw = static_cast<int>(std::floor(source_x));
-            const int x1_raw = x0_raw + 1;
-            const std::uint32_t x0 = static_cast<std::uint32_t>(
-                std::clamp(x0_raw, 0, static_cast<int>(kModelInputWidth) - 1));
-            const std::uint32_t x1 = static_cast<std::uint32_t>(
-                std::clamp(x1_raw, 0, static_cast<int>(kModelInputWidth) - 1));
-            const float wx = source_x - std::floor(source_x);
-
-            const std::size_t p00 = (static_cast<std::size_t>(y0) * kModelInputWidth + x0) * 4;
-            const std::size_t p10 = (static_cast<std::size_t>(y0) * kModelInputWidth + x1) * 4;
-            const std::size_t p01 = (static_cast<std::size_t>(y1) * kModelInputWidth + x0) * 4;
-            const std::size_t p11 = (static_cast<std::size_t>(y1) * kModelInputWidth + x1) * 4;
-            const std::size_t out = (static_cast<std::size_t>(y) * kOnnxUpscaleTargetWidth + x) * 4;
-            const auto interpolate = [&](std::size_t channel) {
-                const float top = input[p00 + channel] * (1.0f - wx) +
-                                  input[p10 + channel] * wx;
-                const float bottom = input[p01 + channel] * (1.0f - wx) +
-                                     input[p11 + channel] * wx;
-                return top * (1.0f - wy) + bottom * wy;
-            };
-            const float alpha_byte = std::clamp(interpolate(3), 0.0f, 255.0f);
-            const float alpha = alpha_byte / 255.0f;
-            const std::size_t output_pixel = static_cast<std::size_t>(y) *
-                                             kOnnxUpscaleTargetWidth + x;
-            for (std::size_t channel = 0; channel < 3; ++channel) {
-                const std::size_t residual_channel = 2 - channel;  // BGRA -> RGB NCHW
-                const float detail = residual[residual_channel * target_pixels + output_pixel];
-                const float corrected = std::clamp(interpolate(channel) / 255.0f + detail,
-                                                   0.0f,
-                                                   1.0f);
-                output[out + channel] = static_cast<std::uint8_t>(
-                    std::clamp(std::lround(corrected * alpha * 255.0f), 0l, 255l));
-            }
-            output[out + 3] = static_cast<std::uint8_t>(
-                std::clamp(std::lround(alpha_byte), 0l, 255l));
-        }
-    };
-#ifdef _MSC_VER
-    concurrency::parallel_for<std::uint32_t>(0, kOnnxUpscaleTargetHeight, compose_row);
-#else
-    for (std::uint32_t y = 0; y < kOnnxUpscaleTargetHeight; ++y) {
-        compose_row(y);
-    }
-#endif
-    return output;
-}
 
 #endif
 
@@ -367,7 +172,11 @@ struct OnnxBackgroundUpscaler::Impl {
     void touch_cache_locked(const std::string& path) {
         cache_lru.erase(std::remove(cache_lru.begin(), cache_lru.end(), path), cache_lru.end());
         cache_lru.push_back(path);
-        while (cache_lru.size() > kCachedFrameLimit) {
+        std::size_t bytes = 0;
+        for (const auto& item : cache) bytes += item.second->bgra.size();
+        // Native x2 images are no longer uniformly FHD; bound retained bytes too.
+        while (cache_lru.size() > kCachedFrameLimit || bytes > kCachedByteLimit) {
+            bytes -= cache.at(cache_lru.front())->bgra.size();
             cache.erase(cache_lru.front());
             cache_lru.pop_front();
         }
@@ -413,6 +222,15 @@ struct OnnxBackgroundUpscaler::Impl {
                 find_tensor_descriptor(model.InputFeatures(), L"rgb_lr");
             const auto output_descriptor =
                 find_tensor_descriptor(model.OutputFeatures(), L"rgb_residual_x2");
+            const auto descriptor_shape = [](const auto& descriptor) {
+                const auto shape = descriptor.Shape();
+                return std::vector<std::int64_t>(shape.begin(), shape.end());
+            };
+            const auto model_shape = onnx_image::model_shape(descriptor_shape(input_descriptor),
+                                                             descriptor_shape(output_descriptor));
+            if (model_shape == onnx_image::ModelShape::Unsupported)
+                throw std::runtime_error("ONNX model requires NCHW batch 1 RGB residual-x2 with fixed 960x540 or dynamic H/W boundaries");
+            const bool dynamic_spatial = model_shape == onnx_image::ModelShape::Dynamic;
             const ml::TensorKind input_kind = input_descriptor.TensorKind();
             const ml::TensorKind output_kind = output_descriptor.TensorKind();
             const auto tensor_kind_label = [](ml::TensorKind kind) {
@@ -455,6 +273,7 @@ struct OnnxBackgroundUpscaler::Impl {
             std::cerr << "[ONNX Upscaler] Model contract accepted: rgb_lr="
                       << tensor_kind_label(input_kind)
                       << ", rgb_residual_x2=" << tensor_kind_label(output_kind)
+                      << (dynamic_spatial ? ", spatial=dynamic original size" : ", spatial=fixed 960x540 tiles")
                       << (internal_int8
                               ? ", internal quantization=INT8/QDQ (" + quantization + ")"
                               : "")
@@ -497,9 +316,6 @@ struct OnnxBackgroundUpscaler::Impl {
                 session = make_high_performance_session();
             }
 
-            const std::vector<std::int64_t> input_shape{1, 3, kModelInputHeight, kModelInputWidth};
-            const std::vector<std::int64_t> output_shape{1, 3, kOnnxUpscaleTargetHeight, kOnnxUpscaleTargetWidth};
-
             while (true) {
                 std::string path;
                 std::uint64_t id = 0;
@@ -533,49 +349,87 @@ struct OnnxBackgroundUpscaler::Impl {
                     bgra_in_flight = false;
                 };
 
-                std::vector<std::uint8_t> low_bgra;
                 const bool decoded = is_bgra
-                                         ? resize_cover_bgra(source_bgra,
-                                                             source_width,
-                                                             source_height,
-                                                             low_bgra)
-                                         : decode_cover_frame(wic_factory.Get(), path, low_bgra);
+                    ? onnx_image::valid_size(source_width, source_height)
+                    : decode_native_frame(wic_factory.Get(), path, source_width, source_height, source_bgra);
                 if (!decoded) {
-                    std::cerr << "[ONNX Upscaler] Could not decode background; keeping native bitmap: "
-                              << path << '\n';
+                    std::cerr << "[ONNX Upscaler] Source cannot be decoded at native size (max 4096 per axis); keeping native bitmap.\n";
                     finish_bgra_request();
                     continue;
                 }
-
-                std::vector<float> rgb = bgra_to_nchw_rgb(low_bgra);
-                if (rgb.empty()) {
+                const auto deblocked = deblock_bgra_ffmpeg(source_width, source_height, source_bgra, [&]() {
+                    std::lock_guard<std::mutex> lock(mutex);
+                    return stop || id != request_id;
+                });
+                if (deblocked != DeblockResult::Completed) {
+                    if (deblocked != DeblockResult::Cancelled)
+                        std::cerr << "[ONNX Upscaler] FFmpeg deblock unavailable or failed; keeping native bitmap.\n";
                     finish_bgra_request();
                     continue;
                 }
+                std::vector<std::uint8_t> output(std::size_t(source_width * 2) * (source_height * 2) * 4);
+                const auto input_width = dynamic_spatial ? source_width : kModelInputWidth;
+                const auto input_height = dynamic_spatial ? source_height : kModelInputHeight;
+                const std::vector<std::int64_t> input_shape{1, 3, input_height, input_width};
+                const std::vector<std::int64_t> output_shape{1, 3, input_height * 2, input_width * 2};
+                const auto tiles = dynamic_spatial
+                    ? std::vector<onnx_image::Tile>{{0, 0, source_width, source_height, 0, 0}}
+                    : onnx_image::plan_tiles(source_width, source_height);
+                bool completed = true;
+                for (const auto& tile : tiles) {
+                    {
+                        std::lock_guard<std::mutex> lock(mutex);
+                        if (stop || id != request_id) { completed = false; break; }
+                    }
+                    // Dynamic models see exactly the decoded/filtered original, with no
+                    // padding, tiling or duplicate full-image BGRA allocation.
+                    const auto low_bgra = dynamic_spatial ? std::vector<std::uint8_t>{}
+                        : onnx_image::extract_tile(source_bgra, source_width, source_height, tile);
+                    std::vector<float> rgb = bgra_to_nchw_rgb(dynamic_spatial ? source_bgra : low_bgra,
+                                                             input_width, input_height);
+                    if (rgb.empty()) { completed = false; break; }
 
-                const auto evaluate_residual = [&](const ml::LearningModelSession& active_session) {
-                    const auto bind_and_evaluate =
-                        [&](const auto& input_tensor, const auto& output_tensor) {
-                            ml::LearningModelBinding binding(active_session);
-                            binding.Bind(L"rgb_lr", input_tensor);
-                            binding.Bind(L"rgb_residual_x2", output_tensor);
-                            active_session.Evaluate(
-                                binding,
-                                L"tenriff-onnx-upscaler-background");
+                    const auto evaluate_residual = [&](const ml::LearningModelSession& active_session) {
+                        const auto bind_and_evaluate =
+                            [&](const auto& input_tensor, const auto& output_tensor) {
+                                ml::LearningModelBinding binding(active_session);
+                                binding.Bind(L"rgb_lr", input_tensor);
+                                binding.Bind(L"rgb_residual_x2", output_tensor);
+                                const auto result = active_session.Evaluate(
+                                    binding,
+                                    L"tenriff-onnx-upscaler-background");
+                                // A dynamic descriptor cannot promise an x2 result. Validate
+                                // the evaluated tensor before indexing residual pixels.
+                                const auto evaluated = result.Outputs().Lookup(L"rgb_residual_x2")
+                                    .template as<std::decay_t<decltype(output_tensor)>>();
+                                const auto evaluated_shape = evaluated.Shape();
+                                if (!onnx_image::valid_residual_shape(
+                                        std::vector<std::int64_t>(evaluated_shape.begin(), evaluated_shape.end()),
+                                        input_width, input_height))
+                                    throw std::runtime_error("ONNX evaluated output must be batch 1 RGB at exactly x2 input dimensions");
+                                std::vector<float> residual(std::size_t(input_width) * input_height * 12);
+                                const auto residual_view = evaluated.GetAsVectorView();
+                                if (residual_view.Size() != residual.size() ||
+                                    residual_view.GetMany(0, residual) != residual.size()) {
+                                    residual.clear();
+                                }
+                                return residual;
+                            };
 
-                            std::vector<float> residual(
-                                static_cast<std::size_t>(kOnnxUpscaleTargetWidth) *
-                                kOnnxUpscaleTargetHeight * 3);
-                            const auto residual_view = output_tensor.GetAsVectorView();
-                            if (residual_view.GetMany(0, residual) != residual.size()) {
-                                residual.clear();
+                        if (input_kind == ml::TensorKind::Float16) {
+                            const auto input_tensor =
+                                ml::TensorFloat16Bit::CreateFromArray(input_shape, rgb);
+                            if (output_kind == ml::TensorKind::Float16) {
+                                const auto output_tensor =
+                                    ml::TensorFloat16Bit::Create(output_shape);
+                                return bind_and_evaluate(input_tensor, output_tensor);
                             }
-                            return residual;
-                        };
+                            const auto output_tensor = ml::TensorFloat::Create(output_shape);
+                            return bind_and_evaluate(input_tensor, output_tensor);
+                        }
 
-                    if (input_kind == ml::TensorKind::Float16) {
                         const auto input_tensor =
-                            ml::TensorFloat16Bit::CreateFromArray(input_shape, rgb);
+                            ml::TensorFloat::CreateFromArray(input_shape, rgb);
                         if (output_kind == ml::TensorKind::Float16) {
                             const auto output_tensor =
                                 ml::TensorFloat16Bit::Create(output_shape);
@@ -583,51 +437,35 @@ struct OnnxBackgroundUpscaler::Impl {
                         }
                         const auto output_tensor = ml::TensorFloat::Create(output_shape);
                         return bind_and_evaluate(input_tensor, output_tensor);
-                    }
+                    };
 
-                    const auto input_tensor =
-                        ml::TensorFloat::CreateFromArray(input_shape, rgb);
-                    if (output_kind == ml::TensorKind::Float16) {
-                        const auto output_tensor =
-                            ml::TensorFloat16Bit::Create(output_shape);
-                        return bind_and_evaluate(input_tensor, output_tensor);
+                    std::vector<float> residual;
+                    try {
+                        residual = evaluate_residual(session);
+                    } catch (const winrt::hresult_error&) {
+                        if (!using_low_power_preference) {
+                            throw;
+                        }
+                        std::cerr << "[ONNX Upscaler] NPU/low-power evaluation rejected this model; "
+                                     "retrying on high-performance DirectX.\n";
+                        session = make_high_performance_session();
+                        using_low_power_preference = false;
+                        residual = evaluate_residual(session);
                     }
-                    const auto output_tensor = ml::TensorFloat::Create(output_shape);
-                    return bind_and_evaluate(input_tensor, output_tensor);
-                };
-
-                std::vector<float> residual;
-                try {
-                    residual = evaluate_residual(session);
-                } catch (const winrt::hresult_error&) {
-                    if (!using_low_power_preference) {
-                        throw;
+                    if (!onnx_image::compose_tile(source_bgra, source_width, source_height,
+                                                  tile, residual, output, input_width, input_height)) {
+                        std::cerr << "[ONNX Upscaler] Invalid residual tile; keeping native bitmap.\n";
+                        completed = false;
+                        break;
                     }
-                    std::cerr << "[ONNX Upscaler] NPU/low-power evaluation rejected this model; "
-                                 "retrying on high-performance DirectX.\n";
-                    session = make_high_performance_session();
-                    using_low_power_preference = false;
-                    residual = evaluate_residual(session);
                 }
-                if (residual.empty()) {
-                    std::cerr << "[ONNX Upscaler] WinML returned an incomplete frame; "
-                                 "keeping native bitmap.\n";
-                    finish_bgra_request();
-                    continue;
-                }
-
-                std::vector<std::uint8_t> output =
-                    compose_onnx_residual_bgra(low_bgra, residual);
-                if (output.empty()) {
-                    finish_bgra_request();
-                    continue;
-                }
+                if (!completed) { finish_bgra_request(); continue; }
 
                 auto frame = std::make_shared<OnnxUpscaleFrame>();
                 frame->source_path = path;
                 frame->request_id = id;
-                frame->width = kOnnxUpscaleTargetWidth;
-                frame->height = kOnnxUpscaleTargetHeight;
+                frame->width = source_width * 2;
+                frame->height = source_height * 2;
                 frame->bgra = std::move(output);
 
                 {
@@ -694,8 +532,9 @@ bool OnnxBackgroundUpscaler::request_bgra(std::string source_key,
                                            std::uint32_t width,
                                            std::uint32_t height,
                                            const std::vector<std::uint8_t>& bgra) {
+    if (!onnx_image::valid_size(width, height)) return false;
     const std::size_t expected = static_cast<std::size_t>(width) * height * 4;
-    if (!impl_ || source_key.empty() || width == 0 || height == 0 || bgra.size() != expected) {
+    if (!impl_ || source_key.empty() || bgra.size() != expected) {
         return false;
     }
     std::lock_guard<std::mutex> lock(impl_->mutex);
@@ -741,8 +580,7 @@ void OnnxBackgroundUpscaler::clear() {
 bool OnnxBackgroundUpscaler::should_upscale(std::uint32_t width,
                                               std::uint32_t height,
                                               std::string_view mode) {
-    return lower_ascii(mode) == "onnx" && width > 0 && height > 0 &&
-           (width < kOnnxUpscaleTargetWidth || height < kOnnxUpscaleTargetHeight);
+    return lower_ascii(mode) == "onnx" && onnx_image::valid_size(width, height);
 }
 
 bool OnnxBackgroundUpscaler::should_upscale_realtime_video(std::string_view) {

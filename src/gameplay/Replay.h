@@ -74,6 +74,9 @@ struct ReplayFile {
     std::string chart_sha256;
     std::string ruleset_id;
     std::string created_utc;
+    // Upload consent at play start. Missing/unknown historical values remain
+    // playable locally, but must never acquire upload eligibility later.
+    std::string record_play_mode;
     std::string server_challenge_id;
     std::string server_challenge_nonce;
 
@@ -108,6 +111,7 @@ struct ResultFile {
     std::string chart_sha256;
     std::string ruleset_id;
     std::string created_utc;
+    std::string record_play_mode;
     std::string player_name;
     std::string replay_path;
     std::string replay_sha256;

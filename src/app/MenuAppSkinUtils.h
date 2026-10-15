@@ -65,7 +65,7 @@ enum class SkinSettingsRowId {
     JudgementY,
     JudgementX,
     ComboX,
-    ExportPreset,
+    ExportPreset,  // Retired; keep this ID reserved so later mouse targets retain their identity.
     ImportPreset,
     OpenSkinEditor,
     ComboFontSize,
@@ -90,7 +90,7 @@ enum class SkinSettingsRowId {
 
 // The same order drives keyboard navigation, rendered rows and mouse hit targets.
 // Keep related controls adjacent instead of deriving positions from row labels.
-inline constexpr std::array<SkinSettingsRowId, 69> kSkinSettingsRowOrder = {
+inline constexpr std::array<SkinSettingsRowId, 68> kSkinSettingsRowOrder = {
     SkinSettingsRowId::KeyMode,
     SkinSettingsRowId::ScratchPosition,
     SkinSettingsRowId::SkinSource,
@@ -101,7 +101,6 @@ inline constexpr std::array<SkinSettingsRowId, 69> kSkinSettingsRowOrder = {
     SkinSettingsRowId::CreateSkin,
     SkinSettingsRowId::OpenSkinFolder,
     SkinSettingsRowId::ReloadSkin,
-    SkinSettingsRowId::ExportPreset,
     SkinSettingsRowId::ImportPreset,
     SkinSettingsRowId::OpenSkinEditor,
     SkinSettingsRowId::JudgeLinePosition,
@@ -171,7 +170,7 @@ enum class SkinSettingsCategory { Source, Geometry, Notes, LongNotes, Effects, H
         case SkinSettingsRowId::SkinSource: case SkinSettingsRowId::ImportedSkin:
         case SkinSettingsRowId::Lr2Resolution: case SkinSettingsRowId::ImportSkin:
         case SkinSettingsRowId::CreateSkin: case SkinSettingsRowId::OpenSkinFolder:
-        case SkinSettingsRowId::ReloadSkin: case SkinSettingsRowId::ExportPreset:
+        case SkinSettingsRowId::ReloadSkin:
         case SkinSettingsRowId::ImportPreset: case SkinSettingsRowId::OpenSkinEditor:
         case SkinSettingsRowId::VisualLatency:
             return SkinSettingsCategory::Source;
@@ -218,6 +217,7 @@ enum class SkinSettingsCategory { Source, Geometry, Notes, LongNotes, Effects, H
         case SkinSettingsRowId::UiFont:
         case SkinSettingsRowId::UiFontFile:
         case SkinSettingsRowId::GameplayCursor:
+        case SkinSettingsRowId::ExportPreset:
             return SkinSettingsCategory::Other;
         case SkinSettingsRowId::Back:
             return SkinSettingsCategory::Navigation;

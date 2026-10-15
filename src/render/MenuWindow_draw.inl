@@ -364,6 +364,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
         const D2D1_RECT_F background_rect =
             D2D1::RectF(0.0f, 0.0f, kBaseWidth, kBaseHeight);
         if (d2d_->gameplay_background_base_bitmap) {
+            // The restored bitmap keeps the original aspect at x2. Cover-fit
+            // and any viewport crop are applied here, after AI composition.
             const D2D1_RECT_F source_rect = centered_bitmap_source_rect(
                 d2d_->gameplay_background_base_bitmap->GetSize(), background_rect);
             ctx->DrawBitmap(d2d_->gameplay_background_base_bitmap.Get(),
@@ -381,8 +383,18 @@ void MenuWindow::draw(const MenuRenderData& data) {
                             D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
                             &source_rect);
         }
-        // BGA brightness belongs to the source image/video. The lane field is
-        // drawn separately; readability must not dim the entire animation.
+        // Dim the composed image/video layers once, before notes and HUD are
+        // drawn. This preserves layer alpha and avoids dimming gameplay UI.
+        if ((d2d_->gameplay_background_base_bitmap || d2d_->gameplay_background_overlay_bitmap) &&
+            d2d_->note_fill_brush) {
+            const auto saved_color = d2d_->note_fill_brush->GetColor();
+            d2d_->note_fill_brush->SetColor(D2D1::ColorF(D2D1::ColorF::Black));
+            const float saved_opacity = d2d_->note_fill_brush->GetOpacity();
+            d2d_->note_fill_brush->SetOpacity(1.0f - std::clamp(data.gameplay.bga_brightness, 0.0f, 1.0f));
+            ctx->FillRectangle(background_rect, d2d_->note_fill_brush.Get());
+            d2d_->note_fill_brush->SetOpacity(saved_opacity);
+            d2d_->note_fill_brush->SetColor(saved_color);
+        }
     }
 
     const bool visible_gameplay_bga = data.kind == MenuScreenKind::GameplayHud &&
@@ -1231,6 +1243,59 @@ void MenuWindow::draw(const MenuRenderData& data) {
         }
     };
 
+    // Every loading surface uses the chart-loading panel. Unknown progress
+    // animates a bounded segment instead of implying a fabricated percentage.
+    auto draw_loading_panel = [&](std::string_view title, std::string_view stage,
+                                  int percent, std::string_view status = {}) {
+        const auto rect = fit_rect_below_performance_overlay(
+            D2D1::RectF(620, 360, 1300, 620), kBaseHeight - 140.0f, 22.0f);
+        const auto panel = D2D1::RoundedRect(rect, 24, 24);
+        if (d2d_->panel_brush) {
+            const float opacity = d2d_->panel_brush->GetOpacity();
+            d2d_->panel_brush->SetOpacity(0.92f);
+            ctx->FillRoundedRectangle(panel, d2d_->panel_brush.Get());
+            d2d_->panel_brush->SetOpacity(opacity);
+        }
+        if (d2d_->button_border_brush)
+            ctx->DrawRoundedRectangle(panel, d2d_->button_border_brush.Get(), 1.6f);
+        const std::string value = !status.empty() ? std::string(status)
+            : percent >= 0 ? std::to_string(std::clamp(percent, 0, 100)) + "%"
+                           : loc("Working...", "처리 중...");
+        auto centered = [&](std::string_view text, IDWriteTextFormat* format,
+                            float top, float bottom, ID2D1SolidColorBrush* brush) {
+            if (!format || !brush) return;
+            const auto alignment = format->GetParagraphAlignment();
+            format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+            draw_text_clipped_aligned(to_wide(std::string(text)), format,
+                D2D1::RectF(rect.left + 32, rect.top + top, rect.right - 32, rect.top + bottom),
+                brush, DWRITE_TEXT_ALIGNMENT_CENTER);
+            format->SetParagraphAlignment(alignment);
+        };
+        centered(title, d2d_->title_format.Get(), 24, 72, d2d_->text_brush.Get());
+        centered(value, d2d_->title_format.Get(), 74, 124, d2d_->text_brush.Get());
+        centered(stage, d2d_->body_format.Get(), 134, 174, d2d_->muted_brush.Get());
+        const auto track = D2D1::RectF(rect.left + 74, rect.bottom - 82, rect.right - 74, rect.bottom - 54);
+        if (d2d_->card_brush) {
+            const float opacity = d2d_->card_brush->GetOpacity();
+            d2d_->card_brush->SetOpacity(0.78f);
+            ctx->FillRoundedRectangle(D2D1::RoundedRect(track, 10, 10), d2d_->card_brush.Get());
+            d2d_->card_brush->SetOpacity(opacity);
+        }
+        if (d2d_->accent_brush) {
+            auto fill = D2D1::RectF(track.left + 4, track.top + 4, track.right - 4, track.bottom - 4);
+            const float width = fill.right - fill.left;
+            if (percent >= 0) {
+                fill.right = fill.left + width * std::clamp(percent, 0, 100) / 100.0f;
+            } else {
+                const float phase = static_cast<float>(0.5 + 0.5 * std::sin(render_now_ns / 1e9 * 3.0));
+                fill.left += phase * width * 0.7f;
+                fill.right = fill.left + width * 0.3f;
+            }
+            if (fill.right > fill.left)
+                ctx->FillRoundedRectangle(D2D1::RoundedRect(fill, 8, 8), d2d_->accent_brush.Get());
+        }
+    };
+
     // Both play and the Skin Settings thumbnail draw the same scene in 1920x1080
     // coordinates. Only the enclosing transform changes in the thumbnail.
     auto draw_gameplay_hud = [&](const MenuRenderData& data, bool is_skin_preview = false,
@@ -1292,52 +1357,12 @@ void MenuWindow::draw(const MenuRenderData& data) {
     };
 
     auto draw_loading_progress = [&]() {
-        if (!data.loading_progress.visible) {
-            return;
-        }
-        constexpr float bar_height = 12.0f;
-        const D2D1_RECT_F track = D2D1::RectF(0.0f, 0.0f, kBaseWidth, bar_height);
-        if (d2d_->card_brush) {
-            const float saved_opacity = d2d_->card_brush->GetOpacity();
-            d2d_->card_brush->SetOpacity(0.96f);
-            ctx->FillRectangle(track, d2d_->card_brush.Get());
-            d2d_->card_brush->SetOpacity(saved_opacity);
-        }
-        if (d2d_->accent_brush) {
-            D2D1_RECT_F fill = track;
-            if (data.loading_progress.percent >= 0) {
-                const float ratio = static_cast<float>(std::clamp(
-                    data.loading_progress.percent, 0, 100)) / 100.0f;
-                fill.right = kBaseWidth * ratio;
-            } else {
-                constexpr float segment_width = 360.0f;
-                const double seconds = static_cast<double>(render_now_ns) / 1'000'000'000.0;
-                const float phase = static_cast<float>(std::fmod(seconds * 0.65, 1.0));
-                fill.left = phase * (kBaseWidth + segment_width) - segment_width;
-                fill.right = fill.left + segment_width;
-            }
-            ctx->FillRectangle(fill, d2d_->accent_brush.Get());
-        }
-        if (d2d_->hud_format && d2d_->text_brush) {
-            std::string label = data.loading_progress.stage.empty()
-                                    ? std::string("INDEXING")
-                                    : data.loading_progress.stage;
-            if (data.loading_progress.percent >= 0) {
-                label += "  " + std::to_string(data.loading_progress.percent) + "%";
-            }
-            if (data.loading_progress.total > 0) {
-                label += "  " + std::to_string(data.loading_progress.processed) +
-                         "/" + std::to_string(data.loading_progress.total);
-            }
-            if (!data.loading_progress.eta.empty()) {
-                label += "  ETA " + data.loading_progress.eta;
-            }
-            draw_text_clipped_aligned(to_wide(label),
-                                      d2d_->hud_format.Get(),
-                                      D2D1::RectF(24.0f, 14.0f, kBaseWidth - 24.0f, 42.0f),
-                                      d2d_->text_brush.Get(),
-                                      DWRITE_TEXT_ALIGNMENT_TRAILING);
-        }
+        if (!data.loading_progress.visible) return;
+        std::string stage = data.loading_progress.stage;
+        if (data.loading_progress.total > 0)
+            stage += "  " + std::to_string(data.loading_progress.processed) + "/" + std::to_string(data.loading_progress.total);
+        if (!data.loading_progress.eta.empty()) stage += "  ETA " + data.loading_progress.eta;
+        draw_loading_panel(loc("LOADING", "불러오는 중"), stage, data.loading_progress.percent);
     };
 
     switch (data.kind) {

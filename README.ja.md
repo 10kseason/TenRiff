@@ -1,4 +1,12 @@
+**2026-10-16 · 現行リリース1.9.2:** 起動時F10のゲスト/オンライン選択、ゲスト・過去記録の送信禁止、動的原寸AIとFFmpegデブロック、スキン書き出し行の削除を含みます。実行・ソースパッケージにBGAモデルは含まず、パスは空、機能はOFFが初期値です。固定基準は1.9.0です。[変更と互換性](docs/release-1.9.2.ja.md) · [検証手順](docs/release-1.9.2-gate.md)。下の日付付き記録は当時の履歴であり、現在の範囲はこの1.9.2の案内に従います。
+
+> 2026-10-16: [FFmpegデブロックと外部ONNX x2](docs/deblock-lunasr-20261016.ja.md)
+
+> 2026-10-16: [BGAを元の解像度で復元してから表示領域に合わせる](docs/native-upscale-20261016.ja.md)
+
 # TenRiff
+
+**2026-10-16 · 1.9.1.1 UI:** [ホーム・グラフィック・読み込み・固定等級 — 1.9.1.1後続候補](docs/ui-feedback-20261016.ja.md).
 
 **2026-10-15 · 1.9.1.1 BMSオンライン対応:** 新しいBMSゲージ・タイミング・RANDOM分岐の記録をSitesコミュニティランキングへ送信し、規則と選択された分岐内容ごとに順位を分けます。新クライアントと対応するWeb配信が必要です。Sitesは引き続き`client_submitted`記録であり、別系統のRanked検証サーバーの制限は維持します。下の1.9.1のローカル専用表記は同版の履歴です。公開済みファイルと固定基準1.9.0を保持します。 [範囲・互換性・検証](docs/feedback-1.9.1.1.ja.md)。
 
@@ -60,13 +68,13 @@
 
 **マルチプレイRate対応ビルド:** ロビーでリーダーが共通のRateを設定します。全員がこのprotocol v6ビルドを使用してください。旧v5クライアントとは接続できません。[案内](docs/multiplayer-rate-build.ko.md)（韓国語）。
 
-公開状況・ダウンロード: [**1.9.1 リリースページ**](https://github.com/10kseason/TenRiff/releases/tag/1.9.1)。公開状況は同ページを基準とし、[検証手順](docs/release-1.9.1-gate.md)を参照してください。**新しいBMSゲージ・分岐記録と従来のタイミングv2記録はサーバー対応までローカル専用**です。Web/API公開は含みません。
+公開状況・ダウンロード: [**1.9.2 リリースページ**](https://github.com/10kseason/TenRiff/releases/tag/1.9.2)。[検証手順](docs/release-1.9.2-gate.md)を参照してください。ゲストと由来情報のない過去記録はローカル専用で、オンラインで新しく開始したプレイだけが既存条件に従って送信されます。サーバー・DB変更は含みません。
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | 日本語
 
-TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。固定基準は `1.9.0`、このソースのバージョンは `1.9.1` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
+TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。固定基準は `1.9.0`、このソースのバージョンは `1.9.2` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
 
-この README は導入文書です。現在の挙動、`1.9.1` リリースと固定 `1.9.0` の基準、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
+この README は導入文書です。現在の挙動、`1.9.2` リリースと固定 `1.9.0` の基準、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
 
 TenRiff のコードベースは、伝統的な長文設計書主導だけで積み上がったものではなく、高速な反復と実験を重視した `vibe coding` 的な性格を持つ作品でもあります。
 

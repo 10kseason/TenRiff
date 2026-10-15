@@ -1,0 +1,1 @@
+Corresponding source for this FFmpeg 7.1 executable is provided as ffmpeg-7.1.tar.xz plus build-minimal.sh in the TenRiff source release package. The source archive is the exact, unmodified upstream archive from https://ffmpeg.org/releases/ffmpeg-7.1.tar.xz. See BUILDING.md, LICENSE.md and COPYING.LGPLv2.1.txt.

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.9.1.1 LANGUAGES C CXX)
+project(TenRiff VERSION 1.9.2 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -348,7 +348,8 @@ if(WIN32)
         src/render/BgaImageLoader.cpp
         src/render/BgaVideoDecoder.cpp
         src/render/BgaVideoFfmpeg.cpp
-        src/render/OnnxBackgroundUpscaler.cpp
+        src/render/FfmpegImageFilter.cpp
+            src/render/OnnxBackgroundUpscaler.cpp
         src/render/ResultPresentation.cpp
         src/render/MenuWindow.cpp
         src/render/GameplaySpriteBatch.cpp
@@ -389,6 +390,9 @@ if(WIN32)
     target_link_libraries(bga_video_smoke PRIVATE ole32 mfplat mfreadwrite mfuuid)
 
     if(TENRIFF_ENABLE_ONNX_UPSCALER AND MSVC)
+        add_executable(deblock_smoke tools/onnx_upscaler/deblock_smoke.cpp src/render/FfmpegImageFilter.cpp)
+        target_include_directories(deblock_smoke PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        target_compile_features(deblock_smoke PRIVATE cxx_std_17)
         target_compile_definitions(tenriff_app PRIVATE
             TENRIFF_ENABLE_ONNX_UPSCALER=1
             _SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS
@@ -397,7 +401,8 @@ if(WIN32)
 
         add_executable(onnx_upscaler_winml_smoke
             tools/onnx_upscaler/winml_smoke.cpp
-            src/render/OnnxBackgroundUpscaler.cpp
+            src/render/FfmpegImageFilter.cpp
+        src/render/OnnxBackgroundUpscaler.cpp
         )
         target_include_directories(onnx_upscaler_winml_smoke PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -424,6 +429,25 @@ target_link_libraries(tenriff_replay_verifier PRIVATE tenriff_core)
 
 set_target_properties(tenriff PROPERTIES OUTPUT_NAME "TenRiff")
 
+# The small raw-image filter helper is separate from general BGA video decoding.
+# BGA model weights are deliberately never copied: users select their own ONNX.
+if(WIN32 AND TENRIFF_ENABLE_ONNX_UPSCALER AND MSVC)
+    set(TENRIFF_FFMPEG_DEBLOCK_RUNTIME "${CMAKE_CURRENT_SOURCE_DIR}/third_party/ffmpeg-7.1/runtime")
+    if(NOT EXISTS "${TENRIFF_FFMPEG_DEBLOCK_RUNTIME}/ffmpeg.exe")
+        message(FATAL_ERROR "Missing bundled FFmpeg deblock helper; see third_party/ffmpeg-7.1/source-packet/BUILDING.md")
+    endif()
+    function(tenriff_copy_ffmpeg_deblock filter_target)
+        add_custom_command(TARGET ${filter_target} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${TENRIFF_FFMPEG_DEBLOCK_RUNTIME}"
+                "$<TARGET_FILE_DIR:${filter_target}>/tools/ffmpeg-deblock"
+            COMMENT "Copying FFmpeg raw-image filter helper and notices")
+    endfunction()
+    foreach(filter_target tenriff deblock_smoke onnx_upscaler_winml_smoke)
+        tenriff_copy_ffmpeg_deblock(${filter_target})
+    endforeach()
+endif()
+
 # Keep menu music beside the runnable binary. Copying the directory as a
 # post-build step also makes newly added numbered variants available without
 # maintaining an asset list in CMake.
@@ -446,6 +470,10 @@ if(WIN32)
     # synthetic charts/profiles. Never packaged as an end-user executable.
     add_executable(menu_app_smoke EXCLUDE_FROM_ALL tools/menu_app_smoke.cpp)
     target_link_libraries(menu_app_smoke PRIVATE tenriff_app)
+    if(COMMAND tenriff_copy_ffmpeg_deblock)
+        tenriff_copy_ffmpeg_deblock(menu_visual_preview)
+        tenriff_copy_ffmpeg_deblock(menu_app_smoke)
+    endif()
     # Silent shared-stream continuity probe, isolated synthetic profile only.
     add_executable(loading_audio_smoke EXCLUDE_FROM_ALL tools/loading_audio_smoke.cpp)
     target_link_libraries(loading_audio_smoke PRIVATE tenriff_app)

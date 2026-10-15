@@ -17,7 +17,6 @@ enum class SkinBoundaryAction {
     CreateSkin,
     OpenSkinFolder,
     ReloadSkin,
-    ExportPreset,
     ImportPreset,
     OpenSkinEditor,
     ChooseUiFont,

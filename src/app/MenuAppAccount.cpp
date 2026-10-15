@@ -106,6 +106,23 @@ std::optional<std::filesystem::path> pick_sites_connection_file(std::string& err
 
 }  // namespace
 
+void MenuApp::choose_play_mode(bool online) {
+    // Once guest mode touches a play, returning online must never promote that record.
+    if (!online && active_recording_permission_)
+        active_recording_permission_->store(false, std::memory_order_release);
+    sites_leaderboard_service_.set_online_enabled(online);
+    online_play_mode_ = online;
+    account_mode_choice_online_ = online;
+    account_mode_selection_ = false;
+    if (online) {
+        ranked_account_sites_mode_ = true;
+        refresh_sites_leaderboard_connection();
+    } else {
+        set_ranked_account_overlay(false);
+    }
+    publish_snapshot();
+}
+
 void MenuApp::toggle_ranked_account_overlay() {
     set_ranked_account_overlay(!ranked_account_overlay_visible_);
     publish_snapshot();
@@ -114,6 +131,8 @@ void MenuApp::toggle_ranked_account_overlay() {
 void MenuApp::set_ranked_account_overlay(bool visible) {
     ranked_account_overlay_visible_ = visible;
     if (visible) {
+        account_mode_selection_ = true;
+        account_mode_choice_online_ = online_play_mode_;
         set_multiplayer_chat_overlay(false);
         dismiss_chat_url_warning();
         ranked_account_focused_field_ = ranked_account_use_private_server_ ? 0 : 1;
@@ -134,6 +153,14 @@ bool MenuApp::handle_ranked_account_overlay_input(uint32_t keycode) {
         publish_snapshot();
         return true;
     }
+    if (account_mode_selection_) {
+        if (keycode == key_left_) account_mode_choice_online_ = false;
+        else if (keycode == key_right_) account_mode_choice_online_ = true;
+        else if (keycode == key_tab_) account_mode_choice_online_ = !account_mode_choice_online_;
+        else if (keycode == key_enter_) { choose_play_mode(account_mode_choice_online_); return true; }
+        publish_snapshot();
+        return true;
+    }
     if (ranked_account_request_busy_.load(std::memory_order_acquire)) return true;
     if (keycode == key_tab_ && control_modifier_pressed()) {
         ranked_account_sites_mode_ = !ranked_account_sites_mode_;
@@ -144,8 +171,10 @@ bool MenuApp::handle_ranked_account_overlay_input(uint32_t keycode) {
     if (ranked_account_sites_mode_) {
         if (keycode == key_v_ && control_modifier_pressed())
             handle_sites_leaderboard_action(render::SitesLeaderboardAction::PasteConnection);
-        else if (keycode == key_enter_)
-            handle_sites_leaderboard_action(render::SitesLeaderboardAction::ImportFile);
+        else if (keycode == key_enter_) {
+            if (sites_connection_saved_) { set_ranked_account_overlay(false); publish_snapshot(); }
+            else handle_sites_leaderboard_action(render::SitesLeaderboardAction::ImportFile);
+        }
         return true;
     }
     if (!ranked_account_signed_in_username_.empty()) {
@@ -216,6 +245,9 @@ bool MenuApp::handle_ranked_account_overlay_input(uint32_t keycode) {
 void MenuApp::populate_ranked_account_overlay(
     render::RankedAccountOverlayData& target) const {
     target.visible = ranked_account_overlay_visible_;
+    target.mode_selection = account_mode_selection_;
+    target.online_mode = online_play_mode_;
+    target.mode_choice_online = account_mode_choice_online_;
     target.register_mode = ranked_account_register_mode_;
     target.busy = ranked_account_request_busy_.load(std::memory_order_acquire);
     target.signed_in = !ranked_account_signed_in_username_.empty();
@@ -249,12 +281,14 @@ void MenuApp::refresh_sites_leaderboard_connection() {
     sites_connection_saved_ = loaded && !missing;
     sites_connection_url_ = sites_connection_saved_ ? connection.site_url : kSitesLeaderboardUrl;
     clear_secret(connection.upload_token);
-    sites_connection_status_ = !loaded ? error : sites_connection_saved_
+    sites_connection_status_ = !online_play_mode_
+        ? ui_text("Guest mode: records stay local and are never uploaded later.", "게스트 모드: 기록은 로컬 전용이며 나중에도 업로드되지 않습니다.")
+        : !loaded ? error : sites_connection_saved_
         ? ui_text("Connection saved. Eligible records upload automatically.",
                   "연결 정보가 저장되어 있습니다. 플레이 후 자동 업로드합니다.")
         : ui_text("Open the website, sign in, and copy your connection information.",
                   "웹사이트에서 로그인한 뒤 연결 정보를 복사해 주세요.");
-    if (sites_connection_saved_ && !sites_last_upload_status_.empty())
+    if (online_play_mode_ && sites_connection_saved_ && !sites_last_upload_status_.empty())
         sites_connection_status_ = sites_last_upload_status_;
 }
 

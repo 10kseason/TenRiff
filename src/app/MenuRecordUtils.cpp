@@ -292,12 +292,15 @@ std::string calculate_rank(const gameplay::ResultStats& stats, bool game_over,
     }
     // Grade uses unrounded categorical accuracy, independently of score,
     // score multipliers and detailed timing accuracy. Surviving low accuracy
-    // is D; F is reserved for failure after the non-play labels above.
+    // below 70% is E; F is reserved for failure after the non-play labels above.
     const double accuracy = calculate_accuracy(stats);
     if (accuracy >= 99.0) {
-        return "S++";
+        return "S+++";
     }
     if (accuracy >= 98.0) {
+        return "S++";
+    }
+    if (accuracy >= 97.0) {
         return "S+";
     }
     if (accuracy >= 95.0) {
@@ -315,7 +318,7 @@ std::string calculate_rank(const gameplay::ResultStats& stats, bool game_over,
     if (accuracy >= 80.0) {
         return "C";
     }
-    return "D";
+    return accuracy >= 70.0 ? "D" : "E";
 }
 
 bool is_better_record(int64_t candidate_score,

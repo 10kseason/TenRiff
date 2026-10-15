@@ -1010,6 +1010,7 @@ TEST_CASE("config save and load preserve explicit uncommon resolutions") {
     }
 }
 
+
 TEST_CASE("config save and load preserve unlimited graphics refresh") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
@@ -2652,4 +2653,31 @@ TEST_CASE("new audio and mode defaults preserve explicit legacy profile choices"
     CHECK(loaded.config.mode.gauge == "ex_hard");
     CHECK(loaded.config.mode.song_index_profile == "fast");
     CHECK_FALSE(loaded.config.mode.ghost_battle_enabled);
+}
+
+TEST_CASE("BGA brightness preserves legacy profiles and clamps percent settings") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    CurrentPathGuard cwd;
+    std::filesystem::current_path(temp.path);
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    CHECK(config.graphics.bga_brightness_percent == 100);
+    for (int value : {0, 1, 37, 99, 100}) {
+        config.graphics.bga_brightness_percent = value;
+        config.graphics.vsync = true;
+        std::string error;
+        REQUIRE(loader.save_profile("profiles/brightness", config, &error));
+        const auto loaded = loader.load_profile("profiles/brightness");
+        REQUIRE(loaded.success());
+        CHECK(loaded.config.graphics.bga_brightness_percent == value);
+        CHECK(loaded.config.graphics.vsync);
+    }
+    write_file("profiles/brightness/config.json", R"({"graphics":{"vsync":true}})");
+    CHECK(loader.load_profile("profiles/brightness").config.graphics.bga_brightness_percent == 100);
+    write_file("profiles/brightness/config.json", R"({"graphics":{"bga_brightness_percent":10000000000}})");
+    CHECK(loader.load_profile("profiles/brightness").config.graphics.bga_brightness_percent == 100);
+    write_file("profiles/brightness/config.json", R"({"graphics":{"bga_brightness_percent":-2}})");
+    CHECK(loader.load_profile("profiles/brightness").config.graphics.bga_brightness_percent == 0);
 }

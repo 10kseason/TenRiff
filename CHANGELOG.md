@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.9.2] - 2026-10-16
+
+- Open the F10 Guest/Online choice on every launch, defaulting to Guest; Esc keeps Guest selected. Online permission lasts only for the current process and applies to fresh plays. Permanently exclude Guest and unmarked historical records from both Sites and Ranked uploads while retaining local history/replay playback.
+- Revoke an active play's upload permission irreversibly on a Guest transition. Invalidate queued work and wait for any already-started POST before completing the transition; switching back to Online cannot promote that play. Preserve existing server/DB formats, numeric ranking and the Sites `client_submitted` trust boundary.
+- Support dynamic-spatial external ONNX residual-x2 models at the complete original dimensions. Apply FFmpeg's built-in weak/block-8 RGB deblock before AI input and bilinear-base composition; fit/crop only after restoration. Retain fixed-model padding/context-tile compatibility, alpha, static-image eligibility and native fallback.
+- Keep BGA model selection empty and upscaling OFF by default. Include no BGA upscaler weights in runtime or source packages; existing NK3 key-conversion models remain. Preserve explicitly saved custom paths/settings.
+- Include the prior UI follow-up: remove the V-Sync option row while retaining refresh selection, add 0–100% BGA brightness in 1% steps, use the common loading bar for skin/chart/table work, retain the Home EN/KO/JA/ZH selector, and fix the requested S+++ through F display ladder without changing score/judgement/gauge rules.
+- Remove the Skin settings Export Skin Preset action. Preserve preset import/drop and full-profile export with internal skin packaging.
+- Preserve release 1.9.1.1 behavior outside these changes and the fixed 1.9.0 baseline. See [changes and compatibility](docs/release-1.9.2.en.md) and the [verification gate](docs/release-1.9.2-gate.md); this entry does not claim completed validation or publication.
+
 ## [1.9.1.1] - 2026-10-15
 
 - Extend the Sites community submission contract to eligible BMS gauge v2, BPM/STOP timing v2 and control-flow v2 records. This requires the updated client and corresponding web deployment; published 1.9.1 binaries and assets retain their behavior.

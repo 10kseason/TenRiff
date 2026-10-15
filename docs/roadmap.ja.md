@@ -1,4 +1,12 @@
+**2026-10-16 · 現行リリース1.9.2:** 起動時F10のゲスト/オンライン選択、ゲスト・過去記録の送信禁止、動的原寸AIとFFmpegデブロック、スキン書き出し行の削除を含みます。実行・ソースパッケージにBGAモデルは含まず、パスは空、機能はOFFが初期値です。固定基準は1.9.0です。[変更と互換性](release-1.9.2.ja.md) · [検証手順](release-1.9.2-gate.md)。下の日付付き記録は当時の履歴であり、現在の範囲はこの1.9.2の案内に従います。
+
+> 2026-10-16: [FFmpegデブロックと外部ONNX x2](deblock-lunasr-20261016.ja.md)
+
+> 2026-10-16: [BGAを元の解像度で復元してから表示領域に合わせる](native-upscale-20261016.ja.md)
+
 # TenRiff Development Roadmap (staged)
+
+**2026-10-16 · 1.9.1.1 UI:** [ホーム・グラフィック・読み込み・固定等級 — 1.9.1.1後続候補](ui-feedback-20261016.ja.md).
 
 **2026-10-15 · 1.9.1.1 BMSオンライン対応:** 新しいBMSゲージ・タイミング・RANDOM分岐の記録をSitesコミュニティランキングへ送信し、規則と選択された分岐内容ごとに順位を分けます。新クライアントと対応するWeb配信が必要です。Sitesは引き続き`client_submitted`記録であり、別系統のRanked検証サーバーの制限は維持します。下の1.9.1のローカル専用表記は同版の履歴です。公開済みファイルと固定基準1.9.0を保持します。 [範囲・互換性・検証](feedback-1.9.1.1.ja.md)。
 
@@ -36,7 +44,7 @@
 
 ## Current Baseline
 - Windows GUI / runtime が主なサポート経路です。
-- 固定基準は `1.9.0`、このソースはリリース候補 `1.9.0.2`。公開 package は NK3 P64 と generalized pattern MLP inference model を同梱するが、BGA upscaler model は同梱しない。互換性と権利を確認済みの upscaler ONNX を選択しても path を保存するだけで、BGA Upscaler は user が有効化して high-spec warning を確認するまで off のまま。自動 benchmark gate はない。
+- 固定基準は `1.9.0`、このソースはリリース `1.9.2`。公開 package は NK3 P64 と generalized pattern MLP inference model を同梱するが、BGA upscaler model は同梱しない。互換性と権利を確認済みの upscaler ONNX を選択しても path を保存するだけで、BGA Upscaler は user が有効化して high-spec warning を確認するまで off のまま。自動 benchmark gate はない。
 - 現行 menu / runtime は BMS family（`.bms/.bme/.bml/.pms`）専用で、native、bundle/profile の TenRiff `skin.json`、LR2 skin をサポート。
 - 現在出荷されている挙動は [`docs/current-state.ja.md`](current-state.ja.md) を先に見てください。この roadmap は方向と残作業を示す文書です。
 

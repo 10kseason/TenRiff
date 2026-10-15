@@ -1,4 +1,12 @@
+**2026-10-16 · 현재 릴리스 1.9.2:** 시작 F10 게스트/온라인 선택, 게스트·과거 기록 업로드 차단, 동적 원본 해상도 AI 처리와 FFmpeg 디블록, 스킨 내보내기 행 제거를 포함합니다. BGA 모델은 실행·소스 패키지에 넣지 않으며 경로는 빈 값, 기능은 OFF가 기본입니다. 고정 기준은 1.9.0입니다. [변경·호환성](release-1.9.2.ko.md) · [검증 절차](release-1.9.2-gate.md). 아래 날짜별 항목은 당시 이력이며 현재 범위는 이 1.9.2 안내를 따릅니다.
+
+> 2026-10-16: [FFmpeg 디블록과 외부 ONNX x2](deblock-lunasr-20261016.ko.md)
+
+> 2026-10-16: [원본 해상도에서 먼저 복원하는 BGA 업스케일](native-upscale-20261016.ko.md)
+
 # TenRiff Development Roadmap (staged)
+
+**2026-10-16 · 1.9.1.1 UI:** [홈·그래픽·로딩 및 고정 등급 — 1.9.1.1 후속 후보](ui-feedback-20261016.ko.md).
 
 **2026-10-15 · 1.9.1.1 BMS 온라인 후속 버전:** 새 BMS 게이지·타이밍·RANDOM 분기 기록을 Sites 커뮤니티 리더보드에 제출하고, 규칙과 실제 분기 내용별로 순위를 분리합니다. 새 클라이언트와 대응 웹 배포가 필요하며, Sites는 계속 `client_submitted` 기록입니다. 별도 Ranked 검증 서버의 차단은 유지합니다. 아래 1.9.1의 로컬 전용 안내는 그 버전의 이력이며 기존 공개 파일과 고정 기준 1.9.0은 보존합니다. [범위·호환성·검증](feedback-1.9.1.1.ko.md).
 
@@ -36,7 +44,7 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current baseline
 - Windows GUI/runtime is the primary supported path.
-- The fixed baseline is `1.9.0` and this source targets release candidate `1.9.0.2`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
+- The fixed baseline is `1.9.0` and this source targets release `1.9.2`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
 - The active menu/runtime is BMS-family only (`.bms/.bme/.bml/.pms`) and supports native, bundled/profile TenRiff `skin.json`, and LR2 skins.
 - For current shipped behavior, read `docs/current-state.md` first; this roadmap is about direction and remaining work.
 

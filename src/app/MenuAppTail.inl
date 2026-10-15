@@ -69,6 +69,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
             gameplay_hud_.background_base_start_sample,
             gameplay_hud_.background_overlay_start_sample,
             config_.graphics.background_upscale_mode);
+    target.bga_brightness = static_cast<float>(std::clamp(config_.graphics.bga_brightness_percent, 0, 100)) / 100.0f;
     target.background_base_path = background_policy.base_path;
     target.background_overlay_path = background_policy.overlay_path;
     target.background_base_start_sample = background_policy.base_start_sample;
@@ -1879,6 +1880,12 @@ void MenuApp::publish_snapshot() {
         }
     }
 
+    if (difficulty_table_loading_ && !render.loading_progress.visible) {
+        render.loading_progress.visible = true;
+        render.loading_progress.stage = ui_text("Difficulty Table", "난이도표");
+    }
+    if (menu_loading_.visible) render.loading_progress = menu_loading_;
+
     populate_help_overlay(render.help_overlay);
     populate_multiplayer_chat_overlay(render.chat_overlay);
     populate_ranked_account_overlay(render.account_overlay);
@@ -2531,12 +2538,15 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     });
 
     CommandLineOptions play_options = options_;
+    active_recording_permission_ = std::make_shared<std::atomic_bool>(online_play_mode_);
+    play_options.online_recording_enabled = online_play_mode_;
+    play_options.online_recording_permission = active_recording_permission_;
     play_options.chart_path = chart_path;
     play_options.replay_path = replay_path;
     RankedPlayAuthorization ranked_authorization;
     std::string ranked_chart_sha256;
     std::string ranked_prepare_error;
-    if (!peer_battle && !session_mix_active_ && replay_path.empty() &&
+    if (online_play_mode_ && !peer_battle && !session_mix_active_ && replay_path.empty() &&
         !mode_mod_auto_scratch(config_.mode.mods) &&
         !bms_editor_practice_start_seconds_.has_value()) {
         std::string extension = path_from_utf8(chart_path).extension().string();
@@ -2730,14 +2740,19 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     sites_result_replay_sha256_ = result.replay_sha256;
     sites_result_upload_status_ = ui_text("Web ranking excluded for this play; local record only.",
                                          "웹 등록 제외 플레이 · 기록은 로컬에 저장");
-    if (replay_playback) {
+    const bool online_record_allowed = online_play_mode_ && play_options.online_recording_enabled &&
+        active_recording_permission_->load(std::memory_order_acquire);
+    if (!online_record_allowed) {
+        sites_result_upload_status_ = ui_text("Guest record: local only; never uploaded later.",
+                                             "게스트 기록: 로컬 전용 · 나중에도 업로드하지 않음");
+    } else if (replay_playback) {
         sites_result_upload_status_ = ui_text("Replay playback does not submit a new web record.",
                                              "리플레이 재생 · 새 웹 기록을 등록하지 않습니다.");
     } else if (result.replay_path.empty() || result.replay_sha256.empty()) {
         sites_result_upload_status_ = ui_text("Web upload unavailable: replay export failed.",
                                              "웹 등록 불가 · 리플레이 저장 결과 확인 필요");
     }
-    if (result.has_value && !session_aborted && (result.finished || result.game_over) &&
+    if (online_record_allowed && result.has_value && !session_aborted && (result.finished || result.game_over) &&
         !replay_playback && !session_mix_active_ && !bms_editor_practice_start_seconds_.has_value() &&
         !result.pause_used &&
         !result.replay_path.empty() && !result.replay_sha256.empty()) {
@@ -2751,7 +2766,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
                 : ui_text("Web upload queue unavailable; record saved locally.", "웹 전송 대기열 사용 불가 · 로컬 저장");
     }
     std::string ranked_result_message;
-    if (result.has_value && !session_aborted && ranked_authorization.valid() &&
+    if (online_record_allowed && result.has_value && !session_aborted && ranked_authorization.valid() &&
         !bms_editor_practice_start_seconds_.has_value() &&
         !result.replay_path.empty()) {
         std::string receipt;
@@ -2768,7 +2783,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         } else {
             ranked_result_message = "Online ranking upload failed: " + upload_error;
         }
-    } else if (!ranked_prepare_error.empty() && !peer_battle &&
+    } else if (online_record_allowed && !ranked_prepare_error.empty() && !peer_battle &&
                !session_mix_active_ && !replay_playback) {
         ranked_result_message = "Online ranking unavailable: " + ranked_prepare_error;
     }
@@ -3048,8 +3063,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
             target.lines = {
                 ui_text("Up / Down or the mouse wheel selects a row. Long lists show a clickable scrollbar on the right.",
                         "위 / 아래 키 또는 마우스 휠로 행을 선택합니다. 긴 목록은 오른쪽의 클릭 가능한 스크롤바를 표시합니다."),
-                ui_text("Display, Resolution, Refresh Hz, and VSync apply live while you adjust them.",
-                        "표시 모드, 해상도, 주사율, VSync는 조정 중에도 즉시 적용됩니다."),
+                ui_text("Display, Resolution, and Refresh Hz apply live while you adjust them.",
+                        "표시 모드, 해상도, 주사율은 조정 중에도 즉시 적용됩니다."),
                 ui_text("Language and menu font size are in Profile Setup. Visual Latency is in Skin Settings.",
                         "언어와 메뉴 글자 크기는 프로필 설정에, 비주얼 레이턴시는 스킨 설정에 있습니다."),
                 ui_text("For Discord voice overlay, use Borderless or Windowed and pin the Voice widget at bottom-left.",

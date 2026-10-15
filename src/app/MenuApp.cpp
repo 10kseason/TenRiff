@@ -1134,6 +1134,21 @@ MenuApp::~MenuApp() {
     shutdown();
 }
 
+MenuApp::MenuLoadingScope::MenuLoadingScope(MenuApp& app, std::string stage)
+    : app_(app), previous_(app.menu_loading_) {
+    app_.menu_loading_ = {};
+    app_.menu_loading_.visible = true;
+    app_.menu_loading_.stage = std::move(stage);
+    try { app_.publish_snapshot(); }
+    catch (...) { app_.menu_loading_ = std::move(previous_); throw; }
+}
+
+MenuApp::MenuLoadingScope::~MenuLoadingScope() noexcept {
+    app_.menu_loading_ = std::move(previous_);
+    try { app_.publish_snapshot(); }
+    catch (...) { std::fputs("[warn] Could not publish loading completion.\n", stderr); }
+}
+
 // Downloads and local cache application retain their existing synchronous
 // ownership. Publish first so the independent renderer can show progress while
 // they block; restore on every exit, including a failed import. Nested refreshes
@@ -1325,6 +1340,10 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
         settings_cursor_ = 0;
     }
 
+    // Every launch starts safely in guest mode and explicitly offers online play.
+    online_play_mode_ = false;
+    sites_leaderboard_service_.set_online_enabled(false);
+    set_ranked_account_overlay(true);
     start_menu_threads();
     publish_snapshot();
 
@@ -2459,6 +2478,13 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
         return;
     }
     if (ranked_account_overlay_visible_) {
+        if (event.kind == render::MenuHitTargetKind::AccountPlayMode) {
+            if (account_mode_selection_ && (event.index == 0 || event.index == 1)) choose_play_mode(event.index == 1);
+            else if (!account_mode_selection_ && event.index == 2) { account_mode_selection_ = true; account_mode_choice_online_ = online_play_mode_; publish_snapshot(); }
+            else if (!account_mode_selection_ && event.index == 3) { set_ranked_account_overlay(false); publish_snapshot(); }
+            return;
+        }
+        if (account_mode_selection_) return;
         const bool busy = ranked_account_request_busy_.load(std::memory_order_acquire);
         if (event.kind == render::MenuHitTargetKind::SitesLeaderboardAction && ranked_account_sites_mode_ && !busy) {
             if (event.index >= 0 && event.index <= static_cast<int>(render::SitesLeaderboardAction::Disconnect))
@@ -3587,7 +3613,7 @@ void MenuApp::handle_title_input(uint32_t keycode) {
 
 void MenuApp::handle_text_input(std::string_view text) {
     if (current_screen() == Screen::QuickSetup && profile_control_key_capture_active_) return;
-    if (ranked_account_overlay_visible_ && ranked_account_sites_mode_) return;
+    if (ranked_account_overlay_visible_ && (account_mode_selection_ || ranked_account_sites_mode_)) return;
     if (ranked_account_overlay_visible_ &&
         ranked_account_signed_in_username_.empty() &&
         !ranked_account_request_busy_.load(std::memory_order_acquire) &&

@@ -359,9 +359,10 @@ GraphicsSettingsEffects GraphicsSettingsController::apply_selected_action(
             runtime.graphics.refresh_hz =
                 cycle_graphics_refresh_hz(runtime.graphics.refresh_hz, direction);
             return mark_changed(true);
-        case GraphicsSettingId::VSync:
-            runtime.graphics.vsync = !runtime.graphics.vsync;
-            return mark_changed(true);
+        case GraphicsSettingId::BgaBrightness:
+            runtime.graphics.bga_brightness_percent = std::clamp(
+                runtime.graphics.bga_brightness_percent + (direction < 0 ? -1 : 1), 0, 100);
+            return mark_changed();
         case GraphicsSettingId::PerformanceHud:
             runtime.graphics.performance_overlay = !runtime.graphics.performance_overlay;
             return mark_changed();

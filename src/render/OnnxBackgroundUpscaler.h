@@ -8,6 +8,7 @@
 
 namespace tenriff::render {
 
+// Fixed model tile output, not the dimensions of the final restored image.
 inline constexpr std::uint32_t kOnnxUpscaleTargetWidth = 1920;
 inline constexpr std::uint32_t kOnnxUpscaleTargetHeight = 1080;
 
@@ -21,7 +22,7 @@ struct OnnxUpscaleFrame {
 
 // External ONNX inference is intentionally isolated from the render and audio threads. A request
 // decodes and evaluates on one worker; callers keep drawing the native bitmap
-// until a completed FHD frame is available.
+// until a completed image at twice the original width/height is available.
 class OnnxBackgroundUpscaler {
 public:
     explicit OnnxBackgroundUpscaler(std::string model_path = {}, bool prefer_npu = false);

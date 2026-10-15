@@ -88,11 +88,6 @@ TEST_CASE("graphics live rows cycle and request immediate runtime apply") {
     CHECK(runtime.graphics.refresh_hz == 0);
     CHECK(effects.apply_runtime_graphics);
 
-    const bool original_vsync = runtime.graphics.vsync;
-    effects = controller.handle(
-        MenuAction::activate(), runtime, GraphicsSettingId::VSync);
-    CHECK(runtime.graphics.vsync != original_vsync);
-    CHECK(effects.apply_runtime_graphics);
     CHECK(controller.dirty());
 }
 
@@ -139,6 +134,8 @@ TEST_CASE("graphics back saves and reapplies once only when dirty") {
 TEST_CASE("graphics ONNX flow keeps file selection and confirmation as boundary effects") {
     tenriff::config::RuntimeConfig runtime;
     GraphicsSettingsController controller;
+
+
 
     auto effects = controller.handle(
         MenuAction::activate(), runtime, GraphicsSettingId::BgaUpscaler);
@@ -265,7 +262,7 @@ TEST_CASE("graphics direct entry supports portrait sizes and preserves preset ad
     CHECK(runtime.graphics.resolution == "900x1600");
     static_cast<void>(controller.handle(MenuAction::activate(), runtime));
     static_cast<void>(controller.resolution_text("640"));
-    static_cast<void>(controller.select(GraphicsSettingId::VSync));
+    static_cast<void>(controller.select(GraphicsSettingId::PerformanceHud));
     CHECK_FALSE(controller.editing_resolution());
     CHECK(runtime.graphics.resolution == "900x1600");
 }
@@ -330,4 +327,26 @@ TEST_CASE("graphics uses the profile language while language editing lives in pr
     CHECK(effects.empty());
     CHECK(runtime.ui.language == "ja");
     CHECK_FALSE(controller.dirty());
+}
+
+TEST_CASE("graphics brightness uses percent steps and retains hidden legacy synchronization") {
+    tenriff::config::RuntimeConfig runtime;
+    GraphicsSettingsController controller;
+    runtime.graphics.vsync = true;
+    for (int i = 99; i >= 0; --i) {
+        static_cast<void>(controller.handle(MenuAction::adjust(-1), runtime, GraphicsSettingId::BgaBrightness));
+        CHECK(runtime.graphics.bga_brightness_percent == i);
+    }
+    static_cast<void>(controller.handle(MenuAction::adjust(-1), runtime, GraphicsSettingId::BgaBrightness));
+    CHECK(runtime.graphics.bga_brightness_percent == 0);
+    for (int i = 0; i < 101; ++i)
+        static_cast<void>(controller.handle(MenuAction::adjust(1), runtime, GraphicsSettingId::BgaBrightness));
+    CHECK(runtime.graphics.bga_brightness_percent == 100);
+    CHECK(runtime.graphics.vsync);
+    for (const auto language : {tenriff::ui::Language::English, tenriff::ui::Language::Korean,
+                               tenriff::ui::Language::Japanese, tenriff::ui::Language::Chinese}) {
+        const auto view = GraphicsSettingsView::build(controller, runtime, language);
+        CHECK(view.rows[5].value == "100%");
+        for (const auto& row : view.rows) CHECK(row.label != "VSync");
+    }
 }

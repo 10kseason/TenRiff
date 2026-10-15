@@ -120,9 +120,10 @@ TEST_CASE("retired skin controls cannot mutate old presets through stale mouse t
         controller.reset("10k");
         const auto saved = tenriff::config::serialize_skin_config(runtime.skin);
         for (const auto id : {SkinSettingsRowId::TargetGap, SkinSettingsRowId::VisualPreset,
-                              SkinSettingsRowId::IndicatorBackground}) {
+                              SkinSettingsRowId::IndicatorBackground, SkinSettingsRowId::ExportPreset}) {
             const auto changed = controller.handle(MenuAction::activate(), runtime, kLr2Names, kTenRiffNames, id);
-            CHECK_FALSE(changed.menu.render_changed);
+            CHECK(changed.empty());
+            CHECK(controller.selected_id() == SkinSettingsRowId::KeyMode);
             CHECK_FALSE(controller.dirty());
         }
         CHECK(tenriff::config::serialize_skin_config(runtime.skin) == saved);
@@ -137,9 +138,6 @@ TEST_CASE("skin preset actions use the same keyboard and mouse controller path")
                                           SkinSettingsRowId::OpenSkinEditor);
     CHECK(editor.boundary_action == SkinBoundaryAction::OpenSkinEditor);
     CHECK_FALSE(editor.menu.persist_config);
-    const auto exported = controller.handle(MenuAction::activate(), runtime, kLr2Names, kTenRiffNames,
-                                             SkinSettingsRowId::ExportPreset);
-    CHECK(exported.boundary_action == SkinBoundaryAction::ExportPreset);
     const auto imported = controller.handle(MenuAction::activate(), runtime, kLr2Names, kTenRiffNames,
                                              SkinSettingsRowId::ImportPreset);
     CHECK(imported.boundary_action == SkinBoundaryAction::ImportPreset);
@@ -151,6 +149,35 @@ TEST_CASE("skin preset actions use the same keyboard and mouse controller path")
     CHECK_FALSE(controller.dirty());
     CHECK(controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames,
                              SkinSettingsRowId::UiFontFile).empty());
+}
+
+TEST_CASE("skin keyboard navigation skips retired export and still opens preset import") {
+    using tenriff::app::menu::settings::skin_setting_id_at;
+    using tenriff::app::menu::settings::skin_setting_index;
+    for (const auto source : {"native", "lr2", "tenriff"}) {
+        tenriff::config::RuntimeConfig runtime;
+        runtime.skin.source = source;
+        const bool lr2 = runtime.skin.source == "lr2";
+        SkinSettingsController controller;
+        controller.reset("10k");
+        static_cast<void>(controller.select(SkinSettingsRowId::ReloadSkin, lr2));
+        const auto reload_index = skin_setting_index(SkinSettingsRowId::ReloadSkin, lr2);
+        REQUIRE(reload_index.has_value());
+        CHECK(skin_setting_id_at(*reload_index + 1, lr2) == SkinSettingsRowId::ImportPreset);
+        CHECK_FALSE(skin_setting_index(SkinSettingsRowId::ExportPreset, lr2).has_value());
+
+        static_cast<void>(controller.handle(MenuAction::move(1), runtime, kLr2Names, kTenRiffNames));
+        CHECK(controller.selected_id() == SkinSettingsRowId::ImportPreset);
+        const auto imported = controller.handle(MenuAction::activate(), runtime, kLr2Names, kTenRiffNames);
+        CHECK(imported.boundary_action == SkinBoundaryAction::ImportPreset);
+        static_cast<void>(controller.handle(MenuAction::move(1), runtime, kLr2Names, kTenRiffNames));
+        CHECK(controller.selected_id() == SkinSettingsRowId::OpenSkinEditor);
+        static_cast<void>(controller.handle(MenuAction::move(-1), runtime, kLr2Names, kTenRiffNames));
+        CHECK(controller.selected_id() == SkinSettingsRowId::ImportPreset);
+        static_cast<void>(controller.handle(MenuAction::move(-1), runtime, kLr2Names, kTenRiffNames));
+        CHECK(controller.selected_id() == SkinSettingsRowId::ReloadSkin);
+        CHECK_FALSE(controller.dirty());
+    }
 }
 
 TEST_CASE("skin controller owns edit mode lane and gap selection") {

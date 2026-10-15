@@ -1,4 +1,12 @@
+**2026-10-16 · Current release 1.9.2:** Adds the startup F10 Guest/Online choice, permanent Guest/historical-record upload exclusion, dynamic original-resolution AI with FFmpeg deblock, and removal of the skin-export row. Runtime/source packages contain no BGA model; the model path is empty and upscaling OFF by default. The fixed baseline stays 1.9.0. [Changes and compatibility](release-1.9.2.en.md) · [Verification gate](release-1.9.2-gate.md). Dated entries below retain their historical scope; this 1.9.2 note defines current behavior.
+
+> 2026-10-16: [FFmpeg deblock and external ONNX x2](deblock-lunasr-20261016.en.md)
+
+> 2026-10-16: [Restore BGA at its original resolution before fitting](native-upscale-20261016.en.md)
+
 # TenRiff Development Roadmap (staged)
+
+**2026-10-16 · 1.9.1.1 UI:** [Home, graphics, loading and fixed grades — 1.9.1.1 follow-up](ui-feedback-20261016.en.md).
 
 **2026-10-15 · 1.9.1.1 online BMS follow-up:** Submit new BMS gauge/timing/RANDOM-branch records to the Sites community leaderboard, with rankings separated by policy and selected branch content. The updated client and corresponding web deployment are required; Sites records remain `client_submitted`, and the separate Ranked verifier gate stays in place. The 1.9.1 local-only note below describes that release; published files and the fixed 1.9.0 baseline are preserved. [Scope, compatibility and verification](feedback-1.9.1.1.en.md).
 
@@ -36,7 +44,7 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current Baseline
 - Windows GUI / runtime is the primary supported path.
-- The fixed baseline is `1.9.0` and this source targets release candidate `1.9.0.2`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
+- The fixed baseline is `1.9.0` and this source targets release `1.9.2`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
 - The active menu / runtime is BMS-family only (`.bms/.bme/.bml/.pms`) and supports native, bundled/profile TenRiff `skin.json`, and LR2 skins.
 - For current shipped behavior, read `docs/current-state.en.md` first; this roadmap is about direction and remaining work.
 
