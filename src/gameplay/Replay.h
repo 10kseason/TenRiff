@@ -34,6 +34,10 @@ struct ReplayTrace {
 struct ReplayModeSettings {
     // Missing in historical files: v1 slice-order STOP; v2 BPM before STOP.
     int bms_timing_version = 1;
+    // Optional compatibility metadata: missing fields retain historical BMS behavior.
+    int bms_gauge_version = 1;
+    int bms_control_flow_version = 1;
+    std::optional<uint32_t> bms_random_seed;
     // Absent in older files: retain the exact historical conversion policy.
     int key_conversion_version = 1;
     // Missing on old evidence: v1 short subdivisions; v2 musical multi-beat holds.
@@ -53,6 +57,11 @@ struct ReplayModeSettings {
     bool practice_no_fail_enabled = false;
     bool one_miss_fail_enabled = false;
 };
+
+// Branch selection is independent from lane randomization on new runs.
+[[nodiscard]] inline uint32_t replay_bms_random_seed(const ReplayModeSettings& mode) {
+    return mode.bms_random_seed.value_or(static_cast<uint32_t>(mode.random_seed.value_or(0)));
+}
 
 struct ReplayFile {
     int version = kNativeScoreVersion;
@@ -85,6 +94,10 @@ struct ReplayFile {
 
 struct ResultFile {
     int bms_timing_version = 1;
+    // Optional compatibility metadata: missing fields retain historical BMS behavior.
+    int bms_gauge_version = 1;
+    int bms_control_flow_version = 1;
+    std::optional<uint32_t> bms_random_seed;
     int key_conversion_version = 1;
     int long_note_mix_version = 1;
     int version = kNativeScoreVersion;

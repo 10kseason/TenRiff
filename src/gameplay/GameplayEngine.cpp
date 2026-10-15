@@ -35,6 +35,28 @@ constexpr std::array<game::GaugeType, 4> kGaugeShiftPriority{
     game::GaugeType::Easy,
 };
 
+game::GaugeRuntimePolicy runtime_gauge_policy(const GameplayChart& chart, const GameplayConfig& config) {
+    auto policy = config.gauge_policy;
+    if (config.gauge_shift_enabled && !policy.course_lr2_deltas) {
+        // Parallel shift gauges must not also use the older refill/threshold
+        // transitions. Retain the opt-in BMS delta contract for every tier.
+        policy = {};
+        policy.bms_lr2_deltas = config.gauge_policy.bms_lr2_deltas;
+        policy.bms_total = config.gauge_policy.bms_total;
+    }
+    if (policy.bms_lr2_deltas) {
+        const int lanes = chart.lane_count > 0 ? chart.lane_count : 10;
+        policy.bms_note_count = 0;
+        for (const auto& note : chart.notes) {
+            if (note.lane > 0 && note.lane <= lanes &&
+                policy.bms_note_count < (std::numeric_limits<int>::max)()) {
+                ++policy.bms_note_count;
+            }
+        }
+    }
+    return policy;
+}
+
 }  // namespace
 
 GameplayEngine::GameplayEngine(const GameplayChart& chart, const GameplayConfig& config)
@@ -43,8 +65,7 @@ GameplayEngine::GameplayEngine(const GameplayChart& chart, const GameplayConfig&
       rate_(clamp_rate(config.rate)),
       duration_samples_(chart.duration_samples),
       windows_(build_windows(config.judge, config.rate)),
-      gauge_manager_(config.gauge, config.gauge_shift_enabled && !config.gauge_policy.course_lr2_deltas
-                                      ? game::GaugeRuntimePolicy{} : config.gauge_policy),
+      gauge_manager_(config.gauge, runtime_gauge_policy(chart, config)),
       gauge_shift_enabled_(config.gauge_shift_enabled && !config.gauge_policy.course_lr2_deltas),
       practice_no_fail_enabled_(config.practice_no_fail_enabled),
       one_miss_fail_enabled_(config.one_miss_fail_enabled),

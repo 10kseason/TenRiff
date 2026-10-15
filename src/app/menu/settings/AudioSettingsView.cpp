@@ -176,25 +176,15 @@ AudioSettingsViewModel AudioSettingsView::build(
         controller));
     view.rows.push_back(make_slider_row(
         AudioSettingId::GameplayVolume,
-        localized(language, "BMS / In-game Volume", "BMS 인게임 볼륨"),
+        localized(language, "BMS Performance Volume", "BMS 연주 볼륨"),
         runtime.audio_ui.gameplay_volume, controller));
     view.rows.push_back(make_slider_row(
         AudioSettingId::MenuMusicVolume,
         localized(language, "TenRiff Menu Music", "텐리프 메뉴 배경음 볼륨"),
         runtime.audio_ui.menu_music_volume, controller));
     view.notes.push_back(localized(language,
-        "BMS volume controls the whole song and previews. TenRiff menu music has its own slider and a quiet 10% reference level.",
-        "BMS 인게임 볼륨은 곡 전체와 미리듣기를 조절합니다. 텐리프 메뉴 배경음은 별도 볼륨과 기본 10% 음량을 사용합니다."));
-    view.rows.push_back(make_slider_row(
-        AudioSettingId::BgmVolume,
-        localized(language, "BMS Background Balance", "BMS 반주 볼륨"),
-        runtime.audio_ui.bgm_volume,
-        controller));
-    view.rows.push_back(make_slider_row(
-        AudioSettingId::KeysoundVolume,
-        localized(language, "BMS Keysound Balance", "BMS 키음 볼륨"),
-        runtime.audio_ui.keysound_volume,
-        controller));
+        "BMS performance volume controls the whole song, keysounds, and previews together. TenRiff menu music has its own slider and a quiet 10% reference level.",
+        "BMS 연주 볼륨은 곡 전체, 키음, 미리듣기를 함께 조절합니다. 텐리프 메뉴 배경음은 별도 볼륨과 기본 10% 음량을 사용합니다."));
     view.rows.push_back(make_row(
         AudioSettingId::SoundOffset,
         SettingsRowKind::Numeric,
@@ -258,8 +248,8 @@ AudioSettingsViewModel AudioSettingsView::build(
         "배경음은 메뉴, 결과, 곡 미리듣기 음악만 제어합니다. 게임플레이 차트 BGM은 계속 재생됩니다."));
     view.notes.push_back(localized(
         language,
-        "Off: skip note keysounds. Autoplay mode routes note keysounds through BGM volume.",
-        "끔: 노트 키음을 재생하지 않습니다. 자동재생에서는 노트 키음이 BGM 볼륨을 따릅니다."));
+        "Off: skip note keysounds. Autoplay mixes note keysounds into the song at the same BMS performance volume.",
+        "끔: 노트 키음을 재생하지 않습니다. 자동재생은 노트 키음을 곡에 섞으며 같은 BMS 연주 볼륨을 사용합니다."));
     view.notes.push_back(localized(
         language,
         "Sound Offset shifts chart BGM and autoplay keysounds only. Positive delays sound; negative advances it.",
@@ -296,8 +286,6 @@ AudioSettingsViewModel AudioSettingsView::build(
             case AudioSettingId::MasterVolume:
             case AudioSettingId::GameplayVolume:
             case AudioSettingId::MenuMusicVolume:
-            case AudioSettingId::BgmVolume:
-            case AudioSettingId::KeysoundVolume:
             case AudioSettingId::Normalize:
                 row.category = localized(language, "Volume", "음량");
                 break;
@@ -311,7 +299,10 @@ AudioSettingsViewModel AudioSettingsView::build(
             case AudioSettingId::BufferFrames:
                 row.category = localized(language, "Output Device", "출력 장치");
                 break;
-            case AudioSettingId::Back: break;
+            case AudioSettingId::Back:
+            case AudioSettingId::BgmVolume:
+            case AudioSettingId::KeysoundVolume:
+                break;
         }
     }
     return view;

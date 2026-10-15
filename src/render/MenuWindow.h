@@ -94,6 +94,7 @@ enum class MenuHitTargetKind {
     SkinPreviewButton,
     GameplayPauseAction,
     GameplayPauseAdjust,
+    TitleLanguageButton,
 };
 
 enum class SongDifficultyTableAction {
@@ -371,6 +372,7 @@ struct ResultScreenData {
     std::string difficulty_table_label;
     std::string difficulty_label;
     bool difficulty_is_aery_five_key = false;
+    int difficulty_prefix_key_count = 0;
     bool has_bpm_changes = false;
     int key_count = 0;
     int level = 0;

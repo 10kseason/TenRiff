@@ -1,9 +1,23 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 namespace tenriff::render {
+
+inline constexpr std::uint32_t kDifficultyLevelColor = 0xF06B7B;
+
+// Song Select and Result share the display policy; the stored table label stays
+// intact. Only the registered 5K Aery table opts into the circled-five badge.
+[[nodiscard]] inline std::string difficulty_display_label(std::string label, bool aery_five_key) {
+    if (aery_five_key) return label;
+    constexpr std::string_view marker = "\xE2\x91\xA4";
+    for (auto pos = label.find(marker); pos != std::string::npos; pos = label.find(marker, pos)) {
+        label.erase(pos, marker.size());
+    }
+    return label;
+}
 
 struct DifficultyLabelPrefix {
     int key_count = 0;

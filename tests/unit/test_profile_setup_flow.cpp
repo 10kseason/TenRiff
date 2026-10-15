@@ -33,12 +33,17 @@ TEST_CASE("reopened profile setup returns to the options hub") {
 TEST_CASE("profile presentation controls cycle all languages and text sizes immediately") {
     tenriff::config::UiConfig settings;
     CHECK(adjust_presentation_setting(settings, kLanguageRow, -1));
-    CHECK(settings.language == "ja");
+    CHECK(settings.language == "zh-CN");
     CHECK(adjust_presentation_setting(settings, kLanguageRow, 1));
     CHECK(settings.language == "en");
     CHECK(adjust_presentation_setting(settings, kLanguageRow, 1));
     CHECK(settings.language == "ko");
     CHECK(adjust_presentation_setting(settings, kLanguageRow, 1));
+    CHECK(settings.language == "ja");
+
+    CHECK(adjust_presentation_setting(settings, kLanguageRow, 1));
+    CHECK(settings.language == "zh-CN");
+    CHECK(adjust_presentation_setting(settings, kLanguageRow, -1));
     CHECK(settings.language == "ja");
 
     CHECK(adjust_presentation_setting(settings, kMenuFontSizeRow, 1));

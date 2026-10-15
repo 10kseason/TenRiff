@@ -20,8 +20,8 @@ enum class AudioSettingId : std::uint8_t {
     KeysoundMode = 1,
     BackgroundSound = 2,
     MasterVolume = 3,
-    BgmVolume = 4,
-    KeysoundVolume = 5,
+    BgmVolume = 4,       // Reserved: retired separate balance control.
+    KeysoundVolume = 5,  // Reserved: retired separate balance control.
     SoundOffset = 6,
     Back = 7,
     Normalize = 8,
@@ -36,12 +36,10 @@ enum class AudioSettingId : std::uint8_t {
     MenuMusicVolume = 17,
 };
 
-inline constexpr std::array<AudioSettingId, 18> kAudioSettingOrder{
+inline constexpr std::array<AudioSettingId, 16> kAudioSettingOrder{
     AudioSettingId::MasterVolume,
     AudioSettingId::GameplayVolume,
     AudioSettingId::MenuMusicVolume,
-    AudioSettingId::BgmVolume,
-    AudioSettingId::KeysoundVolume,
     AudioSettingId::KeysoundMode,
     AudioSettingId::BackgroundSound,
     AudioSettingId::TitleMusic,

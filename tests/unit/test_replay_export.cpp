@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
@@ -81,6 +82,93 @@ void write_file(const std::filesystem::path& path, const std::string& content) {
 }
 
 }  // namespace
+
+TEST_CASE("BMS gauge and control-flow metadata roundtrips legacy policies and full uint32 seeds") {
+    const auto directory = std::filesystem::temp_directory_path() /
+        ("tenriff-bms-policy-records-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(std::filesystem::create_directory(directory));
+    const auto replay_path = directory / "replay.json";
+    const auto result_path = directory / "result.json";
+    ReplayFile replay;
+    replay.replay_format_version = 0;
+    replay.chart_path = "fixture.bms";
+    replay.sample_rate = replay.trace.sample_rate = 1000;
+    replay.trace.lane_count = 1;
+    replay.trace.duration_samples = 10000;
+    ResultFile result;
+    result.chart_path = replay.chart_path;
+    for (const int gauge : {1, 2}) for (const int flow : {1, 2}) {
+        for (const auto seed : {std::optional<uint32_t>{}, std::optional<uint32_t>{0},
+                                std::optional<uint32_t>{std::numeric_limits<uint32_t>::max()}}) {
+            replay.mode.bms_gauge_version = result.bms_gauge_version = gauge;
+            replay.mode.bms_control_flow_version = result.bms_control_flow_version = flow;
+            replay.mode.bms_random_seed = result.bms_random_seed = seed;
+            REQUIRE(save_replay_json(replay_path.u8string(), replay).success());
+            REQUIRE(save_result_json(result_path.u8string(), result).success());
+            const auto parsed_replay = tenriff::app::menu_records::parse_replay_file(replay_path, nullptr);
+            const auto parsed_result = tenriff::app::menu_records::parse_result_file(result_path, nullptr);
+            REQUIRE(parsed_replay.has_value());
+            REQUIRE(parsed_result.has_value());
+            CHECK(parsed_replay->bms_gauge_version == gauge);
+            CHECK(parsed_result->bms_gauge_version == gauge);
+            CHECK(parsed_replay->bms_control_flow_version == flow);
+            CHECK(parsed_result->bms_control_flow_version == flow);
+            CHECK(parsed_replay->bms_random_seed == seed);
+            CHECK(parsed_result->bms_random_seed == seed);
+            for (const auto& path : {replay_path, result_path}) {
+                const auto text = read_file(path);
+                CHECK((text.find("bms_gauge_version") != std::string::npos) == (gauge == 2));
+                CHECK((text.find("bms_control_flow_version") != std::string::npos) == (flow == 2));
+                CHECK((text.find("bms_random_seed") != std::string::npos) == seed.has_value());
+            }
+        }
+    }
+    std::filesystem::remove_all(directory);
+}
+
+TEST_CASE("BMS policy result metadata rejects unsupported versions and invalid random seeds") {
+    using tenriff::config::JsonValue;
+    const auto directory = std::filesystem::temp_directory_path() /
+        ("tenriff-bms-policy-invalid-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(std::filesystem::create_directory(directory));
+    const auto replay_path = directory / "replay.json";
+    const auto result_path = directory / "result.json";
+    ReplayFile replay;
+    replay.replay_format_version = 0;
+    replay.chart_path = "fixture.bms";
+    replay.sample_rate = replay.trace.sample_rate = 1000;
+    replay.trace.lane_count = 1;
+    replay.trace.duration_samples = 10000;
+    ResultFile result;
+    REQUIRE(save_replay_json(replay_path.u8string(), replay).success());
+    REQUIRE(save_result_json(result_path.u8string(), result).success());
+    const auto replay_json = parse_json(read_file(replay_path));
+    const auto result_json = parse_json(read_file(result_path));
+    REQUIRE(replay_json.success());
+    REQUIRE(result_json.success());
+    const auto check_invalid = [&](const char* field, const JsonValue& value) {
+        auto replay_root = *replay_json.root->as_object();
+        auto mode = *replay_root.at("mode").as_object();
+        mode[field] = value;
+        replay_root["mode"] = JsonValue{std::move(mode)};
+        write_file(replay_path, tenriff::config::json_stringify(JsonValue{std::move(replay_root)}));
+        CHECK_FALSE(tenriff::app::menu_records::parse_replay_file(replay_path, nullptr).has_value());
+        auto result_root = *result_json.root->as_object();
+        result_root[field] = value;
+        write_file(result_path, tenriff::config::json_stringify(JsonValue{std::move(result_root)}));
+        std::string error;
+        CHECK_FALSE(tenriff::app::menu_records::parse_result_file(result_path, &error).has_value());
+        CHECK_FALSE(error.empty());
+    };
+    for (const char* field : {"bms_gauge_version", "bms_control_flow_version"}) {
+        for (const auto& value : {JsonValue{0.0}, JsonValue{3.0}, JsonValue{1.5},
+                                  JsonValue{"2"}, JsonValue{true}, JsonValue{}}) check_invalid(field, value);
+    }
+    for (const auto& value : {JsonValue{-1.0}, JsonValue{4294967296.0}, JsonValue{0.5},
+                              JsonValue{"4294967295"}, JsonValue{true}, JsonValue{}})
+        check_invalid("bms_random_seed", value);
+    std::filesystem::remove_all(directory);
+}
 
 TEST_CASE("BMS timing policy replays retain historical scheduling and verify corrected scheduling") {
 #ifdef _WIN32
@@ -1774,4 +1862,90 @@ TEST_CASE("course replay accepts versioned custom identities without admitting c
         replay.ruleset_id = id;
         CHECK_FALSE(validate_replay_evidence(replay).success());
     }
+}
+
+
+TEST_CASE("BMS branch and TOTAL replay reconstruction retains both policy generations") {
+    using namespace tenriff;
+    const auto directory = std::filesystem::current_path() / "bms-branch-total-replay-fixture";
+    REQUIRE(std::filesystem::create_directory(directory));
+    const auto chart_path = directory / "branch-total.bms";
+    std::ostringstream bms;
+    bms << "#TITLE branch-total\n#BPM 120\n#TOTAL 100\n#RANDOM 2\n";
+    for (int branch = 1; branch <= 2; ++branch) {
+        bms << "#IF " << branch << '\n';
+        for (int measure = 1; measure <= (branch == 1 ? 100 : 120); ++measure) {
+            std::string number = std::to_string(measure);
+            number.insert(0, 3 - number.size(), '0');
+            bms << '#' << number << "11:01\n";
+        }
+        bms << "#ENDIF\n";
+    }
+    bms << "#ENDRANDOM\n";
+    write_file(chart_path, bms.str());
+    const auto chart_hash = app::hash_chart_file(chart_path);
+    REQUIRE(chart_hash.valid());
+    std::array<uint32_t, 2> seeds{};
+    std::array<bool, 2> found{};
+    for (uint32_t seed = 0; seed < 32 && !(found[0] && found[1]); ++seed) {
+        const auto loaded = app::ChartLoader{}.load(chart_path.u8string(), 48000, 1.0, "ignore", seed, 1, 2);
+        REQUIRE(loaded.success());
+        const std::size_t branch = loaded.chart.notes.size() == 100 ? 0 : 1;
+        REQUIRE(loaded.chart.notes.size() == 100 || loaded.chart.notes.size() == 120);
+        seeds[branch] = seed; found[branch] = true;
+    }
+    REQUIRE(found[0] && found[1]);
+    for (int version : {1, 2}) for (std::size_t branch = 0; branch < 2; ++branch) {
+        const auto loaded = app::ChartLoader{}.load(chart_path.u8string(), 48000, 1.0, "ignore", seeds[branch], 1, version);
+        REQUIRE(loaded.success());
+        config::ModeConfig mode;
+        mode.key_mode = "auto"; mode.random = "off"; mode.gauge = "normal";
+        const auto managed = app::manage_modes(loaded.chart, loaded.format, mode, {}, 1.0, loaded.base_bpm,
+            48000, app::LongNoteMixVersion::LegacyShort, 3);
+        auto played = managed.chart;
+        gameplay::offset_gameplay_chart_samples(played, 144000);
+        ReplayFile replay;
+        replay.chart_path = chart_path.u8string(); replay.chart_format = "bms";
+        replay.chart_sha256 = chart_hash.sha256; replay.bms_rank = loaded.chart.bms_rank;
+        replay.ruleset_id = std::string(app::kCanonicalReplayRulesetId);
+        replay.sample_rate = 48000; replay.mods = managed.active_mods;
+        replay.mode.key_mode = "auto"; replay.mode.random = "off"; replay.mode.gauge = "normal";
+        replay.mode.key_conversion_version = 3;
+        replay.mode.bms_gauge_version = version;
+        replay.mode.bms_control_flow_version = version;
+        // Old evidence uses the lane seed. New evidence must ignore a different lane seed.
+        replay.mode.random_seed = version == 1 ? static_cast<int>(seeds[branch]) : static_cast<int>(seeds[1 - branch]);
+        if (version == 2) replay.mode.bms_random_seed = seeds[branch];
+        gameplay::GameplayConfig config;
+        config.judge = app::replay_judge_config_for_playback(replay, {}, played.bms_rank);
+        config.gauge_shift_enabled = true;
+        config.gauge_policy.bms_lr2_deltas = version == 2;
+        config.gauge_policy.bms_total = loaded.chart.bms_total.value_or(0.0);
+        gameplay::GameplayEngine engine(played, config);
+        for (std::size_t i = 0; i < played.notes.size() - 20; ++i) {
+            const auto& note = played.notes[i];
+            engine.advance(note.start_sample - 1);
+            (void)engine.handle_input(note.lane, InputState::Pressed, note.start_sample);
+            (void)engine.handle_input(note.lane, InputState::Released, note.start_sample + 1);
+        }
+        engine.advance(played.duration_samples + 240000);
+        replay.trace = engine.replay(); replay.stats = engine.stats();
+        replay.final_score = gameplay::scale_native_score(replay.stats.raw_score, managed.final_multiplier);
+        replay.rate_multiplier = managed.rate_multiplier; replay.score_multiplier = managed.final_multiplier;
+        const auto path = directory / ("v" + std::to_string(version) + "-branch" + std::to_string(branch) + ".json");
+        REQUIRE(save_replay_json(path.u8string(), replay).success());
+        const auto verified = app::verify_replay_file(path, chart_path);
+        CHECK(verified.verified()); CHECK(verified.claims_match);
+        CHECK(verified.final_gauge_value == doctest::Approx(engine.gauge_state().value));
+        CHECK(verified.final_gauge == (version == 2 ? "normal" : "easy"));
+        CHECK(verified.bms_gauge_version == version);
+        CHECK(verified.bms_control_flow_version == version);
+        if (version == 2) {
+            replay.mode.bms_random_seed = seeds[1 - branch];
+            const auto wrong = directory / "wrong-branch.json";
+            REQUIRE(save_replay_json(wrong.u8string(), replay).success());
+            CHECK_FALSE(app::verify_replay_file(wrong, chart_path).verified());
+        }
+    }
+    std::filesystem::remove_all(directory);
 }

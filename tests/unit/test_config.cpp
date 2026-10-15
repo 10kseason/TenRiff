@@ -220,7 +220,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.mode.pacemaker_target_score == 8000);
     CHECK(config.mode.song_index_profile == "fast");
     CHECK(config.mode.gauge == "ex_hard");
-    CHECK(config.audio_ui.gameplay_volume == doctest::Approx(1.0));
+    CHECK(config.audio_ui.gameplay_volume == doctest::Approx(0.2));
     CHECK(config.audio_ui.menu_music_volume == doctest::Approx(1.0));
     CHECK_FALSE(config.mode.calculate_song_index_difficulty);
     CHECK(config.mode.key_conversion_algorithm == "krrcream");
@@ -554,7 +554,7 @@ TEST_CASE("config save and load preserve input debounce setting") {
     auto config = loader.defaults();
     config.input.polling_hz = 2000;
     config.input.judgement_hz = 8000;
-    for (const double saved_debounce : {0.0, 2.5, 8.0, 12.0, 25.0}) {
+    for (const double saved_debounce : {0.0, 1.0, 2.5, 5.0, 8.0, 12.0, 19.0, 20.0}) {
         config.input.debounce_ms = saved_debounce;
         std::string error;
         REQUIRE(loader.save_profile("profiles/test", config, &error));
@@ -603,6 +603,47 @@ TEST_CASE("input debounce defaults off while explicit global and profile values 
     loaded = loader.load_profile("profiles/player");
     REQUIRE(loaded.success());
     CHECK(loaded.config.input.debounce_ms == doctest::Approx(8.0));
+}
+
+TEST_CASE("input debounce load clamps to twenty and save sanitizes nonfinite values to zero") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE_FALSE(temp.path.empty());
+    CurrentPathGuard cwd;
+    std::filesystem::current_path(temp.path);
+    std::filesystem::create_directories("profiles/player");
+    ConfigLoader loader;
+
+    struct SavedCase {
+        const char* json;
+        double expected;
+    };
+    for (const auto& value : {
+            SavedCase{R"({"input":{"debounce_ms":25}})", 20.0},
+            SavedCase{R"({"input":{"debounce_ms":20.5}})", 20.0},
+            SavedCase{R"({"input":{"debounce_ms":1e100}})", 20.0},
+            SavedCase{R"({"input":{"debounce_ms":-1}})", 0.0}}) {
+        write_file("profiles/player/config.json", value.json);
+        const auto loaded = loader.load_profile("profiles/player");
+        REQUIRE(loaded.success());
+        CHECK(loaded.config.input.debounce_ms == doctest::Approx(value.expected));
+        CHECK(std::find(loaded.warnings.begin(), loaded.warnings.end(),
+            "input.debounce_ms must be between 0 and 20; clamping into range.") != loaded.warnings.end());
+    }
+    auto config = loader.defaults();
+    for (const double invalid : {std::numeric_limits<double>::quiet_NaN(),
+             std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity()}) {
+        config.input.debounce_ms = invalid;
+        REQUIRE(loader.save_profile("profiles/player", config));
+        const auto loaded = loader.load_profile("profiles/player");
+        REQUIRE(loaded.success());
+        CHECK(loaded.config.input.debounce_ms == doctest::Approx(0.0));
+    }
+    config.input.debounce_ms = 25.0;
+    REQUIRE(loader.save_profile("profiles/player", config));
+    const auto loaded = loader.load_profile("profiles/player");
+    REQUIRE(loaded.success());
+    CHECK(loaded.config.input.debounce_ms == doctest::Approx(20.0));
+    CHECK(config.input.debounce_ms == doctest::Approx(25.0));
 }
 
 TEST_CASE("audio presets do not override explicit sample rate") {
@@ -1004,7 +1045,7 @@ TEST_CASE("config save and load preserve ui language setting") {
 
     ConfigLoader loader;
     auto config = loader.defaults();
-    for (const std::string language : {"en", "ko", "ja"}) {
+    for (const std::string language : {"en", "ko", "ja", "zh-CN"}) {
         config.ui.language = language;
         std::string error;
         REQUIRE(loader.save_profile("profiles/test", config, &error));
@@ -2172,7 +2213,7 @@ TEST_CASE("config normalizes invalid keysound policy to follow") {
     CHECK(result.config.audio_ui.bms_keysound_policy == "follow");
 }
 
-TEST_CASE("runtime migration upgrades legacy hold and debounce defaults") {
+TEST_CASE("runtime migration upgrades legacy hold defaults without rewriting explicit five millisecond debounce") {
     ConfigLoader loader;
     auto config = loader.defaults();
     config.judge.hold_grace_ms = 20.0;
@@ -2184,7 +2225,7 @@ TEST_CASE("runtime migration upgrades legacy hold and debounce defaults") {
     CHECK(changed);
     CHECK(config.judge.hold_grace_ms == doctest::Approx(80.0));
     CHECK(config.judge.hold_break_ms == doctest::Approx(200.0));
-    CHECK(config.input.debounce_ms == doctest::Approx(8.0));
+    CHECK(config.input.debounce_ms == doctest::Approx(5.0));
 }
 
 TEST_CASE("config load keeps polling cadence and defaults judgement cadence when the new field is missing") {
@@ -2349,6 +2390,9 @@ TEST_CASE("config accepts Japanese aliases and keeps unknown language fallback")
     CHECK(tenriff::config::normalize_ui_language_token("jp") == "ja");
     CHECK(tenriff::config::normalize_ui_language_token("Japanese") == "ja");
     CHECK(tenriff::config::normalize_ui_language_token("korean") == "ko");
+    CHECK(tenriff::config::normalize_ui_language_token("zh-CN") == "zh-CN");
+    CHECK(tenriff::config::normalize_ui_language_token("zh_cn") == "zh-CN");
+    CHECK(tenriff::config::normalize_ui_language_token("Chinese") == "zh-CN");
     CHECK(tenriff::config::normalize_ui_language_token("unknown") == "en");
 }
 
@@ -2598,7 +2642,7 @@ TEST_CASE("new audio and mode defaults preserve explicit legacy profile choices"
     CHECK(loaded.config.mode.ghost_battle_enabled);
     CHECK(loaded.config.audio_ui.bgm_volume == doctest::Approx(0.6));
     CHECK(loaded.config.audio_ui.keysound_volume == doctest::Approx(1.3));
-    CHECK(loaded.config.audio_ui.gameplay_volume == doctest::Approx(1.0));
+    CHECK(loaded.config.audio_ui.gameplay_volume == doctest::Approx(0.2));
     CHECK(loaded.config.audio_ui.menu_music_volume == doctest::Approx(1.0));
     write_file("profiles/player/config.json", R"({"audio":{"gameplay_volume":4,"menu_music_volume":-2}})");
     loaded = loader.load_profile("profiles/player");

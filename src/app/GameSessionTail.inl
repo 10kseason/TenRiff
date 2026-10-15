@@ -503,11 +503,16 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     };
 
     bms_timing_version_ = replay_playback_enabled_ ? replay_source_.mode.bms_timing_version : 2;
+    bms_control_flow_version_ = replay_playback_enabled_ ? replay_source_.mode.bms_control_flow_version :
+        (peer_battle_mode_ ? 1 : 2);
+    // Keep branch choices stable across device-rate reloads and independent of SR/conversion seeds.
+    bms_random_seed_ = replay_playback_enabled_ ? gameplay::replay_bms_random_seed(replay_source_.mode)
+        : (peer_battle_mode_ ? config_.mode.random_seed : next_random_session_seed());
     auto load_chart_for_session_rate = [this](ChartLoadResult& out_result) -> bool {
         ChartLoader loader;
         out_result = loader.load(chart_path_, sample_rate_, config_.speed.rate,
                                   config_.audio_ui.bms_keysound_policy,
-                                  config_.mode.random_seed, bms_timing_version_);
+                                  bms_random_seed_, bms_timing_version_, bms_control_flow_version_);
         for (const auto& message : out_result.messages) {
             std::cerr << "[warn] " << message << std::endl;
         }
@@ -592,6 +597,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     if (!replay_playback_enabled_ && !chart_result.has_bpm_stop_timing_difference)
         bms_timing_version_ = 1;
     chart_format_ = chart_result.format;
+    if (!replay_playback_enabled_ && !chart_result.chart.bms_has_random)
+        bms_control_flow_version_ = 1;
     chart_base_bpm_ = chart_result.reference_bpm > 0.0 ? chart_result.reference_bpm : chart_result.base_bpm;
     report_loading_progress(78, "Applying gameplay mode");
     if (loading_cancel_requested()) {
@@ -690,6 +697,11 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         gameplay_config.judge.indirect_miss_enabled = true;
     }
 
+    bms_gauge_version_ = replay_playback_enabled_ ? replay_source_.mode.bms_gauge_version :
+        (chart_format_ == ChartFormat::Bms && !peer_battle_mode_ && !gameplay_config.gauge_policy.course_lr2_deltas ? 2 : 1);
+    gameplay_config.gauge_policy.bms_lr2_deltas = chart_format_ == ChartFormat::Bms && bms_gauge_version_ == 2;
+    gameplay_config.gauge_policy.bms_total = chart_result.chart.bms_total.value_or(0.0);
+
     active_mods_ = mode_result.active_mods;
     auto_scratch_enabled_ = chart_format_ == ChartFormat::Bms && mode_mod_auto_scratch(active_mods_);
     rate_multiplier_ = mode_result.rate_multiplier;
@@ -759,6 +771,12 @@ bool GameSession::initialize(const CommandLineOptions& options) {
             // Keep old replays playable on their own; never revert a new run.
             ghost_compatible = false;
             std::cerr << "[warn] Legacy ghost disabled: this chart has corrected BPM/STOP timing." << std::endl;
+        }
+        if (ghost_compatible && chart_result.chart.bms_has_random &&
+            (ghost_replay_source_.mode.bms_control_flow_version != bms_control_flow_version_ ||
+             gameplay::replay_bms_random_seed(ghost_replay_source_.mode) != bms_random_seed_)) {
+            ghost_compatible = false;
+            std::cerr << "[warn] Ghost disabled: BMS branch seed/policy differs from this play." << std::endl;
         }
         if (ghost_compatible && key_conversion_version_ == 3 && ghost_replay_source_.mode.key_conversion_version < 3) {
             // A legacy ghost must not undo the new player's duplicate-head fix.
@@ -925,6 +943,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         ghost_chronological_judgement_ = ghost_config.chronological_judgement;
         ghost_config.gauge_shift_enabled = true;
         ghost_config.gauge_policy = {};
+        ghost_config.gauge_policy.bms_lr2_deltas = chart_format_ == ChartFormat::Bms && ghost_replay_source_.mode.bms_gauge_version == 2;
+        ghost_config.gauge_policy.bms_total = chart_.bms_total.value_or(0.0);
         if (!ghost_replay_source_.mode.gauge.empty()) {
             const bool ghost_gauge_shift = is_gauge_shift_token(ghost_replay_source_.mode.gauge);
             if (ghost_gauge_shift) {
@@ -2250,8 +2270,9 @@ void GameSession::mix_chart_audio(float* output, uint32_t frames, int64_t buffer
         return;
     }
 
-    const float bgm_gain = gameplay_bgm_gain(config_.audio_ui.bgm_volume);
-    const float keysound_gain = static_cast<float>(std::clamp(config_.audio_ui.keysound_volume, 0.0, 2.0));
+    // Keep authored per-event gains; the single BMS performance slider is
+    // applied once to the complete mix in finish_audio_output. Legacy profile
+    // BGM/keysound balances must not alter playback or duplicate selection.
     const int64_t buffer_end_samples = buffer_start_samples + static_cast<int64_t>(frames);
     // BGM is queued after input voices. Choose the earliest audible copy in this
     // buffer rather than letting queue order or buffer size change which wins.
@@ -2268,8 +2289,7 @@ void GameSession::mix_chart_audio(float* output, uint32_t frames, int64_t buffer
         // Pin a selected candidate until its voice retires. Concurrent cache
         // eviction cannot remove the winner after it suppressed another copy.
         voice.decoded_identity = identity;
-        const float gain = ((voice.kind == ChartAudioEvent::Kind::Keysound) ? keysound_gain : bgm_gain) *
-            std::clamp(voice.gain, 0.0f, 1.0f);
+        const float gain = std::clamp(voice.gain, 0.0f, 1.0f);
         chart_audio_deduplicator_.consider(voice.chart_sample, voice.asset_id,
             voice.kind == ChartAudioEvent::Kind::Keysound, voice.gain, identity->id, gain, voice.start_sample, i);
     }
@@ -2316,9 +2336,7 @@ void GameSession::mix_chart_audio(float* output, uint32_t frames, int64_t buffer
             continue;
         }
 
-        const float gain =
-            ((voice.kind == ChartAudioEvent::Kind::Keysound) ? keysound_gain : bgm_gain) *
-            std::clamp(voice.gain, 0.0f, 1.0f);
+        const float gain = std::clamp(voice.gain, 0.0f, 1.0f);
         if (!voice.dedup_claimed && voice.start_sample < buffer_end_samples) {
             const auto identity = voice.decoded_identity ? voice.decoded_identity
                 : std::atomic_load_explicit(&asset.clip.identity, std::memory_order_acquire);
@@ -2417,6 +2435,11 @@ void GameSession::shutdown() {
         result_.mods = active_mods_;
         result_.key_conversion_version = key_conversion_version_;
         result_.bms_timing_version = bms_timing_version_;
+        result_.bms_gauge_version = bms_gauge_version_;
+        result_.bms_control_flow_version = bms_control_flow_version_;
+        // Playback must retain an old file's absent field instead of fabricating new evidence.
+        result_.bms_random_seed = replay_playback_enabled_ ? replay_source_.mode.bms_random_seed :
+            (chart_.bms_has_random ? std::optional<uint32_t>(bms_random_seed_) : std::nullopt);
         result_.long_note_mix_version = mode_mod_long_note_mix(active_mods_) ? long_note_mix_version_ : 1;
         result_.player_name = config::normalize_profile_nickname(config_.ui.profile_nickname);
         if (result_.player_name.empty()) {
@@ -2492,6 +2515,9 @@ void GameSession::shutdown() {
             replay.mode.long_note_mix_version = result_.long_note_mix_version;
             replay.mode.key_conversion_version = result_.key_conversion_version;
             replay.mode.bms_timing_version = result_.bms_timing_version;
+            replay.mode.bms_gauge_version = result_.bms_gauge_version;
+            replay.mode.bms_control_flow_version = result_.bms_control_flow_version;
+            replay.mode.bms_random_seed = result_.bms_random_seed;
             replay.mode.key_conversion_algorithm = config_.mode.key_conversion_algorithm;
             replay.mode.key_conversion_nk2_preset = config_.mode.key_conversion_nk2_preset;
             replay.mode.random = config_.mode.random;
@@ -2555,6 +2581,9 @@ void GameSession::shutdown() {
             exported_result.long_note_mix_version = result_.long_note_mix_version;
             exported_result.key_conversion_version = result_.key_conversion_version;
             exported_result.bms_timing_version = result_.bms_timing_version;
+            exported_result.bms_gauge_version = result_.bms_gauge_version;
+            exported_result.bms_control_flow_version = result_.bms_control_flow_version;
+            exported_result.bms_random_seed = result_.bms_random_seed;
             exported_result.rate_multiplier = result_.rate_multiplier;
             exported_result.score_multiplier = result_.score_multiplier;
             exported_result.final_score = result_.final_score;
@@ -3260,6 +3289,16 @@ bool GameSession::handle_control_input(const input::InputEvent& incoming_event) 
     }
     if (escape_keycode_ != 0 && event.state == input::InputState::Pressed &&
         event.keycode == escape_keycode_) {
+        // Once every tap and LN tail has resolved, Esc dismisses the remaining
+        // song audio without opening pause or marking the completed play aborted.
+        // Course Esc remains disabled above; synchronized peer runs retain their
+        // existing exit behavior. Autoplay/replay use this same outro control.
+        if (!peer_battle_mode_ && gameplay_started_ && config_.audio_ui.play_to_end &&
+            engine_ && engine_->is_finished() && !engine_->is_game_over() &&
+            result_transition_pending_) {
+            finished_.store(true, std::memory_order_release);
+            return true;
+        }
         if (peer_battle_mode_ || !gameplay_started_) {
             user_aborted_.store(true, std::memory_order_release);
             stop_requested_.store(true, std::memory_order_release);

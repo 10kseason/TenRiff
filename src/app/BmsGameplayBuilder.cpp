@@ -61,6 +61,18 @@ BmsGameplayBuildResult build_bms_gameplay_chart(const chart::BmsTimeline& timeli
 
     BmsGameplayBuildResult result;
     result.chart.bms_rank = 3;
+    result.chart.bms_has_random = parsed_chart.has_random_directives;
+    if (const auto total = parsed_chart.headers.find("TOTAL"); total != parsed_chart.headers.end()) {
+        const std::string token = trim_copy(total->second);
+        try {
+            std::size_t consumed = 0;
+            const double value = std::stod(token, &consumed);
+            if (consumed == token.size() && std::isfinite(value) && value > 0.0)
+                result.chart.bms_total = value;
+        } catch (const std::exception&) {
+            // Invalid authored values use the same fallback as an absent TOTAL.
+        }
+    }
     if (const auto rank = parsed_chart.headers.find("RANK"); rank != parsed_chart.headers.end()) {
         const std::string token = trim_copy(rank->second);
         if (token.size() == 1 && token[0] >= '0' && token[0] <= '3') {

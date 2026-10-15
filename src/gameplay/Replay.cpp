@@ -259,6 +259,12 @@ config::JsonValue build_trace_json(const ReplayTrace& trace) {
 
 config::JsonValue build_mode_json(const ReplayModeSettings& mode) {
     config::JsonObject obj;
+    if (mode.bms_gauge_version != 1)
+        obj.emplace("bms_gauge_version", config::JsonValue{static_cast<double>(mode.bms_gauge_version)});
+    if (mode.bms_control_flow_version != 1)
+        obj.emplace("bms_control_flow_version", config::JsonValue{static_cast<double>(mode.bms_control_flow_version)});
+    if (mode.bms_random_seed)
+        obj.emplace("bms_random_seed", config::JsonValue{static_cast<double>(*mode.bms_random_seed)});
     if (mode.bms_timing_version != 1)
         obj.emplace("bms_timing_version", config::JsonValue{static_cast<double>(mode.bms_timing_version)});
     if (mode.key_conversion_version != 1) {
@@ -335,6 +341,9 @@ ExportResult save_json_file(const std::string& path, const config::JsonValue& ro
 }  // namespace
 
 ExportResult save_replay_json(const std::string& path, const ReplayFile& replay, int indent) {
+    if ((replay.mode.bms_gauge_version != 1 && replay.mode.bms_gauge_version != 2) ||
+        (replay.mode.bms_control_flow_version != 1 && replay.mode.bms_control_flow_version != 2))
+        return {{}, "Unsupported BMS policy version."};
     if (replay.mode.bms_timing_version != 1 && replay.mode.bms_timing_version != 2)
         return {{}, "Unsupported BMS timing version."};
     if (replay.mode.key_conversion_version != 1 && replay.mode.key_conversion_version != 2 && replay.mode.key_conversion_version != 3) {
@@ -385,6 +394,9 @@ ExportResult save_replay_json(const std::string& path, const ReplayFile& replay,
 }
 
 ExportResult save_result_json(const std::string& path, const ResultFile& result_file, int indent) {
+    if ((result_file.bms_gauge_version != 1 && result_file.bms_gauge_version != 2) ||
+        (result_file.bms_control_flow_version != 1 && result_file.bms_control_flow_version != 2))
+        return {{}, "Unsupported BMS policy version."};
     if (result_file.bms_timing_version != 1 && result_file.bms_timing_version != 2)
         return {{}, "Unsupported BMS timing version."};
     if (result_file.key_conversion_version != 1 && result_file.key_conversion_version != 2 && result_file.key_conversion_version != 3) {
@@ -405,6 +417,12 @@ ExportResult save_result_json(const std::string& path, const ResultFile& result_
     config::JsonObject obj;
     obj.emplace("version", config::JsonValue{static_cast<double>(result_file.version)});
     obj.emplace("replay_format_version", config::JsonValue{static_cast<double>(result_file.replay_format_version)});
+    if (result_file.bms_gauge_version != 1)
+        obj.emplace("bms_gauge_version", config::JsonValue{static_cast<double>(result_file.bms_gauge_version)});
+    if (result_file.bms_control_flow_version != 1)
+        obj.emplace("bms_control_flow_version", config::JsonValue{static_cast<double>(result_file.bms_control_flow_version)});
+    if (result_file.bms_random_seed)
+        obj.emplace("bms_random_seed", config::JsonValue{static_cast<double>(*result_file.bms_random_seed)});
     if (result_file.bms_timing_version != 1)
         obj.emplace("bms_timing_version", config::JsonValue{static_cast<double>(result_file.bms_timing_version)});
     if (result_file.key_conversion_version != 1) {
@@ -509,6 +527,24 @@ ReplayLoadResult load_replay_json(const std::string& path) {
     replay.aborted = read_json_bool(*root, "aborted", false);
 
     if (const auto* mode = find_json_object(*root, "mode")) {
+        for (const auto& field : {std::pair<const char*, int*>{"bms_gauge_version", &replay.mode.bms_gauge_version},
+                                  {"bms_control_flow_version", &replay.mode.bms_control_flow_version}}) {
+            if (const auto* version = find_json_value(*mode, field.first)) {
+                if (!version->is_number() || (version->as_number() != 1.0 && version->as_number() != 2.0)) {
+                    result.error = "Unsupported BMS policy version.";
+                    return result;
+                }
+                *field.second = static_cast<int>(version->as_number());
+            }
+        }
+        if (const auto* seed = find_json_value(*mode, "bms_random_seed")) {
+            const double value = seed->is_number() ? seed->as_number() : -1.0;
+            if (!std::isfinite(value) || value < 0.0 || value > 4294967295.0 || std::floor(value) != value) {
+                result.error = "BMS branch seed must be an unsigned 32-bit integer.";
+                return result;
+            }
+            replay.mode.bms_random_seed = static_cast<uint32_t>(value);
+        }
         if (const auto* version = find_json_value(*mode, "bms_timing_version")) {
             if (!version->is_number() || (version->as_number() != 1.0 && version->as_number() != 2.0)) {
                 result.error = "Unsupported BMS timing version.";
@@ -714,6 +750,9 @@ ReplayLoadResult load_replay_json(const std::string& path) {
 }
 
 ReplayValidationResult validate_replay_evidence(const ReplayFile& replay) {
+    if ((replay.mode.bms_gauge_version != 1 && replay.mode.bms_gauge_version != 2) ||
+        (replay.mode.bms_control_flow_version != 1 && replay.mode.bms_control_flow_version != 2))
+        return {"Unsupported BMS policy version."};
     if (replay.mode.bms_timing_version != 1 && replay.mode.bms_timing_version != 2)
         return {"Unsupported BMS timing version."};
     if (replay.mode.key_conversion_version != 1 && replay.mode.key_conversion_version != 2 && replay.mode.key_conversion_version != 3)

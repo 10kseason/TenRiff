@@ -24,8 +24,6 @@ constexpr double kMasterVolumeMin = 0.0;
 constexpr double kMasterVolumeMax = 1.0;
 constexpr double kChartMixVolumeMin = 0.0;
 constexpr double kChartMixVolumeMax = 2.0;
-constexpr double kInputDebounceWindowMin = 0.0;
-constexpr double kInputDebounceWindowMax = 25.0;
 constexpr int kRefreshHzMin = 60;
 constexpr int kRefreshHzMax = 1050;
 constexpr int kDefaultGraphicsRefreshHz = 300;
@@ -498,9 +496,9 @@ double sanitize_input_debounce_ms(double value, std::vector<std::string>& warnin
     if (std::isfinite(value) && value >= kInputDebounceWindowMin && value <= kInputDebounceWindowMax) {
         return value;
     }
-    warnings.push_back("input.debounce_ms must be between 0 and 25; clamping into range.");
+    warnings.push_back("input.debounce_ms must be between 0 and 20; clamping into range.");
     if (!std::isfinite(value)) {
-        return 8.0;
+        return 0.0;
     }
     return std::clamp(value, kInputDebounceWindowMin, kInputDebounceWindowMax);
 }
@@ -1124,6 +1122,8 @@ JsonValue build_json_root(const RuntimeConfig& config) {
 
     InputConfig persisted_input = config.input;
     sync_input_backend_fields(persisted_input);
+    persisted_input.debounce_ms = clamp_finite(
+        persisted_input.debounce_ms, kInputDebounceWindowMin, kInputDebounceWindowMax, 0.0);
     JsonObject input;
     input.emplace("backend", JsonValue{persisted_input.backend});
     input.emplace("rawinput", JsonValue{persisted_input.rawinput});

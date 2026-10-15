@@ -19,7 +19,6 @@
     },
     "colors": {},
     "assets": {
-      "mark": "assets/mark.png",
       "prism": "assets/prism.png",
       "chevron": "assets/chevron.png",
       "spark": "assets/spark.png",

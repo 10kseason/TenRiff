@@ -915,6 +915,8 @@ ModeManagerResult manage_modes(const gameplay::GameplayChart& chart,
     const bool judge_ex = has_mod_token(result.active_mods, "judge_ex");
     // Key conversion may rebuild a chart: retain its authored timing policy.
     result.chart.bms_rank = chart.bms_rank;
+    result.chart.bms_total = chart.bms_total;
+    result.chart.bms_has_random = chart.bms_has_random;
     const auto chart_judge = chart_format == ChartFormat::Bms && chart.bms_rank.has_value()
         ? judge_timing_for_bms_rank(judge, *chart.bms_rank) : judge;
     result.judge_window_scale = judge_easy ? kCurrentEasyJudgeScale : 1.0;

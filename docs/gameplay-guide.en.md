@@ -1,5 +1,13 @@
 # TenRiff Gameplay Guide
 
+**2026-10-15 · 1.9.1:** The user-authorized 1.9.1 includes the earlier volume/input/outro fixes, BMS TOTAL/RANDOM compatibility, Result colors and the 10 mark. A Home language button cycles EN → KO → JA → ZH and saves the choice. New BMS gauge/branch records remain local until server verification supports them. The fixed baseline stays 1.9.0; earlier releases, installations and profiles are preserved. Dated local notes below retain their historical no-version-bump/unpublished status; this 1.9.1 scope supersedes that status. [Changes and compatibility](feedback-1.9.1.en.md) · [Release verification gate](release-1.9.1-gate.md).
+
+**2026-10-15 · BMS TOTAL / RANDOM / visual follow-up — unreleased, local build and CTest regression passed:** This local follow-up builds on 1.9.0.2. Result levels use the song lobby’s red level text and key-mode symbol colors, and the logo adopts the supplied 10-shaped mark. New ordinary BMS plays use LR2-based recovery/damage with #TOTAL and note count; authored #RANDOM branches receive a seed independent of lane randomization. Historical replays retain their original behavior. The earlier unified-volume changes remain included. Published 1.9.0.2, the fixed 1.9.0 baseline and the version number are unchanged. [Formulas, branching, compatibility and verification scope](bms-total-random-followup.en.md).
+
+**1.9.1 BMS volume:** This guide describes the BMS performance volume shared by accompaniment and keysounds. [Settings and compatibility](config.en.md#audio).
+
+1.9.1 shows difficulty-table loading status and changes debounce UI steps to 1ms, with a 20ms maximum and 0ms default. The old automatic 5→8ms rewrite is retired, preserving saved 5ms and 8ms values. The Korean skin label becomes `LN 끝 줄임`; appearance and judgement behavior are unchanged. In ordinary single-player with Listen to End enabled, `Esc` skips the outro directly to results without opening Pause once the final note and LN tail have been processed.
+
 In 1.9.0.1, assign Hi-Speed -10/+10 in Profile (defaults F5/F6, range 0.50–50.00). Press Xbox/XInput digital buttons or LT/RT in Keymap to bind lanes, or in Profile to bind restart and Hi-Speed controls. Use the D-pad to navigate menus, A to select and B to go back; an otherwise unassigned Start pauses gameplay. LT/RT count as pressed above 30/255. Analog stick axes and vibration are outside this release. [Changes and compatibility](feedback-20261015.en.md).
 
 The 1.9.0 release selects Normal / Hard / EX under `Options > Key Mode Settings > Judge Window`. Easy is removed from new selections but retained for historical replays. The session-only choice is not profile-persisted and resets to Normal on restart. See [EX timing and compatibility](judge-ex-1.9.0.ko.md) (Korean).
@@ -41,6 +49,8 @@ The standard TenRiff play flow is:
 ## 3. Basic Menu Controls
 
 ### Title
+
+The Home language button cycles **EN → KO → JA → ZH → EN**. It saves through the existing `ui.language` setting and persists across restarts. Strings without a translation can fall back to English.
 - `Up` / `Down`: move through the menu
 - `Enter`: select
 - `Esc`: quit
@@ -60,13 +70,14 @@ The 1.8.9 lobby separates large BEST numbers from maximum score, COMBO units and
 - `Esc`: return to the previous screen
 - `-` / `+`: adjust the next-play Rate immediately
 - `F5`: reindex the song library; centered stage / percent / ETA and a progress bar appear while it runs
-- Lower-center difficulty-table card: click the name/URL to edit, File for local JSON, and Reset for native LV. Enter applies the URL; Esc cancels. The difficulty-table row in Sort / Filter remains available.
+- Difficulty-table card (beside Song Library in the default native layout): click the name/URL to edit, File for local JSON, and Reset for native LV. Enter applies the URL; Esc cancels. The difficulty-table row in Sort / Filter remains available.
+- A loading status is shown while the difficulty table is being loaded.
 
 ### Screens commonly used from Song Select
 - `Mode`
   - Adjust Ghost Battle, Autoplay, Practice, Sudden Death, Key Mode, Gauge, Random, Mods, Rate, and Hi-Speed
 - `Audio`
-  - Adjust Master / BGM / Keysound volume and the BMS keysound policy
+  - Adjust Master, BMS Performance and TenRiff Menu Music volumes, plus the BMS keysound mode
 - `Graphics`
   - Adjust VSync, Refresh Hz, Performance HUD, BGA visibility, and the external ONNX BGA Upscaler
   - Turning `BGA` off disables gameplay image/video backgrounds and their decoder/upscaler work; Song Select previews remain visible
@@ -133,6 +144,7 @@ If this is not the layout you want, you can change it in `Options > Keymap`.
 
 - Chart key input: based on the current keymap
 - `Esc`: pause ordinary single-player immediately. Continue or Esc resumes after a 3/2/1 countdown while audio, chart time and scoring remain frozen. Esc during the resume countdown returns to the pause menu.
+- With Listen to End (`play_to_end=true`) enabled, ordinary single-player `Esc` skips the outro directly to results after the final note and LN tail have been processed. Pause does not open; this also applies to autoplay and replay.
 - Session Mix ignores Esc during play; its between-stage result exits remain available. Multiplayer retains its Esc abort behavior.
 - `F3`: decrease Hi-Speed
 - `F4`: increase Hi-Speed
@@ -213,6 +225,8 @@ Explicit aborts (`ABORTED` or `aborted`) show `--`, autoplay shows `AUTO`, and m
 
 ### Gauge
 
+**1.9.1 BMS behavior:** New ordinary BMS plays use `TOTAL / N` recovery for Normal/Easy, and fixed recovery plus TOTAL/note-count damage correction for Hard/EX. `N` counts valid current note heads, with each LN counted once. Hard judgement damage is multiplied by 0.6 below 32%. TenRiff retains its 100% start, zero failure, gauge shifts, judgement classification, 0.5 LN head/tail weights and authored mine damage. Courses retain their course gauge; peer battle retains v1. Existing `gauge.delta` values remain for historical replay compatibility and do not tune the new BMS v2 calculation.
+
 Gauge Shift is always active. `EX / Hard / Normal / Easy` select the starting tier, stored as `ex_hard / hard / normal / easy`. The selected tier and every lower tier start at 100% and accumulate judgements independently. When the current tier reaches zero, the next surviving tier takes over; the highest surviving tier at the end is the final result. Gauge failure occurs when all eligible tiers fail.
 
 Grade/Session Mix uses a separate LR2-reference gauge, carried between songs, with indirect misses and failure below 2% HP. Normal long notes apply gauge once on completion/release. Ordinary `gauge.delta` settings do not apply to courses. See [LR2 gauge comparison and limits](lr2-gauge-audit.ko.md).
@@ -255,11 +269,13 @@ The return keys are:
 - Adjust `Skins > Visual Latency`.
 - Positive values draw the notes earlier.
 
-### BMS keysounds are too loud or too quiet
-- Adjust `Audio > Keysound Volume`.
-- This can be tuned separately from BGM.
+### BMS song audio or keysounds are too loud or too quiet
+
+- Adjust `Audio > BMS Performance Volume` to change accompaniment and keysounds together. `Master Volume` also affects the final level.
+- There is no separate control to make keysounds louder or quieter relative to BGM.
 - The late-input path that could stay silent under `follow` was fixed in 1.2.6: judgement time stays unchanged while only the audible start is pinned to the current writable buffer.
-- If it is still silent, verify `Keysound Mode=follow`, a non-zero volume, and the chart's `#WAV` asset paths.
+- If keysounds are missing, check `Keysound Mode`: `follow` plays them on note hits, `autoplay` plays them at chart times, and Off silences them. This mode does not change their volume relative to BGM.
+- Also check that both Master and BMS Performance volumes are above zero and that the chart's `#WAV` asset paths are valid.
 
 ### The input feels unstable or key conflicts are suspected
 - Use `Options > Keymap > NKRO Test` and press multiple keys at once to check.
@@ -282,3 +298,7 @@ When you start, the easiest order is:
 - Config structure: [`docs/config.en.md`](config.en.md)
 - Menu structure: [`docs/menu.en.md`](menu.en.md)
 - Play loop / engine structure: [`docs/core-loop.en.md`](core-loop.en.md)
+
+**Authored branches:** `#RANDOM N` selects an integer from 1 through N and applies the matching `#IF` section’s notes, assets and timing commands. Alternative sections are not layered together. Fresh attempts use a new branch seed even when lane randomization is off; a repeated draw can still select the same branch. Replays retain the original choices. New records currently remain local.
+
+[Formulas, branching, compatibility and verification scope](bms-total-random-followup.en.md).

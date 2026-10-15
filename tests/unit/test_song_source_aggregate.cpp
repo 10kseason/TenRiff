@@ -1,9 +1,11 @@
 #include "doctest/doctest.h"
 
+#include <array>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -16,9 +18,225 @@
 
 #ifdef _WIN32
 #include "app/MenuApp.h"
+#include "app/MenuRecordUtils.h"
+#include "app/ReplayVerifier.h"
 
 namespace tenriff::app {
 struct MenuAppSongSourceTestAccess {
+    static void check_bms_policy_best(const std::string& root) {
+        auto menu = std::make_unique<MenuApp>();
+        menu->songs_path_ = root;
+        menu_records::ParsedResultRecord parsed;
+        parsed.chart_path = "policy.bms";
+        parsed.bms_random_seed = 0;
+        ReplayVerificationResult verified;
+        verified.status = ReplayVerificationStatus::Verified;
+        verified.official_eligible = verified.claims_match = true;
+        verified.game_over = false;
+        verified.clear_status = "CLEAR";
+        verified.final_gauge = "normal";
+        const std::array<std::array<int, 3>, 7> policies{{
+            {{1, 1, 1}}, {{1, 1, 2}}, {{1, 2, 1}}, {{2, 1, 1}},
+            {{2, 1, 2}}, {{2, 2, 1}}, {{2, 2, 2}},
+        }};
+        const auto append = [&](const std::array<int, 3>& policy, int64_t score, uint32_t seed) {
+            parsed.bms_gauge_version = policy[0];
+            parsed.bms_control_flow_version = policy[1];
+            parsed.bms_timing_version = policy[2];
+            parsed.bms_random_seed = seed;
+            verified.final_score = score;
+            const auto name = std::to_string(menu->local_play_records_.size());
+            menu->append_chart_result_record(parsed, "result-" + name, "replay-" + name, verified);
+            const auto& stored = menu->local_play_records_.back();
+            CHECK(stored.bms_gauge_version == policy[0]);
+            CHECK(stored.bms_control_flow_version == policy[1]);
+            CHECK(stored.bms_timing_version == policy[2]);
+            CHECK(stored.bms_random_seed == seed);
+        };
+        for (std::size_t i = 0; i < policies.size(); ++i) {
+            const int64_t score = 900 - static_cast<int64_t>(i) * 100;
+            append(policies[i], score, static_cast<uint32_t>(i));
+            for (const auto& item : menu->chart_best_results_) {
+                CHECK(item.second.bms_gauge_version == policies[i][0]);
+                CHECK(item.second.bms_control_flow_version == policies[i][1]);
+                CHECK(item.second.bms_timing_version == policies[i][2]);
+                CHECK(item.second.best_score == score);
+            }
+        }
+        for (std::size_t i = 0; i + 1 < policies.size(); ++i) append(policies[i], 99999, 42);
+        for (const auto& item : menu->chart_best_results_) CHECK(item.second.best_score == 300);
+        append(policies.back(), 400, UINT32_MAX);
+        for (const auto& item : menu->chart_best_results_) CHECK(item.second.best_score == 400);
+        CHECK(menu->local_play_records_.size() == 14);
+        // Loading aliases in either order must not compare legacy high scores
+        // with the newest policy's score. Random seed never partitions BEST.
+        const auto keys = menu_songs::build_chart_path_keys(parsed.chart_path, root);
+        REQUIRE(keys.size() >= 2);
+        auto current = menu->chart_best_results_.begin()->second;
+        auto historical = current;
+        historical.bms_gauge_version = 1;
+        historical.best_score = 99999;
+        SongEntry entry;
+        entry.path = parsed.chart_path;
+        for (int reverse = 0; reverse < 2; ++reverse) {
+            menu->chart_best_results_.clear();
+            menu->chart_best_results_[keys[0]] = reverse ? current : historical;
+            menu->chart_best_results_[keys[1]] = reverse ? historical : current;
+            CHECK(menu->best_result_for_song_entry(entry).best_score == 400);
+        }
+    }
+    static void check_bms_policy_live_and_restore(const std::filesystem::path& root) {
+        const auto replay_path = root / "bound-replay.json";
+        { std::ofstream out(replay_path); out << "live-export-evidence-fixture"; }
+        gameplay::ResultFile result;
+        result.chart_path = (root / "chart.bms").u8string();
+        result.chart_format = "bms";
+        result.chart_sha256 = std::string(64, 'a');
+        result.replay_sha256 = std::string(64, 'b');
+        result.replay_path = replay_path.u8string();
+        result.ruleset_id = std::string(kCanonicalReplayRulesetId);
+        result.clear_status = "CLEAR";
+        result.final_gauge = "normal";
+        result.bms_timing_version = result.bms_gauge_version = result.bms_control_flow_version = 2;
+        result.bms_random_seed = UINT32_MAX;
+        for (int mismatch = 0; mismatch < 5; ++mismatch) {
+            auto menu = std::make_unique<MenuApp>();
+            menu->songs_path_ = root.u8string();
+            menu->last_result_ = result.stats;
+            menu->last_game_over_ = false;
+            menu->last_clear_status_ = result.clear_status;
+            menu->last_final_gauge_ = result.final_gauge;
+            menu->last_result_bms_timing_version_ = 2;
+            menu->last_result_bms_gauge_version_ = 2;
+            menu->last_result_bms_control_flow_version_ = 2;
+            menu->last_result_bms_random_seed_ = UINT32_MAX;
+            auto stored = result;
+            if (mismatch == 1) stored.bms_gauge_version = 1;
+            if (mismatch == 2) stored.bms_control_flow_version = 1;
+            if (mismatch == 3) stored.bms_random_seed = 0;
+            if (mismatch == 4) stored.bms_random_seed.reset();
+            const auto result_path = root / ("result-policy-" + std::to_string(mismatch) + ".json");
+            REQUIRE(gameplay::save_result_json(result_path.u8string(), stored).success());
+            menu->cache_current_session_result(result.chart_path, result_path.u8string(),
+                replay_path.u8string(), result.replay_sha256, true, false);
+            REQUIRE(menu->local_play_records_.size() == 1);
+            CHECK(menu->local_play_records_.front().replay_claims_match == (mismatch == 0));
+            CHECK(menu->chart_best_results_.empty() == (mismatch != 0));
+            // History display restores the record's policy even when the next
+            // run's defaults are different; it does not reinterpret old stats.
+            REQUIRE(menu->open_result_record(result_path.u8string(), replay_path.u8string()));
+            CHECK(menu->last_result_bms_gauge_version_ == stored.bms_gauge_version);
+            CHECK(menu->last_result_bms_control_flow_version_ == stored.bms_control_flow_version);
+            CHECK(menu->last_result_bms_random_seed_ == stored.bms_random_seed);
+        }
+    }
+    static void check_result_difficulty_handoff() {
+        struct TableCase { const char* url; const char* symbol; int keys; bool aery; int prefix_keys; };
+        const TableCase cases[] = {
+            {"https://asumatoki.kr/table/aery/header.json", "⑤", 5, true, 0},
+            {"https://classmaterma.github.io/4UE/table.html", "4UE", 4, false, 4},
+            {"https://classmaterma.github.io/UE/table.html", "6UE", 6, false, 6},
+            {"https://classmaterma.github.io/8UE/table.html", "8UE", 8, false, 8},
+            {"https://calc.10k-revive.cloud/table.html", "Ⓡ", 10, false, 10},
+            {"https://fixture.invalid/custom.json", "⑤", 5, false, 0},
+            {"", "", 5, false, 0},
+        };
+        auto menu = std::make_unique<MenuApp>();
+        menu->songs_path_ = "fixture";
+        for (const auto& fixture : cases) {
+            menu->config_.ui.difficulty_table_url = fixture.url;
+            menu->config_.ui.difficulty_table_path = *fixture.url ? "fixture-table.json" : "";
+            SongEntry entry;
+            entry.path = "fixture.bms";
+            entry.title = "Result difficulty fixture";
+            entry.level = 12;
+            entry.key_count = fixture.keys;
+            entry.difficulty_table_symbol = fixture.symbol;
+            entry.difficulty_table_level = *fixture.url ? "LEVEL 12" : "";
+            menu->update_last_chart_metadata("fixture/fixture.bms", &entry);
+            render::MenuRenderData result;
+            menu->populate_result_render_data(result, {});
+            CHECK(result.result.difficulty_label == (*fixture.url
+                ? std::string(fixture.symbol) + "LEVEL 12" : "LV 12"));
+            CHECK(result.result.difficulty_is_aery_five_key == fixture.aery);
+            CHECK(result.result.difficulty_prefix_key_count == fixture.prefix_keys);
+        }
+    }
+    static void check_table_loading(const std::string& profile) {
+        auto menu = std::make_unique<MenuApp>();
+        menu->profile_dir_ = profile;
+        menu->config_.ui.language = "ko";
+        menu->config_.ui.all_song_sources = true;
+        menu->config_.ui.recent_song_sources.clear();
+        menu->config_.audio_ui.background_sound_enabled = false;
+        menu->menu_navigator_.reset(MenuApp::Screen::SongSelect);
+        menu->difficulty_table_url_editing_ = true;
+        const auto check_loading = [&] {
+            CHECK(menu->difficulty_table_loading());
+            CHECK(menu->snapshot_.render.song_select.difficulty_table_name == u8"로딩 중");
+            CHECK(menu->snapshot_.render.song_select.difficulty_table_status == u8"로딩 중");
+            render::MenuRenderData browser;
+            menu->populate_song_browser_render_data(browser);
+            bool loading_row = false;
+            for (const auto& row : browser.generic.rows)
+                if (row.row_index == 5) loading_row = row.value == u8"로딩 중";
+            CHECK(loading_row);
+        };
+        const auto check_finished = [&] {
+            CHECK_FALSE(menu->difficulty_table_loading());
+            CHECK(menu->snapshot_.render.song_select.difficulty_table_name != u8"로딩 중");
+            CHECK(menu->snapshot_.render.song_select.difficulty_table_status != u8"로딩 중");
+        };
+        int fetches = 0;
+        const DifficultyTableFetchFunction fetch = [&](std::string_view url, std::size_t) {
+            check_loading(); // The blocking operation sees the already-published UI.
+            if (!menu->config_.ui.difficulty_table_path.empty()) {
+                menu->refresh_song_source(false);
+                check_loading(); // Nested cache application retains the outer import.
+            }
+            ++fetches;
+            DifficultyTableHttpResponse response;
+            response.status_code = 200;
+            response.final_url = std::string(url);
+            response.body = url.find("data.json") != std::string_view::npos
+                ? R"([{"md5":"0123456789abcdef0123456789abcdef","level":"1"}])"
+                : R"({"name":"Loading fixture","symbol":"lv","data_url":"data.json"})";
+            return response;
+        };
+        for (int refresh = 0; refresh < 2; ++refresh) {
+            REQUIRE(menu->apply_difficulty_table_url("https://fixture.invalid/header.json", fetch));
+            check_finished();
+            CHECK(menu->snapshot_.render.song_select.difficulty_table_name == "Loading fixture");
+        }
+        CHECK(fetches == 4);
+        const auto selected_path = menu->config_.ui.difficulty_table_path;
+        CHECK_FALSE(menu->apply_difficulty_table_url("https://fixture.invalid/failure.json",
+            [&](std::string_view, std::size_t) {
+                check_loading();
+                DifficultyTableHttpResponse response;
+                response.error = "Fixture download failed";
+                return response;
+            }));
+        check_finished();
+        CHECK_FALSE(menu->song_browser_status_message_.empty());
+        CHECK(menu->config_.ui.difficulty_table_path == selected_path);
+        bool threw = false;
+        try {
+            static_cast<void>(menu->apply_difficulty_table_url("https://fixture.invalid/throw.json",
+                [&](std::string_view, std::size_t) -> DifficultyTableHttpResponse {
+                    check_loading();
+                    throw std::runtime_error("Fixture fetch exception");
+                }));
+        } catch (const std::runtime_error&) {
+            threw = true;
+        }
+        CHECK(threw);
+        check_finished();
+        CHECK(menu->config_.ui.difficulty_table_path == selected_path);
+        menu->select_native_difficulty_levels();
+        check_finished();
+        CHECK(menu->config_.ui.difficulty_table_path.empty());
+    }
     static render::MenuRenderData render_index(SongIndex index, const std::vector<std::string>& roots) {
         auto menu = std::make_unique<MenuApp>();
         menu->config_.ui.all_song_sources = true;
@@ -273,6 +491,25 @@ TEST_CASE("ALL SONG skips deleted folders inside a valid cache and continues wit
 }
 
 #ifdef _WIN32
+TEST_CASE("BMS local best selects policy tuples without mixing old scores or partitioning branch seeds") {
+    AggregateFixture f;
+    MenuAppSongSourceTestAccess::check_bms_policy_best(f.base.u8string());
+}
+
+TEST_CASE("BMS live result cache checks policy and seed integrity and restores history metadata") {
+    AggregateFixture f;
+    MenuAppSongSourceTestAccess::check_bms_policy_live_and_restore(f.base);
+}
+
+TEST_CASE("result difficulty metadata preserves the selected registered table display policy") {
+    MenuAppSongSourceTestAccess::check_result_difficulty_handoff();
+}
+
+TEST_CASE("difficulty table loading is published before import and cleared on success refresh failure and unwind") {
+    AggregateFixture f;
+    MenuAppSongSourceTestAccess::check_table_loading(f.profile());
+}
+
 TEST_CASE("1.8.9.4 metadata passes indexed author and BPM changes into lobby and result without stale credits") {
     AggregateFixture f;
     const auto root = f.source("metadata");

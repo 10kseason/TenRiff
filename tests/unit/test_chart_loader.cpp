@@ -1,6 +1,7 @@
 #include "doctest/doctest.h"
 
 #include <algorithm>
+#include <array>
 #include <filesystem>
 #include <cmath>
 #include <fstream>
@@ -11,6 +12,8 @@
 
 #include "app/ChartLoader.h"
 #include "app/ModeManager.h"
+#include "chart/BmsParser.h"
+#include "game/GaugeManager.h"
 #include "gameplay/GameplayEngine.h"
 #include "gameplay/GameplayChart.h"
 #include "bms_timing_fixture.h"
@@ -131,6 +134,205 @@ TEST_CASE("feedback real BMS timing mine reproduction") {
     const char* path = std::getenv("TENRIFF_BMS_TIMING_CHART");
     if (!path || !*path) return; // Local reporter input is intentionally not shipped.
     check_bpm_stop_mine_input(path, true);
+}
+
+TEST_CASE("feedback real BMS RANDOM cultivator reproduction") {
+    const char* path = std::getenv("TENRIFF_BMS_RANDOM_CHART");
+    if (!path || !*path) return; // Local reporter input is intentionally not shipped.
+
+    std::array<bool, 4> seen{};
+    std::array<uint32_t, 4> branch_seeds{};
+    for (uint32_t seed = 0; seed < 256; ++seed) {
+        tenriff::chart::BmsParserOptions options;
+        options.random_seed = seed;
+        options.control_flow_version = 2;
+        const auto parsed = tenriff::chart::BmsParser{}.parseFile(path, options);
+        REQUIRE(parsed.success());
+        REQUIRE(parsed.chart.has_random_directives);
+
+        // This reporter chart chooses one of four LN lanes in measure 32;
+        // subsequent measures must survive its omitted sibling ENDIFs.
+        const auto branch = std::find_if(parsed.chart.commands.begin(), parsed.chart.commands.end(),
+            [](const auto& command) {
+                return command.measure == 32 && command.channel.size() == 2u &&
+                       command.channel[0] == '5' && command.channel[1] >= '1' && command.channel[1] <= '4';
+            });
+        REQUIRE(branch != parsed.chart.commands.end());
+        const auto branch_index = static_cast<std::size_t>(branch->channel[1] - '1');
+        CHECK(std::count_if(parsed.chart.commands.begin(), parsed.chart.commands.end(),
+            [](const auto& command) {
+                return command.measure == 32 && command.channel.size() == 2u &&
+                       command.channel[0] == '5' && command.channel[1] >= '1' && command.channel[1] <= '4';
+            }) == 1);
+        CHECK(std::any_of(parsed.chart.commands.begin(), parsed.chart.commands.end(),
+            [](const auto& command) {
+                return command.measure == 38 && command.channel.size() == 2u && command.channel[0] == '1';
+            }));
+
+        const bool first_for_branch = !seen[branch_index];
+        if (first_for_branch) branch_seeds[branch_index] = seed;
+        seen[branch_index] = true;
+        if (seed < 4 || first_for_branch) {
+            const auto legacy = ChartLoader{}.load(path, 48000, 1.0, "ignore", seed, 2, 1);
+            const auto repaired = ChartLoader{}.load(path, 48000, 1.0, "ignore", seed, 2, 2);
+            REQUIRE(legacy.success());
+            REQUIRE(repaired.success());
+            CHECK(repaired.chart.bms_has_random);
+            REQUIRE(repaired.chart.notes.size() > legacy.chart.notes.size());
+            const auto selected_hold = std::find_if(repaired.chart.notes.rbegin(), repaired.chart.notes.rend(),
+                [branch_index](const auto& note) {
+                    return note.lane == static_cast<int>(branch_index + 1u) && note.end_sample.has_value();
+                });
+            REQUIRE(selected_hold != repaired.chart.notes.rend());
+            CHECK(std::any_of(repaired.chart.notes.begin(), repaired.chart.notes.end(),
+                [&](const auto& note) { return note.start_sample > *selected_hold->end_sample; }));
+            std::cout << "reported BMS RANDOM seed=" << seed << " branch=" << branch_index + 1u
+                << " v1_notes=" << legacy.chart.notes.size()
+                << " v1_duration_samples=" << legacy.chart.duration_samples
+                << " v2_notes=" << repaired.chart.notes.size()
+                << " v2_duration_samples=" << repaired.chart.duration_samples << '\n';
+        }
+        if (seed >= 3 && std::all_of(seen.begin(), seen.end(), [](bool value) { return value; })) break;
+    }
+    REQUIRE(std::all_of(seen.begin(), seen.end(), [](bool value) { return value; }));
+    std::cout << "reported BMS RANDOM four_branch_seeds=" << branch_seeds[0] << ',' << branch_seeds[1]
+              << ',' << branch_seeds[2] << ',' << branch_seeds[3] << '\n';
+}
+
+TEST_CASE("chart loader BMS TOTAL validates authored values and uses LR2 fallback for invalid values") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE_FALSE(temp.path.empty());
+    struct TotalCase { const char* header; double expected; };
+    const TotalCase cases[] = {
+        {"#TOTAL 300\n", 300.0}, {"#TOTAL 12.5\n", 12.5}, {"#TOTAL 4e2\n", 400.0},
+        {"", 0.0}, {"#TOTAL 0\n", 0.0}, {"#TOTAL -1\n", 0.0},
+        {"#TOTAL nan\n", 0.0}, {"#TOTAL inf\n", 0.0}, {"#TOTAL 1e309\n", 0.0},
+        {"#TOTAL 300junk\n", 0.0}, {"#TOTAL invalid\n", 0.0}};
+    const auto path = temp.path / "total.bms";
+    for (const auto& item : cases) {
+        {
+            std::ofstream file(path);
+            REQUIRE(file.good());
+            file << "#TITLE TOTAL fixture\n#BPM 120\n#5K\n" << item.header << "#00111:";
+            for (int index = 0; index < 500; ++index) file << "01";
+            file << '\n';
+        }
+        const auto loaded = ChartLoader{}.load(path.u8string(), 48000, 1.0);
+        REQUIRE(loaded.success());
+        REQUIRE(loaded.chart.notes.size() == 500u);
+        CHECK_FALSE(loaded.chart.bms_has_random);
+        CHECK(loaded.chart.bms_total.has_value() == (item.expected > 0.0));
+        if (item.expected > 0.0) {
+            CHECK(*loaded.chart.bms_total == doctest::Approx(item.expected));
+        }
+        tenriff::game::GaugeRuntimePolicy policy;
+        policy.bms_lr2_deltas = true;
+        policy.bms_total = loaded.chart.bms_total.value_or(0.0);
+        policy.bms_note_count = static_cast<int>(loaded.chart.notes.size());
+        tenriff::game::GaugeManager gauge({}, policy);
+        tenriff::game::GaugeState state{tenriff::game::GaugeType::Normal, 50.0, false};
+        (void)gauge.applyJudgement(state, tenriff::game::Judgement::PG, 0.0);
+        // LR2's missing-TOTAL curve resolves to 256 for 500 playable notes.
+        const double expected_total = item.expected > 0.0 ? item.expected : 256.0;
+        CHECK(state.value == doctest::Approx(50.0 + expected_total / 500.0));
+    }
+}
+
+TEST_CASE("chart loader BMS RANDOM seed survives rate reloads and reaches different patterns") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE_FALSE(temp.path.empty());
+    const auto path = temp.path / "branches.bms";
+    {
+        std::ofstream file(path);
+        REQUIRE(file.good());
+        file << "#TITLE Branch fixture\n#BPM 120\n#5K\n#RANDOM 2\n"
+                "#IF 1\n#TOTAL 250\n#00111:0100\n#ENDIF\n"
+                "#IF 2\n#TOTAL 400\n#00112:0101\n#ENDIF\n"
+                "#ENDRANDOM\n#00315:01\n";
+    }
+    bool saw_first = false;
+    bool saw_second = false;
+    for (uint32_t seed = 0; seed < 16; ++seed) {
+        const auto reference = ChartLoader{}.load(path.u8string(), 48000, 1.0, "ignore", seed, 2, 2);
+        REQUIRE(reference.success());
+        REQUIRE(reference.chart.bms_total.has_value());
+        CHECK(reference.chart.bms_has_random);
+        const bool first = *reference.chart.bms_total == 250.0;
+        saw_first = saw_first || first;
+        saw_second = saw_second || !first;
+        REQUIRE(reference.chart.notes.size() == (first ? 2u : 3u));
+        for (const int sample_rate : {44100, 48000, 96000}) {
+            const auto reloaded = ChartLoader{}.load(path.u8string(), sample_rate, 1.0, "ignore", seed, 2, 2);
+            REQUIRE(reloaded.success());
+            CHECK(reloaded.chart.bms_has_random);
+            CHECK(reloaded.chart.bms_total == reference.chart.bms_total);
+            REQUIRE(reloaded.chart.notes.size() == reference.chart.notes.size());
+            CHECK(reloaded.chart.lane_count == reference.chart.lane_count);
+            for (std::size_t index = 0; index < reference.chart.notes.size(); ++index) {
+                CHECK(reloaded.chart.notes[index].lane == reference.chart.notes[index].lane);
+                const double seconds = static_cast<double>(reloaded.chart.notes[index].start_sample) / sample_rate;
+                const double expected_seconds = static_cast<double>(reference.chart.notes[index].start_sample) / 48000;
+                CHECK(std::abs(seconds - expected_seconds) <= 1.0 / sample_rate);
+            }
+        }
+    }
+    CHECK(saw_first);
+    CHECK(saw_second);
+}
+
+TEST_CASE("chart loader BMS RANDOM keeps versioned shorthand replay schedules") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE_FALSE(temp.path.empty());
+    const auto path = temp.path / "short_branches.bms";
+    {
+        std::ofstream file(path);
+        REQUIRE(file.good());
+        file << "#TITLE Shorthand fixture\n#BPM 120\n#5K\n#00011:01\n#SETRANDOM 2\n"
+                "#IF 1\n#00111:01\n#IF 2\n#00112:01\n#IF 3\n#00113:01\n"
+                "#ENDIF\n#ENDRANDOM\n#00215:01\n";
+    }
+    const auto legacy = ChartLoader{}.load(path.u8string(), 48000, 1.0, "ignore", 0, 2, 1);
+    const auto repaired = ChartLoader{}.load(path.u8string(), 48000, 1.0, "ignore", 0, 2, 2);
+    REQUIRE(legacy.success());
+    REQUIRE(repaired.success());
+    CHECK(legacy.chart.bms_has_random);
+    CHECK(repaired.chart.bms_has_random);
+    REQUIRE(legacy.chart.notes.size() == 1u);
+    REQUIRE(repaired.chart.notes.size() == 3u);
+    CHECK(legacy.chart.notes[0].start_sample == repaired.chart.notes[0].start_sample);
+    CHECK(repaired.chart.notes[1].lane == 2);
+    // Explicit 5K keeps five lanes, but the established sparse-channel mapping
+    // compacts the selected 11/12/15 channels to lanes 1/2/3.
+    CHECK(repaired.chart.notes[2].lane == 3);
+    CHECK(repaired.chart.duration_samples > legacy.chart.duration_samples);
+}
+
+TEST_CASE("chart loader BMS TOTAL and RANDOM metadata survive native and key conversion modes") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE_FALSE(temp.path.empty());
+    const auto path = temp.path / "convert_metadata.bms";
+    {
+        std::ofstream file(path);
+        REQUIRE(file.good());
+        file << "#TITLE Conversion metadata\n#BPM 120\n#5K\n#TOTAL 325.5\n"
+                "#RANDOM 1\n#IF 1\n#00111:01\n#00212:01\n#00313:01\n"
+                "#00414:01\n#00515:01\n#ENDIF\n#ENDRANDOM\n";
+    }
+    const auto loaded = ChartLoader{}.load(path.u8string(), 48000, 1.0);
+    REQUIRE(loaded.success());
+    REQUIRE(loaded.chart.bms_total.has_value());
+    REQUIRE(loaded.chart.bms_has_random);
+    for (const char* key_mode : {"auto", "4k", "6k", "8k", "10k"}) {
+        tenriff::config::ModeConfig mode;
+        mode.key_mode = key_mode;
+        mode.key_conversion_algorithm = "krrcream";
+        mode.random_seed = 42;
+        const auto managed = tenriff::app::manage_modes(loaded.chart, loaded.format, mode,
+            tenriff::config::JudgeConfig{}, 1.0, loaded.base_bpm, 48000);
+        CHECK(managed.chart.bms_has_random);
+        CHECK(managed.chart.bms_total == loaded.chart.bms_total);
+        CHECK_FALSE(managed.chart.notes.empty());
+    }
 }
 
 TEST_CASE("BMS RANK chooses real-time judgement windows while Easy keeps other windows") {

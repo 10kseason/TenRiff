@@ -1,4 +1,5 @@
 #include <cmath>
+#include <limits>
 
 #include "doctest/doctest.h"
 
@@ -430,4 +431,157 @@ TEST_CASE("fatal hits keep the selected gauge label") {
     CHECK(normal_result.game_over);
     CHECK(hard.type == GaugeType::Hard);
     CHECK(normal.type == GaugeType::Normal);
+}
+
+namespace {
+GaugeRuntimePolicy bms_lr2_policy(double total = 300.0, int notes = 1000) {
+    GaugeRuntimePolicy policy;
+    policy.bms_lr2_deltas = true;
+    policy.bms_total = total;
+    policy.bms_note_count = notes;
+    return policy;
+}
+
+double bms_delta(const GaugeManager& manager, GaugeType type, Judgement judgement,
+                 bool empty_poor = false, double initial = 50.0, double weight = 1.0) {
+    GaugeState state{type, initial, false};
+    manager.applyJudgementWeighted(state, judgement, 0.0, weight, empty_poor);
+    return state.value - initial;
+}
+}  // namespace
+
+TEST_CASE("BMS LR2 deltas use TOTAL recovery and distinct consumed versus empty POOR") {
+    GaugeManager manager({}, bms_lr2_policy());
+    const Judgement grades[]{Judgement::PG, Judgement::GR, Judgement::GD, Judgement::BD, Judgement::PR};
+    const double normal[]{0.3, 0.3, 0.15, -4.0, -6.0};
+    const double easy[]{0.36, 0.36, 0.18, -3.2, -4.8};
+    const double hard[]{0.1, 0.1, 0.05, -6.0, -10.0};
+    const double ex[]{0.1, 0.1, 0.05, -12.0, -20.0};
+    for (int i = 0; i < 5; ++i) {
+        CHECK(bms_delta(manager, GaugeType::Normal, grades[i]) == doctest::Approx(normal[i]));
+        CHECK(bms_delta(manager, GaugeType::Easy, grades[i]) == doctest::Approx(easy[i]));
+        CHECK(bms_delta(manager, GaugeType::Hard, grades[i]) == doctest::Approx(hard[i]));
+        CHECK(bms_delta(manager, GaugeType::ExHard, grades[i]) == doctest::Approx(ex[i]));
+    }
+    CHECK(bms_delta(manager, GaugeType::Easy, Judgement::PR, true) == doctest::Approx(-1.6));
+    for (auto type : {GaugeType::Normal, GaugeType::Hard, GaugeType::ExHard}) {
+        CHECK(bms_delta(manager, type, Judgement::PR, true) == doctest::Approx(-2.0));
+    }
+    GaugeManager higher({}, bms_lr2_policy(600.0));
+    CHECK(bms_delta(higher, GaugeType::Normal, Judgement::PG) == doctest::Approx(0.6));
+    CHECK(bms_delta(higher, GaugeType::Easy, Judgement::GD) == doctest::Approx(0.36));
+    CHECK(bms_delta(higher, GaugeType::Normal, Judgement::BD) == doctest::Approx(-4.0));
+    CHECK(bms_delta(higher, GaugeType::Hard, Judgement::PG) == doctest::Approx(0.1));
+}
+
+TEST_CASE("BMS LR2 missing or invalid TOTAL uses the LR2 note-count fallback") {
+    for (double total : {0.0, -1.0, std::numeric_limits<double>::quiet_NaN(),
+                         std::numeric_limits<double>::infinity()}) {
+        GaugeManager manager({}, bms_lr2_policy(total, 500));
+        // N=500 => 160 + (500+100)*.16 = 256.
+        CHECK(bms_delta(manager, GaugeType::Normal, Judgement::PG) == doctest::Approx(0.512));
+        CHECK(bms_delta(manager, GaugeType::Easy, Judgement::PG) == doctest::Approx(0.6144));
+        CHECK(bms_delta(manager, GaugeType::Hard, Judgement::BD) == doctest::Approx(-12.0));
+    }
+    const struct { int notes; double total; } cases[]{{400, 224.0}, {600, 288.0}, {1000, 352.0}};
+    for (const auto& row : cases) {
+        GaugeManager manager({}, bms_lr2_policy(0.0, row.notes));
+        CHECK(bms_delta(manager, GaugeType::Normal, Judgement::PG) == doctest::Approx(row.total / row.notes));
+    }
+    for (int count : {0, -5}) {
+        GaugeManager empty({}, bms_lr2_policy(0.0, count));
+        CHECK(bms_delta(empty, GaugeType::Normal, Judgement::PG) == 0.0);
+        CHECK(bms_delta(empty, GaugeType::Easy, Judgement::GD) == 0.0);
+        CHECK(std::isfinite(bms_delta(empty, GaugeType::Hard, Judgement::BD)));
+    }
+}
+
+TEST_CASE("BMS LR2 Hard damage respects every low-note-count boundary") {
+    const struct { int notes; double factor; } cases[]{
+        {20, 10.0}, {21, 9.8}, {29, 8.2}, {30, 7.0}, {59, 5.0 + 0.2 / 3.0},
+        {60, 5.0}, {124, 4.0 + 1.0 / 65.0}, {125, 4.0}, {249, 3.008},
+        {250, 3.0}, {499, 2.004}, {500, 2.0}, {999, 1.002}, {1000, 1.0}, {2000, 1.0}};
+    for (const auto& row : cases) {
+        GaugeManager manager({}, bms_lr2_policy(1000.0, row.notes));
+        CHECK(bms_delta(manager, GaugeType::Hard, Judgement::BD, false, 100.0) ==
+              doctest::Approx(-6.0 * row.factor));
+        CHECK(bms_delta(manager, GaugeType::ExHard, Judgement::BD, false, 80.0, 0.25) ==
+              doctest::Approx(-3.0 * row.factor));
+        CHECK(bms_delta(manager, GaugeType::Hard, Judgement::PR, true) ==
+              doctest::Approx(-2.0 * row.factor));
+    }
+}
+
+TEST_CASE("BMS LR2 Hard damage uses the larger TOTAL or note-count correction") {
+    const struct { double total; double factor; } cases[]{
+        {96.0, 10.0}, {159.0, 2.5}, {160.0, 2.0}, {175.0, 2.0},
+        {176.0, 10.0 / 6.0}, {239.0, 10.0 / 9.0}, {240.0, 1.0}, {999.0, 1.0}};
+    for (const auto& row : cases) {
+        GaugeManager manager({}, bms_lr2_policy(row.total, 1000));
+        CHECK(bms_delta(manager, GaugeType::Hard, Judgement::BD, false, 100.0) ==
+              doctest::Approx(-6.0 * row.factor));
+        CHECK(bms_delta(manager, GaugeType::ExHard, Judgement::PR, true) ==
+              doctest::Approx(-2.0 * row.factor));
+    }
+    GaugeManager both({}, bms_lr2_policy(160.0, 250)); // TOTAL=2x, N=3x => 3x, not 6x.
+    CHECK(bms_delta(both, GaugeType::Hard, Judgement::BD) == doctest::Approx(-18.0));
+    CHECK(bms_delta(both, GaugeType::Normal, Judgement::BD) == doctest::Approx(-4.0));
+    CHECK(bms_delta(both, GaugeType::Easy, Judgement::BD) == doctest::Approx(-3.2));
+}
+
+TEST_CASE("BMS LR2 only Hard softens all negative judgements below thirty two percent") {
+    GaugeManager manager({}, bms_lr2_policy());
+    for (double initial : {25.0, 30.0, 31.999, 32.0, 32.001}) {
+        const double scale = initial < 32.0 ? 0.6 : 1.0;
+        CHECK(bms_delta(manager, GaugeType::Hard, Judgement::BD, false, initial) == doctest::Approx(-6.0 * scale));
+        CHECK(bms_delta(manager, GaugeType::Hard, Judgement::PR, false, initial) == doctest::Approx(-10.0 * scale));
+        CHECK(bms_delta(manager, GaugeType::Hard, Judgement::PR, true, initial) == doctest::Approx(-2.0 * scale));
+        CHECK(bms_delta(manager, GaugeType::ExHard, Judgement::BD, false, initial) == doctest::Approx(-12.0));
+        CHECK(bms_delta(manager, GaugeType::Easy, Judgement::BD, false, initial) == doctest::Approx(-3.2));
+    }
+}
+
+TEST_CASE("BMS LR2 deltas preserve TenRiff start zero failure mine damage and runtime shifts") {
+    GaugeManager manager({}, bms_lr2_policy(160.0, 20));
+    for (auto type : {GaugeType::Easy, GaugeType::Normal, GaugeType::Hard, GaugeType::ExHard}) {
+        auto state = manager.initialState(type);
+        CHECK(state.value == 100.0);
+        CHECK_FALSE(manager.isFailedValue(1.99));
+        CHECK(manager.isFailedValue(0.0));
+        manager.applyDamage(state, 3.0);
+        CHECK(state.value == doctest::Approx(97.0)); // Authored mine damage is not multiplied.
+        state.value = 0.1;
+        CHECK(manager.applyJudgement(state, Judgement::BD, 0.0).game_over);
+        CHECK(state.value == 0.0);
+        CHECK(state.type == type);
+    }
+    auto policy = bms_lr2_policy();
+    policy.hard_to_normal_shift = true;
+    policy.normal_to_easy_shift = true;
+    GaugeManager shifting({}, policy);
+    GaugeState hard{GaugeType::Hard, 70.0, false};
+    CHECK(shifting.applyJudgement(hard, Judgement::BD, 0.0).downshifted);
+    CHECK(hard.type == GaugeType::Normal);
+    CHECK(hard.value == 100.0);
+    GaugeState normal{GaugeType::Normal, 36.0, false};
+    CHECK(shifting.applyJudgement(normal, Judgement::BD, 0.0).downshifted);
+    CHECK(normal.type == GaugeType::Easy);
+    CHECK(normal.value == 100.0);
+}
+
+TEST_CASE("BMS LR2 runtime policy is opt-in and course gauge takes precedence") {
+    auto policy = bms_lr2_policy(160.0, 20);
+    policy.bms_lr2_deltas = false;
+    GaugeManager legacy({}, policy);
+    CHECK(bms_delta(legacy, GaugeType::Normal, Judgement::PG) == doctest::Approx(0.19));
+    CHECK(bms_delta(legacy, GaugeType::Hard, Judgement::BD) == doctest::Approx(-10.0));
+    policy.bms_lr2_deltas = true;
+    policy.course_lr2_deltas = true;
+    GaugeManager course({}, policy);
+    CHECK(bms_delta(course, GaugeType::Normal, Judgement::PG) == doctest::Approx(0.1));
+    CHECK(bms_delta(course, GaugeType::Normal, Judgement::GD) == doctest::Approx(0.04));
+    CHECK(bms_delta(course, GaugeType::Hard, Judgement::BD) == doctest::Approx(-2.0));
+    CHECK(bms_delta(course, GaugeType::ExHard, Judgement::PR) == doctest::Approx(-3.0));
+    CHECK(bms_delta(course, GaugeType::Easy, Judgement::PR, true) == doctest::Approx(-2.0));
+    CHECK(course.isFailedValue(1.99));
 }

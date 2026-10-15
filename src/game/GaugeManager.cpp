@@ -25,10 +25,35 @@ double max_gauge_for(GaugeType type) {
 bool is_easy_softened_bad_judgement(Judgement judgement) {
     return judgement == Judgement::BD;
 }
+
+double lr2_note_count_damage_scale(double notes) {
+    // LR2oraja's MODIFY_DAMAGE uses both TOTAL and chart size. Use floating
+    // divisions: integer division would erase the short-chart corrections.
+    if (notes <= 20.0) return 10.0;
+    if (notes < 30.0) return 8.0 + 0.2 * (30.0 - notes);
+    if (notes < 60.0) return 5.0 + 0.2 * (60.0 - notes) / 3.0;
+    if (notes < 125.0) return 4.0 + (125.0 - notes) / 65.0;
+    if (notes < 250.0) return 3.0 + 0.008 * (250.0 - notes);
+    if (notes < 500.0) return 2.0 + 0.004 * (500.0 - notes);
+    if (notes < 1000.0) return 1.0 + 0.002 * (1000.0 - notes);
+    return 1.0;
+}
 }
 
 GaugeManager::GaugeManager(GaugeConfig config, GaugeRuntimePolicy policy)
-    : config_(config), policy_(policy) {}
+    : config_(config), policy_(policy) {
+    if (policy_.bms_lr2_deltas && !policy_.course_lr2_deltas) {
+        const double notes = static_cast<double>(std::max(0, policy_.bms_note_count));
+        const double total = std::isfinite(policy_.bms_total) && policy_.bms_total > 0.0
+                                 ? policy_.bms_total
+                                 : 160.0 + (notes + std::clamp(notes - 400.0, 0.0, 200.0)) * 0.16;
+        // An empty chart cannot earn recovery and must never divide by zero.
+        bms_recovery_per_note_ = notes > 0.0 ? total / notes : 0.0;
+        const double total_damage_scale =
+            10.0 / std::clamp(std::floor(total / 16.0) - 5.0, 1.0, 10.0);
+        bms_hard_damage_scale_ = std::max(total_damage_scale, lr2_note_count_damage_scale(notes));
+    }
+}
 
 GaugeState GaugeManager::initialState(GaugeType type) const noexcept {
     GaugeState state;
@@ -43,6 +68,22 @@ GaugeDeltaTable GaugeManager::tableFor(GaugeType type) const noexcept {
         // LR2 beta3 courseType 2; GOOD is 0.04, and a consumed POOR is -3.
         // Empty POOR is a separate -2 event, selected in applyJudgementWeighted.
         return GaugeDeltaTable{0.1, 0.1, 0.04, -2.0, -3.0};
+    }
+    if (policy_.bms_lr2_deltas) {
+        // Delta reference: LR2oraja GaugeProperty LR2 + GrooveGauge TOTAL /
+        // MODIFY_DAMAGE. This deliberately does not replace survival rules.
+        switch (type) {
+        case GaugeType::ExHard:
+            return {0.1, 0.1, 0.05, -12.0 * bms_hard_damage_scale_, -20.0 * bms_hard_damage_scale_};
+        case GaugeType::Hard:
+            return {0.1, 0.1, 0.05, -6.0 * bms_hard_damage_scale_, -10.0 * bms_hard_damage_scale_};
+        case GaugeType::Normal:
+            return {bms_recovery_per_note_, bms_recovery_per_note_, 0.5 * bms_recovery_per_note_, -4.0, -6.0};
+        case GaugeType::Easy:
+        default:
+            return {1.2 * bms_recovery_per_note_, 1.2 * bms_recovery_per_note_,
+                    0.6 * bms_recovery_per_note_, -3.2, -4.8};
+        }
     }
     switch (type) {
     case GaugeType::ExHard:
@@ -71,20 +112,35 @@ GaugeResult GaugeManager::applyJudgementWeighted(GaugeState& state, Judgement ju
         return result;
     }
 
-    double delta = (policy_.course_lr2_deltas && judgement == Judgement::PR && empty_poor
-                        ? -2.0 : deltaFor(state.type, judgement)) * weight;
+    double delta = deltaFor(state.type, judgement);
+    if (judgement == Judgement::PR && empty_poor) {
+        if (policy_.course_lr2_deltas) {
+            delta = -2.0;
+        } else if (policy_.bms_lr2_deltas) {
+            delta = state.type == GaugeType::Easy ? -1.6 : -2.0;
+            if (state.type == GaugeType::Hard || state.type == GaugeType::ExHard) {
+                delta *= bms_hard_damage_scale_;
+            }
+        }
+    }
+    delta *= weight;
     if (policy_.course_lr2_deltas && state.value < kLr2CourseLowGaugeThreshold && delta < 0.0) {
         delta *= 0.6;
     }
-    if (!policy_.course_lr2_deltas && state.type == GaugeType::Easy &&
+    if (!policy_.course_lr2_deltas && !policy_.bms_lr2_deltas && state.type == GaugeType::Easy &&
         state.value <= kEasyLowGaugeBadSofteningThreshold &&
         is_easy_softened_bad_judgement(judgement) && delta < 0.0) {
         // Ease the death spiral slightly when the easy gauge is already nearly empty.
         delta *= kEasyLowGaugeBadSofteningScale;
     }
-    if (!policy_.course_lr2_deltas && state.type == GaugeType::Hard && judgement == Judgement::PR &&
+    if (!policy_.course_lr2_deltas && !policy_.bms_lr2_deltas &&
+        state.type == GaugeType::Hard && judgement == Judgement::PR &&
         state.value <= kLr2HardPoorLowGaugeThreshold && delta < 0.0) {
         delta *= kLr2HardPoorLowGaugeScale;
+    }
+    if (!policy_.course_lr2_deltas && policy_.bms_lr2_deltas && state.type == GaugeType::Hard &&
+        state.value < kLr2CourseLowGaugeThreshold && delta < 0.0) {
+        delta *= 0.6;
     }
     state.value = std::clamp(state.value + delta, kMinGauge, max_gauge_for(state.type));
     if (policy_.course_lr2_deltas) {

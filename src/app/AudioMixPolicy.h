@@ -45,10 +45,6 @@ inline constexpr float kOutputSoftLimitThreshold = 0.92f;
     return std::clamp(mixed_sample * master, -1.0f, 1.0f);
 }
 
-[[nodiscard]] inline float gameplay_bgm_gain(double bgm_volume) {
-    return static_cast<float>(std::clamp(bgm_volume, 0.0, 2.0));
-}
-
 // Focus muting is an output gate, never a change to the saved master volume.
 // Audio/chart clocks continue while silent and regain the same gain on return.
 [[nodiscard]] inline double focused_audio_master_gain(double master_volume,
@@ -57,23 +53,22 @@ inline constexpr float kOutputSoftLimitThreshold = 0.92f;
     return mute_when_inactive && !foreground ? 0.0 : std::clamp(master_volume, 0.0, 1.0);
 }
 
-// MCI exposes a 0..1000 volume range and cannot represent the gameplay mix's
-// 200% boost. Clamp the BGM submix first so master remains responsive over its
-// entire 0..100% range instead of saturating master*bgm at 100%.
+// Both sliders have a 0..100% range. Clamp them independently so master remains
+// responsive over its full range, including when loading older profile values.
 [[nodiscard]] inline double menu_background_gain(bool enabled,
                                                  double master_volume,
-                                                 double bgm_volume) {
+                                                 double music_volume) {
     if (!enabled) {
         return 0.0;
     }
     return std::clamp(master_volume, 0.0, 1.0) *
-           std::clamp(bgm_volume, 0.0, 1.0);
+           std::clamp(music_volume, 0.0, 1.0);
 }
 
 // Song previews have a separate reference gain; gameplay/editor mixes stay unchanged.
 [[nodiscard]] inline double song_preview_gain(bool enabled, double master_volume,
-                                               double bgm_volume) {
-    return menu_background_gain(enabled, master_volume, bgm_volume) * 0.75;
+                                               double performance_volume) {
+    return menu_background_gain(enabled, master_volume, performance_volume) * 0.75;
 }
 
 // Only TenRiff's own scene music gets the quieter reference level.

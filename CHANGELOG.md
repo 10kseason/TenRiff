@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.9.1] - 2026-10-15
+
+- Add a Home language button that cycles EN → KO → JA → ZH and saves the choice using the existing UI language setting. Retain English fallback for missing translations; translation coverage and button interaction are part of final validation.
+- Replace separate BMS background/keysound controls with one **BMS Performance Volume** control (`BMS 연주 볼륨`), defaulting to 20%. Preserve saved whole-chart volume, master 10% and TenRiff music 100% defaults, 1 percentage-point steps and lobby preview ×0.75. Legacy submix fields remain readable/writable but no longer multiply playback, preview or editor audio.
+- Set debounce to 1ms steps over 0–20ms, with 0ms default, and apply the selected value in the input filter. Retire the old 5→8ms rewrite and preserve saved values. Rename the Korean skin label to `LN 끝 줄임` without changing its shape or judging.
+- Show difficulty-table loading status before blocking import/refresh work. With Listen to End enabled, ordinary solo Esc skips the post-note outro directly to normal results, without pause/abort flags; all remaining taps and LN tails must already be resolved. Preserve course and multiplayer controls.
+- Use LR2-derived BMS TOTAL and note-count gauge deltas for new ordinary BMS plays. Preserve TenRiff 100% start, zero failure, independent gauge shifts, judgement classification, LN half-weights and authored mine damage. Keep old replay and course policies, plus protocol-v6 peer-battle gauge behavior.
+- Refresh older RANDOM-derived song metadata through index cache epoch 19, preserving original chart files.
+- Give authored BMS RANDOM/SWITCH branches a separate saved seed, independent of lane randomization. Add control-flow v2 numeric comments and bounded missing-ENDIF recovery while retaining v1 for old replays and peer battle. Reuse the seed during device-rate reloads.
+- Add optional `bms_gauge_version`, `bms_control_flow_version` and `bms_random_seed` to replay/result evidence, with historical defaults. Keep R5/R6 score IDs and separate local comparisons/ghost eligibility by the applicable policy. New BMS gauge/branch records stay local until the online verifier and boards support them.
+- Match Result level presentation to the song lobby's red level text and registered key-mode symbol colors, including the Aery5-only green ⑤. Replace the native menu mark with the supplied 10 motif.
+- Preserve the fixed 1.9.0 baseline, prior releases/assets, profiles and original charts. No web/API/database deployment is included. See the [1.9.1 release gate](docs/release-1.9.1-gate.md) for candidate-versus-final evidence and remaining physical-device, latency, full-LR2 and online limits.
+
 ## [1.9.0.2] - Release candidate, 2026-10-15
 
 - Add case-insensitive `lv:16to20`, `Lv:16`, `lv:19-`, and `lv:18+` song-search filters. Bounds are inclusive and combine with ordinary text and existing filters; selected difficulty tables supply the level, while Native LV uses the chart level.

@@ -194,6 +194,10 @@ public:
         int long_note_mix_version = 1;
         int key_conversion_version = 3;
         int bms_timing_version = 2;
+        // Optional compatibility metadata: missing fields retain historical BMS behavior.
+        int bms_gauge_version = 1;
+        int bms_control_flow_version = 1;
+        std::optional<uint32_t> bms_random_seed;
         double rate_multiplier = 1.0;
         double score_multiplier = 1.0;
         int64_t final_score = 0;
@@ -491,6 +495,9 @@ private:
     int long_note_mix_version_ = 2;
     int key_conversion_version_ = 3;
     int bms_timing_version_ = 2;
+    int bms_gauge_version_ = 1;
+    int bms_control_flow_version_ = 1;
+    uint32_t bms_random_seed_ = 0;
     double rate_multiplier_ = 1.0;
     double score_multiplier_ = 1.0;
     gameplay::ReplayFile replay_source_{};

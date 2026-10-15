@@ -5,6 +5,7 @@ clients need no loose files, image decoders, network requests or working directo
 Run --check to detect stale generated files without changing anything.
 """
 import argparse
+import math
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,9 +24,31 @@ def solid(*points):
 def box(left, top, right, bottom):
     return line((left, top), (right, top), (right, bottom), (left, bottom), (left, top))
 
+def arc(cx, cy, radius, start, end, steps=40):
+    return [(round(cx + radius * math.cos(math.radians(start + (end-start)*i/steps)), 3),
+             round(cy + radius * math.sin(math.radians(start + (end-start)*i/steps)), 3))
+            for i in range(steps + 1)]
+
+def capsule(x1, y1, x2, y2, width):
+    angle = math.degrees(math.atan2(y2 - y1, x2 - x1))
+    return solid(*(arc(x1, y1, width / 2, angle + 90, angle + 270, 10) +
+                   arc(x2, y2, width / 2, angle - 90, angle + 90, 10)))
+
+# The user-supplied 10/waveform emblem is rebuilt as filled vector paths. Two
+# open ring sections retain transparent gaps on every menu background; no white
+# rectangle, raster crop, external decoder or per-frame path generation is used.
+MARK = [solid((8, 35), (28, 23), (29, 24), (29, 71), (18, 77), (18, 38), (8, 43)),
+        solid(*(arc(57, 50, 27, 188, 342) + arc(57, 50, 17, 342, 188))),
+        solid(*(arc(57, 50, 27, 10, 171) + arc(57, 50, 17, 171, 10))),
+        capsule(41.5, 49, 41.5, 54, 4),
+        capsule(48, 44, 48, 57.5, 4),
+        capsule(54.5, 38.5, 54.5, 61.5, 4),
+        capsule(61, 44, 61, 55.5, 4),
+        capsule(63, 49.5, 95, 40, 3),
+        capsule(72, 51, 92, 45, 3)]
+
 ASSETS = {
-    "Mark": [solid((8,20),(70,20),(58,34),(44,34),(28,80),(10,80),(26,34),(8,34)),
-             solid((76,20),(94,20),(72,80),(54,80))],
+    "Mark": MARK,
     "Prism": [line((50,12),(84,32),(84,68),(50,88),(16,68),(16,32),(50,12)),
               line((16,32),(50,52),(84,32)), line((50,52),(50,88))],
     "Chevron": [line((34,20),(64,50),(34,80))],
@@ -73,7 +96,7 @@ def outputs():
             points.extend(vertices)
             tag = 'polygon' if filled else 'polyline'
             svg.append(f'  <{tag} points="' + ' '.join(f'{x},{y}' for x, y in vertices) +
-                       f'" fill="{"#" + color if filled else "none"}" stroke="#{color}" '
+                       f'" fill="{"#" + color if filled else "none"}" stroke="{"none" if name == "Mark" and filled else "#" + color}" '
                        'stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>')
         svg.append('</svg>')
         files[ROOT / 'assets' / 'native-menu' / (name.lower() + '.svg')] = '\n'.join(svg) + '\n'
@@ -84,7 +107,10 @@ def outputs():
               'struct Path { unsigned first, count; uint32_t color; bool filled; };',
               'struct Asset { unsigned first, count; };',
               f'inline constexpr std::array<Point, {len(points)}> points{{{{']
-    header += [f'    {{{x}.0f, {y}.0f}},' for x, y in points]
+    def cpp_float(value):
+        text = f'{value:g}'
+        return text + ('.0f' if '.' not in text else 'f')
+    header += [f'    {{{cpp_float(x)}, {cpp_float(y)}}},' for x, y in points]
     header += ['}};', f'inline constexpr std::array<Path, {len(paths)}> paths{{{{']
     header += [f'    {{{first}, {count}, 0x{color}, {str(filled).lower()}}},' for first, count, color, filled in paths]
     header += ['}};'] + [f'inline constexpr Asset k{name}{{{first}, {count}}};' for name, first, count in ranges]

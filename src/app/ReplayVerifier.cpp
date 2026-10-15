@@ -304,6 +304,8 @@ ReplayVerificationResult verify_replay_against_chart(
     engine_config.legacy_hold_release = replay_uses_legacy_hold_release(replay);
     engine_config.chronological_judgement = replay_uses_chronological_judgement(replay);
     engine_config.gauge = canonical_gauge;
+    engine_config.gauge_policy.bms_lr2_deltas = chart_format == ChartFormat::Bms && replay.mode.bms_gauge_version == 2;
+    engine_config.gauge_policy.bms_total = source_chart.bms_total.value_or(0.0);
     engine_config.initial_gauge = initial_gauge_for(managed.settings.gauge);
     engine_config.gauge_shift_enabled = true;
     engine_config.input_offset_ms = replay.input_offset_ms;
@@ -330,6 +332,9 @@ ReplayVerificationResult verify_replay_against_chart(
     result.status = ReplayVerificationStatus::Verified;
     result.ruleset_id = replay.ruleset_id;
     result.bms_timing_version = replay.mode.bms_timing_version;
+    result.bms_gauge_version = replay.mode.bms_gauge_version;
+    result.bms_control_flow_version = replay.mode.bms_control_flow_version;
+    result.bms_random_seed = replay.mode.bms_random_seed;
     result.stats = engine.stats();
     result.rate_multiplier = managed.rate_multiplier;
     result.score_multiplier = managed.final_multiplier;
@@ -408,13 +413,14 @@ ReplayVerificationResult verify_replay_file(
     }
 
     ChartLoader loader;
-    const uint32_t bms_random_seed = static_cast<uint32_t>(replay.mode.random_seed.value_or(0));
+    const uint32_t bms_random_seed = gameplay::replay_bms_random_seed(replay.mode);
     const ChartLoadResult loaded_chart = loader.load(chart_path.u8string(),
                                                      replay.sample_rate,
                                                      replay.rate,
                                                      "ignore",
                                                      bms_random_seed,
-                                                     replay.mode.bms_timing_version);
+                                                     replay.mode.bms_timing_version,
+                                                     replay.mode.bms_control_flow_version);
     if (!loaded_chart.success()) {
         return invalid_result(loaded_chart.error.empty()
                                   ? "Bound chart could not be reconstructed."

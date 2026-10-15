@@ -10,10 +10,10 @@ namespace tenriff::input {
 
 /// Configuration for key state tracking and debouncing.
 struct KeyStateConfig {
-    int64_t debounce_window_ns = 5'000'000;  ///< 5ms default debounce window.
+    int64_t debounce_window_ns = 0;  ///< Suppress re-presses after release; 0 preserves every real edge.
 };
 
-/// Tracks per-key state and filters duplicate same-state events without dropping real release edges.
+/// Tracks per-source ownership, optionally suppressing re-presses without delaying release edges.
 /// Thread-safety: NOT thread-safe. Use from InputThread only.
 class KeyStateTracker {
 public:
@@ -37,14 +37,19 @@ public:
 private:
     struct SourceState {
         InputState state = InputState::Released;
-        int64_t last_event_time_ns = 0;
-        bool has_event = false;
+        bool suppressed_press = false;
+        int64_t last_release_time_ns = 0;
+        bool has_release = false;
     };
 
     struct KeyState {
         std::unordered_map<InputSourceToken, SourceState> sources;
         std::size_t pressed_source_count = 0;
+        bool polling_only_cycle = false;
     };
+
+    [[nodiscard]] bool within_debounce(const SourceState& source, int64_t now_ns) const;
+    static bool release_source(SourceState& source, int64_t now_ns);
 
     KeyStateConfig config_;
     std::unordered_map<uint32_t, KeyState> key_states_;

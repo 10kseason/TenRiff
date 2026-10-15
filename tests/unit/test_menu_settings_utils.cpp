@@ -13,8 +13,11 @@ TEST_CASE("Every settings ID has localized contextual help independent of row or
     using namespace tenriff::app::menu;
     using namespace tenriff::app::menu::settings;
     const auto check = [](Screen screen, const auto& order) {
-        for (const auto id : order) for (const auto language : {tenriff::ui::Language::English, tenriff::ui::Language::Korean, tenriff::ui::Language::Japanese}) {
+        for (const auto id : order) for (const auto language : {tenriff::ui::Language::English, tenriff::ui::Language::Korean, tenriff::ui::Language::Japanese, tenriff::ui::Language::Chinese}) {
             CHECK_FALSE(setting_help(screen, static_cast<int>(id), language).empty());
+            if (language == tenriff::ui::Language::Chinese)
+                CHECK(setting_help(screen, static_cast<int>(id), language) !=
+                      setting_help(screen, static_cast<int>(id), tenriff::ui::Language::English));
         }
     };
     check(Screen::SettingsAudio, kAudioSettingOrder);
@@ -24,7 +27,12 @@ TEST_CASE("Every settings ID has localized contextual help independent of row or
     check(Screen::SettingsSkins, tenriff::app::kSkinSettingsRowOrder);
     for (const auto [screen, count] : {std::pair{Screen::ModeSelect, 19}, {Screen::ModeMods, 7}, {Screen::OptionsHub, 10},
              {Screen::QuickSetup, tenriff::app::profile_setup::row_count(tenriff::app::profile_setup::Entry::FirstRun)}})
-        for (int id = 0; id < count; ++id) CHECK_FALSE(setting_help(screen, id, tenriff::ui::Language::Korean).empty());
+        for (int id = 0; id < count; ++id) {
+            CHECK_FALSE(setting_help(screen, id, tenriff::ui::Language::Korean).empty());
+            CHECK_FALSE(setting_help(screen, id, tenriff::ui::Language::Chinese).empty());
+            CHECK(setting_help(screen, id, tenriff::ui::Language::Chinese) !=
+                  setting_help(screen, id, tenriff::ui::Language::English));
+        }
     tenriff::render::GenericMenuData data;
     data.rows.resize(2);
     data.rows[0].row_index = static_cast<int>(AudioSettingId::SoundOffset);

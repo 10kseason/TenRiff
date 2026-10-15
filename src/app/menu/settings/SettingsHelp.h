@@ -17,8 +17,8 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Follow plays BMS key sounds when you hit notes. Autoplay plays them with the chart; Off silences them.", "연동은 노트를 누를 때 키음을 냅니다. 자동재생은 차트에 맞춰 키음을 재생하며, 끔은 키음을 제거합니다.", "連動はノート入力時、自動再生は譜面に合わせてキー音を鳴らします。オフではキー音を消します。"},
         {"Toggle menu, result and song-preview music. Gameplay chart BGM keeps playing.", "메뉴·결과·곡 미리듣기 음악을 켜거나 끕니다. 플레이 중 차트 BGM은 계속 재생됩니다.", "メニュー・結果・試聴の音楽を切り替えます。プレイ中のBGMは継続します。"},
         {"Adjust the volume of all game audio together. Start low before raising it.", "게임 전체 음량을 조절합니다. 낮은 값에서 조금씩 올려 맞추세요.", "ゲーム全体の音量です。小さい値から調整してください。"},
-        {"Adjust background music without changing key-sound volume.", "키음 크기를 유지하면서 배경 음악의 음량만 조절합니다.", "キー音は変えず、背景音楽の音量を調整します。"},
-        {"Adjust note key sounds. Raise this relative to BGM if key sounds are hard to hear.", "노트 키음의 음량을 조절합니다. 키음이 잘 들리지 않으면 BGM보다 높게 맞추세요.", "ノートのキー音量です。聞こえにくい場合はBGMより高く設定します。"},
+        {}, // Reserved former BGM volume ID.
+        {}, // Reserved former keysound volume ID.
         {"Shift chart BGM and autoplay key sounds. Positive delays audio; Follow key sounds and judgement timing stay unchanged.", "차트 BGM과 자동재생 키음의 시점을 옮깁니다. 양수는 소리를 늦추며, 직접 누르는 연동 키음과 판정은 그대로입니다.", "BGMと自動再生キー音の時刻を調整します。正の値で遅くなり、連動キー音と判定は変わりません。"},
         {"Save audio changes and return to the previous screen.", "변경한 오디오 설정을 저장하고 이전 화면으로 돌아갑니다.", "音声設定を保存して前の画面に戻ります。"},
         {"Reduce volume differences between songs. This can change perceived loudness.", "곡 사이의 음량 차이를 줄입니다. 켜면 체감 음량이 달라질 수 있습니다.", "曲ごとの音量差を抑えます。聴感上の音量が変わる場合があります。"},
@@ -29,7 +29,7 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Mute game audio while another window is active. Audio returns when you focus TenRiff.", "다른 창을 사용하는 동안 게임 소리를 끕니다. TenRiff로 돌아오면 다시 재생됩니다.", "他のウィンドウを使用中は消音し、TenRiffに戻ると解除します。"},
         {"Choose title-screen music: default, random BMS, last played, or none.", "타이틀 음악을 기본 음악, 랜덤 BMS, 마지막 플레이한 곡 또는 없음으로 고릅니다.", "タイトル音楽を標準、ランダムBMS、最後に遊んだ曲、なしから選びます。"},
         {"After the last judgement, listen to the remaining audio or skip it after the result delay. Notes and scoring stay unchanged.", "마지막 판정 뒤 남은 음악을 끝까지 듣거나 결과 대기 시간 후 스킵합니다. 노트와 점수는 그대로입니다.", "最後の判定後、残りの音楽を最後まで聴くか結果待機時間後にスキップします。"},
-        {"Adjust the entire BMS song and previews together, including keysounds. TenRiff menu music is independent.", "키음을 포함한 BMS 곡 전체와 미리듣기 음량을 조절합니다. 텐리프 메뉴 음악과는 별개입니다.", "キー音を含むBMS曲全体と試聴の音量です。TenRiffメニュー音楽とは独立しています。"},
+        {"Adjust BMS accompaniment, keysounds and previews together. Default: 20%. TenRiff menu music is independent.", "BMS 반주·키음·미리듣기를 함께 조절합니다. 기본값은 20%이며 텐리프 메뉴 음악과는 별개입니다.", "BMSの伴奏・キー音・試聴をまとめて調整します。既定値は20%で、TenRiffメニュー音楽とは独立しています。"},
         {"Adjust TenRiff menu and result music. 100% uses a quiet 10% reference level; BMS songs are unchanged.", "텐리프 메뉴·결과 음악을 조절합니다. 100%는 기본 10% 음량이며 BMS 곡에는 적용되지 않습니다.", "TenRiffのメニュー・結果音楽です。100%は原音の10%を基準とし、BMS曲には適用しません。"},
     };
     static constexpr SettingsHelpText graphics[] = {
@@ -48,7 +48,7 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
     static constexpr SettingsHelpText input[] = {
         {"RawInput receives Windows key events. Polling checks key state repeatedly; use it if RawInput is incompatible.", "RawInput은 Windows 키 이벤트를 받습니다. Polling은 키 상태를 반복 확인하며, RawInput 호환 문제가 있을 때 사용할 수 있습니다.", "RawInputはWindowsのキーイベントを受信します。互換性に問題がある場合はPollingを試してください。"},
         {"Set the key polling frequency. Higher rates cost more CPU. During play this also controls RawInput's bound-key backup checks.", "키 상태 확인 빈도입니다. 높일수록 CPU를 더 사용합니다. 플레이 중에는 RawInput의 노트 키 보조 감시 주기에도 적용됩니다.", "キー確認頻度です。高い値ほどCPUを使います。プレイ中のRawInput補助監視にも適用されます。"},
-        {"Suppress rapid duplicate key transitions. Extra debounce can delay fast repeated presses.", "짧은 간격의 중복 키 변화를 억제합니다. 과도하게 설정하면 빠른 연타 입력이 지연될 수 있습니다.", "短時間の重複入力を抑えます。大きすぎる値は素早い連打を遅らせる場合があります。"},
+        {"0 ms keeps fast repeats. Above 0, a same-key press before the interval after release is blocked; release stays immediate. Intentional fast repeats may be blocked too. Keyboard only; XInput is unchanged.", "0ms는 빠른 연타를 유지합니다. 0보다 크면 키를 놓은 뒤 설정 시간 미만의 같은 키 재입력을 억제하며 해제는 즉시 처리합니다. 의도적인 빠른 연타도 억제될 수 있습니다. 키보드 전용이며 XInput은 그대로입니다.", "0msは高速連打を維持します。正の値では離した後の設定時間未満の再押下を抑制し、離しは即時処理します。意図的な高速連打も抑制される場合があります。キーボード専用でXInputは変わりません。"},
         {"Save input settings and apply backend changes on return.", "입력 설정을 저장하고 돌아가며, 변경한 입력 방식을 적용합니다.", "入力設定を保存し、入力方式の変更を適用して戻ります。"},
     };
     static constexpr SettingsHelpText calibration[] = {
@@ -211,14 +211,14 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
     }
     if (id < 0 || static_cast<std::size_t>(id) >= count) return {};
     const auto& help = entries[id];
-    return std::string(language == ui::Language::Korean ? help.ko :
-                       language == ui::Language::Japanese ? help.ja : help.en);
+    return language == ui::Language::Japanese ? std::string(help.ja) :
+        ui::text(language, help.en, help.ko);
 }
 
 template<class GenericData>
 inline void apply_settings_help(Screen screen, GenericData& data, ui::Language language) {
     const auto text = [language](std::string_view en, std::string_view ko, std::string_view ja) {
-        return std::string(language == ui::Language::Korean ? ko : language == ui::Language::Japanese ? ja : en);
+        return language == ui::Language::Japanese ? std::string(ja) : ui::text(language, en, ko);
     };
     data.selected_help.clear();
     data.selected_help_heading.clear();

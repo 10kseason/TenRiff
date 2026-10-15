@@ -1,5 +1,13 @@
 # TenRiff
 
+**2026-10-15 · 1.9.1:** 用户授权的1.9.1包含此前音量、输入、尾奏修复，BMS TOTAL/RANDOM兼容、结果颜色及10形标志。主页语言按钮按EN → KO → JA → ZH循环并保存选择。新BMS血条/分支记录在服务器验证支持前仅存本地。固定基准仍为1.9.0，保留旧发行版、安装和配置。下方带日期的本地记录中不升版本、未发布等表述保留当时状态；当前以此1.9.1范围为准。 [变更与兼容性](docs/feedback-1.9.1.zh-CN.md) · [发布验证流程](docs/release-1.9.1-gate.md).
+
+**2026-10-15 · BMS TOTAL、RANDOM与结果/标志后续修改 — 未发布、本地构建及CTest回归验证通过：** 本次本地修改基于1.9.0.2。结果页等级改用与选曲大厅相同的红色等级文字及键数符号颜色，标志改为提供的10形图案。新的普通BMS游玩根据#TOTAL及音符数使用LR2式恢复和伤害；谱面内#RANDOM分支使用独立于轨道随机的种子。旧录像保留原有行为，并包含此前的音量统一修改。已发布1.9.0.2、固定基准1.9.0及版本号均不变。 [公式、分支、兼容性与验证范围（英文）](docs/bms-total-random-followup.en.md).
+
+**2026-10-15 · BMS音量统一后续修改 — 未发布、本地构建及CTest回归验证通过：** 此1.9.0.2基础上的本地修改将伴奏、键音独立调节合并为BMS演奏音量（韩文显示：**BMS 연주 볼륨**）。新默认值为20%，保留已保存值。主音量10%、TenRiff音乐100%的默认值、其余音量1个百分点步长及大厅试听×0.75均保留。不更改版本号或固定基准1.9.0。下方带日期的条目保留当时记录。 [设置与兼容说明](docs/config.zh-CN.md#audio).
+
+本次未发布的后续修改还会显示难度表加载状态，并将debounce UI改为1ms步长、最大20ms（默认0ms）。停用旧的5→8ms自动改写，分别保留已保存的5ms和8ms。皮肤的韩文标签改为 `LN 끝 줄임`，外观和判定行为不变。普通单人模式开启听到结束后，最后音符及LN尾端处理完毕时按 `Esc` 会跳过尾奏直接进入结果，不弹出暂停菜单。
+
 **2026-10-15 · 1.9.0.2 发布候选版 — 发布验证流程：**基于已发布的1.9.0.1，将Options改为绿色，仅在选择内置5K Aery难度表时显示绿色⑤，为已注册4/6/8/10键难度表的符号使用对应颜色，并将等级设为红色、分数设为白色，新增`lv:`等级搜索、新建配置debounce默认0ms和音量1%步长。将选曲的排序、过滤和难度表选择器移至Song Library旁的页眉，并增加专辑封面高度。主音量默认10%，固定基准仍为1.9.0。[变更与用法](docs/feedback-1.9.0.2.zh-CN.md)。 公开状态与可下载文件以发布页面为准。[范围与验证](docs/release-1.9.0.2-gate.md)。
 
 **2026-10-15 · 1.9.0.1:** 包含默认主音量10%和大厅图标中心对齐。提供试听×0.75、个人档案指定F5/F6 -10/+10、Xbox/XInput按钮输入、文件选择框防重复，以及BMS BPM/STOP顺序修正与旧回放兼容。固定基准保持1.9.0。 [变更说明](docs/feedback-20261015.zh-CN.md) · [发布验证范围](docs/release-1.9.0.1-gate.md).
@@ -50,13 +58,13 @@
 
 **多人Rate支持版本：**选曲者在大厅设置全员共用的Rate。所有玩家必须使用本protocol v6版本，不能与旧v5客户端连接。[指南](docs/multiplayer-rate-build.ko.md)（韩语）。
 
-公开状态与下载：[**1.9.0.2**](https://github.com/10kseason/TenRiff/releases/tag/1.9.0.2)；公开状态以该发布页面为准，范围与验证见[发布记录](docs/release-1.9.0.2-gate.md)，固定基准仍为1.9.0。解压到新文件夹，运行 `launch_win.bat`，然后按 F10 连接一次网页账号。符合条件的新游玩记录会上传分数、详细分数、准确率和详细准确率。新游玩使用 ruleset-5 (Normal/Hard), ruleset-6 (EX)，网页提交必须包含判定配置。ruleset-1/2/3/4回放保留原判定与LN行为，现有网页记录保留ID和分数。请参阅[连接指南](docs/sites-leaderboard.md)（韩语）。 受BPM/STOP修正影响的新时间版本2记录，在网页支持前仅保存在本地。
+发布状态与下载：[**1.9.1 发布页面**](https://github.com/10kseason/TenRiff/releases/tag/1.9.1)。公开状态以该页面为准，请参阅[验证流程](docs/release-1.9.1-gate.md)。**新BMS血条/分支记录及已有时序v2记录在服务器支持前仅存本地**，不包含网站/API部署。
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。固定基准为 `1.9.0`，此源码版本为 `1.9.0.2`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
+TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。固定基准为 `1.9.0`，此源码版本为 `1.9.1`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
 
-这份 README 是入门文档。关于当前行为、`1.9.0.2` 发布候选版和固定 `1.9.0` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
+这份 README 是入门文档。关于当前行为、`1.9.1` 发行版和固定 `1.9.0` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
 
 TenRiff 也明确属于一种 `vibe coding` 作品：它更多是在快速迭代和实验中成形，而不是只按照传统的长篇设计先行流程推进。
 

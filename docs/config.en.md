@@ -1,5 +1,13 @@
 # TenRiff Config Schema (current)
 
+**2026-10-15 · 1.9.1:** The user-authorized 1.9.1 includes the earlier volume/input/outro fixes, BMS TOTAL/RANDOM compatibility, Result colors and the 10 mark. A Home language button cycles EN → KO → JA → ZH and saves the choice. New BMS gauge/branch records remain local until server verification supports them. The fixed baseline stays 1.9.0; earlier releases, installations and profiles are preserved. Dated local notes below retain their historical no-version-bump/unpublished status; this 1.9.1 scope supersedes that status. [Changes and compatibility](feedback-1.9.1.en.md) · [Release verification gate](release-1.9.1-gate.md).
+
+**2026-10-15 · BMS TOTAL / RANDOM / visual follow-up — unreleased, local build and CTest regression passed:** This local follow-up builds on 1.9.0.2. Result levels use the song lobby’s red level text and key-mode symbol colors, and the logo adopts the supplied 10-shaped mark. New ordinary BMS plays use LR2-based recovery/damage with #TOTAL and note count; authored #RANDOM branches receive a seed independent of lane randomization. Historical replays retain their original behavior. The earlier unified-volume changes remain included. Published 1.9.0.2, the fixed 1.9.0 baseline and the version number are unchanged. [Formulas, branching, compatibility and verification scope](bms-total-random-followup.en.md).
+
+**2026-10-15 · BMS volume follow-up — unreleased, local build and CTest regression passed:** This local follow-up to 1.9.0.2 replaces separate background/keysound controls with one BMS performance volume control (Korean: **BMS 연주 볼륨**). Its new default is 20%; saved values are retained. Master/TenRiff music defaults remain 10%/100%, the remaining volumes use 1 percentage-point steps, and lobby preview keeps ×0.75 attenuation. The version number and fixed 1.9.0 baseline are unchanged. Dated entries below retain their original context.
+
+1.9.1 shows difficulty-table loading status and changes debounce UI steps to 1ms, with a 20ms maximum and 0ms default. The old automatic 5→8ms rewrite is retired, preserving saved 5ms and 8ms values. The Korean skin label becomes `LN 끝 줄임`; appearance and judgement behavior are unchanged. In ordinary single-player with Listen to End enabled, `Esc` skips the outro directly to results without opening Pause once the final note and LN tail have been processed.
+
 **2026-10-15 · 1.9.0.2 release candidate — publication verification gates:** Based on published 1.9.0.1, this candidate makes Options green, shows green ⑤ only for the selected built-in 5K Aery table, colors registered 4/6/8/10-key table symbols, and uses red levels/white scores, adds `lv:` searches, changes the new debounce default to 0ms, and uses 1% audio-volume steps. Move Song Select sort/filter and table selectors beside Song Library and increase the album cover height. Master volume still defaults to 10%; the fixed baseline remains 1.9.0. [Changes and usage](feedback-1.9.0.2.en.md). The release page determines publication status and available downloads. [Release scope and verification](release-1.9.0.2-gate.md).
 
 **2026-10-15 · 1.9.0.1:** Includes 10% default master volume and aligned lobby icon centers. Preview ×0.75, profile-assigned F5/F6 -10/+10, Xbox/XInput button input, single modal file pickers, and corrected BMS BPM/STOP order with historical replay compatibility. The fixed baseline remains 1.9.0. [Changes](feedback-20261015.en.md) · [Release verification scope](release-1.9.0.1-gate.md).
@@ -23,9 +31,13 @@ If a profile does not exist, it is created automatically on first launch.
 
 ### `audio`
 
+**Earlier 1.9.0.2 guidance (history before volume unification):**
+
 The 1.9.0.2 candidate adjusts all five audio UI volumes—master, BMS song, TenRiff music, BGM and keysounds—in **1 percentage-point steps (0.01 in saved values)**. The first three range from 0–100%; BGM and keysounds range from 0–200%. New master volume still defaults to 10% and the others to 100%; explicitly saved volumes are retained.
 
-- `play_to_end` (bool; default `true`): Listen to remaining chart audio after the final judgement. When false, finish normally after `ui.result_tail_ms` without waiting for the outro. Judgements, score, replay and manual post-note skip are unchanged.
+**1.9.1 audio:** The audio UI now has three volume controls: master, BMS performance and TenRiff music. All use **1 percentage-point steps (0.01 in saved values)** over 0–100%, with new defaults of 10%/20%/100%; explicitly saved values are retained. Existing `gameplay_volume` is the only BMS-specific volume multiplier; master gain still applies. `bgm_volume` and `keysound_volume` remain readable/writable for compatibility, but have no individual UI and do not affect gain in play, any preview or editor path. Lobby preview retains its additional ×0.75 attenuation. Listening, physical-device and long-play validation remain unverified.
+
+- `play_to_end` (bool; default `true`): Listen to the remaining audio after the final note and LN tail have been processed. During this outro, ordinary single-player `Esc` goes directly to normal results without opening Pause, including autoplay and replay. Existing Session Mix/multiplayer Esc policies remain. When false, finish normally after `ui.result_tail_ms` without waiting for the outro. Judgement, score and replay rules are unchanged.
 
 - `backend` (string)
   - `wasapi | asio`; default `wasapi`. Selects gameplay and song-preview output; menu/result background music keeps its separate Windows MCI path.
@@ -53,15 +65,15 @@ The 1.9.0.2 candidate adjusts all five audio UI volumes—master, BMS song, TenR
 - `volume` (double)
   - Master volume. 0–1, new default 0.10 (10%); explicitly saved values are retained.
 - `gameplay_volume` (double)
-  - Whole BMS song (background and keysounds) and preview volume. 0–1, default 1.0. UI effects keep their original gain.
+  - BMS performance volume (Korean: BMS 연주 볼륨), jointly controlling background audio, keysounds and previews. 0–1, new default 0.20 (20%); explicitly saved values are retained. The field name and existing UI-effect gain are unchanged.
 - `menu_music_volume` (double)
   - TenRiff menu/result music only. 0–1, default 1.0. The reference gain is 10% of source, 75% quieter than the 40% reference in 1.8.9.7. Independent of BMS songs; not a Windows volume-curve emulation.
 - `bgm_volume` (double)
-  - BMS background submix: 0–2, default 1.0.
+  - Legacy compatibility field. 0–2, default 1.0; existing values are still loaded/saved, but have no individual UI and are ignored by play, preview and editor gain calculations.
 - `normalize_audio` (bool)
   - In-game RMS loudness control, default false. ON retains RMS → soft limiter → master; OFF applies linear master gain and only guards final output overflow. Menu music and song previews are unchanged.
 - `keysound_volume` (double)
-  - New-settings default: `1.0` (100%). Immediately after BGM volume; existing saved profile values are preserved.
+  - Legacy compatibility field. 0–2, default 1.0; existing values are still loaded/saved, but have no individual UI and are ignored by play, preview and editor gain calculations.
 
 See [ASIO setup](asio-audio.md). ASIO holds the selected sample rate fixed and resamples chart audio. `frames` is a request negotiated to a legal driver size. Presets do not overwrite ASIO frames; `exclusive` and `periods` apply to WASAPI. ASIO failures do not fall back to WASAPI automatically.
 
@@ -94,10 +106,14 @@ Version 1.8.9.7 requests MMCSS `Games`/High and disables execution-speed power t
   - the current `1.7.2` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
-  - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
-  - clamped to the `0..25` range
-  - new default is `0ms`; changing the default does not reset saved values
-  - the historical `5ms → 8ms` migration remains separate from the new default
+  - `0ms` disables time-based repress suppression and preserves existing fast repeats. Duplicate same-state events are still removed.
+  - Above `0ms`, a Press from the same key and physical input source is suppressed if it occurs less than the configured interval after Release. A Press exactly at the boundary is accepted.
+  - Real Release events are neither delayed nor dropped by the time filter. Intentional fast represses can also be suppressed inside the interval.
+  - RawInput/Polling mirror events cannot bypass suppression; physical keyboards identified by RawInput are tracked independently. Polling itself does not distinguish physical device IDs. XInput keeps its separate GamepadTracker path and does not use this keyboard time filter.
+  - clamped to `0..20`; the UI adjusts in 1ms steps
+  - default is `0ms`; saved values within the range are retained
+  - retired legacy rule: the value-based `5ms → 8ms` rewrite. It is removed so an explicit 5ms choice in the new UI stays 5ms; saved 5ms and 8ms values are each retained
+
 ### `judge`
 
 The 1.9.0 release selects Normal / Hard / EX under `Options > Key Mode Settings > Judge Window`. Easy is removed from new selections but retained for historical replays. The session-only choice is not profile-persisted and resets to Normal on restart. See [EX timing and compatibility](judge-ex-1.9.0.ko.md) (Korean).
@@ -133,6 +149,8 @@ The 1.9.0 release selects Normal / Hard / EX under `Options > Key Mode Settings 
 - Reference BPM is the tempo with the longest accumulated running time; repeated sections add together and STOP waits are excluded. This fixes the Hi-Speed reference while explicit `#SCROLL`, stops and reverse motion still apply. See [reference BPM](reference-bpm.md).
 
 ### `gauge`
+
+**1.9.1 BMS behavior:** New ordinary BMS plays use `TOTAL / N` recovery for Normal/Easy, and fixed recovery plus TOTAL/note-count damage correction for Hard/EX. `N` counts valid current note heads, with each LN counted once. Hard judgement damage is multiplied by 0.6 below 32%. TenRiff retains its 100% start, zero failure, gauge shifts, judgement classification, 0.5 LN head/tail weights and authored mine damage. Courses retain their course gauge; peer battle retains v1. Existing `gauge.delta` values remain for historical replay compatibility and do not tune the new BMS v2 calculation.
 
 Gauge Shift is always active. `mode.gauge` selects the starting tier: `ex_hard / hard / normal / easy`, from EX down to Easy. The selected tier and every lower tier are simulated independently from 100%; a failed tier yields to the next surviving tier. Gauge failure occurs only when all eligible tiers fail. Legacy `shift` means an EX start.
 
@@ -251,6 +269,8 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
 
 ### `ui`
 
+The Home language button cycles **EN → KO → JA → ZH → EN**. It saves through the existing `ui.language` setting and persists across restarts. Strings without a translation can fall back to English.
+
 `ui.skip_start_countdown` and `ui.instant_restart_key` are built-in controls saved in the profile and `.trprofile` exports. Only the initial `3 / 2 / 1` display after loading is skipped; audio preparation, the existing three-second chart lead-in and judgement timing remain unchanged. Resuming from pause always retains its three-second countdown. Multiplayer forces the initial countdown and blocks instant restart; Session Mix also blocks instant restart. Instant restart does not fire while paused or during the initial countdown, and the key must be released before it can trigger again. See [start/restart controls (Korean)](gameplay-start-controls.ko.md) for lane/reserved-key conflicts and editor-practice start positions.
 
 These controls do not change Sites submission policy. Long LN Mix v2 exclusion from legacy BEST and Sites is a separate conversion policy; the [plugin runtime, API and SDK remain future plans (Korean)](result-analysis-1.8.8.ko.md).
@@ -261,7 +281,7 @@ These controls do not change Sites submission policy. Long LN Mix v2 exclusion f
 | --- | --- | --- |
 | `profile_nickname` | string; UTF-8 ≤48 bytes | Display name; empty uses profile ID. Whitespace/control characters are normalized. |
 | `profile_avatar_path` | string; UTF-8 ≤2048 bytes | Local PNG/JPG avatar path. |
-| `language` | `en`, `ko`, `ja`; `en` | UI language; invalid values normalize to en. |
+| `language` | `en`, `ko`, `ja`, `zh-CN`; `en` | UI language; invalid values normalize to en. |
 | `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | Profile and first-run menu text at 100%, 115%, or 130%. Gameplay fonts remain skin-controlled. |
 | `skip_start_countdown` | bool; `false` | Skip the initial `3 / 2 / 1` display in solo play, including normal starts, menu restarts and result retries. |
 | `instant_restart_key` | string; `""` (unassigned) | Key name for restarting an active solo chart from the beginning. The new attempt always skips the initial countdown; the interrupted attempt saves no result or replay. |
@@ -316,7 +336,7 @@ These are profile `config.json` skin settings. For a skin package's `skin.json` 
 | `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | Independent text/bar X offsets added to the existing judgement-area layout, in 1920x1080 base pixels. |
 | `timing_text_offset_y`, `timing_bar_offset_y` | double: `-400..400`; `0` | Independent text/bar Y offsets in base pixels; positive moves down. |
 | `timing_text_scale`, `timing_bar_scale` | double: `0.50..2`; `1` | Independent FAST/SLOW text and bar scales, adjustable from 50–200% in 5% steps or with sliders. Apply to Studio, Classic, imported skins and previews without changing judgement/combo size or XY offsets. |
-| `show_hold_tail`, `hold_tail_taper_enabled` | bool; `false` | LN tail-cap visibility and taper respectively; no judgement-rule change. |
+| `show_hold_tail`, `hold_tail_taper_enabled` | bool; `false` | LN tail-cap visibility and taper respectively. Only the Korean taper label changes to `LN 끝 줄임`; appearance and judgement rules stay unchanged. |
 | `judgement_line_glow_enabled` | bool; `true` | Judgement-line glow. |
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst brightness; zero disables it. |
 | `key_pulse_enabled` | bool; `true` | Legacy ON/OFF mirror; false or zero brightness disables the burst. |
@@ -397,3 +417,9 @@ Key Settings presents horizontal Key 1… keys with separate primary and seconda
 `skin.key_backdrop_enabled` and `skin.key_backdrop_opacity` (0–1) control held-key lane tint independently of hit-burst brightness. Skin defaults apply until the first user change, which saves `key_backdrop_override=true`. Judgement-line thickness follows note height. ALL SONG shows only table members while a difficulty table is active; Native LV restores all charts. Visuals/BGA follow the audible playback head while judgement/audio scheduling retain the write timeline. Actual speed changes play a short click.
 
 Held-key backdrop RGB brightness uses `skin.key_backdrop_brightness` (0–2, default 1); maximum height uses `skin.key_backdrop_height` (0–1, default 1), anchored at the field bottom. Both are independent of opacity and match in gameplay, ghost play and Skin Settings previews. Hold Left/Right to repeat an enabled minus/plus setting.
+
+## BMS replay/result compatibility (1.9.1)
+
+Three user-approved optional evidence fields are separate from profile settings: `bms_gauge_version`, `bms_control_flow_version`, and `bms_random_seed`. Missing versions mean 1; a missing branch seed falls back to historical `random_seed`, then 0. New ordinary BMS plays record gauge v2; charts with authored branching also record control-flow v2 and a uint32 branch seed. The lane RR/SR, conversion and LN Mix `random_seed` is independent from the authored branch seed. Audio-device reloads retain the same branch, and replay loads use the saved seed and policies. Courses keep their existing gauge and use the new branch parser. Protocol v6 peer battle retains gauge/control-flow v1 and branch seed 0. New gauge/branch evidence stays local: Sites and ranked uploads are blocked until the server supports these conditions. R5/R6 judgement and score IDs are unchanged. Local BEST prefers the policy-version tuple; result comparison groups only matching policies and branch seeds.
+
+[Formulas, branching, compatibility and verification scope](bms-total-random-followup.en.md).

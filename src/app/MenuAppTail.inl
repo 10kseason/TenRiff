@@ -605,8 +605,7 @@ bool MenuApp::start_song_preview_audio(const SongSelectScreen::PreviewDecodeResu
     song_select_screen_.preview_gain().store(
         static_cast<float>(song_preview_gain(
             config_.audio_ui.background_sound_enabled,
-            menu_output_master_gain() * gameplay_volume_gain(config_.audio_ui.gameplay_volume),
-            config_.audio_ui.bgm_volume)),
+            menu_output_master_gain(), config_.audio_ui.gameplay_volume)),
         std::memory_order_release);
 
     const auto samples = preview.samples;
@@ -786,8 +785,7 @@ void MenuApp::service_song_preview() {
         song_select_screen_.preview_gain().store(
             static_cast<float>(song_preview_gain(
                 config_.audio_ui.background_sound_enabled,
-                menu_output_master_gain() * gameplay_volume_gain(config_.audio_ui.gameplay_volume),
-                config_.audio_ui.bgm_volume)),
+                menu_output_master_gain(), config_.audio_ui.gameplay_volume)),
             std::memory_order_release);
         return;
     }
@@ -840,8 +838,7 @@ void MenuApp::sync_menu_music() {
         song_select_screen_.preview_gain().store(
             static_cast<float>(song_preview_gain(
                 true,
-                menu_output_master_gain() * gameplay_volume_gain(config_.audio_ui.gameplay_volume),
-                config_.audio_ui.bgm_volume)),
+                menu_output_master_gain(), config_.audio_ui.gameplay_volume)),
             std::memory_order_release);
         menu_music_.stop();
         return;
@@ -1216,7 +1213,10 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
         render.result.has_bpm_changes = last_chart_entry_.has_bpm_changes;
         render.result.difficulty_label = menu_song_select::song_difficulty_label(last_chart_entry_);
         render.result.difficulty_is_aery_five_key =
+            !config_.ui.difficulty_table_path.empty() &&
             menu_song_select::song_difficulty_is_aery_five_key(last_chart_entry_, config_.ui.difficulty_table_url);
+        render.result.difficulty_prefix_key_count = config_.ui.difficulty_table_path.empty() ? 0 :
+            menu_song_select::song_difficulty_prefix_key_count(last_chart_entry_, config_.ui.difficulty_table_url);
         if (!last_chart_entry_.difficulty_table_level.empty()) {
             render.result.difficulty_table_label =
                 last_chart_entry_.difficulty_table_symbol +
@@ -2820,6 +2820,9 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         last_result_long_note_mix_version_ = result.long_note_mix_version;
         last_result_key_conversion_version_ = result.key_conversion_version;
         last_result_bms_timing_version_ = result.bms_timing_version;
+        last_result_bms_gauge_version_ = result.bms_gauge_version;
+        last_result_bms_control_flow_version_ = result.bms_control_flow_version;
+        last_result_bms_random_seed_ = result.bms_random_seed;
         last_result_rate_multiplier_ = result.rate_multiplier;
         last_result_score_multiplier_ = result.score_multiplier;
         last_result_final_score_ = result.final_score;

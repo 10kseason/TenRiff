@@ -1,5 +1,13 @@
 # TenRiff 游玩指南
 
+**2026-10-15 · 1.9.1:** 用户授权的1.9.1包含此前音量、输入、尾奏修复，BMS TOTAL/RANDOM兼容、结果颜色及10形标志。主页语言按钮按EN → KO → JA → ZH循环并保存选择。新BMS血条/分支记录在服务器验证支持前仅存本地。固定基准仍为1.9.0，保留旧发行版、安装和配置。下方带日期的本地记录中不升版本、未发布等表述保留当时状态；当前以此1.9.1范围为准。 [变更与兼容性](feedback-1.9.1.zh-CN.md) · [发布验证流程](release-1.9.1-gate.md).
+
+**2026-10-15 · BMS TOTAL、RANDOM与结果/标志后续修改 — 未发布、本地构建及CTest回归验证通过：** 本次本地修改基于1.9.0.2。结果页等级改用与选曲大厅相同的红色等级文字及键数符号颜色，标志改为提供的10形图案。新的普通BMS游玩根据#TOTAL及音符数使用LR2式恢复和伤害；谱面内#RANDOM分支使用独立于轨道随机的种子。旧录像保留原有行为，并包含此前的音量统一修改。已发布1.9.0.2、固定基准1.9.0及版本号均不变。 [公式、分支、兼容性与验证范围（英文）](bms-total-random-followup.en.md).
+
+**1.9.1 BMS音量：** 本指南说明统一控制伴奏和键音的BMS演奏音量。[设置与兼容范围](config.zh-CN.md#audio)。
+
+1.9.1会显示难度表加载状态，并将debounce UI改为1ms步长、最大20ms（默认0ms）。停用旧的5→8ms自动改写，分别保留已保存的5ms和8ms。皮肤的韩文标签改为 `LN 끝 줄임`，外观和判定行为不变。普通单人模式开启听到结束后，最后音符及LN尾端处理完毕时按 `Esc` 会跳过尾奏直接进入结果，不弹出暂停菜单。
+
 1.9.0.1可在个人档案中指定Hi-Speed -10/+10（默认F5/F6，范围0.50–50.00）。在Keymap中按Xbox/XInput数字按钮或LT/RT可绑定轨道，在个人档案中可绑定重试和Hi-Speed操作。菜单使用方向键移动、A确认、B返回；未绑定其他操作的Start可暂停游戏。LT/RT超过30/255即视为按下。本次不包含摇杆轴与震动。[变更与兼容范围](feedback-20261015.zh-CN.md)。
 
 1.9.0发布版在 `Options > Key Mode Settings > Judge Window` 中提供默认/Hard/EX。Easy从新选择中移除，但保留旧回放的判定。选择仅在本次运行有效，重启后恢复默认。[EX判定与兼容范围](judge-ex-1.9.0.ko.md)（韩语）。
@@ -41,6 +49,8 @@ TenRiff 的基础游玩流程如下：
 ## 3. 基本菜单操作
 
 ### Title
+
+主页语言按钮按 **EN → KO → JA → ZH → EN** 循环。使用已有的 `ui.language` 保存，重启后保留。缺少翻译的文字可能回退为英语。
 - `Up` / `Down`：移动菜单
 - `Enter`：确认
 - `Esc`：退出
@@ -60,13 +70,14 @@ TenRiff 的基础游玩流程如下：
 - `Esc`：返回上一个画面
 - `-` / `+`：立即调整下一次游玩的 Rate
 - `F5`：重新索引曲库；运行时会居中显示 stage / percent / ETA 与 progress bar
-- 中央底部难度表卡片：点击名称或 URL 编辑，File 选择本地 JSON，Reset 恢复原生 LV。Enter 应用地址，Esc 取消；Sort / Filter 中的难度表项目仍可使用。
+- 难度表卡片（默认原生布局位于Song Library旁的页眉）：点击名称或 URL 编辑，File 选择本地 JSON，Reset 恢复原生 LV。Enter 应用地址，Esc 取消；Sort / Filter 中的难度表项目仍可使用。
+- 加载难度表时显示加载状态。
 
 ### Song Select 中常用的设置页面
 - `Mode`
   - 调整 Ghost Battle、Autoplay、Practice、Sudden Death、Key Mode、Gauge、Random、Mods、Rate、Hi-Speed
 - `Audio`
-  - 调整 Master/BGM/Keysound 音量以及 BMS keysound policy
+  - 调整 Master、BMS Performance、TenRiff Menu Music 音量以及BMS键音模式
 - `Graphics`
   - 调整 VSync、Refresh Hz、Performance HUD、BGA 显示与外部 ONNX BGA Upscaler
   - 关闭 `BGA` 会禁用 gameplay 图片/视频背景及其 decoder/upscaler 工作；Song Select 预览仍会显示
@@ -133,6 +144,7 @@ Discord 客户端的设置方法请参考[官方 Game Overlay 指南](https://su
 
 - 谱面按键输入：以当前 keymap 为准
 - `Esc`：普通单人模式立即暂停。继续或 Esc 会在3/2/1倒计时后恢复；倒计时期间音频、谱面时钟和判定停止。恢复倒计时期间按 Esc 返回暂停菜单。
+- 普通单人模式开启听到结束（`play_to_end=true`）后，在最后音符及LN尾端处理完毕时按 `Esc` 可跳过尾奏直接进入结果，不弹出暂停菜单；自动游玩和回放也适用。
 - Session Mix 游玩中忽略 Esc；保留曲间结果画面的退出操作和多人模式的 Esc 中止操作。
 - `F3`：降低 Hi-Speed
 - `F4`：提高 Hi-Speed
@@ -214,6 +226,8 @@ Casual Score 最高为 10,000 分，判定权重为 `PG 6 / GR 3 / GD 1 / PR 0 /
 
 ### Gauge
 
+**1.9.1 BMS行为：**新的普通BMS游玩中，Normal/Easy恢复采用 `TOTAL / N`，Hard/EX采用固定恢复及TOTAL、音符数伤害修正。`N`为有效音符起点数，每条LN只算一个。Hard血量低于32%时判定伤害乘0.6。保留TenRiff的100%初始血量、0%失败、血条切换、判定分类、LN头尾各0.5权重及地雷伤害。组曲保留原组曲血条，对战保留v1。现有 `gauge.delta` 保留用于旧录像，不用于新的BMS v2计算。
+
 Gauge Shift 始终启用。`EX / Hard / Normal / Easy` 选择起始档位，保存值为 `ex_hard / hard / normal / easy`。所选档位及以下档位分别从 100% 开始独立累计判定。当前档位降至 0% 后切换至已有相同判定历史的下一存活档位，结束时以最高存活档位为最终结果。所有可用档位淘汰后才发生血条失败。
 
 段位/Session Mix 使用跨曲继承的 LR2 参考血条，保留间接失误，HP 低于 2% 时失败。普通 LN 在完成/释放时只结算一次，不应用普通 `gauge.delta`。参见[比较与兼容范围](lr2-gauge-audit.ko.md)。
@@ -256,11 +270,13 @@ Gauge Shift 始终启用。`EX / Hard / Normal / Easy` 选择起始档位，保�
 - 调整 `Skins > Visual Latency`
 - 正值会让 note 更早被画出来
 
-### BMS 中的键音太大或太小
-- 调整 `Audio > Keysound Volume`
-- 可以和 BGM 分开调节
+### BMS曲目或键音太大或太小
+
+- 通过 `Audio > BMS Performance Volume` 一起调整伴奏和键音。最终音量仍受 `Master Volume` 影响。
+- 不提供单独改变键音相对BGM大小的音量控制。
 - 1.2.6 已修复 `follow` 下晚到输入可能无声的路径：判定时间保持不变，只把可听起点固定到当前可写 buffer
-- 如果仍然无声，请检查 `Keysound Mode=follow`、非零音量以及谱面的 `#WAV` asset path
+- 键音缺失时请检查 `Keysound Mode`：`follow` 在击打音符时播放，`autoplay` 按谱面时间播放，Off关闭键音。该模式不改变键音相对BGM的音量。
+- 同时检查Master与BMS Performance音量是否均大于0，以及谱面的 `#WAV` 文件路径是否有效。
 
 ### 输入不稳定或怀疑有按键冲突
 - 在 `Options > Keymap > NKRO Test` 里同时按多个键检查
@@ -283,3 +299,7 @@ Gauge Shift 始终启用。`EX / Hard / Normal / Easy` 选择起始档位，保�
 - 配置结构：[`docs/config.zh-CN.md`](config.zh-CN.md)
 - 菜单结构：[`docs/menu.zh-CN.md`](menu.zh-CN.md)
 - 播放循环/引擎结构：[`docs/core-loop.zh-CN.md`](core-loop.zh-CN.md)
+
+**谱面分支：**`#RANDOM N` 从1到N中选择整数，并应用相应 `#IF` 区间的音符、音源和时间指令，不会叠加不同分支。每次新游玩生成新的分支种子，即使轨道随机关闭，谱面机关也可能变化；也可能再次选中同一分支。录像保持原来的选择。新记录目前仅保存在本地。
+
+[公式、分支、兼容性与验证范围（英文）](bms-total-random-followup.en.md).

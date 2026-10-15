@@ -38,6 +38,11 @@ struct GaugeRuntimePolicy {
     // LR2 beta3 grade-course gauge. Session-only: ordinary/ranked gauge
     // configuration and replay rules remain independent of course balance.
     bool course_lr2_deltas = false;
+    // Opt-in BMS delta rules only. Replay/session setup selects compatibility;
+    // TenRiff start, failure, shifts and judgement/LN semantics stay unchanged.
+    bool bms_lr2_deltas = false;
+    double bms_total = 0.0;  // Missing/nonpositive/nonfinite uses the LR2 fallback.
+    int bms_note_count = 0;  // Playable heads: a tap or complete LN counts once.
     bool hard_to_normal_shift = false;
     double hard_to_normal_threshold = 66.0;
     bool normal_to_easy_shift = false;
@@ -78,6 +83,8 @@ private:
 
     GaugeConfig config_;
     GaugeRuntimePolicy policy_;
+    double bms_recovery_per_note_ = 0.0;
+    double bms_hard_damage_scale_ = 1.0;
 };
 
 }  // namespace tenriff::game

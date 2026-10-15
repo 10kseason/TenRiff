@@ -280,10 +280,13 @@ void MenuWindow::draw(const MenuRenderData& data) {
         d2d_->private_ui_font_revision = data.ui_font_revision;
         static_cast<void>(d2d_->private_ui_font.load(d2d_->dwrite_factory.Get(), d2d_->private_ui_font_path));
     }
+    const bool language_default_font = data.ui_font == "default" || data.ui_font == "custom";
     const wchar_t* ui_family = d2d_->private_ui_font.collection
         ? d2d_->private_ui_font.family.c_str()
-        : data.ui_language == ui::Language::Japanese && (data.ui_font == "default" || data.ui_font == "custom")
-            ? L"Yu Gothic UI" : ui_font_family_for_token(data.ui_font);
+        : data.ui_language == ui::Language::Chinese && language_default_font
+            ? L"Microsoft YaHei UI"
+            : data.ui_language == ui::Language::Japanese && language_default_font
+                ? L"Yu Gothic UI" : ui_font_family_for_token(data.ui_font);
     if (font_file_changed || d2d_->ui_font_family != ui_family || custom_fonts != native_font_overrides_ ||
         d2d_->applied_ui_text_scale != d2d_->requested_ui_text_scale ||
         (custom_fonts && native_font_revision_ != data.lobby_skin.revision)) {
@@ -1243,6 +1246,23 @@ void MenuWindow::draw(const MenuRenderData& data) {
 #include "MenuWindow_draw_title_body.inl"
     };
 
+    auto draw_title_language_button = [&]() {
+        const auto footer = modern_title_screen
+            ? skin_layout_rect(data, "title.footer", D2D1::RectF(64, 972, 1856, 1048))
+            : footer_bar_rect(false);
+        const auto rect = native_rect("title.language", D2D1::RectF(footer.right - 320, footer.top - 88, footer.right, footer.top - 24));
+        draw_glass_panel(rect, 12, 0.95f, 0, false, 0);
+        register_hit(rect, MenuHitTargetKind::TitleLanguageButton, 0, MenuHitPart::Activate);
+        const std::string label = loc("Language", "언어") + " · " +
+            std::string(ui::language_native_label(data.ui_language)) + " ›";
+        const auto saved_alignment = d2d_->body_format->GetParagraphAlignment();
+        d2d_->body_format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+        draw_text_clipped_aligned(to_wide(label), d2d_->body_format.Get(),
+            D2D1::RectF(rect.left + 12, rect.top, rect.right - 12, rect.bottom),
+            d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+        d2d_->body_format->SetParagraphAlignment(saved_alignment);
+    };
+
     auto draw_song_select = [&]() {
 #include "MenuWindow_draw_songselect_body.inl"
     };
@@ -1323,6 +1343,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
     switch (data.kind) {
         case MenuScreenKind::TitleMenu:
             draw_title_menu();
+            draw_title_language_button();
             break;
         case MenuScreenKind::SongSelect:
             draw_song_select();

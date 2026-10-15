@@ -61,6 +61,85 @@ TEST_CASE("gameplay engine accepts a carried course gauge value") {
     CHECK_FALSE(engine.is_game_over());
 }
 
+TEST_CASE("BMS LR2 engine divisor counts complete LN once and excludes invalid lanes and mines") {
+    GameplayChart chart;
+    chart.lane_count = 2;
+    chart.duration_samples = 4000;
+    chart.notes = {NoteEvent{1, 1000, std::nullopt}, NoteEvent{2, 2000, 2500},
+                   NoteEvent{0, 3000, std::nullopt}, NoteEvent{3, 3000, std::nullopt}};
+    chart.mines.push_back(MineEvent{1, 3500, 7.0});
+    for (bool enabled : {false, true}) {
+        GameplayConfig config;
+        config.sample_rate = 1000;
+        config.initial_gauge_value = 50.0;
+        config.gauge_policy.bms_lr2_deltas = enabled;
+        config.gauge_policy.bms_total = 1.0;
+        config.gauge_policy.bms_note_count = 9999; // Engine derives the actual valid-head count.
+        GameplayEngine engine(chart, config);
+        const double per_note = enabled ? 0.5 : 0.19;
+        (void)engine.handle_input(1, InputState::Pressed, 1000);
+        CHECK(engine.gauge_state().value == doctest::Approx(50.0 + per_note));
+        (void)engine.handle_input(2, InputState::Pressed, 2000);
+        CHECK(engine.gauge_state().value == doctest::Approx(50.0 + per_note * 1.5));
+        engine.advance(2500);
+        CHECK(engine.gauge_state().value == doctest::Approx(50.0 + per_note * 2.0));
+        CHECK(engine.stats().total_notes == 2);
+        CHECK(engine.stats().max_combo == 3);
+        CHECK_FALSE(engine.is_game_over());
+    }
+}
+
+TEST_CASE("BMS LR2 engine retains delta policy while parallel gauge shifts discard refill transitions") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 21000;
+    for (int i = 1; i <= 20; ++i) chart.notes.push_back(NoteEvent{1, i * 1000, std::nullopt});
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.judge.pg_ms = 5.0;
+    config.judge.gr_ms = 10.0;
+    config.judge.gd_ms = 20.0;
+    config.judge.bd_ms = 40.0;
+    config.gauge_shift_enabled = true;
+    config.initial_gauge = tenriff::game::GaugeType::ExHard;
+    config.gauge_policy.bms_lr2_deltas = true;
+    config.gauge_policy.bms_total = 10.0;
+    config.gauge_policy.hard_to_normal_shift = true; // Parallel gauge shift must suppress this.
+    config.gauge_policy.normal_to_easy_shift = true;
+    GameplayEngine engine(chart, config);
+    (void)engine.handle_input(1, InputState::Pressed, 1030);
+    CHECK(engine.gauge_state().type == tenriff::game::GaugeType::Hard);
+    CHECK(engine.gauge_state().value == doctest::Approx(40.0));
+    (void)engine.handle_input(1, InputState::Released, 1100);
+    (void)engine.handle_input(1, InputState::Pressed, 2030);
+    CHECK(engine.gauge_state().type == tenriff::game::GaugeType::Normal);
+    CHECK(engine.gauge_state().value == doctest::Approx(92.0));
+    (void)engine.handle_input(1, InputState::Released, 2100);
+    (void)engine.handle_input(1, InputState::Pressed, 3000);
+    CHECK(engine.gauge_state().value == doctest::Approx(92.5));
+    CHECK_FALSE(engine.is_game_over());
+}
+
+TEST_CASE("BMS LR2 engine preserves the selected judgement mode consumed-miss classification") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 2000;
+    chart.notes.push_back(NoteEvent{1, 1000, std::nullopt});
+    for (bool indirect : {false, true}) {
+        GameplayConfig config;
+        config.sample_rate = 1000;
+        config.initial_gauge_value = 50.0;
+        config.gauge_policy.bms_lr2_deltas = true;
+        config.gauge_policy.bms_total = 300.0;
+        config.judge.indirect_miss_enabled = indirect;
+        GameplayEngine engine(chart, config);
+        engine.advance(1500);
+        CHECK(engine.gauge_state().value == doctest::Approx(indirect ? 44.0 : 46.0));
+        CHECK(engine.stats().counts.bd == (indirect ? 0 : 1));
+        CHECK(engine.stats().counts.pr == (indirect ? 1 : 0));
+    }
+}
+
 TEST_CASE("gameplay engine scores a basic hit") {
     GameplayChart chart;
     chart.lane_count = 1;

@@ -1,5 +1,13 @@
 # TenRiff 配置模式（当前）
 
+**2026-10-15 · 1.9.1:** 用户授权的1.9.1包含此前音量、输入、尾奏修复，BMS TOTAL/RANDOM兼容、结果颜色及10形标志。主页语言按钮按EN → KO → JA → ZH循环并保存选择。新BMS血条/分支记录在服务器验证支持前仅存本地。固定基准仍为1.9.0，保留旧发行版、安装和配置。下方带日期的本地记录中不升版本、未发布等表述保留当时状态；当前以此1.9.1范围为准。 [变更与兼容性](feedback-1.9.1.zh-CN.md) · [发布验证流程](release-1.9.1-gate.md).
+
+**2026-10-15 · BMS TOTAL、RANDOM与结果/标志后续修改 — 未发布、本地构建及CTest回归验证通过：** 本次本地修改基于1.9.0.2。结果页等级改用与选曲大厅相同的红色等级文字及键数符号颜色，标志改为提供的10形图案。新的普通BMS游玩根据#TOTAL及音符数使用LR2式恢复和伤害；谱面内#RANDOM分支使用独立于轨道随机的种子。旧录像保留原有行为，并包含此前的音量统一修改。已发布1.9.0.2、固定基准1.9.0及版本号均不变。 [公式、分支、兼容性与验证范围（英文）](bms-total-random-followup.en.md).
+
+**2026-10-15 · BMS音量统一后续修改 — 未发布、本地构建及CTest回归验证通过：** 此1.9.0.2基础上的本地修改将伴奏、键音独立调节合并为BMS演奏音量（韩文显示：**BMS 연주 볼륨**）。新默认值为20%，保留已保存值。主音量10%、TenRiff音乐100%的默认值、其余音量1个百分点步长及大厅试听×0.75均保留。不更改版本号或固定基准1.9.0。下方带日期的条目保留当时记录。
+
+1.9.1会显示难度表加载状态，并将debounce UI改为1ms步长、最大20ms（默认0ms）。停用旧的5→8ms自动改写，分别保留已保存的5ms和8ms。皮肤的韩文标签改为 `LN 끝 줄임`，外观和判定行为不变。普通单人模式开启听到结束后，最后音符及LN尾端处理完毕时按 `Esc` 会跳过尾奏直接进入结果，不弹出暂停菜单。
+
 **2026-10-15 · 1.9.0.2 发布候选版 — 发布验证流程：**基于已发布的1.9.0.1，将Options改为绿色，仅在选择内置5K Aery难度表时显示绿色⑤，为已注册4/6/8/10键难度表的符号使用对应颜色，并将等级设为红色、分数设为白色，新增`lv:`等级搜索、新建配置debounce默认0ms和音量1%步长。将选曲的排序、过滤和难度表选择器移至Song Library旁的页眉，并增加专辑封面高度。主音量默认10%，固定基准仍为1.9.0。[变更与用法](feedback-1.9.0.2.zh-CN.md)。 公开状态与可下载文件以发布页面为准。[范围与验证](release-1.9.0.2-gate.md)。
 
 **2026-10-15 · 1.9.0.1:** 包含默认主音量10%和大厅图标中心对齐。提供试听×0.75、个人档案指定F5/F6 -10/+10、Xbox/XInput按钮输入、文件选择框防重复，以及BMS BPM/STOP顺序修正与旧回放兼容。固定基准保持1.9.0。 [变更说明](feedback-20261015.zh-CN.md) · [发布验证范围](release-1.9.0.1-gate.md).
@@ -23,9 +31,13 @@
 
 ### `audio`
 
+**此前1.9.0.2说明（音量统一前的历史记录）：**
+
 1.9.0.2候选版的音频UI将主音量、BMS曲目、TenRiff音乐、BGM和键音这5项统一为 **1个百分点步长（保存值0.01）**。前3项范围为0–100%，BGM和键音为0–200%。新建配置主音量仍默认10%，其余默认100%；已保存的音量保持不变。
 
-- `play_to_end` (bool; default `true`): 最后一次判定后播放剩余音乐。false 时仅等待 `ui.result_tail_ms` 后正常进入结果。判定、分数、回放与手动跳过不变。
+**1.9.1音频：** 音频UI只保留主音量、BMS演奏音量、TenRiff音乐3项，范围均为0–100%，以 **1个百分点（保存值0.01）** 调整。新默认值依次为10%、20%、100%，明确保存的值保持不变。沿用 `gameplay_volume` 作为唯一的BMS专用音量倍率，主音量倍率继续生效。`bgm_volume` 与 `keysound_volume` 为兼容保留读写，但移除独立UI，并在游玩、所有试听和编辑器路径中忽略这些音量倍率。大厅试听仍额外衰减×0.75。实际听音、物理设备及长时间游玩尚未验证。
+
+- `play_to_end` (bool; default `true`): 最后音符和LN尾端处理完毕后继续播放剩余音乐。普通单人模式在此尾奏阶段按 `Esc` 可直接进入正常结果，不打开暂停菜单（包括自动游玩和回放）。保留Session Mix、多人模式原有Esc规则。false时仅等待 `ui.result_tail_ms` 后进入结果，判定、分数及回放规则不变。
 
 - `backend` (string)
   - `wasapi | asio`，默认为 `wasapi`。用于游玩和曲目试听；菜单和结果 BGM 保留独立的 Windows MCI 路径。
@@ -53,15 +65,15 @@
 - `volume` (double)
   - 主音量。0–1，新默认值0.10（10%）；保留明确保存的值。
 - `gameplay_volume` (double)
-  - 整个BMS曲目（伴奏和按键音）及试听音量。0–1，默认1.0。UI音效保持原有音量。
+  - BMS演奏音量（韩文显示：BMS 연주 볼륨），共同调节伴奏、键音和试听。0–1，新默认值0.20（20%）；保留明确保存的值。字段名与UI音效的原有倍率不变。
 - `menu_music_volume` (double)
   - 仅用于TenRiff菜单和结果音乐。0–1，默认1.0。基准为原音的10%，比1.8.9.7的40%基准再降低75%。独立于BMS曲目，不模拟Windows音量曲线。
 - `bgm_volume` (double)
-  - BMS background submix: 0–2, default 1.0.
+  - 兼容用旧字段。0–2，默认1.0；保留已有值的读写，但不再提供独立UI，并在游玩、试听和编辑器音量计算中忽略。
 - `normalize_audio` (bool)
   - 游戏内RMS音量调整，默认false。ON保留RMS→软限幅→主音量；OFF仅应用线性主音量与最终输出范围限制。菜单音乐及选曲试听不变。
 - `keysound_volume` (double)
-  - 新设置默认值为 `1.0`（100%）。紧接BGM音量，保留已有配置的保存值。
+  - 兼容用旧字段。0–2，默认1.0；保留已有值的读写，但不再提供独立UI，并在游玩、试听和编辑器音量计算中忽略。
 
 参见 [ASIO 设置](asio-audio.md)。ASIO 固定所选采样率并对谱面音频重采样。`frames` 为请求值，按驱动支持的大小协商。预设不覆盖 ASIO frames；`exclusive` 与 `periods` 仅用于 WASAPI。ASIO 失败时不会自动切换 WASAPI。
 
@@ -94,10 +106,14 @@
   - 当前 runtime 不再用此值驱动独立的 audio-thread judgement sub-step loop
   - 默认值为 `4000` (`0.25ms`)
 - `debounce_ms` (double)
-  - 保留真实 Press/Release 转换，仅从 pressed-state tracking 中移除同状态重复 event
-  - clamp 到 `0..25`
-  - 新默认值为 `0ms`；本次默认值变更不会重置已保存的值
-  - 保留历史 `5ms → 8ms` 迁移，与新默认值分开处理
+  - `0ms`关闭按时间抑制再次按下的功能，保留原有快速连打；仍会移除同状态重复事件。
+  - 大于`0ms`时，同一按键、同一物理输入源在Release后未满设定时间到达的下一次Press会被抑制；恰好达到时间边界的Press允许通过。
+  - 时间过滤器不延迟或丢弃真实Release。即使是有意的快速再次按下，也可能因落在设定时间内而被抑制。
+  - RawInput/Polling镜像事件不能绕过抑制，由RawInput识别的不同物理键盘独立处理；Polling本身不区分物理设备ID。XInput保留原有独立GamepadTracker路径，不使用此键盘时间过滤器。
+  - 限制在 `0..20`，UI以1ms步长调整
+  - 默认值为 `0ms`；保留范围内的已保存值
+  - 停用的旧规则：按值执行 `5ms → 8ms` 自动改写。移除该规则，避免改写新UI中明确选择的5ms；已保存的5ms和8ms分别保持原值
+
 ### `judge`
 
 1.9.0发布版在 `Options > Key Mode Settings > Judge Window` 中提供默认/Hard/EX。Easy从新选择中移除，但保留旧回放的判定。选择仅在本次运行有效，重启后恢复默认。[EX判定与兼容范围](judge-ex-1.9.0.ko.md)（韩语）。
@@ -134,6 +150,8 @@
 - 基准 BPM 为累计进行时间最长的速度；相同 BPM 的区间合并计算，排除 STOP 等待。Hi-Speed 以此固定，保留显式 `#SCROLL`、停止和逆向效果。参见[计算规则](reference-bpm.md)。
 
 ### `gauge`
+
+**1.9.1 BMS行为：**新的普通BMS游玩中，Normal/Easy恢复采用 `TOTAL / N`，Hard/EX采用固定恢复及TOTAL、音符数伤害修正。`N`为有效音符起点数，每条LN只算一个。Hard血量低于32%时判定伤害乘0.6。保留TenRiff的100%初始血量、0%失败、血条切换、判定分类、LN头尾各0.5权重及地雷伤害。组曲保留原组曲血条，对战保留v1。现有 `gauge.delta` 保留用于旧录像，不用于新的BMS v2计算。
 
 Gauge Shift 始终启用。`mode.gauge` 的 `ex_hard / hard / normal / easy` 选择从 EX 到 Easy 的起始档位。所选档位及以下档位均从 100% 独立并行计算，当前档位淘汰后转至下一存活档位。全部可用档位淘汰后才发生血条失败。旧 `shift` 值表示从 EX 开始。
 
@@ -253,6 +271,8 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 
 ### `ui`
 
+主页语言按钮按 **EN → KO → JA → ZH → EN** 循环。使用已有的 `ui.language` 保存，重启后保留。缺少翻译的文字可能回退为英语。
+
 `ui.skip_start_countdown` 和 `ui.instant_restart_key` 是本体功能，保存在配置档及 `.trprofile` 导出文件中。跳过的仅是加载后的初始 `3 / 2 / 1` 显示；音频准备、原有谱面开头的3秒空白及判定时间保持不变。从暂停继续时始终保留3秒恢复倒计时。多人游戏强制保留初始倒计时并禁用即时重新开始；Session Mix 也禁用即时重新开始。暂停或初始倒计时期间不会触发，必须松开按键后才能再次触发。轨道键、保留键冲突和编辑器练习起点等细节见[开始与重新开始说明（韩语）](gameplay-start-controls.ko.md)。
 
 这些设置不会改变 Sites 记录提交规则。长 LN Mix v2 不计入旧 BEST 或 Sites 是独立的变换规则；[插件运行环境、API 和 SDK 仍是未来计划（韩语）](result-analysis-1.8.8.ko.md)。
@@ -263,7 +283,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | --- | --- | --- |
 | `profile_nickname` | string; UTF-8 ≤48 bytes | 显示名称；为空时使用配置 ID，并规范化空白与控制字符。 |
 | `profile_avatar_path` | string; UTF-8 ≤2048 bytes | 本地 PNG/JPG 头像路径。 |
-| `language` | `en`, `ko`, `ja`; `en` | UI 语言；无效值规范化为 en。 |
+| `language` | `en`, `ko`, `ja`, `zh-CN`; `en` | UI 语言；无效值规范化为 en。 |
 | `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | 配置档和首次设置中的菜单字号：100%、115%、130%。游戏内字体继续由皮肤控制。 |
 | `skip_start_countdown` | bool; `false` | 跳过单人游玩开始时的 `3 / 2 / 1` 显示；适用于正常开始、菜单重新开始及结果页重试。 |
 | `instant_restart_key` | string; `""`（未分配） | 从头重新开始正在进行的单人谱面的键名。新一轮始终跳过初始倒计时；中断的尝试不保存结果或回放。 |
@@ -318,7 +338,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | 文字和条的独立 X 偏移，叠加于原判定布局，以 1920x1080 像素为基准。 |
 | `timing_text_offset_y`, `timing_bar_offset_y` | double: `-400..400`; `0` | 文字和条的独立 Y 偏移；正值向下。 |
 | `timing_text_scale`, `timing_bar_scale` | double: `0.50..2`; `1` | FAST/SLOW文字与条的独立缩放，支持50–200%、5%步长或滑块。适用于Studio、Classic、导入皮肤与预览，不改变判定、连击大小或XY位置。 |
-| `show_hold_tail`, `hold_tail_taper_enabled` | bool; `false` | 分别控制长条尾部端帽与渐缩，不改变判定规则。 |
+| `show_hold_tail`, `hold_tail_taper_enabled` | bool; `false` | 分别控制LN尾端端帽与渐缩。仅将渐缩的韩文标签改为 `LN 끝 줄임`，外观和判定规则不变。 |
 | `judgement_line_glow_enabled` | bool; `true` | 判定线周围发光。 |
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst 亮度；0 为关闭。 |
 | `key_pulse_enabled` | bool; `true` | 旧版开关兼容；false 或亮度为 0 时关闭。 |
@@ -398,3 +418,9 @@ Xbox/XInput按钮使用现有按键名称字段：`PadUp`, `PadDown`, `PadLeft`,
 `skin.key_backdrop_enabled` 和 `skin.key_backdrop_opacity` (0–1) 控制按键背景色，与击打特效亮度分开。首次修改保存 `key_backdrop_override=true` 并优先使用用户配置。判定线粗细随音符高度变化。选择难度表时 ALL SONG 只显示表内谱面，Native LV 恢复所有谱面。画面和 BGA 使用实际音频播放位置，判定和音频调度保持原时钟。速度发生变化时播放短点击声。
 
 按键背景RGB亮度使用 `skin.key_backdrop_brightness`（0–2，默认1），最大高度使用 `skin.key_backdrop_height`（0–1，默认1），以下边缘为基准。两项独立于透明度，在游戏、幽灵和皮肤预览中一致。带有 `−/+` 的设置可按住左右方向键连续调整。
+
+## BMS录像与结果兼容性（1.9.1）
+
+新增三个已获用户批准的可选记录字段：`bms_gauge_version`、`bms_control_flow_version`、`bms_random_seed`，它们不是用户配置项。版本缺省为1，分支种子缺省时使用旧 `random_seed`，再缺省则为0。新的普通BMS记录血条v2；有分支的谱面还记录控制流v2及uint32分支种子。轨道RR/SR、键数转换和LN Mix使用的 `random_seed` 与谱面分支种子独立。音频设备重新加载时保留相同分支，录像按保存的种子和规则重现。组曲保留原血条并使用新分支解析器。protocol v6对战保留血条/控制流v1及分支种子0。新血条/分支记录在服务器支持这些条件前仅保存在本地，阻止Sites和ranked上传。R5/R6判定与分数ID不变。本地BEST按规则版本组合优先，结果比较只匹配相同规则与分支种子。
+
+[公式、分支、兼容性与验证范围（英文）](bms-total-random-followup.en.md).

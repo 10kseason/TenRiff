@@ -73,12 +73,14 @@ InputSettingsViewModel InputSettingsView::build(
         true));
     view.rows.push_back(make_row(
         InputSettingId::Debounce,
-        SettingsRowKind::Choice,
+        SettingsRowKind::Numeric,
         localized(language, "Debounce", "디바운스"),
         format_decimal(runtime.input.debounce_ms) + " ms",
         controller,
         false,
         true));
+    view.rows.back().numeric_range = NumericSettingRange{
+        config::kInputDebounceWindowMin, config::kInputDebounceWindowMax, 1.0};
     view.rows.push_back(make_row(
         InputSettingId::Back,
         SettingsRowKind::Action,
@@ -115,8 +117,8 @@ InputSettingsViewModel InputSettingsView::build(
         "플레이 중 RawInput은 폴링 Hz 주기로 노트 키를 항상 보조 감시합니다."));
     view.notes.push_back(localized(
         language,
-        "Debounce filters duplicate switch chatter on a single key before gameplay sees it.",
-        "디바운스는 플레이에 전달되기 전 한 키의 중복 스위치 채터링을 걸러냅니다."));
+        "Debounce (keyboard): 0-20 ms in 1 ms steps, default 0. Above 0, same-key represses before the interval after release are blocked, even intentional fast repeats. Release stays immediate; XInput is unchanged.",
+        "키보드 디바운스: 0~20ms, 1ms 단위, 기본 0ms. 0보다 크면 키를 놓은 뒤 설정 시간 미만의 같은 키 재입력을 억제하며 의도적인 빠른 연타도 포함됩니다. 키 해제는 즉시 처리하고 XInput은 그대로입니다."));
     view.notes.push_back(localized(
         language,
         "Left/Right or click +/- to change. Back saves and returns.",

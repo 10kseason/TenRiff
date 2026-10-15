@@ -61,6 +61,7 @@ struct Report {
 struct PresentProbe {
     std::atomic<std::uint64_t> successful_presents{0};
     std::atomic<std::uint64_t> callbacks_without_present{0};
+    std::atomic<std::uint64_t> table_loading_presents{0};
     std::atomic<std::uint64_t> raw_zero_reads_after_progress{0};
     std::atomic<std::int64_t> last_completion_ns{0};
 
@@ -119,6 +120,36 @@ struct MenuAppVisualTestAccess {
         app.populate_title_render_data(view, "Fixture", {});
         report.check("title.single_play_label", view.title.buttons[0].label == app.ui_text("Single Play", "싱글 플레이"));
         app.title_cursor_ = saved_cursor;
+        app.publish_snapshot();
+    }
+    static void check_home_language_cycle(MenuApp& app, Report& report) {
+        const std::string saved_language = app.config_.ui.language;
+        const int saved_cursor = app.title_cursor_;
+        app.config_.ui.language = "en";
+        app.publish_snapshot();
+        for (const auto token : {"ko", "ja", "zh-CN", "en"}) {
+            click(app, Kind::TitleLanguageButton, 0);
+            const std::string name = std::string("title.language_") + token;
+            report.check(name + ".cycle", app.config_.ui.language == token &&
+                app.current_screen() == Screen::Title && app.title_cursor_ == saved_cursor);
+            {
+                std::lock_guard<std::mutex> lock(app.snapshot_mutex_);
+                const auto& view = app.snapshot_.render;
+                report.check(name + ".immediate_snapshot", view.ui_language == ui::language_from_token(token) &&
+                    view.title.buttons.size() == 4 && view.title.buttons[2].label == app.ui_text("OPTIONS", "옵션"));
+            }
+            const auto persisted = config::ConfigLoader{}.load_profile(app.profile_dir_);
+            report.check(name + ".persisted", persisted.success() && persisted.config.ui.language == token);
+        }
+        click(app, Kind::TitleLanguageButton, 0, Part::SelectOnly);
+        click(app, Kind::TitleLanguageButton, 1);
+        report.check("title.language_ignores_non_activation", app.config_.ui.language == "en");
+        app.reset_screen(Screen::OptionsHub);
+        click(app, Kind::TitleLanguageButton, 0);
+        report.check("title.language_scoped_to_home", app.config_.ui.language == "en");
+        app.reset_screen(Screen::Title);
+        app.config_.ui.language = saved_language;
+        app.persist_runtime_config();
         app.publish_snapshot();
     }
     static void check_browser_sort_and_range(MenuApp& app, Report& report) {
@@ -315,7 +346,16 @@ struct MenuAppVisualTestAccess {
         app.menu_window_.set_config(app.current_window_config());
         if (!app.render_thread_.initialize(app.current_render_config(), [&app]() {
                 app.render_tick();
-                present_probe.record(app.menu_window_.last_present_completion_ns());
+                const auto completed = app.menu_window_.last_present_completion_ns();
+                const auto& table = app.render_cache_.song_select;
+                if (completed > 0 && (table.difficulty_table_name == "Loading..." ||
+                    table.difficulty_table_name == u8"로딩 중" ||
+                    table.difficulty_table_name == u8"読み込み中")) {
+                    present_probe.table_loading_presents.fetch_add(1, std::memory_order_release);
+                }
+                // Publish completion after the payload observation so a waiter
+                // cannot see the new Present with the old loading-frame count.
+                present_probe.record(completed);
             }, [&app]() { app.menu_window_.shutdown(); }) || !app.render_thread_.start()) {
             throw std::runtime_error("Cannot attach smoke Present observer");
         }
@@ -751,6 +791,96 @@ struct MenuAppVisualTestAccess {
         app.current_song_record_indices_ = saved_current;
         app.config_.mode.mods = saved_mods;
     }
+    static void check_table_loading_present(MenuApp& app, Report& report) {
+        const auto saved_path = app.config_.ui.difficulty_table_path;
+        const auto saved_url = app.config_.ui.difficulty_table_url;
+        const auto saved_input = app.difficulty_table_url_input_;
+        const auto saved_status = app.song_browser_status_message_;
+        const auto saved_display_path = app.difficulty_table_display_path_;
+        const auto saved_display_name = app.difficulty_table_display_name_;
+        const bool saved_editing = app.difficulty_table_url_editing_;
+        const bool saved_loading = app.difficulty_table_loading_;
+        const bool saved_loading_snapshot = app.difficulty_table_loading_snapshot_;
+        const auto restore = [&] {
+            app.config_.ui.difficulty_table_path = saved_path;
+            app.config_.ui.difficulty_table_url = saved_url;
+            app.difficulty_table_url_input_ = saved_input;
+            app.song_browser_status_message_ = saved_status;
+            app.difficulty_table_display_path_ = saved_display_path;
+            app.difficulty_table_display_name_ = saved_display_name;
+            app.difficulty_table_url_editing_ = saved_editing;
+            app.difficulty_table_loading_ = saved_loading;
+            app.difficulty_table_loading_snapshot_ = saved_loading_snapshot;
+            app.publish_snapshot();
+        };
+        try {
+            for (const bool editor : {false, true}) {
+                const std::string prefix = editor ? "table.loading_editor" : "table.loading_card";
+                app.difficulty_table_url_editing_ = editor;
+                app.difficulty_table_url_input_ = "https://fixture.invalid/loading.json";
+                bool fetched = false;
+                const bool applied = app.apply_difficulty_table_url(app.difficulty_table_url_input_,
+                    [&](std::string_view, std::size_t) {
+                        fetched = true;
+                        bool published = false;
+                        {
+                            std::lock_guard<std::mutex> lock(app.snapshot_mutex_);
+                            const auto& table = app.snapshot_.render.song_select;
+                            published = table.difficulty_table_name == app.ui_text("Loading...", "로딩 중") &&
+                                table.difficulty_table_status == app.ui_text("Loading...", "로딩 중") &&
+                                table.difficulty_table_editing == editor;
+                        }
+                        report.check(prefix + ".published_before_fetch", published);
+                        const auto before = present_probe.table_loading_presents.load(std::memory_order_acquire);
+                        const auto began = Clock::now();
+                        std::string detail;
+                        const bool live = present(app, detail);
+                        const auto loading_frames = present_probe.table_loading_presents.load(std::memory_order_acquire) - before;
+                        report.check(prefix + ".present_during_blocking_fetch", live && loading_frames > 0,
+                            detail + "; loading Presents=" + std::to_string(loading_frames));
+
+                        // Capture only this app's render target, keeping all previous PNGs.
+                        const auto directory = std::filesystem::current_path() / "screenshots";
+                        std::vector<std::filesystem::path> previous;
+                        if (std::filesystem::exists(directory))
+                            for (const auto& entry : std::filesystem::directory_iterator(directory)) previous.push_back(entry.path());
+                        app.menu_window_.request_screenshot();
+                        const auto deadline = Clock::now() + std::chrono::seconds(3);
+                        bool complete = false;
+                        std::string filename;
+                        while (Clock::now() < deadline && !complete) {
+                            if (std::filesystem::exists(directory)) {
+                                for (const auto& entry : std::filesystem::directory_iterator(directory)) {
+                                    if (entry.path().extension() != ".png" ||
+                                        std::find(previous.begin(), previous.end(), entry.path()) != previous.end()) continue;
+                                    std::ifstream input(entry.path(), std::ios::binary | std::ios::ate);
+                                    if (!input || input.tellg() < 32) continue;
+                                    std::array<unsigned char, 8> header{}, end{};
+                                    input.seekg(0); input.read(reinterpret_cast<char*>(header.data()), header.size());
+                                    input.seekg(-12, std::ios::end); input.read(reinterpret_cast<char*>(end.data()), end.size());
+                                    complete = input.good() && header == std::array<unsigned char, 8>{137,80,78,71,13,10,26,10} &&
+                                        end == std::array<unsigned char, 8>{0,0,0,0,73,69,78,68};
+                                    if (complete) { filename = entry.path().filename().string(); break; }
+                                }
+                            }
+                            if (!complete) std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                        }
+                        report.check(prefix + ".screenshot_during_fetch", complete && app.difficulty_table_loading_,
+                            filename + "; blocked_ms=" + std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - began).count()));
+                        DifficultyTableHttpResponse response;
+                        response.error = "Intentional offline loading fixture";
+                        return response;
+                    });
+                report.check(prefix + ".cleared_after_failure", fetched && !applied && !app.difficulty_table_loading_ &&
+                    app.snapshot_.render.song_select.difficulty_table_name != app.ui_text("Loading...", "로딩 중") &&
+                    app.config_.ui.difficulty_table_path == saved_path && app.config_.ui.difficulty_table_url == saved_url);
+            }
+        } catch (...) {
+            restore();
+            throw;
+        }
+        restore();
+    }
     static void check_table_input_and_filter(MenuApp& app, Report& report) {
         const auto saved_url = app.difficulty_table_url_input_;
         app.difficulty_table_url_editing_ = true;
@@ -1064,6 +1194,14 @@ struct MenuAppFeedbackTestAccess {
         return session.bms_timing_version_ == version && session.ghost_replay_enabled_ == ghost &&
             static_cast<bool>(session.ghost_engine_) == ghost;
     }
+    static uint32_t check_bms_session_policy(const GameSession& session, Report& report, int attempt) {
+        const auto name = "bms_branch.initialize_" + std::to_string(attempt);
+        report.check(name + ".independent_fixed_lane_seed", session.config_.mode.random_seed == 24680u);
+        report.check(name + ".policies", session.bms_control_flow_version_ == 2 &&
+            session.bms_gauge_version_ == 2 && session.chart_.bms_has_random &&
+            session.chart_.bms_total == std::optional<double>(200.0));
+        return session.bms_random_seed_;
+    }
     static std::vector<gameplay::ReplayEvent> timing_inputs(const GameSession& session) {
         std::vector<gameplay::ReplayEvent> events;
         for (const auto& note : session.chart_.notes) {
@@ -1185,6 +1323,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
     report.check("library.indexed_exactly_one_synthetic_chart", indexed);
     if (!indexed) throw std::runtime_error("Synthetic library did not index");
     Access::check_home_navigation(app, report);
+    Access::check_home_language_cycle(app, report);
 
     Access::click(app, Kind::TitleButton, 2);
     expect_screen(app, report, "options", Screen::OptionsHub);
@@ -1244,6 +1383,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
     expect_screen(app, report, "options.back", Screen::Title);
     Access::click(app, Kind::TitleButton, 0);
     expect_screen(app, report, "lobby", Screen::SongSelect);
+    Access::check_table_loading_present(app, report);
     Access::check_table_input_and_filter(app, report);
     Access::check_level_search_input(app, report);
     Access::check_browser_sort_and_range(app, report);
@@ -1534,14 +1674,9 @@ void separate_judge_flow(tenriff::app::CommandLineOptions options, Report& repor
             std::string payload;
             const bool built = app::build_sites_score_json(*replay.replay, result.replay_sha256,
                 "Judge Boundary Fixture", result.clear_status, payload, error);
-            const auto json = config::parse_json(payload);
-            bool same_mods = false;
-            if (json.success() && json.root->as_object()) {
-                const auto* mods = json.root->as_object()->at("mods").as_array();
-                same_mods = mods && mods->size() == config.mode.mods.size() &&
-                    (!hard || mods->front().as_string() == "judge_hard");
-            }
-            report.check(name + ".sites_payload_conditions", built && same_mods, error);
+            report.check(name + ".new_bms_policy_stays_local", !built && payload.empty() &&
+                replay.replay->mode.bms_gauge_version == 2 &&
+                error.find("separate leaderboard condition") != std::string::npos, error);
         }
         const auto saved = loader.load_profile(profile);
         report.check(name + ".profile_stays_unmodified", saved.success() && saved.config.mode.mods.empty());
@@ -1745,6 +1880,34 @@ void separate_timing_flow(tenriff::app::CommandLineOptions options, Report& repo
     const bool ready = unchanged->initialize(options);
     report.check("timing.unchanged_chart_keeps_v1", ready && SessionAccess::timing_state(*unchanged, 1, false));
     unchanged->shutdown();
+
+    // Exercise initialize(), not just the seed helper: fixed SR must remain
+    // fixed while authored RANDOM gets a fresh independent seed each attempt.
+    options.chart_path = "timing-fixture/branch.bms";
+    {
+        std::ofstream file(options.chart_path);
+        file << "#TITLE Branch\n#KEYS 5\n#BPM 120\n#TOTAL 200\n#RANDOM 4\n";
+        for (int branch = 1; branch <= 4; ++branch)
+            file << "#IF " << branch << "\n#0011" << branch << ":01\n#ENDIF\n";
+        file << "#ENDRANDOM\n#00215:01\n";
+    }
+    config.mode.key_mode = "auto";
+    config.mode.random = "sr";
+    config.mode.random_seed = 24680u;
+    if (!loader.save_profile(profile, app::build_persisted_runtime_config(config)))
+        throw std::runtime_error("Cannot seed branch profile");
+    std::optional<uint32_t> previous_branch_seed;
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        auto branch_session = std::make_unique<app::GameSession>();
+        const bool initialized = branch_session->initialize(options);
+        report.check("bms_branch.initialize_" + std::to_string(attempt), initialized);
+        if (initialized) {
+            const auto seed = SessionAccess::check_bms_session_policy(*branch_session, report, attempt);
+            if (previous_branch_seed) report.check("bms_branch.fresh_seed_" + std::to_string(attempt), seed != *previous_branch_seed);
+            previous_branch_seed = seed;
+        }
+        branch_session->shutdown();
+    }
 }
 }  // namespace
 
