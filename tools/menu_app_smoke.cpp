@@ -225,6 +225,14 @@ struct MenuAppVisualTestAccess {
     }
     static void check_sequential_keymap(MenuApp& app, Report& report) {
         check_keymap_palette(app, report);
+        // This fixture owns synthetic down/up edges. A physical held-key
+        // snapshot during capture must not turn its first down into a repeat.
+        const bool resume_physical_input = app.input_thread_.is_running();
+        app.input_thread_.stop();
+        while (app.input_thread_.queue().pop()) {}
+        app.pressed_keys_.clear();
+        app.menu_key_owners_.clear();
+        app.reset_song_select_repeat();
         const auto original = app.keymap_;
         app.keymap_settings_controller_.reset(4, "4k");
         click(app, Kind::SettingsRow, 1);
@@ -274,6 +282,8 @@ struct MenuAppVisualTestAccess {
         std::string error;
         report.check("keymap.fixture_restored", manager.save_profile(app.profile_dir_, original, &error), error);
         app.keymap_ = app.working_keymap_ = original;
+        if (resume_physical_input && !app.input_thread_.start())
+            throw std::runtime_error("Cannot restore menu input after keymap fixture");
         app.refresh_menu_input_polling_scope();
         app.publish_snapshot();
     }
@@ -1675,12 +1685,18 @@ void separate_timing_flow(tenriff::app::CommandLineOptions options, Report& repo
     std::vector<gameplay::ReplayEvent> events;
     std::size_t submitted = 0;
     bool timed_out = false;
-    const auto deadline = Clock::now() + std::chrono::seconds(15);
+    const auto timing_flow_start = Clock::now();
+    const auto deadline = timing_flow_start + std::chrono::seconds(15);
+    int64_t max_observed_sample = 0;
+    bool observed_gameplay_start = false;
     session->set_hud_callback([&](const app::GameSession::HudSnapshot& hud) {
+        max_observed_sample = std::max(max_observed_sample, hud.current_sample);
+        observed_gameplay_start = observed_gameplay_start || session->did_start_gameplay();
         if (Clock::now() > deadline) { timed_out = true; SessionAccess::timeout(*session); return; }
         if (session->did_start_gameplay()) SessionAccess::submit_delta_inputs(*session, events, submitted, hud.current_sample);
     });
     const bool initialized = session->initialize(options);
+    const auto timing_run_start = Clock::now();
     report.check("timing.corrected_live_initialize", initialized && SessionAccess::timing_state(*session, 2, false));
     if (initialized) {
         events = SessionAccess::timing_inputs(*session);
@@ -1689,8 +1705,14 @@ void separate_timing_flow(tenriff::app::CommandLineOptions options, Report& repo
     }
     session->shutdown();
     const auto result = session->result();
+    // Keep watchdog/clock failures distinguishable from actual note judgements.
+    const std::string timing_detail = "timeout=" + std::to_string(timed_out) +
+        " initialize_ms=" + std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(timing_run_start - timing_flow_start).count()) +
+        " run_ms=" + std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - timing_run_start).count()) +
+        " started=" + std::to_string(observed_gameplay_start) + " max_sample=" + std::to_string(max_observed_sample) +
+        " submitted=" + std::to_string(submitted);
     report.check("timing.corrected_live_50ms_tap_survives", !timed_out && result.has_value && result.finished &&
-        !result.game_over && result.stats.counts.pg == 2 && result.stats.counts.pr == 0);
+        !result.game_over && result.stats.counts.pg == 2 && result.stats.counts.pr == 0, timing_detail);
     report.check("timing.result_exports_v2", result.bms_timing_version == 2);
     const auto replay = gameplay::load_replay_json(result.replay_path);
     report.check("timing.replay_exports_v2", replay.success() && replay.replay->mode.bms_timing_version == 2);

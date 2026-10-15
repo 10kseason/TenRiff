@@ -6,6 +6,8 @@ This **1.9.0.2 release candidate** is based on published 1.9.0.1. The fixed base
 
 - Display Options in green.
 - Show green ⑤ only when the built-in 5K Aery difficulty table is selected. Default Lv and other tables omit ⑤; levels stay red and scores stay white. Original chart and difficulty-table data are preserved.
+- Move the native Song Select Sort/Filter and Difficulty Table selector boxes from the lower center into the header beside `Song Library`. Use the freed center space for a taller album cover while preserving the best-record area and header song count. Final rendering checks must confirm that selectors, count, records and cover do not overlap.
+- Apply this move/enlargement to the default compact layout. Authored native or legacy left/center/header layout rectangles retain their prior placement; song sources and records are unchanged.
 
 ### Registered difficulty-table symbol colors
 
@@ -51,11 +53,17 @@ Saved volumes and existing output multipliers, including preview ×0.75, are ret
 
 ## Validation and compatibility
 
-These results describe the candidate before the final Aery ⑤ restoration and registered-table symbol-color follow-up. The development build and independently extracted source build each passed the Release build, CTest 3/3 (1,224 cases each, 0 integration skips), editor 35/35 and native MenuApp/GameSession 307/307. Native smoke includes 22 search key-handling checks. The earlier render passed six fixtures/360 Presents/86 geometry hit checks. Final build and display checks for Aery ⑤ and 4UE/6UE/8UE/Ⓡ colors remain release gates, including Aery FHD/small-window captures, red numeric levels, and default Lv/other/custom-table exclusions.
+Before the Aery ⑤, registered-symbol colors and Song Select layout follow-ups, the development and independently extracted source builds each passed Release build, CTest 3/3 (1,224 cases each, 0 integration skips), editor 35/35 and native MenuApp/GameSession 307/307, including 22 search key-handling checks. That earlier render covered six fixtures/360 Presents/86 geometry hit checks. These results do not replace the latest native failure below.
+
+The final runtime Release build completed. The latest visual checks passed **24 fixtures/1,440 Presents/381 geometry checks/24 table-prefix pixel checks**. This establishes layout/color/pixel and render-liveness evidence. OS `native_dispatch` results were not all true, so it does not establish that every OS click or key-delivery check passed.
 
 The initial build failed on unsupported test diagnostic CAPTURE; those diagnostic lines were removed. The first native search run missed the minus key SC_0C; a search-specific key-code comparison corrected it before the final passing checks above. Initial failure logs, original inputs and existing records are preserved.
 
 The first packaging gate failed an existing skin lane-number shortcut test once. A focused retry with the unchanged test executable, the full CTest retry and independent build checks passed, but **the root cause remains unconfirmed**. Preserve the original failure; passing retries do not establish a fix for the intermittent cause.
+
+The first `smoke-layout` passed **305/307**. Its 15-second watchdog aborted before any replay input, recording `aborted=true` and zero judgements; the later claims mismatch followed from the abort. Initialization delay versus audio-clock stall remains unresolved for that run. Only diagnostics were added, with timeouts and assertions unchanged.
+
+The next `smoke-layout-final` passed **304/307**. Timing passed (`timeout=0`, initialization 14ms, run 3,492ms, `max_sample=153467`, replay verified), while last-key capture completion, sequential profile readback and secondary-key advancement in the same slot failed. Code inspection confirmed a contamination path: capture clicks refresh live `GetAsyncKeyState`; held W/E/R can suppress the first synthetic down, leave capture active and cause the secondary click to be ignored. The held key was not recorded, so **this run-specific cause is not proven**. A test-only fix stops/drains the input thread and clears pressed/owner state before the synthetic sequence, then restarts it afterward. Product code and the held-repeat assertion are unchanged. The final isolated rerun and independent-build checks are pending.
 
 Local package/independent-build evidence and initial failures remain in separate evidence. Final package correspondence, PR/main CI and public asset checks follow the [release gate](release-1.9.0.2-gate.md); this document does not mark them passed in advance. The release page determines actual publication status. Internal key dispatch and geometry checks do not establish physical-device input coverage; hardware, latency, long play and other PCs remain unverified. The fixed baseline remains 1.9.0.
 
