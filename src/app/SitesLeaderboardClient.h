@@ -16,7 +16,16 @@ namespace tenriff::app {
 [[nodiscard]] bool build_sites_score_json(const gameplay::ReplayFile& replay,
     std::string_view replay_sha256, std::string_view chart_title,
     std::string_view clear_status, std::string& payload, std::string& error,
-    std::string_view chart_author = {});
+    std::string_view chart_author = {}, std::string_view bms_branch_sha256 = {});
+
+// Worker-only chart I/O: validates replay policy and exact original chart bytes,
+// then hashes the selected active content for control v2. Legacy/nonbranch
+// records return an empty identity without opening a chart file.
+[[nodiscard]] bool prepare_sites_bms_branch_identity(const gameplay::ReplayFile& replay,
+    std::string& branch_sha256, std::string& error);
+
+// Branch identity v1 hashes this domain followed by BmsParseResult::active_text.
+inline constexpr std::string_view kSitesBmsBranchIdentityDomain = "TenRiff:BMS-active-branch:v1\n";
 
 // Opt-in, bounded background uploads. No account tokens or filesystem paths enter the payload.
 class SitesLeaderboardService {

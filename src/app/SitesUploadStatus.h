@@ -38,9 +38,9 @@ inline SitesUploadStatusText sites_upload_status_text(std::string_view message) 
     if (message.find("HTTP 429") != std::string_view::npos)
         return {"Web upload rate limited (HTTP 429). Try playing again later; this record is local.",
                 "웹 업로드 요청 제한 (HTTP 429) · 잠시 후 다음 플레이 · 이번 기록은 로컬 저장"};
-    if (message.find("BMS timing v2") != std::string_view::npos)
-        return {"Corrected BMS timing uses local records until the web supports it.",
-                "변속 오류 수정 채보 · 웹 지원 전까지 로컬 기록 저장"};
+    if (message.find("BMS branch chart evidence") != std::string_view::npos)
+        return {"Web upload skipped: original BMS chart unavailable or changed; record saved locally.",
+                "웹 등록 제외 · 원본 BMS 채보가 없거나 변경됨 · 로컬 저장"};
     if (message.find("LN Mix v2") != std::string_view::npos)
         return {"Long LN Mix uses local records only.", "긴 LN 믹스는 로컬 기록만 저장합니다."};
     if (message.find("not eligible") != std::string_view::npos)

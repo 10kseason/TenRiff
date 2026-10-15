@@ -2257,7 +2257,10 @@ struct GameSessionAudioTestAccess {
 
         CompletionTestDirectory directory;
         const auto chart_path = directory.path / "fixture.bms";
-        { std::ofstream file(chart_path); file << "#TITLE Completion fixture\n#BPM 120\n"; }
+        { std::ofstream file(chart_path);
+          file << "#TITLE Completion fixture\n#BPM 120\n";
+          if (bms_policy) file << "#RANDOM 1\n#IF 1\n#00111:01\n#ENDIF\n#ENDRANDOM\n";
+        }
         session->chart_path_ = chart_path.u8string();
         session->profile_dir_ = directory.path.u8string();
         session->shutdown();
@@ -2287,12 +2290,14 @@ struct GameSessionAudioTestAccess {
             CHECK(replay.replay->trace.events[i].state == recorded_events[i].state);
             CHECK(replay.replay->trace.events[i].sample == recorded_events[i].sample);
         }
-        std::string payload, error;
+        std::string payload, error, branch_sha256;
+        REQUIRE(prepare_sites_bms_branch_identity(*replay.replay, branch_sha256, error));
+        CHECK(branch_sha256.empty() == !bms_policy);
         const bool accepted = build_sites_score_json(*replay.replay, result.replay_sha256,
-                                    "Completion fixture", result.clear_status, payload, error);
-        CHECK(accepted == !(auto_scratch || stale_catchup || bms_policy));
-        CHECK(payload.empty() == (auto_scratch || stale_catchup || bms_policy));
-        CHECK(error.empty() == !(auto_scratch || stale_catchup || bms_policy));
+                                    "Completion fixture", result.clear_status, payload, error, {}, branch_sha256);
+        CHECK(accepted == !(auto_scratch || stale_catchup));
+        CHECK(payload.empty() == (auto_scratch || stale_catchup));
+        CHECK(error.empty() == !(auto_scratch || stale_catchup));
         if (stale_catchup) {
             CHECK(replay.replay->ruleset_id == "custom-ruleset-5");
             CHECK_FALSE(is_supported_canonical_replay_ruleset(replay.replay->ruleset_id));

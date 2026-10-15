@@ -110,6 +110,25 @@ TEST_CASE("chart file hashing reports missing files without partial hashes") {
     CHECK_FALSE(error.empty());
 }
 
+TEST_CASE("chart byte SHA-256 matches standard vectors and keeps embedded zero bytes") {
+    CHECK(tenriff::app::sha256_bytes("") == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+    CHECK(tenriff::app::sha256_bytes("abc") == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    CHECK(tenriff::app::sha256_bytes("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq") ==
+          "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1");
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    // NUL is a reserved Windows device name even with an extension.
+    const auto chart = temp.path / "embedded-zero.bms";
+    const std::string content("a\0b", 3);
+    write_file(chart, content);
+    const auto hashes = tenriff::app::hash_chart_file(chart);
+    REQUIRE(hashes.valid());
+    REQUIRE(hashes.size == content.size());
+    CHECK(tenriff::app::sha256_bytes(content) == hashes.sha256);
+    CHECK(tenriff::app::sha256_bytes(content) != tenriff::app::sha256_bytes("a"));
+}
+
 TEST_CASE("difficulty table loads a standard data array with explicit identity") {
     TempDirGuard temp;
     temp.path = make_temp_dir();

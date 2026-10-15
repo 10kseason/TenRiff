@@ -3,6 +3,7 @@
 #include "app/ModeManager.h"
 #include "app/RankedRecordsClient.h"
 #include "app/ReplayVerifier.h"
+#include "chart/BmsParser.h"
 #include "config/SimpleJson.h"
 #include <algorithm>
 #include <chrono>
@@ -20,6 +21,20 @@ bool is_hash(std::string_view value) {
     return value.size() == 64 && std::all_of(value.begin(), value.end(), [](char c) {
         return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
     });
+}
+bool valid_bms_policy(const gameplay::ReplayFile& replay, std::string& error) {
+    const auto& mode = replay.mode;
+    const auto supported = [](int version) { return version == 1 || version == 2; };
+    const bool nonlegacy = mode.bms_timing_version != 1 || mode.bms_gauge_version != 1 ||
+                           mode.bms_control_flow_version != 1;
+    if (!supported(mode.bms_timing_version) || !supported(mode.bms_gauge_version) ||
+        !supported(mode.bms_control_flow_version) ||
+        ((nonlegacy || mode.bms_random_seed) && replay.chart_format != "bms") ||
+        (mode.bms_control_flow_version == 2) != mode.bms_random_seed.has_value()) {
+        error = "Sites upload skipped: unsupported or inconsistent BMS policy metadata.";
+        return false;
+    }
+    return true;
 }
 std::string sites_utc_timestamp(std::string_view value) {
     // GameSession exports filename-safe YYYYMMDD_HHMMSSZ timestamps.
@@ -43,18 +58,71 @@ std::string quoted(std::string_view text) {
 }
 }  // namespace
 
+bool prepare_sites_bms_branch_identity(const gameplay::ReplayFile& replay,
+    std::string& branch_sha256, std::string& error) {
+    branch_sha256.clear();
+    error.clear();
+    if (!valid_bms_policy(replay, error)) return false;
+    if (replay.mode.bms_control_flow_version == 1) return true;
+
+    // Hash and parse the very same bounded byte buffer. Reopening the file
+    // between hashing and expansion could attribute a changed chart's branch.
+    constexpr std::uintmax_t kMaxChartBytes = 32u * 1024u * 1024u;
+    try {
+        const auto path = std::filesystem::u8path(replay.chart_path);
+        std::error_code ec;
+        if (path.empty() || !std::filesystem::is_regular_file(path, ec) || ec) {
+            error = "Sites upload skipped: BMS branch chart evidence is unavailable.";
+            return false;
+        }
+        const auto size = std::filesystem::file_size(path, ec);
+        if (ec || size > kMaxChartBytes) {
+            error = "Sites upload skipped: BMS branch chart evidence is missing or too large.";
+            return false;
+        }
+        std::ifstream input(path, std::ios::binary);
+        std::string content(static_cast<std::size_t>(size), '\0');
+        if (!input || !input.read(content.data(), static_cast<std::streamsize>(content.size())) ||
+            input.peek() != std::char_traits<char>::eof()) {
+            error = "Sites upload skipped: BMS branch chart evidence could not be read completely.";
+            return false;
+        }
+        if (!is_hash(replay.chart_sha256) || sha256_bytes(content) != replay.chart_sha256) {
+            error = "Sites upload skipped: BMS branch chart evidence no longer matches the replay.";
+            return false;
+        }
+        chart::BmsParserOptions options;
+        options.control_flow_version = replay.mode.bms_control_flow_version;
+        options.random_seed = gameplay::replay_bms_random_seed(replay.mode);
+        options.capture_active_text = true;
+        // Match the ordinary runtime's strict parser. Control recovery
+        // warnings remain the same authored-chart policy used during play.
+        const auto parsed = chart::BmsParser{}.parse(content, options);
+        if (!parsed.success() || !parsed.chart.has_random_directives) {
+            error = "Sites upload skipped: BMS branch chart metadata cannot reproduce this policy.";
+            return false;
+        }
+        std::string identity(kSitesBmsBranchIdentityDomain);
+        identity.append(parsed.active_text);
+        branch_sha256 = sha256_bytes(identity);
+        return true;
+    } catch (...) {
+        // No chart path, content, or parser diagnostics enter a visible status.
+        error = "Sites upload skipped: BMS branch chart evidence is unavailable.";
+        return false;
+    }
+}
+
 bool build_sites_score_json(const gameplay::ReplayFile& replay,
     std::string_view replay_sha256, std::string_view chart_title,
     std::string_view clear_status, std::string& payload, std::string& error,
-    std::string_view chart_author) {
+    std::string_view chart_author, std::string_view bms_branch_sha256) {
     payload.clear();
     error.clear();
-    if (replay.mode.bms_gauge_version != 1 || replay.mode.bms_control_flow_version != 1 || replay.mode.bms_random_seed) {
-        error = "Sites upload skipped: this BMS gauge/branch policy needs a separate leaderboard condition; this score remains local.";
-        return false;
-    }
-    if (replay.mode.bms_timing_version != 1) {
-        error = "Sites upload skipped: BMS timing v2 needs a separate leaderboard condition; this score remains local.";
+    if (!valid_bms_policy(replay, error)) return false;
+    if ((replay.mode.bms_control_flow_version == 2 && !is_hash(bms_branch_sha256)) ||
+        (replay.mode.bms_control_flow_version == 1 && !bms_branch_sha256.empty())) {
+        error = "Sites upload skipped: missing or inconsistent BMS branch identity metadata.";
         return false;
     }
     if (mode_mod_long_note_mix(replay.mods) && replay.mode.long_note_mix_version != 1) {
@@ -123,6 +191,16 @@ bool build_sites_score_json(const gameplay::ReplayFile& replay,
     // Metadata is supplied by the indexed chart, not replay evidence. Omitting
     // it preserves old uploads and does not change score/board identity.
     if (!chart_author.empty()) output << ",\"chart_author\":" << quoted(chart_author);
+    if (replay.mode.bms_timing_version != 1 || replay.mode.bms_gauge_version != 1 ||
+        replay.mode.bms_control_flow_version != 1) {
+        output << ",\"bms_timing_version\":" << replay.mode.bms_timing_version
+               << ",\"bms_gauge_version\":" << replay.mode.bms_gauge_version
+               << ",\"bms_control_flow_version\":" << replay.mode.bms_control_flow_version;
+        if (replay.mode.bms_control_flow_version == 2) {
+            output << ",\"bms_random_seed\":" << *replay.mode.bms_random_seed
+                   << ",\"bms_branch_sha256\":" << quoted(bms_branch_sha256);
+        }
+    }
     output << ",\"key_mode\":" << quoted(std::to_string(lanes) + "K")
            << ",\"rate_milli\":" << std::llround(replay.rate * 1000.0)
            << ",\"ruleset_id\":" << quoted(replay.ruleset_id)
@@ -184,7 +262,7 @@ void SitesLeaderboardService::worker_main() {
         }
         std::string message;
         try {
-            std::string error, payload;
+            std::string error, payload, branch_sha256;
             bool missing = false;
             SitesLeaderboardConnection connection;
             std::error_code ec;
@@ -200,8 +278,10 @@ void SitesLeaderboardService::worker_main() {
                     message = "Sites upload skipped: replay evidence no longer matches the result.";
                 } else if (!loaded.success()) {
                     message = "Sites upload skipped: " + loaded.error;
+                } else if (!prepare_sites_bms_branch_identity(*loaded.replay, branch_sha256, error)) {
+                    message = error;
                 } else if (!build_sites_score_json(*loaded.replay, pending.replay_sha256,
-                           pending.chart_title, pending.clear_status, payload, error, pending.chart_author)) {
+                           pending.chart_title, pending.clear_status, payload, error, pending.chart_author, branch_sha256)) {
                     message = error;
                 } else {
                     bool accepted = false;

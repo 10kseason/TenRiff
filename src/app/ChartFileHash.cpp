@@ -301,6 +301,12 @@ void set_error(std::string* error, std::string message) {
 
 }  // namespace
 
+std::string sha256_bytes(std::string_view bytes) {
+    Sha256Digest digest;
+    digest.update(reinterpret_cast<const std::uint8_t*>(bytes.data()), bytes.size());
+    return to_hex(digest.finish());
+}
+
 ChartFileHashes hash_chart_file(const std::filesystem::path& path, std::string* error) {
     if (error) {
         error->clear();

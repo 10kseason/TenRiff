@@ -980,6 +980,11 @@ BmsParseResult BmsParser::parse(std::string_view content, const BmsParserOptions
             continue;
         }
 
+        if (options.capture_active_text) {
+            result.active_text.append(trimmed);
+            result.active_text.push_back('\n');
+        }
+
         std::string command = trim(std::string_view(trimmed).substr(1));
         auto separator_pos = command.find_first_of(" \t:");
         std::string key = separator_pos == std::string::npos ? command : command.substr(0, separator_pos);

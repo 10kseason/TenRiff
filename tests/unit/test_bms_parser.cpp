@@ -506,6 +506,30 @@ TEST_CASE("BMS RANDOM bounded recovery does not hide missing required terminator
     CHECK(has_message(unfinished_switch, BmsParseSeverity::Warning));
 }
 
+TEST_CASE("BMS active text capture is opt-in and preserves selected directive order") {
+    const std::string content = "\xEF\xBB\xBF  #BPM 120 ; comment\r\n"
+        "* header comment\r\nignored text\r\n\r\n#SETRANDOM 2 // selected\r\n"
+        "#IF 1\r\n#00111:01\r\n#ELSEIF 2\r\n\t#WAV01 dir//sample.wav \r\n"
+        " #00112:01 ; note\r\n#00112:02\r\n#ENDIF\r\n#ENDRANDOM\r\n";
+    BmsParser parser;
+    const auto ordinary = parser.parse(content);
+    REQUIRE(ordinary.success());
+    CHECK(ordinary.active_text.empty());
+    BmsParserOptions options;
+    options.capture_active_text = true;
+    const auto captured = parser.parse(content, options);
+    REQUIRE(captured.success());
+    CHECK(captured.active_text == "#BPM 120\n#WAV01 dir//sample.wav\n#00112:01\n#00112:02\n");
+    CHECK(captured.chart.commands.size() == ordinary.chart.commands.size());
+    CHECK(captured.chart.headers == ordinary.chart.headers);
+    CHECK(captured.chart.wav == ordinary.chart.wav);
+    CHECK(captured.messages.size() == ordinary.messages.size());
+    options.metadata_only = true;
+    options.retain_wav_bmp = false;
+    options.retain_unknown_headers = false;
+    CHECK(parser.parse(content, options).active_text == captured.active_text);
+}
+
 TEST_CASE("parses measure commands with even tokens") {
     const char* data =
         "#00111:0100\n"

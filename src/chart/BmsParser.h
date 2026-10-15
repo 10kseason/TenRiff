@@ -27,6 +27,9 @@ struct BmsParserOptions {
     // Version 1 reproduces historical replay parsing. Version 2 also accepts
     // control-number comments and bounded missing-ENDIF recovery in authored BMS.
     int control_flow_version = 2;
+    // Upload-only branch identity. Ordinary gameplay does not retain another
+    // chart-text copy. Captures active directives after control expansion.
+    bool capture_active_text = false;
 };
 
 enum class BmsParseSeverity {
@@ -69,6 +72,9 @@ struct BmsChart {
 struct BmsParseResult {
     BmsChart chart;
     std::vector<BmsParseMessage> messages;
+    // BOM/encoding-normalized, semicolon-comment-stripped active # directives,
+    // outer whitespace removed, source order retained, each ending in LF.
+    std::string active_text;
 
     bool success() const;
 };
