@@ -4,6 +4,9 @@
 #include <iterator>
 #include <iostream>
 #include <limits>
+#include <map>
+#include "app/ChartFileHash.h"
+#include "chart/BmsParser.h"
 #include "app/SitesLeaderboardClient.h"
 #include "app/SitesUploadResponse.h"
 #include "app/ReplayVerifier.h"
@@ -119,6 +122,30 @@ gameplay::ReplayFile score_fixture() {
     replay.stats.detailed_accuracy_weight = 100.0;
     return replay;
 }
+
+struct SitesChartFixture {
+    std::filesystem::path directory = std::filesystem::temp_directory_path() /
+        ("tenriff_sites_branch_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::filesystem::path path = directory / "branch.bms";
+    SitesChartFixture() { std::filesystem::create_directories(directory); }
+    ~SitesChartFixture() {
+        std::error_code ec;
+        std::filesystem::remove(path, ec);
+        std::filesystem::remove(directory, ec);
+    }
+    gameplay::ReplayFile write(std::string_view content) {
+        std::ofstream output(path, std::ios::binary | std::ios::trunc);
+        output.write(content.data(), static_cast<std::streamsize>(content.size()));
+        REQUIRE(output.good());
+        output.close();
+        auto replay = score_fixture();
+        replay.chart_path = path.u8string();
+        replay.chart_sha256 = app::sha256_bytes(content);
+        replay.mode.bms_control_flow_version = 2;
+        replay.mode.bms_random_seed = 0u;
+        return replay;
+    }
+};
 }  // namespace
 
 TEST_CASE("Sites payload preserves all four native metrics without display rounding") {
@@ -204,27 +231,169 @@ TEST_CASE("Sites keeps musical LN Mix v2 out of unversioned legacy boards") {
     CHECK(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
 }
 
-TEST_CASE("Sites keeps corrected BMS timing out of historical timing boards") {
-    auto replay = score_fixture();
-    std::string payload, error;
-    REQUIRE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
-    replay.mode.bms_timing_version = 2;
-    CHECK_FALSE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
-    CHECK(payload.empty());
-    CHECK(error.find("BMS timing v2") != std::string::npos);
+TEST_CASE("Sites BMS policy metadata preserves legacy payload and accepts distinct supported conditions") {
+    for (int timing : {1, 2}) for (int gauge : {1, 2}) for (int control : {1, 2}) {
+        auto replay = score_fixture();
+        replay.mode.bms_timing_version = timing;
+        replay.mode.bms_gauge_version = gauge;
+        replay.mode.bms_control_flow_version = control;
+        if (control == 2) replay.mode.bms_random_seed = 0u;
+        const std::string branch = control == 2 ? std::string(64, 'a') : "";
+        std::string payload, error;
+        REQUIRE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error, {}, branch));
+        const auto json = config::parse_json(payload);
+        REQUIRE(json.success());
+        const auto& fields = *json.root->as_object();
+        const bool nonlegacy = timing != 1 || gauge != 1 || control != 1;
+        CHECK(fields.count("bms_timing_version") == (nonlegacy ? 1u : 0u));
+        CHECK(fields.count("bms_gauge_version") == (nonlegacy ? 1u : 0u));
+        CHECK(fields.count("bms_control_flow_version") == (nonlegacy ? 1u : 0u));
+        CHECK(fields.count("bms_random_seed") == (control == 2 ? 1u : 0u));
+        CHECK(fields.count("bms_branch_sha256") == (control == 2 ? 1u : 0u));
+        if (nonlegacy) {
+            CHECK(fields.at("bms_timing_version").as_number() == timing);
+            CHECK(fields.at("bms_gauge_version").as_number() == gauge);
+            CHECK(fields.at("bms_control_flow_version").as_number() == control);
+        }
+        if (control == 2) {
+            CHECK(fields.at("bms_random_seed").as_number() == 0.0);
+            CHECK(fields.at("bms_branch_sha256").as_string() == branch);
+        }
+        if (timing == 2 && gauge == 2 && control == 2) {
+            std::cout << "[bms-policy-payload] " << payload << '\n';
+            replay.mode.bms_random_seed = 0xffffffffu;
+            REQUIRE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error, {}, branch));
+            CHECK(payload.find("\"bms_random_seed\":4294967295") != std::string::npos);
+        }
+    }
 }
 
-TEST_CASE("Sites keeps TOTAL and authored branch policies out of legacy boards") {
-    for (int policy = 0; policy < 3; ++policy) {
+TEST_CASE("Sites rejects unknown and inconsistent BMS policy seed and identity metadata") {
+    for (int which = 0; which < 3; ++which) for (int version : {-1, 0, 3, 999}) {
         auto replay = score_fixture();
-        if (policy == 0) replay.mode.bms_gauge_version = 2;
-        if (policy == 1) replay.mode.bms_control_flow_version = 2;
-        if (policy == 2) replay.mode.bms_random_seed = 0u;
-        std::string payload, error;
+        if (which == 0) replay.mode.bms_timing_version = version;
+        if (which == 1) replay.mode.bms_gauge_version = version;
+        if (which == 2) replay.mode.bms_control_flow_version = version;
+        std::string payload = "old", error;
         CHECK_FALSE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
         CHECK(payload.empty());
-        CHECK(error.find("separate leaderboard condition") != std::string::npos);
+        CHECK(error.find("metadata") != std::string::npos);
     }
+    for (int scenario = 0; scenario < 8; ++scenario) {
+        auto replay = score_fixture();
+        std::string branch;
+        if (scenario == 0) replay.mode.bms_random_seed = 0u;
+        if (scenario == 1) branch = std::string(64, 'a');
+        if (scenario >= 2 && scenario <= 5) {
+            replay.mode.bms_control_flow_version = 2;
+            if (scenario != 2) replay.mode.bms_random_seed = 0u;
+            if (scenario == 2) branch = std::string(64, 'a');
+            if (scenario == 4) branch = std::string(64, 'A');
+            if (scenario == 5) branch = std::string(63, 'a');
+        }
+        if (scenario >= 6) {
+            replay.chart_format = "osu";
+            if (scenario == 6) replay.mode.bms_gauge_version = 2;
+            if (scenario == 7) replay.mode.bms_timing_version = 2;
+        }
+        std::string payload = "old", error;
+        CHECK_FALSE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error, {}, branch));
+        CHECK(payload.empty());
+        CHECK(error.find("metadata") != std::string::npos);
+    }
+}
+
+TEST_CASE("Sites BMS branch identity groups selected content instead of independent seed values") {
+    SitesChartFixture fixture;
+    const std::string content = "#TITLE Branch fixture\n#BPM 120\n#RANDOM 2\n"
+        "#IF 1\n#00111:01\n#ELSE\n#00112:01\n#ENDIF\n#ENDRANDOM\n";
+    auto replay = fixture.write(content);
+    std::map<std::string, int> hashes;
+    for (uint32_t seed = 0; seed < 32; ++seed) {
+        replay.mode.bms_random_seed = seed;
+        replay.mode.random_seed = static_cast<int>(seed + 1000u);
+        std::string hash, error;
+        REQUIRE(app::prepare_sites_bms_branch_identity(replay, hash, error));
+        REQUIRE(hash.size() == 64u);
+        ++hashes[hash];
+        chart::BmsParserOptions options;
+        options.random_seed = seed;
+        options.capture_active_text = true;
+        const auto parsed = chart::BmsParser{}.parse(content, options);
+        CHECK(hash == app::sha256_bytes(std::string(app::kSitesBmsBranchIdentityDomain) + parsed.active_text));
+        CHECK(hash != app::sha256_bytes(parsed.active_text));
+        replay.mode.random_seed = -1;
+        std::string repeated;
+        REQUIRE(app::prepare_sites_bms_branch_identity(replay, repeated, error));
+        CHECK(repeated == hash);
+    }
+    REQUIRE(hashes.size() == 2u);
+    for (const auto& hash : hashes) CHECK(hash.second > 1);
+    replay.mode.bms_random_seed = 0xffffffffu;
+    std::string hash, error;
+    REQUIRE(app::prepare_sites_bms_branch_identity(replay, hash, error));
+    CHECK(hashes.count(hash) == 1u);
+
+    // Different control alternatives containing identical active directives
+    // (even differently commented or indented) belong to the same board.
+    replay = fixture.write("#BPM 120\n#RANDOM 2\n#IF 1\n #00111:01 ; first\n"
+        "#ELSE\n\t#00111:01 ; second\n\n#ENDIF\n#ENDRANDOM\n");
+    std::string first;
+    for (uint32_t seed = 0; seed < 32; ++seed) {
+        replay.mode.bms_random_seed = seed;
+        REQUIRE(app::prepare_sites_bms_branch_identity(replay, hash, error));
+        if (first.empty()) first = hash;
+        CHECK(hash == first);
+    }
+}
+
+TEST_CASE("Sites BMS branch identity requires exact bounded original chart evidence") {
+    SitesChartFixture fixture;
+    const std::string content = "#BPM 120\n#RANDOM 1\n#IF 1\n#00111:01\n#ENDIF\n";
+    auto replay = fixture.write(content);
+    std::string hash, error;
+    REQUIRE(app::prepare_sites_bms_branch_identity(replay, hash, error));
+    auto changed = fixture.write(content + "; changed original bytes\n");
+    CHECK_FALSE(app::prepare_sites_bms_branch_identity(replay, hash, error));
+    CHECK(hash.empty());
+    CHECK(error.find("no longer matches") != std::string::npos);
+    CHECK(error.find(fixture.path.u8string()) == std::string::npos);
+    CHECK(app::sites_upload_status_text(error).korean.find("원본 BMS") != std::string_view::npos);
+    replay = changed;
+    REQUIRE(app::prepare_sites_bms_branch_identity(replay, hash, error));
+    replay.chart_path += ".missing";
+    CHECK_FALSE(app::prepare_sites_bms_branch_identity(replay, hash, error));
+    CHECK(hash.empty());
+    replay = fixture.write("#BPM 120\n#00111:01\n");
+    CHECK_FALSE(app::prepare_sites_bms_branch_identity(replay, hash, error));
+    CHECK(error.find("metadata") != std::string::npos);
+    replay = fixture.write("#BPM invalid\n#RANDOM 1\n#00111:01\n");
+    CHECK_FALSE(app::prepare_sites_bms_branch_identity(replay, hash, error));
+    replay = fixture.write(content);
+    std::filesystem::resize_file(fixture.path, 32u * 1024u * 1024u + 1u);
+    CHECK_FALSE(app::prepare_sites_bms_branch_identity(replay, hash, error));
+    CHECK(hash.empty());
+    CHECK(error.find("too large") != std::string::npos);
+}
+
+TEST_CASE("Sites BMS legacy and nonbranch policies require no chart read but malformed policies fail") {
+    auto replay = score_fixture();
+    replay.chart_path = "definitely_missing_sites_branch.bms";
+    std::string hash = "old", error = "old";
+    REQUIRE(app::prepare_sites_bms_branch_identity(replay, hash, error));
+    CHECK(hash.empty());
+    CHECK(error.empty());
+    replay.mode.bms_timing_version = 2;
+    replay.mode.bms_gauge_version = 2;
+    REQUIRE(app::prepare_sites_bms_branch_identity(replay, hash, error));
+    CHECK(hash.empty());
+    replay.mode.bms_control_flow_version = 2;
+    CHECK_FALSE(app::prepare_sites_bms_branch_identity(replay, hash, error));
+    CHECK(error.find("metadata") != std::string::npos);
+    replay.mode.bms_random_seed = 0u;
+    replay.chart_format = "osu";
+    CHECK_FALSE(app::prepare_sites_bms_branch_identity(replay, hash, error));
+    CHECK(error.find("metadata") != std::string::npos);
 }
 
 TEST_CASE("Sites EX payload requires its own R6 policy and excludes mixed judge modes") {

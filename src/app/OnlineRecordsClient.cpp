@@ -153,7 +153,7 @@ bool fetch_json_impl(const std::string& base_url,
     while (!path.empty() && path.back() == L'/') path.pop_back();
     path += utf8_to_wide(endpoint);
 
-    InternetHandle session(WinHttpOpen(L"TenRiff/1.9.1 records",
+    InternetHandle session(WinHttpOpen(L"TenRiff/1.9.1.1 records",
                                        WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
                                        WINHTTP_NO_PROXY_NAME,
                                        WINHTTP_NO_PROXY_BYPASS, 0));
@@ -408,6 +408,27 @@ bool parse_sites_record_boards(std::string_view json, std::string_view title,
         board.conditions_label = board.key_mode + " / " + std::to_string(rate / 1000) + "." +
             (rate % 1000 < 100 ? "0" : "") + std::to_string((rate % 1000) / 10) +
             "x / " + ruleset_label + " / " + timing_label + " / " + gauge + " / " + random;
+        const bool has_bms_policy = find_field(*condition, "bms_timing_version") ||
+            find_field(*condition, "bms_gauge_version") || find_field(*condition, "bms_control_flow_version");
+        const auto* branch_field = find_field(*condition, "bms_branch_sha256");
+        if (has_bms_policy) {
+            std::int64_t timing = 0, gauge_version = 0, control = 0;
+            if (!required_integer(*condition, "bms_timing_version", 1, 2, timing) ||
+                !required_integer(*condition, "bms_gauge_version", 1, 2, gauge_version) ||
+                !required_integer(*condition, "bms_control_flow_version", 1, 2, control) ||
+                timing_label.compare(0, 4, "BMS ") != 0 ||
+                (board.ruleset_id != "tenriff-native-score-v2-ruleset-5" &&
+                 board.ruleset_id != "tenriff-native-score-v2-ruleset-6")) return fail();
+            // These are community comparison conditions, not server replay verification.
+            board.conditions_label += gauge_version == 2 ? " / BMS TOTAL" : " / GAUGE v1";
+            board.conditions_label += " / STOP v" + std::to_string(timing);
+            if (control == 2) {
+                std::string branch;
+                if (!safe_string(*condition, "bms_branch_sha256", branch, 64) ||
+                    !valid_sha256(branch) || lower_ascii(branch) != branch) return fail();
+                board.conditions_label += " / BRANCH " + branch.substr(0, 8);
+            } else if (branch_field) return fail();
+        } else if (branch_field) return fail();
         if (const auto* mods_field = find_field(*condition, "mods")) {
             const auto* mods = mods_field->as_array();
             if (!mods || mods->size() > 20) return fail();

@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.1.1] - 2026-10-15
+
+- Extend the Sites community submission contract to eligible BMS gauge v2, BPM/STOP timing v2 and control-flow v2 records. This requires the updated client and corresponding web deployment; published 1.9.1 binaries and assets retain their behavior.
+- Isolate ranking conditions by BMS policy versions and the SHA-256 of active content after branch expansion. Seeds selecting the same content share a condition; retain the seed as per-score reproduction metadata, not a ranking key. Preserve original chart identities and historical board/score identities when optional fields are absent.
+- Keep Sites records explicitly `client_submitted`: validate authentication, payload shape, duplicates and supported conditions without claiming server replay reexecution or anti-cheat. Preserve the separate Ranked verifier gate, LN Mix v2 and all other existing exclusions.
+- Preserve replay files/formats, 1.9.1 gameplay and defaults, saved profiles, previous release assets and the fixed 1.9.0 baseline. Do not add bulk retry of old local scores. See [scope and verification boundaries](docs/feedback-1.9.1.1.en.md); publication and final validation are determined by the release page.
+
 ## [1.9.1] - 2026-10-15
 
 - Add a Home language button that cycles EN → KO → JA → ZH and saves the choice using the existing UI language setting. Retain English fallback for missing translations; translation coverage and button interaction are part of final validation.

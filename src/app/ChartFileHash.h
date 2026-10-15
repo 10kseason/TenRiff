@@ -23,5 +23,7 @@ struct ChartFileHashes {
                                               std::string* error = nullptr);
 [[nodiscard]] ChartFileHashes hash_chart_file_utf8(std::string_view path,
                                                    std::string* error = nullptr);
+// Exact bytes, including embedded NULs; used for an already bounded chart read.
+[[nodiscard]] std::string sha256_bytes(std::string_view bytes);
 
 }  // namespace tenriff::app

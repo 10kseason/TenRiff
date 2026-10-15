@@ -6,7 +6,7 @@
 #include "app/ReplayVerifier.h"
 int main(int argc, char** argv) {
     if (argc == 4 && (std::string(argv[1]) == "--inspect" || std::string(argv[1]) == "--retry")) {
-        std::string error, payload;
+        std::string error, payload, branch_sha256;
         const auto result = tenriff::app::menu_records::parse_result_file(std::filesystem::u8path(argv[2]), &error);
         if (!result) { std::cerr << "Result parse failed: " << error; return 1; }
         const auto path = std::filesystem::u8path(result->replay_path);
@@ -14,7 +14,9 @@ int main(int argc, char** argv) {
         if (!replay.success()) { std::cerr << "Replay parse failed: " << replay.error; return 1; }
         const auto hashes = tenriff::app::hash_chart_file(path, &error);
         if (!hashes.valid() || hashes.sha256 != result->replay_sha256) { std::cerr << "Replay hash mismatch"; return 1; }
-        if (!tenriff::app::build_sites_score_json(*replay.replay, hashes.sha256, argv[3], result->clear_status, payload, error)) {
+        if (!tenriff::app::prepare_sites_bms_branch_identity(*replay.replay, branch_sha256, error) ||
+            !tenriff::app::build_sites_score_json(*replay.replay, hashes.sha256, argv[3], result->clear_status,
+                                                payload, error, {}, branch_sha256)) {
             std::cerr << error; return 1;
         }
         std::cout << "Native payload validated; score=" << replay.replay->final_score << "\n";

@@ -80,6 +80,57 @@ TEST_CASE("Sites board display distinguishes EX R6 from historical R5") {
     CHECK(boards.front().conditions_label.find("judge_ex") != std::string::npos);
 }
 
+TEST_CASE("Sites BMS boards display isolated gauge timing and selected branch policies") {
+    using namespace tenriff;
+    const config::JsonValue profile{"bms-normal"};
+    auto parsed = config::parse_json(sites_timing_board_fixture(&profile, ""));
+    REQUIRE(parsed.success());
+    auto root = *parsed.root->as_object();
+    auto rows = *root.at("boards").as_array();
+    auto row = *rows[0].as_object();
+    auto condition = *config::parse_json(row.at("conditions").as_string()).root->as_object();
+    condition["ruleset"] = config::JsonValue{"tenriff-native-score-v2-ruleset-5"};
+    condition["bms_timing_version"] = config::JsonValue{2.0};
+    condition["bms_gauge_version"] = config::JsonValue{2.0};
+    condition["bms_control_flow_version"] = config::JsonValue{2.0};
+    condition["bms_branch_sha256"] = config::JsonValue{std::string(64, 'c')};
+    const auto check = [&](const config::JsonObject& value, bool expected) {
+        auto fixture_row = row;
+        fixture_row["conditions"] = config::JsonValue{config::json_stringify(config::JsonValue{value})};
+        auto fixture_root = root;
+        fixture_root["boards"] = config::JsonValue{config::JsonArray{config::JsonValue{fixture_row}}};
+        std::vector<app::SitesRecordBoard> boards;
+        std::string error;
+        CHECK(app::parse_sites_record_boards(config::json_stringify(config::JsonValue{fixture_root}),
+                                             "Fixture", boards, error) == expected);
+        if (expected) {
+            REQUIRE(boards.size() == 1);
+            CHECK(boards[0].conditions_label.find("BMS TOTAL / STOP v2 / BRANCH cccccccc") != std::string::npos);
+        } else CHECK(boards.empty());
+    };
+    check(condition, true);
+    for (const auto* key : {"bms_timing_version", "bms_gauge_version", "bms_control_flow_version", "bms_branch_sha256"}) {
+        auto missing = condition;
+        missing.erase(key);
+        check(missing, false);
+    }
+    for (const auto& value : {config::JsonValue{0.0}, config::JsonValue{2.5}, config::JsonValue{3.0},
+                              config::JsonValue{true}, config::JsonValue{"2"}}) {
+        auto invalid = condition;
+        invalid["bms_gauge_version"] = value;
+        check(invalid, false);
+    }
+    auto invalid = condition;
+    invalid["bms_branch_sha256"] = config::JsonValue{std::string(64, 'C')};
+    check(invalid, false);
+    invalid = condition;
+    invalid["bms_control_flow_version"] = config::JsonValue{1.0};
+    check(invalid, false);
+    invalid = condition;
+    invalid["timing_profile"] = config::JsonValue{"osu-fixed"};
+    check(invalid, false);
+}
+
 TEST_CASE("Sites board timing metadata allows old and future profiles but rejects malformed values") {
     using namespace tenriff;
     std::vector<app::SitesRecordBoard> boards;
