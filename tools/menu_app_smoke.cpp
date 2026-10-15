@@ -1674,9 +1674,12 @@ void separate_judge_flow(tenriff::app::CommandLineOptions options, Report& repor
             std::string payload;
             const bool built = app::build_sites_score_json(*replay.replay, result.replay_sha256,
                 "Judge Boundary Fixture", result.clear_status, payload, error);
-            report.check(name + ".new_bms_policy_stays_local", !built && payload.empty() &&
+            report.check(name + ".new_bms_policy_upload_metadata", built && error.empty() &&
                 replay.replay->mode.bms_gauge_version == 2 &&
-                error.find("separate leaderboard condition") != std::string::npos, error);
+                payload.find("\"bms_gauge_version\":2") != std::string::npos &&
+                payload.find("\"bms_control_flow_version\":1") != std::string::npos &&
+                payload.find("bms_random_seed") == std::string::npos &&
+                payload.find("bms_branch_sha256") == std::string::npos, error);
         }
         const auto saved = loader.load_profile(profile);
         report.check(name + ".profile_stays_unmodified", saved.success() && saved.config.mode.mods.empty());
