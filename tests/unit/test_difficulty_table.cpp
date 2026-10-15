@@ -118,10 +118,14 @@ TEST_CASE("chart byte SHA-256 matches standard vectors and keeps embedded zero b
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
-    const auto chart = temp.path / "nul.bms";
+    // NUL is a reserved Windows device name even with an extension.
+    const auto chart = temp.path / "embedded-zero.bms";
     const std::string content("a\0b", 3);
     write_file(chart, content);
-    CHECK(tenriff::app::sha256_bytes(content) == tenriff::app::hash_chart_file(chart).sha256);
+    const auto hashes = tenriff::app::hash_chart_file(chart);
+    REQUIRE(hashes.valid());
+    REQUIRE(hashes.size == content.size());
+    CHECK(tenriff::app::sha256_bytes(content) == hashes.sha256);
     CHECK(tenriff::app::sha256_bytes(content) != tenriff::app::sha256_bytes("a"));
 }
 
