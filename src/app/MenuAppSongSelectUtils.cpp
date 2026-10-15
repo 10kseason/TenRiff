@@ -5,6 +5,7 @@
 #include <cctype>
 #include <iomanip>
 #include <limits>
+#include <optional>
 #include <sstream>
 
 #include "app/MenuAppSettingsUtils.h"
@@ -43,6 +44,55 @@ std::string level_filter_label(int level_min, int level_max) {
         return "LV " + std::to_string(level_min) + "+";
     }
     return "LV <= " + std::to_string(level_max);
+}
+
+std::optional<int> song_filter_level(const SongEntry& entry, bool table_active) {
+    int effective_level = entry.level;
+    if (table_active) {
+        // A table label may carry its own prefix (st12, ★12) or a trailing +.
+        // Never substitute native LV for an unranked/non-numeric table label.
+        std::string_view label = entry.difficulty_table_level;
+        while (!label.empty() && std::isspace(static_cast<unsigned char>(label.front()))) label.remove_prefix(1);
+        while (!label.empty() && std::isspace(static_cast<unsigned char>(label.back()))) label.remove_suffix(1);
+        const auto first_digit = label.find_first_of("0123456789");
+        if (first_digit == std::string_view::npos) return std::nullopt;
+        const auto prefix = label.substr(0, first_digit);
+        if (prefix.find_first_of("-+./") != std::string_view::npos || prefix.find(u8"−") != std::string_view::npos) return std::nullopt;
+        const char* start = label.data() + first_digit;
+        const char* end = label.data() + label.size();
+        const auto parsed = std::from_chars(start, end, effective_level);
+        if (parsed.ec != std::errc{}) return std::nullopt;
+        const std::string_view suffix(parsed.ptr, static_cast<std::size_t>(end - parsed.ptr));
+        if (!suffix.empty() && suffix != "+") return std::nullopt;
+    } else if (effective_level <= 0) {
+        return std::nullopt;
+    }
+    return effective_level;
+}
+
+bool parse_search_level_range(std::string_view term, int& minimum, int& maximum) {
+    if (term.substr(0, 3) != "lv:") return false;
+    term.remove_prefix(3);
+    if (term.empty()) return false;
+
+    const auto parse_level = [](std::string_view value, int& level) {
+        if (value.empty() || value.find_first_not_of("0123456789") != std::string_view::npos) return false;
+        const auto parsed = std::from_chars(value.data(), value.data() + value.size(), level);
+        return parsed.ec == std::errc{} && parsed.ptr == value.data() + value.size();
+    };
+
+    minimum = 0;
+    maximum = std::numeric_limits<int>::max();
+    const auto separator = term.find("to");
+    if (separator != std::string_view::npos) {
+        return parse_level(term.substr(0, separator), minimum) &&
+               parse_level(term.substr(separator + 2), maximum) && minimum <= maximum;
+    }
+    if (term.back() == '+') return parse_level(term.substr(0, term.size() - 1), minimum);
+    if (term.back() == '-') return parse_level(term.substr(0, term.size() - 1), maximum);
+    if (!parse_level(term, minimum)) return false;
+    maximum = minimum;
+    return true;
 }
 
 int compare_natural_ascii(std::string_view lhs, std::string_view rhs) {
@@ -248,6 +298,26 @@ bool song_difficulty_is_aery_five_key(const SongEntry& entry, std::string_view t
            entry.difficulty_table_symbol.rfind("⑤", 0) == 0;
 }
 
+int song_difficulty_prefix_key_count(const SongEntry& entry, std::string_view table_url) {
+    if (entry.difficulty_table_level.empty()) {
+        return 0;
+    }
+    // Color the registered table's exact prefix, independently of chart keys or level digits.
+    if (table_url == config::kBuiltinDifficultyTables[5].url && entry.difficulty_table_symbol == "4UE") {
+        return 4;
+    }
+    if (table_url == config::kBuiltinDifficultyTables[6].url && entry.difficulty_table_symbol == "6UE") {
+        return 6;
+    }
+    if (table_url == config::kBuiltinDifficultyTables[7].url && entry.difficulty_table_symbol == "8UE") {
+        return 8;
+    }
+    if (table_url == config::kBuiltinDifficultyTables[2].url && entry.difficulty_table_symbol == "Ⓡ") {
+        return 10;
+    }
+    return 0;
+}
+
 std::string song_index_stage_label(SongIndexProgressStage stage, ui::Language language) {
     switch (stage) {
     case SongIndexProgressStage::ScanningFiles:
@@ -303,7 +373,7 @@ std::string format_int_with_commas(int64_t value) {
     return out;
 }
 
-bool song_entry_matches_search(const SongEntry& entry, std::string_view query) {
+bool song_entry_matches_search(const SongEntry& entry, std::string_view query, bool table_active) {
     const std::string normalized_query = to_lower_ascii(std::string(query));
     if (normalized_query.find_first_not_of(" \t") == std::string::npos) {
         return true;
@@ -337,6 +407,16 @@ bool song_entry_matches_search(const SongEntry& entry, std::string_view query) {
             end = normalized_query.size();
         }
         const std::string_view term(normalized_query.data() + begin, end - begin);
+        int level_min = 0;
+        int level_max = 0;
+        if (parse_search_level_range(term, level_min, level_max)) {
+            const auto level = song_filter_level(entry, table_active);
+            if (!level.has_value() || *level < level_min || *level > level_max) return false;
+            cursor = end;
+            continue;
+        }
+        // Incomplete/malformed lv: expressions remain literal search terms;
+        // silently dropping them would unexpectedly show unrelated songs.
         bool term_found = false;
         for (const auto& haystack : haystacks) {
             if (haystack.find(term) != std::string::npos) {
@@ -365,30 +445,12 @@ bool song_entry_matches_level_filter(const SongEntry& entry, int level_min, int 
     if (level_min <= 0 && level_max <= 0) {
         return true;
     }
-    int effective_level = entry.level;
-    if (table_active) {
-        // A table label may carry its own prefix (st12, ★12) or a trailing +.
-        // Never substitute native LV for an unranked/non-numeric table label.
-        std::string_view label = entry.difficulty_table_level;
-        while (!label.empty() && std::isspace(static_cast<unsigned char>(label.front()))) label.remove_prefix(1);
-        while (!label.empty() && std::isspace(static_cast<unsigned char>(label.back()))) label.remove_suffix(1);
-        const auto first_digit = label.find_first_of("0123456789");
-        if (first_digit == std::string_view::npos) return false;
-        const auto prefix = label.substr(0, first_digit);
-        if (prefix.find_first_of("-+./") != std::string_view::npos || prefix.find(u8"−") != std::string_view::npos) return false;
-        const char* start = label.data() + first_digit;
-        const char* end = label.data() + label.size();
-        const auto parsed = std::from_chars(start, end, effective_level);
-        if (parsed.ec != std::errc{}) return false;
-        const std::string_view suffix(parsed.ptr, static_cast<std::size_t>(end - parsed.ptr));
-        if (!suffix.empty() && suffix != "+") return false;
-    } else if (effective_level <= 0) {
+    const auto effective_level = song_filter_level(entry, table_active);
+    if (!effective_level.has_value()) return false;
+    if (level_min > 0 && *effective_level < level_min) {
         return false;
     }
-    if (level_min > 0 && effective_level < level_min) {
-        return false;
-    }
-    if (level_max > 0 && effective_level > level_max) {
+    if (level_max > 0 && *effective_level > level_max) {
         return false;
     }
     return true;

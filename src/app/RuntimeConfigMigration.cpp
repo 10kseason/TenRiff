@@ -52,7 +52,8 @@ constexpr double kLegacyHoldBreakMs = 50.0;
 constexpr double kPreviousCurrentHoldBreakMs = 120.0;
 constexpr double kCurrentHoldBreakMs = 200.0;
 constexpr double kLegacyInputDebounceMs = 5.0;
-constexpr double kCurrentInputDebounceMs = 8.0;
+// Preserve the historical 5 -> 8 ms migration independently of new-profile defaults.
+constexpr double kLegacyMigratedInputDebounceMs = 8.0;
 constexpr double kPreviousResultTailMs = 3000.0;
 constexpr double kCurrentResultTailMs = 500.0;
 constexpr int kLegacyGraphicsRefreshHz = 1050;
@@ -286,7 +287,7 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
         changed = true;
     }
     if (std::abs(config.input.debounce_ms - kLegacyInputDebounceMs) <= kInputDebounceToleranceMs) {
-        config.input.debounce_ms = kCurrentInputDebounceMs;
+        config.input.debounce_ms = kLegacyMigratedInputDebounceMs;
         changed = true;
     }
     if (std::abs(config.ui.result_tail_ms - kPreviousResultTailMs) <= kResultTailToleranceMs) {

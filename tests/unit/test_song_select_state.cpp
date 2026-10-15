@@ -4,6 +4,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <unordered_map>
 #include <vector>
 
@@ -20,6 +21,7 @@ using tenriff::app::menu_song_select::count_song_membership_matches;
 using tenriff::app::menu_song_select::song_collection_membership_contains;
 using tenriff::app::menu_song_select::song_difficulty_label;
 using tenriff::app::menu_song_select::song_difficulty_is_aery_five_key;
+using tenriff::app::menu_song_select::song_difficulty_prefix_key_count;
 using tenriff::app::menu_song_select::song_entry_less_by_difficulty_asc;
 using tenriff::app::menu_song_select::song_entry_less_by_difficulty_desc;
 using tenriff::app::menu_song_select::song_entry_matches_level_filter;
@@ -118,6 +120,112 @@ TEST_CASE("song search matches artist names directly") {
     CHECK(song_entry_matches_search(entry, "mitsu"));
     CHECK(song_entry_matches_search(entry, "MITSUKIYO"));
     CHECK_FALSE(song_entry_matches_search(entry, "xi"));
+}
+
+TEST_CASE("song search lv expressions use inclusive native level boundaries and ignore case") {
+    SongEntry entry;
+    entry.format = "bms";
+    for (int level = 15; level <= 21; ++level) {
+        entry.level = entry.native_level = level;
+        CHECK(song_entry_matches_search(entry, "lv:16to20") == (level >= 16 && level <= 20));
+        CHECK(song_entry_matches_search(entry, "LV:16TO20") == (level >= 16 && level <= 20));
+        CHECK(song_entry_matches_search(entry, "Lv:16") == (level == 16));
+        CHECK(song_entry_matches_search(entry, "lv:19-") == (level <= 19));
+        CHECK(song_entry_matches_search(entry, "lV:18+") == (level >= 18));
+    }
+    entry.level = 16;
+    CHECK(song_entry_matches_search(entry, "lv:016"));
+    CHECK(song_entry_matches_search(entry, "lv:16to16"));
+    entry.level = std::numeric_limits<int>::max();
+    CHECK(song_entry_matches_search(entry, "lv:2147483647"));
+    CHECK(song_entry_matches_search(entry, "lv:2147483647+"));
+    CHECK(song_entry_matches_search(entry, "lv:2147483647-"));
+}
+
+TEST_CASE("song search lv expressions combine with all existing text terms and bounds") {
+    SongEntry entry;
+    entry.title = "Blue Archive";
+    entry.artist = "Mitsukiyo";
+    entry.path = "Songs/blue_archive/chart.bms";
+    entry.chart_name = "Another";
+    entry.format = "bms";
+    entry.key_count = 7;
+    entry.level = 18;
+
+    CHECK(song_entry_matches_search(entry, "  BLUE\tLv:16tO20 mitsu 7k another "));
+    CHECK(song_entry_matches_search(entry, "lv:16+ lv:20-"));
+    CHECK_FALSE(song_entry_matches_search(entry, "lv:18+ lv:17-"));
+    CHECK_FALSE(song_entry_matches_search(entry, "blue lv:19"));
+    CHECK_FALSE(song_entry_matches_search(entry, "xi lv:18"));
+    CHECK(song_entry_matches_search(entry, "blue mitsu 7k another bms lv18"));
+    CHECK_FALSE(song_entry_matches_search(entry, "blue mitsu 5k"));
+    CHECK(song_entry_matches_search(entry, " \t "));
+
+    // Search adds an intersection; existing sidebar bounds still apply.
+    CHECK(song_entry_matches_search(entry, "lv:16to20"));
+    CHECK(song_entry_matches_level_filter(entry, 18, 19));
+    CHECK_FALSE(song_entry_matches_level_filter(entry, 19, 20));
+}
+
+TEST_CASE("song search lv expressions use the selected table without native fallback") {
+    SongEntry entry;
+    entry.level = entry.native_level = 50;
+    entry.difficulty_table_name = "Selected Table";
+    entry.difficulty_table_symbol = "st";
+    for (const std::string label : {"18", "018", "18+", "st18", "sl18+", u8"★18", "  LV 18  "}) {
+        entry.difficulty_table_level = label;
+        CHECK(song_entry_matches_search(entry, "lv:16to20", true));
+        CHECK(song_entry_matches_search(entry, "Lv:18", true));
+        CHECK(song_entry_matches_search(entry, "lv:19-", true));
+        CHECK(song_entry_matches_search(entry, "lv:18+", true));
+        CHECK_FALSE(song_entry_matches_search(entry, "lv:50", true));
+        CHECK_FALSE(song_entry_matches_search(entry, "lv:16to20", false));
+        CHECK(song_entry_matches_search(entry, "lv:50", false));
+    }
+    for (const std::string label : {"", "?", "EX", "18-19", "18/19", "18.5", "18A", "-18", u8"−18", "99999999999999"}) {
+        entry.difficulty_table_level = label;
+        CHECK_FALSE(song_entry_matches_search(entry, "lv:0+", true));
+        CHECK_FALSE(song_entry_matches_search(entry, "lv:50", true));
+        CHECK(song_entry_matches_search(entry, "lv:50", false));
+    }
+    entry.difficulty_table_level = "19";
+    CHECK_FALSE(song_entry_matches_search(entry, "lv:18", true));
+    CHECK(song_entry_matches_search(entry, "lv:19", true));
+}
+
+TEST_CASE("song search lv zero matches authored table zero but excludes unknown native levels") {
+    SongEntry entry;
+    entry.level = 0;
+    entry.difficulty_table_level = "st0";
+    CHECK(song_entry_matches_search(entry, "lv:0", true));
+    CHECK(song_entry_matches_search(entry, "lv:0-", true));
+    CHECK(song_entry_matches_search(entry, "lv:0+", true));
+    CHECK(song_entry_matches_search(entry, "lv:0to1", true));
+    CHECK_FALSE(song_entry_matches_search(entry, "lv:1+", true));
+    CHECK_FALSE(song_entry_matches_search(entry, "lv:0", false));
+    CHECK_FALSE(song_entry_matches_search(entry, "lv:0+", false));
+    entry.difficulty_table_level = "1";
+    CHECK_FALSE(song_entry_matches_search(entry, "lv:0", true));
+    CHECK_FALSE(song_entry_matches_search(entry, "lv:0-", true));
+    entry.level = -1;
+    CHECK_FALSE(song_entry_matches_search(entry, "lv:0+", false));
+}
+
+TEST_CASE("song search malformed lv expressions retain conservative literal matching") {
+    SongEntry entry;
+    entry.level = 18;
+    for (const std::string query : {"lv:", "lv:abc", "lv:-18", "lv:+18", "lv:18.5", "lv:18++",
+                                    "lv:20to16", "lv:18to", "lv:to18", "lv:16to20to24", "lv:18+tail",
+                                    "lv:2147483648", "lv:0to2147483648", "lv:999999999999999999999+"}) {
+        entry.title = "Unrelated Song";
+        CHECK_FALSE(song_entry_matches_search(entry, query));
+        entry.title = "Literal " + query;
+        CHECK(song_entry_matches_search(entry, query));
+    }
+    entry.title = "prefix-lv:18";
+    entry.level = 20;
+    CHECK(song_entry_matches_search(entry, "prefix-lv:18"));
+    CHECK_FALSE(song_entry_matches_search(entry, "lv:18"));
 }
 
 TEST_CASE("artist sort orders by artist then title") {
@@ -222,6 +330,77 @@ TEST_CASE("only the built-in 5K Aery table opts into a mode-colored circled-five
     entry.difficulty_table_symbol = "⑤";
     entry.difficulty_table_level.clear();
     CHECK_FALSE(song_difficulty_is_aery_five_key(entry, aery_url));
+}
+
+TEST_CASE("registered difficulty table prefixes require the exact table and symbol") {
+    struct PrefixCase {
+        std::string_view url;
+        std::string_view symbol;
+        int prefix_key_count;
+    };
+    constexpr PrefixCase cases[]{
+        {"https://classmaterma.github.io/4UE/table.html", "4UE", 4},
+        {"https://classmaterma.github.io/UE/table.html", "6UE", 6},
+        {"https://classmaterma.github.io/8UE/table.html", "8UE", 8},
+        {"https://calc.10k-revive.cloud/table.html", "Ⓡ", 10},
+    };
+    for (const auto& expected : cases) {
+        SongEntry entry;
+        entry.difficulty_table_symbol = expected.symbol;
+        entry.difficulty_table_level = "13+";
+        for (const int chart_keys : {0, 4, 5, 6, 8, 10, 16}) {
+            entry.key_count = chart_keys;
+            CHECK(song_difficulty_prefix_key_count(entry, expected.url) == expected.prefix_key_count);
+        }
+        CHECK(song_difficulty_label(entry) == std::string(expected.symbol) + "13+");
+        for (const auto& other : cases) {
+            if (other.url != expected.url) {
+                CHECK(song_difficulty_prefix_key_count(entry, other.url) == 0);
+            }
+        }
+        CHECK(song_difficulty_prefix_key_count(entry, "") == 0);
+        CHECK(song_difficulty_prefix_key_count(entry, "https://example.com/custom/table.html") == 0);
+        CHECK(song_difficulty_prefix_key_count(entry, std::string(expected.url) + "?custom=1") == 0);
+        CHECK(song_difficulty_prefix_key_count(entry, "https://asumatoki.kr/table/aery/header.json") == 0);
+        entry.difficulty_table_symbol = std::string(expected.symbol) + "LEVEL";
+        CHECK(song_difficulty_prefix_key_count(entry, expected.url) == 0);
+        entry.difficulty_table_symbol = " " + std::string(expected.symbol);
+        CHECK(song_difficulty_prefix_key_count(entry, expected.url) == 0);
+        entry.difficulty_table_symbol.clear();
+        CHECK(song_difficulty_prefix_key_count(entry, expected.url) == 0);
+        entry.difficulty_table_symbol = expected.symbol;
+        entry.difficulty_table_level.clear();
+        CHECK(song_difficulty_prefix_key_count(entry, expected.url) == 0);
+    }
+}
+
+TEST_CASE("numeric chart and table difficulties cannot select a colored table prefix") {
+    constexpr std::string_view ue_url = "https://classmaterma.github.io/4UE/table.html";
+    SongEntry entry;
+    CHECK(song_difficulty_prefix_key_count(entry, "") == 0);
+    CHECK(song_difficulty_prefix_key_count(entry, ue_url) == 0);
+    for (const int level : {4, 6, 8, 10}) {
+        entry.level = level;
+        entry.key_count = level;
+        CHECK(song_difficulty_prefix_key_count(entry, ue_url) == 0);
+        entry.difficulty_table_level = std::to_string(level);
+        entry.difficulty_table_symbol = "LV ";
+        CHECK(song_difficulty_prefix_key_count(entry, ue_url) == 0);
+        entry.difficulty_table_symbol = std::to_string(level);
+        CHECK(song_difficulty_prefix_key_count(entry, ue_url) == 0);
+        entry.difficulty_table_symbol = "4UE";
+        CHECK(song_difficulty_prefix_key_count(entry, ue_url) == 4);
+        CHECK(song_difficulty_prefix_key_count(entry, "") == 0);
+        entry.difficulty_table_symbol.clear();
+        entry.difficulty_table_level.clear();
+    }
+
+    entry.key_count = 5;
+    entry.difficulty_table_symbol = "⑤";
+    entry.difficulty_table_level = "LEVEL 10";
+    constexpr std::string_view aery_url = "https://asumatoki.kr/table/aery/header.json";
+    CHECK(song_difficulty_is_aery_five_key(entry, aery_url));
+    CHECK(song_difficulty_prefix_key_count(entry, aery_url) == 0);
 }
 
 TEST_CASE("difficulty table levels without level_order use natural numeric ordering") {
@@ -333,6 +512,8 @@ TEST_CASE("native LV restores cached labels filters and sorting after a difficul
         std::stable_sort(table_index.index.entries.begin(), table_index.index.entries.end(), song_entry_less_by_difficulty_asc);
         CHECK(table_index.index.entries[0].title == "High Native");
         CHECK(song_difficulty_label(table_index.index.entries[0]) == "T1");
+        CHECK(song_entry_matches_search(table_index.index.entries[0], "lv:1", true));
+        CHECK_FALSE(song_entry_matches_search(table_index.index.entries[1], "lv:1", true));
         REQUIRE(save_song_index(cache_path.u8string(), table_index.index, options, &error));
 
         // The native selection persists empty table fields. Loading that profile and
@@ -369,6 +550,8 @@ TEST_CASE("native LV restores cached labels filters and sorting after a difficul
         CHECK(song_difficulty_label(native.index.entries[1]) == "LV " + std::to_string(high_level));
         CHECK(song_entry_matches_level_filter(native.index.entries[0], low_level, low_level));
         CHECK_FALSE(song_entry_matches_level_filter(native.index.entries[1], low_level, low_level));
+        CHECK(song_entry_matches_search(native.index.entries[0], "lv:" + std::to_string(low_level)));
+        CHECK_FALSE(song_entry_matches_search(native.index.entries[1], "lv:" + std::to_string(low_level)));
         CHECK(song_group_level_key(native.index.entries[0]) < song_group_level_key(native.index.entries[1]));
         std::stable_sort(native.index.entries.begin(), native.index.entries.end(), song_entry_less_by_difficulty_desc);
     CHECK(native.index.entries[0].title == "High Native");

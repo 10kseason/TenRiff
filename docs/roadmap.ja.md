@@ -1,5 +1,7 @@
 # TenRiff Development Roadmap (staged)
 
+**2026-10-15 · 1.9.0.2 リリース候補 — 公開検証手順:** 公開済み1.9.0.1を基に、Optionsを緑色、組み込み5K Aery表の選択時だけ緑の⑤を表示し、登録済み4/6/8/10キーモード表の記号を対応色にし、レベルを赤・スコアを白にし、`lv:` レベル検索、新規debounce既定値0ms、音量の1%刻み調整を追加します。選曲の並び替え・フィルター・難易度表選択をSong Library横のヘッダーへ移し、アルバム画像の高さを広げます。マスター既定値10%と固定基準1.9.0は維持します。[変更・使い方](feedback-1.9.0.2.ja.md)。 公開状況とダウンロードはリリースページを基準に確認してください。[範囲・検証](release-1.9.0.2-gate.md)。
+
 **2026-10-15 · 1.9.0.1:** マスター音量の既定値10%とロビーアイコンの中心揃えを含みます。プレビュー×0.75、プロフィールで指定するF5/F6 -10/+10、Xbox/XInputボタン入力、ファイル選択の重複防止、BMS BPM/STOP順序修正と旧リプレイ互換を提供します。固定基準は1.9.0を維持します。 [変更内容](feedback-20261015.ja.md) · [リリース検証範囲](release-1.9.0.1-gate.md).
 
 **2026-10-14 · 1.9.0 / 新しい固定基準:** 確認済みのローカル候補を指定された正式版へ昇格します。BMS/メニュー音量分離、ロビー・フィルター・スキン操作、ランク・SUBARTIST、韓国語モード表示、EX判定、送信状態を含みます。通常/HardはR5、EXはR6。旧R1–R5記録と保存設定を保持します。[固定基準](baseline-1.9.0.ja.md) · [検証範囲](release-1.9.0-gate.md)。以下の日付付き項目は当時の履歴です。
@@ -24,9 +26,17 @@
 
 ## Current Baseline
 - Windows GUI / runtime が主なサポート経路です。
-- 固定基準は `1.9.0`、このソースは `1.9.0.1`。公開 package は NK3 P64 と generalized pattern MLP inference model を同梱するが、BGA upscaler model は同梱しない。互換性と権利を確認済みの upscaler ONNX を選択しても path を保存するだけで、BGA Upscaler は user が有効化して high-spec warning を確認するまで off のまま。自動 benchmark gate はない。
+- 固定基準は `1.9.0`、このソースはリリース候補 `1.9.0.2`。公開 package は NK3 P64 と generalized pattern MLP inference model を同梱するが、BGA upscaler model は同梱しない。互換性と権利を確認済みの upscaler ONNX を選択しても path を保存するだけで、BGA Upscaler は user が有効化して high-spec warning を確認するまで off のまま。自動 benchmark gate はない。
 - 現行 menu / runtime は BMS family（`.bms/.bme/.bml/.pms`）専用で、native、bundle/profile の TenRiff `skin.json`、LR2 skin をサポート。
 - 現在出荷されている挙動は [`docs/current-state.ja.md`](current-state.ja.md) を先に見てください。この roadmap は方向と残作業を示す文書です。
+
+## 1.9.0.2リリース候補の検証範囲
+
+以下は最終的なAery ⑤・登録表の記号色・選曲配置調整前の候補での検証結果です。開発ビルドとZIP展開ソースの独立ビルドの両方で、Releaseビルド、CTest 3/3（各1,224件、integration skips 0）、エディター35/35、native MenuApp/GameSession 307/307が通過しました。native検査には検索キー処理22件を含みます。復元前の描画は6 fixture/360 Presents/86 geometry hit checksを通過しました。Aery ⑤と4UE/6UE/8UE/Ⓡの色調整後のビルド・表示確認はリリース検証項目です。AeryのFHD/小さい画面、数値レベルの赤維持、既定Lv・他の表・カスタム表への非適用、新ヘッダー選択欄・拡大画像・ベスト記録・曲数の重なりも確認対象です。
+
+初回パッケージ検査では既存のスキンレーン数字ショートカット検査が一度失敗しました。同一テスト実行ファイルの変更なし再検査、CTest全体の再実行、独立ビルド検査は通過しましたが、**根本原因は未確定**です。初期失敗も保全し、再実行の成功を間欠的原因の修正とは扱いません。
+
+ローカルパッケージ・独立ビルドの根拠と初期失敗は別のevidenceに保全します。最終公開パッケージの対応、PR/main CI、公開アセットの確認は[リリース検証手順](release-1.9.0.2-gate.md)に従い、この文書では事前に通過としません。公開状況はリリースページが基準です。内部キーdispatch・geometry検査は実機入力の検証を代替せず、実機・遅延・長時間プレイ・別PCは未検証です。固定基準は1.9.0です。
 
 ## 1.9.0.1以降の確認範囲
 

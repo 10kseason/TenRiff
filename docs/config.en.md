@@ -1,5 +1,7 @@
 # TenRiff Config Schema (current)
 
+**2026-10-15 · 1.9.0.2 release candidate — publication verification gates:** Based on published 1.9.0.1, this candidate makes Options green, shows green ⑤ only for the selected built-in 5K Aery table, colors registered 4/6/8/10-key table symbols, and uses red levels/white scores, adds `lv:` searches, changes the new debounce default to 0ms, and uses 1% audio-volume steps. Move Song Select sort/filter and table selectors beside Song Library and increase the album cover height. Master volume still defaults to 10%; the fixed baseline remains 1.9.0. [Changes and usage](feedback-1.9.0.2.en.md). The release page determines publication status and available downloads. [Release scope and verification](release-1.9.0.2-gate.md).
+
 **2026-10-15 · 1.9.0.1:** Includes 10% default master volume and aligned lobby icon centers. Preview ×0.75, profile-assigned F5/F6 -10/+10, Xbox/XInput button input, single modal file pickers, and corrected BMS BPM/STOP order with historical replay compatibility. The fixed baseline remains 1.9.0. [Changes](feedback-20261015.en.md) · [Release verification scope](release-1.9.0.1-gate.md).
 
 **1.8.8:** Includes result analysis, freely resizable windows and direct width/height entry, result `F9` PNG hints, long LN Mix, and menu, keysound and start-control improvements. See the [release guide (Korean)](release-1.8.8-gate.md) for current verification and delivery status. The user-pinned baseline remains 1.8.7; its existing tag and release files are preserved.
@@ -20,6 +22,8 @@ If a profile does not exist, it is created automatically on first launch.
 ## `config.json`
 
 ### `audio`
+
+The 1.9.0.2 candidate adjusts all five audio UI volumes—master, BMS song, TenRiff music, BGM and keysounds—in **1 percentage-point steps (0.01 in saved values)**. The first three range from 0–100%; BGM and keysounds range from 0–200%. New master volume still defaults to 10% and the others to 100%; explicitly saved volumes are retained.
 
 - `play_to_end` (bool; default `true`): Listen to remaining chart audio after the final judgement. When false, finish normally after `ui.result_tail_ms` without waiting for the outro. Judgements, score, replay and manual post-note skip are unchanged.
 
@@ -47,7 +51,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `title_music` (string)
   - `none | default | random_bms | last_played`; default `default`. Selects no music, the bundled theme, a random loaded BMS, or the last played chart for Title and Quick Setup. Unavailable chart audio falls back to the default theme. BMS audio includes keysounds and is prepared asynchronously, capped at five minutes and looped.
 - `volume` (double)
-  - master volume
+  - Master volume. 0–1, new default 0.10 (10%); explicitly saved values are retained.
 - `gameplay_volume` (double)
   - Whole BMS song (background and keysounds) and preview volume. 0–1, default 1.0. UI effects keep their original gain.
 - `menu_music_volume` (double)
@@ -92,7 +96,8 @@ Version 1.8.9.7 requests MMCSS `Games`/High and disables execution-speed power t
 - `debounce_ms` (double)
   - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
   - clamped to the `0..25` range
-  - default value is `8ms`
+  - new default is `0ms`; changing the default does not reset saved values
+  - the historical `5ms → 8ms` migration remains separate from the new default
 ### `judge`
 
 The 1.9.0 release selects Normal / Hard / EX under `Options > Key Mode Settings > Judge Window`. Easy is removed from new selections but retained for historical replays. The session-only choice is not profile-persisted and resets to Normal on restart. See [EX timing and compatibility](judge-ex-1.9.0.ko.md) (Korean).

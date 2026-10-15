@@ -1,5 +1,9 @@
 # TenRiff Current State
 
+**2026-10-15 · 1.9.0.2 release candidate — publication verification gates:** Based on published 1.9.0.1, this candidate makes Options green, shows green ⑤ only for the selected built-in 5K Aery table, colors registered 4/6/8/10-key table symbols, and uses red levels/white scores, adds `lv:` searches, changes the new debounce default to 0ms, and uses 1% audio-volume steps. Move Song Select sort/filter and table selectors beside Song Library and increase the album cover height. Master volume still defaults to 10%; the fixed baseline remains 1.9.0. [Changes and usage](feedback-1.9.0.2.en.md). The release page determines publication status and available downloads. [Release scope and verification](release-1.9.0.2-gate.md).
+
+Search is case-insensitive: `lv:16to20` includes 16–20, `Lv:16` matches exactly 16, `lv:19-` means at most 19, and `lv:18+` means at least 18. It uses the selected difficulty table level, or the chart/BMS level under default Lv.
+
 **2026-10-15 · 1.9.0.1:** Includes 10% default master volume and aligned lobby icon centers. Preview ×0.75, profile-assigned F5/F6 -10/+10, Xbox/XInput button input, single modal file pickers, and corrected BMS BPM/STOP order with historical replay compatibility. The fixed baseline remains 1.9.0. [Changes](feedback-20261015.en.md) · [Release verification scope](release-1.9.0.1-gate.md).
 
 **2026-10-14 · 1.9.0 / new fixed baseline:** Promotes the reviewed local candidate to the requested release line: independent BMS/TenRiff music volume, lobby/filter/skin controls, grades and SUBARTIST credits, localized mods, EX timing and upload status. Normal/Hard use R5, EX uses R6; historical R1–R5 records and saved settings are preserved. [Baseline](baseline-1.9.0.en.md) · [Release verification scope](release-1.9.0-gate.md). Dated entries below retain their historical release context.
@@ -55,14 +59,14 @@ The 1.9.0 release selects Normal / Hard / EX under `Options > Key Mode Settings 
 - 1.7.10 hardens ALL SONG against deleted cached entries and adds merge progress and consistent completion-state publication. [Verification and unreproduced symptom](release-1.7.10-gate.md).
 - 1.7.8 adds modern native menus, Luma Keys digital keyboard skins for every 4K–16K layout, Japanese UI, and web/offline skin editing. Menu and gameplay visual controls are stored separately in `native` and `gameplay.native`. [Validation](release-1.7.8-gate.md).
 
-The fixed baseline is **1.9.0**. This checkout is the **1.9.0.1 release line**: Normal/Hard retain R5 and EX uses R6, preserving earlier records. See [candidate scope and verification limits](release-1.9.0.1-gate.md) (Korean). Dated entries below describe earlier releases.
+The fixed baseline is **1.9.0**. This checkout is a **1.9.0.2 release candidate** based on published 1.9.0.1, with local checks passed; the linked release page determines publication status. Normal/Hard retain R5 and EX uses R6, preserving earlier records. See the [current changes](feedback-1.9.0.2.en.md). Dated entries below describe earlier releases.
 
 The 749/739 checks in the [local 1.7.1 r2 report](local-1.7.1-r2.ko.md) are historical, not the new release's results. See [library management](library-management.md), [reference BPM](reference-bpm.md), [skin presets](skin-presets.md) and [ASIO](asio-audio.md).
 
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- User-pinned baseline version: `1.9.0`; current source targets `1.9.0.1`
+- User-pinned baseline version: `1.9.0`; current source targets `1.9.0.2`
 - XInput digital buttons/triggers can be assigned in Keymap/Profile. A dedicated worker owns system queries; the existing InputThread drains its internal queue into the shared RawInput/Polling input queue. The worker lifetime follows input start/stop. Four-controller aggregation and disconnect/focus behavior follow the [1.9.0.1 notes](feedback-20261015.en.md). Physical-controller verification is separate from simulated input tests.
 - 1.7.1 provides full-room HUD/results for up to eight players, tied ranks/missing-score states, P-GREAT-only effects, independent judgement/combo placement, ten Options cards, audio normalization and the Song Select difficulty-table card. See [follow-up details](gameplay-polish-followup.md) and [verification](release-1.7.1-gate.md).
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.

@@ -1,7 +1,9 @@
-TenRiff 1.9.0.1 source scope
+TenRiff 1.9.0.2 source scope
+
+Release candidate: table-aware lv search, lobby colors, green ⑤ only for the selected built-in 5K Aery table (omitted under default Lv and other tables), registered 4UE/6UE/8UE/Revive10 Ⓡ symbol colors, header-side Song Select controls with a taller album cover, 0ms debounce defaults and 1% audio controls. Only the version-specific release page determines publication status. See docs/release-1.9.0.2-gate.md for delivery verification requirements.
 
 The fixed public baseline is the client-only 1.9.0 release, explicitly selected on 2026-10-14. Previous baseline documents, tags and published assets remain preserved history.
-This source adds preview attenuation, assignable Hi-Speed -10/+10, Xbox/XInput buttons, single owned file pickers and BMS BPM-before-STOP correction. Optional timing-version metadata preserves historical replays; affected new v2 records remain local until online support exists. Normal/Hard remain R5 and EX remains R6. Implementation, verification and publication boundaries are in docs/release-1.9.0.1-gate.md, docs/feedback-20261015.en.md and docs/baseline-1.9.0.en.md.
+This source adds preview attenuation, assignable Hi-Speed -10/+10, Xbox/XInput buttons, single owned file pickers and BMS BPM-before-STOP correction. Optional timing-version metadata preserves historical replays; affected new v2 records remain local until online support exists. Normal/Hard remain R5 and EX remains R6. Implementation, verification and publication boundaries are in docs/release-1.9.0.2-gate.md, docs/feedback-1.9.0.2.en.md and docs/baseline-1.9.0.en.md.
 Plugin runtime/API/SDK and major GameSession extraction are not implemented in this release. Long LN Mix v2 remains local-history/replay only, excluded from legacy BEST and Sites uploads.
 Xbox/XInput uses optional Windows system DLLs only. No driver, XInput DLL, analog-stick axis or rumble component is bundled.
 
@@ -89,7 +91,7 @@ Notes:
 - Local LLM/tooling checkouts such as `external/llama.cpp/` are intentionally excluded from the public source package.
 - The repository license is MIT and should be shipped with both source and binary distributions.
 - The generic External ONNX Upscaler source and compatibility tools are included, but BGA upscaler models, checkpoints, training data, and model-specific verification metadata are excluded. Bundled ONNX files are limited to the project-owned NK3 P64 graph and fixed-target generalized pattern MLP inference exports; raw charts, training caches, and checkpoints remain excluded.
-- Standalone BMS key-converter source is retained for development regression only. Official 1.9.0.1 binary archives do not contain its CLI or GUI executables, and the top-level build option defaults off.
+- Standalone BMS key-converter source is retained for development regression only. Official 1.9.0.2 binary archives do not contain its CLI or GUI executables, and the top-level build option defaults off.
 
 Web-ranking privacy boundary:
 - Client-side ranking protocol, eligibility rules, payload validation, and verifier tests may remain public for reproducibility.

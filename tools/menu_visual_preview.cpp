@@ -653,6 +653,9 @@ int main(int argc, char** argv) {
     std::string sites_records_title;
     std::string display_level = "12";
     bool aery_five_key = false;
+    bool native_level_table = false;
+    int table_prefix_keys = 0;
+    bool mixed_table_prefixes = false;
     bool backdrop_off = false;
     double backdrop_opacity = -1.0;
     double backdrop_brightness = -1.0;
@@ -712,6 +715,9 @@ int main(int argc, char** argv) {
         if (arg == "--analysis-unavailable") { analysis_unavailable = true; continue; }
         if (arg == "--display-level" && i + 1 < argc) { display_level = argv[++i]; continue; }
         if (arg == "--aery-five-key") { aery_five_key = true; menu_keys = 5; continue; }
+        if (arg == "--native-level-table") { native_level_table = true; continue; }
+        if (arg == "--table-prefix-keys" && i + 1 < argc) { table_prefix_keys = std::atoi(argv[++i]); menu_keys = table_prefix_keys; continue; }
+        if (arg == "--mixed-table-prefixes") { mixed_table_prefixes = true; table_prefix_keys = 10; menu_keys = 10; continue; }
         if (arg == "--analysis-no-samples") { analysis_no_samples = true; continue; }
         if (arg == "--edit-resolution") { settings = graphics_settings = edit_resolution = true; continue; }
         if (arg == "--invalid-resolution") { settings = graphics_settings = edit_resolution = invalid_resolution = true; continue; }
@@ -1139,6 +1145,7 @@ int main(int argc, char** argv) {
     songs.selected_song_layout = std::to_string(menu_keys) + " KEYS";
     songs.selected_song_difficulty = aery_five_key && display_level == "12" ? "⑤LEVEL 12" : display_level;
     songs.selected_song_difficulty_is_aery_five_key = aery_five_key && menu_keys == 5;
+    songs.selected_song_difficulty_prefix_key_count = table_prefix_keys;
     songs.selected_song_bpm = 180;
     songs.selected_song_note_count = 1824;
     songs.selected_song_nps_min = 3;
@@ -1149,9 +1156,12 @@ int main(int argc, char** argv) {
     songs.current_hi_speed = "3.50";
     songs.current_visual_latency = "+0 ms";
     songs.current_random = loc("Off", "꺼짐");
-    songs.difficulty_table_name = empty ? loc("Native LV", "기본 LV") :
+    songs.difficulty_table_name = empty || native_level_table ? loc("Native LV", "기본 LV") :
         (aery_five_key ? "5K Aery" : "発狂BMS難易度表");
-    songs.difficulty_table_active = !empty;
+    songs.difficulty_table_active = !empty && !native_level_table;
+    if (songs.difficulty_table_active && table_prefix_keys != 0) {
+        songs.difficulty_table_name = table_prefix_keys == 10 ? "10Key Revive Pack" : std::to_string(table_prefix_keys) + "UE";
+    }
     songs.difficulty_table_editing = table_editor;
     songs.difficulty_table_url_input = "https://example.com/table/header.json";
     songs.sort_summary = loc("LV ASC", "LV 오름");
@@ -1197,6 +1207,17 @@ int main(int argc, char** argv) {
             card.level = 12 + i;
             card.level_label = "⑤" + loc("LEVEL", "레벨") + " " + std::to_string(12 + i);
             card.difficulty_is_aery_five_key = songs.selected_song_difficulty_is_aery_five_key;
+            card.difficulty_prefix_key_count = table_prefix_keys;
+            if (table_prefix_keys != 0) {
+                card.level_label = (table_prefix_keys == 10 ? std::string(u8"Ⓡ") : std::to_string(table_prefix_keys) + "UE") + std::to_string(12 + i);
+            }
+            if (mixed_table_prefixes) {
+                const std::array<int, 7> prefix_modes = {4, 6, 8, 10, 0, 5, 0};
+                const std::array<const char*, 7> prefix_labels = {"4UE18+", "6UE4", "8UE?!", u8"Ⓡ10", "10", u8"⑤LEVEL 17+", "st4"};
+                card.level_label = prefix_labels[static_cast<std::size_t>(i)];
+                card.difficulty_prefix_key_count = prefix_modes[static_cast<std::size_t>(i)];
+                card.difficulty_is_aery_five_key = card.difficulty_prefix_key_count == 5;
+            }
             card.song_index = i;
             card.selected = i == 0;
             card.favorite = i == 1;

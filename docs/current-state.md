@@ -1,5 +1,9 @@
 # TenRiff Current State
 
+**2026-10-15 · 1.9.0.2 릴리스 후보 — 공개 검증 절차:** 공개 1.9.0.1을 바탕으로 Options 초록색, 기본 제공 5K Aery 표에서만 초록 ⑤ 표시·등록 4/6/8/10키 표 기호 색상·레벨 빨강·점수 흰색, `lv:` 레벨 검색, 새 debounce 기본값 0ms와 오디오 음량 1% 단위를 적용합니다. 선곡의 정렬·필터·난이도표 선택기를 Song Library 옆 상단으로 옮기고 앨범 표지 높이를 늘립니다. 마스터 기본 10%와 고정 기준 1.9.0을 유지합니다. [변경·사용 안내](feedback-1.9.0.2.ko.md). 실제 공개 여부와 다운로드는 릴리스 페이지가 기준입니다. [릴리스 범위·검증](release-1.9.0.2-gate.md).
+
+검색은 대소문자와 무관하며 `lv:16to20`은 16–20 포함, `Lv:16`은 정확히 16, `lv:19-`는 19 이하, `lv:18+`는 18 이상입니다. 선택한 난이도표 레벨을 사용하고 기본 Lv에서는 차트/BMS 레벨을 사용합니다.
+
 **2026-10-15 · 1.9.0.1:** 마스터 기본 음량 10%, 로비 아이콘 중심 정렬을 포함합니다. 미리듣기 ×0.75, 프로필에서 지정하는 F5/F6 -10/+10, Xbox/XInput 버튼 입력, 파일 선택창 중복 방지, BMS BPM/STOP 순서 수정과 옛 리플레이 호환을 제공합니다. 고정 기준은 1.9.0을 유지합니다. [변경 안내](feedback-20261015.ko.md) · [릴리스 검증 범위](release-1.9.0.1-gate.md).
 
 **2026-10-14 · 1.9.0 / 새 고정 기준선:** 사용자가 검토한 로컬 후보를 정식 배포 버전으로 올립니다. BMS/텐리프 음악 음량 분리, 로비·필터·스킨 조작, 등급·SUBARTIST 표시, 한글 모드와 EX 판정, 업로드 상태 표시를 포함합니다. 기본/Hard는 R5, EX는 R6이며 R1–R5 기록·기존 설정을 보존합니다. [기준선](baseline-1.9.0.md) · [릴리스 검증 범위](release-1.9.0-gate.md). 아래 날짜별 항목은 당시 릴리스 이력입니다.
@@ -55,7 +59,7 @@
 - 1.7.10: ALL SONG의 삭제된 캐시 항목 건너뛰기, 캐시 통합 진행률과 완료 상태 전달을 보강했습니다. [검증 범위 및 미재현 증상](release-1.7.10-gate.md).
 - 1.7.8: 새 기본 메뉴 에셋·애니메이션, 4~16키 Luma Keys 디지털 건반, 일본어 UI와 웹/오프라인 스킨 에디터를 제공합니다. 메뉴는 `native`, 인게임은 `gameplay.native`에서 도형·색·위치·글꼴·모션을 편집합니다. [검증 범위](release-1.7.8-gate.md).
 
-고정 기준은 **1.9.0**, 이 작업본은 **1.9.0.1 릴리스 라인**입니다. 기본/Hard는 R5, EX는 R6이며 이전 기록은 유지합니다. 변경 범위와 검증 한계는 [릴리스 안내](release-1.9.0.1-gate.md)를 참고하세요. 아래 날짜별 항목은 과거 공개 버전 이력입니다.
+고정 기준은 **1.9.0**, 이 작업본은 공개 1.9.0.1 기반의 **1.9.0.2 릴리스 후보**이며 로컬 검사를 통과했습니다. 공개 상태는 위 릴리스 검증 안내에서 연결한 릴리스 페이지를 따릅니다. 기본/Hard는 R5, EX는 R6이며 이전 기록을 유지합니다. [현재 변경 안내](feedback-1.9.0.2.ko.md)를 참고하세요. 아래 날짜별 항목은 과거 공개 버전 이력입니다.
 
 [로컬 1.7.1 r2 보고서](local-1.7.1-r2.ko.md)의 749/739 검사 횟수는 이전 빌드의 기록입니다. 현재 릴리스 검사 횟수로 재사용하지 않습니다. 기능별 안내는 [곡 소스와 난이도표](library-management.md), [대표 BPM](reference-bpm.md), [스킨 프리셋](skin-presets.md), [ASIO](asio-audio.md)를 참고하세요.
 
@@ -66,7 +70,7 @@
 - BMS landmines (`D1-D9`, `E1-E9`) are playable, including `#WAV00`, base-36 damage tokens, `ZZ` instant fail, exact press/release boundary behavior, and lane-mod/key-converter remapping.
 - Results and local records expose fixed native score separately from detail score, and categorical native accuracy separately from continuous timing-based detailed accuracy.
 - 새 replay evidence v3는 차트 SHA-256, canonical ruleset, result-to-replay SHA-256을 저장하고 입력 trace를 headless 엔진으로 재실행합니다. 공식 로컬 best는 재계산된 verified 결과만 사용하며 legacy/custom/assist 기록은 히스토리에 `unverified`로 남습니다.
-- 사용자 고정 기준 버전은 `1.9.0`; 현재 소스는 `1.9.0.1`
+- 사용자 고정 기준 버전은 `1.9.0`; 현재 소스는 `1.9.0.2`
 - XInput 디지털 버튼·트리거는 키 설정·프로필 조작에 지정한다. 전용 작업 스레드가 시스템 조회를 맡고 기존 InputThread가 내부 큐를 받아 RawInput/Polling 공통 입력 큐에 전달한다. 작업 스레드 수명은 입력 시작·종료에 묶인다. 네 패드 합산, 연결 해제·포커스 복귀 처리는 [1.9.0.1 안내](feedback-20261015.ko.md)를 따른다. 물리 패드 검증은 모의 입력 테스트와 구분한다.
 - 1.7.9 UI 개선: 프로필/첫 실행의 언어·3단계 글자 크기, 사진 미리보기/시작 메뉴 사진, ALL SONG 통합 소스, 선곡 경계와 디지털 탭, 정적인 TI와 홀로그램 TENRIFF. [사용 및 구현 안내](menu-profile-library-polish.ko.md).
 - 1.7.1은 최대 8인 HUD·결과, 동점 순위·점수 대기 상태, P-GREAT 전용 연출, 독립 판정·콤보 위치, 옵션 10개, 오디오 노멀라이즈와 선곡 난이도표 카드를 제공합니다. [변경 설명](gameplay-polish-followup.md), [검증 범위](release-1.7.1-gate.md) 참고.

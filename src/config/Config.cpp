@@ -2082,7 +2082,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.input.queue_size = 2048;
     config.input.polling_hz = 1000;
     config.input.judgement_hz = 4000;
-    config.input.debounce_ms = 8.0;
+    config.input.debounce_ms = 0.0;
 
     config.judge = {};
     config.speed.rate = 1.0;

@@ -1,5 +1,7 @@
 # TenRiff 开发路线图（分阶段）
 
+**2026-10-15 · 1.9.0.2 发布候选版 — 发布验证流程：**基于已发布的1.9.0.1，将Options改为绿色，仅在选择内置5K Aery难度表时显示绿色⑤，为已注册4/6/8/10键难度表的符号使用对应颜色，并将等级设为红色、分数设为白色，新增`lv:`等级搜索、新建配置debounce默认0ms和音量1%步长。将选曲的排序、过滤和难度表选择器移至Song Library旁的页眉，并增加专辑封面高度。主音量默认10%，固定基准仍为1.9.0。[变更与用法](feedback-1.9.0.2.zh-CN.md)。 公开状态与可下载文件以发布页面为准。[范围与验证](release-1.9.0.2-gate.md)。
+
 **2026-10-15 · 1.9.0.1:** 包含默认主音量10%和大厅图标中心对齐。提供试听×0.75、个人档案指定F5/F6 -10/+10、Xbox/XInput按钮输入、文件选择框防重复，以及BMS BPM/STOP顺序修正与旧回放兼容。固定基准保持1.9.0。 [变更说明](feedback-20261015.zh-CN.md) · [发布验证范围](release-1.9.0.1-gate.md).
 
 **2026-10-14 · 1.9.0 / 新固定基准：** 将已检查的本地候选版提升为指定正式版本，包括BMS/菜单音量分离、大厅/筛选/皮肤操作、等级与SUBARTIST、韩文模式界面、EX判定和上传状态。普通/Hard使用R5，EX使用R6；保留旧R1–R5记录及已保存设置。[固定基准](baseline-1.9.0.zh-CN.md) · [验证范围](release-1.9.0-gate.md)。下方带日期的条目保留当时发布历史。
@@ -24,9 +26,17 @@
 
 ## 当前基线
 - Windows GUI/runtime 是主要受支持路径。
-- 固定基准为 `1.9.0`，此源码版本为 `1.9.0.1`；公开包附带 NK3 P64 与 generalized pattern MLP inference 模型，但不附带 BGA upscaler 模型。选择兼容且权利已厘清的 upscaler ONNX 只会保存路径，BGA Upscaler 会一直保持 off，直到用户手动开启并确认 high-spec warning；不存在自动 benchmark gate。
+- 固定基准为 `1.9.0`，此源码为发布候选版 `1.9.0.2`；公开包附带 NK3 P64 与 generalized pattern MLP inference 模型，但不附带 BGA upscaler 模型。选择兼容且权利已厘清的 upscaler ONNX 只会保存路径，BGA Upscaler 会一直保持 off，直到用户手动开启并确认 high-spec warning；不存在自动 benchmark gate。
 - 当前菜单/runtime 仅支持 BMS family（`.bms/.bme/.bml/.pms`），并支持 native、bundle/profile TenRiff `skin.json` 与 LR2 skin。
 - 关于当前已发布的行为，请先看 [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)；这份路线图主要讲方向和剩余工作。
+
+## 1.9.0.2发布候选版验证范围
+
+以下结果对应最终Aery ⑤、注册表符号配色和选曲布局补充之前的候选版。开发构建与ZIP解压源码的独立构建均通过Release构建、CTest 3/3（各1,224项，integration skips 0）、编辑器35/35及native MenuApp/GameSession 307/307。native检查含22项搜索按键处理检查。恢复前的渲染通过6个fixture/360 Presents/86 geometry hit checks。Aery ⑤及4UE/6UE/8UE/Ⓡ配色补充后的构建和显示检查仍是发布验证项，包括Aery FHD/小窗口、数字等级保持红色、默认Lv/其他表/自定义表的排除规则，以及新页眉选择器、增高封面、最佳记录和曲目计数是否重叠。
+
+首次打包检查中，现有皮肤轨道数字快捷键测试失败过一次。随后在未修改测试可执行文件的情况下，定向重试、完整CTest重试和独立构建检查均通过，但 **根本原因仍未确认**。保留首次失败，不将重试成功视为间歇性问题已修复。
+
+本地软件包、独立构建证据及初始失败保存在单独的evidence中。最终发布包对应关系、PR/main CI和公开资产检查遵循[发布验证流程](release-1.9.0.2-gate.md)，本文不提前标记为通过。实际公开状态以发布页面为准。内部按键dispatch和geometry检查不能代替实体输入验证；设备、延迟、长时间游玩和其他PC仍未验证。固定基准保持1.9.0。
 
 ## 1.9.0.1之后的验证范围
 

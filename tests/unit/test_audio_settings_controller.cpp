@@ -234,7 +234,7 @@ struct MenuAppRepeatTestAccess {
         auto menu = fixture();
         press(*menu, menu->key_right_);
         const double first = menu->config_.audio_ui.master_volume;
-        CHECK(first > 0.20);
+        CHECK(first == doctest::Approx(0.21));
         const auto due = menu->song_select_repeat_next_ns_;
         REQUIRE(due > 0);
         menu->service_song_select_repeat(due - 1, true);
@@ -246,7 +246,7 @@ struct MenuAppRepeatTestAccess {
         CHECK(menu->song_select_repeat_next_ns_ == due);
         menu->service_song_select_repeat(due, true);
         const double second = menu->config_.audio_ui.master_volume;
-        CHECK(second > first);
+        CHECK(second == doctest::Approx(0.22));
         CHECK(menu->song_select_repeat_next_ns_ > due);
         release(*menu, menu->key_right_);
         menu->service_song_select_repeat(due + 1'000'000'000LL, true);
@@ -383,13 +383,15 @@ TEST_CASE("audio setting identifiers and ranges are stable") {
     REQUIRE(master.has_value());
     CHECK(master->minimum == doctest::Approx(0.0));
     CHECK(master->maximum == doctest::Approx(1.0));
-    CHECK(master->step == doctest::Approx(0.05));
+    CHECK(master->step == doctest::Approx(0.01));
+    CHECK(audio_setting_numeric_range(AudioSettingId::GameplayVolume) == master);
+    CHECK(audio_setting_numeric_range(AudioSettingId::MenuMusicVolume) == master);
 
     const auto bgm = audio_setting_numeric_range(AudioSettingId::BgmVolume);
     REQUIRE(bgm.has_value());
     CHECK(bgm->minimum == doctest::Approx(0.0));
     CHECK(bgm->maximum == doctest::Approx(2.0));
-    CHECK(bgm->step == doctest::Approx(0.05));
+    CHECK(bgm->step == doctest::Approx(0.01));
     CHECK(audio_setting_numeric_range(AudioSettingId::KeysoundVolume) == bgm);
 
     const auto offset = audio_setting_numeric_range(AudioSettingId::SoundOffset);
@@ -444,7 +446,7 @@ TEST_CASE("audio settings controller preserves every row behavior") {
         AudioSettingsController controller;
         static_cast<void>(controller.select(AudioSettingId::MasterVolume));
         check_render_only(controller.handle(MenuAction::adjust(-1), runtime));
-        CHECK(runtime.audio_ui.master_volume == doctest::Approx(0.05));
+        CHECK(runtime.audio_ui.master_volume == doctest::Approx(0.09));
     }
 
     {
@@ -452,7 +454,7 @@ TEST_CASE("audio settings controller preserves every row behavior") {
         AudioSettingsController controller;
         static_cast<void>(controller.select(AudioSettingId::BgmVolume));
         check_render_only(controller.handle(MenuAction::adjust(1), runtime));
-        CHECK(runtime.audio_ui.bgm_volume == doctest::Approx(1.05));
+        CHECK(runtime.audio_ui.bgm_volume == doctest::Approx(1.01));
     }
 
     {
@@ -460,7 +462,7 @@ TEST_CASE("audio settings controller preserves every row behavior") {
         AudioSettingsController controller;
         static_cast<void>(controller.select(AudioSettingId::KeysoundVolume));
         check_render_only(controller.handle(MenuAction::adjust(1), runtime));
-        CHECK(runtime.audio_ui.keysound_volume == doctest::Approx(1.05));
+        CHECK(runtime.audio_ui.keysound_volume == doctest::Approx(1.01));
     }
 
     {
@@ -522,12 +524,12 @@ TEST_CASE("audio settings numeric actions clamp and snap") {
     check_no_effects(controller.handle(MenuAction::adjust(1), runtime));
     CHECK_FALSE(controller.dirty());
 
-    check_render_only(controller.handle(MenuAction::set_ratio(0.52), runtime));
-    CHECK(runtime.audio_ui.master_volume == doctest::Approx(0.50));
+    check_render_only(controller.handle(MenuAction::set_ratio(0.523), runtime));
+    CHECK(runtime.audio_ui.master_volume == doctest::Approx(0.52));
 
     check_render_only(controller.handle(
-        MenuAction::set_ratio(0.52), runtime, AudioSettingId::BgmVolume));
-    CHECK(runtime.audio_ui.bgm_volume == doctest::Approx(1.05));
+        MenuAction::set_ratio(0.522), runtime, AudioSettingId::BgmVolume));
+    CHECK(runtime.audio_ui.bgm_volume == doctest::Approx(1.04));
 
     static_cast<void>(controller.handle(MenuAction::set_ratio(4.0), runtime));
     CHECK(runtime.audio_ui.bgm_volume == doctest::Approx(2.0));
@@ -546,44 +548,63 @@ TEST_CASE("audio settings numeric actions clamp and snap") {
     check_no_effects(controller.handle(MenuAction::adjust(-1), runtime));
 }
 
-TEST_CASE("audio settings keyboard and pointer volume changes have parity") {
-    tenriff::config::RuntimeConfig keyboard_runtime;
-    tenriff::config::RuntimeConfig pointer_runtime;
-    AudioSettingsController keyboard;
-    AudioSettingsController pointer;
+TEST_CASE("all audio volumes adjust by one percent with keyboard and pointer parity") {
+    using AudioConfig = tenriff::config::AudioUiConfig;
+    struct VolumeCase {
+        AudioSettingId id;
+        double AudioConfig::* member;
+        double maximum;
+    };
+    const std::array<VolumeCase, 5> cases{{
+        {AudioSettingId::MasterVolume, &AudioConfig::master_volume, 1.0},
+        {AudioSettingId::GameplayVolume, &AudioConfig::gameplay_volume, 1.0},
+        {AudioSettingId::MenuMusicVolume, &AudioConfig::menu_music_volume, 1.0},
+        {AudioSettingId::BgmVolume, &AudioConfig::bgm_volume, 2.0},
+        {AudioSettingId::KeysoundVolume, &AudioConfig::keysound_volume, 2.0},
+    }};
+    for (const auto& volume : cases) {
+        tenriff::config::RuntimeConfig keyboard_runtime;
+        tenriff::config::RuntimeConfig pointer_runtime;
+        AudioSettingsController keyboard;
+        AudioSettingsController pointer;
+        double& keyboard_value = keyboard_runtime.audio_ui.*volume.member;
+        double& pointer_value = pointer_runtime.audio_ui.*volume.member;
+        keyboard_value = pointer_value = 0.0;
+        static_cast<void>(keyboard.select(volume.id));
+        static_cast<void>(pointer.select(volume.id));
+        check_no_effects(keyboard.handle(MenuAction::adjust(-1), keyboard_runtime));
+        for (int percent = 1; percent <= 47; ++percent) {
+            check_render_only(keyboard.handle(MenuAction::adjust(1), keyboard_runtime));
+            CHECK(keyboard_value == doctest::Approx(percent / 100.0));
+        }
+        check_render_only(pointer.handle(
+            MenuAction::set_ratio(0.473 / volume.maximum), pointer_runtime, volume.id));
+        CHECK(pointer_value == doctest::Approx(0.47));
+        CHECK(keyboard_value == doctest::Approx(pointer_value));
+        check_render_only(keyboard.handle(MenuAction::adjust(-1), keyboard_runtime));
+        check_render_only(pointer.handle(MenuAction::adjust(-1), pointer_runtime, volume.id));
+        CHECK(keyboard_value == doctest::Approx(0.46));
+        CHECK(pointer_value == doctest::Approx(keyboard_value));
 
-    keyboard_runtime.audio_ui.master_volume = 0.0;
-    pointer_runtime.audio_ui.master_volume = 0.0;
-    static_cast<void>(keyboard.select(AudioSettingId::MasterVolume));
-    for (int step = 0; step < 10; ++step) {
-        static_cast<void>(keyboard.handle(MenuAction::adjust(1), keyboard_runtime));
-    }
-    static_cast<void>(pointer.handle(
-        MenuAction::set_ratio(0.5), pointer_runtime, AudioSettingId::MasterVolume));
-    CHECK(keyboard_runtime.audio_ui.master_volume ==
-          doctest::Approx(pointer_runtime.audio_ui.master_volume));
+        // The grid applies only when the user adjusts this control.
+        pointer_value = 0.473;
+        pointer.reset(volume.id);
+        static_cast<void>(AudioSettingsView::build(pointer, pointer_runtime, tenriff::ui::Language::English));
+        CHECK(pointer_value == doctest::Approx(0.473));
+        CHECK_FALSE(pointer.handle(MenuAction::back(), pointer_runtime).persist_config);
+        check_render_only(pointer.handle(MenuAction::adjust(1), pointer_runtime, volume.id));
+        CHECK(pointer_value == doctest::Approx(0.48));
 
-    keyboard_runtime.audio_ui.bgm_volume = 0.0;
-    pointer_runtime.audio_ui.bgm_volume = 0.0;
-    static_cast<void>(keyboard.select(AudioSettingId::BgmVolume));
-    for (int step = 0; step < 20; ++step) {
-        static_cast<void>(keyboard.handle(MenuAction::adjust(1), keyboard_runtime));
+        check_render_only(pointer.handle(MenuAction::set_ratio(4.0), pointer_runtime, volume.id));
+        CHECK(pointer_value == doctest::Approx(volume.maximum));
+        check_no_effects(pointer.handle(MenuAction::adjust(1), pointer_runtime));
+        check_render_only(pointer.handle(MenuAction::adjust(-1), pointer_runtime));
+        CHECK(pointer_value == doctest::Approx(volume.maximum - 0.01));
+        check_render_only(pointer.handle(MenuAction::set_ratio(-4.0), pointer_runtime));
+        CHECK(pointer_value == doctest::Approx(0.0));
+        check_no_effects(pointer.handle(MenuAction::adjust(-1), pointer_runtime));
+        CHECK(pointer.handle(MenuAction::back(), pointer_runtime).persist_config);
     }
-    static_cast<void>(pointer.handle(
-        MenuAction::set_ratio(0.5), pointer_runtime, AudioSettingId::BgmVolume));
-    CHECK(keyboard_runtime.audio_ui.bgm_volume ==
-          doctest::Approx(pointer_runtime.audio_ui.bgm_volume));
-
-    keyboard_runtime.audio_ui.keysound_volume = 0.0;
-    pointer_runtime.audio_ui.keysound_volume = 0.0;
-    static_cast<void>(keyboard.select(AudioSettingId::KeysoundVolume));
-    for (int step = 0; step < 20; ++step) {
-        static_cast<void>(keyboard.handle(MenuAction::adjust(1), keyboard_runtime));
-    }
-    static_cast<void>(pointer.handle(
-        MenuAction::set_ratio(0.5), pointer_runtime, AudioSettingId::KeysoundVolume));
-    CHECK(keyboard_runtime.audio_ui.keysound_volume ==
-          doctest::Approx(pointer_runtime.audio_ui.keysound_volume));
 }
 
 TEST_CASE("audio settings no-op actions do not make the controller dirty") {

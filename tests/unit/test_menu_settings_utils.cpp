@@ -107,10 +107,16 @@ TEST_CASE("difficulty table selection upgrades hashless Fast indexing") {
 
 TEST_CASE("volume slider ratios clamp and snap to configured steps") {
     using tenriff::app::slider_value_from_ratio;
+    using tenriff::app::kVolumeStep;
+    using tenriff::app::kChartMixVolumeStep;
 
-    CHECK(slider_value_from_ratio(0.0, 0.0, 1.0, 0.05) == doctest::Approx(0.0));
-    CHECK(slider_value_from_ratio(0.52, 0.0, 1.0, 0.05) == doctest::Approx(0.5));
-    CHECK(slider_value_from_ratio(0.52, 0.0, 2.0, 0.05) == doctest::Approx(1.05));
-    CHECK(slider_value_from_ratio(-1.0, 0.0, 2.0, 0.05) == doctest::Approx(0.0));
-    CHECK(slider_value_from_ratio(3.0, 0.0, 2.0, 0.05) == doctest::Approx(2.0));
+    CHECK(kVolumeStep == doctest::Approx(0.01));
+    CHECK(kChartMixVolumeStep == doctest::Approx(0.01));
+    CHECK(slider_value_from_ratio(0.0, 0.0, 1.0, kVolumeStep) == doctest::Approx(0.0));
+    CHECK(slider_value_from_ratio(0.523, 0.0, 1.0, kVolumeStep) == doctest::Approx(0.52));
+    CHECK(slider_value_from_ratio(0.526, 0.0, 1.0, kVolumeStep) == doctest::Approx(0.53));
+    CHECK(slider_value_from_ratio(0.522, 0.0, 2.0, kChartMixVolumeStep) == doctest::Approx(1.04));
+    CHECK(slider_value_from_ratio(0.524, 0.0, 2.0, kChartMixVolumeStep) == doctest::Approx(1.05));
+    CHECK(slider_value_from_ratio(-1.0, 0.0, 2.0, kChartMixVolumeStep) == doctest::Approx(0.0));
+    CHECK(slider_value_from_ratio(3.0, 0.0, 2.0, kChartMixVolumeStep) == doctest::Approx(2.0));
 }

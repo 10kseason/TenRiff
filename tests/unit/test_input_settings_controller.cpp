@@ -153,7 +153,7 @@ TEST_CASE("input settings view preserves values fallback detail and localization
     REQUIRE(english.notes.size() == 6);
     CHECK(english.rows[0].value == "RawInput (active: Polling)");
     CHECK(english.rows[1].value == "1000");
-    CHECK(english.rows[2].value == "8 ms");
+    CHECK(english.rows[2].value == "0 ms");
     CHECK(english.rows[2].selected);
     CHECK(english.rows[3].activatable);
 
@@ -162,4 +162,9 @@ TEST_CASE("input settings view preserves values fallback detail and localization
     CHECK(korean.rows[1].label == "폴링 Hz");
     CHECK(korean.rows[2].label == "디바운스");
     CHECK(korean.rows[3].label == "뒤로");
+
+    runtime.input.debounce_ms = 8.0;
+    const auto saved = InputSettingsView::build(controller, runtime, false, tenriff::ui::Language::English);
+    CHECK(saved.rows[2].value == "8 ms");
+    CHECK(runtime.input.debounce_ms == doctest::Approx(8.0));
 }

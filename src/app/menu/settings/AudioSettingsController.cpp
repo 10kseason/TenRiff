@@ -9,8 +9,8 @@
 namespace tenriff::app::menu::settings {
 namespace {
 
-constexpr NumericSettingRange kMasterVolumeRange{0.0, 1.0, 0.05};
-constexpr NumericSettingRange kChartMixVolumeRange{0.0, 2.0, 0.05};
+constexpr NumericSettingRange kMasterVolumeRange{0.0, 1.0, 0.01};
+constexpr NumericSettingRange kChartMixVolumeRange{0.0, 2.0, 0.01};
 constexpr NumericSettingRange kSoundOffsetRange{
     config::kSoundOffsetMin,
     config::kSoundOffsetMax,

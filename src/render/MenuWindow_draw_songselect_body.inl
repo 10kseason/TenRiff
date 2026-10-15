@@ -1,4 +1,21 @@
         const float ambient_pulse = static_cast<float>(pulse_wave_01(render_now_ns, 6.4, 0.18));
+        // Only the built-in 5K Aery table keeps its mode badge. Other song-list
+        // labels hide the prefix without changing stored table identities.
+        auto song_level_label = [](std::string label, bool aery_five_key = false) {
+            if (aery_five_key) return label;
+            constexpr std::string_view marker = u8"⑤";
+            for (auto pos = label.find(marker); pos != std::string::npos; pos = label.find(marker, pos)) {
+                label.erase(pos, marker.size());
+            }
+            return label;
+        };
+        auto song_level_text = [&](const std::string& label, bool aery_five_key = false) {
+            return to_wide(song_level_label(label, aery_five_key));
+        };
+        const bool selected_aery_badge = data.song_select.difficulty_table_active &&
+            data.song_select.selected_song_difficulty_is_aery_five_key;
+        const int selected_prefix_keys = data.song_select.difficulty_table_active
+            ? data.song_select.selected_song_difficulty_prefix_key_count : 0;
         const float selection_pulse = static_cast<float>(pulse_wave_01(render_now_ns, 4.2, 0.46));
         const std::size_t jacket_identity = std::hash<std::string>{}(data.song_select.selected_song_title) ^
             static_cast<std::size_t>(data.song_select.list_selected_index + 1);
@@ -282,6 +299,22 @@
             skin_layout_rect(data, "song_select.right_panel",
                              native_rect("songselect.rect.019", D2D1::RectF(1397.0f, 152.0f, 1882.0f, 922.0f)));
 
+        // Keep authored header/center layouts together. Color-only native skins
+        // inherit the compact defaults without moving explicitly placed cards.
+        const bool authored_library_layout = (data.lobby_skin.enabled &&
+            (data.lobby_skin.layout_rects.count("song_select.left_panel") != 0 ||
+             data.lobby_skin.layout_rects.count("song_select.center_panel") != 0)) ||
+            (native_overrides && std::any_of(
+            native_style.rects.begin(), native_style.rects.end(), [](const auto& item) {
+                return item.first == "songselect.rect.017" || item.first == "songselect.rect.018" ||
+                    item.first == "songselect.rect.020" || item.first == "songselect.rect.021" ||
+                    item.first == "songselect.rect.022" || item.first == "songselect.rect.036" ||
+                    item.first == "songselect.rect.044" ||
+                    (item.first >= "songselect.rect.050" && item.first <= "songselect.rect.058");
+            }));
+        const bool library_header_controls = modern_library_screen && !authored_library_layout &&
+            !data.song_select.showing_sources && !data.song_select.showing_records;
+
         if (modern_library_screen && d2d_->native_menu_brush) {
             // The outer frame groups the library and its art/BEST/filter cards;
             // existing inner panels keep their independent content and hit areas.
@@ -306,11 +339,14 @@
                            : wloc("SONG LIBRARY", "곡 라이브러리"));
             draw_text_clipped(library_title,
                               d2d_->title_format.Get(),
-                              native_rect("songselect.rect.020", D2D1::RectF(left_panel.left + 18.0f, left_panel.top + 16.0f,
-                                          left_panel.right - 130.0f, left_panel.top + 54.0f)),
+                              native_rect("songselect.rect.020", D2D1::RectF(left_panel.left + 18.0f,
+                                          left_panel.top + (library_header_controls ? 4.0f : 16.0f),
+                                          library_header_controls ? left_panel.left + 218.0f : left_panel.right - 130.0f,
+                                          left_panel.top + (library_header_controls ? 36.0f : 54.0f))),
                               d2d_->text_brush.Get());
         }
-        if (d2d_->hud_format && d2d_->muted_brush) {
+        if (d2d_->hud_format && d2d_->muted_brush &&
+            !(library_header_controls && data.song_select.indexing)) {
             const int item_count = data.song_select.showing_sources
                                        ? data.song_select.source_count
                                        : (data.song_select.showing_records
@@ -318,8 +354,11 @@
                                               : data.song_select.song_count);
             draw_trailing_text(to_wide(format_int_with_commas(item_count)),
                                d2d_->hud_format.Get(),
-                               native_rect("songselect.rect.021", D2D1::RectF(left_panel.right - 130.0f, left_panel.top + 24.0f,
-                                           left_panel.right - 18.0f, left_panel.top + 52.0f)),
+                               native_rect("songselect.rect.021", D2D1::RectF(
+                                           library_header_controls ? left_panel.left + 18.0f : left_panel.right - 130.0f,
+                                           left_panel.top + (library_header_controls ? 36.0f : 24.0f),
+                                           library_header_controls ? left_panel.left + 218.0f : left_panel.right - 18.0f,
+                                           left_panel.top + (library_header_controls ? 60.0f : 52.0f))),
                                d2d_->muted_brush.Get());
         }
         draw_rule(left_panel.left + 18.0f, left_panel.top + 66.0f,
@@ -331,8 +370,10 @@
                 indexing_text += " " + std::to_string(data.song_select.indexing_percent) + "%";
             }
             draw_text_clipped(to_wide(indexing_text), d2d_->hud_format.Get(),
-                              native_rect("songselect.rect.022", D2D1::RectF(left_panel.left + 18.0f, left_panel.top + 45.0f,
-                                          left_panel.right - 18.0f, left_panel.top + 68.0f)),
+                              native_rect("songselect.rect.022", D2D1::RectF(left_panel.left + 18.0f,
+                                          left_panel.top + (library_header_controls ? 36.0f : 45.0f),
+                                          library_header_controls ? left_panel.left + 218.0f : left_panel.right - 18.0f,
+                                          left_panel.top + (library_header_controls ? 60.0f : 68.0f))),
                               d2d_->accent_brush.Get());
         }
 
@@ -415,7 +456,7 @@
                                   native_rect("songselect.rect.027", D2D1::RectF(text_left, card.top + 38.0f,
                                               value_left - 8.0f, card.top + 61.0f)),
                                   d2d_->muted_brush.Get());
-                draw_metadata_ellipsis(to_wide(song.detail), d2d_->hud_format.Get(),
+                draw_metadata_ellipsis(song_level_text(song.detail), d2d_->hud_format.Get(),
                                   native_rect("songselect.rect.028", D2D1::RectF(text_left, card.top + 60.0f,
                                               value_left - 8.0f, card.bottom - 5.0f)),
                                   song.selected && d2d_->accent_brush
@@ -426,13 +467,15 @@
                 std::string level = !song.level_label.empty()
                                         ? song.level_label
                                         : (song.level > 0 ? std::to_string(song.level) : "");
-                draw_difficulty_label(to_wide(level), d2d_->title_format.Get(),
+                const bool aery_badge = data.song_select.difficulty_table_active && song.difficulty_is_aery_five_key;
+                draw_difficulty_label(song_level_text(level, aery_badge), d2d_->title_format.Get(),
                                    native_rect("songselect.rect.029", D2D1::RectF(value_left, card.top + 13.0f,
                                                card.right - 12.0f, card.top + 48.0f)),
-                                   modern_library_screen ? semantic_color(0xC2A0FF)
+                                   modern_library_screen ? semantic_color(0xF06B7B)
                                        : static_cast<ID2D1Brush*>(d2d_->text_brush.Get()),
-                                   modern_library_screen && song.difficulty_is_aery_five_key,
-                                   DWRITE_TEXT_ALIGNMENT_TRAILING);
+                                   modern_library_screen && aery_badge,
+                                   DWRITE_TEXT_ALIGNMENT_TRAILING,
+                                   data.song_select.difficulty_table_active ? song.difficulty_prefix_key_count : 0);
             }
             if (song.favorite && d2d_->hud_format && d2d_->accent_brush) {
                 draw_trailing_text(L"FAV", d2d_->hud_format.Get(),
@@ -529,9 +572,11 @@
         const float best_rank_extra = modern_library_screen && !authored_best_rank &&
             !data.song_select.showing_sources && !data.song_select.showing_records
             ? std::min(86.0f, std::max(0.0f, center_paired_height - 180.0f)) : 0.0f;
+        // Reuse the removed action strip for art; BEST keeps its full height.
+        const float showcase_extra = library_header_controls ? center_action_height + center_section_gap : 0.0f;
         const D2D1_RECT_F showcase =
             native_rect("songselect.rect.036", D2D1::RectF(center_panel.left, center_panel.top,
-                        center_panel.right, center_panel.top + center_paired_height - best_rank_extra));
+                        center_panel.right, center_panel.top + center_paired_height - best_rank_extra + showcase_extra));
         draw_glass_panel(showcase, 12.0f, 0.86f, 0.30f, true, 5.0f);
         const bool has_selected_song =
             !data.song_select.showing_sources && !data.song_select.showing_records &&
@@ -707,7 +752,7 @@
             }
             d2d_->button_border_brush->SetOpacity(saved);
         }
-        constexpr std::array<uint32_t, 3> best_colors = {0xC2A0FF, 0x63E9F2, 0xB0ED80};
+        constexpr std::array<uint32_t, 3> best_colors = {0xFFFFFF, 0x63E9F2, 0xB0ED80};
         for (std::size_t i = 0; i < best_columns.size(); ++i) {
             const float column_left =
                 best_columns_left + static_cast<float>(i) * (best_column_width + best_column_gap);
@@ -745,8 +790,11 @@
         }
 
         const D2D1_RECT_F action_strip =
-            native_rect("songselect.rect.050", D2D1::RectF(center_panel.left, best_panel.bottom + center_section_gap,
-                        center_panel.right, center_panel.bottom));
+            native_rect("songselect.rect.050", D2D1::RectF(
+                        library_header_controls ? left_panel.left + 230.0f : center_panel.left,
+                        library_header_controls ? left_panel.top + 4.0f : best_panel.bottom + center_section_gap,
+                        library_header_controls ? left_panel.right - 18.0f : center_panel.right,
+                        library_header_controls ? left_panel.top + 62.0f : center_panel.bottom));
         const D2D1_RECT_F filter_button =
             native_rect("songselect.rect.052", D2D1::RectF(action_strip.left, action_strip.top,
                         action_strip.left + (action_strip.right - action_strip.left) * 0.32f, action_strip.bottom));
@@ -778,19 +826,27 @@
             draw_centered_text(wloc("SORT / FILTER", "정렬 / 필터"), d2d_->body_format.Get(),
                                filter_button, d2d_->text_brush.Get(), true);
         }
-        const float table_actions_left = table_button.right - 84.0f;
+        const float table_actions_left = table_button.right - (library_header_controls ? 60.0f : 84.0f);
         const D2D1_RECT_F table_link = native_rect("songselect.rect.054", D2D1::RectF(table_button.left, table_button.top, table_actions_left - 8.0f, table_button.bottom));
-        const D2D1_RECT_F table_file = native_rect("songselect.rect.055", D2D1::RectF(table_actions_left, table_button.top + 7.0f, table_button.right - 8.0f, table_button.top + 38.0f));
-        const D2D1_RECT_F table_clear = native_rect("songselect.rect.056", D2D1::RectF(table_actions_left, table_button.top + 44.0f, table_button.right - 8.0f, table_button.bottom - 7.0f));
+        const D2D1_RECT_F table_file = native_rect("songselect.rect.055", D2D1::RectF(table_actions_left,
+            table_button.top + (library_header_controls ? 5.0f : 7.0f), table_button.right - 8.0f,
+            table_button.top + (library_header_controls ? 27.0f : 38.0f)));
+        const D2D1_RECT_F table_clear = native_rect("songselect.rect.056", D2D1::RectF(table_actions_left,
+            table_button.top + (library_header_controls ? 31.0f : 44.0f), table_button.right - 8.0f,
+            table_button.bottom - (library_header_controls ? 5.0f : 7.0f)));
         register_hit(table_link, MenuHitTargetKind::SongDifficultyTable, static_cast<int>(SongDifficultyTableAction::EditUrl));
         register_hit(table_file, MenuHitTargetKind::SongDifficultyTable, static_cast<int>(SongDifficultyTableAction::LocalFile));
         if (data.song_select.difficulty_table_active) register_hit(table_clear, MenuHitTargetKind::SongDifficultyTable, static_cast<int>(SongDifficultyTableAction::Reset));
         draw_text_clipped(wloc("TABLE / SELECT", "난이도표 / 선택"), d2d_->hud_format.Get(),
-            native_rect("songselect.rect.057", D2D1::RectF(table_link.left + 14, table_link.top + 12, table_link.right - 8, table_link.top + 34)), d2d_->muted_brush.Get());
+            native_rect("songselect.rect.057", D2D1::RectF(table_link.left + 14,
+                table_link.top + (library_header_controls ? 5.0f : 12.0f), table_link.right - 8,
+                table_link.top + (library_header_controls ? 25.0f : 34.0f))), d2d_->muted_brush.Get());
         std::wstring table_name = to_wide(data.song_select.difficulty_table_name);
         if (table_name.size() > 26) table_name = table_name.substr(0, 25) + L"…";
         draw_text_clipped(table_name, d2d_->body_format.Get(),
-            native_rect("songselect.rect.058", D2D1::RectF(table_link.left + 14, table_link.top + 40, table_link.right - 8, table_link.bottom - 10)), d2d_->accent_brush.Get());
+            native_rect("songselect.rect.058", D2D1::RectF(table_link.left + 14,
+                table_link.top + (library_header_controls ? 28.0f : 40.0f), table_link.right - 8,
+                table_link.bottom - (library_header_controls ? 5.0f : 10.0f))), d2d_->accent_brush.Get());
         draw_glass_panel(table_file, 7, 0.88f, 0, false, 0);
         draw_glass_panel(table_clear, 7, 0.70f, 0, false, 0);
         draw_centered_text(wloc("FILE", "파일"), d2d_->hud_format.Get(), table_file, d2d_->text_brush.Get(), true);
@@ -885,17 +941,17 @@
             }
             if (d2d_->title_format && d2d_->text_brush) {
                 draw_difficulty_label(
-                    to_wide(data.song_select.selected_song_difficulty.empty()
+                    song_level_text(data.song_select.selected_song_difficulty.empty()
                                 ? std::string("--")
-                                : data.song_select.selected_song_difficulty),
+                                : data.song_select.selected_song_difficulty, selected_aery_badge),
                     d2d_->body_format.Get(),
                     native_rect("songselect.rect.065", D2D1::RectF(difficulty_card.left + 14.0f,
                                 difficulty_card.top + (modern_library_screen ? 94.0f : 118.0f),
                                 difficulty_split - 10.0f,
                                 difficulty_card.bottom - 14.0f)),
-                    d2d_->text_brush.Get(),
-                    modern_library_screen && data.song_select.selected_song_difficulty_is_aery_five_key,
-                    DWRITE_TEXT_ALIGNMENT_CENTER);
+                    modern_library_screen ? semantic_color(0xF06B7B) : d2d_->text_brush.Get(),
+                    modern_library_screen && selected_aery_badge,
+                    DWRITE_TEXT_ALIGNMENT_CENTER, selected_prefix_keys);
                 draw_centered_text(to_wide(data.song_select.selected_song_layout),
                                    d2d_->title_format.Get(),
                                    native_rect("songselect.rect.066", D2D1::RectF(difficulty_split + 12.0f,
@@ -967,22 +1023,23 @@
             const std::array<std::pair<std::string, std::string>, 4> metadata_values = {{
                 {data.song_select.selected_song_has_bpm_changes ? "BPM! :" : "BPM",
                  data.song_select.selected_song_bpm > 0.0 ? format_decimal(data.song_select.selected_song_bpm, 1) : "--"},
-                {loc("LEVEL", "레벨"), data.song_select.selected_song_difficulty.empty() ? "--" : data.song_select.selected_song_difficulty},
+                {loc("LEVEL", "레벨"), data.song_select.selected_song_difficulty.empty() ? "--" : song_level_label(data.song_select.selected_song_difficulty, selected_aery_badge)},
                 {loc("NOTES", "노트 수"), data.song_select.selected_song_note_count > 0 ? format_int_with_commas(data.song_select.selected_song_note_count) : "--"},
                 {"NPS MED", data.song_select.selected_song_nps_median > 0.0 ? format_decimal(data.song_select.selected_song_nps_median, 1) : "--"},
             }};
-            constexpr std::array<uint32_t, 4> metadata_colors = {0xFFD479, 0xC2A0FF, 0xFFFFFF, 0x63E9F2};
+            constexpr std::array<uint32_t, 4> metadata_colors = {0xFFD479, 0xF06B7B, 0xFFFFFF, 0x63E9F2};
             for (std::size_t i = 0; i < metadata_cells.size(); ++i) {
                 if (modern_library_screen) {
                     const auto& cell = metadata_cells[i];
                     draw_text_clipped(to_wide(metadata_values[i].first), d2d_->song_record_label_format.Get(),
                         D2D1::RectF(cell.left, cell.top, cell.right, cell.top + 26.0f),
                         semantic_color(metadata_colors[i], i == 2 ? 1.0f : 0.86f));
-                    draw_difficulty_label(to_wide(metadata_values[i].second), d2d_->song_metadata_value_format.Get(),
+                    draw_difficulty_label(i == 1 ? song_level_text(metadata_values[i].second, selected_aery_badge)
+                                                : to_wide(metadata_values[i].second), d2d_->song_metadata_value_format.Get(),
                         D2D1::RectF(cell.left, cell.top + 24.0f, cell.right, cell.bottom),
                         semantic_color(metadata_colors[i]),
-                        i == 1 && data.song_select.selected_song_difficulty_is_aery_five_key,
-                        DWRITE_TEXT_ALIGNMENT_LEADING);
+                        i == 1 && selected_aery_badge,
+                        DWRITE_TEXT_ALIGNMENT_LEADING, i == 1 ? selected_prefix_keys : 0);
                 } else {
                     draw_meta_pair(metadata_cells[i], metadata_values[i].first, metadata_values[i].second, i == 1);
                 }

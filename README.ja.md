@@ -1,5 +1,7 @@
 # TenRiff
 
+**2026-10-15 · 1.9.0.2 リリース候補 — 公開検証手順:** 公開済み1.9.0.1を基に、Optionsを緑色、組み込み5K Aery表の選択時だけ緑の⑤を表示し、登録済み4/6/8/10キーモード表の記号を対応色にし、レベルを赤・スコアを白にし、`lv:` レベル検索、新規debounce既定値0ms、音量の1%刻み調整を追加します。選曲の並び替え・フィルター・難易度表選択をSong Library横のヘッダーへ移し、アルバム画像の高さを広げます。マスター既定値10%と固定基準1.9.0は維持します。[変更・使い方](docs/feedback-1.9.0.2.ja.md)。 公開状況とダウンロードはリリースページを基準に確認してください。[範囲・検証](docs/release-1.9.0.2-gate.md)。
+
 **2026-10-15 · 1.9.0.1:** マスター音量の既定値10%とロビーアイコンの中心揃えを含みます。プレビュー×0.75、プロフィールで指定するF5/F6 -10/+10、Xbox/XInputボタン入力、ファイル選択の重複防止、BMS BPM/STOP順序修正と旧リプレイ互換を提供します。固定基準は1.9.0を維持します。 [変更内容](docs/feedback-20261015.ja.md) · [リリース検証範囲](docs/release-1.9.0.1-gate.md).
 
 **2026-10-14 · 1.9.0 / 新しい固定基準:** 確認済みのローカル候補を指定された正式版へ昇格します。BMS/メニュー音量分離、ロビー・フィルター・スキン操作、ランク・SUBARTIST、韓国語モード表示、EX判定、送信状態を含みます。通常/HardはR5、EXはR6。旧R1–R5記録と保存設定を保持します。[固定基準](docs/baseline-1.9.0.ja.md) · [検証範囲](docs/release-1.9.0-gate.md)。以下の日付付き項目は当時の履歴です。
@@ -48,13 +50,13 @@
 
 **マルチプレイRate対応ビルド:** ロビーでリーダーが共通のRateを設定します。全員がこのprotocol v6ビルドを使用してください。旧v5クライアントとは接続できません。[案内](docs/multiplayer-rate-build.ko.md)（韓国語）。
 
-リリース・ダウンロード: [**1.9.0.1**](https://github.com/10kseason/TenRiff/releases/tag/1.9.0.1)。実際のパッケージ・公開状況は[リリース記録](docs/release-1.9.0.1-gate.md)を参照してください。固定基準は1.9.0を維持します。新しいフォルダーに展開し、`launch_win.bat` から起動して F10 でウェブアカウントを一度連携してください。対象となる新しいプレイのスコア・詳細スコア・精度・詳細精度を送信します。新しいプレイは ruleset-5 (Normal/Hard), ruleset-6 (EX) を使用し、ウェブ送信には判定プロファイルが必要です。ruleset-1/2/3/4 のリプレイは当時の判定とLN動作を、既存のウェブ記録はIDとスコアを維持します。[接続ガイド](docs/sites-leaderboard.md)（韓国語）を参照してください。 BPM/STOP修正の影響を受ける新しいタイミングバージョン2記録は、Web対応までローカル保存のみです。
+公開状況・ダウンロード: [**1.9.0.2**](https://github.com/10kseason/TenRiff/releases/tag/1.9.0.2)。公開状況はこのリリースページを基準とし、範囲と検証は[リリース記録](docs/release-1.9.0.2-gate.md)を参照してください。固定基準は1.9.0を維持します。新しいフォルダーに展開し、`launch_win.bat` から起動して F10 でウェブアカウントを一度連携してください。対象となる新しいプレイのスコア・詳細スコア・精度・詳細精度を送信します。新しいプレイは ruleset-5 (Normal/Hard), ruleset-6 (EX) を使用し、ウェブ送信には判定プロファイルが必要です。ruleset-1/2/3/4 のリプレイは当時の判定とLN動作を、既存のウェブ記録はIDとスコアを維持します。[接続ガイド](docs/sites-leaderboard.md)（韓国語）を参照してください。 BPM/STOP修正の影響を受ける新しいタイミングバージョン2記録は、Web対応までローカル保存のみです。
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | 日本語
 
-TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。固定基準は `1.9.0`、このソースのバージョンは `1.9.0.1` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
+TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。固定基準は `1.9.0`、このソースのバージョンは `1.9.0.2` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
 
-この README は導入文書です。現在の挙動、`1.9.0.1` のリリースラインと固定 `1.9.0` の基準、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
+この README は導入文書です。現在の挙動、`1.9.0.2` のリリース候補と固定 `1.9.0` の基準、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
 
 TenRiff のコードベースは、伝統的な長文設計書主導だけで積み上がったものではなく、高速な反復と実験を重視した `vibe coding` 的な性格を持つ作品でもあります。
 
