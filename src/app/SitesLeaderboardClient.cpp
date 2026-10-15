@@ -49,6 +49,10 @@ bool build_sites_score_json(const gameplay::ReplayFile& replay,
     std::string_view chart_author) {
     payload.clear();
     error.clear();
+    if (replay.mode.bms_gauge_version != 1 || replay.mode.bms_control_flow_version != 1 || replay.mode.bms_random_seed) {
+        error = "Sites upload skipped: this BMS gauge/branch policy needs a separate leaderboard condition; this score remains local.";
+        return false;
+    }
     if (replay.mode.bms_timing_version != 1) {
         error = "Sites upload skipped: BMS timing v2 needs a separate leaderboard condition; this score remains local.";
         return false;

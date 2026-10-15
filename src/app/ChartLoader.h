@@ -34,7 +34,8 @@ public:
                                        double rate,
                                        std::string_view bms_keysound_policy = "ignore",
                                        uint32_t bms_random_seed = 0,
-                                       int bms_timing_version = 2) const;
+                                       int bms_timing_version = 2,
+                                       int bms_control_flow_version = 2) const;
 };
 
 }  // namespace tenriff::app

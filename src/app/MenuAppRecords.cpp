@@ -4,6 +4,7 @@
 #include <cmath>
 #include <filesystem>
 #include <iostream>
+#include <tuple>
 #include <unordered_set>
 
 #include "app/MenuAppSettingsUtils.h"
@@ -86,12 +87,18 @@ bool live_result_claims_match(const menu_records::ParsedResultRecord& parsed,
                               double score_multiplier,
                               int long_note_mix_version,
                               int key_conversion_version,
-                              int bms_timing_version) {
+                              int bms_timing_version,
+                              int bms_gauge_version,
+                              int bms_control_flow_version,
+                              std::optional<uint32_t> bms_random_seed) {
     const auto& stored = parsed.stats;
     return parsed.final_score == final_score &&
            parsed.long_note_mix_version == long_note_mix_version &&
            parsed.key_conversion_version == key_conversion_version &&
            parsed.bms_timing_version == bms_timing_version &&
+           parsed.bms_gauge_version == bms_gauge_version &&
+           parsed.bms_control_flow_version == bms_control_flow_version &&
+           parsed.bms_random_seed == bms_random_seed &&
            parsed.game_over == game_over &&
            parsed.clear_status == clear_status &&
            parsed.final_gauge == final_gauge &&
@@ -131,6 +138,8 @@ void MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
     candidate.has_value = true;
     candidate.replay_verified = replay_verified;
     candidate.bms_timing_version = parsed.bms_timing_version;
+    candidate.bms_gauge_version = parsed.bms_gauge_version;
+    candidate.bms_control_flow_version = parsed.bms_control_flow_version;
     candidate.rank = menu_records::calculate_rank(effective_stats, effective_game_over,
                                                    effective_clear_status, parsed.aborted);
     candidate.best_score = effective_score;
@@ -158,6 +167,9 @@ void MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
 
     LocalPlayRecord record;
     record.bms_timing_version = parsed.bms_timing_version;
+    record.bms_gauge_version = parsed.bms_gauge_version;
+    record.bms_control_flow_version = parsed.bms_control_flow_version;
+    record.bms_random_seed = parsed.bms_random_seed;
     record.chart_path = parsed.chart_path;
     record.chart_format = parsed.chart_format;
     record.created_utc = parsed.created_utc;
@@ -220,11 +232,15 @@ void MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
             continue;
         }
 
-        // A corrected chart's BEST starts with its first verified v2 play.
-        // Legacy scores remain in history and cannot outrank different timing.
-        if (candidate.bms_timing_version != existing->second.bms_timing_version) {
-            if (candidate.bms_timing_version > existing->second.bms_timing_version)
-                existing->second = candidate;
+        // Each newer gauge/control-flow/timing policy starts a fresh BEST.
+        // Historical outcomes stay in history; random branch seeds identify a
+        // performance but do not create a separate chart BEST for every play.
+        const auto candidate_policy = std::tie(candidate.bms_gauge_version,
+            candidate.bms_control_flow_version, candidate.bms_timing_version);
+        const auto existing_policy = std::tie(existing->second.bms_gauge_version,
+            existing->second.bms_control_flow_version, existing->second.bms_timing_version);
+        if (candidate_policy != existing_policy) {
+            if (candidate_policy > existing_policy) existing->second = candidate;
             continue;
         }
 
@@ -321,7 +337,10 @@ void MenuApp::reload_chart_best_results() {
             if (verification.verified() &&
                 (verification.chart_sha256 != parsed->chart_sha256 ||
                  parsed->ruleset_id != verification.ruleset_id ||
-                 parsed->bms_timing_version != verification.bms_timing_version)) {
+                 parsed->bms_timing_version != verification.bms_timing_version ||
+                 parsed->bms_gauge_version != verification.bms_gauge_version ||
+                 parsed->bms_control_flow_version != verification.bms_control_flow_version ||
+                 parsed->bms_random_seed != verification.bms_random_seed)) {
                 verification.status = ReplayVerificationStatus::Invalid;
                 verification.detail = "Result metadata does not match the verified replay evidence.";
                 verification.official_eligible = false;
@@ -413,7 +432,10 @@ void MenuApp::cache_current_session_result(const std::string& chart_path,
                                                            last_result_score_multiplier_,
                                                            last_result_long_note_mix_version_,
                                                            last_result_key_conversion_version_,
-                                                           last_result_bms_timing_version_);
+                                                           last_result_bms_timing_version_,
+                                                           last_result_bms_gauge_version_,
+                                                           last_result_bms_control_flow_version_,
+                                                           last_result_bms_random_seed_);
         if (!evidence_matches || !claims_match) {
             verification.status = ReplayVerificationStatus::Invalid;
             verification.detail = !evidence_matches
@@ -428,6 +450,9 @@ void MenuApp::cache_current_session_result(const std::string& chart_path,
                 "Current session outcome accepted from the live engine; replay reconstruction deferred.";
             verification.stats = last_result_;
             verification.bms_timing_version = last_result_bms_timing_version_;
+            verification.bms_gauge_version = last_result_bms_gauge_version_;
+            verification.bms_control_flow_version = last_result_bms_control_flow_version_;
+            verification.bms_random_seed = last_result_bms_random_seed_;
             verification.clear_status = last_clear_status_;
             verification.final_gauge = last_final_gauge_;
             verification.rate_multiplier = last_result_rate_multiplier_;
@@ -547,6 +572,10 @@ const MenuApp::ReplaySummary* MenuApp::replay_summary_for_path(const std::string
             summary.mods = parsed->mods;
             summary.long_note_mix_version = parsed->long_note_mix_version;
             summary.key_conversion_version = parsed->key_conversion_version;
+            summary.bms_timing_version = parsed->bms_timing_version;
+            summary.bms_gauge_version = parsed->bms_gauge_version;
+            summary.bms_control_flow_version = parsed->bms_control_flow_version;
+            summary.bms_random_seed = parsed->bms_random_seed;
             summary.rate_multiplier = parsed->rate_multiplier;
             summary.score_multiplier = parsed->score_multiplier;
             summary.pause_used = parsed->pause_used;
@@ -600,6 +629,9 @@ bool MenuApp::open_result_record(const std::string& result_path,
     last_result_long_note_mix_version_ = parsed->long_note_mix_version;
     last_result_key_conversion_version_ = parsed->key_conversion_version;
     last_result_bms_timing_version_ = parsed->bms_timing_version;
+    last_result_bms_gauge_version_ = parsed->bms_gauge_version;
+    last_result_bms_control_flow_version_ = parsed->bms_control_flow_version;
+    last_result_bms_random_seed_ = parsed->bms_random_seed;
     last_result_rate_multiplier_ = parsed->rate_multiplier;
     last_result_score_multiplier_ = parsed->score_multiplier;
     last_result_final_score_ = parsed->final_score;
@@ -682,9 +714,11 @@ std::string MenuApp::best_replay_path_for_selected_song() const {
             menu_records::default_ghost_replay_allowed(record.autoplay_enabled,
                                                        record.practice_no_fail_enabled,
                                                        record.clear_status)) {
-            // Histories are score-sorted. Prefer a compatible corrected replay
-            // over a higher-scoring legacy schedule, preserving order within it.
-            if (!best || record.bms_timing_version > best->bms_timing_version) best = &record;
+            // Histories are score-sorted. Preserve that ordering only within
+            // the same gauge/control-flow/timing policy; session setup checks
+            // branch-seed compatibility before actually applying a ghost.
+            if (!best || std::tie(record.bms_gauge_version, record.bms_control_flow_version, record.bms_timing_version) >
+                         std::tie(best->bms_gauge_version, best->bms_control_flow_version, best->bms_timing_version)) best = &record;
         }
     }
     return best ? best->replay_path : std::string{};

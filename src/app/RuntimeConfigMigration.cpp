@@ -51,9 +51,6 @@ constexpr double kCurrentHoldGraceMs = 80.0;
 constexpr double kLegacyHoldBreakMs = 50.0;
 constexpr double kPreviousCurrentHoldBreakMs = 120.0;
 constexpr double kCurrentHoldBreakMs = 200.0;
-constexpr double kLegacyInputDebounceMs = 5.0;
-// Preserve the historical 5 -> 8 ms migration independently of new-profile defaults.
-constexpr double kLegacyMigratedInputDebounceMs = 8.0;
 constexpr double kPreviousResultTailMs = 3000.0;
 constexpr double kCurrentResultTailMs = 500.0;
 constexpr int kLegacyGraphicsRefreshHz = 1050;
@@ -66,7 +63,6 @@ constexpr double kLegacyClassicHoldBodyOpacity = 0.34;
 constexpr double kLegacyNeonHoldBodyOpacity = 0.28;
 constexpr double kLegacyMinimalHoldBodyOpacity = 0.15;
 constexpr double kJudgeWindowToleranceMs = 0.001;
-constexpr double kInputDebounceToleranceMs = 0.001;
 constexpr double kResultTailToleranceMs = 0.001;
 constexpr double kGaugeDeltaTolerance = 0.00001;
 constexpr double kSkinScaleTolerance = 0.00001;
@@ -286,10 +282,8 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
         config.judge.hold_break_ms = kCurrentHoldBreakMs;
         changed = true;
     }
-    if (std::abs(config.input.debounce_ms - kLegacyInputDebounceMs) <= kInputDebounceToleranceMs) {
-        config.input.debounce_ms = kLegacyMigratedInputDebounceMs;
-        changed = true;
-    }
+    // The former value-only 5 -> 8 ms migration is retired: 5 ms is an explicit
+    // choice in the 1 ms input control and must survive a save/reload unchanged.
     if (std::abs(config.ui.result_tail_ms - kPreviousResultTailMs) <= kResultTailToleranceMs) {
         config.ui.result_tail_ms = kCurrentResultTailMs;
         changed = true;

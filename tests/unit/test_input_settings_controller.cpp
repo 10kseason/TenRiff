@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <limits>
 
 #include "app/menu/MenuAction.h"
 #include "app/menu/settings/InputSettingsController.h"
@@ -75,7 +76,7 @@ TEST_CASE("input backend selection and fallback retry request a backend reinitia
     CHECK_FALSE(controller.dirty());
 }
 
-TEST_CASE("input polling and debounce options cycle in both directions") {
+TEST_CASE("input polling cycles while debounce advances one millisecond within zero to twenty") {
     tenriff::config::RuntimeConfig runtime;
     InputSettingsController controller;
 
@@ -88,9 +89,44 @@ TEST_CASE("input polling and debounce options cycle in both directions") {
 
     static_cast<void>(controller.select(InputSettingId::Debounce));
     runtime.input.debounce_ms = 0.0;
-    static_cast<void>(controller.handle(MenuAction::adjust(-1), runtime, false));
-    CHECK(runtime.input.debounce_ms == doctest::Approx(12.0));
-    static_cast<void>(controller.handle(MenuAction::adjust(1), runtime, false));
+    controller.reset(InputSettingId::Debounce);
+    CHECK(controller.handle(MenuAction::adjust(-1), runtime, false).empty());
+    CHECK_FALSE(controller.dirty());
+    for (int value = 1; value <= 20; ++value) {
+        CHECK(controller.handle(MenuAction::adjust(1), runtime, false).render_changed);
+        CHECK(runtime.input.debounce_ms == doctest::Approx(value));
+    }
+    controller.reset(InputSettingId::Debounce);
+    CHECK(controller.handle(MenuAction::adjust(1), runtime, false).empty());
+    CHECK_FALSE(controller.dirty());
+    for (int value = 19; value >= 0; --value) {
+        CHECK(controller.handle(MenuAction::adjust(-1), runtime, false).render_changed);
+        CHECK(runtime.input.debounce_ms == doctest::Approx(value));
+    }
+    CHECK(runtime.input.debounce_ms == doctest::Approx(0.0));
+    CHECK_FALSE(controller.backend_dirty());
+    const auto leave = controller.handle(MenuAction::back(), runtime, false);
+    CHECK(leave.persist_config);
+    CHECK(leave.restart_input);
+    CHECK_FALSE(leave.reinitialize_input_backend);
+}
+
+TEST_CASE("input debounce keeps saved fractions until adjustment and handles invalid runtime values") {
+    tenriff::config::RuntimeConfig runtime;
+    InputSettingsController controller;
+    controller.reset(InputSettingId::Debounce);
+    runtime.input.debounce_ms = 2.5;
+    CHECK(controller.handle(MenuAction::activate(), runtime, false).empty());
+    CHECK(runtime.input.debounce_ms == doctest::Approx(2.5));
+    CHECK(controller.handle(MenuAction::adjust(1), runtime, false).render_changed);
+    CHECK(runtime.input.debounce_ms == doctest::Approx(4.0));
+    CHECK(controller.handle(MenuAction::adjust(1), runtime, false).render_changed);
+    CHECK(runtime.input.debounce_ms == doctest::Approx(5.0));
+    runtime.input.debounce_ms = std::numeric_limits<double>::quiet_NaN();
+    CHECK(controller.handle(MenuAction::adjust(1), runtime, false).render_changed);
+    CHECK(runtime.input.debounce_ms == doctest::Approx(1.0));
+    runtime.input.debounce_ms = std::numeric_limits<double>::infinity();
+    CHECK(controller.handle(MenuAction::adjust(-1), runtime, false).render_changed);
     CHECK(runtime.input.debounce_ms == doctest::Approx(0.0));
 }
 
@@ -107,11 +143,17 @@ TEST_CASE("input pointer target and keyboard adjustment share one mutation path"
     CHECK(keyboard_runtime.input.polling_hz == pointer_runtime.input.polling_hz);
 
     static_cast<void>(keyboard.select(InputSettingId::Debounce));
+    static_cast<void>(keyboard.handle(MenuAction::adjust(1), keyboard_runtime, false));
+    static_cast<void>(pointer.handle(
+        MenuAction::adjust(1), pointer_runtime, false, InputSettingId::Debounce));
+    CHECK(keyboard_runtime.input.debounce_ms ==
+          doctest::Approx(pointer_runtime.input.debounce_ms));
+    CHECK(keyboard_runtime.input.debounce_ms == doctest::Approx(1.0));
     static_cast<void>(keyboard.handle(MenuAction::adjust(-1), keyboard_runtime, false));
     static_cast<void>(pointer.handle(
         MenuAction::adjust(-1), pointer_runtime, false, InputSettingId::Debounce));
-    CHECK(keyboard_runtime.input.debounce_ms ==
-          doctest::Approx(pointer_runtime.input.debounce_ms));
+    CHECK(keyboard_runtime.input.debounce_ms == doctest::Approx(0.0));
+    CHECK(pointer_runtime.input.debounce_ms == doctest::Approx(0.0));
 }
 
 TEST_CASE("input Back requests persistence and one restart only for dirty visits") {
@@ -154,6 +196,14 @@ TEST_CASE("input settings view preserves values fallback detail and localization
     CHECK(english.rows[0].value == "RawInput (active: Polling)");
     CHECK(english.rows[1].value == "1000");
     CHECK(english.rows[2].value == "0 ms");
+    CHECK(english.rows[2].kind == tenriff::app::menu::settings::SettingsRowKind::Numeric);
+    REQUIRE(english.rows[2].numeric_range.has_value());
+    CHECK(english.rows[2].numeric_range->minimum == doctest::Approx(0.0));
+    CHECK(english.rows[2].numeric_range->maximum == doctest::Approx(20.0));
+    CHECK(english.rows[2].numeric_range->step == doctest::Approx(1.0));
+    CHECK(english.notes[4].find("0-20 ms in 1 ms steps") != std::string::npos);
+    CHECK(english.notes[4].find("keyboard") != std::string::npos);
+    CHECK(english.notes[4].find("Release stays immediate") != std::string::npos);
     CHECK(english.rows[2].selected);
     CHECK(english.rows[3].activatable);
 

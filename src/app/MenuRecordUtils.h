@@ -27,6 +27,9 @@ struct ParsedResultRecord {
     int long_note_mix_version = 1;
     int key_conversion_version = 1;
     int bms_timing_version = 1;
+    int bms_gauge_version = 1;
+    int bms_control_flow_version = 1;
+    std::optional<uint32_t> bms_random_seed;
     double rate_multiplier = 1.0;
     double score_multiplier = 1.0;
     int64_t final_score = 0;
@@ -51,6 +54,9 @@ struct ParsedReplayRecord {
     int long_note_mix_version = 1;
     int key_conversion_version = 1;
     int bms_timing_version = 1;
+    int bms_gauge_version = 1;
+    int bms_control_flow_version = 1;
+    std::optional<uint32_t> bms_random_seed;
     double rate_multiplier = 1.0;
     double score_multiplier = 1.0;
     int64_t final_score = 0;

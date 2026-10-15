@@ -304,7 +304,7 @@ TEST_CASE("background sound toggle only gates non-game background audio") {
           doctest::Approx(0.0));
     CHECK(tenriff::app::menu_background_gain(true, 0.5, 2.0) ==
           doctest::Approx(0.5));
-    CHECK(tenriff::app::gameplay_bgm_gain(0.75) == doctest::Approx(0.75f));
+    CHECK(tenriff::app::gameplay_volume_gain(0.75) == doctest::Approx(0.75f));
 }
 
 TEST_CASE("song previews use 0.75 gain independently of gameplay and scene music") {
@@ -313,7 +313,7 @@ TEST_CASE("song previews use 0.75 gain independently of gameplay and scene music
         std::vector<float> gameplay(4), preview(4);
         std::size_t cursor = 0;
         tenriff::app::mix_chart_audio_clip_linear(clip, 0, 1.0,
-            tenriff::app::gameplay_bgm_gain(volume), gameplay.data(), 2, 0);
+            tenriff::app::gameplay_volume_gain(volume), gameplay.data(), 2, 0);
         tenriff::app::mix_looping_song_preview(clip, cursor,
             static_cast<float>(tenriff::app::song_preview_gain(true, 1.0, volume)), preview.data(), 2);
         for (std::size_t i = 0; i < clip.size(); ++i) {
@@ -328,7 +328,7 @@ TEST_CASE("song previews use 0.75 gain independently of gameplay and scene music
     CHECK(tenriff::app::song_preview_gain(true, 0.0, 1.0) == doctest::Approx(0.0));
     CHECK(tenriff::app::tenriff_music_gain(false, 1.0, 1.0) == doctest::Approx(0.0));
     CHECK(tenriff::app::tenriff_music_gain(true, 1.0, 2.0) == doctest::Approx(0.1));
-    CHECK(tenriff::app::gameplay_bgm_gain(2.0) == doctest::Approx(2.0));
+    CHECK(tenriff::app::gameplay_volume_gain(2.0) == doctest::Approx(1.0));
 }
 
 TEST_CASE("song preview PCM mixer loops and follows gain") {

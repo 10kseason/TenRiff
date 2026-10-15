@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <system_error>
 #include <unordered_set>
+#include <utility>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -124,13 +125,69 @@ private:
     uint32_t state_;
 };
 
+std::pair<std::string, std::string> bms_control_header(std::string_view line) {
+    const std::string candidate = strip_comment(line);
+    if (candidate.empty() || candidate.front() != '#') {
+        return {};
+    }
+    const std::string command = trim(std::string_view(candidate).substr(1));
+    const auto separator = command.find_first_of(" \t:");
+    std::string key = separator == std::string::npos ? command : command.substr(0, separator);
+    std::string value = separator == std::string::npos
+                            ? std::string{}
+                            : parse_header_value(std::string_view(command).substr(separator));
+    to_upper_ascii(key);
+    return {std::move(key), std::move(value)};
+}
+
+std::vector<std::size_t> bms_if_terminator_budgets(std::string_view content) {
+    struct LineScope {
+        std::size_t scope = 0;
+        bool ends_if = false;
+    };
+    std::istringstream input{std::string(content)};
+    std::vector<LineScope> lines;
+    std::vector<std::size_t> scopes{0};
+    std::size_t scope_count = 1;
+    std::string line;
+    while (std::getline(input, line)) {
+        const auto header = bms_control_header(line);
+        const auto& key = header.first;
+        if (key == "RANDOM" || key == "SETRANDOM") {
+            scopes.push_back(scope_count++);
+        }
+        lines.push_back({scopes.back(), key == "ENDIF"});
+        if (key == "ENDRANDOM" && scopes.size() > 1u) {
+            scopes.pop_back();
+        }
+    }
+
+    // Count only terminators in this RANDOM scope. A child RANDOM's ENDIF
+    // cannot close a parent IF. This keeps valid nesting intact while allowing
+    // recovery of repeated sibling IFs whose missing ENDIFs are provable.
+    std::vector<std::size_t> remaining(scope_count, 0);
+    std::vector<std::size_t> budgets(lines.size(), 0);
+    for (std::size_t index = lines.size(); index > 0; --index) {
+        const auto& entry = lines[index - 1u];
+        remaining[entry.scope] += entry.ends_if ? 1u : 0u;
+        budgets[index - 1u] = remaining[entry.scope];
+    }
+    return budgets;
+}
+
 std::string preprocess_bms_control_flow(std::string_view content,
                                         uint32_t random_seed,
+                                        int control_flow_version,
+                                        bool& has_random_directives,
                                         std::vector<BmsParseMessage>& messages) {
     std::istringstream input{std::string(content)};
     std::ostringstream output;
     std::vector<BmsControlFrame> frames;
     BmsControlRandom random(random_seed);
+    const bool repair_control_flow = control_flow_version >= 2;
+    const auto if_terminator_budgets = repair_control_flow
+                                          ? bms_if_terminator_budgets(content)
+                                          : std::vector<std::size_t>{};
     std::string line;
     std::size_t line_number = 0;
 
@@ -141,6 +198,11 @@ std::string preprocess_bms_control_flow(std::string_view content,
         add_message(messages, BmsParseSeverity::Warning, line, std::move(text));
     };
     const auto parse_positive = [&](std::string_view value, int& parsed) {
+        if (repair_control_flow) {
+            // The original BM98 examples annotate numeric control commands
+            // with // comments. Do not strip // from asset names or headers.
+            value = value.substr(0, value.find("//"));
+        }
         return parse_int(value, parsed) && parsed > 0;
     };
     const auto nearest_selected_random = [&frames]() -> std::optional<int> {
@@ -165,21 +227,13 @@ std::string preprocess_bms_control_flow(std::string_view content,
             line.pop_back();
         }
 
-        std::string candidate = strip_comment(line);
-        std::string key;
-        std::string value;
-        if (!candidate.empty() && candidate.front() == '#') {
-            std::string command = trim(std::string_view(candidate).substr(1));
-            const auto separator = command.find_first_of(" \t:");
-            key = separator == std::string::npos ? command : command.substr(0, separator);
-            value = separator == std::string::npos
-                        ? std::string{}
-                        : parse_header_value(std::string_view(command).substr(separator));
-            to_upper_ascii(key);
-        }
+        auto header = bms_control_header(line);
+        const auto& key = header.first;
+        const auto& value = header.second;
 
         bool control_line = true;
         if (key == "RANDOM" || key == "SETRANDOM") {
+            has_random_directives = true;
             const bool parent_active = current_active();
             int range_or_value = 0;
             if (!parse_positive(value, range_or_value)) {
@@ -194,6 +248,21 @@ std::string preprocess_bms_control_flow(std::string_view content,
         } else if (key == "ENDRANDOM") {
             close_frame(BmsControlFrameKind::Random, key);
         } else if (key == "IF") {
+            if (repair_control_flow && !frames.empty() && frames.back().kind == BmsControlFrameKind::If) {
+                std::size_t open_ifs = 0;
+                for (auto it = frames.rbegin(); it != frames.rend() && it->kind == BmsControlFrameKind::If; ++it) {
+                    ++open_ifs;
+                }
+                const bool in_random_scope = frames.size() > open_ifs &&
+                    frames[frames.size() - open_ifs - 1u].kind == BmsControlFrameKind::Random;
+                if (in_random_scope && open_ifs + 1u > if_terminator_budgets[line_number - 1u]) {
+                    // Some authored charts write IF 1 / IF 2 / ... / ENDIF
+                    // as siblings. Recover only if the enclosing RANDOM has
+                    // too few ENDIFs left to represent valid nested IFs.
+                    frames.pop_back();
+                    warn(line_number, "Missing #ENDIF before a sibling #IF; previous branch was closed.");
+                }
+            }
             const bool parent_active = current_active();
             int label = 0;
             if (!parse_positive(value, label)) {
@@ -230,6 +299,7 @@ std::string preprocess_bms_control_flow(std::string_view content,
         } else if (key == "ENDIF") {
             close_frame(BmsControlFrameKind::If, key);
         } else if (key == "SWITCH" || key == "SETSWITCH") {
+            has_random_directives = true;
             const bool parent_active = current_active();
             int range_or_value = 0;
             if (!parse_positive(value, range_or_value)) {
@@ -291,7 +361,10 @@ std::string preprocess_bms_control_flow(std::string_view content,
         output << '\n';
     }
 
-    if (!frames.empty()) {
+    const bool unclosed_required_frame = std::any_of(frames.begin(), frames.end(), [](const BmsControlFrame& frame) {
+        return frame.kind != BmsControlFrameKind::Random;
+    });
+    if (!frames.empty() && (!repair_control_flow || unclosed_required_frame)) {
         warn(line_number, "BMS control-flow block reached end of file without a matching terminator.");
     }
     return output.str();
@@ -881,7 +954,8 @@ bool BmsParseResult::success() const {
 BmsParseResult BmsParser::parse(std::string_view content, const BmsParserOptions& options) const {
     BmsParseResult result;
     std::string cleaned = remove_bom(normalize_bms_text(content));
-    cleaned = preprocess_bms_control_flow(cleaned, options.random_seed, result.messages);
+    cleaned = preprocess_bms_control_flow(cleaned, options.random_seed, options.control_flow_version,
+                                         result.chart.has_random_directives, result.messages);
     std::unordered_set<std::string> metadata_lane_channels;
 
     std::istringstream stream(cleaned);

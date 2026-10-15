@@ -66,6 +66,7 @@ std::string song_group_section_label(MenuApp::SongGroupMode mode, const SongEntr
 }  // namespace
 
 std::string MenuApp::difficulty_table_display_name() {
+    if (difficulty_table_loading()) return ui_text("Loading...", "로딩 중");
     if (config_.ui.difficulty_table_path.empty()) return ui_text("Native LV", "기본 LV");
     if (const auto* builtin = config::builtin_difficulty_table(config_.ui.difficulty_table_url)) {
         return ui_text(builtin->name_en, builtin->name_ko);
@@ -106,7 +107,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
     render.song_select.difficulty_table_active = !config_.ui.difficulty_table_path.empty();
     render.song_select.difficulty_table_editing = difficulty_table_url_editing_;
     render.song_select.difficulty_table_url_input = difficulty_table_url_input_;
-    render.song_select.difficulty_table_status = song_browser_status_message_;
+    render.song_select.difficulty_table_status = difficulty_table_loading()
+        ? ui_text("Loading...", "로딩 중") : song_browser_status_message_;
     render.song_select.profile_avatar_path = config_.ui.profile_avatar_path;
     render.song_select.quick_settings_focused =
         song_select_view_ == SongSelectView::Songs &&
@@ -789,7 +791,7 @@ void MenuApp::populate_song_browser_render_data(render::MenuRenderData& render) 
     render.generic.rows.back().secondary_selected = settings_cursor_ == 4;
     append_menu_row(render.generic,
                     ui_text("Difficulty Table", "난이도표"),
-                    difficulty_table_url_editing_
+                    difficulty_table_url_editing_ && !difficulty_table_loading()
                         ? (safe_ui_text(difficulty_table_url_input_,
                                         ui_text("URL", "URL")) +
                            "|")

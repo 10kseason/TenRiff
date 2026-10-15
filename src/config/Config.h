@@ -21,6 +21,8 @@ inline constexpr double kVisualOffsetMin = -500.0;
 inline constexpr double kVisualOffsetMax = 500.0;
 inline constexpr double kSoundOffsetMin = -500.0;
 inline constexpr double kSoundOffsetMax = 500.0;
+inline constexpr double kInputDebounceWindowMin = 0.0;
+inline constexpr double kInputDebounceWindowMax = 20.0;
 inline constexpr double kGameplayFieldOffsetXMin = -720.0;
 inline constexpr double kGameplayFieldOffsetXMax = 720.0;
 inline constexpr double kGameplayFieldOffsetXDefault = 0.0;
@@ -122,8 +124,9 @@ struct AudioUiConfig {
     std::string title_music = "default";
     double master_volume = 0.10;
     // Chart-wide gain is independent of TenRiff menu/scene music.
-    double gameplay_volume = 1.0;
+    double gameplay_volume = 0.20;
     double menu_music_volume = 1.0;
+    // Legacy profile fields round-trip for older clients; playback ignores them.
     double bgm_volume = 1.0;
     double keysound_volume = 1.0;
     bool normalize_audio = false;

@@ -305,6 +305,207 @@ TEST_CASE("BMS SETRANDOM and SETSWITCH support exact branches skip and default")
     CHECK(result.chart.commands.front().data == "02");
 }
 
+TEST_CASE("BMS RANDOM selects exactly one authored section and reaches every label") {
+    // Model section-local pattern gimmicks: common notes must survive while the
+    // selected branch supplies its own notes, keysound and timing definitions.
+    std::string data = "#00111:01\n#RANDOM 12\n";
+    for (int label = 1; label <= 12; ++label) {
+        data += "#IF " + std::to_string(label) + "\n";
+        data += "#PLAYLEVEL " + std::to_string(label) + "\n";
+        data += "#WAV01 branch" + std::to_string(label) + ".wav\n";
+        data += "#BPM01 " + std::to_string(120 + label) + "\n";
+        data += "#00212:0100\n#00208:01\n#ENDIF\n";
+    }
+    data += "#ENDRANDOM\n#00313:01\n";
+
+    std::array<bool, 12> seen{};
+    BmsParser parser;
+    for (uint32_t seed = 0; seed < 256; ++seed) {
+        BmsParserOptions options;
+        options.random_seed = seed;
+        const auto selected = parser.parse(data, options);
+        REQUIRE(selected.success());
+        REQUIRE(selected.chart.commands.size() == 4u);
+        CHECK(selected.chart.commands[0].measure == 1);
+        CHECK(selected.chart.commands[1].measure == 2);
+        CHECK(selected.chart.commands[2].channel == "08");
+        CHECK(selected.chart.commands[3].measure == 3);
+        const int label = std::stoi(selected.chart.headers.at("PLAYLEVEL"));
+        REQUIRE(label >= 1);
+        REQUIRE(label <= 12);
+        seen[static_cast<std::size_t>(label - 1)] = true;
+        CHECK(selected.chart.wav.at("01") == "branch" + std::to_string(label) + ".wav");
+        CHECK(selected.chart.bpm.at("01") == doctest::Approx(120 + label));
+    }
+    CHECK(std::all_of(seen.begin(), seen.end(), [](bool visited) { return visited; }));
+}
+
+TEST_CASE("BMS nested RANDOM restores its parent selection and suppresses inactive draws") {
+    const char* inactive_prefix =
+        "#SETRANDOM 2\n"
+        "#IF 1\n"
+        "#RANDOM 31\n#IF 1\n#TITLE Inactive\n#ENDIF\n#ENDRANDOM\n"
+        "#ELSEIF 2\n"
+        "#SETRANDOM 1\n#IF 1\n#00111:01\n#ELSE\n#00112:02\n#ENDIF\n#ENDRANDOM\n"
+        "#ENDIF\n"
+        "#IF 2\n#00213:03\n#ENDIF\n"
+        "#ENDRANDOM\n";
+    const char* random_suffix =
+        "#RANDOM 2\n#IF 1\n#TITLE First\n#ELSE\n#TITLE Second\n#ENDIF\n#ENDRANDOM\n";
+    BmsParser parser;
+    for (uint32_t seed = 0; seed < 32; ++seed) {
+        BmsParserOptions options;
+        options.random_seed = seed;
+        const auto nested = parser.parse(std::string(inactive_prefix) + random_suffix, options);
+        const auto baseline = parser.parse(random_suffix, options);
+        REQUIRE(nested.success());
+        REQUIRE(baseline.success());
+        REQUIRE(nested.chart.commands.size() == 2u);
+        CHECK(nested.chart.commands[0].channel == "11");
+        CHECK(nested.chart.commands[1].channel == "13");
+        CHECK(nested.chart.headers.at("TITLE") == baseline.chart.headers.at("TITLE"));
+    }
+}
+
+TEST_CASE("BMS independent RANDOM sections keep common notes without explicit ENDRANDOM") {
+    // ENDRANDOM is an extension, not a requirement of the original BM98 syntax.
+    const char* data =
+        "#RANDOM 1\n#IF 1\n#00111:01\n#ENDIF\n"
+        "#RANDOM 1\n#IF 1\n#00212:02\n#ENDIF\n"
+        "#00313:03\n";
+    BmsParser parser;
+    const auto result = parser.parse(data);
+    REQUIRE(result.success());
+    REQUIRE(result.chart.commands.size() == 3u);
+    CHECK(result.chart.commands[0].measure == 1);
+    CHECK(result.chart.commands[1].measure == 2);
+    CHECK(result.chart.commands[2].measure == 3);
+    CHECK_FALSE(has_message(result, BmsParseSeverity::Warning));
+
+    BmsParserOptions legacy_options;
+    legacy_options.control_flow_version = 1;
+    const auto legacy = parser.parse(data, legacy_options);
+    REQUIRE(legacy.success());
+    CHECK(legacy.chart.commands.size() == 3u);
+    CHECK(has_message(legacy, BmsParseSeverity::Warning));
+}
+
+TEST_CASE("BMS RANDOM recovers provably missing sibling ENDIF and preserves legacy output") {
+    // Reduced syntax from an authored four-way gimmick: IF 1/2/3/4 share
+    // one final ENDIF. No chart notes or assets from the source are copied.
+    const char* body =
+        "#IF 1\n#03211:01\n"
+        "#IF 2\n#03212:01\n"
+        "#IF 3\n#03213:01\n"
+        "#IF 4\n#03214:01\n"
+        "#ENDIF\n#ENDRANDOM\n#03315:01\n";
+    BmsParser parser;
+    for (int selected = 1; selected <= 4; ++selected) {
+        const std::string data = "#00011:01\n#SETRANDOM " + std::to_string(selected) + "\n" + body;
+        const auto repaired = parser.parse(data);
+        REQUIRE(repaired.success());
+        REQUIRE(repaired.chart.commands.size() == 3u);
+        CHECK(repaired.chart.commands[0].measure == 0);
+        CHECK(repaired.chart.commands[1].channel == "1" + std::to_string(selected));
+        CHECK(repaired.chart.commands[2].measure == 33);
+        CHECK(has_message(repaired, BmsParseSeverity::Warning));
+
+        BmsParserOptions legacy_options;
+        legacy_options.control_flow_version = 1;
+        const auto legacy = parser.parse(data, legacy_options);
+        REQUIRE(legacy.success());
+        // Historical parser drops the rest of the file after the unresolved
+        // nested IFs. Old replays must continue to see exactly that chart.
+        REQUIRE(legacy.chart.commands.size() == (selected == 1 ? 2u : 1u));
+        CHECK(legacy.chart.commands.front().measure == 0);
+        if (selected == 1) {
+            CHECK(legacy.chart.commands.back().channel == "11");
+            CHECK(legacy.chart.commands.back().measure == 32);
+        }
+    }
+}
+
+TEST_CASE("BMS RANDOM recovery preserves valid nested IF and inactive parent branches") {
+    const char* nested =
+        "#SETRANDOM 2\n#IF 2\n#00111:01\n"
+        "#IF 2\n#00212:01\n#ENDIF\n"
+        "#ELSEIF 2\n#00313:01\n#ELSE\n#00414:01\n#ENDIF\n"
+        "#ENDRANDOM\n#00515:01\n";
+    BmsParser parser;
+    for (int version : {1, 2}) {
+        BmsParserOptions options;
+        options.control_flow_version = version;
+        const auto result = parser.parse(nested, options);
+        REQUIRE(result.success());
+        REQUIRE(result.chart.commands.size() == 3u);
+        CHECK(result.chart.commands[0].measure == 1);
+        CHECK(result.chart.commands[1].measure == 2);
+        CHECK(result.chart.commands[2].measure == 5);
+        CHECK_FALSE(has_message(result, BmsParseSeverity::Warning));
+    }
+
+    const auto inactive = parser.parse(
+        "#SETRANDOM 1\n#IF 2\n"
+        "#SETRANDOM 2\n#IF 1\n#00111:01\n#IF 2\n#00212:01\n#ENDIF\n#ENDRANDOM\n"
+        "#ELSE\n#00313:01\n#ENDIF\n#ENDRANDOM\n#00414:01\n");
+    REQUIRE(inactive.success());
+    REQUIRE(inactive.chart.commands.size() == 2u);
+    CHECK(inactive.chart.commands[0].measure == 3);
+    CHECK(inactive.chart.commands[1].measure == 4);
+}
+
+TEST_CASE("BMS RANDOM numeric comments are versioned without altering header text") {
+    const char* data =
+        "#TITLE https://example.invalid/branch\n"
+        "#WAV01 sound//alternate.wav\n"
+        "#SETRANDOM 2 // choose the second section\n"
+        "#IF 1\n#00111:01\n#ENDIF\n"
+        "#IF 2 // selected\n#00112:01\n#ENDIF\n#ENDRANDOM\n"
+        "#SETSWITCH 2 // same numeric comment syntax\n"
+        "#CASE 1\n#00211:01\n#SKIP\n"
+        "#CASE 2 // selected\n#00212:01\n#SKIP\n#ENDSW\n";
+    BmsParser parser;
+    const auto repaired = parser.parse(data);
+    REQUIRE(repaired.success());
+    REQUIRE(repaired.chart.commands.size() == 2u);
+    CHECK(repaired.chart.commands[0].channel == "12");
+    CHECK(repaired.chart.commands[1].channel == "12");
+    CHECK(repaired.chart.headers.at("TITLE") == "https://example.invalid/branch");
+    CHECK(repaired.chart.wav.at("01") == "sound//alternate.wav");
+    CHECK_FALSE(has_message(repaired, BmsParseSeverity::Warning));
+
+    BmsParserOptions legacy_options;
+    legacy_options.control_flow_version = 1;
+    const auto legacy = parser.parse(data, legacy_options);
+    REQUIRE(legacy.success());
+    REQUIRE(legacy.chart.commands.size() == 2u);
+    CHECK(legacy.chart.commands[0].channel == "11");
+    CHECK(legacy.chart.commands[1].channel == "11");
+}
+
+TEST_CASE("BMS RANDOM branch metadata detects all directives including inactive controls") {
+    BmsParser parser;
+    CHECK_FALSE(parser.parse("#TITLE RANDOM is only text\n#00111:01\n").chart.has_random_directives);
+    for (const char* directive : {"RANDOM", "SETRANDOM", "SWITCH", "SETSWITCH"}) {
+        BmsParserOptions options;
+        options.metadata_only = true;
+        const std::string inactive = "#IF 1\n#" + std::string(directive) + " 2\n";
+        CHECK(parser.parse(inactive, options).chart.has_random_directives);
+        options.control_flow_version = 1;
+        CHECK(parser.parse(inactive, options).chart.has_random_directives);
+    }
+}
+
+TEST_CASE("BMS RANDOM bounded recovery does not hide missing required terminators") {
+    BmsParser parser;
+    const auto unfinished_if = parser.parse("#SETRANDOM 1\n#IF 1\n#00111:01\n");
+    CHECK(unfinished_if.success());
+    CHECK(has_message(unfinished_if, BmsParseSeverity::Warning));
+    const auto unfinished_switch = parser.parse("#SETSWITCH 1\n#CASE 1\n#00111:01\n");
+    CHECK(unfinished_switch.success());
+    CHECK(has_message(unfinished_switch, BmsParseSeverity::Warning));
+}
+
 TEST_CASE("parses measure commands with even tokens") {
     const char* data =
         "#00111:0100\n"

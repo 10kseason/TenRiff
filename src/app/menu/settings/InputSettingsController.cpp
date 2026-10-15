@@ -8,7 +8,6 @@ namespace tenriff::app::menu::settings {
 namespace {
 
 constexpr std::array<int, 4> kPollingOptions{1000, 2000, 4000, 8000};
-constexpr std::array<int, 7> kDebounceMsOptions{0, 2, 4, 6, 8, 10, 12};
 
 template <std::size_t Size>
 int cycle_nearest_option(const std::array<int, Size>& options, int current, int direction) {
@@ -154,12 +153,16 @@ MenuEffectFlags InputSettingsController::apply_selected_action(
             return mark_changed(false);
         }
         case InputSettingId::Debounce: {
-            const int current = static_cast<int>(std::llround(runtime.input.debounce_ms));
-            const int next = cycle_nearest_option(kDebounceMsOptions, current, action.direction);
-            if (runtime.input.debounce_ms == static_cast<double>(next)) {
+            const double current = std::isfinite(runtime.input.debounce_ms)
+                ? std::clamp(runtime.input.debounce_ms,
+                             config::kInputDebounceWindowMin, config::kInputDebounceWindowMax)
+                : 0.0;
+            const double next = std::clamp(std::round(current + action.direction),
+                                          config::kInputDebounceWindowMin, config::kInputDebounceWindowMax);
+            if (runtime.input.debounce_ms == next) {
                 return {};
             }
-            runtime.input.debounce_ms = static_cast<double>(next);
+            runtime.input.debounce_ms = next;
             return mark_changed(false);
         }
         case InputSettingId::Back:

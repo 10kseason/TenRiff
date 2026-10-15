@@ -1,5 +1,13 @@
 # TenRiff Gameplay Guide
 
+**2026-10-15 · 1.9.1:** ユーザー承認の1.9.1に、先の音量・入力・後奏修正、BMS TOTAL/RANDOM互換性、結果の色と10マークを含めます。ホームの言語ボタンはEN → KO → JA → ZHの順に切り替えて保存します。新しいBMSゲージ・分岐記録はサーバー検証が対応するまでローカル専用です。固定基準は1.9.0で、旧リリース・インストール・プロファイルを保持します。下の日付付きローカル記録の版維持・未公開表記は当時の状態であり、現在はこの1.9.1の範囲を基準とします。 [変更・互換性](feedback-1.9.1.ja.md) · [リリース検証手順](release-1.9.1-gate.md).
+
+**2026-10-15 · BMS TOTAL・RANDOM・結果/ロゴの追加変更 — 未公開・ローカルビルドとCTest回帰検証通過:** 1.9.0.2を基にしたローカル作業です。結果のレベル表示を選曲ロビーと同じ赤いレベル文字・キーモード別の記号色に揃え、ロゴを提供された10形のマークへ変更します。新しい通常BMSプレイは#TOTALとノート数に基づくLR2系の回復・ダメージを使い、譜面内#RANDOMの分岐はレーンランダムとは独立したシードで選択します。過去のリプレイは元の動作を維持します。先の音量統合も含みます。公開済み1.9.0.2・固定基準1.9.0・バージョン番号は変更しません。 [計算式・分岐・互換性と検証範囲（英語）](bms-total-random-followup.en.md).
+
+**1.9.1 BMS音量：** このガイドでは伴奏とキー音に共通で適用するBMS演奏音量を説明します。[設定・互換性](config.ja.md#audio)。
+
+1.9.1では難易度表の読み込み状態を表示し、debounceのUIを1ms刻み・最大20ms（既定0ms）にします。従来の5→8ms自動補正は廃止し、保存した5msと8msをそれぞれ保持します。スキンの韓国語表示名は `LN 끝 줄임` となり、形状・判定動作は変わりません。通常のシングルプレイで最後まで聴く設定が有効なら、最後のノート・LN終端処理後の `Esc` は一時停止を開かず後奏を飛ばして結果へ進みます。
+
 1.9.0.1ではプロフィールでHi-Speed -10/+10を指定します（既定F5/F6、範囲0.50–50.00）。Xbox/XInputのデジタルボタンとLT/RTをKeymapで押すとレーンに、プロフィールでは再試行・Hi-Speed操作に割り当てられます。メニューは方向パッドで移動、Aで選択、Bで戻り、他の操作に未割当のStartでゲームを一時停止します。LT/RTは30/255を超えると押下です。スティック軸と振動は今回の範囲外です。[変更・互換性](feedback-20261015.ja.md)。
 
 1.9.0リリースでは `Options > Key Mode Settings > Judge Window` から通常/Hard/EXを選択します。Easyは新しい選択肢から外し、過去のリプレイでは維持します。選択は実行中のみ有効で、再起動後は通常に戻ります。[EX判定と互換性](judge-ex-1.9.0.ko.md)（韓国語）。
@@ -39,6 +47,8 @@ Windows では通常、次のどちらかで起動します。
 ## 3. 基本メニュー操作
 
 ### Title
+
+ホームの言語ボタンは **EN → KO → JA → ZH → EN** の順で切り替えます。既存の `ui.language` に保存し、再起動後も保持します。訳がない文言は英語にフォールバックする場合があります。
 - `Up` / `Down`: メニュー移動
 - `Enter`: 決定
 - `Esc`: 終了
@@ -58,13 +68,14 @@ Windows では通常、次のどちらかで起動します。
 - `Esc`: 前の画面に戻る
 - `-` / `+`: 次の play の Rate を即時調整
 - `F5`: 曲ライブラリを再インデックス。実行中は stage / percent / ETA と progress bar を中央表示
-- 中央下部の難易度表カード: 名前・URL で編集、File でローカル JSON、Reset で標準 LV。Enter で URL 適用、Esc で取消。Sort / Filter 内の難易度表行も使用できます。
+- 難易度表カード（標準ネイティブ配置ではSong Library横の上部）: 名前・URL で編集、File でローカル JSON、Reset で標準 LV。Enter で URL 適用、Esc で取消。Sort / Filter 内の難易度表行も使用できます。
+- 難易度表の読み込み中は読み込み状態を表示します。
 
 ### Song Select からよく使う画面
 - `Mode`
   - Ghost Battle、Autoplay、Practice、Sudden Death、Key Mode、Gauge、Random、Mods、Rate、Hi-Speed を調整
 - `Audio`
-  - Master / BGM / Keysound volume と BMS keysound policy を調整
+  - Master・BMS Performance・TenRiff Menu Music の音量とBMSキー音モードを調整
 - `Graphics`
   - VSync、Refresh Hz、Performance HUD、BGA 表示、external ONNX BGA Upscaler を調整
   - `BGA` を off にすると gameplay image/video background と decoder/upscaler 処理を無効化し、Song Select preview は維持
@@ -127,6 +138,7 @@ client 側の設定は Discord の [公式 Game Overlay guide](https://support.d
 
 - 譜面キー入力: 現在の keymap に従う
 - `Esc`: 通常の single-player を直ちに一時停止します。Continue または Esc で3/2/1カウントダウン後に再開し、その間は音声・譜面時刻・判定が停止します。再開カウントダウン中の Esc は一時停止メニューへ戻ります。
+- 最後まで聴く設定（`play_to_end=true`）が有効な通常のシングルプレイでは、最後のノート・LN終端処理後の `Esc` で後奏を飛ばし直接結果へ進みます。一時停止は開かず、自動プレイ・リプレイにも適用します。
 - Session Mix のプレイ中は Esc を無視します。曲間の結果画面の終了操作と multiplayer の Esc 中止は維持します。
 - `F3`: Hi-Speed を下げる
 - `F4`: Hi-Speed を上げる
@@ -204,6 +216,8 @@ Casual Score は最大 10,000 点で、judgement weight は `PG 6 / GR 3 / GD 1 
 
 ### Gauge
 
+**1.9.1 BMS動作:** 新しい通常BMSプレイではNormal/Easyの回復に `TOTAL / N` を使い、Hard/EXは固定回復とTOTAL・ノート数によるダメージ補正を使います。`N`は有効なノートの開始点数で、LN一本を一個と数えます。Hardは32%未満で判定ダメージが0.6倍です。開始100%・0%で失敗・ゲージシフト・判定分類・LN開始/終端の0.5重み・地雷ダメージはTenRiffの規則を維持します。コースは従来のコースゲージ、対戦はv1を維持します。既存 `gauge.delta` は過去のリプレイ用に残し、新しいBMS v2の計算には使いません。
+
 Gauge Shift は常に有効です。`EX / Hard / Normal / Easy` は開始段階で、保存値は `ex_hard / hard / normal / easy` です。選択段階と下位段階をそれぞれ 100% から並列計算します。現在の段階が 0% で脱落すると、同じ判定履歴を累積した次の生存段階へ移り、終了時の最上位生存段階が結果になります。対象段階がすべて脱落するとゲージ失敗です。
 
 段位/Session Mix は曲間で引き継ぐ LR2 参照ゲージを使用し、間接ミスを維持して HP 2% 未満で失敗します。通常 LN は完走/解除時に一度だけ反映し、通常の `gauge.delta` は適用しません。[比較と互換範囲](lr2-gauge-audit.ko.md)を参照してください。
@@ -243,11 +257,13 @@ Gauge Shift は常に有効です。`EX / Hard / Normal / Easy` は開始段階�
 - `Skins > Visual Latency` を調整する
 - 正の値はノートをより早く描画する
 
-### BMS keysound が大きすぎる/小さすぎる
-- `Audio > Keysound Volume` を調整する
-- BGM と別々に調整できる
+### BMS曲やキー音が大きすぎる/小さすぎる
+
+- `Audio > BMS Performance Volume` で伴奏とキー音をまとめて調整します。最終音量には `Master Volume` も適用されます。
+- キー音だけをBGMより大きく、または小さくする個別音量はありません。
 - `follow` でも無音になり得た late-input 経路は 1.2.6 で修正され、判定時刻は維持したまま可聴開始だけを現在書き込み可能な buffer へ固定する
-- まだ無音なら `Keysound Mode=follow`、0 以外の volume、譜面の `#WAV` asset path を確認する
+- キー音が聞こえない場合は `Keysound Mode` を確認します。`follow` はノート入力時、`autoplay` は譜面時刻に再生し、Offはキー音を消します。このモードはBGMとの音量比を変更しません。
+- MasterとBMS Performanceの両方が0より大きいこと、譜面の `#WAV` ファイルパスが正しいことも確認します。
 
 ### 入力が不安定、またはキー競合が疑わしい
 - `Options > Keymap > NKRO Test` で複数キー同時押しを確認する
@@ -268,3 +284,7 @@ Gauge Shift は常に有効です。`EX / Hard / Normal / Easy` は開始段階�
 - 設定構造: [`docs/config.ja.md`](config.ja.md)
 - menu 構造: [`docs/menu.ja.md`](menu.ja.md)
 - play loop / engine 構造: [`docs/core-loop.ja.md`](core-loop.ja.md)
+
+**譜面内の分岐:** `#RANDOM N` は1からNの整数を選び、対応する `#IF` 区間のノート・音源・タイミング命令を適用します。別の分岐を重ねて再生しません。レーンランダムがOFFでも新しい試行では分岐シードを更新するため、譜面の仕掛けが変わる場合があります。同じ分岐が再度選ばれることもあります。リプレイは当時の選択を維持します。新しい記録は現在ローカル専用です。
+
+[計算式・分岐・互換性と検証範囲（英語）](bms-total-random-followup.en.md).

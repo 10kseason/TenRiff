@@ -24,6 +24,9 @@ struct BmsParserOptions {
     // explicit makes repeated chart loads and replay playback select the same
     // #RANDOM/#SWITCH branches.
     uint32_t random_seed = 0;
+    // Version 1 reproduces historical replay parsing. Version 2 also accepts
+    // control-number comments and bounded missing-ENDIF recovery in authored BMS.
+    int control_flow_version = 2;
 };
 
 enum class BmsParseSeverity {
@@ -54,6 +57,9 @@ struct BmsChart {
     double base_bpm = 0.0;
     // Preserve the chart extent even when indexing discards BGM/media payloads.
     int last_measure_index = 0;
+    // Includes directives in inactive branches; session setup uses this to keep
+    // authored branch randomness independent of the lane-randomization seed.
+    bool has_random_directives = false;
     int declared_key_count = 0;
     std::string layout_label;
     std::vector<BmsMeasureCommand> commands;

@@ -384,7 +384,8 @@ ChartLoadResult ChartLoader::load(const std::string& path,
                                   double rate,
                                   std::string_view bms_keysound_policy,
                                   uint32_t bms_random_seed,
-                                  int bms_timing_version) const {
+                                  int bms_timing_version,
+                                  int bms_control_flow_version) const {
     ChartLoadResult result;
     AssetLookupIndex asset_lookup;
 
@@ -402,6 +403,7 @@ ChartLoadResult ChartLoader::load(const std::string& path,
     chart::BmsParser parser;
     chart::BmsParserOptions parser_options;
     parser_options.random_seed = bms_random_seed;
+    parser_options.control_flow_version = bms_control_flow_version;
     auto parse_result = parser.parseFile(file_path.u8string(), parser_options);
     append_bms_messages(result.messages, parse_result.messages);
     if (!parse_result.success()) {

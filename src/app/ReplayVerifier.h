@@ -52,6 +52,10 @@ struct ReplayVerificationResult {
     bool claims_match = false;
     bool official_eligible = false;
     int bms_timing_version = 1;
+    // Optional compatibility metadata: missing fields retain historical BMS behavior.
+    int bms_gauge_version = 1;
+    int bms_control_flow_version = 1;
+    std::optional<uint32_t> bms_random_seed;
 
     [[nodiscard]] bool verified() const {
         return status == ReplayVerificationStatus::Verified;

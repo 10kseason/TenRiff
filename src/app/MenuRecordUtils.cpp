@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <fstream>
+#include <limits>
 #include <sstream>
 
 #include "config/SimpleJson.h"
@@ -481,6 +482,25 @@ std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path&
     out.stats.negative_delta_count = read_json_int(*stats_obj, "negative_delta_count", 0);
     const double stddev_delta_ms = read_json_number(*stats_obj, "stddev_delta_ms", 0.0);
     out.mods = read_json_string_array(*root, "mods");
+    for (const auto& field : {std::pair<const char*, int*>{"bms_gauge_version", &out.bms_gauge_version},
+                              {"bms_control_flow_version", &out.bms_control_flow_version}}) {
+        if (const auto* version = find_json_value(*root, field.first)) {
+            if (!version->is_number() || (version->as_number() != 1.0 && version->as_number() != 2.0)) {
+                if (error) *error = std::string("Unsupported BMS policy in result: ") + field.first;
+                return std::nullopt;
+            }
+            *field.second = static_cast<int>(version->as_number());
+        }
+    }
+    if (const auto* seed = find_json_value(*root, "bms_random_seed")) {
+        const double value = seed->as_number();
+        if (!seed->is_number() || !std::isfinite(value) || std::floor(value) != value ||
+            value < 0.0 || value > static_cast<double>(std::numeric_limits<uint32_t>::max())) {
+            if (error) *error = "Invalid BMS random seed in result.";
+            return std::nullopt;
+        }
+        out.bms_random_seed = static_cast<uint32_t>(value);
+    }
     if (const auto* version = find_json_value(*root, "bms_timing_version")) {
         if (!version->is_number() || (version->as_number() != 1.0 && version->as_number() != 2.0)) {
             if (error) *error = "Unsupported BMS timing version in result.";
@@ -591,6 +611,9 @@ std::optional<ParsedReplayRecord> parse_replay_file(const std::filesystem::path&
     out.long_note_mix_version = replay.mode.long_note_mix_version;
     out.key_conversion_version = replay.mode.key_conversion_version;
     out.bms_timing_version = replay.mode.bms_timing_version;
+    out.bms_gauge_version = replay.mode.bms_gauge_version;
+    out.bms_control_flow_version = replay.mode.bms_control_flow_version;
+    out.bms_random_seed = replay.mode.bms_random_seed;
     out.rate_multiplier = replay.rate_multiplier;
     out.score_multiplier = replay.score_multiplier;
     out.pause_used = replay.pause_used;

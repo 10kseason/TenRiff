@@ -13,7 +13,7 @@
     "background_sound_enabled": true,
     "title_music": "default",
     "volume": 0.1,
-    "gameplay_volume": 1.0,
+    "gameplay_volume": 0.2,
     "menu_music_volume": 1.0,
     "bgm_volume": 1.0,
     "keysound_volume": 1.0,

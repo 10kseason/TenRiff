@@ -389,7 +389,7 @@
         const float metadata_width = (song_panel.right - song_panel.left - 88.0f) / 2.0f;
         for (std::size_t index = 0; index < chart_metadata.size(); ++index) {
             const float left = song_panel.left + 44.0f + metadata_width * static_cast<float>(index);
-            auto* value_brush = index == 1 ? semantic_brush(0xC2A0FF) : d2d_->text_brush.Get();
+            auto* value_brush = index == 1 ? semantic_brush(kDifficultyLevelColor) : d2d_->text_brush.Get();
             draw_result_text(chart_metadata[index].first,
                              d2d_->result_label_format.Get(),
                              native_rect("result_single.rect.015", D2D1::RectF(left, song_panel.top + 494.0f,
@@ -401,9 +401,10 @@
             if (index == 1) {
                 const float saved_opacity = value_brush->GetOpacity();
                 value_brush->SetOpacity(saved_opacity * presentation.information);
-                draw_difficulty_label(to_wide(chart_metadata[index].second), d2d_->song_metadata_value_format.Get(),
+                draw_difficulty_label(to_wide(difficulty_display_label(chart_metadata[index].second,
+                                      data.result.difficulty_is_aery_five_key)), d2d_->song_metadata_value_format.Get(),
                                       value_rect, value_brush, data.result.difficulty_is_aery_five_key,
-                                      DWRITE_TEXT_ALIGNMENT_CENTER);
+                                      DWRITE_TEXT_ALIGNMENT_CENTER, data.result.difficulty_prefix_key_count);
                 value_brush->SetOpacity(saved_opacity);
             } else {
                 draw_result_text(chart_metadata[index].second, d2d_->song_metadata_value_format.Get(),

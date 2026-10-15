@@ -36,9 +36,9 @@ namespace tenriff::app {
 
 namespace {
 
-// v16 did not retain general SUBARTIST credits, so its derived display strings
-// need one rescan. The cache keys and source chart bytes remain unchanged.
-constexpr int kSongIndexVersion = 18; // BPM/STOP timing changes duration and difficulty.
+// v18 predates corrected BMS control flow and can retain truncated/empty RANDOM
+// charts even when source mtime/size match. Rebuild derived metadata once.
+constexpr int kSongIndexVersion = 19;
 constexpr std::uintmax_t kMaxMetadataChartFileBytes = 8u * 1024u * 1024u;
 
 bool cancel_requested(const SongIndexCancelCallback& cancel) {

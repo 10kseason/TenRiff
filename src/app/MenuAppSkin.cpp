@@ -939,7 +939,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::GearBoundary), false, true);
     append_menu_row(render.generic, ui_text("LN Tail Cap", "LN 끝 표시"), ui_on_off(config_.skin.show_hold_tail),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::ShowHoldTail), false, true);
-    append_menu_row(render.generic, ui_text("LN Tail Taper", "LN 끝 사기롱놋화"), ui_on_off(config_.skin.hold_tail_taper_enabled),
+    append_menu_row(render.generic, ui_text("LN Tail Taper", "LN 끝 줄임"), ui_on_off(config_.skin.hold_tail_taper_enabled),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::LnTailTaper), false, true);
     append_menu_row(render.generic, ui_text("Lane Tint Opacity", "레인 색상 농도"),
                     format_percent(config_.skin.lane_background_opacity),

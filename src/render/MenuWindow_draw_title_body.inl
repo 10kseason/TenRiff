@@ -248,7 +248,10 @@
             const float guide_top =
                 data.performance.visible ? std::max(button_stack_top + 26.0f, overlay_rect.bottom + 26.0f)
                                          : (button_stack_top + 26.0f);
-            const float guide_bottom = std::max(guide_top + 220.0f, bands.body_bottom - 24.0f);
+            // Reserve the lower-right language button in the default legacy
+            // layout. Explicit skin guide rectangles retain their authored size.
+            const float guide_bottom = std::min(std::max(guide_top + 220.0f, bands.body_bottom - 24.0f),
+                                                std::max(guide_top + 1.0f, bands.footer_top - 112.0f));
             const D2D1_RECT_F guide_rect =
                 skin_layout_rect(data, "title.guide",
                                  native_rect("title.rect.013", D2D1::RectF(1492.0f, guide_top, 1834.0f, guide_bottom)));

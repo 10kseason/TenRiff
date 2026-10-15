@@ -2,6 +2,8 @@
 
 > Document scope: includes early designs, improvement proposals and dated analysis. Uncompleted proposals and historical measurements are not current behavior, defaults or performance guarantees. See [current state](current-state.en.md) and [configuration](config.en.md).
 
+**2026-10-15 · Unreleased keyboard debounce follow-up — local build and CTest regression passed:** `0ms` preserves existing fast repeats. A positive value suppresses the next Press from the same key and physical input source when it arrives less than the configured interval after Release; a Press exactly at the boundary is accepted. Real Release events are neither delayed nor dropped. Intentional fast represses inside this interval can also be suppressed. RawInput/Polling mirrors cannot bypass the filter, and physical keyboards identified by RawInput are tracked independently. Polling itself does not distinguish physical device IDs. XInput keeps its separate GamepadTracker path without this keyboard filter. The historical design statements below about preserving every real Press/Release describe the new time filter at 0ms. Physical latency improvements and device-specific feel remain unverified.
+
 TenRiff prioritizes minimal input-to-judgement-to-sound latency (<20 ms end-to-end). This note consolidates the follow-up items from the four development manuals to tighten the pipeline while keeping the "Raw Input -> SPSC queue -> Audio thread judgement" philosophy intact.
 
 ## Input Pipeline and Timestamping

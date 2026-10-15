@@ -3,6 +3,15 @@
 #include "render/TextFit.h"
 #include "render/DifficultyLabel.h"
 
+TEST_CASE("song and result difficulty display retain only the Aery five badge") {
+    using tenriff::render::difficulty_display_label;
+    CHECK(difficulty_display_label("\xE2\x91\xA4LEVEL 12", true) == "\xE2\x91\xA4LEVEL 12");
+    CHECK(difficulty_display_label("\xE2\x91\xA4LEVEL 12", false) == "LEVEL 12");
+    for (const auto* label : {"LV 12", "4UE18+", "6UE4", "8UE?!", "\xE2\x93\x87" "10", "st12", ""}) {
+        CHECK(difficulty_display_label(label, false) == label);
+    }
+}
+
 TEST_CASE("difficulty prefixes color the complete registered mode marker only") {
     using tenriff::render::difficulty_label_prefix;
     const auto four = difficulty_label_prefix(L"4UE18+", false, 4);

@@ -10,7 +10,6 @@ namespace tenriff::app::menu::settings {
 namespace {
 
 constexpr NumericSettingRange kMasterVolumeRange{0.0, 1.0, 0.01};
-constexpr NumericSettingRange kChartMixVolumeRange{0.0, 2.0, 0.01};
 constexpr NumericSettingRange kSoundOffsetRange{
     config::kSoundOffsetMin,
     config::kSoundOffsetMax,
@@ -123,9 +122,6 @@ std::optional<NumericSettingRange> audio_setting_numeric_range(AudioSettingId id
         case AudioSettingId::GameplayVolume:
         case AudioSettingId::MenuMusicVolume:
             return kMasterVolumeRange;
-        case AudioSettingId::BgmVolume:
-        case AudioSettingId::KeysoundVolume:
-            return kChartMixVolumeRange;
         case AudioSettingId::SoundOffset:
             return kSoundOffsetRange;
         case AudioSettingId::Preset:
@@ -140,6 +136,8 @@ std::optional<NumericSettingRange> audio_setting_numeric_range(AudioSettingId id
         case AudioSettingId::AsioDriver:
         case AudioSettingId::SampleRate:
         case AudioSettingId::BufferFrames:
+        case AudioSettingId::BgmVolume:
+        case AudioSettingId::KeysoundVolume:
             return std::nullopt;
     }
     return std::nullopt;
@@ -176,6 +174,10 @@ MenuEffectFlags AudioSettingsController::handle(
     const MenuAction& action,
     config::RuntimeConfig& runtime,
     std::optional<AudioSettingId> target) {
+    // Retired renderer IDs cannot select another row or dispatch a stale action.
+    if (target.has_value() && !audio_setting_index(*target).has_value()) {
+        return {};
+    }
     if (action.kind == MenuActionKind::Back) {
         return leave_screen();
     }
@@ -185,9 +187,6 @@ MenuEffectFlags AudioSettingsController::handle(
 
     MenuEffectFlags effects;
     if (target.has_value()) {
-        if (!audio_setting_index(*target).has_value()) {
-            return effects;
-        }
         effects.merge(select(*target));
     }
     effects.merge(apply_selected_action(action, runtime));
@@ -347,32 +346,7 @@ MenuEffectFlags AudioSettingsController::apply_selected_action(
             break;
         }
         case AudioSettingId::BgmVolume:
-            if (is_adjust) {
-                changed = set_numeric_value(
-                    runtime.audio_ui.bgm_volume,
-                    runtime.audio_ui.bgm_volume +
-                        static_cast<double>(action.direction) * kChartMixVolumeRange.step,
-                    kChartMixVolumeRange);
-            } else if (is_set_ratio) {
-                changed = set_numeric_value(
-                    runtime.audio_ui.bgm_volume,
-                    value_from_ratio(action.ratio, kChartMixVolumeRange),
-                    kChartMixVolumeRange);
-            }
-            break;
         case AudioSettingId::KeysoundVolume:
-            if (is_adjust) {
-                changed = set_numeric_value(
-                    runtime.audio_ui.keysound_volume,
-                    runtime.audio_ui.keysound_volume +
-                        static_cast<double>(action.direction) * kChartMixVolumeRange.step,
-                    kChartMixVolumeRange);
-            } else if (is_set_ratio) {
-                changed = set_numeric_value(
-                    runtime.audio_ui.keysound_volume,
-                    value_from_ratio(action.ratio, kChartMixVolumeRange),
-                    kChartMixVolumeRange);
-            }
             break;
         case AudioSettingId::SoundOffset:
             if (is_adjust) {

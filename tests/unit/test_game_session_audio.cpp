@@ -19,6 +19,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <stdexcept>
+#include <utility>
 
 namespace tenriff::app {
 
@@ -1613,6 +1614,7 @@ struct GameSessionAudioTestAccess {
 
     static void check_normalize_and_focus_output() {
         auto session = std::make_unique<GameSession>();
+        session->config_.audio_ui.gameplay_volume = 1.0;
         session->sample_rate_ = 48000;
         session->mix_normalizer_.reset(48000);
         session->config_.audio_ui.master_volume = 0.7;
@@ -1654,6 +1656,7 @@ struct GameSessionAudioTestAccess {
 
     static void check_normalize_off_preserves_full_scale_waveform() {
         auto session = std::make_unique<GameSession>();
+        session->config_.audio_ui.gameplay_volume = 1.0;
         session->config_.audio_ui.normalize_audio = false;
         session->config_.audio_ui.master_volume = 0.7;
         const std::vector<float> original{
@@ -1668,6 +1671,7 @@ struct GameSessionAudioTestAccess {
 
     static void check_normalize_off_mix_retains_master_headroom() {
         auto session = std::make_unique<GameSession>();
+        session->config_.audio_ui.gameplay_volume = 1.0;
         session->sample_rate_ = 48000;
         session->chart_.lane_count = 1;
         session->chart_.duration_samples = 480000;
@@ -1710,34 +1714,38 @@ struct GameSessionAudioTestAccess {
 
     static void check_independent_chart_volume() {
         // Exercise the real BGM + realtime keysound mixer and output stage.
-        for (const double volume : {0.0, 0.35, 1.0}) {
+        for (const double volume : {0.0, 0.2, 0.35, 1.0}) {
             for (const double menu_volume : {0.0, 1.0}) {
-                auto session = std::make_unique<GameSession>();
-                session->config_.audio_ui.master_volume = 0.8;
-                session->config_.audio_ui.gameplay_volume = volume;
-                session->config_.audio_ui.menu_music_volume = menu_volume;
-                session->config_.audio_ui.bgm_volume = 0.5;
-                session->config_.audio_ui.keysound_volume = 1.5;
-                session->config_.audio_ui.normalize_audio = false;
-                session->chart_audio_assets_.resize(2);
-                session->chart_audio_assets_[0].clip.samples =
-                    std::make_shared<const std::vector<float>>(std::vector<float>{0.4f, -0.2f, 0.2f, -0.1f});
-                session->chart_audio_assets_[1].clip.samples =
-                    std::make_shared<const std::vector<float>>(std::vector<float>{0.2f, 0.1f, 0.1f, 0.05f});
-                session->chart_audio_voices_.push_back({0, 0, GameSession::ChartAudioEvent::Kind::Bgm, 1.0f});
-                session->chart_audio_voices_.push_back({0, 1, GameSession::ChartAudioEvent::Kind::Keysound, 1.0f});
-                std::vector<float> output(4, 0.0f);
-                session->mix_chart_audio(output.data(), 2, 0);
-                session->finish_audio_output(output.data(), 2, true);
-                const std::vector<float> expected{0.5f, 0.05f, 0.25f, 0.025f};
-                for (std::size_t i = 0; i < output.size(); ++i)
-                    CHECK(output[i] == doctest::Approx(expected[i] * volume * 0.8).epsilon(0.00001));
+                for (const auto legacy : {std::pair{0.0, 0.0}, std::pair{0.5, 1.5},
+                                            std::pair{2.0, 0.0}, std::pair{0.0, 2.0}}) {
+                    auto session = std::make_unique<GameSession>();
+                    session->config_.audio_ui.master_volume = 0.8;
+                    session->config_.audio_ui.gameplay_volume = volume;
+                    session->config_.audio_ui.menu_music_volume = menu_volume;
+                    session->config_.audio_ui.bgm_volume = legacy.first;
+                    session->config_.audio_ui.keysound_volume = legacy.second;
+                    session->config_.audio_ui.normalize_audio = false;
+                    session->chart_audio_assets_.resize(2);
+                    session->chart_audio_assets_[0].clip.samples =
+                        std::make_shared<const std::vector<float>>(std::vector<float>{0.4f, -0.2f, 0.2f, -0.1f});
+                    session->chart_audio_assets_[1].clip.samples =
+                        std::make_shared<const std::vector<float>>(std::vector<float>{0.2f, 0.1f, 0.1f, 0.05f});
+                    session->chart_audio_voices_.push_back({0, 0, GameSession::ChartAudioEvent::Kind::Bgm, 1.0f});
+                    session->chart_audio_voices_.push_back({0, 1, GameSession::ChartAudioEvent::Kind::Keysound, 1.0f});
+                    std::vector<float> output(4, 0.0f);
+                    session->mix_chart_audio(output.data(), 2, 0);
+                    session->finish_audio_output(output.data(), 2, true);
+                    const std::vector<float> expected{0.6f, -0.1f, 0.3f, -0.05f};
+                    for (std::size_t i = 0; i < output.size(); ++i)
+                        CHECK(output[i] == doctest::Approx(expected[i] * volume * 0.8).epsilon(0.00001));
+                }
             }
         }
     }
 
     static void check_normalize_off_output_range_boundary() {
         auto session = std::make_unique<GameSession>();
+        session->config_.audio_ui.gameplay_volume = 1.0;
         session->config_.audio_ui.normalize_audio = false;
         session->config_.audio_ui.master_volume = 0.5;
         std::vector<float> output{3.0f, -3.0f, 1.6f, -1.6f,
@@ -1916,6 +1924,10 @@ struct GameSessionAudioTestAccess {
             auto cross = chord;
             cross.audio_cues = {{256, 0}, {256, 1}};
             CHECK(render(cross, mode) == expected);
+            // Legacy per-channel balances no longer change sound or exact-PCM
+            // deduplication, including real input and replay scheduling.
+            CHECK(render(cross, mode, 0, 0.0) == expected);
+            CHECK(render(cross, mode, 0, 2.0) == expected);
         }
         auto bgm = original;
         bgm.audio_cues = {{256, 0}};
@@ -2124,11 +2136,19 @@ struct GameSessionAudioTestAccess {
 
     static void check_automatic_result(bool delayed_bgm, bool manual_skip, bool silent,
                                        bool failed_audio = false, bool skip_outro = false, bool pacemaker = false,
-                                       bool auto_scratch = false, bool stale_catchup = false) {
+                                       bool auto_scratch = false, bool stale_catchup = false,
+                                       uint32_t skip_key = 32, bool future_skip = false, bool bms_policy = false) {
         auto session = std::make_unique<GameSession>();
         session->sample_rate_ = 48000;
         session->chart_.lane_count = 4;
         session->chart_.bms_rank = 3; // BMS loader resolves absent #RANK to EASY.
+        if (bms_policy) {
+            session->chart_.bms_total = 200.0;
+            session->chart_.bms_has_random = true;
+            session->bms_gauge_version_ = 2;
+            session->bms_control_flow_version_ = 2;
+            session->bms_random_seed_ = 0xffffffffu;
+        }
         // Trailing chart measures and startup decode estimates must not keep a
         // completed score waiting after all audible voices have drained.
         session->chart_.duration_samples = 960000;
@@ -2136,6 +2156,8 @@ struct GameSessionAudioTestAccess {
         gameplay::GameplayConfig config;
         config.sample_rate = 48000;
         config.gauge_shift_enabled = true;
+        config.gauge_policy.bms_lr2_deltas = bms_policy;
+        config.gauge_policy.bms_total = session->chart_.bms_total.value_or(0.0);
         session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
         session->gauge_shift_enabled_ = true;
         if (pacemaker) {
@@ -2155,6 +2177,7 @@ struct GameSessionAudioTestAccess {
         // This direct fixture bypasses initialize(), which keeps unaffected
         // BPM-only charts on the historical timing identity for web records.
         session->bms_timing_version_ = 1;
+        session->escape_keycode_ = 27;
         session->key_to_lane_[32] = 1;
         session->lane_binding_state_.configure(session->key_to_lane_);
         session->lane_activity_.assign(4, 0);
@@ -2191,20 +2214,28 @@ struct GameSessionAudioTestAccess {
         const int64_t expected_end = (skip_outro || silent || failed_audio) ? 17280 : delayed_bgm ? 96000 : 48000;
         // Model two queued device buffers. No input is injected after the last
         // note unless this is the explicit skip compatibility case.
+        int64_t last_buffer_sample = 0;
         for (int64_t sample = 12000; sample <= expected_end + 960; sample += 480) {
+            last_buffer_sample = sample;
             if (manual_skip && sample == 14400) {
                 input::InputEvent skip{};
-                skip.keycode = 32;
+                skip.keycode = skip_key;
                 skip.state = input::InputState::Pressed;
-                REQUIRE(session->input_thread_.queue().push(skip));
+                if (future_skip) REQUIRE(session->future_events_.push({skip, sample}));
+                else REQUIRE(session->input_thread_.queue().push(skip));
             }
             session->audio_thread_.invoke_callback(audio.data(), 480, sample, sample - 960,
                 3'000'000'000LL + (sample - 960) * 1'000'000'000LL / 48000);
-            if (manual_skip && sample >= 14400) break;
+            // A future-queue event waits for the audible judgement horizon;
+            // the two queued device buffers must not make the fixture end early.
+            if (manual_skip && session->finished_.load()) break;
             if (sample - 960 < expected_end) CHECK_FALSE(session->finished_.load());
         }
         REQUIRE(session->finished_.load());
+        if (manual_skip) CHECK(last_buffer_sample <= 16320);
         CHECK_FALSE(session->user_aborted_.load());
+        CHECK_FALSE(session->paused_.load());
+        CHECK_FALSE(session->pause_used_.load());
         CHECK(session->engine_->stats().counts.pg == (pacemaker ? 0 : 1));
         CHECK(session->engine_->stats().counts.gr == (pacemaker ? 1 : 0));
         const auto recorded_events = session->engine_->replay().events;
@@ -2233,6 +2264,9 @@ struct GameSessionAudioTestAccess {
         const auto& result = session->result();
         REQUIRE(result.has_value);
         CHECK(result.bms_timing_version == 1);
+        CHECK(result.bms_gauge_version == (bms_policy ? 2 : 1));
+        CHECK(result.bms_control_flow_version == (bms_policy ? 2 : 1));
+        CHECK(result.bms_random_seed == (bms_policy ? std::optional<uint32_t>(0xffffffffu) : std::nullopt));
         CHECK(result.finished);
         REQUIRE_FALSE(result.replay_path.empty());
         REQUIRE_FALSE(result.result_path.empty());
@@ -2244,6 +2278,9 @@ struct GameSessionAudioTestAccess {
         const auto replay = gameplay::load_replay_json(result.replay_path);
         REQUIRE(replay.success());
         CHECK(replay.replay->mode.bms_timing_version == 1);
+        CHECK(replay.replay->mode.bms_gauge_version == result.bms_gauge_version);
+        CHECK(replay.replay->mode.bms_control_flow_version == result.bms_control_flow_version);
+        CHECK(replay.replay->mode.bms_random_seed == result.bms_random_seed);
         REQUIRE(replay.replay->trace.events.size() == recorded_events.size());
         for (std::size_t i = 0; i < recorded_events.size(); ++i) {
             CHECK(replay.replay->trace.events[i].lane == recorded_events[i].lane);
@@ -2253,9 +2290,9 @@ struct GameSessionAudioTestAccess {
         std::string payload, error;
         const bool accepted = build_sites_score_json(*replay.replay, result.replay_sha256,
                                     "Completion fixture", result.clear_status, payload, error);
-        CHECK(accepted == !(auto_scratch || stale_catchup));
-        CHECK(payload.empty() == (auto_scratch || stale_catchup));
-        CHECK(error.empty() == !(auto_scratch || stale_catchup));
+        CHECK(accepted == !(auto_scratch || stale_catchup || bms_policy));
+        CHECK(payload.empty() == (auto_scratch || stale_catchup || bms_policy));
+        CHECK(error.empty() == !(auto_scratch || stale_catchup || bms_policy));
         if (stale_catchup) {
             CHECK(replay.replay->ruleset_id == "custom-ruleset-5");
             CHECK_FALSE(is_supported_canonical_replay_ruleset(replay.replay->ruleset_id));
@@ -2281,6 +2318,27 @@ struct GameSessionAudioTestAccess {
         }
         CHECK(result.export_warnings.empty() == !stale_catchup);
     }
+    static void check_legacy_branch_result_seed() {
+        auto session = std::make_unique<GameSession>();
+        session->sample_rate_ = 48000;
+        session->chart_format_ = ChartFormat::Bms;
+        session->chart_.lane_count = 1;
+        session->chart_.bms_has_random = true;
+        session->chart_.notes.push_back(gameplay::NoteEvent{1, 0, std::nullopt});
+        session->chart_.duration_samples = 48000;
+        session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, gameplay::GameplayConfig{});
+        session->engine_->advance(480000);
+        session->gameplay_started_ = true;
+        session->replay_playback_enabled_ = true;
+        session->replay_source_.mode.random_seed = 123;
+        session->bms_random_seed_ = 123;
+        session->shutdown();
+        REQUIRE(session->result().has_value);
+        CHECK_FALSE(session->result().bms_random_seed.has_value());
+        CHECK(session->result().bms_gauge_version == 1);
+        CHECK(session->result().bms_control_flow_version == 1);
+    }
+
     static std::unique_ptr<GameSession> pause_fixture() {
         auto session = std::make_unique<GameSession>();
         session->sample_rate_ = 48000;
@@ -2311,6 +2369,32 @@ struct GameSessionAudioTestAccess {
         event.keycode = key;
         event.state = input::InputState::Pressed;
         REQUIRE(session.handle_control_input(event));
+    }
+
+    static void check_outro_escape_guards(bool future_queue) {
+        // A live LN (even after its head is judged) and a future tap must still
+        // pause. Only a completed solo outro may bypass the pause UI.
+        for (int mode = 0; mode < 9; ++mode) {
+            auto session = shift_lane_fixture(32, mode == 1);
+            session->config_.audio_ui.play_to_end = mode != 3;
+            session->result_transition_pending_ = mode != 4;
+            if (mode != 2) {
+                queue_physical_edge(*session, 32, input::InputState::Pressed, 48000, future_queue);
+            }
+            session->course_gauge_enabled_ = mode == 5;
+            session->peer_battle_mode_ = mode == 6;
+            session->autoplay_enabled_ = mode == 7;
+            session->replay_playback_enabled_ = mode == 8;
+            const auto recorded_events = session->engine_->replay().events.size();
+            queue_physical_edge(*session, 27, input::InputState::Pressed, 48480, future_queue);
+            const bool skip = mode == 0 || mode == 7 || mode == 8;
+            const bool abort_peer = mode == 6;
+            CHECK(session->finished_.load() == (skip || abort_peer));
+            CHECK(session->user_aborted_.load() == abort_peer);
+            CHECK(session->paused_.load() == (mode >= 1 && mode <= 4));
+            CHECK(session->pause_used_.load() == (mode >= 1 && mode <= 4));
+            CHECK(session->engine_->replay().events.size() == recorded_events);
+        }
     }
 
     static void paused_buffer(GameSession& session, int64_t sample, int count) {
@@ -2801,6 +2885,15 @@ TEST_CASE("post-note skip still exports without adding an input or aborting the 
     tenriff::app::GameSessionAudioTestAccess::check_automatic_result(false, true, false);
 }
 
+TEST_CASE("Esc skips a completed listen-to-end outro without pause and preserves eligible replay export") {
+    for (const bool future_queue : {false, true}) {
+        for (const bool future_bgm : {false, true})
+            tenriff::app::GameSessionAudioTestAccess::check_automatic_result(
+                future_bgm, true, false, false, false, false, false, false, 27, future_queue);
+        tenriff::app::GameSessionAudioTestAccess::check_outro_escape_guards(future_queue);
+    }
+}
+
 TEST_CASE("failed decoded audio does not keep a finished record waiting for an estimated tail") {
     tenriff::app::GameSessionAudioTestAccess::check_automatic_result(false, false, false, true);
 }
@@ -2843,6 +2936,15 @@ TEST_CASE("R5 continuous clock preserves interframe monotonicity and bounded rec
 
 TEST_CASE("R5 stale input catch-up exports an unranked custom replay without mislabeling pause") {
     tenriff::app::GameSessionAudioTestAccess::check_automatic_result(false, false, true, false, false, false, false, true);
+}
+
+TEST_CASE("BMS new gauge and branch policies survive actual session result export") {
+    tenriff::app::GameSessionAudioTestAccess::check_automatic_result(
+        false, false, true, false, false, false, false, false, 32, false, true);
+}
+
+TEST_CASE("BMS legacy playback result does not invent an optional branch seed") {
+    tenriff::app::GameSessionAudioTestAccess::check_legacy_branch_result_seed();
 }
 
 TEST_CASE("R5 scheduled replay autoplay scratch audio keeps write timing while legacy judgement stays historical") {

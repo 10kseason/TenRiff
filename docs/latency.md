@@ -2,6 +2,8 @@
 
 > 문서 성격: 초기 설계·개선 방향과 당시 분석을 포함합니다. 미완료 제안이나 과거 수치는 현재 동작·기본값·성능 보장이 아닙니다. 현재 기준은 [현재 상태](current-state.md)와 [설정](config.md)을 확인하세요.
 
+**2026-10-15 · 미공개 키보드 debounce 후속 변경 — 로컬 빌드 및 CTest 회귀검증 통과:** `0ms`는 기존 고속 연타를 유지하고, 0보다 큰 값은 같은 키·물리 입력 소스의 Release 이후 설정 시간 미만에 도착한 다음 Press를 억제합니다. 정확한 시간 경계의 Press는 허용하며 실제 Release는 지연하거나 누락하지 않습니다. 의도적인 빠른 재누름도 이 구간 안이면 억제됩니다. RawInput/Polling 미러 우회는 막고 RawInput으로 식별된 물리 키보드별 상태는 독립적으로 유지합니다. Polling 자체는 물리 기기 ID를 구분하지 않습니다. XInput은 기존 별도 GamepadTracker 경로이며 이 키보드 필터를 적용하지 않습니다. 아래의 모든 실제 Press/Release 보존 설명은 이전 설계 기록으로, 새 시간 필터에서는 0ms일 때의 동작입니다. 물리 지연 개선이나 장치별 체감은 아직 검증하지 않았습니다.
+
 TenRiff prioritizes minimal input-to-judgement-to-sound latency (<20 ms end-to-end). This note consolidates follow-up items from the four development manuals to tighten the pipeline while keeping the "Raw Input → SPSC queue → Audio thread judgement" philosophy intact.
 
 ## Input pipeline and timestamping

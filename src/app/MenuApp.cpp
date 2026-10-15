@@ -841,6 +841,9 @@ std::string MenuApp::ui_language_label(std::string_view token) const {
     if (normalized == "ja") {
         return ui_text("Japanese", "일본어");
     }
+    if (normalized == "zh-CN") {
+        return ui_text("Chinese", "중국어");
+    }
     return ui_text("English", "영어");
 }
 
@@ -1131,6 +1134,50 @@ MenuApp::~MenuApp() {
     shutdown();
 }
 
+// Downloads and local cache application retain their existing synchronous
+// ownership. Publish first so the independent renderer can show progress while
+// they block; restore on every exit, including a failed import. Nested refreshes
+// must not clear the surrounding import's indicator.
+class MenuApp::DifficultyTableLoadingScope {
+public:
+    explicit DifficultyTableLoadingScope(MenuApp& app, bool enabled = true)
+        : app_(app), previous_(app.difficulty_table_loading_), enabled_(enabled) {
+        if (enabled_) {
+            app_.difficulty_table_loading_ = true;
+            try {
+                app_.publish_snapshot();
+                app_.difficulty_table_loading_snapshot_ = true;
+            } catch (...) {
+                app_.difficulty_table_loading_ = previous_;
+                throw;
+            }
+        }
+    }
+    ~DifficultyTableLoadingScope() noexcept {
+        if (enabled_) {
+            app_.difficulty_table_loading_ = previous_;
+            const bool loading = app_.difficulty_table_loading();
+            try {
+                app_.publish_snapshot();
+                app_.difficulty_table_loading_snapshot_ = loading;
+            } catch (...) {
+                // Restoring the state must not terminate an in-flight exception.
+                // Leave the last-published marker unchanged so the loop retries.
+                std::fputs("[warn] Could not publish difficulty-table completion.\n", stderr);
+            }
+        }
+    }
+private:
+    MenuApp& app_;
+    bool previous_;
+    bool enabled_;
+};
+
+bool MenuApp::difficulty_table_loading() const {
+    return difficulty_table_loading_ ||
+        (!config_.ui.difficulty_table_path.empty() && song_indexer_.is_running());
+}
+
 bool MenuApp::initialize(const CommandLineOptions& options) {
     exit_code_ = 0;
     input_backend_fallback_policy_.clear();
@@ -1405,6 +1452,13 @@ void MenuApp::run() {
             publish_snapshot();
         }
 
+        // A worker can finish just after its result snapshot was published.
+        // Publish the transition even if no more input or index progress arrives.
+        const bool table_loading = difficulty_table_loading();
+        if (difficulty_table_loading_snapshot_ != table_loading) {
+            difficulty_table_loading_snapshot_ = table_loading;
+            publish_snapshot();
+        }
         update_keymap_capture_timeout();
         update_song_select_repeat();
         update_bms_editor_repeat();
@@ -2024,6 +2078,7 @@ void MenuApp::persist_runtime_config() {
 }
 
 void MenuApp::refresh_song_source(bool force_reindex) {
+    const DifficultyTableLoadingScope loading(*this, !config_.ui.difficulty_table_path.empty());
     difficulty_table_display_path_.clear();
     if (config_.ui.all_song_sources) switch_all_song_sources(force_reindex);
     else switch_song_source(songs_path_, force_reindex);
@@ -2800,6 +2855,15 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
     }
 
     switch (event.kind) {
+        case render::MenuHitTargetKind::TitleLanguageButton:
+            if (current_screen() != Screen::Title || event.index != 0 ||
+                event.part != render::MenuHitPart::Activate) {
+                return;
+            }
+            static_cast<void>(profile_setup::adjust_presentation_setting(config_.ui, profile_setup::kLanguageRow, 1));
+            persist_runtime_config();
+            publish_snapshot();
+            return;
         case render::MenuHitTargetKind::TitleButton:
             if (current_screen() != Screen::Title) {
                 return;
@@ -4523,7 +4587,7 @@ void MenuApp::select_native_difficulty_levels() {
     publish_snapshot();
 }
 
-bool MenuApp::apply_difficulty_table_url(std::string_view url) {
+bool MenuApp::apply_difficulty_table_url(std::string_view url, DifficultyTableFetchFunction fetch) {
     std::string trimmed(url);
     while (!trimmed.empty() && static_cast<unsigned char>(trimmed.back()) <= 0x20u) {
         trimmed.pop_back();
@@ -4535,8 +4599,9 @@ bool MenuApp::apply_difficulty_table_url(std::string_view url) {
         return false;
     }
 
+    const DifficultyTableLoadingScope loading(*this);
     const DifficultyTableLinkImportResult imported = import_difficulty_table_link(
-        trimmed, path_from_utf8(profile_dir_) / "difficulty_tables");
+        trimmed, path_from_utf8(profile_dir_) / "difficulty_tables", std::move(fetch));
     if (!imported.success()) {
         std::cerr << "[warn] Difficulty-table link was not imported: " << imported.error << std::endl;
         song_browser_status_message_ = imported.error;
@@ -4645,6 +4710,7 @@ void MenuApp::handle_difficulty_table_input(uint32_t keycode) {
                 if (picked.empty()) {
                     return;
                 }
+                const DifficultyTableLoadingScope loading(*this);
                 const DifficultyTableLoadResult loaded = load_difficulty_table_utf8(picked);
                 if (!loaded.success()) {
                     std::cerr << "[warn] Difficulty table was not selected: "

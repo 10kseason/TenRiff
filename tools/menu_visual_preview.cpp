@@ -338,6 +338,7 @@ struct MenuWindowVisualTestAccess {
             !fixture.generic.rows.empty() ? fixture.generic.rows.size() : 1;
         std::set<std::pair<int, int>> verified_targets;
         std::set<int> verified_result_targets;
+        bool title_language_verified = false;
         for (std::size_t visit = 0; visit < visits; ++visit) {
             if (verify) {
                 for (std::size_t row = 0; row < fixture.generic.rows.size(); ++row)
@@ -347,7 +348,8 @@ struct MenuWindowVisualTestAccess {
             const auto regions = window.hit_regions_;
             for (const auto& region : regions) {
                 const bool menu_card = region.kind == MenuHitTargetKind::OptionsItem ||
-                    region.kind == MenuHitTargetKind::TitleButton;
+                    region.kind == MenuHitTargetKind::TitleButton ||
+                    region.kind == MenuHitTargetKind::TitleLanguageButton;
                 const bool song_control = song_fixture &&
                     (region.kind == MenuHitTargetKind::SongCard || region.kind == MenuHitTargetKind::SongNavButton ||
                      region.kind == MenuHitTargetKind::SongDifficultyTable);
@@ -397,6 +399,8 @@ struct MenuWindowVisualTestAccess {
                     if (geometry_pass) verified_targets.emplace(region.index, static_cast<int>(region.part));
                     else failures.emplace_back("geometry hit mismatch: id=" + std::to_string(region.index) + " part=" + std::to_string(static_cast<int>(region.part)));
                     if (geometry_pass && result_control) verified_result_targets.insert(region.index);
+                    if (geometry_pass && region.kind == MenuHitTargetKind::TitleLanguageButton)
+                        title_language_verified = true;
                     if (foreground) {
                         while (window.poll_click_event()) {}
                         window.on_mouse_click(window_x, window_y, false);
@@ -426,7 +430,9 @@ struct MenuWindowVisualTestAccess {
             if (!source.result.replay_available && verified_result_targets.count(1))
                 failures.emplace_back("unavailable result replay action is interactive");
         }
-        if (verify && song_fixture) {
+        // The table editor deliberately replaces background song hits with its
+        // modal controls; those controls were verified in the region loop above.
+        if (verify && song_fixture && !source.song_select.difficulty_table_editing) {
             const auto search = std::find_if(window.hit_regions_.begin(), window.hit_regions_.end(), [](const auto& hit) {
                 return hit.kind == MenuHitTargetKind::SongNavButton && hit.index == 2;
             });
@@ -447,6 +453,19 @@ struct MenuWindowVisualTestAccess {
         }
         if (verify && source.generic.heading == ui::text(source.ui_language, "Audio Settings", "오디오 설정")) {
             using namespace app::menu::settings;
+            if (std::count_if(source.generic.rows.begin(), source.generic.rows.end(),
+                    [](const auto& row) { return row.slider; }) != 3)
+                failures.emplace_back("audio settings must expose exactly three volume sliders");
+            for (const auto& row : source.generic.rows) {
+                if (row.row_index == static_cast<int>(AudioSettingId::BgmVolume) ||
+                    row.row_index == static_cast<int>(AudioSettingId::KeysoundVolume))
+                    failures.emplace_back("retired BMS submix control remains visible");
+            }
+            for (const auto id : {AudioSettingId::MasterVolume, AudioSettingId::GameplayVolume,
+                                 AudioSettingId::MenuMusicVolume}) {
+                if (!verified_targets.count({static_cast<int>(id), static_cast<int>(MenuHitPart::SetValue)}))
+                    failures.emplace_back("required audio volume slider hit missing: id=" + std::to_string(static_cast<int>(id)));
+            }
             for (const auto id : {AudioSettingId::Normalize, AudioSettingId::Backend,
                                  AudioSettingId::AsioDriver, AudioSettingId::SampleRate, AudioSettingId::BufferFrames}) {
                 if (!verified_targets.count({static_cast<int>(id), static_cast<int>(MenuHitPart::Decrement)}))
@@ -498,6 +517,8 @@ struct MenuWindowVisualTestAccess {
         JsonArray notes;
         for (const auto& note : source.generic.notes) notes.emplace_back(note);
         JsonObject report{
+            {"ui_language", JsonValue(std::string(ui::language_token(source.ui_language)))},
+            {"title_language_button_verified", JsonValue(title_language_verified)},
             {"preview_drag", std::move(preview_drag)},
             {"notes", JsonValue(std::move(notes))},
             {"selected_song_difficulty", JsonValue(source.song_select.selected_song_difficulty)},
@@ -564,6 +585,7 @@ int main(int argc, char** argv) {
     bool analysis_no_samples = false;
     bool options_grid = false;
     bool table_editor = false;
+    bool table_loading = false;
     bool gameplay = false;
     bool menu_roundtrip = false;
     bool ghost = false;
@@ -692,6 +714,10 @@ int main(int argc, char** argv) {
     data.ui_language = tenriff::ui::Language::Korean;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
+        if (arg == "--chinese") {
+            data.ui_language = tenriff::ui::Language::Chinese;
+            continue;
+        }
         if (arg == "--ui-font" && i + 1 < argc) {
             data.ui_font = tenriff::config::normalize_skin_ui_font_token(argv[++i]); continue;
         }
@@ -716,6 +742,7 @@ int main(int argc, char** argv) {
         if (arg == "--display-level" && i + 1 < argc) { display_level = argv[++i]; continue; }
         if (arg == "--aery-five-key") { aery_five_key = true; menu_keys = 5; continue; }
         if (arg == "--native-level-table") { native_level_table = true; continue; }
+        if (arg == "--table-loading") { table_loading = true; continue; }
         if (arg == "--table-prefix-keys" && i + 1 < argc) { table_prefix_keys = std::atoi(argv[++i]); menu_keys = table_prefix_keys; continue; }
         if (arg == "--mixed-table-prefixes") { mixed_table_prefixes = true; table_prefix_keys = 10; menu_keys = 10; continue; }
         if (arg == "--analysis-no-samples") { analysis_no_samples = true; continue; }
@@ -1060,7 +1087,7 @@ int main(int argc, char** argv) {
             loc("Hi-Speed -10 Key", "배속 -10 키"), loc("Hi-Speed +10 Key", "배속 +10 키"),
             loc("Done", "완료")};
         const std::array<std::string, 18> values{
-            data.ui_language == tenriff::ui::Language::Japanese ? "日本語" : loc("English", "한국어"),
+            std::string(tenriff::ui::language_native_label(data.ui_language)),
             data.ui_text_scale > 1.2f ? loc("Extra Large", "더 크게") :
                 data.ui_text_scale > 1.0f ? loc("Large", "크게") : loc("Normal", "보통"),
             "ALL SONG", "NORMAL", "1.00x", "0 ms", "Follow", "RawInput", "PLAYER",
@@ -1164,6 +1191,10 @@ int main(int argc, char** argv) {
     }
     songs.difficulty_table_editing = table_editor;
     songs.difficulty_table_url_input = "https://example.com/table/header.json";
+    if (table_loading) {
+        songs.difficulty_table_name = loc("Loading...", "로딩 중");
+        songs.difficulty_table_status = loc("Loading...", "로딩 중");
+    }
     songs.sort_summary = loc("LV ASC", "LV 오름");
     songs.group_summary = loc("NONE", "없음");
     songs.primary_hint = loc("UP/DOWN  MOVE     ENTER / dbl-click  PLAY     I  EDIT BMS     C  ADD COURSE",
@@ -1249,7 +1280,8 @@ int main(int argc, char** argv) {
     score.bpm = 180;
     score.has_bpm_changes = bpm_change;
     score.difficulty_label = songs.selected_song_difficulty;
-    score.difficulty_is_aery_five_key = songs.selected_song_difficulty_is_aery_five_key;
+    score.difficulty_is_aery_five_key = songs.difficulty_table_active && songs.selected_song_difficulty_is_aery_five_key;
+    score.difficulty_prefix_key_count = songs.difficulty_table_active ? songs.selected_song_difficulty_prefix_key_count : 0;
     score.rank = result_grade.empty() ? (failed ? "F" : "S+") : result_grade;
     score.status = result_status.empty() ? (failed ? "FAILED" : "CLEAR") : result_status;
     score.web_upload_status = web_upload_status;

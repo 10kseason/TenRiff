@@ -20,6 +20,7 @@
 #include "app/CommandLine.h"
 #include "app/BmsEditor.h"
 #include "app/BmsEditorPreview.h"
+#include "app/DifficultyTableLink.h"
 #include "app/GameplayHudRevisions.h"
 #include "app/GlobalChatService.h"
 #include "app/InputBackendStatus.h"
@@ -537,7 +538,10 @@ private:
     [[nodiscard]] std::string ui_skin_source_label(std::string_view token) const;
     [[nodiscard]] std::string ui_skin_note_shape_label(std::string_view token) const;
     [[nodiscard]] std::string ui_skin_note_image_aspect_label(std::string_view token) const;
-    [[nodiscard]] bool apply_difficulty_table_url(std::string_view url);
+    class DifficultyTableLoadingScope;
+    [[nodiscard]] bool difficulty_table_loading() const;
+    [[nodiscard]] bool apply_difficulty_table_url(std::string_view url,
+                                                DifficultyTableFetchFunction fetch = {});
     void apply_builtin_difficulty_table(int index);
     void select_native_difficulty_levels();
     void add_song_source_from_dialog();
@@ -553,6 +557,8 @@ private:
         bool has_value = false;
         bool replay_verified = false;
         int bms_timing_version = 1;
+        int bms_gauge_version = 1;
+        int bms_control_flow_version = 1;
         std::string rank = "--";
         int64_t best_score = 0;
         int64_t detail_score = 0;
@@ -575,6 +581,9 @@ private:
 
     struct LocalPlayRecord {
         int bms_timing_version = 1;
+        int bms_gauge_version = 1;
+        int bms_control_flow_version = 1;
+        std::optional<uint32_t> bms_random_seed;
         std::string chart_path;
         std::string chart_format;
         std::string created_utc;
@@ -625,6 +634,10 @@ private:
         std::vector<std::string> mods;
         int long_note_mix_version = 1;
         int key_conversion_version = 1;
+        int bms_timing_version = 1;
+        int bms_gauge_version = 1;
+        int bms_control_flow_version = 1;
+        std::optional<uint32_t> bms_random_seed;
         double rate_multiplier = 1.0;
         double score_multiplier = 1.0;
         bool pause_used = false;
@@ -664,6 +677,9 @@ private:
     int last_result_long_note_mix_version_ = 1;
     int last_result_key_conversion_version_ = 1;
     int last_result_bms_timing_version_ = 1;
+    int last_result_bms_gauge_version_ = 1;
+    int last_result_bms_control_flow_version_ = 1;
+    std::optional<uint32_t> last_result_bms_random_seed_;
     double last_result_rate_multiplier_ = 1.0;
     double last_result_score_multiplier_ = 1.0;
     int64_t last_result_final_score_ = 0;
@@ -893,6 +909,8 @@ private:
     // Typed difficulty-table URL. Editing keeps its own buffer so cancelling
     // leaves the table that is already loaded alone.
     bool difficulty_table_url_editing_ = false;
+    bool difficulty_table_loading_ = false;
+    bool difficulty_table_loading_snapshot_ = false;
     std::string difficulty_table_url_input_{};
     std::string difficulty_table_display_path_{};
     std::string difficulty_table_display_name_{};

@@ -21,14 +21,38 @@ TEST_CASE("UI language normalization accepts Japanese without changing legacy to
     CHECK(language_token(Language::Japanese) == "ja");
 }
 
-TEST_CASE("UI language cycles all three choices in both directions") {
+TEST_CASE("UI language accepts Chinese aliases and preserves its canonical profile token") {
+    for (const auto alias : {"zh", "ZH-CN", "zh_CN", "Chinese", "cn"})
+        CHECK(language_from_token(alias) == Language::Chinese);
+    CHECK(language_token(Language::Chinese) == "zh-CN");
+    CHECK(tenriff::ui::language_native_label(Language::English) == "English");
+    CHECK(tenriff::ui::language_native_label(Language::Korean) == "한국어");
+    CHECK(tenriff::ui::language_native_label(Language::Japanese) == "日本語");
+    CHECK(tenriff::ui::language_native_label(Language::Chinese) == "中文");
+}
+
+TEST_CASE("UI language cycles all four choices in both directions") {
     CHECK(cycle_language(Language::English, 1) == Language::Korean);
     CHECK(cycle_language(Language::Korean, 1) == Language::Japanese);
-    CHECK(cycle_language(Language::Japanese, 1) == Language::English);
-    CHECK(cycle_language(Language::English, -1) == Language::Japanese);
+    CHECK(cycle_language(Language::Japanese, 1) == Language::Chinese);
+    CHECK(cycle_language(Language::Chinese, 1) == Language::English);
+    CHECK(cycle_language(Language::English, -1) == Language::Chinese);
+    CHECK(cycle_language(Language::Chinese, -1) == Language::Japanese);
     CHECK(cycle_language(Language::Japanese, -1) == Language::Korean);
     CHECK(cycle_language(Language::Korean, -1) == Language::English);
     CHECK(cycle_language(Language::Japanese, 0) == Language::Japanese);
+}
+
+TEST_CASE("Chinese UI translates home and profile labels while preserving user text") {
+    CHECK(text(Language::Chinese, "Language", "언어") == "语言");
+    CHECK(text(Language::Chinese, "OPTIONS", "옵션") == "选项");
+    CHECK(text(Language::Chinese, "English", "영어") == "英语");
+    CHECK(text(Language::Chinese, "Korean", "한국어") == "韩语");
+    CHECK(text(Language::Chinese, "Japanese", "일본어") == "日语");
+    CHECK(text(Language::Chinese, "Chinese", "중국어") == "中文");
+    CHECK(text(Language::Japanese, "Chinese", "중국어") == "中国語");
+    CHECK(text(Language::Chinese, "my-chart-曲名.bms", "변경 금지") == "my-chart-曲名.bms");
+    CHECK(text(Language::Chinese, "", "") == "");
 }
 
 TEST_CASE("Japanese UI covers menu settings loading result and BMS editing") {

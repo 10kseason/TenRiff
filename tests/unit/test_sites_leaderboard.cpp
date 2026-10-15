@@ -214,6 +214,19 @@ TEST_CASE("Sites keeps corrected BMS timing out of historical timing boards") {
     CHECK(error.find("BMS timing v2") != std::string::npos);
 }
 
+TEST_CASE("Sites keeps TOTAL and authored branch policies out of legacy boards") {
+    for (int policy = 0; policy < 3; ++policy) {
+        auto replay = score_fixture();
+        if (policy == 0) replay.mode.bms_gauge_version = 2;
+        if (policy == 1) replay.mode.bms_control_flow_version = 2;
+        if (policy == 2) replay.mode.bms_random_seed = 0u;
+        std::string payload, error;
+        CHECK_FALSE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
+        CHECK(payload.empty());
+        CHECK(error.find("separate leaderboard condition") != std::string::npos);
+    }
+}
+
 TEST_CASE("Sites EX payload requires its own R6 policy and excludes mixed judge modes") {
     auto replay = score_fixture();
     replay.ruleset_id = std::string(app::kExReplayRulesetId);

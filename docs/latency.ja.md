@@ -2,6 +2,8 @@
 
 > 文書の範囲: 初期設計・改善案・当時の分析を含みます。未完了の提案や過去の測定値は現在の挙動・既定値・性能保証ではありません。[現在の状態](current-state.ja.md)と[設定](config.ja.md)を参照してください。
 
+**2026-10-15 · 未公開のキーボードdebounce追加変更 — ローカルビルドとCTest回帰検証通過：** `0ms`は従来の高速連打を維持します。正の値では、同じキー・物理入力元のRelease後、設定時間未満で届く次のPressを抑制し、境界ちょうどのPressは許可します。実際のReleaseは遅延・欠落させません。意図的な素早い再押下もこの時間内なら抑制されます。RawInput/Pollingのミラーによる回避を防ぎ、RawInputで識別した物理キーボードごとの状態は独立して扱います。Polling自体は物理機器IDを区別しません。XInputは既存の別GamepadTracker経路で、このキーボードフィルターを適用しません。以下の「実際のPress/Releaseをすべて保持する」記述は以前の設計記録であり、新しい時間フィルターでは0ms時の動作です。物理遅延の改善や機器ごとの操作感は未検証です。
+
 TenRiff は input-to-judgement-to-sound の end-to-end 遅延を最小化することを重視します。このノートは、"Raw Input -> SPSC queue -> Audio thread judgement" という方針を保ったまま、後続作業でどこを締めるべきかをまとめたものです。
 
 ## Input Pipeline and Timestamping

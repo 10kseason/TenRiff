@@ -2,6 +2,7 @@
 #include "app/MainApiTlsPin.h"
 #include "app/SitesLeaderboardClient.h"
 #include "app/SitesUploadResponse.h"
+#include "gameplay/Replay.h"
 
 #include "config/SimpleJson.h"
 
@@ -771,6 +772,17 @@ bool submit_ranked_replay(const std::string& base_url,
     const auto replay_size = std::filesystem::file_size(replay_path, filesystem_error);
     if (filesystem_error || replay_size == 0 || replay_size > kMaximumReplayBytes) {
         error = "Ranked replay must be readable and at most 5 MiB.";
+        return false;
+    }
+    const auto replay = gameplay::load_replay_json(replay_path.u8string());
+    if (!replay.success()) {
+        error = "Ranked replay could not be parsed.";
+        return false;
+    }
+    if (replay.replay->mode.bms_gauge_version != 1 ||
+        replay.replay->mode.bms_control_flow_version != 1 || replay.replay->mode.bms_random_seed) {
+        // The deployed verifier/boards have not negotiated these optional policies.
+        error = "Ranked upload skipped: this BMS gauge/branch policy remains local until server support is available.";
         return false;
     }
     std::ifstream input(replay_path, std::ios::binary);
