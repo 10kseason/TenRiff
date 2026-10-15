@@ -1,16 +1,19 @@
         const float ambient_pulse = static_cast<float>(pulse_wave_01(render_now_ns, 6.4, 0.18));
-        // Hide the table's decorative prefix only here; stored labels and the
-        // result screen retain the authored difficulty-table identity.
-        auto song_level_label = [](std::string label) {
+        // Only the built-in 5K Aery table keeps its mode badge. Other song-list
+        // labels hide the prefix without changing stored table identities.
+        auto song_level_label = [](std::string label, bool aery_five_key = false) {
+            if (aery_five_key) return label;
             constexpr std::string_view marker = u8"⑤";
             for (auto pos = label.find(marker); pos != std::string::npos; pos = label.find(marker, pos)) {
                 label.erase(pos, marker.size());
             }
             return label;
         };
-        auto song_level_text = [&](const std::string& label) {
-            return to_wide(song_level_label(label));
+        auto song_level_text = [&](const std::string& label, bool aery_five_key = false) {
+            return to_wide(song_level_label(label, aery_five_key));
         };
+        const bool selected_aery_badge = data.song_select.difficulty_table_active &&
+            data.song_select.selected_song_difficulty_is_aery_five_key;
         const float selection_pulse = static_cast<float>(pulse_wave_01(render_now_ns, 4.2, 0.46));
         const std::size_t jacket_identity = std::hash<std::string>{}(data.song_select.selected_song_title) ^
             static_cast<std::size_t>(data.song_select.list_selected_index + 1);
@@ -438,12 +441,13 @@
                 std::string level = !song.level_label.empty()
                                         ? song.level_label
                                         : (song.level > 0 ? std::to_string(song.level) : "");
-                draw_difficulty_label(song_level_text(level), d2d_->title_format.Get(),
+                const bool aery_badge = data.song_select.difficulty_table_active && song.difficulty_is_aery_five_key;
+                draw_difficulty_label(song_level_text(level, aery_badge), d2d_->title_format.Get(),
                                    native_rect("songselect.rect.029", D2D1::RectF(value_left, card.top + 13.0f,
                                                card.right - 12.0f, card.top + 48.0f)),
                                    modern_library_screen ? semantic_color(0xF06B7B)
                                        : static_cast<ID2D1Brush*>(d2d_->text_brush.Get()),
-                                   false,
+                                   modern_library_screen && aery_badge,
                                    DWRITE_TEXT_ALIGNMENT_TRAILING);
             }
             if (song.favorite && d2d_->hud_format && d2d_->accent_brush) {
@@ -899,14 +903,14 @@
                 draw_difficulty_label(
                     song_level_text(data.song_select.selected_song_difficulty.empty()
                                 ? std::string("--")
-                                : data.song_select.selected_song_difficulty),
+                                : data.song_select.selected_song_difficulty, selected_aery_badge),
                     d2d_->body_format.Get(),
                     native_rect("songselect.rect.065", D2D1::RectF(difficulty_card.left + 14.0f,
                                 difficulty_card.top + (modern_library_screen ? 94.0f : 118.0f),
                                 difficulty_split - 10.0f,
                                 difficulty_card.bottom - 14.0f)),
                     modern_library_screen ? semantic_color(0xF06B7B) : d2d_->text_brush.Get(),
-                    false,
+                    modern_library_screen && selected_aery_badge,
                     DWRITE_TEXT_ALIGNMENT_CENTER);
                 draw_centered_text(to_wide(data.song_select.selected_song_layout),
                                    d2d_->title_format.Get(),
@@ -979,7 +983,7 @@
             const std::array<std::pair<std::string, std::string>, 4> metadata_values = {{
                 {data.song_select.selected_song_has_bpm_changes ? "BPM! :" : "BPM",
                  data.song_select.selected_song_bpm > 0.0 ? format_decimal(data.song_select.selected_song_bpm, 1) : "--"},
-                {loc("LEVEL", "레벨"), data.song_select.selected_song_difficulty.empty() ? "--" : song_level_label(data.song_select.selected_song_difficulty)},
+                {loc("LEVEL", "레벨"), data.song_select.selected_song_difficulty.empty() ? "--" : song_level_label(data.song_select.selected_song_difficulty, selected_aery_badge)},
                 {loc("NOTES", "노트 수"), data.song_select.selected_song_note_count > 0 ? format_int_with_commas(data.song_select.selected_song_note_count) : "--"},
                 {"NPS MED", data.song_select.selected_song_nps_median > 0.0 ? format_decimal(data.song_select.selected_song_nps_median, 1) : "--"},
             }};
@@ -990,11 +994,11 @@
                     draw_text_clipped(to_wide(metadata_values[i].first), d2d_->song_record_label_format.Get(),
                         D2D1::RectF(cell.left, cell.top, cell.right, cell.top + 26.0f),
                         semantic_color(metadata_colors[i], i == 2 ? 1.0f : 0.86f));
-                    draw_difficulty_label(i == 1 ? song_level_text(metadata_values[i].second)
+                    draw_difficulty_label(i == 1 ? song_level_text(metadata_values[i].second, selected_aery_badge)
                                                 : to_wide(metadata_values[i].second), d2d_->song_metadata_value_format.Get(),
                         D2D1::RectF(cell.left, cell.top + 24.0f, cell.right, cell.bottom),
                         semantic_color(metadata_colors[i]),
-                        false,
+                        i == 1 && selected_aery_badge,
                         DWRITE_TEXT_ALIGNMENT_LEADING);
                 } else {
                     draw_meta_pair(metadata_cells[i], metadata_values[i].first, metadata_values[i].second, i == 1);

@@ -1,6 +1,6 @@
 # TenRiff Development Roadmap (staged)
 
-**2026-10-15 · 1.9.0.2 로컬 후보 — 로컬 검사 통과·미공개:** 공개 1.9.0.1을 바탕으로 Options 초록색, 선곡의 ⑤ 제거·레벨 빨강·점수 흰색, `lv:` 레벨 검색, 새 debounce 기본값 0ms와 오디오 음량 1% 단위를 적용합니다. 마스터 기본 10%와 고정 기준 1.9.0을 유지합니다. 아직 공개하지 않았습니다. [변경·사용 안내](feedback-1.9.0.2.ko.md).
+**2026-10-15 · 1.9.0.2 릴리스 후보 — 공개 검증 절차:** 공개 1.9.0.1을 바탕으로 Options 초록색, 기본 제공 5K Aery 표에서만 초록 ⑤ 표시·레벨 빨강·점수 흰색, `lv:` 레벨 검색, 새 debounce 기본값 0ms와 오디오 음량 1% 단위를 적용합니다. 마스터 기본 10%와 고정 기준 1.9.0을 유지합니다. [변경·사용 안내](feedback-1.9.0.2.ko.md). 실제 공개 여부와 다운로드는 릴리스 페이지가 기준입니다. [릴리스 범위·검증](release-1.9.0.2-gate.md).
 
 **2026-10-15 · 1.9.0.1:** 마스터 기본 음량 10%, 로비 아이콘 중심 정렬을 포함합니다. 미리듣기 ×0.75, 프로필에서 지정하는 F5/F6 -10/+10, Xbox/XInput 버튼 입력, 파일 선택창 중복 방지, BMS BPM/STOP 순서 수정과 옛 리플레이 호환을 제공합니다. 고정 기준은 1.9.0을 유지합니다. [변경 안내](feedback-20261015.ko.md) · [릴리스 검증 범위](release-1.9.0.1-gate.md).
 
@@ -26,15 +26,17 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current baseline
 - Windows GUI/runtime is the primary supported path.
-- The fixed baseline is `1.9.0` and this source targets local candidate `1.9.0.2`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
+- The fixed baseline is `1.9.0` and this source targets release candidate `1.9.0.2`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
 - The active menu/runtime is BMS-family only (`.bms/.bme/.bml/.pms`) and supports native, bundled/profile TenRiff `skin.json`, and LR2 skins.
 - For current shipped behavior, read `docs/current-state.md` first; this roadmap is about direction and remaining work.
 
-## 1.9.0.2 로컬 후보 검증 범위
+## 1.9.0.2 릴리스 후보 검증 범위
 
-Release 빌드와 최종 CTest 3/3(1,224개, integration skips 0), 에디터 35/35, native MenuApp/GameSession 307/307(검색 키 처리 22개 포함)이 통과했습니다. native 렌더 6개 fixture/360 Presents와 geometry 86 hit checks도 통과했으며, FHD/960×540 캡처에서 초록 Options·빨강 레벨·흰 점수·⑤ 제거를 확인했습니다.
+아래 수치는 최종 Aery ⑤ 복원 전 후보의 검증입니다. 개발 빌드와 ZIP 추출 소스의 독립 빌드 모두 Release 빌드, CTest 3/3(각 1,224개, integration skips 0), 에디터 35/35, native MenuApp/GameSession 307/307을 통과했습니다. native 검사는 검색 키 처리 22개를 포함합니다. 복원 전 렌더는 6개 fixture/360 Presents/86 geometry hit checks를 통과했습니다. 최종 Aery ⑤ 복원 후 빌드와 Aery FHD/작은 창·기본 Lv·사용자 표의 표시 검증은 릴리스 검증 절차에서 별도로 확인합니다.
 
-패키지와 독립 추출 소스 빌드 결과는 별도 로컬 검증 기록을 따릅니다. 공개하지 않았습니다. 상세 결과와 로그는 로컬 evidence에 별도로 기록합니다. 내부 키 dispatch 검사는 물리 장치 입력 검증을 대신하지 않으며, 물리 장치·입력 지연·장시간 플레이·다른 PC는 미검증입니다. 고정 기준은 1.9.0입니다.
+첫 패키징에서는 기존 스킨 레인 숫자 단축키 검사가 한 차례 실패했습니다. 코드 변경 없이 같은 테스트 바이너리의 재검사, 전체 CTest 재실행 및 독립 빌드 검사는 통과했지만 **근본 원인은 미확정**입니다. 최초 실패도 보존하며 재실행 통과를 원인 해결로 해석하지 않습니다.
+
+로컬 패키지·독립 빌드 근거와 초기 실패는 별도 evidence에 보존합니다. 최종 공개 패키지 대응·PR/main CI·공개 자산 검사는 [릴리스 검증 절차](release-1.9.0.2-gate.md)를 따르며 이 문서에서 미리 통과로 표시하지 않습니다. 실제 공개 상태는 릴리스 페이지가 기준입니다. 내부 키 dispatch·geometry 검사는 물리 장치 입력을 대신하지 않으며 물리 장치·지연·장시간 플레이·다른 PC는 미검증입니다. 고정 기준은 1.9.0입니다.
 
 ## 1.9.0.1 이후 확인할 범위
 

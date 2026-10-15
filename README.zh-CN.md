@@ -1,6 +1,6 @@
 # TenRiff
 
-**2026-10-15 · 1.9.0.2 本地候选版 — 本地检查通过·未发布：**基于已发布的1.9.0.1，将Options改为绿色，移除选曲中的⑤并将等级设为红色、分数设为白色，新增`lv:`等级搜索、新建配置debounce默认0ms和音量1%步长。主音量默认10%，固定基准仍为1.9.0。尚未发布。[变更与用法](docs/feedback-1.9.0.2.zh-CN.md)。
+**2026-10-15 · 1.9.0.2 发布候选版 — 发布验证流程：**基于已发布的1.9.0.1，将Options改为绿色，仅在选择内置5K Aery难度表时显示绿色⑤，并将等级设为红色、分数设为白色，新增`lv:`等级搜索、新建配置debounce默认0ms和音量1%步长。主音量默认10%，固定基准仍为1.9.0。[变更与用法](docs/feedback-1.9.0.2.zh-CN.md)。 公开状态与可下载文件以发布页面为准。[范围与验证](docs/release-1.9.0.2-gate.md)。
 
 **2026-10-15 · 1.9.0.1:** 包含默认主音量10%和大厅图标中心对齐。提供试听×0.75、个人档案指定F5/F6 -10/+10、Xbox/XInput按钮输入、文件选择框防重复，以及BMS BPM/STOP顺序修正与旧回放兼容。固定基准保持1.9.0。 [变更说明](docs/feedback-20261015.zh-CN.md) · [发布验证范围](docs/release-1.9.0.1-gate.md).
 
@@ -50,13 +50,13 @@
 
 **多人Rate支持版本：**选曲者在大厅设置全员共用的Rate。所有玩家必须使用本protocol v6版本，不能与旧v5客户端连接。[指南](docs/multiplayer-rate-build.ko.md)（韩语）。
 
-版本与下载：[**1.9.0.1**](https://github.com/10kseason/TenRiff/releases/tag/1.9.0.1)；实际软件包／公开状态见[发布记录](docs/release-1.9.0.1-gate.md)，固定基准仍为1.9.0。解压到新文件夹，运行 `launch_win.bat`，然后按 F10 连接一次网页账号。符合条件的新游玩记录会上传分数、详细分数、准确率和详细准确率。新游玩使用 ruleset-5 (Normal/Hard), ruleset-6 (EX)，网页提交必须包含判定配置。ruleset-1/2/3/4回放保留原判定与LN行为，现有网页记录保留ID和分数。请参阅[连接指南](docs/sites-leaderboard.md)（韩语）。 受BPM/STOP修正影响的新时间版本2记录，在网页支持前仅保存在本地。
+公开状态与下载：[**1.9.0.2**](https://github.com/10kseason/TenRiff/releases/tag/1.9.0.2)；公开状态以该发布页面为准，范围与验证见[发布记录](docs/release-1.9.0.2-gate.md)，固定基准仍为1.9.0。解压到新文件夹，运行 `launch_win.bat`，然后按 F10 连接一次网页账号。符合条件的新游玩记录会上传分数、详细分数、准确率和详细准确率。新游玩使用 ruleset-5 (Normal/Hard), ruleset-6 (EX)，网页提交必须包含判定配置。ruleset-1/2/3/4回放保留原判定与LN行为，现有网页记录保留ID和分数。请参阅[连接指南](docs/sites-leaderboard.md)（韩语）。 受BPM/STOP修正影响的新时间版本2记录，在网页支持前仅保存在本地。
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
 TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。固定基准为 `1.9.0`，此源码版本为 `1.9.0.2`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
 
-这份 README 是入门文档。关于当前行为、`1.9.0.2` 本地候选版和固定 `1.9.0` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
+这份 README 是入门文档。关于当前行为、`1.9.0.2` 发布候选版和固定 `1.9.0` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
 
 TenRiff 也明确属于一种 `vibe coding` 作品：它更多是在快速迭代和实验中成形，而不是只按照传统的长篇设计先行流程推进。
 

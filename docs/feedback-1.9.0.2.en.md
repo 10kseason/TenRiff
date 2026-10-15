@@ -1,11 +1,11 @@
-# TenRiff 1.9.0.2 local feedback candidate · 2026-10-15
+# TenRiff 1.9.0.2 release feedback · 2026-10-15
 
-This local candidate is based on published 1.9.0.1. **Local checks passed; it is not published.** The fixed baseline remains [1.9.0](baseline-1.9.0.en.md). Previous releases, installations, profiles and original charts are preserved. Package and independently extracted source-build results belong to the separate local verification record; publication is a separate step.
+This **1.9.0.2 release candidate** is based on published 1.9.0.1. The fixed baseline remains [1.9.0](baseline-1.9.0.en.md); previous releases, installations, profiles and original charts are preserved. Only the [1.9.0.2 release page](https://github.com/10kseason/TenRiff/releases/tag/1.9.0.2) determines publication status and available downloads. The [release gate](release-1.9.0.2-gate.md) distinguishes local evidence from remaining publication checks.
 
 ## Lobby and Song Select
 
 - Display Options in green.
-- Remove ⑤ from Song Select, display levels in red and scores in white. This changes presentation, not the original chart or difficulty-table data.
+- Show green ⑤ only when the built-in 5K Aery difficulty table is selected. Default Lv and other tables omit ⑤; levels stay red and scores stay white. Original chart and difficulty-table data are preserved.
 
 ## Level search
 
@@ -37,11 +37,13 @@ Saved volumes and existing output multipliers, including preview ×0.75, are ret
 
 ## Validation and compatibility
 
-The Release build, final CTest 3/3 (1,224 cases, 0 integration skips), editor 35/35, and native MenuApp/GameSession 307/307 (including 22 search key-handling checks) passed. Six native render fixtures/360 Presents and 86 geometry hit checks passed. FHD/960×540 capture review confirmed green Options, red levels, white scores and removal of ⑤.
+These results describe the candidate before the final Aery ⑤ restoration. The development build and independently extracted source build each passed the Release build, CTest 3/3 (1,224 cases each, 0 integration skips), editor 35/35 and native MenuApp/GameSession 307/307. Native smoke includes 22 search key-handling checks. The earlier render passed six fixtures/360 Presents/86 geometry hit checks. Post-restoration build and Aery FHD/small-window, default Lv and custom-table display checks remain separate release gates.
 
 The initial build failed on unsupported test diagnostic CAPTURE; those diagnostic lines were removed. The first native search run missed the minus key SC_0C; a search-specific key-code comparison corrected it before the final passing checks above. Initial failure logs, original inputs and existing records are preserved.
 
-Consult the separate local verification record for package and independently extracted source-build results. Nothing has been published. Detailed results and logs are recorded separately in local evidence. Internal key dispatch does not establish physical-device input coverage; physical devices, input latency, long play and other PCs remain unverified. The fixed baseline remains 1.9.0.
+The first packaging gate failed an existing skin lane-number shortcut test once. A focused retry with the unchanged test executable, the full CTest retry and independent build checks passed, but **the root cause remains unconfirmed**. Preserve the original failure; passing retries do not establish a fix for the intermittent cause.
+
+Local package/independent-build evidence and initial failures remain in separate evidence. Final package correspondence, PR/main CI and public asset checks follow the [release gate](release-1.9.0.2-gate.md); this document does not mark them passed in advance. The release page determines actual publication status. Internal key dispatch and geometry checks do not establish physical-device input coverage; hardware, latency, long play and other PCs remain unverified. The fixed baseline remains 1.9.0.
 
 [BMS timing and replay compatibility from 1.9.0.1](feedback-20261015.en.md) remain: affected timing-v2 records stay local until web support is added. This candidate does not deploy a website/API/database, promote the fixed baseline or overwrite an installation.
 

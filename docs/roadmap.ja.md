@@ -1,6 +1,6 @@
 # TenRiff Development Roadmap (staged)
 
-**2026-10-15 · 1.9.0.2 ローカル候補 — ローカル検査通過・未公開:** 公開済み1.9.0.1を基に、Optionsを緑色、選曲の⑤を削除してレベルを赤・スコアを白にし、`lv:` レベル検索、新規debounce既定値0ms、音量の1%刻み調整を追加します。マスター既定値10%と固定基準1.9.0は維持します。まだ公開していません。[変更・使い方](feedback-1.9.0.2.ja.md)。
+**2026-10-15 · 1.9.0.2 リリース候補 — 公開検証手順:** 公開済み1.9.0.1を基に、Optionsを緑色、組み込み5K Aery表の選択時だけ緑の⑤を表示し、レベルを赤・スコアを白にし、`lv:` レベル検索、新規debounce既定値0ms、音量の1%刻み調整を追加します。マスター既定値10%と固定基準1.9.0は維持します。[変更・使い方](feedback-1.9.0.2.ja.md)。 公開状況とダウンロードはリリースページを基準に確認してください。[範囲・検証](release-1.9.0.2-gate.md)。
 
 **2026-10-15 · 1.9.0.1:** マスター音量の既定値10%とロビーアイコンの中心揃えを含みます。プレビュー×0.75、プロフィールで指定するF5/F6 -10/+10、Xbox/XInputボタン入力、ファイル選択の重複防止、BMS BPM/STOP順序修正と旧リプレイ互換を提供します。固定基準は1.9.0を維持します。 [変更内容](feedback-20261015.ja.md) · [リリース検証範囲](release-1.9.0.1-gate.md).
 
@@ -26,15 +26,17 @@
 
 ## Current Baseline
 - Windows GUI / runtime が主なサポート経路です。
-- 固定基準は `1.9.0`、このソースはローカル候補 `1.9.0.2`。公開 package は NK3 P64 と generalized pattern MLP inference model を同梱するが、BGA upscaler model は同梱しない。互換性と権利を確認済みの upscaler ONNX を選択しても path を保存するだけで、BGA Upscaler は user が有効化して high-spec warning を確認するまで off のまま。自動 benchmark gate はない。
+- 固定基準は `1.9.0`、このソースはリリース候補 `1.9.0.2`。公開 package は NK3 P64 と generalized pattern MLP inference model を同梱するが、BGA upscaler model は同梱しない。互換性と権利を確認済みの upscaler ONNX を選択しても path を保存するだけで、BGA Upscaler は user が有効化して high-spec warning を確認するまで off のまま。自動 benchmark gate はない。
 - 現行 menu / runtime は BMS family（`.bms/.bme/.bml/.pms`）専用で、native、bundle/profile の TenRiff `skin.json`、LR2 skin をサポート。
 - 現在出荷されている挙動は [`docs/current-state.ja.md`](current-state.ja.md) を先に見てください。この roadmap は方向と残作業を示す文書です。
 
-## 1.9.0.2ローカル候補の検証範囲
+## 1.9.0.2リリース候補の検証範囲
 
-Releaseビルド、最終CTest 3/3（1,224件、integration skips 0）、エディター35/35、native MenuApp/GameSession 307/307（検索キー処理22件を含む）が通過しました。native描画6 fixture/360 Presentsとgeometry 86 hit checksも通過し、FHD/960×540キャプチャで緑のOptions・赤いレベル・白いスコア・⑤の削除を確認しました。
+以下は最終的なAery ⑤復元前の候補での検証結果です。開発ビルドとZIP展開ソースの独立ビルドの両方で、Releaseビルド、CTest 3/3（各1,224件、integration skips 0）、エディター35/35、native MenuApp/GameSession 307/307が通過しました。native検査には検索キー処理22件を含みます。復元前の描画は6 fixture/360 Presents/86 geometry hit checksを通過しました。復元後のビルドとAeryのFHD/小さい画面・既定Lv・カスタム表の表示確認は別のリリース検証項目です。
 
-パッケージと独立した展開ソースのビルド結果は別のローカル検証記録を参照してください。まだ公開していません。詳細結果とログはローカルevidenceに別途記録します。内部キーdispatch検査は実機入力の検証を代替しません。物理デバイス・入力遅延・長時間プレイ・別PCは未検証です。固定基準は1.9.0を維持します。
+初回パッケージ検査では既存のスキンレーン数字ショートカット検査が一度失敗しました。同一テスト実行ファイルの変更なし再検査、CTest全体の再実行、独立ビルド検査は通過しましたが、**根本原因は未確定**です。初期失敗も保全し、再実行の成功を間欠的原因の修正とは扱いません。
+
+ローカルパッケージ・独立ビルドの根拠と初期失敗は別のevidenceに保全します。最終公開パッケージの対応、PR/main CI、公開アセットの確認は[リリース検証手順](release-1.9.0.2-gate.md)に従い、この文書では事前に通過としません。公開状況はリリースページが基準です。内部キーdispatch・geometry検査は実機入力の検証を代替せず、実機・遅延・長時間プレイ・別PCは未検証です。固定基準は1.9.0です。
 
 ## 1.9.0.1以降の確認範囲
 

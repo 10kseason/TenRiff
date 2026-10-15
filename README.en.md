@@ -1,6 +1,6 @@
 # TenRiff
 
-**2026-10-15 · 1.9.0.2 local candidate — local checks passed, unpublished:** Based on published 1.9.0.1, this candidate makes Options green, removes ⑤ from Song Select and uses red levels/white scores, adds `lv:` searches, changes the new debounce default to 0ms, and uses 1% audio-volume steps. Master volume still defaults to 10%; the fixed baseline remains 1.9.0. Not published yet. [Changes and usage](docs/feedback-1.9.0.2.en.md).
+**2026-10-15 · 1.9.0.2 release candidate — publication verification gates:** Based on published 1.9.0.1, this candidate makes Options green, shows green ⑤ only for the selected built-in 5K Aery table and uses red levels/white scores, adds `lv:` searches, changes the new debounce default to 0ms, and uses 1% audio-volume steps. Master volume still defaults to 10%; the fixed baseline remains 1.9.0. [Changes and usage](docs/feedback-1.9.0.2.en.md). The release page determines publication status and available downloads. [Release scope and verification](docs/release-1.9.0.2-gate.md).
 
 **2026-10-15 · 1.9.0.1:** Includes 10% default master volume and aligned lobby icon centers. Preview ×0.75, profile-assigned F5/F6 -10/+10, Xbox/XInput button input, single modal file pickers, and corrected BMS BPM/STOP order with historical replay compatibility. The fixed baseline remains 1.9.0. [Changes](docs/feedback-20261015.en.md) · [Release verification scope](docs/release-1.9.0.1-gate.md).
 
@@ -50,13 +50,13 @@
 
 **Multiplayer Rate build:** the leader sets a shared Room Rate in the lobby. All participants must use this protocol v6 build; previous v5 clients cannot join. [Guide (Korean)](docs/multiplayer.md).
 
-Release and downloads: [**1.9.0.1**](https://github.com/10kseason/TenRiff/releases/tag/1.9.0.1). Actual package/publication status is tracked in the [release record](docs/release-1.9.0.1-gate.md); the fixed baseline remains 1.9.0. Extract to a new folder, run `launch_win.bat`, then press F10 and link your web account once. Eligible new plays upload score, detail score, accuracy, and detailed accuracy. New plays use ruleset-5 (Normal/Hard), ruleset-6 (EX) with a required timing profile for web submissions; ruleset-1/2/3/4 replays retain their original timing and LN behavior, and existing web records keep their IDs and scores. See the [connection guide](docs/sites-leaderboard.md) (Korean). New timing-version-2 records affected by the BPM/STOP correction remain local until web support is added.
+Publication status and downloads: [**1.9.0.2**](https://github.com/10kseason/TenRiff/releases/tag/1.9.0.2). The release page determines availability; scope and verification gates are in the [release record](docs/release-1.9.0.2-gate.md); the fixed baseline remains 1.9.0. Extract to a new folder, run `launch_win.bat`, then press F10 and link your web account once. Eligible new plays upload score, detail score, accuracy, and detailed accuracy. New plays use ruleset-5 (Normal/Hard), ruleset-6 (EX) with a required timing profile for web submissions; ruleset-1/2/3/4 replays retain their original timing and LN behavior, and existing web records keep their IDs and scores. See the [connection guide](docs/sites-leaderboard.md) (Korean). New timing-version-2 records affected by the BPM/STOP correction remain local until web support is added.
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
 TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The fixed baseline is `1.9.0` and this source targets `1.9.0.2`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-This README explains what to read first when opening the project. For current behavior, the `1.9.0.2` local candidate, the fixed `1.9.0` baseline, configuration and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
+This README explains what to read first when opening the project. For current behavior, the `1.9.0.2` release candidate, the fixed `1.9.0` baseline, configuration and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
 
 TenRiff should also be read as a `vibe coding` work: it was shaped through fast iteration and experimentation rather than only through a traditional long-form design-first process.
 

@@ -1,6 +1,6 @@
 # TenRiff Development Roadmap (staged)
 
-**2026-10-15 · 1.9.0.2 local candidate — local checks passed, unpublished:** Based on published 1.9.0.1, this candidate makes Options green, removes ⑤ from Song Select and uses red levels/white scores, adds `lv:` searches, changes the new debounce default to 0ms, and uses 1% audio-volume steps. Master volume still defaults to 10%; the fixed baseline remains 1.9.0. Not published yet. [Changes and usage](feedback-1.9.0.2.en.md).
+**2026-10-15 · 1.9.0.2 release candidate — publication verification gates:** Based on published 1.9.0.1, this candidate makes Options green, shows green ⑤ only for the selected built-in 5K Aery table and uses red levels/white scores, adds `lv:` searches, changes the new debounce default to 0ms, and uses 1% audio-volume steps. Master volume still defaults to 10%; the fixed baseline remains 1.9.0. [Changes and usage](feedback-1.9.0.2.en.md). The release page determines publication status and available downloads. [Release scope and verification](release-1.9.0.2-gate.md).
 
 **2026-10-15 · 1.9.0.1:** Includes 10% default master volume and aligned lobby icon centers. Preview ×0.75, profile-assigned F5/F6 -10/+10, Xbox/XInput button input, single modal file pickers, and corrected BMS BPM/STOP order with historical replay compatibility. The fixed baseline remains 1.9.0. [Changes](feedback-20261015.en.md) · [Release verification scope](release-1.9.0.1-gate.md).
 
@@ -26,15 +26,17 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current Baseline
 - Windows GUI / runtime is the primary supported path.
-- The fixed baseline is `1.9.0` and this source targets local candidate `1.9.0.2`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
+- The fixed baseline is `1.9.0` and this source targets release candidate `1.9.0.2`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
 - The active menu / runtime is BMS-family only (`.bms/.bme/.bml/.pms`) and supports native, bundled/profile TenRiff `skin.json`, and LR2 skins.
 - For current shipped behavior, read `docs/current-state.en.md` first; this roadmap is about direction and remaining work.
 
-## 1.9.0.2 local candidate validation
+## 1.9.0.2 release candidate validation
 
-The Release build, final CTest 3/3 (1,224 cases, 0 integration skips), editor 35/35, and native MenuApp/GameSession 307/307 (including 22 search key-handling checks) passed. Six native render fixtures/360 Presents and 86 geometry hit checks passed. FHD/960×540 capture review confirmed green Options, red levels, white scores and removal of ⑤.
+These results describe the candidate before the final Aery ⑤ restoration. The development build and independently extracted source build each passed the Release build, CTest 3/3 (1,224 cases each, 0 integration skips), editor 35/35 and native MenuApp/GameSession 307/307. Native smoke includes 22 search key-handling checks. The earlier render passed six fixtures/360 Presents/86 geometry hit checks. Post-restoration build and Aery FHD/small-window, default Lv and custom-table display checks remain separate release gates.
 
-Consult the separate local verification record for package and independently extracted source-build results. Nothing has been published. Detailed results and logs are recorded separately in local evidence. Internal key dispatch does not establish physical-device input coverage; physical devices, input latency, long play and other PCs remain unverified. The fixed baseline remains 1.9.0.
+The first packaging gate failed an existing skin lane-number shortcut test once. A focused retry with the unchanged test executable, the full CTest retry and independent build checks passed, but **the root cause remains unconfirmed**. Preserve the original failure; passing retries do not establish a fix for the intermittent cause.
+
+Local package/independent-build evidence and initial failures remain in separate evidence. Final package correspondence, PR/main CI and public asset checks follow the [release gate](release-1.9.0.2-gate.md); this document does not mark them passed in advance. The release page determines actual publication status. Internal key dispatch and geometry checks do not establish physical-device input coverage; hardware, latency, long play and other PCs remain unverified. The fixed baseline remains 1.9.0.
 
 ## Follow-up after 1.9.0.1
 

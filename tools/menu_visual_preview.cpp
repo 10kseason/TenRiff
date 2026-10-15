@@ -653,6 +653,7 @@ int main(int argc, char** argv) {
     std::string sites_records_title;
     std::string display_level = "12";
     bool aery_five_key = false;
+    bool native_level_table = false;
     bool backdrop_off = false;
     double backdrop_opacity = -1.0;
     double backdrop_brightness = -1.0;
@@ -712,6 +713,7 @@ int main(int argc, char** argv) {
         if (arg == "--analysis-unavailable") { analysis_unavailable = true; continue; }
         if (arg == "--display-level" && i + 1 < argc) { display_level = argv[++i]; continue; }
         if (arg == "--aery-five-key") { aery_five_key = true; menu_keys = 5; continue; }
+        if (arg == "--native-level-table") { native_level_table = true; continue; }
         if (arg == "--analysis-no-samples") { analysis_no_samples = true; continue; }
         if (arg == "--edit-resolution") { settings = graphics_settings = edit_resolution = true; continue; }
         if (arg == "--invalid-resolution") { settings = graphics_settings = edit_resolution = invalid_resolution = true; continue; }
@@ -1149,9 +1151,9 @@ int main(int argc, char** argv) {
     songs.current_hi_speed = "3.50";
     songs.current_visual_latency = "+0 ms";
     songs.current_random = loc("Off", "꺼짐");
-    songs.difficulty_table_name = empty ? loc("Native LV", "기본 LV") :
+    songs.difficulty_table_name = empty || native_level_table ? loc("Native LV", "기본 LV") :
         (aery_five_key ? "5K Aery" : "発狂BMS難易度表");
-    songs.difficulty_table_active = !empty;
+    songs.difficulty_table_active = !empty && !native_level_table;
     songs.difficulty_table_editing = table_editor;
     songs.difficulty_table_url_input = "https://example.com/table/header.json";
     songs.sort_summary = loc("LV ASC", "LV 오름");
