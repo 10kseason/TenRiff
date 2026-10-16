@@ -1017,7 +1017,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     true);
     append_menu_row(render.generic, ui_text("FAST/SLOW Bar", "FAST/SLOW 막대"), ui_on_off(timing_visibility.bar),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TimingBar), false, true);
-    append_menu_row(render.generic, ui_text("FAST/SLOW Bar Display", "FAST/SLOW 막대 표시 방식"),
+    append_menu_row(render.generic, ui_text("FAST/SLOW Display", "FAST/SLOW 표시 방식"),
                     timing_visibility.always_visible ? ui_text("Always", "항상") : ui_text("After non-PG", "피그렛 외 판정 후"),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TimingBarMode), false, true);
     append_menu_row(render.generic, ui_text("FAST/SLOW Indicator X", "FAST/SLOW 인디케이터 X"), std::to_string(static_cast<int>(config_.skin.timing_text_offset_x)) + " px",

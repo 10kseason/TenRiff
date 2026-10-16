@@ -70,7 +70,8 @@ GameplayEngine::GameplayEngine(const GameplayChart& chart, const GameplayConfig&
       practice_no_fail_enabled_(config.practice_no_fail_enabled),
       one_miss_fail_enabled_(config.one_miss_fail_enabled),
       legacy_hold_release_(config.legacy_hold_release),
-      chronological_judgement_(config.chronological_judgement) {
+      chronological_judgement_(config.chronological_judgement),
+      empty_poor_affects_accuracy_(config.empty_poor_affects_accuracy) {
     if (config.gauge_policy.course_lr2_deltas) {
         windows_.indirect_miss_enabled = true;
     }
@@ -465,7 +466,9 @@ void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms,
                             delta_ms,
                             combo_impact,
                             weight,
-                            detailed_accuracy_credit_for(judgement, delta_ms));
+                            detailed_accuracy_credit_for(judgement, delta_ms),
+                            empty_poor_affects_accuracy_ || judgement != game::Judgement::PR ||
+                                combo_impact != ComboImpact::Preserve);
     stats_.record_gauge_sample(sample, gauge_state_.value);
 
     if (result.downshifted) {
@@ -663,7 +666,7 @@ void GameplayEngine::apply_empty_poor(int lane, int64_t sample) {
                     ComboImpact::Preserve,
                     false);
     stats_.analysis.observe(TimingEventKind::EmptyPoor, lane, sample,
-                            game::Judgement::PR, std::nullopt, 1.0);
+                            game::Judgement::PR, std::nullopt, 1.0, empty_poor_affects_accuracy_);
 }
 
 OsuManiaJudgement GameplayEngine::record_osu_hold(const HoldState& hold,

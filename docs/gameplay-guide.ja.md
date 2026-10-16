@@ -11,7 +11,7 @@
 1.9.0.1ではプロフィールでHi-Speed -10/+10を指定します（既定F5/F6、範囲0.50–50.00）。Xbox/XInputのデジタルボタンとLT/RTをKeymapで押すとレーンに、プロフィールでは再試行・Hi-Speed操作に割り当てられます。メニューは方向パッドで移動、Aで選択、Bで戻り、他の操作に未割当のStartでゲームを一時停止します。LT/RTは30/255を超えると押下です。スティック軸と振動は今回の範囲外です。[変更・互換性](feedback-20261015.ja.md)。
 
 1.9.0リリースでは `Options > Key Mode Settings > Judge Window` から通常/Hard/EXを選択します。Easyは新しい選択肢から外し、過去のリプレイでは維持します。選択は実行中のみ有効で、再起動後は通常に戻ります。[EX判定と互換性](judge-ex-1.9.0.ko.md)（韓国語）。
-- 新しい通常/Hardは `tenriff-native-score-v2-ruleset-5`、EXは `tenriff-native-score-v2-ruleset-6` を記録します。過去のR1–R5・Easy・LN規則は維持し、カスタム判定は非公式です。
+- 1.9.3の新通常/Hardは`tenriff-native-score-v2-ruleset-7`、EXは`tenriff-native-score-v2-ruleset-8`です。空POORの精度寄与だけを除外し数値判定幅は維持します。過去R1–R6のリプレイは当時の規則を保持し、カスタム判定は非公式です。
 - `Judge EX` はEASY基準PG/GR/GD=`14/44.571429/78.857143ms`（Hardの80%）でRANK比率を維持。BADは全RANKで250ms固定、別の自動ミス期限は340ms、スコア倍率はHardと同じ1.10です。
 
 この文書は、TenRiff を初めて触るプレイヤーが実際にどうやって曲を選び、プレイし、結果を確認するかに焦点を当てたユーザーガイドです。

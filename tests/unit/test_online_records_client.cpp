@@ -109,6 +109,11 @@ TEST_CASE("Sites BMS boards display isolated gauge timing and selected branch po
         } else CHECK(boards.empty());
     };
     check(condition, true);
+    for (const auto ruleset : {"tenriff-native-score-v2-ruleset-7", "tenriff-native-score-v2-ruleset-8"}) {
+        auto current = condition;
+        current["ruleset"] = config::JsonValue{ruleset};
+        check(current, true);
+    }
     for (const auto* key : {"bms_timing_version", "bms_gauge_version", "bms_control_flow_version", "bms_branch_sha256"}) {
         auto missing = condition;
         missing.erase(key);

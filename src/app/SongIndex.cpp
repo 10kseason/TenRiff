@@ -1,4 +1,5 @@
 #include "app/SongIndex.h"
+#include "app/BmsRankLabel.h"
 #include "app/SongIndexBudget.h"
 #include "app/MenuSongUtils.h"
 #include "app/ChartFileHash.h"
@@ -36,9 +37,9 @@ namespace tenriff::app {
 
 namespace {
 
-// v18 predates corrected BMS control flow and can retain truncated/empty RANDOM
-// charts even when source mtime/size match. Rebuild derived metadata once.
-constexpr int kSongIndexVersion = 19;
+// v19 lacks authored judgement metadata; older caches also predate corrected
+// RANDOM control flow. Rebuild these derived caches once, preserving records.
+constexpr int kSongIndexVersion = 20;
 constexpr std::uintmax_t kMaxMetadataChartFileBytes = 8u * 1024u * 1024u;
 
 bool cancel_requested(const SongIndexCancelCallback& cancel) {
@@ -730,6 +731,9 @@ SongEntry build_bms_entry(std::string relative_path,
     entry.chart_author = bms_chart_author_from_headers(parsed.chart);
     entry.artist = bms_artist_from_headers(parsed.chart, entry.chart_author);
     entry.chart_name = bms_chart_name_from_headers(parsed.chart);
+    const auto rank_it = parsed.chart.headers.find("RANK");
+    entry.bms_rank = bms_rank_for_display(rank_it == parsed.chart.headers.end()
+        ? std::string_view{} : std::string_view(rank_it->second));
 
     auto level_it = parsed.chart.headers.find("PLAYLEVEL");
     if (level_it != parsed.chart.headers.end()) {
@@ -1575,6 +1579,10 @@ private:
                     return false;
                 }
                 entry.level = static_cast<int>(std::llround(value.value()));
+            } else if (*key == "bms_rank") {
+                const auto value = parse_number();
+                if (!value || *value < -1 || *value > 4 || std::floor(*value) != *value) return false;
+                entry.bms_rank = static_cast<int>(*value);
             } else if (*key == "native_level") {
                 auto value = parse_number();
                 if (!value.has_value()) {
@@ -1847,6 +1855,7 @@ bool save_song_index(const std::string& path,
         file << ",\"key_count\":" << entry.key_count;
         file << ",\"level\":" << entry.level;
         file << ",\"native_level\":" << entry.native_level;
+        file << ",\"bms_rank\":" << entry.bms_rank;
         file << ",\"rating\":" << entry.rating;
         file << ",\"bpm\":" << entry.bpm;
         file << ",\"has_bpm_changes\":" << (entry.has_bpm_changes ? "true" : "false");

@@ -50,8 +50,7 @@
                 ctx->SetTransform(D2D1::Matrix3x2F::Scale(deck.info_scale, deck.info_scale) *
                     D2D1::Matrix3x2F::Translation(deck.info_x, deck.info_y) * saved_transform);
                 const float info_width = deck.info_width / deck.info_scale;
-                studio_text(c.artist_text, studio_fonts.studio_body.Get(),
-                    D2D1::RectF(0, 42, info_width, 69), ng_color("body", D2D1::ColorF(0x7C889B)));
+                draw_artist_and_level(D2D1::RectF(0, 42, info_width, 69), studio_fonts.studio_body.Get());
                 const float cell_width = (info_width - 12.0f) / 3.0f;
                 for (int i = 0; i < 6; ++i) {
                     const float x = (i % 3) * (cell_width + 6.0f) + 9.0f;

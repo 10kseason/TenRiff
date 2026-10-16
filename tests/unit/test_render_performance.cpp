@@ -515,14 +515,14 @@ TEST_CASE("ONNX shape contract accepts dynamic spatial RGB and rejects unsafe bo
     CHECK(model_shape({1, 3, 540, 960}, {1, 3, 1080, 1920}) == ModelShape::Fixed);
     CHECK(model_shape({1, 3, -1, -1}, {1, 3, -1, -1}) == ModelShape::Dynamic);
     for (const auto& bad : std::vector<std::vector<std::int64_t>>{
-             {}, {3, -1, -1}, {2, 3, -1, -1}, {-1, 3, -1, -1}, {1, 4, -1, -1},
+             {}, {3, -1, -1}, {2, 3, -1, -1}, {1, 4, -1, -1},
              {1, -1, -1, -1}, {1, 3, 0, 0}, {1, 3, -1, 960}, {1, 3, 540, -1},
-             {1, 3, -2, -2}, {1, 3, 1080, 1920}}) {
+             {1, 3, -2, -2}, {1, 3, 9000, 9000}}) {
         CHECK(model_shape(bad, {1, 3, -1, -1}) == ModelShape::Unsupported);
         CHECK(model_shape({1, 3, -1, -1}, bad) == ModelShape::Unsupported);
     }
-    CHECK(model_shape({1, 3, 540, 960}, {1, 3, 540, 960}) == ModelShape::Unsupported);
-    CHECK(model_shape({1, 3, -1, -1}, {1, 3, 1080, 1920}) == ModelShape::Unsupported);
+    CHECK(model_shape({1, 3, 540, 960}, {1, 3, 540, 960}) == ModelShape::Fixed);
+    CHECK(model_shape({1, 3, -1, -1}, {1, 3, 1080, 1920}) == ModelShape::Dynamic);
     CHECK(valid_residual_shape({1, 3, 26, 38}, 19, 13));
     CHECK(valid_residual_shape({1, 3, 8192, 8192}, 4096, 4096));
     CHECK_FALSE(valid_residual_shape({1, 3, 13, 19}, 19, 13));
@@ -561,6 +561,65 @@ TEST_CASE("dynamic ONNX composition preserves original coordinates without fixed
         CHECK_FALSE(compose_tile(source, width, height, full_image, residual, output, width, height));
         residual.clear();
         CHECK_FALSE(compose_tile(source, width, height, full_image, residual, output, width, height));
+    }
+}
+
+TEST_CASE("ONNX output semantics preserve legacy residuals and allow explicit completed images") {
+    using namespace tenriff::render::onnx_image;
+    CHECK(output_mode("auto", "rgb_lr", "rgb_residual_x2") == OutputMode::Residual);
+    CHECK(output_mode("auto", "input", "output") == OutputMode::Image);
+    CHECK(output_mode("auto", "input", "output", "residual") == OutputMode::Residual);
+    CHECK(output_mode("image", "rgb_lr", "rgb_residual_x2") == OutputMode::Image);
+    CHECK(output_mode("residual", "input", "output", "image") == OutputMode::Residual);
+    bool rejected_metadata = false, rejected_mode = false;
+    try { (void)output_mode("auto", "input", "output", "unknown"); }
+    catch (const std::runtime_error&) { rejected_metadata = true; }
+    try { (void)output_mode("unknown", "input", "output"); }
+    catch (const std::runtime_error&) { rejected_mode = true; }
+    CHECK(rejected_metadata);
+    CHECK(rejected_mode);
+    CHECK(model_shape({-1, 3, -1, -1}, {-1, 3, -1, -1}) == ModelShape::Dynamic);
+    CHECK(model_shape({1, 3, 32, 64}, {1, 3, 128, 256}) == ModelShape::Fixed);
+    CHECK(model_shape({1, 3, 32, 64}, {1, 3, 64, 256}) == ModelShape::Unsupported);
+    CHECK(output_scale({1, 3, 39, 57}, 19, 13) == 3);
+    CHECK(output_scale({1, 3, 52, 76}, 19, 13) == 4);
+    CHECK(output_scale({1, 3, 65, 95}, 19, 13) == 0);
+    CHECK(output_scale({1, 3, 52, 75}, 19, 13) == 0);
+    CHECK(output_scale({1, 3, 52, 38}, 19, 13) == 0);
+    CHECK(output_scale({1, 3, 8196, 8196}, 2049, 2049) == 0);
+}
+
+TEST_CASE("ONNX image outputs are not double-added and residual outputs retain the base at every scale") {
+    using namespace tenriff::render::onnx_image;
+    const std::vector<std::uint8_t> source{64, 128, 192, 128};
+    for (const auto scale : {1u, 2u, 3u, 4u}) {
+        const auto plane = scale * scale;
+        std::vector<float> pixels(plane * 3, 0.25f);
+        std::vector<std::uint8_t> output(plane * 4);
+        REQUIRE(compose_tile(source, 1, 1, {0, 0, 1, 1, 0, 0}, pixels, output, 1, 1, scale, OutputMode::Image));
+        for (std::size_t i = 0; i < output.size(); i += 4) {
+            CHECK(output[i] == 32); CHECK(output[i + 1] == 32);
+            CHECK(output[i + 2] == 32); CHECK(output[i + 3] == 128);
+        }
+        REQUIRE(compose_tile(source, 1, 1, {0, 0, 1, 1, 0, 0}, pixels, output, 1, 1, scale, OutputMode::Residual));
+        CHECK(output[0] == 64); CHECK(output[1] == 96); CHECK(output[2] == 128);
+        pixels[0] = std::numeric_limits<float>::infinity();
+        CHECK_FALSE(compose_tile(source, 1, 1, {0, 0, 1, 1, 0, 0}, pixels, output, 1, 1, scale, OutputMode::Image));
+    }
+}
+
+TEST_CASE("ONNX arbitrary fixed tiles cover odd originals exactly once") {
+    using namespace tenriff::render::onnx_image;
+    for (const auto dims : {std::pair{1u, 1u}, {3u, 7u}, {32u, 64u}, {64u, 32u}}) {
+        const auto [iw, ih] = dims;
+        std::vector<int> owned(73 * 59);
+        std::vector<std::uint8_t> source(73 * 59 * 4, 128);
+        for (const auto& tile : plan_tiles(73, 59, iw, ih)) {
+            REQUIRE(extract_tile(source, 73, 59, tile, iw, ih).size() == iw * ih * 4);
+            for (auto y = tile.y; y < tile.y + tile.height; ++y)
+                for (auto x = tile.x; x < tile.x + tile.width; ++x) ++owned[y * 73 + x];
+        }
+        CHECK(std::all_of(owned.begin(), owned.end(), [](int n) { return n == 1; }));
     }
 }
 

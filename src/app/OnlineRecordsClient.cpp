@@ -399,7 +399,9 @@ bool parse_sites_record_boards(std::string_view json, std::string_view title,
         board.rate_milli = static_cast<int>(rate);
         board.id = lower_ascii(board.id);
         board.chart_sha256 = lower_ascii(board.chart_sha256);
-        const std::string ruleset_label = board.ruleset_id == "tenriff-native-score-v2-ruleset-6" ? "RULESET 6" :
+        const std::string ruleset_label = board.ruleset_id == "tenriff-native-score-v2-ruleset-8" ? "RULESET 8" :
+                                          board.ruleset_id == "tenriff-native-score-v2-ruleset-7" ? "RULESET 7" :
+                                          board.ruleset_id == "tenriff-native-score-v2-ruleset-6" ? "RULESET 6" :
                                           board.ruleset_id == "tenriff-native-score-v2-ruleset-5" ? "RULESET 5" :
                                           board.ruleset_id == "tenriff-native-score-v2-ruleset-4" ? "RULESET 4" :
                                           board.ruleset_id == "tenriff-native-score-v2-ruleset-3" ? "RULESET 3" :
@@ -418,7 +420,9 @@ bool parse_sites_record_boards(std::string_view json, std::string_view title,
                 !required_integer(*condition, "bms_control_flow_version", 1, 2, control) ||
                 timing_label.compare(0, 4, "BMS ") != 0 ||
                 (board.ruleset_id != "tenriff-native-score-v2-ruleset-5" &&
-                 board.ruleset_id != "tenriff-native-score-v2-ruleset-6")) return fail();
+                 board.ruleset_id != "tenriff-native-score-v2-ruleset-6" &&
+                 board.ruleset_id != "tenriff-native-score-v2-ruleset-7" &&
+                 board.ruleset_id != "tenriff-native-score-v2-ruleset-8")) return fail();
             // These are community comparison conditions, not server replay verification.
             board.conditions_label += gauge_version == 2 ? " / BMS TOTAL" : " / GAUGE v1";
             board.conditions_label += " / STOP v" + std::to_string(timing);

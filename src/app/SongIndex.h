@@ -26,6 +26,7 @@ struct SongEntry {
     std::string audio_preview_path;
     int key_count = 0;
     int level = 0;
+    int bms_rank = -1; // Authored display rank; -1 for non-BMS or unparsed charts.
     int native_level = 0;
     double rating = 0.0;
     double bpm = 0.0;

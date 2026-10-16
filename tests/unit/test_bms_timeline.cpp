@@ -14,6 +14,24 @@ using tenriff::chart::BmsChartNormalizer;
 using tenriff::chart::BmsNormalizedEventType;
 using tenriff::chart::BmsTimelineBuilder;
 
+TEST_CASE("BMS measure lines follow authored lengths BPM and STOP before boundary waits") {
+    const auto parsed = tenriff::chart::BmsParser{}.parse(
+        "#BPM 120\n#BPM01 240\n#STOP01 48\n#00102:0.5\n#00008:0001\n#00109:01\n#00211:01\n");
+    REQUIRE(parsed.success());
+    const auto norm = BmsChartNormalizer{}.normalize(parsed.chart);
+    REQUIRE(norm.success());
+    const auto built = BmsTimelineBuilder{}.build(norm.chart, 48000);
+    REQUIRE(built.success());
+    REQUIRE(built.timeline.measure_samples.size() == 3);
+    CHECK(built.timeline.measure_samples[0] == 0);
+    CHECK(built.timeline.measure_samples[1] == 72000);
+    CHECK(built.timeline.measure_samples[2] == 108000);
+    const auto boundary_note = std::find_if(built.timeline.events.begin(), built.timeline.events.end(),
+        [](const auto& event) { return event.event.type == BmsNormalizedEventType::Note; });
+    REQUIRE(boundary_note != built.timeline.events.end());
+    CHECK(boundary_note->time_samples == built.timeline.measure_samples[2]);
+}
+
 TEST_CASE("BMS timing v2 applies coincident BPM before STOP independent of slice storage") {
     auto parsed = tenriff::chart::BmsParser{}.parse(bpm_stop_mine_fixture());
     REQUIRE(parsed.success());

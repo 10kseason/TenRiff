@@ -2314,7 +2314,7 @@ struct GameSessionAudioTestAccess {
         CHECK(payload.empty() == !upload_eligible);
         CHECK(error.empty() == upload_eligible);
         if (stale_catchup) {
-            CHECK(replay.replay->ruleset_id == "custom-ruleset-5");
+            CHECK(replay.replay->ruleset_id == "custom-ruleset-7");
             CHECK_FALSE(is_supported_canonical_replay_ruleset(replay.replay->ruleset_id));
             CHECK_FALSE(result.pause_used);
             CHECK(std::any_of(result.export_warnings.begin(), result.export_warnings.end(),
@@ -2322,10 +2322,10 @@ struct GameSessionAudioTestAccess {
             std::ifstream saved_result(std::filesystem::u8path(result.result_path));
             REQUIRE(saved_result.is_open());
             const std::string saved((std::istreambuf_iterator<char>(saved_result)), std::istreambuf_iterator<char>());
-            CHECK(saved.find("custom-ruleset-5") != std::string::npos);
+            CHECK(saved.find("custom-ruleset-7") != std::string::npos);
         }
         if (auto_scratch) {
-            CHECK(replay.replay->ruleset_id == "custom-ruleset-5");
+            CHECK(replay.replay->ruleset_id == "custom-ruleset-7");
             CHECK(result.final_score == 0);
             CHECK(replay.replay->final_score == 0);
             CHECK(result.clear_status.find("ASSIST AUTO SCRATCH") == 0);

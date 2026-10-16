@@ -71,7 +71,8 @@ struct ResultStats {
                           double delta_ms,
                           ComboImpact combo_impact,
                           double weight = 1.0,
-                          double detailed_accuracy_credit = -1.0);
+                          double detailed_accuracy_credit = -1.0,
+                          bool contributes_accuracy = true);
     void record_note_total(int count, int combo_steps = 0);
     void record_gauge_sample(int64_t sample, double value);
     void record_shift(int64_t sample, game::GaugeType from, game::GaugeType to);

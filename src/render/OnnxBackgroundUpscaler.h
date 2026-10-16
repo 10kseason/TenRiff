@@ -22,10 +22,11 @@ struct OnnxUpscaleFrame {
 
 // External ONNX inference is intentionally isolated from the render and audio threads. A request
 // decodes and evaluates on one worker; callers keep drawing the native bitmap
-// until a completed image at twice the original width/height is available.
+// until a completed image at the model's native scale is available.
 class OnnxBackgroundUpscaler {
 public:
-    explicit OnnxBackgroundUpscaler(std::string model_path = {}, bool prefer_npu = false);
+    explicit OnnxBackgroundUpscaler(std::string model_path = {}, bool prefer_npu = false,
+                                    std::string output_mode = "auto");
     ~OnnxBackgroundUpscaler();
 
     OnnxBackgroundUpscaler(const OnnxBackgroundUpscaler&) = delete;

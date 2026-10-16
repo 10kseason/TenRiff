@@ -677,6 +677,22 @@
             d2d_->text_brush->SetColor(saved_text_color);
         };
 
+        // Reserve a separate level cell so an unusually long artist never
+        // clips or pushes the chart difficulty outside the HUD column.
+        const auto draw_artist_and_level = [&](D2D1_RECT_F rect, IDWriteTextFormat* font) {
+            if (!scene_hud_cache.level_text.empty()) {
+                const float level_width = std::min(180.0f, (rect.right - rect.left) * 0.42f);
+                const auto level_rect = D2D1::RectF(rect.right - level_width, rect.top, rect.right, rect.bottom);
+                const auto saved = d2d_->text_brush->GetColor();
+                d2d_->text_brush->SetColor(D2D1::ColorF(kDifficultyLevelColor));
+                draw_fitted_readable_text(scene_hud_cache.level_text, font, level_rect,
+                    d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
+                d2d_->text_brush->SetColor(saved);
+                rect.right = level_rect.left - 12.0f;
+            }
+            draw_fitted_readable_text(scene_hud_cache.artist_text, font, rect,
+                d2d_->muted_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING);
+        };
 #include "MenuWindow_draw_studio_deck.inl"
         auto draw_gameplay_header = [&](const GameplayProgressTrackLayout* battle_column = nullptr) {
             if (studio) draw_studio_header();
@@ -688,8 +704,7 @@
                 const float left = battle_column->left, right = battle_column->right;
                 draw_full_song_title(ng_font("title", scene_title_format.Get()),
                     D2D1::RectF(left, 72.0f, right, 114.0f), d2d_->text_brush.Get());
-                draw_fitted_readable_text(scene_hud_cache.artist_text, ng_font("body", scene_body_format.Get()),
-                    D2D1::RectF(left, 118.0f, right, 146.0f), d2d_->muted_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING);
+                draw_artist_and_level(D2D1::RectF(left, 118.0f, right, 146.0f), ng_font("body", scene_body_format.Get()));
                 // The long solo status line cannot cross either battle card.
                 float top = 156.0f;
                 for (const auto& line : scene_hud_cache.battle_speed_text) {
@@ -710,10 +725,7 @@
                 if (scene_body_format && d2d_->muted_brush) {
                     const D2D1_RECT_F artist_rect = ng_rect("artist",D2D1::RectF(header_left, header_top + 46.0f, solo_header_right, header_top + 84.0f));
                     IDWriteTextFormat* artist_format = ng_font("body",scene_body_format.Get());
-                    draw_scaled_readable_text(scene_hud_cache.artist_text, artist_format, artist_rect,
-                        d2d_->muted_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING,
-                        measured_text_scale(1, scene_hud_cache.artist_text, artist_format,
-                                            artist_rect.right - artist_rect.left, 0.70f));
+                    draw_artist_and_level(artist_rect, artist_format);
                 }
                 if (scene_hud_format && d2d_->muted_brush) {
                     const D2D1_RECT_F speed_rect = ng_rect("speed",D2D1::RectF(header_left, header_top + 82.0f, solo_header_right, header_top + 118.0f));
@@ -825,6 +837,7 @@
             }
             scene_hud_cache.title_text = to_wide(title);
             scene_hud_cache.artist_text = to_wide(artist);
+            scene_hud_cache.level_text = to_wide(difficulty_display_label(data.gameplay.difficulty_label, false));
             scene_hud_cache.speed_text =
                 to_wide(loc("RATE x", "RATE x") + format_decimal(data.gameplay.rate, 2) +
                         " / HS " + format_decimal(data.gameplay.hispeed, 2) +
@@ -1610,11 +1623,25 @@
             brush->SetOpacity(saved_opacity);
         };
 
+        const auto draw_measure_lines = [&](const GameplayFieldLayout& field) {
+            if (!d2d_->lane_divider_brush) return;
+            const auto opacity = d2d_->lane_divider_brush->GetOpacity();
+            d2d_->lane_divider_brush->SetOpacity(0.44f);
+            for (std::size_t i = 0; i < std::min(data.gameplay.measure_line_count,
+                                               data.gameplay.measure_line_positions.size()); ++i) {
+                const float y = gameplay_field_y(field.top, field.bottom - field.top,
+                    visual_to_y(data.gameplay.measure_line_positions[i]));
+                ctx->DrawLine(D2D1::Point2F(field.left, y), D2D1::Point2F(field.right, y),
+                    d2d_->lane_divider_brush.Get(), 1.0f);
+            }
+            d2d_->lane_divider_brush->SetOpacity(opacity);
+        };
         const D2D1_ANTIALIAS_MODE saved_antialias = ctx->GetAntialiasMode();
         ctx->PushAxisAlignedClip(field_clip_rect, D2D1_ANTIALIAS_MODE_ALIASED);
         const bool player_has_gear_overlay =
             draw_imported_gear_overlay(field_layout, hit_line_y);
         draw_key_backdrop(field_layout, data.gameplay.lane_pressed, data.gameplay.lane_pressed_count);
+        draw_measure_lines(field_layout);
         if (use_imported_metrics) {
             draw_key_labels(field_layout);
         }
@@ -2304,6 +2331,7 @@
             const bool ghost_has_gear_overlay =
                 draw_imported_gear_overlay(ghost_field_layout, ghost_hit_line_y);
             draw_key_backdrop(ghost_field_layout, data.gameplay.ghost_lane_pressed, data.gameplay.ghost_lane_pressed_count);
+            draw_measure_lines(ghost_field_layout);
             if (use_imported_metrics) {
                 draw_key_labels(ghost_field_layout);
             }
@@ -2673,9 +2701,8 @@
                     draw_full_song_title(ng_font("title", scene_title_format.Get()),
                         D2D1::RectF(left, summary.row_edges[0], right, summary.row_edges[1]),
                         d2d_->text_brush.Get());
-                    draw_fitted_readable_text(scene_hud_cache.artist_text, ng_font("body", scene_body_format.Get()),
-                        D2D1::RectF(left, summary.row_edges[1], right, summary.row_edges[2]),
-                        d2d_->muted_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING);
+                    draw_artist_and_level(D2D1::RectF(left, summary.row_edges[1], right, summary.row_edges[2]),
+                        ng_font("body", scene_body_format.Get()));
                     for (std::size_t row = 0; row < scene_hud_cache.battle_speed_pair_text.size(); ++row) {
                         draw_fitted_readable_text(scene_hud_cache.battle_speed_pair_text[row], scene_hud_format.Get(),
                             D2D1::RectF(left, summary.row_edges[row + 2], right, summary.row_edges[row + 3]),

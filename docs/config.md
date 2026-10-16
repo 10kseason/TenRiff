@@ -1,5 +1,7 @@
 # TenRiff Config Schema (current)
 
+**1.9.3 현재 계약:** 안전 불러오기 기본값, 공푸어 정확도 제외 R7/R8, 일반 ONNX와 지원 Safetensors를 적용합니다. 운영 Sites v19는 조건에 맞는 새 Online 기록을 받고 Guest/출처 없는 과거 기록은 영구 제외합니다. BGA 가중치 미동봉·OFF/빈 경로·기준선1.9.0을 유지합니다. [1.9.3 범위](release-1.9.3.ko.md)가 아래 날짜별 이력보다 우선합니다.
+
 **2026-10-16 · 1.9.2:** 실행마다 F10 게스트/온라인 창을 열고 항상 게스트에서 시작합니다. 선택은 저장 설정이 아닌 실행 중 권한입니다. 게스트·출처 없는 과거 기록은 이후 온라인 전환으로 업로드하지 않으며 기존 로컬 기록·리플레이는 유지합니다. 동적 원본 해상도 ONNX와 FFmpeg 디블록을 지원하지만 BGA 모델은 실행·소스 패키지에 포함하지 않고, 모델 경로는 빈 값·업스케일은 OFF가 기본입니다. 고정 기준은 1.9.0입니다. [범위·호환성](release-1.9.2.ko.md) · [검증 절차](release-1.9.2-gate.md). 아래 날짜별 안내는 해당 버전의 이력입니다.
 
 게스트로 전환하면 현재 플레이의 업로드 권한을 영구 취소하고 대기 중 제출을 무효화합니다. 이미 시작한 POST는 끝날 때까지 기다린 뒤 전환을 완료합니다. 같은 플레이에서 온라인으로 돌아가도 권한은 복구되지 않습니다. Sites와 별도 Ranked 경로 모두 이 제한을 적용하며 서버·DB와 기존 지원 조건은 바꾸지 않습니다.
@@ -135,7 +137,7 @@ ASIO 설정은 [장치 설정 안내](asio-audio.md)를 참고하세요. 선택 
   - 현재 프로필에서는 `340ms`로 저장·정규화하며, BAD 판정창과 별도로 무입력 자동 미스 확정 시점을 정함
   - 기본 Normal/Easy/Hard 모두 노트 시각에서 `340ms`를 초과하면 자동 미스. Normal/Easy는 BAD, Hard는 콤보를 끊는 간접 `POOR`/OD8 `MISS`로 기록
   - BAD창 밖이지만 자동 미스 전인 늦은 입력은 BAD 적중으로 인정하지 않고 이전 노트를 미스 처리한 뒤 다음 노트를 검사함
-- 기본/Hard 새 플레이는 `tenriff-native-score-v2-ruleset-5`, EX만 `tenriff-native-score-v2-ruleset-6`을 기록합니다. R1–R5의 과거 판정·Easy·LN 정책을 보존하며 커스텀 판정은 비공식입니다.
+- 새 기본/Hard는 `tenriff-native-score-v2-ruleset-7`, EX는 `tenriff-native-score-v2-ruleset-8`을 사용합니다. 공푸어 정확도만 제외하고 수치 판정창은 유지합니다. 과거 R1–R6와 custom 기록은 당시 정책으로 재생하며 새 custom 경로는 대응하는 7/8 ID를 사용합니다.
 - R5는 수치 창을 바꾸지 않고 자동 사건을 시간순으로 처리하며 R1~R4의 이전 처리 순서를 보존합니다. [일관성 수정](release-1.8.9.5-gate.md).
 - `hold_grace` (double, ms; 기본 `80ms`)
   - 설정 호환용 값이며 현재 native 꼬리 PG/GR 경계로 사용하지 않음; `hold_break`의 하한으로 사용
@@ -193,20 +195,19 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
   - 기본값은 `true`; `false`면 게임플레이의 이미지/영상 BGA와 관련 디코더·업스케일러 작업을 끔
   - Song Select 배경 미리보기는 별도 기능이므로 계속 표시됨
 - `background_upscale_mode` (string)
-  - `onnx | off`; 기존 `lunasr` 값은 호환을 위해 `onnx`로 마이그레이션
-  - 기본값은 `off`; Graphics Settings의 `BGA Upscaler`에서 ON/OFF를 직접 바꿈
-  - ON으로 바꿀 때 고사양 기능 경고를 확인해야 하며 자동 성능 벤치마크는 실행하지 않음
-  - 원본 이미지 픽셀에 FFmpeg 디블록(weak, block8)을 적용한 뒤 AI x2 복원·잔차 합성을 완료한 뒤 표시 영역에 맞추고 필요한 크롭을 수행함. 선행 16:9 크롭/960×540 변환 없음
-  - 동적 공간 축 모델은 원본 H/W 전체를 한 번에 처리함. 고정 모델 호환은 원본 픽셀 패딩/32픽셀 문맥 타일을 사용함. 원본 최대 축당4096, 결과 최대8192; 초과는 일반 표시 유지
-  - 캐시는 인스턴스당 최대3개/96MiB. 정지 이미지 전용이며 영상 AI는 비활성
+  - `onnx | off`; 옛 `lunasr`는 `onnx`로 호환하며 기본 `off`. ON은 고사양 경고 확인이 필요하고 자동 성능 검사는 없음
+  - 원본 → FFmpeg RGB 디블록 → 모델 고유 x1~x4 추론 → 잔차 합성/완성 이미지 → 표시 맞춤/크롭. 원본을 먼저 960×540 등으로 줄이지 않음
+  - 동적 모델은 원본 전체, 고정 모델은 패딩·문맥 타일. 원본 축 최대4096·출력8192, 캐시 인스턴스당3개/96MiB. 영상 AI는 비활성
 - `background_upscale_model_path` (string)
-  - 기본값은 빈 문자열이며 기존 빈 선택도 유지. 명시적 사용자 경로는 보존하며 업스케일 OFF 기본값은 바뀌지 않음
-  - 공개 실행·소스 패키지에 BGA 업스케일 모델을 포함하지 않음. FFmpeg는 게임 옆 `tools/ffmpeg-deblock/ffmpeg.exe` 또는 PATH에서 찾음. [처리 순서·실행 경로](deblock-lunasr-20261016.ko.md)
-  - Graphics Settings의 `ONNX Model`에서 파일을 선택하거나 해당 화면에 `.onnx`를 드롭하면 경로만 저장되며 업스케일러를 자동으로 켜지는 않음
-  - 절대 경로 또는 실행 파일/현재 작업 폴더 기준 상대 경로를 허용하며 공개 패키지에는 모델을 포함하지 않음
-  - float32 또는 float16 NCHW `rgb_lr [1,3,H,W]` -> `rgb_residual_x2 [1,3,2H,2W]` 동적 residual x2를 지원하며 실제 출력 크기를 검사. 기존 고정 `[1,3,540,960]` -> `[1,3,1080,1920]` 계약도 유지. 두 공간 축 모두 동적이어야 하며 부분 동적 축은 거절함. 외부 경계를 float로 유지하는 INT8 QDQ 모델은 내부 양자화를 감지해 지원
-  - 모델 로드, 입출력 계약 또는 추론 실패 시 native scaling 유지
-  - 사용자 모델의 권리·품질·성능은 사용자가 확인해야 하며 상세 계약은 `tools/onnx_upscaler/README.md`
+  - 기본 빈 문자열, 명시 저장 경로 유지. `ONNX / Safetensors`에서 선택하거나 `.onnx`/`.safetensors`를 드롭; 선택은 출력 Auto로 초기화하고 자동으로 ON하지 않음
+  - 실행·소스 배포에 BGA 가중치 없음. 절대 경로 또는 실행 파일/작업 폴더 상대 경로 허용
+  - 단일 RGB NCHW FP32/FP16 입출력, 임의 이름, 배치1·채널3, 양 공간 축 모두 고정 또는 동적, 실제 균일 정수 x1~x4. 입력0~1, float 경계의 내부INT8 QDQ 허용. 부분동적/NHWC/다중입출력은 거절
+  - Safetensors는 지원 LunaSR2 또는 변환 가능한 설치 Spandrel 구조만 처리. 별도 Python+torch/safetensors/onnx/onnxruntime 필요, 자동 설치/다운로드 없음. 실패 시 원본 표시·로그
+  - [상세 계약·설치·한계](../tools/onnx_upscaler/README.md). 모델별 크기·연산자·메모리·품질 제약은 별도
+- `background_upscale_output_mode` (string)
+  - `auto | residual | image`, 기본 `auto`. 명시 선택 우선; 모델 변경 시 Auto로 초기화하고 세션/캐시 교체
+  - Auto는 `tenriff.output_mode` 메타데이터 → 옛 `rgb_lr`/`rgb_residual_x2` 쌍은 잔차 → 그 외 완성 이미지. 의미를 자동 추론하지 않으므로 미표시 잔차 모델은 직접 선택
+  - residual은 디블록된 원본의 bilinear 확대에 보정값 합성, image는 결과 RGB 사용. 0~1 제한과 원본 알파 보존
 - `background_upscale_prefer_npu` (bool)
   - 기본값은 `false`이며 기본 경로는 high-performance DirectX GPU를 요청함
   - Graphics Settings의 `저전력 DirectX(실험)`에서 `DirectXMinPower` 요청을 켬
@@ -274,8 +275,8 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
   - `auto_scratch`: 실제 BMS 스크래치만 자동 입력. 점수 배율 0%, ASSIST 기록이며 공식 최고 기록·랭킹 제외
 - `song_index_profile` (string)
   - `safe | fast`
-  - 기본 `fast`(빠름·최소). 해시·미리보기·난이도 계산을 생략합니다.
-  - `safe`는 선택 가능한 전체 인덱싱 방식이며, 난이도표는 이 방식을 사용합니다.
+  - 기본 `safe`(안전). 해시와 미리보기 메타데이터를 준비하며 난이도표도 이 방식을 사용합니다. 자체 LV/CR 계산 여부는 아래 별도 설정을 따릅니다.
+  - 저장된 선택은 유지합니다. 선택 가능한 `fast`(빠름·최소)는 해시·미리보기·난이도 계산을 생략합니다.
 - `calculate_song_index_difficulty` (bool)
   - 기본값은 `false`
   - `false`면 BMS `#PLAYLEVEL`을 메뉴 LV로 유지하고 CPU 비용이 큰 자체 LV/CR 계산을 건너뜀
@@ -447,6 +448,6 @@ Xbox/XInput 버튼은 기존 키 이름 자리에 저장합니다: `PadUp`, `Pad
 
 ## BMS 리플레이·결과 호환성 (1.9.1)
 
-프로필 설정과 별개인 선택적 기록 필드 `bms_gauge_version`, `bms_control_flow_version`, `bms_random_seed`를 추가합니다(사용자 승인). 버전 필드가 없으면 각각 1이며, 분기 시드가 없으면 옛 `random_seed`, 그것도 없으면 0을 사용합니다. 새 일반 BMS는 게이지 v2, 분기가 있는 채보는 제어 흐름 v2와 uint32 분기 시드를 기록합니다. 레인 RR/SR·변환·LN Mix의 `random_seed`와 분기 시드는 서로 독립적입니다. 오디오 장치 재로드는 같은 분기를 유지하고, 리플레이는 저장된 분기와 정책을 재현합니다. 코스 게이지는 유지하며 새 분기 파서를 사용합니다. protocol v6 멀티 대전은 게이지/제어 흐름 v1·분기 시드 0을 유지합니다. 새 게이지/분기 기록은 서버가 해당 조건을 지원할 때까지 로컬에만 저장하며 Sites와 ranked 업로드를 차단합니다. R5/R6 판정·점수 ID는 바꾸지 않습니다. 로컬 BEST는 정책 버전 우선순위를 사용하고 결과 비교는 같은 정책·분기 시드만 묶습니다.
+프로필 설정과 별개인 선택적 기록 필드 `bms_gauge_version`, `bms_control_flow_version`, `bms_random_seed`를 추가합니다(사용자 승인). 버전 필드가 없으면 각각 1이며, 분기 시드가 없으면 옛 `random_seed`, 그것도 없으면 0을 사용합니다. 새 일반 BMS는 게이지 v2, 분기가 있는 채보는 제어 흐름 v2와 uint32 분기 시드를 기록합니다. 레인 RR/SR·변환·LN Mix의 `random_seed`와 분기 시드는 서로 독립적입니다. 오디오 장치 재로드는 같은 분기를 유지하고, 리플레이는 저장된 분기와 정책을 재현합니다. 코스 게이지는 유지하며 새 분기 파서를 사용합니다. protocol v6 멀티 대전은 게이지/제어 흐름 v1·분기 시드 0을 유지합니다. Sites는 1.9.1.1부터 지원 조건의 게이지/분기 기록을 받으며 운영 v19는 새 R7/R8도 별도 보드로 받습니다. Guest 영구 제외와 별도 Ranked 제한은 유지합니다. 새 플레이는 R7/R8, 과거 기록은 원래 ID를 유지합니다. 로컬 BEST는 정책 버전 우선순위를 사용하고 결과 비교는 같은 정책·분기 시드만 묶습니다.
 
 [수식·분기·호환성 설계와 검증 범위](bms-total-random-followup.en.md).

@@ -55,13 +55,13 @@ std::optional<std::string> pick_onnx_model_dialog_utf8() {
     }
     dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST);
     const COMDLG_FILTERSPEC filters[] = {
-        {L"ONNX model (*.onnx)", L"*.onnx"},
+        {L"Upscaler model (*.onnx;*.safetensors)", L"*.onnx;*.safetensors"},
         {L"All files (*.*)", L"*.*"},
     };
     dialog->SetFileTypes(static_cast<UINT>(std::size(filters)), filters);
     dialog->SetFileTypeIndex(1);
     dialog->SetDefaultExtension(L"onnx");
-    dialog->SetTitle(L"Select external ONNX upscaler");
+    dialog->SetTitle(L"Select external ONNX / Safetensors upscaler");
 
     std::optional<std::string> result;
     if (SUCCEEDED(show_native_file_dialog(dialog.Get()))) {

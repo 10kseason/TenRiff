@@ -581,6 +581,7 @@ config::RuntimeConfig portable_runtime(config::RuntimeConfig value) {
     ui.hispeed_increase_key = value.ui.hispeed_increase_key;
     value.ui = std::move(ui);
     value.graphics.background_upscale_model_path.clear();
+    value.graphics.background_upscale_output_mode = "auto";
     value.skin.ui_font_path.clear();
     if (value.skin.ui_font == "custom") value.skin.ui_font = "default";
     return value;
@@ -599,6 +600,7 @@ void restore_local_preferences(config::RuntimeConfig& loaded, const config::Runt
     loaded.ui.hispeed_decrease_key = portable.hispeed_decrease_key;
     loaded.ui.hispeed_increase_key = portable.hispeed_increase_key;
     loaded.graphics.background_upscale_model_path = current.graphics.background_upscale_model_path;
+    loaded.graphics.background_upscale_output_mode = current.graphics.background_upscale_output_mode;
 }
 
 void validate_settings_file(const fs::path& file) {

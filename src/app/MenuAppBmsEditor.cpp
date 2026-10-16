@@ -213,6 +213,9 @@ void MenuApp::launch_bms_editor_practice() {
         return;
     }
     output.write(chart_text.data(), static_cast<std::streamsize>(chart_text.size()));
+    // Launch opens the temporary chart again immediately, including its HUD
+    // metadata. Flush/close the writer before either reader can observe it.
+    output.close();
     if (!output) {
         std::error_code ec;
         std::filesystem::remove(practice_path, ec);

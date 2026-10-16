@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.9.2 LANGUAGES C CXX)
+project(TenRiff VERSION 1.9.3 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -393,6 +393,9 @@ if(WIN32)
         add_executable(deblock_smoke tools/onnx_upscaler/deblock_smoke.cpp src/render/FfmpegImageFilter.cpp)
         target_include_directories(deblock_smoke PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         target_compile_features(deblock_smoke PRIVATE cxx_std_17)
+        add_executable(safetensors_process_smoke EXCLUDE_FROM_ALL tools/onnx_upscaler/safetensors_process_smoke.cpp)
+        target_include_directories(safetensors_process_smoke PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        target_compile_features(safetensors_process_smoke PRIVATE cxx_std_17)
         target_compile_definitions(tenriff_app PRIVATE
             TENRIFF_ENABLE_ONNX_UPSCALER=1
             _SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS
@@ -441,6 +444,11 @@ if(WIN32 AND TENRIFF_ENABLE_ONNX_UPSCALER AND MSVC)
             COMMAND ${CMAKE_COMMAND} -E copy_directory
                 "${TENRIFF_FFMPEG_DEBLOCK_RUNTIME}"
                 "$<TARGET_FILE_DIR:${filter_target}>/tools/ffmpeg-deblock"
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:${filter_target}>/tools/onnx_upscaler"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/onnx_upscaler/convert_safetensors.py"
+                "$<TARGET_FILE_DIR:${filter_target}>/tools/onnx_upscaler/convert_safetensors.py"
             COMMENT "Copying FFmpeg raw-image filter helper and notices")
     endfunction()
     foreach(filter_target tenriff deblock_smoke onnx_upscaler_winml_smoke)

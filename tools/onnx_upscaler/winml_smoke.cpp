@@ -74,6 +74,30 @@ int wmain(int argc, wchar_t** argv) {
             return 2;
         }
 
+        if (argc >= 4) {
+            tenriff::render::OnnxBackgroundUpscaler upscaler(model_path.u8string(), false,
+                argc >= 5 ? winrt::to_string(argv[4]) : "auto");
+            upscaler.request(std::filesystem::path(argv[2]).u8string());
+            std::shared_ptr<const tenriff::render::OnnxUpscaleFrame> native;
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+            while (!native && std::chrono::steady_clock::now() < deadline) {
+                native = upscaler.take_ready();
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            }
+            if (!native) { std::cerr << "Native image restoration timed out\n"; return 7; }
+            const std::filesystem::path prefix(argv[3]);
+            const auto raw_path = std::filesystem::path(prefix.wstring() + L".bgra");
+            const auto json_path = std::filesystem::path(prefix.wstring() + L".json");
+            if (std::filesystem::exists(raw_path) || std::filesystem::exists(json_path)) return 8;
+            std::ofstream raw(raw_path, std::ios::binary);
+            raw.write(reinterpret_cast<const char*>(native->bgra.data()), native->bgra.size());
+            std::ofstream json(json_path);
+            json << "{\"width\":" << native->width << ",\"height\":" << native->height << "}\n";
+            if (!raw.good() || !json.good()) return 8;
+            std::cout << "Native image restored: " << native->width << 'x' << native->height << '\n';
+            return 0;
+        }
+
         namespace ml = winrt::Windows::AI::MachineLearning;
         const auto load_started = std::chrono::steady_clock::now();
         const ml::LearningModel model = ml::LearningModel::LoadFromFilePath(model_path.c_str());
@@ -286,27 +310,6 @@ int wmain(int argc, wchar_t** argv) {
                          warm_finished - warm_started).count()
                   << " video_backpressure=passed"
                   << '\n';
-        if (argc == 4) {
-            tenriff::render::OnnxBackgroundUpscaler upscaler(model_path.u8string());
-            upscaler.request(std::filesystem::path(argv[2]).u8string());
-            std::shared_ptr<const tenriff::render::OnnxUpscaleFrame> native;
-            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
-            while (!native && std::chrono::steady_clock::now() < deadline) {
-                native = upscaler.take_ready();
-                std::this_thread::sleep_for(std::chrono::milliseconds(5));
-            }
-            if (!native) { std::cerr << "Native image restoration timed out\n"; return 7; }
-            const std::filesystem::path prefix(argv[3]);
-            const auto raw_path = std::filesystem::path(prefix.wstring() + L".bgra");
-            const auto json_path = std::filesystem::path(prefix.wstring() + L".json");
-            if (std::filesystem::exists(raw_path) || std::filesystem::exists(json_path)) return 8;
-            std::ofstream raw(raw_path, std::ios::binary);
-            raw.write(reinterpret_cast<const char*>(native->bgra.data()), native->bgra.size());
-            std::ofstream json(json_path);
-            json << "{\"width\":" << native->width << ",\"height\":" << native->height << "}\n";
-            if (!raw.good() || !json.good()) return 8;
-            std::cout << "Native image restored: " << native->width << 'x' << native->height << '\n';
-        }
         return 0;
     } catch (const winrt::hresult_error& error) {
         std::wcerr << L"WinML error 0x" << std::hex

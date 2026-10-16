@@ -102,6 +102,20 @@ BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart, int
 
     const auto& events = chart.events;
     std::size_t index = 0;
+    std::size_t next_measure = 0;
+    // Observe authored measure boundaries without inserting timing events or
+    // changing floating-point accumulation. A boundary coincident with STOP is
+    // scheduled before that STOP, like a note at the same chart position.
+    const auto append_measures_until = [&](double end_position) {
+        if (!std::isfinite(current_bpm) || current_bpm <= 0.0) return;
+        while (next_measure < chart.measures.size() &&
+               chart.measures[next_measure].start <= end_position + kPositionEpsilon) {
+            const double delta = std::max(0.0, chart.measures[next_measure].start - current_position);
+            result.timeline.measure_samples.push_back(static_cast<int64_t>(std::llround(
+                current_time_samples + seconds_from_position_delta(delta, current_bpm) * sample_rate)));
+            ++next_measure;
+        }
+    };
 
     while (index < events.size()) {
         double group_position = events[index].position;
@@ -112,6 +126,7 @@ BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart, int
         }
 
         double delta_position = group_position - current_position;
+        append_measures_until(group_position);
         if (delta_position > kPositionEpsilon) {
             if (!std::isfinite(current_bpm) || current_bpm <= 0.0) {
                 add_message(result.messages, BmsParseSeverity::Error, events[index].measure,
@@ -216,6 +231,7 @@ BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart, int
     }
 
     double remaining = chart_end_position - current_position;
+    append_measures_until(chart_end_position);
     if (remaining > kPositionEpsilon) {
         if (!std::isfinite(current_bpm) || current_bpm <= 0.0) {
             add_message(result.messages, BmsParseSeverity::Error, static_cast<int>(chart.measures.size()) - 1,

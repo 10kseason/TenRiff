@@ -13,6 +13,7 @@
 #include "app/MenuSongUtils.h"
 #include "app/ModeManager.h"
 #include "app/ReplayVerifier.h"
+#include "chart/BmsParser.h"
 #include "gameplay/Replay.h"
 #include "timing/HighResClock.h"
 
@@ -774,6 +775,7 @@ void MenuApp::update_last_chart_metadata(const std::string& chart_path,
     last_chart_path_ = chart_path;
     last_chart_entry_ = {};
     last_chart_entry_valid_ = false;
+    last_chart_difficulty_label_.clear();
 
     const auto target_keys = menu_songs::build_chart_path_keys(chart_path, songs_path_);
     const std::unordered_set<std::string> target_key_set(target_keys.begin(), target_keys.end());
@@ -792,6 +794,7 @@ void MenuApp::update_last_chart_metadata(const std::string& chart_path,
                                 ? menu_song_select::filename_only(chart_path)
                                 : entry.title;
         last_chart_artist_ = entry.artist;
+        last_chart_difficulty_label_ = menu_song_select::song_difficulty_label(entry);
         last_chart_bpm_ = entry.bpm;
     };
 
@@ -809,6 +812,26 @@ void MenuApp::update_last_chart_metadata(const std::string& chart_path,
     last_chart_title_ = menu_song_select::filename_only(chart_path);
     last_chart_artist_.clear();
     last_chart_bpm_ = 0.0;
+    // Editor practice and direct launches can target a chart outside the index.
+    // Read that exact file's authored level; an unrelated selected/indexed chart
+    // must never supply its table difficulty. Keep result metadata validity as-is.
+    chart::BmsParserOptions metadata_options;
+    metadata_options.metadata_only = true;
+    metadata_options.retain_wav_bmp = false;
+    metadata_options.retain_unknown_headers = false;
+    metadata_options.retain_nonessential_commands = false;
+    const auto parsed = chart::BmsParser{}.parseFile(chart_path, metadata_options);
+    if (parsed.success()) {
+        const auto level = parsed.chart.headers.find("PLAYLEVEL");
+        if (level != parsed.chart.headers.end()) {
+            try {
+                const int value = std::stoi(level->second);
+                if (value > 0) last_chart_difficulty_label_ = "LV " + std::to_string(value);
+            } catch (const std::exception&) {
+                // Invalid/missing levels are omitted, matching index behavior.
+            }
+        }
+    }
 }
 
 

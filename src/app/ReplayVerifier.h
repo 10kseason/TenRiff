@@ -13,9 +13,14 @@
 namespace tenriff::app {
 
 inline constexpr std::string_view kCanonicalReplayRulesetId =
-    "tenriff-native-score-v2-ruleset-5";
-// EX has a separate identity; ordinary and Hard runs retain their R5 boards.
+    "tenriff-native-score-v2-ruleset-7";
+// Empty POOR accuracy exclusion has an explicit identity. R1-R6 retain their
+// original accuracy, timing, score and gauge interpretation on replay.
 inline constexpr std::string_view kExReplayRulesetId =
+    "tenriff-native-score-v2-ruleset-8";
+inline constexpr std::string_view kRuleset5ReplayRulesetId =
+    "tenriff-native-score-v2-ruleset-5";
+inline constexpr std::string_view kRuleset6ReplayRulesetId =
     "tenriff-native-score-v2-ruleset-6";
 inline constexpr std::string_view kRuleset4ReplayRulesetId =
     "tenriff-native-score-v2-ruleset-4";
@@ -71,6 +76,9 @@ struct ReplayVerificationResult {
     std::optional<int> bms_rank = std::nullopt);
 [[nodiscard]] bool replay_uses_chronological_judgement(const gameplay::ReplayFile& replay);
 [[nodiscard]] bool replay_uses_legacy_hold_release(const gameplay::ReplayFile& replay);
+[[nodiscard]] bool replay_empty_poor_affects_accuracy(const gameplay::ReplayFile& replay);
+[[nodiscard]] bool is_sites_supported_replay_ruleset(
+    std::string_view ruleset_id, const std::vector<std::string>& mods);
 [[nodiscard]] bool is_canonical_score_ruleset(const config::JudgeConfig& judge,
                                               const game::GaugeConfig& gauge);
 [[nodiscard]] std::string replay_ruleset_id_for_runtime(const config::JudgeConfig& judge,

@@ -1,5 +1,7 @@
 # TenRiff Config Schema (current)
 
+**1.9.3の現在の契約:** 安全読み込み既定、空POOR精度除外R7/R8、一般ONNXと対応Safetensorsを適用します。運用Sites v19は適格な新規Online記録を受け付け、Guest・由来不明の過去記録は永久除外します。BGA重み非同梱・OFF/空パス・基準1.9.0を維持します。[1.9.3範囲](release-1.9.3.ja.md)が下の日時付き履歴より優先します。
+
 **2026-10-15 · 1.9.1:** ユーザー承認の1.9.1に、先の音量・入力・後奏修正、BMS TOTAL/RANDOM互換性、結果の色と10マークを含めます。ホームの言語ボタンはEN → KO → JA → ZHの順に切り替えて保存します。新しいBMSゲージ・分岐記録はサーバー検証が対応するまでローカル専用です。固定基準は1.9.0で、旧リリース・インストール・プロファイルを保持します。下の日付付きローカル記録の版維持・未公開表記は当時の状態であり、現在はこの1.9.1の範囲を基準とします。 [変更・互換性](feedback-1.9.1.ja.md) · [リリース検証手順](release-1.9.1-gate.md).
 
 **2026-10-15 · BMS TOTAL・RANDOM・結果/ロゴの追加変更 — 未公開・ローカルビルドとCTest回帰検証通過:** 1.9.0.2を基にしたローカル作業です。結果のレベル表示を選曲ロビーと同じ赤いレベル文字・キーモード別の記号色に揃え、ロゴを提供された10形のマークへ変更します。新しい通常BMSプレイは#TOTALとノート数に基づくLR2系の回復・ダメージを使い、譜面内#RANDOMの分岐はレーンランダムとは独立したシードで選択します。過去のリプレイは元の動作を維持します。先の音量統合も含みます。公開済み1.9.0.2・固定基準1.9.0・バージョン番号は変更しません。 [計算式・分岐・互換性と検証範囲（英語）](bms-total-random-followup.en.md).
@@ -131,7 +133,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - 現在のプロファイルでは `340ms` に保存・正規化し、BADの入力判定幅から独立した自動ミスの期限として使用する
   - 標準のNormal/Easy/Hardは未入力ノートが `340ms` を超えると自動ミス。Normal/EasyはBAD、Hardはコンボを切る間接 `POOR` / OD8 `MISS` を記録する
   - BAD範囲外から自動ミス期限までの遅い入力はBADヒットにせず、前のノートをミスにして次のノートを調べる
-- 新しい通常/Hardは `tenriff-native-score-v2-ruleset-5`、EXは `tenriff-native-score-v2-ruleset-6` を記録します。過去のR1–R5・Easy・LN規則は維持し、カスタム判定は非公式です。
+- 新しい通常/Hardは`tenriff-native-score-v2-ruleset-7`、EXは`tenriff-native-score-v2-ruleset-8`です。空POORの精度寄与だけを変え、数値判定幅は維持します。過去R1–R6/customは当時の規則を保ち、新customは対応する7/8 IDを使います。
 - R5は数値の判定幅を変えず自動イベントを時刻順に処理し、R1–R4の旧処理順を保持します。[修正範囲](release-1.8.9.5-gate.md)。
 - `hold_grace` (double, ms; 既定 `80ms`)
   - 設定互換性と `hold_break` の下限のために保持。現在のnative終端PG/GR境界ではない
@@ -186,15 +188,19 @@ Gauge Shift は常に有効です。`mode.gauge` の `ex_hard / hard / normal / 
   - 既定値は `true`。`false` では gameplay の image/video BGA と decoder/upscaler 処理を無効化
   - Song Select の background preview は別機能なので表示を維持
 - `background_upscale_mode` (string)
-  - `onnx | off`。旧 `lunasr` 値は互換性のため `onnx` に移行
-  - 既定値は `off`。Graphics Settings の `BGA Upscaler` で明示的に ON/OFF
-  - ON 時は high-spec 警告の確認が必要で、自動 performance benchmark は実行しない
+  - `onnx | off`、旧`lunasr`は`onnx`に互換、既定`off`。有効化には高性能警告の確認が必要で、自動性能測定なし
+  - 元画像 → FFmpeg RGBデブロック → モデル固有x1–x4推論 → 残差合成/完成画像 → 表示調整/クロップ。先に960×540へ縮小しない
+  - 動的モデルは元画像全体、固定モデルはパディング・文脈タイル。入力/出力軸上限4096/8192、各インスタンスのキャッシュ3枚/96MiB。動画AIは無効
 - `background_upscale_model_path` (string)
-  - Graphics Settings の `ONNX Model` で選択するか、その画面に `.onnx` file を drop。選択は path だけを保存し、upscaler を自動で ON にしない
-  - 絶対 path または executable/current directory 基準の相対 path。公開 package は model を含まない
-  - 現在の契約: float32 または float16 NCHW `rgb_lr [1,3,540,960]` -> `rgb_residual_x2 [1,3,1080,1920]` residual x2。外部 boundary を float のままにする INT8 QDQ model は内部量子化を検出して対応
-  - load・contract・inference 失敗時は native scaling を維持
-  - model の権利・品質・性能は user が確認。詳細は `tools/onnx_upscaler/README.md`
+  - 既定空、明示保存パスは維持。`ONNX / Safetensors`選択か`.onnx`/`.safetensors`をドロップ。出力Autoへ戻すが自動ONにしない
+  - 実行・ソース配布にBGA重みなし。絶対パスまたは実行ファイル/作業フォルダー相対パスに対応
+  - 単一RGB NCHW FP32/FP16入出力、任意名、batch1/channels3、両空間軸が固定または動的、均一整数x1–x4。入力0..1、float境界の内部INT8 QDQ対応。片軸動的・NHWC・複数入出力は拒否
+  - Safetensorsは対応LunaSR2または導入済みSpandrelの変換可能構造に限定。外部Python+torch/safetensors/onnx/onnxruntime必須、自動導入/取得なし。失敗時は元画像とログを維持
+  - [契約・設定・制限](../tools/onnx_upscaler/README.md)。モデル固有の寸法・演算・メモリ・品質制約が残る
+- `background_upscale_output_mode` (string)
+  - `auto | residual | image`、既定`auto`。手動選択優先、モデル変更でAutoへ戻しセッション/キャッシュを交換
+  - Autoは`tenriff.output_mode`、次に旧`rgb_lr`/`rgb_residual_x2`組なら残差、それ以外は完成画像。意味を推測しないため未記載残差は手動選択
+  - residualはデブロック原画像のbilinear拡大へ出力を加算、imageは出力RGBを使用。共に0..1制限と原alphaを維持
 - `background_upscale_prefer_npu` (bool)
   - 既定値は `false` で、default path は high-performance DirectX GPU を要求
   - Graphics Settings の実験的な `Low-Power DirectX` で `DirectXMinPower` を要求
@@ -261,8 +267,8 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
   - `auto_scratch`: 実際のBMS皿だけを自動入力。スコア倍率0%、ASSIST記録で正式な最高記録・ランキングから除外
 - `song_index_profile` (string)
   - `safe | fast`
-  - 既定は`fast`（最小）。ハッシュ・試聴・難易度計算を省略します。
-  - `safe`は難易度表で使用する完全スキャンの選択肢です。
+  - 既定は`safe`（安全）。ハッシュと試聴情報を用意し、難易度表にも対応します。独自LV/CRの計算は下記の別設定に従います。
+  - 保存済みの選択は保持します。任意の`fast`（最小）はハッシュ・試聴・難易度計算を省略します。
 - `calculate_song_index_difficulty` (bool)
   - 既定値は `false`
   - `false` は BMS `#PLAYLEVEL` を menu LV として保持し、CPU 負荷の高い native LV/CR 計算を省略
@@ -421,6 +427,6 @@ Xbox/XInputボタンは既存のキー名欄に保存します: `PadUp`, `PadDow
 
 ## BMSリプレイ・結果の互換性（1.9.1）
 
-ユーザー承認済みの任意記録フィールド `bms_gauge_version`、`bms_control_flow_version`、`bms_random_seed` を追加します。プロファイル設定ではありません。版が省略されていれば1、分岐シードがなければ旧 `random_seed`、それもなければ0を使います。新しい通常BMSはゲージv2、分岐のある譜面は制御フローv2とuint32の分岐シードを記録します。レーンRR/SR・変換・LN Mix用の `random_seed` とは独立です。音声デバイスの再読み込みでも同じ分岐を維持し、リプレイでは保存したシードと規則を使います。コースは従来ゲージと新しい分岐パーサーを使用します。protocol v6対戦はゲージ/制御フローv1・分岐シード0を維持します。新しいゲージ/分岐の記録はサーバーが対応するまでローカルのみとし、Sitesとrankedへの送信を停止します。R5/R6の判定・スコアIDは変えません。ローカルBESTは規則版の組を優先し、結果比較は同じ規則・分岐シードに限ります。
+ユーザー承認済みの任意記録フィールド `bms_gauge_version`、`bms_control_flow_version`、`bms_random_seed` を追加します。プロファイル設定ではありません。版が省略されていれば1、分岐シードがなければ旧 `random_seed`、それもなければ0を使います。新しい通常BMSはゲージv2、分岐のある譜面は制御フローv2とuint32の分岐シードを記録します。レーンRR/SR・変換・LN Mix用の `random_seed` とは独立です。音声デバイスの再読み込みでも同じ分岐を維持し、リプレイでは保存したシードと規則を使います。コースは従来ゲージと新しい分岐パーサーを使用します。protocol v6対戦はゲージ/制御フローv1・分岐シード0を維持します。Sitesは1.9.1.1から対応ゲージ/分岐記録を受け付け、運用v19は新R7/R8も別ボードで受け付けます。Guest永久除外と別Ranked制限は維持します。新プレイはR7/R8、過去記録は元のIDを使います。ローカルBESTは規則版の組を優先し、結果比較は同じ規則・分岐シードに限ります。
 
 [計算式・分岐・互換性と検証範囲（英語）](bms-total-random-followup.en.md).

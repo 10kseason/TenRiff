@@ -135,7 +135,7 @@ bool build_sites_score_json(const gameplay::ReplayFile& replay,
         error = "Sites upload skipped: LN Mix v2 needs a separate leaderboard condition; this score remains local.";
         return false;
     }
-    if (!is_current_canonical_replay_ruleset(replay.ruleset_id, replay.mods) ||
+    if (!is_sites_supported_replay_ruleset(replay.ruleset_id, replay.mods) ||
         replay.replay_format_version != gameplay::kReplayFormatVersion ||
         replay.aborted || replay.pause_used || replay.mode.autoplay_enabled ||
         replay.mode.practice_no_fail_enabled || replay.mode.one_miss_fail_enabled ||

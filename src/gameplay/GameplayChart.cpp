@@ -302,6 +302,7 @@ void offset_gameplay_chart_samples(GameplayChart& chart, int64_t sample_offset) 
         segment.start_sample = add_sample_offset(segment.start_sample, sample_offset);
         segment.end_sample = add_sample_offset(segment.end_sample, sample_offset);
     }
+    for (auto& measure : chart.measure_samples) measure = add_sample_offset(measure, sample_offset);
     for (auto& cue : chart.audio_cues) {
         cue.start_sample = add_sample_offset(cue.start_sample, sample_offset);
     }
@@ -313,6 +314,9 @@ void offset_gameplay_chart_samples(GameplayChart& chart, int64_t sample_offset) 
 void trim_gameplay_chart_before_sample(GameplayChart& chart, int64_t sample) {
     if (sample <= 0) return;
     chart.duration_samples = std::max<int64_t>(0, chart.duration_samples - sample);
+    chart.measure_samples.erase(chart.measure_samples.begin(),
+        std::lower_bound(chart.measure_samples.begin(), chart.measure_samples.end(), sample));
+    for (auto& measure : chart.measure_samples) measure -= sample;
     chart.notes.erase(std::remove_if(chart.notes.begin(), chart.notes.end(),
         [sample](auto& note) {
             const int64_t end = note.end_sample.value_or(note.start_sample);
@@ -372,6 +376,8 @@ GameplayChart from_bms_timeline(const chart::BmsTimeline& timeline, double rate)
     }
 
     chart.duration_samples = scale_samples(timeline.duration_samples, rate);
+    for (const auto sample : timeline.measure_samples)
+        chart.measure_samples.push_back(scale_samples(sample, rate));
 
     std::stable_sort(chart.notes.begin(), chart.notes.end(), [](const NoteEvent& lhs, const NoteEvent& rhs) {
         if (lhs.start_sample != rhs.start_sample) {

@@ -68,6 +68,8 @@ struct GameplayConfig {
     // R5 orders automatic events by their due sample before each input.
     // R1-R4 playback/verifiers explicitly select false to retain historical ordering.
     bool chronological_judgement = true;
+    // R1-R6 replay playback explicitly opts into the historical denominator.
+    bool empty_poor_affects_accuracy = false;
 };
 
 struct LiveJudgementFeedback {
@@ -188,6 +190,7 @@ private:
     bool one_miss_fail_enabled_ = false;
     bool legacy_hold_release_ = false;
     bool chronological_judgement_ = true;
+    bool empty_poor_affects_accuracy_ = false;
 };
 
 }  // namespace tenriff::gameplay

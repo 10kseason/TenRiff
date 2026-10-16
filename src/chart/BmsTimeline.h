@@ -30,6 +30,7 @@ struct BmsTimeline {
     bool has_bpm_stop_timing_difference = false;
     std::vector<BmsScheduledEvent> events;
     std::vector<BmsScrollSegment> scroll_segments;
+    std::vector<int64_t> measure_samples;
 };
 
 struct BmsTimelineMessage {

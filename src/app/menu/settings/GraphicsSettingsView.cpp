@@ -159,9 +159,17 @@ GraphicsSettingsViewModel GraphicsSettingsView::build(
         controller, false, true));
     view.rows.push_back(make_row(
         GraphicsSettingId::OnnxModel, SettingsRowKind::Action,
-        localized(language, "ONNX Model", "ONNX 모델"),
+        localized(language, "ONNX / Safetensors", "ONNX / Safetensors"),
         model_label(runtime.graphics.background_upscale_model_path, language),
         controller, true, false));
+    const auto output_mode = config::normalize_background_upscale_output_mode(runtime.graphics.background_upscale_output_mode);
+    view.rows.push_back(make_row(
+        GraphicsSettingId::OnnxOutput, SettingsRowKind::Choice,
+        localized(language, "ONNX Output", "ONNX 출력 방식"),
+        output_mode == "residual" ? localized(language, "Residual", "잔차") :
+        output_mode == "image" ? localized(language, "Complete Image", "완성 이미지") :
+                                localized(language, "Auto", "자동"),
+        controller, false, true));
     view.rows.push_back(make_row(
         GraphicsSettingId::PreferLowPowerDirectX, SettingsRowKind::Toggle,
         localized(language,
@@ -231,8 +239,15 @@ GraphicsSettingsViewModel GraphicsSettingsView::build(
         "The ONNX upscaler has no automatic performance benchmark. It is intended for high-spec systems and may cause stutter or heavy accelerator load.",
         "ONNX 업스케일러는 자동 성능 벤치마크 없이 실행됩니다. 고사양 시스템용이며 끊김이나 높은 가속기 부하가 생길 수 있습니다."));
     view.notes.push_back(localized(language,
-        "Selecting or dropping an .onnx file changes only the model path. Turn BGA Upscaler ON separately and confirm the warning. Failures keep native scaling.",
-        "ONNX 파일 선택·드롭은 모델 경로만 바꿉니다. BGA 업스케일러를 별도로 켜고 경고를 확인하세요. 실패 시 원본 확대를 유지합니다."));
+        "Selecting an ONNX model resets Output to Auto. Auto uses known residual models or complete images; choose Residual for other residual models. Enable BGA Upscaler separately.",
+        "ONNX 모델을 선택하면 출력 방식이 자동으로 초기화됩니다. 자동은 알려진 잔차 모델 또는 완성 이미지를 사용합니다. 다른 잔차 모델은 잔차를 선택하세요. 업스케일러는 별도로 켜세요."));
+    if (to_lower_ascii(runtime.graphics.background_upscale_model_path).size() >= 12 &&
+        to_lower_ascii(runtime.graphics.background_upscale_model_path).substr(
+            runtime.graphics.background_upscale_model_path.size() - 12) == ".safetensors") {
+        view.notes.insert(view.notes.begin(), localized(language,
+            "Safetensors: requires local Python, torch, safetensors, onnx and onnxruntime. Known LunaSR2 or installed Spandrel architectures are converted on first use (up to 120 s). Failure keeps native images; see the log.",
+            "Safetensors: 로컬 Python, torch, safetensors, onnx, onnxruntime가 필요합니다. 지원 LunaSR2 또는 설치된 Spandrel 구조를 처음 사용할 때 변환합니다(최대 120초). 실패하면 원본을 유지하며 로그에서 원인을 확인할 수 있습니다."));
+    }
     view.notes.push_back(localized(language,
         "FP32/FP16 model I/O and float-boundary INT8 QDQ metadata are detected automatically. Low-Power DirectX requests DirectXMinPower; it does not select or verify an NPU.",
         "FP32/FP16 모델 입출력과 float 경계 INT8 QDQ 메타데이터를 자동 감지합니다. 저전력 DirectX는 DirectXMinPower 요청이며 NPU를 명시 선택하거나 검증하지 않습니다."));

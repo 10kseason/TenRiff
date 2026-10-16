@@ -115,6 +115,7 @@ struct GraphicsConfig {
     int bga_brightness_percent = 100;
     std::string background_upscale_mode = "off";
     std::string background_upscale_model_path;
+    std::string background_upscale_output_mode = "auto";
     bool background_upscale_prefer_npu = false;
 };
 
@@ -290,7 +291,7 @@ struct ModeConfig {
     bool auto_scratch_hide_lanes = false;
     double pacemaker_target_accuracy = kPacemakerAccuracyDefault;
     int64_t pacemaker_target_score = kPacemakerScoreDefault;
-    std::string song_index_profile = "fast";
+    std::string song_index_profile = "safe";
     bool calculate_song_index_difficulty = false;
 };
 
@@ -349,6 +350,7 @@ public:
 [[nodiscard]] std::string normalize_profile_nickname(std::string_view value);
 [[nodiscard]] std::string normalize_profile_avatar_path(std::string_view value);
 [[nodiscard]] std::string normalize_background_upscale_mode(std::string_view token);
+[[nodiscard]] std::string normalize_background_upscale_output_mode(std::string_view token);
 [[nodiscard]] std::vector<std::string> supported_skin_mode_tokens();
 [[nodiscard]] std::vector<std::string> supported_skin_color_tokens();
 [[nodiscard]] std::string normalize_skin_source_token(std::string_view token);

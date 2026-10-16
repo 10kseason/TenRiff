@@ -7,6 +7,7 @@
 
 #include "gameplay/GameplayEngine.h"
 #include "gameplay/TimingAnalysis.h"
+#include "gameplay/TimingAnalysisJson.h"
 
 namespace {
 
@@ -269,12 +270,33 @@ TEST_CASE("engine empty poor and dense recovery retain native accuracy and trace
     CHECK(kind(stats.analysis, TimingEventKind::EmptyPoor).event_count == 1);
     CHECK(kind(stats.analysis, TimingEventKind::Tap).event_count == 2);
     CHECK(stats.raw_score == 5000);
-    CHECK(stats.accuracy_percent() == doctest::Approx(40.0));
+    CHECK(stats.accuracy_percent() == doctest::Approx(60.0));
     REQUIRE(engine.replay().events.size() == 3);
     CHECK(engine.replay().events[0].sample == 100);
     CHECK(engine.replay().events[1].sample == 101);
     CHECK(engine.replay().events[2].sample == 1100);
     check_accuracy_matches(stats);
+}
+
+TEST_CASE("empty POOR analysis keeps events and roundtrips zero accuracy segments") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 12000;
+    chart.notes = {NoteEvent{1, 1000, std::nullopt}};
+    for (const bool legacy : {false, true}) {
+        auto config = analysis_config();
+        config.empty_poor_affects_accuracy = legacy;
+        GameplayEngine engine(chart, config);
+        (void)engine.handle_input(1, InputState::Pressed, 100);
+        CHECK(engine.stats().analysis.total.event_count == 1);
+        check_accuracy_matches(engine.stats());
+        const auto json = build_timing_analysis_json(engine.stats().analysis);
+        const auto restored = parse_timing_analysis_json(&json);
+        CHECK(restored.available);
+        CHECK(restored.total.event_count == 1);
+        CHECK(restored.segments[0].event_count == 1);
+        CHECK(restored.segments[0].accuracy_weight == (legacy ? 1.0 : 0.0));
+    }
 }
 
 TEST_CASE("analysis observes historical deferred LN policy without modernizing R1 R2") {

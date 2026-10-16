@@ -218,7 +218,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.mode.pacemaker_mode == "off");
     CHECK(config.mode.pacemaker_target_accuracy == doctest::Approx(90.0));
     CHECK(config.mode.pacemaker_target_score == 8000);
-    CHECK(config.mode.song_index_profile == "fast");
+    CHECK(config.mode.song_index_profile == "safe");
     CHECK(config.mode.gauge == "ex_hard");
     CHECK(config.audio_ui.gameplay_volume == doctest::Approx(0.2));
     CHECK(config.audio_ui.menu_music_volume == doctest::Approx(1.0));
@@ -234,6 +234,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.graphics.bga_enabled);
     CHECK(config.graphics.background_upscale_mode == "off");
     CHECK(config.graphics.background_upscale_model_path.empty());
+    CHECK(config.graphics.background_upscale_output_mode == "auto");
     CHECK_FALSE(config.graphics.background_upscale_prefer_npu);
     CHECK(tenriff::config::normalize_background_upscale_mode("onnx") == "onnx");
     CHECK(tenriff::config::normalize_background_upscale_mode("lunasr") == "onnx");
@@ -973,6 +974,7 @@ TEST_CASE("config save and load preserve graphics display settings") {
     config.graphics.bga_enabled = false;
     config.graphics.background_upscale_mode = "onnx";
     config.graphics.background_upscale_model_path = "models/custom-upscaler.onnx";
+    config.graphics.background_upscale_output_mode = "residual";
     config.graphics.background_upscale_prefer_npu = false;
 
     std::string error;
@@ -989,6 +991,7 @@ TEST_CASE("config save and load preserve graphics display settings") {
     CHECK_FALSE(result.config.graphics.bga_enabled);
     CHECK(result.config.graphics.background_upscale_mode == "onnx");
     CHECK(result.config.graphics.background_upscale_model_path == "models/custom-upscaler.onnx");
+    CHECK(result.config.graphics.background_upscale_output_mode == "residual");
     CHECK_FALSE(result.config.graphics.background_upscale_prefer_npu);
 }
 
@@ -1008,6 +1011,28 @@ TEST_CASE("config save and load preserve explicit uncommon resolutions") {
         REQUIRE(loaded.success());
         CHECK(loaded.config.graphics.resolution == size);
     }
+}
+
+TEST_CASE("ONNX output modes persist and unknown or historical settings default to auto") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    CurrentPathGuard cwd;
+    std::filesystem::current_path(temp.path);
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    for (const auto mode : {"auto", "residual", "image"}) {
+        config.graphics.background_upscale_output_mode = mode;
+        REQUIRE(loader.save_profile("profiles/modes", config));
+        const auto loaded = loader.load_profile("profiles/modes");
+        REQUIRE(loaded.success());
+        CHECK(loaded.config.graphics.background_upscale_output_mode == mode);
+    }
+    write_file("profiles/modes/config.json", R"({"graphics":{"background_upscale_output_mode":"unknown"}})");
+    CHECK(loader.load_profile("profiles/modes").config.graphics.background_upscale_output_mode == "auto");
+    write_file("profiles/modes/config.json", R"({"graphics":{"background_upscale_model_path":"old.onnx"}})");
+    CHECK(loader.load_profile("profiles/modes").config.graphics.background_upscale_output_mode == "auto");
+    CHECK(tenriff::config::normalize_background_upscale_output_mode("IMAGE") == "image");
 }
 
 
@@ -2635,11 +2660,11 @@ TEST_CASE("new audio and mode defaults preserve explicit legacy profile choices"
     std::filesystem::current_path(temp.path);
     std::filesystem::create_directories("profiles/player");
     ConfigLoader loader;
-    write_file("profiles/player/config.json", R"({"audio":{"bgm_volume":0.6,"keysound_volume":1.3},"mode":{"gauge":"normal","song_index_profile":"safe","ghost_battle_enabled":true}})");
+    write_file("profiles/player/config.json", R"({"audio":{"bgm_volume":0.6,"keysound_volume":1.3},"mode":{"gauge":"normal","song_index_profile":"fast","ghost_battle_enabled":true}})");
     auto loaded = loader.load_profile("profiles/player");
     REQUIRE(loaded.success());
     CHECK(loaded.config.mode.gauge == "normal");
-    CHECK(loaded.config.mode.song_index_profile == "safe");
+    CHECK(loaded.config.mode.song_index_profile == "fast");
     CHECK(loaded.config.mode.ghost_battle_enabled);
     CHECK(loaded.config.audio_ui.bgm_volume == doctest::Approx(0.6));
     CHECK(loaded.config.audio_ui.keysound_volume == doctest::Approx(1.3));
@@ -2651,7 +2676,7 @@ TEST_CASE("new audio and mode defaults preserve explicit legacy profile choices"
     CHECK(loaded.config.audio_ui.gameplay_volume == doctest::Approx(1.0));
     CHECK(loaded.config.audio_ui.menu_music_volume == doctest::Approx(0.0));
     CHECK(loaded.config.mode.gauge == "ex_hard");
-    CHECK(loaded.config.mode.song_index_profile == "fast");
+    CHECK(loaded.config.mode.song_index_profile == "safe");
     CHECK_FALSE(loaded.config.mode.ghost_battle_enabled);
 }
 

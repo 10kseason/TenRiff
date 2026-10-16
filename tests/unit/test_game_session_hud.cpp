@@ -8,6 +8,8 @@
 #include "app/GameplayCompletionFlow.h"
 #include "app/GameplayPauseMenu.h"
 #include "app/GameplayHudWindow.h"
+#include "app/TimingFeedbackSettings.h"
+#include "app/BmsRankLabel.h"
 #include "gameplay/GameplayEngine.h"
 #include "gameplay/GameplayChart.h"
 #include "render/GameplayFeedbackText.h"
@@ -23,6 +25,59 @@ bool note_is_expired_for_hud(const tenriff::gameplay::NoteEvent& note, int64_t c
 }
 
 }  // namespace
+
+TEST_CASE("HUD followup authored BMS ranks map without modifying gameplay judgement rules") {
+    using namespace tenriff::app;
+    const char* expected[]{"VHD", "HD", "NM", "EZ", "VEZ"};
+    for (int rank = 0; rank < 5; ++rank) {
+        CHECK(bms_rank_for_display(std::to_string(rank)) == rank);
+        CHECK(bms_rank_label(rank) == expected[rank]);
+    }
+    CHECK(bms_rank_for_display(" 4\t") == 4);
+    CHECK(bms_rank_for_display("") == 3);
+    CHECK(bms_rank_for_display("4 invalid") == 3);
+    CHECK(bms_rank_for_display("9") == 3);
+    CHECK(bms_rank_label(-1).empty());
+}
+
+TEST_CASE("HUD followup always timing retains a real sample without initial fake FAST") {
+    using tenriff::app::timing_feedback_should_display;
+    CHECK_FALSE(timing_feedback_should_display(false, false, true));
+    CHECK_FALSE(timing_feedback_should_display(false, true, false));
+    CHECK(timing_feedback_should_display(true, true, false));
+    CHECK(timing_feedback_should_display(false, true, true));
+    tenriff::app::GameplayHudRevisionInput previous;
+    auto next = previous;
+    next.has_retained_timing_feedback = true;
+    CHECK(tenriff::app::diff_gameplay_hud_revisions(previous, next).text_changed);
+    next = previous;
+    next.ghost_has_retained_timing_feedback = true;
+    CHECK(tenriff::app::diff_gameplay_hud_revisions(previous, next).text_changed);
+}
+
+TEST_CASE("HUD followup measure movement invalidates motion and preserves chart transformations") {
+    tenriff::app::GameplayHudRevisionInput previous;
+    auto next = previous;
+    next.measure_line_count = 1;
+    next.measure_line_positions[0] = 0.5;
+    CHECK(tenriff::app::diff_gameplay_hud_revisions(previous, next).motion_changed);
+    CHECK_FALSE(tenriff::app::diff_gameplay_hud_revisions(previous, next).text_changed);
+    auto moved = next;
+    moved.measure_line_positions[0] = 0.75;
+    CHECK(tenriff::app::diff_gameplay_hud_revisions(next, moved).motion_changed);
+    tenriff::chart::BmsTimeline timeline;
+    timeline.duration_samples = 8000;
+    timeline.measure_samples = {0, 2000, 4000, 6000};
+    auto chart = tenriff::gameplay::from_bms_timeline(timeline, 2.0);
+    REQUIRE(chart.measure_samples.size() == 4);
+    CHECK(chart.measure_samples[2] == 2000);
+    tenriff::gameplay::offset_gameplay_chart_samples(chart, 500);
+    CHECK(chart.measure_samples[2] == 2500);
+    tenriff::gameplay::trim_gameplay_chart_before_sample(chart, 1500);
+    REQUIRE(chart.measure_samples.size() == 3);
+    CHECK(chart.measure_samples[0] == 0);
+    CHECK(chart.measure_samples[2] == 2000);
+}
 
 TEST_CASE("short note expires once its head leaves the HUD past window") {
     tenriff::gameplay::NoteEvent note{1, 1000, std::nullopt};

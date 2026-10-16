@@ -226,6 +226,8 @@ BmsGameplayBuildResult build_bms_gameplay_chart(const chart::BmsTimeline& timeli
         result.chart.lane_group_size = 8;
     }
     result.chart.duration_samples = std::max<int64_t>(0, scale_samples(timeline.duration_samples, rate));
+    for (const auto sample : timeline.measure_samples)
+        result.chart.measure_samples.push_back(scale_samples(sample, rate));
     result.chart.scroll_segments.reserve(timeline.scroll_segments.size());
     for (const auto& segment : timeline.scroll_segments) {
         result.chart.scroll_segments.push_back(gameplay::ScrollSegment{

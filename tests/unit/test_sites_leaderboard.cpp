@@ -109,7 +109,7 @@ bool json_values_equal(const config::JsonValue& lhs, const config::JsonValue& rh
 gameplay::ReplayFile score_fixture() {
     gameplay::ReplayFile replay;
     replay.record_play_mode = "online";
-    replay.ruleset_id = std::string(app::kCanonicalReplayRulesetId);
+    replay.ruleset_id = std::string(app::kRuleset5ReplayRulesetId);
     replay.chart_format = "bms";
     replay.bms_rank = 3;
     replay.chart_sha256 = std::string(64, 'b');
@@ -358,7 +358,7 @@ TEST_CASE("Sites payload preserves active judge modifiers without relabeling nor
         REQUIRE(mods);
         CHECK(mods->size() == (mod.empty() ? 0u : 1u));
         if (!mod.empty()) CHECK(mods->front().as_string() == mod);
-        CHECK(root->at("ruleset_id").as_string() == app::kCanonicalReplayRulesetId);
+        CHECK(root->at("ruleset_id").as_string() == app::kRuleset5ReplayRulesetId);
         CHECK(root->at("timing_profile").as_string() == "bms-easy");
     }
 }
@@ -544,9 +544,38 @@ TEST_CASE("Sites BMS legacy and nonbranch policies require no chart read but mal
     CHECK(error.find("metadata") != std::string::npos);
 }
 
+TEST_CASE("Sites R7 R8 empty POOR policy is explicit and preserves historical payload identities") {
+    for (const bool ex : {false, true}) {
+        auto replay = score_fixture();
+        replay.ruleset_id = std::string(ex ? app::kExReplayRulesetId : app::kCanonicalReplayRulesetId);
+        replay.mods = ex ? std::vector<std::string>{"judge_ex"} : std::vector<std::string>{};
+        replay.stats.counts.pr = 3;
+        replay.stats.accuracy_points = 99.6;
+        replay.stats.accuracy_weight = 100.0;
+        replay.mode.bms_timing_version = 2;
+        replay.mode.bms_gauge_version = 2;
+        replay.mode.bms_control_flow_version = 2;
+        replay.mode.bms_random_seed = 99550;
+        std::string payload, error;
+        REQUIRE(app::build_sites_score_json(replay, std::string(64, 'c'), "Empty POOR Fixture", "CLEAR",
+                                           payload, error, {}, std::string(64, 'd')));
+        const auto parsed = config::parse_json(payload);
+        REQUIRE(parsed.success());
+        const auto* object = parsed.root->as_object();
+        REQUIRE(object);
+        CHECK(object->at("ruleset_id").as_string() == replay.ruleset_id);
+        CHECK(object->at("accuracy").as_number() == doctest::Approx(99.6));
+        CHECK(object->at("bms_control_flow_version").as_number() == 2.0);
+        std::cout << (ex ? "[empty-poor-r8-payload] " : "[empty-poor-r7-payload] ") << payload << '\n';
+        replay.mods = ex ? std::vector<std::string>{} : std::vector<std::string>{"judge_ex"};
+        CHECK_FALSE(app::build_sites_score_json(replay, std::string(64, 'c'), "Empty POOR Fixture", "CLEAR",
+                                               payload, error, {}, std::string(64, 'd')));
+    }
+}
+
 TEST_CASE("Sites EX payload requires its own R6 policy and excludes mixed judge modes") {
     auto replay = score_fixture();
-    replay.ruleset_id = std::string(app::kExReplayRulesetId);
+    replay.ruleset_id = std::string(app::kRuleset6ReplayRulesetId);
     replay.mods = {"judge_ex"};
     std::string payload, error;
     REQUIRE(app::build_sites_score_json(replay, std::string(64, 'c'), "EX Fixture", "CLEAR", payload, error));
@@ -554,14 +583,14 @@ TEST_CASE("Sites EX payload requires its own R6 policy and excludes mixed judge 
     REQUIRE(json.success());
     const auto* root = json.root->as_object();
     REQUIRE(root);
-    CHECK(root->at("ruleset_id").as_string() == app::kExReplayRulesetId);
+    CHECK(root->at("ruleset_id").as_string() == app::kRuleset6ReplayRulesetId);
     CHECK(root->at("mods").as_array()->front().as_string() == "judge_ex");
     CHECK(root->at("timing_profile").as_string() == "bms-easy");
     // Synthetic public fixture: exercise the native serializer in web schema QA.
     std::cout << "[judge-ex-payload] " << payload << '\n';
-    replay.ruleset_id = std::string(app::kCanonicalReplayRulesetId);
+    replay.ruleset_id = std::string(app::kRuleset5ReplayRulesetId);
     CHECK_FALSE(app::build_sites_score_json(replay, std::string(64, 'c'), "EX Fixture", "CLEAR", payload, error));
-    replay.ruleset_id = std::string(app::kExReplayRulesetId);
+    replay.ruleset_id = std::string(app::kRuleset6ReplayRulesetId);
     for (const std::vector<std::string> mods : {std::vector<std::string>{},
             std::vector<std::string>{"judge_hard"}, std::vector<std::string>{"judge_ex", "judge_hard"},
             std::vector<std::string>{"judge_ex", "judge_easy"}}) {
@@ -682,7 +711,7 @@ TEST_CASE("Sites connection accepts only an HTTPS Site origin and header-safe up
 TEST_CASE("Sites score payload omits private evidence and rejects assisted or noncanonical play") {
     gameplay::ReplayFile replay;
     replay.record_play_mode = "online";
-    replay.ruleset_id = std::string(app::kCanonicalReplayRulesetId);
+    replay.ruleset_id = std::string(app::kRuleset5ReplayRulesetId);
     replay.chart_format = "bms";
     replay.bms_rank = 3;
     replay.chart_sha256 = std::string(64, 'b');

@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.9.3] - 2026-10-16
+
+- Exclude Empty Poor from ordinary, detailed and segment accuracy while retaining gauge loss, POOR counts and existing raw-score/combo effects. New Normal/Hard and EX records use R7/R8; preserve R1–R6 replay calculations, previous board identities, timing windows and replay format. The approved leaderboard version 19 accepts the new rules separately and retains Stable grades and the `client_submitted` boundary.
+- Show authored BMS RANK as VEZ/EZ/NM/HD/VHD at the album art's lower right and refresh metadata with cache 20. RANK 4 retains its existing Easy timing fallback. Reserve in-game level space in Classic/Studio/battle headers, including actual-chart metadata for editor practice and direct launch. Add BMS measure lines behind notes using existing timing and scroll coordinates.
+- Fix Always FAST/SLOW to retain the last real non-PG timing text and marker; preserve conditional 750ms expiry and independent text/bar switches. Default new or missing indexing settings to Safe while keeping saved Fast choices and the separate LV/CR default OFF.
+- Extend external ONNX to residual or completed-image output, arbitrary names, RGB NCHW FP32/FP16 boundaries, fixed or fully dynamic spatial axes and uniform integer x1–x4 scale. Offer Auto/Residual/Complete Image output modes while retaining original-first FFmpeg deblock, post-inference fitting/cropping, alpha and native fallback.
+- Support optional local Safetensors conversion for known LunaSR2 and exportable installed Spandrel structures. Use a bounded isolated Python process, numerical ONNX validation and verified cache; do not auto-install dependencies or download models. Python/model dependencies are external and general architecture compatibility is limited.
+- Keep BGA model weights out of both runtime and source delivery. Preserve empty path/OFF/Auto defaults, existing NK3 conversion assets, disabled video AI, Guest/historical upload exclusion and the fixed 1.9.0 baseline. See [scope](docs/release-1.9.3.en.md) and the [verification gate](docs/release-1.9.3-gate.md); this entry does not claim final checks or publication are complete.
+
 ## [1.9.2] - 2026-10-16
 
 - Open the F10 Guest/Online choice on every launch, defaulting to Guest; Esc keeps Guest selected. Online permission lasts only for the current process and applies to fresh plays. Permanently exclude Guest and unmarked historical records from both Sites and Ranked uploads while retaining local history/replay playback.

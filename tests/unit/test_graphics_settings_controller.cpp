@@ -24,7 +24,7 @@ TEST_CASE("graphics setting and ONNX confirmation identifiers are stable") {
     using tenriff::app::menu::settings::onnx_upscaler_confirm_id_at;
 
     static_assert(static_cast<std::uint8_t>(GraphicsSettingId::Display) == 0);
-    static_assert(static_cast<std::uint8_t>(GraphicsSettingId::Back) == 10);
+    static_assert(static_cast<std::uint8_t>(GraphicsSettingId::Back) == 11);
     static_assert(static_cast<std::uint8_t>(OnnxUpscalerConfirmId::Enable) == 0);
     static_assert(static_cast<std::uint8_t>(OnnxUpscalerConfirmId::KeepNative) == 1);
     for (std::size_t index = 0; index < kGraphicsSettingOrder.size(); ++index) {
@@ -293,12 +293,12 @@ TEST_CASE("graphics settings views preserve values localization and safe default
     static_cast<void>(controller.select(GraphicsSettingId::OnnxModel));
 
     const auto korean = GraphicsSettingsView::build(controller, runtime, tenriff::ui::Language::Korean);
-    REQUIRE(korean.rows.size() == 11);
+    REQUIRE(korean.rows.size() == 12);
     REQUIRE(korean.notes.size() == 11);
     CHECK(korean.rows[2].value == "무제한 (최대 1500 FPS)");
     CHECK(korean.rows[8].value == "model.onnx");
     CHECK(korean.rows[8].selected);
-    CHECK(korean.rows[10].label == "뒤로");
+    CHECK(korean.rows[11].label == "뒤로");
 
     controller.prepare_onnx_confirmation();
     const auto confirmation =
@@ -310,20 +310,45 @@ TEST_CASE("graphics settings views preserve values localization and safe default
     CHECK(confirmation.rows[0].label == "Yes, enable ONNX");
 }
 
+TEST_CASE("ONNX output selection is localized and resets for a new model without enabling inference") {
+    tenriff::config::RuntimeConfig runtime;
+    GraphicsSettingsController controller;
+    CHECK(runtime.graphics.background_upscale_output_mode == "auto");
+    for (const auto expected : {"residual", "image", "auto"}) {
+        const auto effects = controller.handle(MenuAction::adjust(1), runtime, GraphicsSettingId::OnnxOutput);
+        CHECK(effects.menu.render_changed);
+        CHECK(runtime.graphics.background_upscale_output_mode == expected);
+    }
+    static_cast<void>(controller.handle(MenuAction::adjust(-1), runtime, GraphicsSettingId::OnnxOutput));
+    CHECK(runtime.graphics.background_upscale_output_mode == "image");
+    for (const auto language : {tenriff::ui::Language::Korean, tenriff::ui::Language::Japanese,
+                               tenriff::ui::Language::Chinese}) {
+        const auto view = GraphicsSettingsView::build(controller, runtime, language);
+        CHECK(view.rows[9].label != "ONNX Output");
+        CHECK(view.rows[9].value != "Complete Image");
+    }
+    static_cast<void>(controller.set_onnx_model_path(runtime, "external.onnx"));
+    CHECK(runtime.graphics.background_upscale_output_mode == "auto");
+    CHECK(GraphicsSettingsView::build(controller, runtime, tenriff::ui::Language::Japanese).rows[9].value == "自動");
+    CHECK(GraphicsSettingsView::build(controller, runtime, tenriff::ui::Language::Chinese).rows[9].value == "自动");
+    CHECK(runtime.graphics.background_upscale_mode == "off");
+    CHECK(controller.handle(MenuAction::back(), runtime).menu.persist_config);
+}
+
 TEST_CASE("graphics uses the profile language while language editing lives in profile setup") {
     tenriff::config::RuntimeConfig runtime;
     runtime.ui.language = "ja";
     GraphicsSettingsController controller;
     const auto japanese = GraphicsSettingsView::build(
         controller, runtime, tenriff::ui::Language::Japanese);
-    REQUIRE(japanese.rows.size() == 11);
-    CHECK(japanese.rows[10].label == "戻る");
+    REQUIRE(japanese.rows.size() == 12);
+    CHECK(japanese.rows[11].label == "戻る");
     CHECK(japanese.rows[0].value == "ボーダーレス");
     CHECK(japanese.rows[2].value == "ディスプレイに合わせる");
     for (const auto& row : japanese.rows) CHECK(row.label != "言語");
     // Out-of-range pointer targets cannot change profile settings.
     const auto effects = controller.handle(
-        MenuAction::activate(), runtime, static_cast<GraphicsSettingId>(11));
+        MenuAction::activate(), runtime, static_cast<GraphicsSettingId>(12));
     CHECK(effects.empty());
     CHECK(runtime.ui.language == "ja");
     CHECK_FALSE(controller.dirty());

@@ -28,6 +28,7 @@
 #endif
 
 #include "util/Utf8Compat.h"
+#include "render/SafetensorsModel.h"
 #endif
 
 #if defined(TENRIFF_ENABLE_ONNX_UPSCALER) && defined(_WIN32)
@@ -40,8 +41,6 @@ namespace tenriff::render {
 
 namespace {
 
-constexpr std::uint32_t kModelInputWidth = onnx_image::kInputWidth;
-constexpr std::uint32_t kModelInputHeight = onnx_image::kInputHeight;
 constexpr std::size_t kCachedFrameLimit = 3;
 constexpr std::size_t kCachedByteLimit = 96u * 1024u * 1024u;
 
@@ -135,6 +134,7 @@ std::vector<float> bgra_to_nchw_rgb(const std::vector<std::uint8_t>& bgra,
 
 struct OnnxBackgroundUpscaler::Impl {
     std::string model_path;
+    std::string configured_output_mode;
     bool prefer_npu = true;
     std::mutex mutex;
     std::condition_variable wake;
@@ -153,8 +153,10 @@ struct OnnxBackgroundUpscaler::Impl {
     std::unordered_map<std::string, std::shared_ptr<const OnnxUpscaleFrame>> cache;
     std::deque<std::string> cache_lru;
 
-    explicit Impl(std::string configured_model_path, bool configured_prefer_npu)
+    explicit Impl(std::string configured_model_path, bool configured_prefer_npu,
+                  std::string output_mode)
         : model_path(std::move(configured_model_path)),
+          configured_output_mode(std::move(output_mode)),
           prefer_npu(configured_prefer_npu),
           worker([this]() { run(); }) {}
 
@@ -196,40 +198,42 @@ struct OnnxBackgroundUpscaler::Impl {
                 return;
             }
 
-            const auto resolved_model_path = resolve_model_path(model_path);
+            auto resolved_model_path = resolve_model_path(model_path);
             if (!resolved_model_path.has_value()) {
                 std::cerr << "[ONNX Upscaler] WinML model not found; using native background scaling.\n";
                 return;
             }
 
+            if (lower_ascii(resolved_model_path->extension().u8string()) == ".safetensors") {
+                std::cerr << "[ONNX Upscaler] Preparing external Safetensors model; native image remains visible.\n";
+                resolved_model_path = safetensors::prepare(*resolved_model_path, [this]() {
+                    std::lock_guard<std::mutex> lock(mutex);
+                    return stop;
+                });
+            }
+
             namespace ml = winrt::Windows::AI::MachineLearning;
             const ml::LearningModel model = ml::LearningModel::LoadFromFilePath(resolved_model_path->c_str());
-            const auto find_tensor_descriptor =
-                [](const auto& features, const wchar_t* expected_name) {
-                    for (const auto& feature : features) {
-                        if (feature.Name() != expected_name) {
-                            continue;
-                        }
-                        const auto tensor = feature.template try_as<ml::TensorFeatureDescriptor>();
-                        if (!tensor) {
-                            throw std::runtime_error("ONNX feature is not a tensor");
-                        }
-                        return tensor;
-                    }
-                    throw std::runtime_error("ONNX model is missing a required tensor");
+            const auto single_tensor_descriptor = [](const auto& features) {
+                    if (features.Size() != 1)
+                        throw std::runtime_error("ONNX upscaler requires exactly one input and one output");
+                    const auto tensor = features.GetAt(0).template try_as<ml::TensorFeatureDescriptor>();
+                    if (!tensor) throw std::runtime_error("ONNX feature is not a tensor");
+                    return tensor;
                 };
-            const auto input_descriptor =
-                find_tensor_descriptor(model.InputFeatures(), L"rgb_lr");
-            const auto output_descriptor =
-                find_tensor_descriptor(model.OutputFeatures(), L"rgb_residual_x2");
+            const auto input_descriptor = single_tensor_descriptor(model.InputFeatures());
+            const auto output_descriptor = single_tensor_descriptor(model.OutputFeatures());
+            const auto input_name = input_descriptor.Name();
+            const auto output_name = output_descriptor.Name();
             const auto descriptor_shape = [](const auto& descriptor) {
                 const auto shape = descriptor.Shape();
                 return std::vector<std::int64_t>(shape.begin(), shape.end());
             };
-            const auto model_shape = onnx_image::model_shape(descriptor_shape(input_descriptor),
+            const auto input_dimensions = descriptor_shape(input_descriptor);
+            const auto model_shape = onnx_image::model_shape(input_dimensions,
                                                              descriptor_shape(output_descriptor));
             if (model_shape == onnx_image::ModelShape::Unsupported)
-                throw std::runtime_error("ONNX model requires NCHW batch 1 RGB residual-x2 with fixed 960x540 or dynamic H/W boundaries");
+                throw std::runtime_error("ONNX upscaler requires NCHW RGB, batch 1, fixed or fully dynamic H/W, integer x1-x4 output");
             const bool dynamic_spatial = model_shape == onnx_image::ModelShape::Dynamic;
             const ml::TensorKind input_kind = input_descriptor.TensorKind();
             const ml::TensorKind output_kind = output_descriptor.TensorKind();
@@ -252,15 +256,19 @@ struct OnnxBackgroundUpscaler::Impl {
             };
             if (!is_supported_float_kind(input_kind) ||
                 !is_supported_float_kind(output_kind)) {
-                throw std::runtime_error(std::string("ONNX boundary detected as rgb_lr=") +
+                throw std::runtime_error(std::string("ONNX boundary detected as input=") +
                                          tensor_kind_label(input_kind) +
-                                         ", rgb_residual_x2=" +
+                                         ", output=" +
                                          tensor_kind_label(output_kind) +
                                          "; raw INT8/UINT8 boundaries need scale and zero-point "
                                          "metadata, so use an INT8 QDQ model with FP32/FP16 boundaries");
             }
             std::string quantization;
             const auto metadata = model.Metadata();
+            const auto output_mode = onnx_image::output_mode(configured_output_mode,
+                winrt::to_string(input_name), winrt::to_string(output_name),
+                metadata.HasKey(L"tenriff.output_mode")
+                    ? winrt::to_string(metadata.Lookup(L"tenriff.output_mode")) : "");
             if (metadata.HasKey(L"tenriff.quantization")) {
                 quantization = winrt::to_string(metadata.Lookup(L"tenriff.quantization"));
             }
@@ -270,10 +278,11 @@ struct OnnxBackgroundUpscaler::Impl {
                 quantization_lower.find("s8") != std::string::npos ||
                 quantization_lower.find("u8") != std::string::npos ||
                 quantization_lower.find("qdq") != std::string::npos;
-            std::cerr << "[ONNX Upscaler] Model contract accepted: rgb_lr="
+            std::cerr << "[ONNX Upscaler] Model contract accepted: input="
                       << tensor_kind_label(input_kind)
-                      << ", rgb_residual_x2=" << tensor_kind_label(output_kind)
-                      << (dynamic_spatial ? ", spatial=dynamic original size" : ", spatial=fixed 960x540 tiles")
+                      << ", output=" << tensor_kind_label(output_kind)
+                      << (output_mode == onnx_image::OutputMode::Residual ? ", mode=residual" : ", mode=image")
+                      << (dynamic_spatial ? ", spatial=dynamic original size" : ", spatial=fixed native tiles")
                       << (internal_int8
                               ? ", internal quantization=INT8/QDQ (" + quantization + ")"
                               : "")
@@ -367,14 +376,14 @@ struct OnnxBackgroundUpscaler::Impl {
                     finish_bgra_request();
                     continue;
                 }
-                std::vector<std::uint8_t> output(std::size_t(source_width * 2) * (source_height * 2) * 4);
-                const auto input_width = dynamic_spatial ? source_width : kModelInputWidth;
-                const auto input_height = dynamic_spatial ? source_height : kModelInputHeight;
+                std::vector<std::uint8_t> output;
+                std::uint32_t frame_scale = 0;
+                const auto input_width = dynamic_spatial ? source_width : static_cast<std::uint32_t>(input_dimensions[3]);
+                const auto input_height = dynamic_spatial ? source_height : static_cast<std::uint32_t>(input_dimensions[2]);
                 const std::vector<std::int64_t> input_shape{1, 3, input_height, input_width};
-                const std::vector<std::int64_t> output_shape{1, 3, input_height * 2, input_width * 2};
                 const auto tiles = dynamic_spatial
                     ? std::vector<onnx_image::Tile>{{0, 0, source_width, source_height, 0, 0}}
-                    : onnx_image::plan_tiles(source_width, source_height);
+                    : onnx_image::plan_tiles(source_width, source_height, input_width, input_height);
                 bool completed = true;
                 for (const auto& tile : tiles) {
                     {
@@ -384,64 +393,47 @@ struct OnnxBackgroundUpscaler::Impl {
                     // Dynamic models see exactly the decoded/filtered original, with no
                     // padding, tiling or duplicate full-image BGRA allocation.
                     const auto low_bgra = dynamic_spatial ? std::vector<std::uint8_t>{}
-                        : onnx_image::extract_tile(source_bgra, source_width, source_height, tile);
+                        : onnx_image::extract_tile(source_bgra, source_width, source_height, tile, input_width, input_height);
                     std::vector<float> rgb = bgra_to_nchw_rgb(dynamic_spatial ? source_bgra : low_bgra,
                                                              input_width, input_height);
                     if (rgb.empty()) { completed = false; break; }
 
-                    const auto evaluate_residual = [&](const ml::LearningModelSession& active_session) {
-                        const auto bind_and_evaluate =
-                            [&](const auto& input_tensor, const auto& output_tensor) {
-                                ml::LearningModelBinding binding(active_session);
-                                binding.Bind(L"rgb_lr", input_tensor);
-                                binding.Bind(L"rgb_residual_x2", output_tensor);
-                                const auto result = active_session.Evaluate(
-                                    binding,
-                                    L"tenriff-onnx-upscaler-background");
-                                // A dynamic descriptor cannot promise an x2 result. Validate
-                                // the evaluated tensor before indexing residual pixels.
-                                const auto evaluated = result.Outputs().Lookup(L"rgb_residual_x2")
-                                    .template as<std::decay_t<decltype(output_tensor)>>();
-                                const auto evaluated_shape = evaluated.Shape();
-                                if (!onnx_image::valid_residual_shape(
-                                        std::vector<std::int64_t>(evaluated_shape.begin(), evaluated_shape.end()),
-                                        input_width, input_height))
-                                    throw std::runtime_error("ONNX evaluated output must be batch 1 RGB at exactly x2 input dimensions");
-                                std::vector<float> residual(std::size_t(input_width) * input_height * 12);
-                                const auto residual_view = evaluated.GetAsVectorView();
-                                if (residual_view.Size() != residual.size() ||
-                                    residual_view.GetMany(0, residual) != residual.size()) {
-                                    residual.clear();
-                                }
-                                return residual;
-                            };
-
-                        if (input_kind == ml::TensorKind::Float16) {
-                            const auto input_tensor =
-                                ml::TensorFloat16Bit::CreateFromArray(input_shape, rgb);
-                            if (output_kind == ml::TensorKind::Float16) {
-                                const auto output_tensor =
-                                    ml::TensorFloat16Bit::Create(output_shape);
-                                return bind_and_evaluate(input_tensor, output_tensor);
+                    const auto evaluate_output = [&](const ml::LearningModelSession& active_session) {
+                        ml::LearningModelBinding binding(active_session);
+                        if (input_kind == ml::TensorKind::Float16)
+                            binding.Bind(input_name, ml::TensorFloat16Bit::CreateFromArray(input_shape, rgb));
+                        else
+                            binding.Bind(input_name, ml::TensorFloat::CreateFromArray(input_shape, rgb));
+                        // Leave output allocation to WinML: dynamic models do not declare
+                        // their scale until evaluation. Never guess it from tensor names.
+                        const auto result = active_session.Evaluate(binding, L"tenriff-onnx-upscaler-background");
+                        const auto read_output = [&](const auto& evaluated) {
+                            const auto shape = evaluated.Shape();
+                            const auto scale = onnx_image::output_scale(
+                                std::vector<std::int64_t>(shape.begin(), shape.end()), input_width, input_height);
+                            if (!scale || (frame_scale && frame_scale != scale) ||
+                                source_width * scale > onnx_image::kMaxOutputDimension ||
+                                source_height * scale > onnx_image::kMaxOutputDimension)
+                                throw std::runtime_error("ONNX output must be batch 1 RGB at uniform integer x1-x4, at most 8192 pixels per restored axis");
+                            if (!frame_scale) {
+                                frame_scale = scale;
+                                output.resize(std::size_t(source_width * scale) * (source_height * scale) * 4);
                             }
-                            const auto output_tensor = ml::TensorFloat::Create(output_shape);
-                            return bind_and_evaluate(input_tensor, output_tensor);
-                        }
-
-                        const auto input_tensor =
-                            ml::TensorFloat::CreateFromArray(input_shape, rgb);
-                        if (output_kind == ml::TensorKind::Float16) {
-                            const auto output_tensor =
-                                ml::TensorFloat16Bit::Create(output_shape);
-                            return bind_and_evaluate(input_tensor, output_tensor);
-                        }
-                        const auto output_tensor = ml::TensorFloat::Create(output_shape);
-                        return bind_and_evaluate(input_tensor, output_tensor);
+                            std::vector<float> pixels(std::size_t(input_width * scale) * (input_height * scale) * 3);
+                            const auto values = evaluated.GetAsVectorView();
+                            if (values.Size() != pixels.size() || values.GetMany(0, pixels) != pixels.size())
+                                throw std::runtime_error("ONNX output storage does not match its shape");
+                            return pixels;
+                        };
+                        const auto tensor = result.Outputs().Lookup(output_name);
+                        return output_kind == ml::TensorKind::Float16
+                            ? read_output(tensor.as<ml::TensorFloat16Bit>())
+                            : read_output(tensor.as<ml::TensorFloat>());
                     };
 
                     std::vector<float> residual;
                     try {
-                        residual = evaluate_residual(session);
+                        residual = evaluate_output(session);
                     } catch (const winrt::hresult_error&) {
                         if (!using_low_power_preference) {
                             throw;
@@ -450,11 +442,12 @@ struct OnnxBackgroundUpscaler::Impl {
                                      "retrying on high-performance DirectX.\n";
                         session = make_high_performance_session();
                         using_low_power_preference = false;
-                        residual = evaluate_residual(session);
+                        residual = evaluate_output(session);
                     }
                     if (!onnx_image::compose_tile(source_bgra, source_width, source_height,
-                                                  tile, residual, output, input_width, input_height)) {
-                        std::cerr << "[ONNX Upscaler] Invalid residual tile; keeping native bitmap.\n";
+                                                  tile, residual, output, input_width, input_height,
+                                                  frame_scale, output_mode)) {
+                        std::cerr << "[ONNX Upscaler] Invalid output tile; keeping native bitmap.\n";
                         completed = false;
                         break;
                     }
@@ -464,8 +457,8 @@ struct OnnxBackgroundUpscaler::Impl {
                 auto frame = std::make_shared<OnnxUpscaleFrame>();
                 frame->source_path = path;
                 frame->request_id = id;
-                frame->width = source_width * 2;
-                frame->height = source_height * 2;
+                frame->width = source_width * frame_scale;
+                frame->height = source_height * frame_scale;
                 frame->bgra = std::move(output);
 
                 {
@@ -496,8 +489,9 @@ struct OnnxBackgroundUpscaler::Impl {
     }
 };
 
-OnnxBackgroundUpscaler::OnnxBackgroundUpscaler(std::string model_path, bool prefer_npu)
-    : impl_(std::make_unique<Impl>(std::move(model_path), prefer_npu)) {}
+OnnxBackgroundUpscaler::OnnxBackgroundUpscaler(std::string model_path, bool prefer_npu,
+                                             std::string output_mode)
+    : impl_(std::make_unique<Impl>(std::move(model_path), prefer_npu, std::move(output_mode))) {}
 
 OnnxBackgroundUpscaler::~OnnxBackgroundUpscaler() = default;
 
