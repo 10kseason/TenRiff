@@ -521,6 +521,7 @@ struct GameplayHudData {
     bool show_timing_feedback = true;
     bool show_timing_bar = true;
     bool timing_bar_always_visible = false;
+    std::string timing_marker_style = "dot";
     double timing_text_offset_x = 0.0;
     double note_fade_in = 0.0;
     double note_fade_out = 0.0;
@@ -700,6 +701,7 @@ struct SkinPreviewData {
     bool show_timing_feedback = true;
     bool show_timing_bar = true;
     bool timing_bar_always_visible = false;
+    std::string timing_marker_style = "dot";
     double timing_text_offset_x = 0.0;
     double note_fade_in = 0.0;
     double note_fade_out = 0.0;
@@ -894,6 +896,7 @@ struct MenuRenderData {
     std::string ui_font_path;
     uint64_t ui_font_revision = 0;
     float ui_text_scale = 1.0f;
+    std::array<std::string, 11> function_keys{"F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11"};
     uint64_t profile_avatar_revision = 0;
     LobbySkinData lobby_skin;
 
@@ -981,6 +984,7 @@ private:
     void invalidate_gameplay_note_sprite_cache();
     [[nodiscard]] bool ensure_gameplay_note_sprites(const GameplayHudData& data);
     void invalidate_gameplay_background_cache();
+    [[nodiscard]] std::array<std::size_t, 2> gameplay_background_retention_stats() const;
     void set_background_upscale_model_path(std::string model_path, bool prefer_npu, std::string output_mode);
     [[nodiscard]] bool ensure_gameplay_background_bitmap(const GameplayHudData& data);
     void invalidate_song_select_preview_cache();

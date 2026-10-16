@@ -178,6 +178,17 @@ void MenuWindow::draw(const MenuRenderData& data) {
     ID2D1Bitmap* title_background = find_song_card_preview_bitmap(title_background_path);
     const bool has_title_art = title_background != nullptr;
 #include "MenuWindow_draw_native_motion.inl"
+    // Never collect while showing gameplay or its pause/loading overlay.
+    // Static BGA retention is per visit to gameplay, not a process-lifetime cache.
+    if (data.kind != MenuScreenKind::GameplayHud && !data.generic.skin_preview.visible) {
+        if (d2d_->gameplay_background_used) {
+            invalidate_gameplay_background_cache();
+            d2d_->gameplay_background_bitmaps.clear();
+            d2d_->gameplay_background_bitmap_bytes = 0;
+            d2d_->gameplay_background_used = false;
+        }
+        app::process_memory_reclamation().collect_if_allowed();
+    }
     MenuRenderData* skin_preview_scene = nullptr;
     const auto drag_context = data.generic.skin_preview.visible
         ? (data.generic.skin_preview.fullscreen ? FieldDragContext::FullscreenPreview : FieldDragContext::EmbeddedPreview)
@@ -614,10 +625,10 @@ void MenuWindow::draw(const MenuRenderData& data) {
 #include "MenuWindow_draw_panel_glow.inl"
 
     auto loc = [&](std::string_view english, std::string_view korean) {
-        return ui::text(data.ui_language, english, korean);
+        return ui::function_key_labels(ui::text(data.ui_language, english, korean), data.function_keys);
     };
     auto wloc = [&](std::string_view english, std::string_view korean) {
-        return to_wide(ui::text(data.ui_language, english, korean));
+        return to_wide(loc(english, korean));
     };
 
     auto inset_rect = [](const D2D1_RECT_F& rect, float dx, float dy) {

@@ -547,6 +547,10 @@ void MenuApp::populate_multiplayer_chat_overlay(render::ChatOverlayData& target)
 }
 
 bool MenuApp::queue_gameplay_chat_input(const input::InputEvent& event) {
+    if (gameplay_overlay_capture_active_.load(std::memory_order_acquire)) {
+        const auto vk = config::KeycodeMap::polling_vk_for_keycode(event.keycode);
+        if (vk && ((*vk >= 0x30 && *vk <= 0x6f) || *vk >= 0xba)) return true;
+    }
     if (key_f11_ != 0 && event.keycode == key_f11_) {
         // F11 owns both edges even when the overlay closes before key-up.
         // Shift remains an ordinary gameplay binding; F8 retains calibration.

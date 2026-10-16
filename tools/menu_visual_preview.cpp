@@ -4,6 +4,7 @@
 #include "render/MenuWindow.h"
 #include "timing/HighResClock.h"
 #include "app/PeerBattleRuntimeRules.h"
+#include "app/MemoryReclamation.h"
 #include "app/TenRiffSkin.h"
 #include "app/Lr2Skin.h"
 #include "app/MenuApp.h"
@@ -283,6 +284,45 @@ struct MenuWindowVisualTestAccess {
             {"context_cancelled", JsonValue(cancelled)}, {"movements", JsonValue(std::move(movements))}});
     }
     static void gpu_sprites(MenuWindow& window, bool enabled) { window.gameplay_sprite_batch_enabled_ = enabled; }
+    static bool check_background_retention(MenuWindow& window, MenuRenderData source,
+                                           const std::string& directory) {
+        app::GameplayMemoryDeferral playing;
+        playing.begin();
+        source.kind = MenuScreenKind::GameplayHud;
+        source.generic.skin_preview.visible = false;
+        source.gameplay.background_upscale_mode = "off";
+        source.gameplay.background_overlay_path.clear();
+        std::array<std::size_t, 2> peak{};
+        for (int i = 0; i < 257; ++i) {
+            source.gameplay.background_base_path = directory + "/" + std::to_string(i) + ".bmp";
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+            do {
+                window.render(source);
+                peak = window.gameplay_background_retention_stats();
+                if (peak[0] == static_cast<std::size_t>(i + 1)) break;
+                if (window.had_fatal_error() || std::chrono::steady_clock::now() >= deadline) {
+                    std::cerr << "BGA retention failed at image " << i << " count=" << peak[0] << '\n';
+                    return false;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            } while (true);
+        }
+        source.gameplay.paused = true;
+        window.render(source);
+        const bool paused_retained = window.gameplay_background_retention_stats() == peak;
+        playing.end();
+        source.kind = MenuScreenKind::TitleMenu;
+        window.render(source);
+        const auto menu = window.gameplay_background_retention_stats();
+        const bool passed = paused_retained && peak[0] == 257 && peak[1] > 192ull * 1024 * 1024 &&
+            menu[0] == 0 && menu[1] == 0 && !window.had_fatal_error();
+        std::cout << "{\"passed\":" << (passed ? "true" : "false")
+                  << ",\"peak_images\":" << peak[0] << ",\"peak_bytes\":" << peak[1]
+                  << ",\"paused_retained\":" << (paused_retained ? "true" : "false")
+                  << ",\"menu_images\":" << menu[0] << ",\"menu_bytes\":" << menu[1] << "}\n";
+        return passed;
+    }
+
     static std::array<uint64_t, 6> gpu_sprite_stats(const MenuWindow& window) {
         const auto& stats = window.benchmark_gpu_sprite_stats_;
         return {stats[0], stats[1], stats[2], stats[3], stats[4], window.benchmark_gpu_sprite_submissions_};
@@ -612,7 +652,10 @@ int main(int argc, char** argv) {
     bool timing_text_off = false, timing_bar_off = false;
     bool indicator_background_off = false;
     bool timing_bar_always = false;
+    std::string timing_marker_style = "dot";
+    bool remapped_functions = false;
     bool measure_lines_fixture = false;
+    bool measure_alignment_fixture = false;
     std::string bms_rank_fixture;
     std::string artist_fixture;
     double timing_text_x = 0, timing_text_y = 0, timing_bar_x = 0, timing_bar_y = 0;
@@ -698,6 +741,7 @@ int main(int argc, char** argv) {
     bool verify_hits = false;
     bool hitmap_written = false;
     std::string hitmap_path;
+    std::string retention_probe_directory;
     bool profile_settings = false;
     bool title = false;
     bool focus_options = false;
@@ -726,7 +770,23 @@ int main(int argc, char** argv) {
     data.ui_language = tenriff::ui::Language::Korean;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
+        // Keep new independent flags outside the legacy nested else-if chain (MSVC limit).
+        if (arg == "--bga-retention-probe" && i + 1 < argc) {
+            retention_probe_directory = argv[++i];
+            continue;
+        }
+        if (arg == "--timing-marker" && i + 1 < argc) {
+            timing_marker_style = argv[++i];
+            if (timing_marker_style != "dot" && timing_marker_style != "barcode") return 2;
+            continue;
+        }
+        if (arg == "--remapped-functions") { remapped_functions = true; continue; }
         if (arg == "--measure-lines") { measure_lines_fixture = true; continue; }
+        if (arg == "--measure-alignment" || arg == "--measure-alignment-no-lines") {
+            measure_alignment_fixture = true;
+            measure_lines_fixture = arg == "--measure-alignment";
+            continue;
+        }
         if (arg == "--bms-rank" && i + 1 < argc) { bms_rank_fixture = argv[++i]; continue; }
         if (arg == "--artist-text" && i + 1 < argc) { artist_fixture = argv[++i]; continue; }
         if (arg == "--language" && i + 1 < argc) { data.ui_language = tenriff::ui::language_from_token(argv[++i]); continue; }
@@ -1103,7 +1163,7 @@ int main(int argc, char** argv) {
         data.generic.heading = loc("Profile Setup", "프로필 설정");
         data.generic.profile_preview_visible = true;
         data.generic.profile_avatar_path = avatar_path;
-        const std::array<std::string, 18> labels{
+        const std::array<std::string, 27> labels{
             loc("Language", "언어"), loc("Menu Font Size", "메뉴 글자 크기"),
             loc("Songs Folder", "곡 폴더"), loc("Gauge", "게이지"), "Rate",
             loc("Visual Latency", "비주얼 레이턴시"), loc("Keysound", "키음"),
@@ -1111,15 +1171,20 @@ int main(int argc, char** argv) {
             loc("Avatar Image", "프로필 사진"), loc("Clear Avatar", "사진 지우기"),
             loc("Export All Settings", "전체 설정 내보내기"), loc("Import All Settings", "전체 설정 가져오기"),
             loc("Skip Start Countdown", "시작 카운트다운 생략"), loc("Instant Restart Key", "즉시 재시작 키"),
-            loc("Hi-Speed -10 Key", "배속 -10 키"), loc("Hi-Speed +10 Key", "배속 +10 키"),
+            loc("Note Speed x0.5 Key", "노트속도 ×0.5 키"), loc("Note Speed x2 Key", "노트속도 ×2 키"),
+            loc("Help / Judge Line -", "도움말 / 판정선 -"), loc("Song Folder / Judge Line +", "곡 폴더 / 판정선 +"),
+            loc("Note Speed -0.25", "노트속도 -0.25"), loc("Note Speed +0.25", "노트속도 +0.25"),
+            loc("Editor / Visual Latency -", "편집기 / 비주얼 레이턴시 -"), loc("Visual Latency +", "비주얼 레이턴시 +"),
+            loc("Screenshot", "스크린샷"), loc("Guest / Online", "게스트 / 온라인"), loc("Chat", "채팅"),
             loc("Done", "완료")};
-        const std::array<std::string, 18> values{
+        const std::array<std::string, 27> values{
             std::string(tenriff::ui::language_native_label(data.ui_language)),
             data.ui_text_scale > 1.2f ? loc("Extra Large", "더 크게") :
                 data.ui_text_scale > 1.0f ? loc("Large", "크게") : loc("Normal", "보통"),
             "ALL SONG", "NORMAL", "1.00x", "0 ms", "Follow", "RawInput", "PLAYER",
             avatar_path.empty() ? loc("Not set", "설정 안 됨") : "preview-avatar.png",
-            loc("Clear", "지우기"), ".trprofile", ".trprofile", loc("Off", "꺼짐"), "F12", "F5", "F6", loc("Back", "돌아가기")};
+            loc("Clear", "지우기"), ".trprofile", ".trprofile", loc("Off", "꺼짐"), "--", "F5", "F6",
+            "F1", "F2", "F3", "F4", "F7", "F8", "F9", "F10", "F11", loc("Back", "돌아가기")};
         for (int i = 0; i < static_cast<int>(labels.size()); ++i) {
             MenuRowData row;
             row.label = labels[i]; row.value = values[i]; row.row_index = i;
@@ -1589,6 +1654,13 @@ int main(int argc, char** argv) {
     data.gameplay.indicator_background_visible = data.generic.skin_preview.indicator_background_visible = !indicator_background_off;
     data.gameplay.show_timing_bar = data.generic.skin_preview.show_timing_bar = !timing_bar_off;
     data.gameplay.timing_bar_always_visible = data.generic.skin_preview.timing_bar_always_visible = timing_bar_always;
+    data.gameplay.timing_marker_style = data.generic.skin_preview.timing_marker_style = timing_marker_style;
+    if (remapped_functions) {
+        data.function_keys[0] = "F12";
+        data.function_keys[4] = "Q";
+        data.function_keys[5] = "W";
+        data.function_keys[8] = "E";
+    }
     data.gameplay.timing_text_offset_x = data.generic.skin_preview.timing_text_offset_x = timing_text_x;
     data.gameplay.timing_text_offset_y = data.generic.skin_preview.timing_text_offset_y = timing_text_y;
     data.gameplay.timing_bar_offset_x = data.generic.skin_preview.timing_bar_offset_x = timing_bar_x;
@@ -1749,6 +1821,8 @@ int main(int argc, char** argv) {
     window.set_config(config);
     MenuWindowVisualTestAccess::gpu_sprites(window, gpu_sprites);
     MenuWindowVisualTestAccess::benchmark(window, benchmark_frames > 0);
+    if (!retention_probe_directory.empty())
+        return MenuWindowVisualTestAccess::check_background_retention(window, data, retention_probe_directory) ? 0 : 5;
     if (benchmark_frames > 0) frame_limit = benchmark_warmup + benchmark_frames;
     const auto start = std::chrono::steady_clock::now();
     while (!window.should_close()) {
@@ -1783,6 +1857,7 @@ int main(int argc, char** argv) {
                 hud.has_timing_feedback = retained;
                 hud.timing_feedback_delta_ms = retained ? -28.0 : 0.0;
                 if (timing_feedback_case == "always-pg" || timing_feedback_case == "always-expired") hud.timing_bar_always_visible = true;
+                if (timing_feedback_case == "expired" || timing_feedback_case == "always-expired") hud.timing_history_count = 0;
             }
             hud.text_revision = static_cast<uint64_t>(hit + 1);
             hud.motion_revision++;
@@ -1826,6 +1901,9 @@ int main(int argc, char** argv) {
                 GameplayNoteData note;
                 note.lane = lane;
                 note.start_sample = hud.current_sample + static_cast<int64_t>((0.1 + std::fmod(lane * 0.13 + seconds * 0.5, 1.0)) * 40000);
+                if (measure_alignment_fixture)
+                    note.start_sample = static_cast<int64_t>((std::floor(seconds / 0.5) * 0.5 +
+                        (1 + (lane - 1) % 3) * 0.5) * 48000);
                 note.visual_position = note.start_sample / 48000.0;
                 note.tail_visual_position = note.visual_position;
                 if (lane % 3 == 0) {

@@ -162,6 +162,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.show_timing_feedback = timing_visibility.text;
     target.show_timing_bar = timing_visibility.bar;
     target.timing_bar_always_visible = timing_visibility.always_visible;
+    target.timing_marker_style = config_.skin.timing_marker_style;
     target.note_fade_in = config_.skin.note_fade_in;
     target.note_fade_out = config_.skin.note_fade_out;
     target.timing_text_offset_x = config_.skin.timing_text_offset_x;
@@ -1071,10 +1072,30 @@ void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
         const auto& binding = decrease ? config_.ui.hispeed_decrease_key : config_.ui.hispeed_increase_key;
         const bool capturing = profile_control_key_capture_active_ && profile_control_key_capture_row_ == row;
         append_menu_row(render.generic,
-            decrease ? ui_text("Hi-Speed -10 Key", "배속 -10 키") : ui_text("Hi-Speed +10 Key", "배속 +10 키"),
+            decrease ? ui_text("Note Speed x0.5 Key", "노트속도 ×0.5 키") : ui_text("Note Speed x2 Key", "노트속도 ×2 키"),
             capturing ? (profile_control_key_status_.empty()
                 ? ui_text("Press a key (Esc cancels, Delete clears)", "키 입력 (Esc 취소, Delete 해제)")
                 : profile_control_key_status_)
+                : (binding.empty() ? ui_text("Unassigned", "미지정") : binding),
+            settings_cursor_ == row, render::MenuHitTargetKind::SettingsRow, row, true, false);
+    }
+    const std::array<std::string, 9> action_labels{
+        ui_text("Help / Judge Line -", "도움말 / 판정선 -"),
+        ui_text("Song Folder / Judge Line +", "곡 폴더 / 판정선 +"),
+        ui_text("Note Speed -0.25", "노트속도 -0.25"),
+        ui_text("Note Speed +0.25", "노트속도 +0.25"),
+        ui_text("Editor / Visual Latency -", "편집기 / 비주얼 레이턴시 -"),
+        ui_text("Visual Latency +", "비주얼 레이턴시 +"),
+        ui_text("Screenshot", "스크린샷"),
+        ui_text("Guest / Online", "게스트 / 온라인"),
+        ui_text("Chat", "채팅")};
+    for (int row = profile_setup::kFunctionKeysFirstRow; row <= profile_setup::kFunctionKeysLastRow; ++row) {
+        const int number = profile_setup::function_for_row(row);
+        const auto& binding = config::function_key(config_.ui, number);
+        const bool capturing = profile_control_key_capture_active_ && profile_control_key_capture_row_ == row;
+        append_menu_row(render.generic, action_labels[row - profile_setup::kFunctionKeysFirstRow],
+            capturing ? (profile_control_key_status_.empty()
+                ? ui_text("Press a key (Esc cancels, Delete clears)", "키 입력 (Esc 취소, Delete 해제)") : profile_control_key_status_)
                 : (binding.empty() ? ui_text("Unassigned", "미지정") : binding),
             settings_cursor_ == row, render::MenuHitTargetKind::SettingsRow, row, true, false);
     }
@@ -1733,6 +1754,7 @@ void MenuApp::publish_snapshot() {
     MenuSnapshot snapshot;
     render::MenuRenderData render;
     render.ui_language = ui_language();
+    render.function_keys = config::function_key_labels(config_.ui);
     render.ui_text_scale = config::menu_text_scale(config_.ui.menu_font_size);
     render.profile_avatar_revision = profile_avatar_revision_;
     render.ui_font = config::normalize_skin_ui_font_token(config_.skin.ui_font);
@@ -1833,6 +1855,7 @@ void MenuApp::publish_snapshot() {
 
     if (render.kind == render::MenuScreenKind::GenericList) {
         menu::settings::apply_settings_help(current_screen(), render.generic, ui_language());
+        render.generic.selected_help = ui::function_key_labels(render.generic.selected_help, render.function_keys);
         if (current_screen() == Screen::SettingsSkins)
             for (const auto& status : skin_status_messages_)
                 render.generic.selected_help += "\n\n" + status;

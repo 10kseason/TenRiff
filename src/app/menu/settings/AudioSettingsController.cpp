@@ -134,6 +134,7 @@ std::optional<NumericSettingRange> audio_setting_numeric_range(AudioSettingId id
         case AudioSettingId::Back:
         case AudioSettingId::Backend:
         case AudioSettingId::AsioDriver:
+        case AudioSettingId::OutputDevice:
         case AudioSettingId::SampleRate:
         case AudioSettingId::BufferFrames:
         case AudioSettingId::BgmVolume:
@@ -235,6 +236,26 @@ MenuEffectFlags AudioSettingsController::apply_selected_action(
                     ? audio::AudioBackend::WASAPI : audio::AudioBackend::ASIO;
                 apply_audio_preset(runtime);
                 changed = true;
+            }
+            break;
+        case AudioSettingId::OutputDevice:
+            if ((is_adjust || is_activate) && runtime.audio.backend == audio::AudioBackend::WASAPI) {
+                std::size_t index = 0;
+                for (std::size_t i = 0; i < output_devices_.size(); ++i) {
+                    if (output_devices_[i].id == runtime.audio.device_id) index = i + 1;
+                }
+                const std::size_t count = output_devices_.size() + 1;
+                // An unplugged saved endpoint is retained until this explicit edit.
+                if (!runtime.audio.device_id.empty() && index == 0) {
+                    changed = true;
+                    runtime.audio.device_id.clear();
+                } else {
+                    index = is_adjust && action.direction < 0
+                        ? (index == 0 ? count - 1 : index - 1) : (index + 1) % count;
+                    const std::string next = index == 0 ? "" : output_devices_[index - 1].id;
+                    changed = next != runtime.audio.device_id;
+                    runtime.audio.device_id = next;
+                }
             }
             break;
         case AudioSettingId::AsioDriver:

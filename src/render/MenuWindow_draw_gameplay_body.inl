@@ -478,8 +478,8 @@
                                          float combo_anchor_y,
                                          const std::array<double, kGameplayTimingHistoryMaxEntries>& timing_history,
                                          std::size_t timing_history_count,
-                                         bool has_live_feedback,
-                                         double live_feedback_delta_ms) {
+                                         bool /*has_live_feedback*/,
+                                         double /*live_feedback_delta_ms*/) {
             if (!scene_body_format || !d2d_->text_brush) {
                 return;
             }
@@ -508,12 +508,15 @@
             // Keep only the timing marks, including for older presets that enable a backing.
             const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
             const float indicator_center_y = (indicator_rect.top + indicator_rect.bottom) * 0.5f;
+            d2d_->text_brush->SetColor(ng_color("timing", D2D1::ColorF(0x6E7A8C, 0.8f)));
+            ctx->FillRectangle(D2D1::RectF(indicator_rect.left, indicator_center_y - 0.5f,
+                indicator_rect.right, indicator_center_y + 0.5f), d2d_->text_brush.Get());
             d2d_->text_brush->SetColor(ng_color("timing",D2D1::ColorF(0xF7FAFD, 0.92f)));
             ctx->FillRectangle(D2D1::RectF(feedback_center_x - 1.0f, indicator_rect.top - 3.0f,
                                            feedback_center_x + 1.0f, indicator_rect.bottom + 3.0f),
                                d2d_->text_brush.Get());
 
-            for (std::size_t i = 0; has_live_feedback && i < timing_history_count; ++i) {
+            for (std::size_t i = 0; i < timing_history_count; ++i) {
                 const double delta_ms = timing_history[i];
                 const float history_weight =
                     static_cast<float>(i + 1) / static_cast<float>(std::max<std::size_t>(1, timing_history_count));
@@ -521,7 +524,6 @@
                     feedback_center_x +
                     static_cast<float>(std::clamp(delta_ms / kGameplayTimingIndicatorRangeMs, -1.0, 1.0)) *
                         kGameplayTimingIndicatorHalfWidth;
-                const float marker_half_width = 0.8f + 0.8f * history_weight;
                 const float marker_half_height = 1.4f + 2.4f * history_weight;
                 D2D1_COLOR_F marker_color = ng_color("timing",D2D1::ColorF(0xF7FAFD, 0.12f + 0.50f * history_weight * history_weight));
                 if (delta_ms < -0.05) {
@@ -530,17 +532,17 @@
                     marker_color = ng_color("timing_slow",D2D1::ColorF(0xFF5A6B, 0.12f + 0.50f * history_weight * history_weight));
                 }
                 d2d_->text_brush->SetColor(marker_color);
-                ctx->FillRoundedRectangle(
-                    D2D1::RoundedRect(D2D1::RectF(marker_center_x - marker_half_width,
-                                                 indicator_center_y - marker_half_height,
-                                                 marker_center_x + marker_half_width,
-                                                 indicator_center_y + marker_half_height),
-                                      marker_half_width,
-                                      marker_half_width),
-                    d2d_->text_brush.Get());
+                if (data.gameplay.timing_marker_style == "barcode") {
+                    ctx->FillRectangle(D2D1::RectF(marker_center_x - 1.0f, indicator_center_y - 9.0f,
+                        marker_center_x + 1.0f, indicator_center_y + 9.0f), d2d_->text_brush.Get());
+                } else {
+                    ctx->FillEllipse(D2D1::Ellipse(D2D1::Point2F(marker_center_x, indicator_center_y),
+                        marker_half_height, marker_half_height), d2d_->text_brush.Get());
+                }
             }
 
-            if (has_live_feedback) {
+            if (timing_history_count > 0) {
+                const double live_feedback_delta_ms = timing_history[timing_history_count - 1];
                 const float live_marker_center_x =
                     feedback_center_x +
                     static_cast<float>(std::clamp(live_feedback_delta_ms / kGameplayTimingIndicatorRangeMs,
@@ -548,8 +550,13 @@
                                                   1.0)) *
                         kGameplayTimingIndicatorHalfWidth;
                 d2d_->text_brush->SetColor(ng_color("timing",D2D1::ColorF(0xF7FAFD, 0.98f)));
-                ctx->FillEllipse(D2D1::Ellipse(D2D1::Point2F(live_marker_center_x, indicator_center_y), 5.0f, 5.0f),
-                                 d2d_->text_brush.Get());
+                if (data.gameplay.timing_marker_style == "barcode") {
+                    ctx->FillRectangle(D2D1::RectF(live_marker_center_x - 1.5f, indicator_center_y - 10.0f,
+                        live_marker_center_x + 1.5f, indicator_center_y + 10.0f), d2d_->text_brush.Get());
+                } else {
+                    ctx->FillEllipse(D2D1::Ellipse(D2D1::Point2F(live_marker_center_x, indicator_center_y), 5.0f, 5.0f),
+                                     d2d_->text_brush.Get());
+                }
             }
 
             d2d_->text_brush->SetColor(saved_text_color);
@@ -1119,8 +1126,8 @@
 
             if (scene_body_format && d2d_->muted_brush) {
                 const std::wstring hispeed_hint_w =
-                    wloc("HI-SPEED  F3/F4  +/-0.25   PROFILE KEYS  +/-10",
-                         "노트 배속  F3/F4  +/-0.25   프로필 지정 키  +/-10");
+                    wloc("HI-SPEED  F3/F4  +/-0.25   F5 x0.5 / F6 x2",
+                         "노트속도  F3/F4  +/-0.25   F5 ×0.5 / F6 ×2");
                 draw_readable_text_aligned(
                     hispeed_hint_w,
                     scene_body_format.Get(),
@@ -1630,7 +1637,11 @@
             for (std::size_t i = 0; i < std::min(data.gameplay.measure_line_count,
                                                data.gameplay.measure_line_positions.size()); ++i) {
                 const float y = gameplay_field_y(field.top, field.bottom - field.top,
-                    visual_to_y(data.gameplay.measure_line_positions[i]));
+                    visual_to_y(data.gameplay.measure_line_positions[i])) +
+                    gameplay_note_head_half_height(note_height_scale) + 0.5f;
+                // Notes are centered on their timing position. Attach the top
+                // of this one-pixel stroke to the note's bottom edge, including
+                // the configured/imported note height, without shifting time.
                 ctx->DrawLine(D2D1::Point2F(field.left, y), D2D1::Point2F(field.right, y),
                     d2d_->lane_divider_brush.Get(), 1.0f);
             }
@@ -1946,7 +1957,7 @@
                                          int64_t feedback_started_ns) {
             if (studio) { draw_studio_feedback(feedback_field, has_feedback, feedback, feedback_delta_ms,
                                                has_non_pg_feedback, has_timing_feedback, feedback_text,
-                                               feedback_timing_text, feedback_animation); return; }
+                                               feedback_timing_text, feedback_animation, timing_history, timing_history_count); return; }
             const bool show_feedback_overlay = has_feedback && !feedback_text.empty();
             const bool show_timing_feedback = data.gameplay.show_timing_feedback && has_timing_feedback &&
                 !feedback_timing_text.empty();
@@ -2885,18 +2896,18 @@
                 struct PauseTuningRow {
                     const wchar_t* label;
                     std::wstring value;
-                    const wchar_t* keys;
+                    std::wstring keys;
                 };
                 const std::array<PauseTuningRow, 3> tuning_rows{{
                     {L"\uD310\uC815\uC120",
                      to_wide(format_decimal(data.gameplay.judgement_line_position * 100.0) + "%"),
-                     L"F1 / F2"},
+                     wloc("F1 / F2", "F1 / F2")},
                     {L"\uC18D\uB3C4",
                      to_wide(format_decimal(data.gameplay.hispeed)),
-                     L"F3 / F4"},
+                     wloc("F3 / F4", "F3 / F4")},
                     {L"\uB808\uC774\uD134\uC2DC",
                      to_wide(format_signed_ms(data.gameplay.visual_offset_ms)),
-                     L"F7 / F8"},
+                     wloc("F7 / F8", "F7 / F8")},
                 }};
                 for (std::size_t row = 0; row < tuning_rows.size(); ++row) {
                     const float top = tuning_rect.top + static_cast<float>(row) * 42.0f;

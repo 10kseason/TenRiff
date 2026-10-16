@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.9.4] - 2026-10-17
+
+- Retain decoded chart PCM and static BGA during play/pause; release at stopped-session/menu transitions. Defer forced indexer heap/working-set trims while a session is loading or active. Memory use may increase; ordinary lifetimes, video recycling and device-loss recovery remain.
+- Add Dot/Barcode timing indicators with independent 0.7-second expiry and always-visible scale/center.
+- Add WASAPI sound output selection and profile F1–F11 bindings with matching hints. Menu/result MCI music retains the Windows default output.
+- Change F5/F6 coarse note-speed controls from −10/+10 to ×0.5/×2, once per press.
+- Align BMS measure lines below note heads for player/ghost and configured note height.
+- Preserve 1.9.3 gameplay/replay/Guest/grade contracts, external-model defaults and fixed baseline 1.9.0.
+
+
 ## [1.9.3] - 2026-10-16
 
 - Exclude Empty Poor from ordinary, detailed and segment accuracy while retaining gauge loss, POOR counts and existing raw-score/combo effects. New Normal/Hard and EX records use R7/R8; preserve R1–R6 replay calculations, previous board identities, timing windows and replay format. The approved leaderboard version 19 accepts the new rules separately and retains Stable grades and the `client_submitted` boundary.

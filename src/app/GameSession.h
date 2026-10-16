@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "app/ChartLoader.h"
+#include "app/MemoryReclamation.h"
 #include "app/ChartAudioDedup.h"
 #include "app/CommandLine.h"
 #include "app/InputBackendStatus.h"
@@ -269,6 +270,8 @@ public:
     [[nodiscard]] const InputBackendRuntimeState& input_backend_state() const { return input_backend_state_; }
 
 private:
+    GameplayMemoryDeferral memory_deferral_;
+
     friend struct GameSessionAudioTestAccess;
     friend struct MenuAppFeedbackTestAccess;
     struct FutureEvent {
@@ -453,7 +456,6 @@ private:
     void chart_audio_loader_thread_main();
     void service_chart_audio_streaming(int64_t current_sample);
     void queue_chart_audio_prefetch(int64_t current_sample);
-    void trim_chart_audio_cache(int64_t current_sample);
     [[nodiscard]] bool wait_for_chart_audio_startup(const std::vector<uint8_t>& required_assets);
     void log_chart_audio_memory(std::string_view phase);
     void schedule_chart_audio(int64_t buffer_end_samples);
@@ -593,6 +595,7 @@ private:
     uint32_t f9_keycode_ = 0;
     uint32_t f10_keycode_ = 0;
     uint32_t f11_keycode_ = 0;
+    std::array<uint32_t, 2> lane_conflicting_overlay_keys_{};
 
     // Judgement-line and visual-latency tuning while the chart plays. Same
     // press-then-auto-repeat shape as the hi-speed keys.
@@ -649,7 +652,6 @@ private:
     std::condition_variable chart_audio_stream_cv_;
     std::deque<std::size_t> chart_audio_load_queue_;
     std::vector<std::thread> chart_audio_loader_threads_;
-    std::unique_ptr<std::atomic<int64_t>[]> chart_audio_active_until_samples_;
     ChartAudioPcmRegistry chart_audio_pcm_registry_;
     ChartAudioDeduplicator chart_audio_deduplicator_;
     std::vector<BufferedLaneInput> pending_input_events_;
@@ -661,10 +663,8 @@ private:
     std::vector<gameplay::MineTrigger> ghost_mine_trigger_buffer_;
     std::size_t next_chart_audio_event_ = 0;
     std::uint64_t startup_preload_budget_bytes_ = 0;
-    std::uint64_t runtime_chart_audio_budget_bytes_ = 0;
     std::uint64_t chart_audio_decoded_bytes_ = 0;
     std::size_t chart_audio_deferred_count_ = 0;
-    std::size_t chart_audio_eviction_count_ = 0;
     int64_t last_chart_audio_service_sample_ = (std::numeric_limits<int64_t>::min)();
     bool chart_audio_loader_stop_ = false;
     bool chart_audio_startup_logged_ = false;

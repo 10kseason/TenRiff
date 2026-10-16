@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -150,6 +151,7 @@ struct UiConfig {
     std::string instant_restart_key;
     std::string hispeed_decrease_key = "F5";
     std::string hispeed_increase_key = "F6";
+    std::array<std::string, 11> function_keys{"F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11"};
     std::string active_song_source;
     std::string last_played_chart_path;
     // The aggregate library preserves the last individual source for switching back.
@@ -171,6 +173,24 @@ struct UiConfig {
     std::string private_server_url;
     std::string account_server_mode = "main";
 };
+
+// F5/F6 retain their existing serialized names for profile compatibility.
+inline std::string& function_key(UiConfig& ui, int number) {
+    if (number == 5) return ui.hispeed_decrease_key;
+    if (number == 6) return ui.hispeed_increase_key;
+    return ui.function_keys.at(static_cast<std::size_t>(number - 1));
+}
+inline const std::string& function_key(const UiConfig& ui, int number) {
+    if (number == 5) return ui.hispeed_decrease_key;
+    if (number == 6) return ui.hispeed_increase_key;
+    return ui.function_keys.at(static_cast<std::size_t>(number - 1));
+}
+inline std::array<std::string, 11> function_key_labels(const UiConfig& ui) {
+    auto labels = ui.function_keys;
+    labels[4] = ui.hispeed_decrease_key;
+    labels[5] = ui.hispeed_increase_key;
+    return labels;
+}
 
 struct SkinConfig {
     std::string source = "native";
@@ -198,6 +218,7 @@ struct SkinConfig {
     bool show_timing_feedback = true;
     bool show_timing_bar = true;
     bool timing_bar_always_visible = false;
+    std::string timing_marker_style = "dot";  // dot | barcode
     double timing_text_offset_x = 0.0;
     double timing_text_offset_y = 0.0;
     double timing_bar_offset_x = 0.0;

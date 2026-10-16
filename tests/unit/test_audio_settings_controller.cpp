@@ -545,7 +545,7 @@ TEST_CASE("audio settings expose unified BMS performance volume and retain legac
     CHECK(runtime.audio_ui.gameplay_volume == doctest::Approx(0.4));
     CHECK(runtime.audio_ui.menu_music_volume == doctest::Approx(0.2));
     const auto view = AudioSettingsView::build(controller, runtime, tenriff::ui::Language::Korean);
-    REQUIRE(view.rows.size() == 16);
+    REQUIRE(view.rows.size() == 17);
     CHECK(view.rows[1].label == "BMS 연주 볼륨");
     CHECK(view.rows[1].value == "40%");
     CHECK(view.rows[2].value == "20%");
@@ -742,20 +742,20 @@ TEST_CASE("audio settings view groups related controls and preserves saved value
     static_cast<void>(controller.select(AudioSettingId::GameplayVolume));
 
     const auto english = AudioSettingsView::build(controller, runtime, tenriff::ui::Language::English);
-    REQUIRE(english.rows.size() == 16);
+    REQUIRE(english.rows.size() == 17);
     REQUIRE(english.notes.size() == 10);
-    const std::array<const char*, 16> labels{
+    const std::array<const char*, 17> labels{
         "Master Volume", "BMS Performance Volume", "TenRiff Menu Music", "Keysound Mode", "Background Sound", "Title Music", "Song Ending",
         "Mute When Inactive", "Normalize Audio", "Sound Offset", "Preset",
-        "Audio Backend", "ASIO Driver", "ASIO Sample Rate", "ASIO Buffer Size", "Back",
+        "Audio Backend", "Sound Output Device", "ASIO Driver", "ASIO Sample Rate", "ASIO Buffer Size", "Back",
     };
-    const std::array<const char*, 16> values{
+    const std::array<const char*, 17> values{
         "100%", "20%", "100%", "Follow", "On", "Default Music", "Listen to End", "Off", "Off", "+0.0 ms", "High",
-        "WASAPI", "No 64-bit ASIO driver", "44100 Hz", "128 samples", "",
+        "WASAPI", "System Default", "No 64-bit ASIO driver", "44100 Hz", "128 samples", "",
     };
-    const std::array<const char*, 16> categories{
+    const std::array<const char*, 17> categories{
         "Volume", "Volume", "Volume", "Playback", "Playback", "Playback", "Playback", "Playback", "Volume",
-        "Timing", "Output Device", "Output Device", "Output Device", "Output Device", "Output Device", "",
+        "Timing", "Output Device", "Output Device", "Output Device", "Output Device", "Output Device", "Output Device", "",
     };
     for (std::size_t index = 0; index < english.rows.size(); ++index) {
         const auto& row = english.rows[index];
@@ -778,7 +778,7 @@ TEST_CASE("audio settings view groups related controls and preserves saved value
     CHECK_FALSE(english.rows.back().adjustable);
     CHECK(english.rows[11].activatable);
     CHECK(english.rows[11].adjustable);
-    for (std::size_t index = 12; index <= 14; ++index) {
+    for (std::size_t index = 13; index <= 15; ++index) {
         CHECK_FALSE(english.rows[index].activatable);
         CHECK_FALSE(english.rows[index].adjustable);
     }
@@ -791,13 +791,13 @@ TEST_CASE("audio settings view groups related controls and preserves saved value
     CHECK(korean.rows[0].category == "음량");
     CHECK(korean.rows[9].category == "타이밍");
     CHECK(korean.rows[10].category == "출력 장치");
-    CHECK(korean.rows[14].label == "ASIO 버퍼 사이즈");
-    CHECK(korean.rows[14].value == "128 샘플");
+    CHECK(korean.rows[15].label == "ASIO 버퍼 사이즈");
+    CHECK(korean.rows[15].value == "128 샘플");
     const auto japanese = AudioSettingsView::build(controller, runtime, tenriff::ui::Language::Japanese);
     CHECK(japanese.rows[5].label == "タイトル音楽");
     CHECK(japanese.rows[5].value == "標準の音楽");
-    CHECK(japanese.rows[14].label == "ASIO バッファサイズ");
-    CHECK(japanese.rows[14].value == "128 サンプル");
+    CHECK(japanese.rows[15].label == "ASIO バッファサイズ");
+    CHECK(japanese.rows[15].value == "128 サンプル");
 }
 
 TEST_CASE("title music choices support both pointer activation and reverse keyboard selection") {
@@ -1051,4 +1051,29 @@ TEST_CASE("audio outro choice toggles with keyboard and pointer without changing
     CHECK(runtime.audio_ui.play_to_end);
     CHECK(runtime.audio_ui.master_volume == doctest::Approx(0.10));
     CHECK(controller.handle(MenuAction::back(), runtime).persist_config);
+}
+
+
+TEST_CASE("sound output selector retains unplugged IDs and applies selected endpoint on exit") {
+    tenriff::config::RuntimeConfig runtime;
+    AudioSettingsController controller;
+    controller.set_output_devices({{"endpoint-a", "Speakers"}, {"endpoint-b", "Headphones"}});
+    auto change = [&](int direction) { return controller.handle(MenuAction::adjust(direction), runtime, AudioSettingId::OutputDevice); };
+    check_render_only(change(1)); CHECK(runtime.audio.device_id == "endpoint-a");
+    check_render_only(change(1)); CHECK(runtime.audio.device_id == "endpoint-b");
+    check_render_only(change(1)); CHECK(runtime.audio.device_id.empty());
+    check_render_only(change(-1)); CHECK(runtime.audio.device_id == "endpoint-b");
+    const auto effects = controller.handle(MenuAction::back(), runtime);
+    CHECK(effects.persist_config); CHECK(effects.restart_audio);
+    runtime.audio.device_id = "unplugged";
+    controller.reset(); controller.set_output_devices({});
+    const auto view = AudioSettingsView::build(controller, runtime, tenriff::ui::Language::English);
+    CHECK(runtime.audio.device_id == "unplugged");
+    const auto row = std::find_if(view.rows.begin(),view.rows.end(),[](const auto& r){return r.id==AudioSettingId::OutputDevice;});
+    REQUIRE(row != view.rows.end()); CHECK(row->value == "Saved output unavailable");
+    CHECK_FALSE(controller.handle(MenuAction::back(), runtime).persist_config);
+    check_render_only(change(1)); CHECK(runtime.audio.device_id.empty());
+    runtime.audio.backend = tenriff::audio::AudioBackend::ASIO;
+    controller.set_output_devices({{"endpoint-a", "Speakers"}});
+    check_no_effects(change(1)); CHECK(runtime.audio.device_id.empty());
 }

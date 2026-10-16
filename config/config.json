@@ -2,6 +2,7 @@
   "audio": {
     "backend": "wasapi",
     "asio_driver": "",
+    "device_id": "",
     "rate": 44100,
     "frames": 256,
     "periods": 3,
@@ -136,6 +137,7 @@
     "show_timing_feedback": true,
     "show_timing_bar": true,
     "timing_bar_always_visible": false,
+    "timing_marker_style": "dot",
     "indicator_background_visible": false,
     "timing_text_scale": 1.0,
     "timing_bar_scale": 1.0,

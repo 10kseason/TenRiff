@@ -166,3 +166,10 @@
 {"Left / Right: adjust this value.", "左/右：调整此值。"},
 {"Enter: select this action.", "Enter：执行此操作。"},
 {"Unavailable in the current mode.", "当前模式下不可用。"},
+
+{"Assign a function shortcut. Enter captures a key, Esc cancels, Delete clears. Duplicate and lane keys are rejected; hints follow the assigned key.", "指定功能快捷键。Enter开始设置，Esc取消，Delete清除。不能使用重复或轨道按键；提示会显示当前按键。"},
+{"Assign the Note Speed x0.5 key (default F5). Enter assigns; Esc cancels; Delete clears. One step per press.", "指定音符速度乘0.5的按键（当前F5）。Enter设置、Esc取消、Delete清除。每次按下仅执行一次。"},
+{"Assign the Note Speed x2 key (default F6). Enter assigns; Esc cancels; Delete clears. One step per press.", "指定音符速度乘2的按键（当前F6）。Enter设置、Esc取消、Delete清除。每次按下仅执行一次。"},
+{"Always keeps the indicator and last FAST/SLOW text visible. Each dot or barcode expires after 0.7 seconds. Text and bar can be toggled separately.", "常显模式保持指示器及最后的FAST/SLOW文字。每个点或竖线在0.7秒后消失；文字和指示器可分别开关。"},
+{"Choose gameplay and BMS preview output. F5 refreshes; Back applies. Menu/result music uses System Default. ASIO has its own selector.", "选择游玩和BMS试听输出。F5刷新，返回时应用。菜单与结果音乐使用系统默认，ASIO单独选择。"},
+{"Choose round dots or straight vertical barcode markers. Each judgement marker disappears after 0.7 seconds.", "选择圆点或竖直条形。每个判定标记在0.7秒后消失。"},

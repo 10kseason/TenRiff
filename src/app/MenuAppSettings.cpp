@@ -1,3 +1,4 @@
+#include "ui/FunctionKeyLabels.h"
 #include "app/MenuApp.h"
 
 #include <utility>
@@ -7,6 +8,7 @@
 #include "app/SessionRandomSeed.h"
 #include "app/menu/settings/AudioSettingsView.h"
 #include "audio/AsioBackend.h"
+#include "audio/WasapiBackend.h"
 
 namespace tenriff::app {
 
@@ -17,6 +19,10 @@ void MenuApp::handle_audio_settings_input(uint32_t keycode) {
             drivers.push_back({driver.id, driver.name});
         }
         audio_settings_controller_.set_asio_drivers(std::move(drivers));
+        std::vector<menu::settings::AudioDriverChoice> outputs;
+        for (const auto& output : audio::WasapiBackend::enumerate_output_devices())
+            outputs.push_back({output.id, output.name});
+        audio_settings_controller_.set_output_devices(std::move(outputs));
         publish_snapshot();
         return;
     }
@@ -131,6 +137,10 @@ void MenuApp::populate_audio_settings_render_data(render::MenuRenderData& render
             drivers.push_back({driver.id, driver.name});
         }
         audio_settings_controller_.set_asio_drivers(std::move(drivers));
+        std::vector<menu::settings::AudioDriverChoice> outputs;
+        for (const auto& output : audio::WasapiBackend::enumerate_output_devices())
+            outputs.push_back({output.id, output.name});
+        audio_settings_controller_.set_output_devices(std::move(outputs));
     }
     auto view = menu::settings::AudioSettingsView::build(
         audio_settings_controller_, config_, ui_language());
@@ -152,6 +162,7 @@ void MenuApp::populate_audio_settings_render_data(render::MenuRenderData& render
         render.generic.rows.push_back(std::move(row));
     }
     render.generic.notes = std::move(view.notes);
+    for (auto& note : render.generic.notes) note = ui::function_key_labels(note, config::function_key_labels(config_.ui));
 }
 
 void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render) {

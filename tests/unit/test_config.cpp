@@ -353,6 +353,10 @@ TEST_CASE("profile start controls retain legacy defaults and roundtrip without c
     edited.ui.instant_restart_key = "F12";
     edited.ui.hispeed_decrease_key = "Q";
     edited.ui.hispeed_increase_key.clear();
+    edited.ui.function_keys[0] = "F2";
+    edited.ui.function_keys[1] = "F1";
+    edited.skin.timing_marker_style = "barcode";
+    edited.audio.device_id = "synthetic-endpoint";
     edited.input_offset_ms = 12.5;
     edited.sound_offset_ms = -8.0;
     REQUIRE(loader.save_profile("profiles/test", edited));
@@ -362,6 +366,10 @@ TEST_CASE("profile start controls retain legacy defaults and roundtrip without c
     CHECK(loaded.config.ui.instant_restart_key == "F12");
     CHECK(loaded.config.ui.hispeed_decrease_key == "Q");
     CHECK(loaded.config.ui.hispeed_increase_key.empty());
+    CHECK(loaded.config.ui.function_keys[0] == "F2");
+    CHECK(loaded.config.ui.function_keys[1] == "F1");
+    CHECK(loaded.config.skin.timing_marker_style == "barcode");
+    CHECK(loaded.config.audio.device_id == "synthetic-endpoint");
     CHECK(loaded.config.input_offset_ms == doctest::Approx(12.5));
     CHECK(loaded.config.sound_offset_ms == doctest::Approx(-8.0));
     write_file(temp.path / "profiles" / "test" / "config.json",

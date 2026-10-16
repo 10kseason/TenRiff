@@ -204,6 +204,16 @@ AudioSettingsViewModel AudioSettingsView::build(
         AudioSettingId::Backend, SettingsRowKind::Choice,
         localized(language, "Audio Backend", "오디오 출력 방식"),
         asio ? "ASIO" : "WASAPI", controller, true, true));
+    std::string output_name = runtime.audio.device_id.empty()
+        ? localized(language, "System Default", "시스템 기본 장치")
+        : localized(language, "Saved output unavailable", "저장한 출력 장치 없음");
+    for (const auto& device : controller.output_devices()) {
+        if (device.id == runtime.audio.device_id) output_name = device.name;
+    }
+    view.rows.push_back(make_row(
+        AudioSettingId::OutputDevice, SettingsRowKind::Choice,
+        localized(language, "Sound Output Device", "사운드 출력 장치"),
+        std::move(output_name), controller, !asio, !asio));
     std::string driver_name;
     if (controller.asio_drivers().empty()) {
         driver_name = localized(language, "No 64-bit ASIO driver", "64비트 ASIO 드라이버 없음");
@@ -256,8 +266,8 @@ AudioSettingsViewModel AudioSettingsView::build(
         "사운드 오프셋은 차트 BGM과 자동재생 키음만 이동합니다. 양수는 소리를 늦추고 음수는 앞당깁니다."));
     view.notes.push_back(localized(
         language,
-        "ASIO uses the selected installed 64-bit driver and its first stereo output pair. The driver negotiates the requested buffer. F5 refreshes the driver list; WASAPI presets do not apply to ASIO.",
-        "ASIO는 선택한 설치 드라이버의 첫 스테레오 출력을 사용합니다. 버퍼는 드라이버의 지원값으로 맞춥니다. F5로 드라이버 목록을 새로고침하며 WASAPI 프리셋은 ASIO에 적용되지 않습니다."));
+        "ASIO uses the selected installed 64-bit driver and its first stereo output pair. The driver negotiates the requested buffer. F5 refreshes output devices and drivers; WASAPI presets do not apply to ASIO.",
+        "ASIO는 선택한 설치 드라이버의 첫 스테레오 출력을 사용합니다. 버퍼는 드라이버의 지원값으로 맞춥니다. F5로 출력 장치와 드라이버 목록을 새로고침하며 WASAPI 프리셋은 ASIO에 적용되지 않습니다."));
     view.notes.push_back(localized(
         language,
         "Mute When Inactive silences all game audio while another window is active. Saved volume and song timing stay unchanged.",
@@ -295,6 +305,7 @@ AudioSettingsViewModel AudioSettingsView::build(
             case AudioSettingId::Preset:
             case AudioSettingId::Backend:
             case AudioSettingId::AsioDriver:
+            case AudioSettingId::OutputDevice:
             case AudioSettingId::SampleRate:
             case AudioSettingId::BufferFrames:
                 row.category = localized(language, "Output Device", "출력 장치");

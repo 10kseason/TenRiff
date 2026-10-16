@@ -1,3 +1,5 @@
+**2026-10-17 · 1.9.3 local:** [インジケーター・出力・プロファイルキー](input-feedback-20261017.ja.md).
+
 # TenRiff Config Schema (current)
 
 **1.9.3の現在の契約:** 安全読み込み既定、空POOR精度除外R7/R8、一般ONNXと対応Safetensorsを適用します。運用Sites v19は適格な新規Online記録を受け付け、Guest・由来不明の過去記録は永久除外します。BGA重み非同梱・OFF/空パス・基準1.9.0を維持します。[1.9.3範囲](release-1.9.3.ja.md)が下の日時付き履歴より優先します。
@@ -43,6 +45,8 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `wasapi | asio`、既定は `wasapi`。プレイと曲プレビューの出力を選択。メニュー・結果の BGM は独立した Windows MCI 経路を維持。
+- `device_id` (string)
+  - 既定は空文字列（システム既定）。ゲームプレイと BMS プレビューの WASAPI 出力 ID。サウンド設定で選択します。指定機器が見つからなくても自動代替しません。内蔵メニュー・結果音楽の MCI 出力はシステム既定のままです。
 - `asio_driver` (string)
   - インストール済み64ビット ASIO ドライバーの CLSID。空は Auto（名前順の最初）。Audio 設定で選び、F5 で一覧を更新。
 - `rate` (int)
@@ -293,8 +297,9 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | プロファイル・初回設定のメニュー文字サイズ（100%・115%・130%）。プレイ中の文字サイズはスキン設定を維持。 |
 | `skip_start_countdown` | bool; `false` | ソロプレイ開始時の `3 / 2 / 1` 表示を省略。通常の開始、メニューからの再開始、結果画面からの再試行に適用。 |
 | `instant_restart_key` | string; `""`（未割当） | 進行中のソロ譜面を最初から再開始するキー名。新しい試行では初期カウントダウンを常に省略し、中断した試行の結果・リプレイは保存しない。 |
-| `hispeed_decrease_key` | string; `"F5"` | Hi-Speed -10キー。プロフィールで指定、空文字で解除。 |
-| `hispeed_increase_key` | string; `"F6"` | Hi-Speed +10キー。プロフィールで指定、空文字で解除。 |
+| `hispeed_decrease_key` | string; `"F5"` | Note Speed ×0.5キー。プロフィールで指定、空文字で解除。 |
+| `hispeed_increase_key` | string; `"F6"` | Note Speed ×2キー。プロフィールで指定、空文字で解除。 |
+| `function_keys` | object; F1–F11 | F1～F11機能と案内をプロファイルで変更。空文字で解除。 |
 | `all_song_sources` | bool; `false` | 登録フォルダーを統合する ALL SONG を復元。同一チャートパスの重複を除外。 |
 | `result_tail_ms` | double; `500` ms | 判定完了後の結果遷移の追加待機時間。`audio.play_to_end=true` の場合は譜面音声の終了時刻も考慮します。 |
 | `require_enter_to_exit` | bool; `true` | 読込・保存互換用。現在の Windows 結果入力経路はこの値で自動終了しません。 |
@@ -339,7 +344,8 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | `show_gear_boundary_line` | bool; `false` | ギア境界線を表示。 |
 | `show_timing_feedback` | bool; `true` | バーとは別にFAST/SLOW文字を表示。 |
 | `show_timing_bar` | bool; `true` | タイミングバーを表示。旧設定で省略時は文字のスイッチを継承。 |
-| `timing_bar_always_visible` | bool; `false` | `true`で目盛りを常時表示、`false`でPG以外の判定後0.75秒間表示。文字・現在の誤差は直後のPGでも消えず0.75秒維持。バーのオン・オフは`show_timing_bar`で設定。 |
+| `timing_bar_always_visible` | bool; `false` | `true`で目盛りと最後のFAST/SLOW文字を保持。各点/バーコードは0.7秒で消えます。`false`は従来の非PG後0.75秒表示。バー自体は`show_timing_bar`で切替。 |
+| `timing_marker_style` | `dot` / `barcode`; `dot` | 判定表示を点か縦線にします。 |
 | `timing_feedback_override` | bool; `false` | ユーザーが表示を変更した後はプロファイルの設定をスキンより優先。 |
 | `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | 文字とバーの独立X移動。従来の判定周辺配置に加える1920x1080基準ピクセル。 |
 | `timing_text_offset_y`, `timing_bar_offset_y` | double: `-400..400`; `0` | 文字とバーの独立Y移動。正は下、負は上。 |

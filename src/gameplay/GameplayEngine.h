@@ -1,5 +1,7 @@
 #pragma once
 
+#include <limits>
+
 #include <array>
 #include <cstdint>
 #include <optional>
@@ -120,7 +122,9 @@ public:
     void drain_mine_triggers(std::vector<MineTrigger>& out);
     void collect_active_holds(std::vector<ActiveHoldView>& out) const;
     void collect_recent_timing_deltas(std::array<double, kGameplayTimingHistoryMaxEntries>& out,
-                                      std::size_t* out_count) const;
+                                      std::size_t* out_count,
+                                      int64_t after_sample = std::numeric_limits<int64_t>::min(),
+                                      int64_t through_sample = std::numeric_limits<int64_t>::max()) const;
 
     [[nodiscard]] int lane_count() const { return lane_count_; }
     [[nodiscard]] int64_t duration_samples() const { return duration_samples_; }
@@ -152,7 +156,7 @@ private:
     void finalize_if_done(int64_t current_sample);
     void update_lane_input_state(LaneState& lane, input::InputState state, int64_t input_sample);
     [[nodiscard]] bool should_apply_early_empty_poor(const LaneState& lane, int64_t input_sample) const;
-    void push_recent_timing_delta(double delta_ms);
+    void push_recent_timing_delta(double delta_ms, int64_t sample);
 
     [[nodiscard]] double samples_to_ms(int64_t samples) const;
     [[nodiscard]] double detailed_accuracy_credit_for(game::Judgement judgement, double delta_ms) const;
@@ -181,6 +185,7 @@ private:
     LiveJudgementFeedback non_pg_feedback_;
     std::vector<MineTrigger> pending_mine_triggers_;
     std::array<double, kGameplayTimingHistoryMaxEntries> recent_timing_deltas_{};
+    std::array<int64_t, kGameplayTimingHistoryMaxEntries> recent_timing_samples_{};
     std::size_t recent_timing_delta_count_ = 0;
     std::size_t recent_timing_delta_head_ = 0;
 

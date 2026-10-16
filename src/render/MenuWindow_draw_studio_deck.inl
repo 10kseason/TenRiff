@@ -184,7 +184,9 @@
         auto draw_studio_feedback = [&](const GameplayFieldLayout& field, bool has_feedback, const std::string& feedback,
                                         double delta, bool has_non_pg_feedback, bool has_timing_feedback,
                                         const std::wstring& text, const std::wstring& timing_text,
-                                        const GameplayTextPopAnimation& animation) {
+                                        const GameplayTextPopAnimation& animation,
+                                        const std::array<double, kGameplayTimingHistoryMaxEntries>& timing_history,
+                                        std::size_t timing_history_count) {
             auto* fill = d2d_->note_fill_brush.Get();
             if (!fill) return;
             const auto saved_color = fill->GetColor();
@@ -235,9 +237,18 @@
                     D2D1::Point2F(cx, by + 1)) * saved);
                 fill->SetColor(D2D1::ColorF(0x6E7A8C)); ctx->FillRectangle(D2D1::RectF(cx - half_width, by, cx + half_width, by + 2), fill);
                 fill->SetColor(D2D1::ColorF(0xC9CED6)); ctx->FillRectangle(D2D1::RectF(cx - 1, by - 5, cx + 1, by + 7), fill);
-                if (has_timing_feedback) {
-                    fill->SetColor(timing_color);
-                    ctx->FillEllipse(D2D1::Ellipse(D2D1::Point2F(cx + static_cast<float>(std::clamp(delta / 80.0, -1.0, 1.0)) * half_width, by + 1), 4, 4), fill);
+                for (std::size_t i = 0; i < timing_history_count; ++i) {
+                    const double marker_delta = timing_history[i];
+                    auto color = marker_delta < -0.05 ? ng_color("timing_fast", D2D1::ColorF(0x5DA9FF))
+                        : marker_delta > 0.05 ? ng_color("timing_slow", D2D1::ColorF(0xFF6B7A))
+                        : ng_color("timing", D2D1::ColorF(0xF7FAFD));
+                    color.a *= 0.3f + 0.7f * static_cast<float>(i + 1) / static_cast<float>(timing_history_count);
+                    fill->SetColor(color);
+                    const float x = cx + static_cast<float>(std::clamp(marker_delta / 80.0, -1.0, 1.0)) * half_width;
+                    if (data.gameplay.timing_marker_style == "barcode")
+                        ctx->FillRectangle(D2D1::RectF(x - 1, by - 8, x + 1, by + 10), fill);
+                    else
+                        ctx->FillEllipse(D2D1::Ellipse(D2D1::Point2F(x, by + 1), 4, 4), fill);
                 }
                 ctx->SetTransform(saved);
             }

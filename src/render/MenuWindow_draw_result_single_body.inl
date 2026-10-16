@@ -10,7 +10,7 @@
             static_cast<double>(presentation_elapsed_ns) / 1'000'000'000.0;
         const bool result_success = data.result.cleared;
         const auto result_loc = [&](std::string_view english, std::string_view korean) {
-            return ui::text(data.ui_language, english, korean);
+            return loc(english, korean);
         };
 
         const auto semantic_brush = [&](uint32_t rgb) -> ID2D1Brush* {

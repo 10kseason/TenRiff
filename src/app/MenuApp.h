@@ -447,6 +447,7 @@ private:
     void apply_song_sort(SongSortMode mode);
     bool remember_song_source(const std::string& source_path);
     void persist_runtime_config();
+    void refresh_function_keys();
     void refresh_song_source(bool force_reindex);
     void switch_song_source(const std::string& new_songs_path, bool force_reindex);
     void switch_all_song_sources(bool force_reindex);
@@ -986,6 +987,7 @@ private:
     uint32_t key_f9_ = 0;
     uint32_t key_f10_ = 0;
     uint32_t key_f11_ = 0;
+    std::array<uint32_t, 11> function_keycodes_{};
     uint32_t key_minus_ = 0;
     uint32_t key_plus_ = 0;
     int bms_editor_view_measures_ = 8;

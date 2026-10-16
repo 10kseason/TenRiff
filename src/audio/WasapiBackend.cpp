@@ -10,6 +10,7 @@
 #include <functiondiscoverykeys_devpkey.h>
 
 #include <cstring>
+#include <wrl/client.h>
 
 namespace tenriff::audio {
 
@@ -76,6 +77,49 @@ bool is_stereo_float_format(const WAVEFORMATEX* format) {
 
 WasapiBackend::WasapiBackend() = default;
 
+std::vector<WasapiBackend::OutputDevice> WasapiBackend::enumerate_output_devices() {
+    std::vector<OutputDevice> result;
+    const HRESULT initialized = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    if (FAILED(initialized) && initialized != RPC_E_CHANGED_MODE) return result;
+    {
+        using Microsoft::WRL::ComPtr;
+        ComPtr<IMMDeviceEnumerator> enumerator;
+        ComPtr<IMMDeviceCollection> devices;
+        if (SUCCEEDED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
+                IID_PPV_ARGS(&enumerator))) &&
+            SUCCEEDED(enumerator->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &devices))) {
+            const auto utf8 = [](const wchar_t* text) {
+                if (!text) return std::string{};
+                const int length = static_cast<int>(wcslen(text));
+                const int bytes = WideCharToMultiByte(CP_UTF8, 0, text, length, nullptr, 0, nullptr, nullptr);
+                std::string value(static_cast<std::size_t>(bytes), '\0');
+                if (bytes > 0) WideCharToMultiByte(CP_UTF8, 0, text, length, value.data(), bytes, nullptr, nullptr);
+                return value;
+            };
+            UINT count = 0;
+            devices->GetCount(&count);
+            for (UINT i = 0; i < count; ++i) {
+                ComPtr<IMMDevice> device;
+                ComPtr<IPropertyStore> properties;
+                LPWSTR id = nullptr;
+                if (FAILED(devices->Item(i, &device)) || FAILED(device->GetId(&id))) continue;
+                OutputDevice choice{utf8(id), "Audio output"};
+                CoTaskMemFree(id);
+                if (SUCCEEDED(device->OpenPropertyStore(STGM_READ, &properties))) {
+                    PROPVARIANT name;
+                    PropVariantInit(&name);
+                    if (SUCCEEDED(properties->GetValue(PKEY_Device_FriendlyName, &name)) && name.vt == VT_LPWSTR)
+                        choice.name = utf8(name.pwszVal);
+                    PropVariantClear(&name);
+                }
+                result.push_back(std::move(choice));
+            }
+        }
+    } // Release COM objects before balancing this thread's initialization.
+    if (SUCCEEDED(initialized)) CoUninitialize();
+    return result;
+}
+
 WasapiBackend::~WasapiBackend() {
     shutdown();
 }
@@ -116,7 +160,7 @@ AudioResult WasapiBackend::initialize(const AudioConfig& config) {
     return AudioResult::Success;
 }
 
-AudioResult WasapiBackend::initialize_device(const AudioConfig& /*config*/) {
+AudioResult WasapiBackend::initialize_device(const AudioConfig& config) {
     IMMDeviceEnumerator* enumerator = nullptr;
     HRESULT hr = CoCreateInstance(
         __uuidof(MMDeviceEnumerator),
@@ -131,7 +175,17 @@ AudioResult WasapiBackend::initialize_device(const AudioConfig& /*config*/) {
     }
 
     IMMDevice* device = nullptr;
-    hr = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &device);
+    if (config.device_id.empty()) {
+        hr = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &device);
+    } else {
+        const int length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+            config.device_id.c_str(), -1, nullptr, 0);
+        std::wstring id(static_cast<std::size_t>(length), L'\0');
+        if (length > 0) MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+            config.device_id.c_str(), -1, id.data(), length);
+        // Never silently route a specifically selected output to another device.
+        hr = length > 0 ? enumerator->GetDevice(id.c_str(), &device) : E_INVALIDARG;
+    }
     enumerator->Release();
 
     if (FAILED(hr) || !device) {

@@ -579,7 +579,9 @@ config::RuntimeConfig portable_runtime(config::RuntimeConfig value) {
     ui.instant_restart_key = value.ui.instant_restart_key;
     ui.hispeed_decrease_key = value.ui.hispeed_decrease_key;
     ui.hispeed_increase_key = value.ui.hispeed_increase_key;
+    ui.function_keys = value.ui.function_keys;
     value.ui = std::move(ui);
+    value.audio.device_id.clear();
     value.graphics.background_upscale_model_path.clear();
     value.graphics.background_upscale_output_mode = "auto";
     value.skin.ui_font_path.clear();
@@ -589,6 +591,7 @@ config::RuntimeConfig portable_runtime(config::RuntimeConfig value) {
 
 void restore_local_preferences(config::RuntimeConfig& loaded, const config::RuntimeConfig& current) {
     const auto portable = loaded.ui;
+    loaded.audio.device_id = current.audio.device_id;
     loaded.ui = current.ui;
     loaded.ui.language = portable.language;
     loaded.ui.menu_font_size = portable.menu_font_size;
@@ -599,6 +602,7 @@ void restore_local_preferences(config::RuntimeConfig& loaded, const config::Runt
     loaded.ui.instant_restart_key = portable.instant_restart_key;
     loaded.ui.hispeed_decrease_key = portable.hispeed_decrease_key;
     loaded.ui.hispeed_increase_key = portable.hispeed_increase_key;
+    loaded.ui.function_keys = portable.function_keys;
     loaded.graphics.background_upscale_model_path = current.graphics.background_upscale_model_path;
     loaded.graphics.background_upscale_output_mode = current.graphics.background_upscale_output_mode;
 }

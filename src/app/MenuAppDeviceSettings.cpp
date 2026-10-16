@@ -1,3 +1,4 @@
+#include "ui/FunctionKeyLabels.h"
 #include "app/NativeFileDialog.h"
 #include "app/MenuApp.h"
 
@@ -272,6 +273,7 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
         render.generic.rows.push_back(std::move(row));
     }
     render.generic.notes = std::move(view.notes);
+    for (auto& note : render.generic.notes) note = ui::function_key_labels(note, config::function_key_labels(config_.ui));
     if (!graphics_resolution_status_.empty()) render.generic.notes.insert(render.generic.notes.begin(), graphics_resolution_status_);
     if (graphics_settings_controller_.editing_resolution()) {
         render.generic.footer_notes.push_back(ui_text(
@@ -299,6 +301,7 @@ void MenuApp::populate_onnx_upscaler_confirm_render_data(render::MenuRenderData&
         render.generic.rows.push_back(std::move(row));
     }
     render.generic.notes = std::move(view.notes);
+    for (auto& note : render.generic.notes) note = ui::function_key_labels(note, config::function_key_labels(config_.ui));
 }
 
 void MenuApp::populate_input_settings_render_data(render::MenuRenderData& render) {
@@ -323,6 +326,7 @@ void MenuApp::populate_input_settings_render_data(render::MenuRenderData& render
         render.generic.rows.push_back(std::move(row));
     }
     render.generic.notes = std::move(view.notes);
+    for (auto& note : render.generic.notes) note = ui::function_key_labels(note, config::function_key_labels(config_.ui));
 }
 
 void MenuApp::populate_calibration_settings_render_data(render::MenuRenderData& render) {
@@ -344,6 +348,7 @@ void MenuApp::populate_calibration_settings_render_data(render::MenuRenderData& 
         render.generic.rows.push_back(std::move(row));
     }
     render.generic.notes = std::move(view.notes);
+    for (auto& note : render.generic.notes) note = ui::function_key_labels(note, config::function_key_labels(config_.ui));
 }
 
 }  // namespace tenriff::app
