@@ -1733,6 +1733,106 @@ TEST_CASE("LR2 course replay metadata rejects missing carry unknown policies and
     CHECK_FALSE(validate_replay_evidence(replay).success());
 }
 
+TEST_CASE("R7 R8 preserve old empty POOR replay accuracy and change only the new denominator") {
+    using namespace tenriff;
+    // Unlike the in-memory engine probes, a persisted v3 replay requires a
+    // supported audio sample rate. Keep the same millisecond scenario at 48 kHz.
+    constexpr int sample_rate = 48000;
+    constexpr int samples_per_ms = sample_rate / 1000;
+    gameplay::GameplayChart source;
+    source.lane_count = 4;
+    source.duration_samples = 3000 * samples_per_ms;
+    source.bms_rank = 3;
+    source.notes = {gameplay::NoteEvent{1, 1000 * samples_per_ms, std::nullopt},
+                    gameplay::NoteEvent{1, 2000 * samples_per_ms, std::nullopt}};
+    const auto directory = std::filesystem::temp_directory_path() /
+        ("tenriff-empty-poor-rulesets-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(std::filesystem::create_directory(directory));
+    std::optional<double> old_gauge;
+    int sequence = 0;
+    for (const auto ruleset : {app::kLegacyReplayRulesetId, app::kPreviousReplayRulesetId,
+             app::kRuleset3ReplayRulesetId, app::kRuleset4ReplayRulesetId, app::kRuleset5ReplayRulesetId,
+             app::kRuleset6ReplayRulesetId, app::kCanonicalReplayRulesetId, app::kExReplayRulesetId}) {
+        ReplayFile replay;
+        replay.ruleset_id = ruleset;
+        replay.chart_format = "bms";
+        replay.chart_sha256 = std::string(64, 'b');
+        replay.bms_rank = 3;
+        replay.sample_rate = sample_rate;
+        replay.mods = (ruleset == app::kRuleset6ReplayRulesetId || ruleset == app::kExReplayRulesetId)
+            ? std::vector<std::string>{"judge_ex"} : std::vector<std::string>{};
+        config::ModeConfig mode;
+        mode.key_mode = "auto";
+        mode.random = "off";
+        mode.gauge = "normal";
+        mode.mods = replay.mods;
+        const auto managed = app::manage_modes(source, app::ChartFormat::Bms, mode, config::JudgeConfig{},
+                                               1.0, 120.0, sample_rate);
+        auto chart = managed.chart;
+        gameplay::offset_gameplay_chart_samples(chart, app::kReplayVerificationLeadInMs * samples_per_ms);
+        gameplay::GameplayConfig engine_config;
+        engine_config.sample_rate = sample_rate;
+        engine_config.judge = app::replay_judge_config_for_playback(replay, config::JudgeConfig{}, source.bms_rank);
+        engine_config.legacy_hold_release = app::replay_uses_legacy_hold_release(replay);
+        engine_config.chronological_judgement = app::replay_uses_chronological_judgement(replay);
+        engine_config.empty_poor_affects_accuracy = app::replay_empty_poor_affects_accuracy(replay);
+        engine_config.gauge_shift_enabled = true;
+        gameplay::GameplayEngine engine(chart, engine_config);
+        for (const int milliseconds : {3100, 4000, 5000}) {
+            const int64_t sample = static_cast<int64_t>(milliseconds) * samples_per_ms;
+            (void)engine.handle_input(1, InputState::Pressed, sample);
+            (void)engine.handle_input(1, InputState::Released, sample + 1);
+        }
+        engine.advance(chart.duration_samples + 5000 * samples_per_ms);
+        replay.trace = engine.replay();
+        replay.stats = engine.stats();
+        replay.rate_multiplier = managed.rate_multiplier;
+        replay.score_multiplier = managed.final_multiplier;
+        replay.final_score = gameplay::scale_native_score(replay.stats.raw_score, replay.score_multiplier);
+        const auto path = directory / (std::to_string(sequence++) + ".json");
+        REQUIRE(save_replay_json(path.u8string(), replay).success());
+        const auto restored = load_replay_json(path.u8string());
+        if (!restored.success()) std::cerr << "[empty-poor-roundtrip] " << restored.error << '\n';
+        REQUIRE(restored.success());
+        const auto verified = app::verify_replay_against_chart(*restored.replay, source, app::ChartFormat::Bms, 120.0);
+        REQUIRE(verified.verified());
+        CHECK(verified.claims_match);
+        CHECK(verified.stats.counts.pr == 1);
+        CHECK(verified.stats.counts.pg == 2);
+        CHECK(verified.stats.raw_score == 10000);
+        CHECK(verified.stats.max_combo == 2);
+        const bool historical = ruleset != app::kCanonicalReplayRulesetId && ruleset != app::kExReplayRulesetId;
+        CHECK(verified.stats.accuracy_percent() == doctest::Approx(historical ? 200.0 / 3.0 : 100.0));
+        CHECK(verified.stats.detailed_accuracy_percent() == doctest::Approx(historical ? 200.0 / 3.0 : 100.0));
+        CHECK(restored.replay->stats.accuracy_percent() == doctest::Approx(verified.stats.accuracy_percent()));
+        if (!old_gauge) old_gauge = verified.final_gauge_value;
+        CHECK(verified.final_gauge_value == doctest::Approx(*old_gauge));
+    }
+    std::filesystem::remove_all(directory);
+}
+
+TEST_CASE("R7 R8 empty POOR policy is independent of evidence envelope and preserves unknown replays") {
+    using namespace tenriff::app;
+    ReplayFile replay;
+    for (const int format : {0, 1, 2, tenriff::gameplay::kReplayFormatVersion}) {
+        replay.replay_format_version = format;
+        for (const auto historical : {kLegacyReplayRulesetId, kPreviousReplayRulesetId, kRuleset3ReplayRulesetId,
+                kRuleset4ReplayRulesetId, kRuleset5ReplayRulesetId, kRuleset6ReplayRulesetId,
+                std::string_view("custom"), std::string_view("custom-ruleset-5"),
+                std::string_view("custom-ruleset-6"), std::string_view("unknown")}) {
+            replay.ruleset_id = historical;
+            CHECK(replay_empty_poor_affects_accuracy(replay));
+        }
+        for (const auto current : {kCanonicalReplayRulesetId, kExReplayRulesetId,
+                std::string_view("custom-ruleset-7"), std::string_view("custom-ruleset-8")}) {
+            replay.ruleset_id = current;
+            CHECK_FALSE(replay_empty_poor_affects_accuracy(replay));
+            CHECK(replay_uses_chronological_judgement(replay));
+            CHECK_FALSE(replay_uses_legacy_hold_release(replay));
+        }
+    }
+}
+
 TEST_CASE("R5 identity selects chronological processing independently of replay envelope version") {
     ReplayFile replay;
     for (int format : {0, 1, 2, tenriff::gameplay::kReplayFormatVersion}) {
@@ -1765,11 +1865,11 @@ TEST_CASE("R6 binds EX exclusively and preserves R1 through R5 judgement identit
     CHECK(replay_ruleset_id_for_runtime(judge, gauge, true, false, "off", {"judge_easy"}) ==
           kCanonicalReplayRulesetId);
     CHECK(replay_ruleset_id_for_runtime(judge, gauge, true, false, "off", {"judge_ex"}) == kExReplayRulesetId);
-    CHECK(replay_ruleset_id_for_runtime(judge, gauge, false, false, "off", {"judge_ex"}) == "custom-ruleset-6");
-    CHECK(replay_ruleset_id_for_runtime(judge, gauge, true, true, "off", {"judge_ex"}) == "custom-ruleset-6");
+    CHECK(replay_ruleset_id_for_runtime(judge, gauge, false, false, "off", {"judge_ex"}) == "custom-ruleset-8");
+    CHECK(replay_ruleset_id_for_runtime(judge, gauge, true, true, "off", {"judge_ex"}) == "custom-ruleset-8");
     auto custom_judge = judge;
     custom_judge.pg_ms = 20.0;
-    CHECK(replay_ruleset_id_for_runtime(custom_judge, gauge, true, false, "off", {"judge_ex"}) == "custom-ruleset-6");
+    CHECK(replay_ruleset_id_for_runtime(custom_judge, gauge, true, false, "off", {"judge_ex"}) == "custom-ruleset-8");
     CHECK(is_current_canonical_replay_ruleset(kCanonicalReplayRulesetId, {"judge_hard"}));
     CHECK(is_current_canonical_replay_ruleset(kExReplayRulesetId, {"judge_ex", "no_ln_release"}));
     CHECK_FALSE(is_current_canonical_replay_ruleset(kExReplayRulesetId, {}));
@@ -1896,7 +1996,7 @@ TEST_CASE("course replay accepts versioned custom identities without admitting c
     replay.trace.duration_samples = 48000;
     replay.mode.course_gauge = kLr2CourseGaugeId;
     replay.mode.course_gauge_initial_value = 37.5;
-    for (const auto id : {"custom", "custom-ruleset-5", "custom-ruleset-6"}) {
+    for (const auto id : {"custom", "custom-ruleset-5", "custom-ruleset-6", "custom-ruleset-7", "custom-ruleset-8"}) {
         replay.ruleset_id = id;
         CHECK(validate_replay_evidence(replay).success());
     }

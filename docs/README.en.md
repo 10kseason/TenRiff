@@ -1,4 +1,6 @@
-**2026-10-16 · Current release 1.9.2:** Adds the startup F10 Guest/Online choice, permanent Guest/historical-record upload exclusion, dynamic original-resolution AI with FFmpeg deblock, and removal of the skin-export row. Runtime/source packages contain no BGA model; the model path is empty and upscaling OFF by default. The fixed baseline stays 1.9.0. [Changes and compatibility](release-1.9.2.en.md) · [Verification gate](release-1.9.2-gate.md). Dated entries below retain their historical scope; this 1.9.2 note defines current behavior.
+**2026-10-16 · 1.9.3 release scope:** Adds Empty Poor accuracy exclusion (R7/R8), the BMS rank badge, in-game levels and measure lines, retained FAST/SLOW, Safe indexing defaults, general residual/image ONNX and supported external Safetensors conversion. Runtime/source packages contain no BGA weights; OFF/empty-path defaults remain. Guest upload exclusion, fixed grades and baseline 1.9.0 are preserved. [Changes and compatibility](release-1.9.3.en.md) · [Verification gate](release-1.9.3-gate.md). The [1.9.3 release page](https://github.com/10kseason/TenRiff/releases/tag/1.9.3) determines publication and downloads; dated entries below retain their historical scope.
+
+> Previous 1.9.2: [Guest/Online, original-resolution upscaling and UI changes](release-1.9.2.en.md).
 
 > 2026-10-16: [FFmpeg deblock and external ONNX x2](deblock-lunasr-20261016.en.md)
 

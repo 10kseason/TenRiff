@@ -59,6 +59,8 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.current_visual_position = gameplay_hud_.current_visual_position;
     target.visual_velocity = gameplay_hud_.visual_velocity;
     target.visual_scroll_segments = gameplay_hud_.visual_scroll_segments;
+    target.measure_line_count = gameplay_hud_.measure_line_count;
+    target.measure_line_positions = gameplay_hud_.measure_line_positions;
     target.future_visual_span = gameplay_hud_.future_visual_span;
     target.past_visual_span = gameplay_hud_.past_visual_span;
     const render::GameplayBackgroundPolicy background_policy =
@@ -76,6 +78,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.background_overlay_start_sample = background_policy.overlay_start_sample;
     target.background_upscale_mode = background_policy.upscale_mode;
     target.background_upscale_model_path = config_.graphics.background_upscale_model_path;
+    target.background_upscale_output_mode = config_.graphics.background_upscale_output_mode;
     target.background_upscale_prefer_npu = config_.graphics.background_upscale_prefer_npu;
     // While a chart is running the session owns F1/F2 and F7/F8 retuning;
     // F11 opens chat, and F10 opens the account overlay.
@@ -275,6 +278,9 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.feedback_delta_ms = gameplay_hud_.feedback_delta_ms;
     target.has_non_pg_feedback = gameplay_hud_.has_non_pg_feedback;
     target.has_timing_feedback = gameplay_hud_.has_timing_feedback;
+    target.has_retained_timing_feedback = gameplay_hud_.has_retained_timing_feedback;
+    target.has_timing_feedback = timing_feedback_should_display(target.has_timing_feedback,
+        gameplay_hud_.has_retained_timing_feedback, target.timing_bar_always_visible);
     target.timing_feedback_delta_ms = gameplay_hud_.timing_feedback_delta_ms;
     target.timing_history_count = gameplay_hud_.timing_history_count;
     target.timing_history_delta_ms.fill(0.0);
@@ -499,6 +505,9 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.ghost_feedback_delta_ms = gameplay_hud_.ghost_feedback_delta_ms;
     target.ghost_has_non_pg_feedback = gameplay_hud_.ghost_has_non_pg_feedback;
     target.ghost_has_timing_feedback = gameplay_hud_.ghost_has_timing_feedback;
+    target.ghost_has_retained_timing_feedback = gameplay_hud_.ghost_has_retained_timing_feedback;
+    target.ghost_has_timing_feedback = timing_feedback_should_display(target.ghost_has_timing_feedback,
+        gameplay_hud_.ghost_has_retained_timing_feedback, target.timing_bar_always_visible);
     target.ghost_timing_feedback_delta_ms = gameplay_hud_.ghost_timing_feedback_delta_ms;
     target.ghost_timing_history_count = gameplay_hud_.ghost_timing_history_count;
     target.ghost_timing_history_delta_ms.fill(0.0);
@@ -1799,6 +1808,7 @@ void MenuApp::publish_snapshot() {
             render.kind = render::MenuScreenKind::GameplayHud;
             render.gameplay.title = last_chart_title_;
             render.gameplay.artist = last_chart_artist_;
+            render.gameplay.difficulty_label = last_chart_difficulty_label_;
             render.gameplay.bpm = last_chart_bpm_;
             populate_gameplay_render_data(render.gameplay);
             render.gameplay.scroll_speed =
@@ -2407,6 +2417,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.current_visual_position = hud.current_visual_position;
         gameplay_hud_.visual_velocity = hud.visual_velocity;
         gameplay_hud_.visual_scroll_segments = hud.visual_scroll_segments;
+        gameplay_hud_.measure_line_count = hud.measure_line_count;
+        gameplay_hud_.measure_line_positions = hud.measure_line_positions;
         gameplay_hud_.future_visual_span = hud.future_visual_span;
         gameplay_hud_.past_visual_span = hud.past_visual_span;
         gameplay_hud_.background_base_path = hud.background_base_path;
@@ -2432,6 +2444,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.feedback_delta_ms = hud.feedback_delta_ms;
         gameplay_hud_.has_non_pg_feedback = hud.has_non_pg_feedback;
         gameplay_hud_.has_timing_feedback = hud.has_timing_feedback;
+        gameplay_hud_.has_retained_timing_feedback = hud.has_retained_timing_feedback;
         gameplay_hud_.timing_feedback_delta_ms = hud.timing_feedback_delta_ms;
         gameplay_hud_.peer_revision = peer_revision;
         gameplay_hud_.timing_history_count = hud.timing_history_count;
@@ -2477,6 +2490,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.ghost_feedback_delta_ms = hud.ghost_feedback_delta_ms;
         gameplay_hud_.ghost_has_non_pg_feedback = hud.ghost_has_non_pg_feedback;
         gameplay_hud_.ghost_has_timing_feedback = hud.ghost_has_timing_feedback;
+        gameplay_hud_.ghost_has_retained_timing_feedback = hud.ghost_has_retained_timing_feedback;
         gameplay_hud_.ghost_timing_feedback_delta_ms = hud.ghost_timing_feedback_delta_ms;
         gameplay_hud_.ghost_timing_history_count = hud.ghost_timing_history_count;
         gameplay_hud_.ghost_timing_history_delta_ms.fill(0.0);

@@ -1173,6 +1173,109 @@ struct MenuAppVisualTestAccess {
         app.skin_settings_controller_ = saved_controller;
         app.publish_snapshot();
     }
+    static void check_hud_feedback_followup(MenuApp& app, Report& report) {
+        const auto saved_skin = app.config_.skin;
+        MenuApp::GameplayHudState saved_hud;
+        {
+            std::lock_guard<std::mutex> lock(app.gameplay_hud_mutex_);
+            saved_hud = app.gameplay_hud_;
+            app.reset_gameplay_hud_state(app.gameplay_hud_);
+            app.gameplay_hud_.has_retained_timing_feedback = true;
+            app.gameplay_hud_.timing_feedback_delta_ms = -28;
+            app.gameplay_hud_.ghost_has_retained_timing_feedback = true;
+            app.gameplay_hud_.ghost_timing_feedback_delta_ms = 31;
+            app.gameplay_hud_.measure_line_count = 2;
+            app.gameplay_hud_.measure_line_positions[0] = 1.25;
+            app.gameplay_hud_.measure_line_positions[1] = 1.75;
+        }
+        app.config_.skin.source = "native";
+        app.config_.skin.timing_feedback_override = true;
+        app.config_.skin.timing_bar_always_visible = true;
+        app.config_.skin.show_timing_feedback = true;
+        app.config_.skin.show_timing_bar = false;
+        render::GameplayHudData hud;
+        app.populate_gameplay_render_data(hud);
+        report.check("hud.always_keeps_expired_real_timing", hud.has_timing_feedback &&
+            hud.timing_feedback_delta_ms == -28 && hud.ghost_has_timing_feedback &&
+            hud.ghost_timing_feedback_delta_ms == 31);
+        report.check("hud.always_preserves_independent_text_bar", hud.show_timing_feedback && !hud.show_timing_bar);
+        report.check("hud.measure_positions_reach_render", hud.measure_line_count == 2 &&
+            hud.measure_line_positions[0] == 1.25 && hud.measure_line_positions[1] == 1.75);
+        app.config_.skin.timing_bar_always_visible = false;
+        app.populate_gameplay_render_data(hud);
+        report.check("hud.conditional_expires_real_timing", !hud.has_timing_feedback && !hud.ghost_has_timing_feedback);
+        {
+            std::lock_guard<std::mutex> lock(app.gameplay_hud_mutex_);
+            app.gameplay_hud_.has_retained_timing_feedback = false;
+            app.gameplay_hud_.ghost_has_retained_timing_feedback = false;
+        }
+        app.config_.skin.timing_bar_always_visible = true;
+        app.populate_gameplay_render_data(hud);
+        report.check("hud.always_never_fabricates_initial_fast", !hud.has_timing_feedback && !hud.ghost_has_timing_feedback);
+        app.config_.skin = saved_skin;
+        {
+            std::lock_guard<std::mutex> lock(app.gameplay_hud_mutex_);
+            app.gameplay_hud_ = std::move(saved_hud);
+        }
+    }
+    static void check_launch_level_metadata(MenuApp& app, Report& report) {
+        const auto saved_path = app.last_chart_path_;
+        const auto saved_title = app.last_chart_title_;
+        const auto saved_artist = app.last_chart_artist_;
+        const auto saved_level = app.last_chart_difficulty_label_;
+        const auto saved_entry = app.last_chart_entry_;
+        const bool saved_valid = app.last_chart_entry_valid_;
+        const double saved_bpm = app.last_chart_bpm_;
+        const auto saved_screen = app.current_screen();
+        const auto directory = std::filesystem::absolute("hud-level-fixture");
+        std::filesystem::create_directory(directory);
+        const auto original = directory / "original.bms";
+        { std::ofstream file(original, std::ios::binary);
+          file << "#TITLE Practice level\n#BPM 120\n#PLAYLEVEL 17\n#4K\n#00111:01\n"; }
+        BmsEditorDocument editor;
+        std::string error;
+        const bool loaded = editor.load_file(original.u8string(), &error);
+        report.check("hud.level_editor_fixture_loaded", loaded, error);
+        if (loaded) {
+            (void)editor.set_base_bpm(135.0); // Serialize an unsaved editor change.
+            const auto practice = directory / ".tenriff-practice-fixture.bms";
+            { std::ofstream file(practice, std::ios::binary); file << editor.serialize_text(&error); }
+            SongEntry unrelated;
+            unrelated.path = original.u8string();
+            unrelated.level = 88;
+            unrelated.difficulty_table_symbol = "TABLE ";
+            unrelated.difficulty_table_level = "99";
+            app.update_last_chart_metadata(practice.u8string(), &unrelated);
+            report.check("hud.level_practice_uses_serialized_target", !app.last_chart_entry_valid_ &&
+                app.last_chart_difficulty_label_ == "LV 17");
+            app.reset_screen(Screen::Gameplay);
+            app.publish_snapshot();
+            {
+                std::lock_guard<std::mutex> lock(app.snapshot_mutex_);
+                report.check("hud.level_practice_reaches_gameplay_snapshot",
+                    app.snapshot_.render.gameplay.difficulty_label == "LV 17");
+            }
+            app.update_last_chart_metadata(original.u8string(), nullptr);
+            report.check("hud.level_unindexed_direct_launch", !app.last_chart_entry_valid_ &&
+                app.last_chart_difficulty_label_ == "LV 17");
+            app.update_last_chart_metadata(original.u8string(), &unrelated);
+            // Table symbols are sanitized separately, including trailing spaces.
+            report.check("hud.level_matching_index_retains_table", app.last_chart_entry_valid_ &&
+                app.last_chart_difficulty_label_ == "TABLE99", app.last_chart_difficulty_label_);
+            app.update_last_chart_metadata((directory / "missing.bms").u8string(), &unrelated);
+            report.check("hud.level_missing_target_cannot_reuse_selection", !app.last_chart_entry_valid_ &&
+                app.last_chart_difficulty_label_.empty());
+        }
+        app.last_chart_path_ = saved_path;
+        app.last_chart_title_ = saved_title;
+        app.last_chart_artist_ = saved_artist;
+        app.last_chart_difficulty_label_ = saved_level;
+        app.last_chart_entry_ = saved_entry;
+        app.last_chart_entry_valid_ = saved_valid;
+        app.last_chart_bpm_ = saved_bpm;
+        app.reset_screen(saved_screen);
+        app.publish_snapshot();
+    }
     static void check_loading_pacing(MenuApp& app, Report& report) {
         const auto saved_refresh = app.config_.graphics.refresh_hz;
         app.config_.graphics.refresh_hz = 0;
@@ -1204,13 +1307,15 @@ struct MenuAppVisualTestAccess {
         bool loading = false, countdown = false, playing = false;
         int64_t sample = 0;
         int64_t presented_ns = 0;
+        bool measure_lines = false;
     };
     static Observation observe(MenuApp& app) {
         std::lock_guard<std::mutex> lock(app.gameplay_hud_mutex_);
         const auto& hud = app.gameplay_hud_;
         return {hud.loading, hud.countdown_active,
                 hud.active && !hud.loading && !hud.countdown_active && hud.current_sample > 0,
-                hud.current_sample, present_probe.last_completion_ns.load(std::memory_order_acquire)};
+                hud.current_sample, present_probe.last_completion_ns.load(std::memory_order_acquire),
+                hud.measure_line_count > 0 && std::isfinite(hud.measure_line_positions[0])};
     }
 };
 
@@ -1444,15 +1549,19 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
     Access::check_level_search_input(app, report);
     Access::check_browser_sort_and_range(app, report);
     Access::check_loading_pacing(app, report);
+    Access::check_hud_feedback_followup(app, report);
+    Access::check_launch_level_metadata(app, report);
 
     std::atomic<bool> observing{true};
     bool loading = false, countdown = false, playing = false, gameplay_present = false;
     bool gameplay_resize_attempted = false, gameplay_resized = false;
+    bool measure_lines_observed = false;
     int64_t first_play_present = 0, last_sample = 0;
     std::thread observer([&] {
         while (observing.load(std::memory_order_acquire)) {
             const auto value = Access::observe(app);
             loading |= value.loading; countdown |= value.countdown; playing |= value.playing;
+            measure_lines_observed |= value.measure_lines;
             last_sample = std::max(last_sample, value.sample);
             if (value.playing) {
                 if (!gameplay_resize_attempted) {
@@ -1477,6 +1586,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
     report.check("menu_gameplay.start_countdown_observed", countdown);
     report.check("menu_gameplay.audio_clock_advanced", playing && last_sample > 0);
     report.check("menu_gameplay.presents_advanced", gameplay_present);
+    report.check("menu_gameplay.authored_measure_lines_reach_hud", measure_lines_observed);
     report.check("menu_gameplay.window_resize_retained_on_result", gameplay_resized &&
         Access::config(app).graphics.resolution == "1439x809");
     const auto resized_profile = tenriff::config::ConfigLoader{}.load_profile("profiles/menu-smoke");

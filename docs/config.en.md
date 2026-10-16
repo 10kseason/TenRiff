@@ -1,5 +1,7 @@
 # TenRiff Config Schema (current)
 
+**Current 1.9.3 contract:** Safe indexing defaults, Empty Poor accuracy exclusion with R7/R8, general ONNX and supported Safetensors apply. Production Sites v19 accepts eligible fresh Online records; Guest/unmarked historical records remain permanently excluded. No BGA weights ship; OFF/empty-path defaults and baseline1.9.0 remain. The [1.9.3 scope](release-1.9.3.en.md) supersedes dated history below.
+
 **2026-10-15 · 1.9.1:** The user-authorized 1.9.1 includes the earlier volume/input/outro fixes, BMS TOTAL/RANDOM compatibility, Result colors and the 10 mark. A Home language button cycles EN → KO → JA → ZH and saves the choice. New BMS gauge/branch records remain local until server verification supports them. The fixed baseline stays 1.9.0; earlier releases, installations and profiles are preserved. Dated local notes below retain their historical no-version-bump/unpublished status; this 1.9.1 scope supersedes that status. [Changes and compatibility](feedback-1.9.1.en.md) · [Release verification gate](release-1.9.1-gate.md).
 
 **2026-10-15 · BMS TOTAL / RANDOM / visual follow-up — unreleased, local build and CTest regression passed:** This local follow-up builds on 1.9.0.2. Result levels use the song lobby’s red level text and key-mode symbol colors, and the logo adopts the supplied 10-shaped mark. New ordinary BMS plays use LR2-based recovery/damage with #TOTAL and note count; authored #RANDOM branches receive a seed independent of lane randomization. Historical replays retain their original behavior. The earlier unified-volume changes remain included. Published 1.9.0.2, the fixed 1.9.0 baseline and the version number are unchanged. [Formulas, branching, compatibility and verification scope](bms-total-random-followup.en.md).
@@ -131,7 +133,7 @@ The 1.9.0 release selects Normal / Hard / EX under `Options > Key Mode Settings 
   - current profiles save and normalize this value to `340ms`, independently of the BAD hit window
   - default Normal/Easy/Hard automatically miss an unplayed note once it is more than `340ms` late. Normal/Easy record BAD; Hard records a combo-breaking indirect `POOR` / OD8 `MISS`
   - a late press outside BAD but before automatic timeout misses the expired note, then checks the next note; it cannot score a BAD hit outside the hit window
-- New Normal/Hard plays retain `tenriff-native-score-v2-ruleset-5`; EX uses `tenriff-native-score-v2-ruleset-6`. Historical R1–R5 timing, Easy and LN policies remain unchanged; custom timing is unofficial.
+- New Normal/Hard uses `tenriff-native-score-v2-ruleset-7`; EX uses `tenriff-native-score-v2-ruleset-8`. Only Empty Poor accuracy contribution changes, not numerical timing windows. Historical R1–R6/custom records retain their policy; new custom paths use the corresponding 7/8 IDs.
 - R5 keeps the numerical timing windows, processes automatic events chronologically, and preserves R1–R4 processing order. [Timing fix](release-1.8.9.5-gate.md).
 - `hold_grace` (double, ms; default `80ms`)
   - retained for configuration compatibility and as the lower bound of `hold_break`; not the current native tail PG/GR boundary
@@ -184,15 +186,19 @@ Grade/Session Mix uses a separate LR2-reference gauge, carried between songs, wi
   - defaults to `true`; `false` disables gameplay image/video BGA plus its decoder and upscaler work
   - Song Select background previews remain visible because they are a separate feature
 - `background_upscale_mode` (string)
-  - `onnx | off`; legacy `lunasr` values migrate to `onnx`
-  - defaults to `off`; users switch it explicitly through `BGA Upscaler` in Graphics Settings
-  - enabling it requires confirmation of a high-spec warning; no automatic performance benchmark runs
+  - `onnx | off`; legacy `lunasr` maps to `onnx`; default `off`. Enabling requires the high-spec warning, without an automatic performance benchmark
+  - original → FFmpeg RGB deblock → model-native x1–x4 inference → residual composition/complete image → display fit/crop; no pre-resizing to 960×540
+  - dynamic models use the whole original; fixed models use padding/context tiles. Source/output axis bounds4096/8192; cache3 images/96MiB per instance. Video AI remains disabled
 - `background_upscale_model_path` (string)
-  - selected from Graphics Settings > `ONNX Model`, or set by dropping an `.onnx` file on that screen; selecting only stores the path and does not enable the upscaler
-  - accepts an absolute path or a path relative to the executable/current directory; public packages include no model
-  - current contract: float32 or float16 NCHW `rgb_lr [1,3,540,960]` -> `rgb_residual_x2 [1,3,1080,1920]` residual x2; INT8 QDQ models with floating external boundaries are detected and supported
-  - load, contract, or inference failure keeps native scaling
-  - users are responsible for model rights, quality, and performance; see `tools/onnx_upscaler/README.md`
+  - default empty; preserve explicitly saved paths. Select `ONNX / Safetensors` or drop `.onnx`/`.safetensors`; selection resets output Auto without enabling inference
+  - no BGA weights in runtime/source delivery. Absolute or executable/working-directory-relative paths are accepted
+  - one RGB NCHW FP32/FP16 input/output, arbitrary names, batch1/channels3, both spatial axes fixed or dynamic, uniform integer x1–x4. Input0..1; internal INT8 QDQ with float boundaries is supported. Reject partial dynamics, NHWC and multiple inputs/outputs
+  - Safetensors needs a supported LunaSR2 or exportable installed Spandrel architecture and external Python+torch/safetensors/onnx/onnxruntime. No auto-install/download. Failure retains native rendering and logs the cause
+  - [Contract, setup and limitations](../tools/onnx_upscaler/README.md). Model-specific size/operator/memory/quality constraints remain
+- `background_upscale_output_mode` (string)
+  - `auto | residual | image`, default `auto`. Explicit choices override detection; model changes reset Auto and replace sessions/caches
+  - Auto uses `tenriff.output_mode` metadata, otherwise the legacy `rgb_lr`/`rgb_residual_x2` pair means residual and other names mean complete image. Select unmarked residual models explicitly; Auto does not infer semantics
+  - residual adds output to bilinear enlargement of the deblocked original; image uses output RGB directly. Both clamp0..1 and preserve original alpha
 - `background_upscale_prefer_npu` (bool)
   - defaults to `false`; the default path requests a high-performance DirectX GPU
   - experimental `Low-Power DirectX` in Graphics Settings requests `DirectXMinPower`
@@ -259,8 +265,8 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
   - `auto_scratch`: automatically plays actual BMS scratches only. Score multiplier 0%, ASSIST record, excluded from official best records and rankings
 - `song_index_profile` (string)
   - `safe | fast`
-  - Default `fast` (minimal), skipping hashes, previews and difficulty calculation.
-  - `safe` is the optional full indexing profile used by difficulty tables.
+  - Default `safe`: prepares hashes and preview metadata, and supports difficulty tables. Native LV/CR calculation follows the separate setting below.
+  - Saved choices are preserved. Optional `fast` (minimal) skips hashes, previews and difficulty calculation.
 - `calculate_song_index_difficulty` (bool)
   - defaults to `false`
   - `false` keeps BMS `#PLAYLEVEL` as the menu LV and skips the CPU-heavy native LV/CR calculation
@@ -420,6 +426,6 @@ Held-key backdrop RGB brightness uses `skin.key_backdrop_brightness` (0–2, def
 
 ## BMS replay/result compatibility (1.9.1)
 
-Three user-approved optional evidence fields are separate from profile settings: `bms_gauge_version`, `bms_control_flow_version`, and `bms_random_seed`. Missing versions mean 1; a missing branch seed falls back to historical `random_seed`, then 0. New ordinary BMS plays record gauge v2; charts with authored branching also record control-flow v2 and a uint32 branch seed. The lane RR/SR, conversion and LN Mix `random_seed` is independent from the authored branch seed. Audio-device reloads retain the same branch, and replay loads use the saved seed and policies. Courses keep their existing gauge and use the new branch parser. Protocol v6 peer battle retains gauge/control-flow v1 and branch seed 0. New gauge/branch evidence stays local: Sites and ranked uploads are blocked until the server supports these conditions. R5/R6 judgement and score IDs are unchanged. Local BEST prefers the policy-version tuple; result comparison groups only matching policies and branch seeds.
+Three user-approved optional evidence fields are separate from profile settings: `bms_gauge_version`, `bms_control_flow_version`, and `bms_random_seed`. Missing versions mean 1; a missing branch seed falls back to historical `random_seed`, then 0. New ordinary BMS plays record gauge v2; charts with authored branching also record control-flow v2 and a uint32 branch seed. The lane RR/SR, conversion and LN Mix `random_seed` is independent from the authored branch seed. Audio-device reloads retain the same branch, and replay loads use the saved seed and policies. Courses keep their existing gauge and use the new branch parser. Protocol v6 peer battle retains gauge/control-flow v1 and branch seed 0. Sites has accepted supported gauge/branch evidence since 1.9.1.1; production v19 also accepts new R7/R8 in separate boards. Permanent Guest exclusion and separate Ranked restrictions remain. New plays use R7/R8 and old records retain their original IDs. Local BEST prefers the policy-version tuple; result comparison groups only matching policies and branch seeds.
 
 [Formulas, branching, compatibility and verification scope](bms-total-random-followup.en.md).

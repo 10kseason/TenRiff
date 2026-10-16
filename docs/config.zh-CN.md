@@ -1,5 +1,7 @@
 # TenRiff 配置模式（当前）
 
+**1.9.3当前契约：** 使用安全加载默认值、空POOR准确率排除R7/R8、一般ONNX及受支持Safetensors。正式Sites v19接受符合条件的新Online记录，Guest及未标注来源的历史记录永久排除。不附带BGA权重，保持OFF/空路径及1.9.0基准。[1.9.3范围](release-1.9.3.zh-CN.md)优先于下方带日期历史。
+
 **2026-10-15 · 1.9.1:** 用户授权的1.9.1包含此前音量、输入、尾奏修复，BMS TOTAL/RANDOM兼容、结果颜色及10形标志。主页语言按钮按EN → KO → JA → ZH循环并保存选择。新BMS血条/分支记录在服务器验证支持前仅存本地。固定基准仍为1.9.0，保留旧发行版、安装和配置。下方带日期的本地记录中不升版本、未发布等表述保留当时状态；当前以此1.9.1范围为准。 [变更与兼容性](feedback-1.9.1.zh-CN.md) · [发布验证流程](release-1.9.1-gate.md).
 
 **2026-10-15 · BMS TOTAL、RANDOM与结果/标志后续修改 — 未发布、本地构建及CTest回归验证通过：** 本次本地修改基于1.9.0.2。结果页等级改用与选曲大厅相同的红色等级文字及键数符号颜色，标志改为提供的10形图案。新的普通BMS游玩根据#TOTAL及音符数使用LR2式恢复和伤害；谱面内#RANDOM分支使用独立于轨道随机的种子。旧录像保留原有行为，并包含此前的音量统一修改。已发布1.9.0.2、固定基准1.9.0及版本号均不变。 [公式、分支、兼容性与验证范围（英文）](bms-total-random-followup.en.md).
@@ -131,7 +133,7 @@
   - 当前配置将此值保存并归一化为 `340ms`，自动漏键判定时限独立于BAD命中窗口
   - 默认Normal/Easy/Hard在未输入音符超过 `340ms` 后自动判漏键；Normal/Easy记BAD，Hard记断连的间接 `POOR` / OD8 `MISS`
   - BAD窗口外、自动判漏键前的迟到输入不会命中BAD，而是先将过期音符记为漏键，再检查下一音符
-- 新的默认/Hard仍使用 `tenriff-native-score-v2-ruleset-5`，EX使用 `tenriff-native-score-v2-ruleset-6`。保留旧R1–R5、Easy与LN规则，自定义判定仍为非官方。
+- 新普通/Hard使用`tenriff-native-score-v2-ruleset-7`，EX使用`tenriff-native-score-v2-ruleset-8`。仅排除空POOR的准确率贡献，不改数值判定窗口。历史R1–R6/custom保留原规则，新custom路径使用对应7/8 ID。
 - R5保持原判定时间范围，按时间顺序处理自动事件，并保留R1–R4的原处理顺序。[修正范围](release-1.8.9.5-gate.md)。
 - `hold_grace` (double, ms；默认 `80ms`)
   - 为配置兼容性及 `hold_break` 下限保留；不是当前native尾端PG/GR的判定边界
@@ -186,15 +188,19 @@ Gauge Shift 始终启用。`mode.gauge` 的 `ex_hard / hard / normal / easy` 选
   - 默认值为 `true`；设为 `false` 会关闭 gameplay 图片/视频 BGA 及其 decoder/upscaler 工作
   - Song Select 背景预览属于独立功能，因此仍会显示
 - `background_upscale_mode` (string)
-  - `onnx | off`；旧 `lunasr` 值会迁移为 `onnx`
-  - 默认值为 `off`；通过 Graphics Settings 中的 `BGA Upscaler` 明确切换 ON/OFF
-  - 开启时必须确认高配置警告；不会自动运行性能 benchmark
+  - `onnx | off`，旧`lunasr`兼容为`onnx`，默认`off`。启用需确认高配置提示，不自动运行性能测试
+  - 原图 → FFmpeg RGB去块 → 模型原生x1–x4推理 → 残差合成/完整图像 → 显示适配/裁剪，不预先缩至960×540
+  - 动态模型处理整张原图，固定模型使用填充/上下文分块。输入/输出单轴上限4096/8192，每实例缓存3张/96MiB，视频AI禁用
 - `background_upscale_model_path` (string)
-  - 可在 Graphics Settings 的 `ONNX Model` 中选择，或把 `.onnx` 文件拖入该页面；选择只保存路径，不会自动开启 upscaler
-  - 支持绝对路径，或相对于可执行文件/当前目录的路径；公开包不包含模型
-  - 当前契约：float32 或 float16 NCHW `rgb_lr [1,3,540,960]` -> `rgb_residual_x2 [1,3,1080,1920]` residual x2；支持并检测外部边界保持浮点的 INT8 QDQ 模型
-  - 加载、契约或推理失败时保持 native scaling
-  - 用户需自行确认模型权利、质量与性能；详见 `tools/onnx_upscaler/README.md`
+  - 默认空，保留明确保存路径。选择`ONNX / Safetensors`或拖入`.onnx`/`.safetensors`；输出重置Auto，但不自动启用
+  - 运行/源码包不附BGA权重。接受绝对路径或相对执行文件/工作目录的路径
+  - 单个RGB NCHW FP32/FP16输入输出、任意名称、batch1/channels3、双空间轴固定或动态、统一整数x1–x4。输入0..1，支持浮点边界内部INT8 QDQ；拒绝部分动态、NHWC及多个输入输出
+  - Safetensors限支持的LunaSR2或已安装Spandrel中可导出架构，需要外部Python+torch/safetensors/onnx/onnxruntime，不自动安装/下载。失败保留原图并记录原因
+  - [契约、设置及限制](../tools/onnx_upscaler/README.md)。模型尺寸、算子、内存及质量限制仍存在
+- `background_upscale_output_mode` (string)
+  - `auto | residual | image`，默认`auto`。手动选择优先；换模型重置Auto并替换会话/缓存
+  - Auto优先`tenriff.output_mode`，其次旧`rgb_lr`/`rgb_residual_x2`组合为残差，其他为完整图像。不会推断语义，未标记残差请手动选择
+  - residual将输出加到去块原图的bilinear放大结果，image直接使用输出RGB；均限制0..1并保留原alpha
 - `background_upscale_prefer_npu` (bool)
   - 默认值为 `false`，默认路径会请求高性能 DirectX GPU
   - Graphics Settings 的实验性 `Low-Power DirectX` 会请求 `DirectXMinPower`
@@ -261,8 +267,8 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
   - `auto_scratch`：只自动处理实际BMS转盘。分数倍率0%，标为ASSIST，不计入正式最佳记录和排名
 - `song_index_profile` (string)
   - `safe | fast`
-  - 默认`fast`（最小），跳过哈希、试听和难度计算。
-  - `safe`是难度表使用的完整索引选项。
+  - 默认`safe`（安全），准备哈希和试听信息并支持难度表。原生LV/CR计算遵循下方的独立设置。
+  - 保留已保存的选择。可选的`fast`（最小）跳过哈希、试听和难度计算。
 - `calculate_song_index_difficulty` (bool)
   - 默认值为 `false`
   - `false` 保留 BMS `#PLAYLEVEL` 作为菜单 LV，并跳过 CPU 开销较高的原生 LV/CR 计算
@@ -421,6 +427,6 @@ Xbox/XInput按钮使用现有按键名称字段：`PadUp`, `PadDown`, `PadLeft`,
 
 ## BMS录像与结果兼容性（1.9.1）
 
-新增三个已获用户批准的可选记录字段：`bms_gauge_version`、`bms_control_flow_version`、`bms_random_seed`，它们不是用户配置项。版本缺省为1，分支种子缺省时使用旧 `random_seed`，再缺省则为0。新的普通BMS记录血条v2；有分支的谱面还记录控制流v2及uint32分支种子。轨道RR/SR、键数转换和LN Mix使用的 `random_seed` 与谱面分支种子独立。音频设备重新加载时保留相同分支，录像按保存的种子和规则重现。组曲保留原血条并使用新分支解析器。protocol v6对战保留血条/控制流v1及分支种子0。新血条/分支记录在服务器支持这些条件前仅保存在本地，阻止Sites和ranked上传。R5/R6判定与分数ID不变。本地BEST按规则版本组合优先，结果比较只匹配相同规则与分支种子。
+新增三个已获用户批准的可选记录字段：`bms_gauge_version`、`bms_control_flow_version`、`bms_random_seed`，它们不是用户配置项。版本缺省为1，分支种子缺省时使用旧 `random_seed`，再缺省则为0。新的普通BMS记录血条v2；有分支的谱面还记录控制流v2及uint32分支种子。轨道RR/SR、键数转换和LN Mix使用的 `random_seed` 与谱面分支种子独立。音频设备重新加载时保留相同分支，录像按保存的种子和规则重现。组曲保留原血条并使用新分支解析器。protocol v6对战保留血条/控制流v1及分支种子0。Sites自1.9.1.1起接受符合条件的血条/分支记录，正式v19也以独立榜单接受新R7/R8。保留Guest永久排除及独立Ranked限制。新游玩使用R7/R8，旧记录保持原ID。本地BEST按规则版本组合优先，结果比较只匹配相同规则与分支种子。
 
 [公式、分支、兼容性与验证范围（英文）](bms-total-random-followup.en.md).

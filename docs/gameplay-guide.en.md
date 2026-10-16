@@ -11,7 +11,7 @@
 In 1.9.0.1, assign Hi-Speed -10/+10 in Profile (defaults F5/F6, range 0.50–50.00). Press Xbox/XInput digital buttons or LT/RT in Keymap to bind lanes, or in Profile to bind restart and Hi-Speed controls. Use the D-pad to navigate menus, A to select and B to go back; an otherwise unassigned Start pauses gameplay. LT/RT count as pressed above 30/255. Analog stick axes and vibration are outside this release. [Changes and compatibility](feedback-20261015.en.md).
 
 The 1.9.0 release selects Normal / Hard / EX under `Options > Key Mode Settings > Judge Window`. Easy is removed from new selections but retained for historical replays. The session-only choice is not profile-persisted and resets to Normal on restart. See [EX timing and compatibility](judge-ex-1.9.0.ko.md) (Korean).
-- New Normal/Hard plays retain `tenriff-native-score-v2-ruleset-5`; EX uses `tenriff-native-score-v2-ruleset-6`. Historical R1–R5 timing, Easy and LN policies remain unchanged; custom timing is unofficial.
+- In 1.9.3, new Normal/Hard uses `tenriff-native-score-v2-ruleset-7`; EX uses `tenriff-native-score-v2-ruleset-8`. Only Empty Poor accuracy contribution changes, not numerical timing windows. Historical R1–R6 replays retain their policies; custom timing is unofficial.
 - `Judge EX` uses EASY PG/GR/GD=`14/44.571429/78.857143ms` (80% of Hard), retaining BMS RANK scaling. BAD is fixed at 250ms; the separate automatic-miss deadline remains 340ms and the score factor remains Hard's 1.10.
 
 This document is a user guide focused on how a first-time TenRiff player actually chooses a song, plays it, and checks the result.

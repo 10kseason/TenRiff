@@ -1,4 +1,5 @@
 #include "app/MenuApp.h"
+#include "app/BmsRankLabel.h"
 #include "app/DifficultyTable.h"
 #include "config/BuiltinDifficultyTables.h"
 
@@ -631,6 +632,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 "--");
             render.song_select.selected_song_chart_name = safe_ui_text(entry->chart_name);
             render.song_select.selected_song_difficulty = safe_ui_text(song_difficulty_label(*entry));
+            render.song_select.selected_song_bms_rank = bms_rank_label(entry->bms_rank);
             render.song_select.selected_song_difficulty_is_aery_five_key =
                 song_difficulty_is_aery_five_key(*entry, config_.ui.difficulty_table_url);
             render.song_select.selected_song_difficulty_prefix_key_count =
@@ -651,6 +653,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             render.song_select.background_upscale_mode = config_.graphics.background_upscale_mode;
             render.song_select.background_upscale_model_path =
                 config_.graphics.background_upscale_model_path;
+            render.song_select.background_upscale_output_mode = config_.graphics.background_upscale_output_mode;
             render.song_select.selected_song_lamp =
                 current_best.has_value ? current_best.clear_status : ui_text("NO PLAY", "기록 없음");
             render.song_select.selected_song_favorite = selected_song_is_favorite();

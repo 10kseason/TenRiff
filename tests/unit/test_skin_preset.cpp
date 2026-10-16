@@ -396,6 +396,8 @@ TEST_CASE("portable profile round trip preserves keys skin settings and backs up
     auto current = loader.defaults();
     current.ui.active_song_source = "keep-current-library";
     current.ui.private_server_url = "https://keep-current.example.test";
+    current.graphics.background_upscale_model_path = "keep-local.onnx";
+    current.graphics.background_upscale_output_mode = "image";
     const auto profile = dir.path / fs::u8path(u8"새 버전") / "profiles" / "default";
     REQUIRE(loader.save_profile(profile.u8string(), current));
     REQUIRE(manager.save_profile(profile.u8string(), manager.default_keymap()));
@@ -406,6 +408,8 @@ TEST_CASE("portable profile round trip preserves keys skin settings and backs up
     CHECK(read_preset_test_file(fs::u8path(imported.backup_path) / "config.json") == before);
     CHECK(imported.config.ui.active_song_source == current.ui.active_song_source);
     CHECK(imported.config.ui.private_server_url == current.ui.private_server_url);
+    CHECK(imported.config.graphics.background_upscale_model_path == "keep-local.onnx");
+    CHECK(imported.config.graphics.background_upscale_output_mode == "image");
     const auto reloaded = loader.load_profile(profile.u8string());
     REQUIRE(reloaded.success());
     CHECK(reloaded.config.skin.note_width_scales.at("8k") == doctest::Approx(1.3));

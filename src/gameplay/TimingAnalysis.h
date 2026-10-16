@@ -56,7 +56,7 @@ struct TimingAccuracyBucket {
     double accuracy_weight = 0.0;
 
     [[nodiscard]] double accuracy_percent() const noexcept;
-    void record(game::Judgement judgement, double weight) noexcept;
+    void record(game::Judgement judgement, double weight, bool contributes_accuracy = true) noexcept;
 };
 
 // Observational data only: never used by scoring, judgement, gauges, or replay validation.
@@ -77,7 +77,7 @@ struct TimingAnalysis {
     // with no delta. Automatic tails and empty presses never create timing samples.
     void observe(TimingEventKind kind, int lane, int64_t target_sample,
                  game::Judgement judgement, std::optional<double> measured_delta_ms,
-                 double weight) noexcept;
+                 double weight, bool contributes_accuracy = true) noexcept;
 };
 
 }  // namespace tenriff::gameplay

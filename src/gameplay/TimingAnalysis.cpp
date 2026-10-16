@@ -52,9 +52,9 @@ double TimingAccuracyBucket::accuracy_percent() const noexcept {
                : 0.0;
 }
 
-void TimingAccuracyBucket::record(game::Judgement judgement, double weight) noexcept {
+void TimingAccuracyBucket::record(game::Judgement judgement, double weight, bool contributes_accuracy) noexcept {
     // Mirror ResultStats' native categorical accuracy, including split LN weights
-    // and empty POORs. This is deliberately unrelated to detailed timing accuracy.
+    // and the selected empty-POOR policy. This is unrelated to detailed timing accuracy.
     const double safe_weight = std::isfinite(weight) && weight > 0.0 ? weight : 1.0;
     double credit = 0.0;
     switch (judgement) {
@@ -65,8 +65,10 @@ void TimingAccuracyBucket::record(game::Judgement judgement, double weight) noex
         case game::Judgement::PR: break;
     }
     ++event_count;
-    accuracy_points += credit * safe_weight;
-    accuracy_weight += safe_weight;
+    if (contributes_accuracy) {
+        accuracy_points += credit * safe_weight;
+        accuracy_weight += safe_weight;
+    }
 }
 
 void TimingAnalysis::initialize(int lanes, int rate, int64_t duration) noexcept {
@@ -79,7 +81,8 @@ void TimingAnalysis::initialize(int lanes, int rate, int64_t duration) noexcept 
 
 void TimingAnalysis::observe(TimingEventKind kind, int lane, int64_t target_sample,
                              game::Judgement judgement,
-                             std::optional<double> measured_delta_ms, double weight) noexcept {
+                             std::optional<double> measured_delta_ms, double weight,
+                             bool contributes_accuracy) noexcept {
     const auto kind_index = static_cast<std::size_t>(kind);
     if (!available || kind_index >= by_kind.size() || lane <= 0 || lane > lane_count) return;
     const bool unmeasured_kind = kind == TimingEventKind::AutoCompletion || kind == TimingEventKind::EmptyPoor;
@@ -98,7 +101,7 @@ void TimingAnalysis::observe(TimingEventKind kind, int lane, int64_t target_samp
         segment = position >= 1.0 ? segments.size() - 1
                                  : std::min(static_cast<std::size_t>(position * segments.size()), segments.size() - 1);
     }
-    segments[segment].record(judgement, weight);
+    segments[segment].record(judgement, weight, contributes_accuracy);
 }
 
 }  // namespace tenriff::gameplay

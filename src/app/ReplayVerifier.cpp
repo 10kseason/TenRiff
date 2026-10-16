@@ -100,7 +100,8 @@ bool judge_mods_match_ruleset(std::string_view ruleset_id,
         other_judge = other_judge || descriptor->token == "judge_easy" ||
                       descriptor->token == "judge_hard";
     }
-    return ex == (ruleset_id == kExReplayRulesetId) && !(ex && other_judge);
+    return ex == (ruleset_id == kExReplayRulesetId || ruleset_id == kRuleset6ReplayRulesetId) &&
+           !(ex && other_judge);
 }
 
 }  // namespace
@@ -137,6 +138,7 @@ bool is_canonical_score_ruleset(const config::JudgeConfig& judge,
 
 bool is_supported_canonical_replay_ruleset(std::string_view ruleset_id) {
     return ruleset_id == kExReplayRulesetId || ruleset_id == kCanonicalReplayRulesetId || ruleset_id == kRuleset4ReplayRulesetId ||
+           ruleset_id == kRuleset5ReplayRulesetId || ruleset_id == kRuleset6ReplayRulesetId ||
            ruleset_id == kRuleset3ReplayRulesetId ||
            ruleset_id == kPreviousReplayRulesetId ||
            ruleset_id == kLegacyReplayRulesetId;
@@ -152,13 +154,33 @@ bool replay_uses_chronological_judgement(const gameplay::ReplayFile& replay) {
     // Ruleset identity, not evidence-envelope version, selects gameplay semantics.
     // An unhashed new replay must still reproduce its chronological run.
     return replay.ruleset_id == kCanonicalReplayRulesetId || replay.ruleset_id == kExReplayRulesetId ||
+           replay.ruleset_id == kRuleset5ReplayRulesetId || replay.ruleset_id == kRuleset6ReplayRulesetId ||
+           replay.ruleset_id == "custom-ruleset-7" || replay.ruleset_id == "custom-ruleset-8" ||
            replay.ruleset_id == "custom-ruleset-5" || replay.ruleset_id == "custom-ruleset-6";
+}
+
+bool replay_empty_poor_affects_accuracy(const gameplay::ReplayFile& replay) {
+    // Unknown and historical evidence keeps the conservative legacy behavior.
+    // An unhashed current replay still has its explicit R7/R8 runtime identity.
+    return replay.ruleset_id != kCanonicalReplayRulesetId && replay.ruleset_id != kExReplayRulesetId &&
+           replay.ruleset_id != "custom-ruleset-7" && replay.ruleset_id != "custom-ruleset-8";
+}
+
+bool is_sites_supported_replay_ruleset(std::string_view ruleset_id,
+                                      const std::vector<std::string>& mods) {
+    // Preserve historical submissions and send the actual new identity. An old
+    // server can reject R7/R8 explicitly; it must never receive relabeled scores.
+    return (ruleset_id == kRuleset5ReplayRulesetId || ruleset_id == kRuleset6ReplayRulesetId ||
+            ruleset_id == kCanonicalReplayRulesetId || ruleset_id == kExReplayRulesetId) &&
+           judge_mods_match_ruleset(ruleset_id, mods);
 }
 
 bool replay_uses_legacy_hold_release(const gameplay::ReplayFile& replay) {
     // A current run can lack a chart hash and therefore export older evidence
     // metadata. Its explicit scoring ruleset still defines playback behavior.
     if (replay.ruleset_id == kExReplayRulesetId || replay.ruleset_id == kCanonicalReplayRulesetId ||
+        replay.ruleset_id == kRuleset5ReplayRulesetId || replay.ruleset_id == kRuleset6ReplayRulesetId ||
+        replay.ruleset_id == "custom-ruleset-7" || replay.ruleset_id == "custom-ruleset-8" ||
         replay.ruleset_id == kRuleset4ReplayRulesetId || replay.ruleset_id == kRuleset3ReplayRulesetId ||
         replay.ruleset_id == "custom-ruleset-5" || replay.ruleset_id == "custom-ruleset-6")
         return false;
@@ -171,8 +193,11 @@ config::JudgeConfig replay_judge_config_for_playback(
     const auto mods = normalize_mode_mod_tokens(replay.mods);
     const bool easy = std::find(mods.begin(), mods.end(), "judge_easy") != mods.end();
     const bool hard = std::find(mods.begin(), mods.end(), "judge_hard") != mods.end();
-    const bool ex_ruleset = replay.ruleset_id == kExReplayRulesetId || replay.ruleset_id == "custom-ruleset-6";
+    const bool ex_ruleset = replay.ruleset_id == kExReplayRulesetId ||
+                           replay.ruleset_id == kRuleset6ReplayRulesetId ||
+                           replay.ruleset_id == "custom-ruleset-6" || replay.ruleset_id == "custom-ruleset-8";
     const bool ranked = ex_ruleset || replay.ruleset_id == kCanonicalReplayRulesetId ||
+                        replay.ruleset_id == kRuleset5ReplayRulesetId || replay.ruleset_id == "custom-ruleset-7" ||
                         replay.ruleset_id == kRuleset4ReplayRulesetId ||
                         replay.ruleset_id == kRuleset3ReplayRulesetId || replay.ruleset_id == "custom-ruleset-5";
     const bool legacy = replay.ruleset_id == kLegacyReplayRulesetId ||
@@ -207,7 +232,7 @@ std::string replay_ruleset_id_for_runtime(const config::JudgeConfig& judge,
     const bool ex = mode_mod_judge_ex(mods);
     if (!standard_gauge_shift || course_gauge || pacemaker_mode_active(pacemaker_mode) ||
         !is_canonical_score_ruleset(judge, gauge)) {
-        return ex ? "custom-ruleset-6" : "custom-ruleset-5";
+        return ex ? "custom-ruleset-8" : "custom-ruleset-7";
     }
     return std::string(ex ? kExReplayRulesetId : kCanonicalReplayRulesetId);
 }
@@ -303,6 +328,7 @@ ReplayVerificationResult verify_replay_against_chart(
     engine_config.judge = replay_judge_config_for_playback(replay, canonical_judge, source_chart.bms_rank);
     engine_config.legacy_hold_release = replay_uses_legacy_hold_release(replay);
     engine_config.chronological_judgement = replay_uses_chronological_judgement(replay);
+    engine_config.empty_poor_affects_accuracy = replay_empty_poor_affects_accuracy(replay);
     engine_config.gauge = canonical_gauge;
     engine_config.gauge_policy.bms_lr2_deltas = chart_format == ChartFormat::Bms && replay.mode.bms_gauge_version == 2;
     engine_config.gauge_policy.bms_total = source_chart.bms_total.value_or(0.0);

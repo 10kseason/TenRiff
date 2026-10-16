@@ -612,6 +612,9 @@ int main(int argc, char** argv) {
     bool timing_text_off = false, timing_bar_off = false;
     bool indicator_background_off = false;
     bool timing_bar_always = false;
+    bool measure_lines_fixture = false;
+    std::string bms_rank_fixture;
+    std::string artist_fixture;
     double timing_text_x = 0, timing_text_y = 0, timing_bar_x = 0, timing_bar_y = 0;
     double timing_text_scale = 1.0, timing_bar_scale = 1.0;
     bool search_active = false;
@@ -723,6 +726,9 @@ int main(int argc, char** argv) {
     data.ui_language = tenriff::ui::Language::Korean;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
+        if (arg == "--measure-lines") { measure_lines_fixture = true; continue; }
+        if (arg == "--bms-rank" && i + 1 < argc) { bms_rank_fixture = argv[++i]; continue; }
+        if (arg == "--artist-text" && i + 1 < argc) { artist_fixture = argv[++i]; continue; }
         if (arg == "--language" && i + 1 < argc) { data.ui_language = tenriff::ui::language_from_token(argv[++i]); continue; }
         if (arg == "--bga-brightness" && i + 1 < argc) { bga_brightness_percent = std::clamp(std::stoi(argv[++i]), 0, 100); continue; }
         if (arg == "--play-mode") { mode_selection = true; sites_account = true; continue; }
@@ -832,7 +838,8 @@ int main(int argc, char** argv) {
         else if (arg == "--timing-feedback-case" && i + 1 < argc) {
             timing_feedback_case = argv[++i];
             if (timing_feedback_case != "retained-pg" && timing_feedback_case != "expired" &&
-                timing_feedback_case != "poor" && timing_feedback_case != "always-pg") {
+                timing_feedback_case != "poor" && timing_feedback_case != "always-pg" &&
+                timing_feedback_case != "always-expired") {
                 std::cerr << "Unknown timing feedback fixture.\n"; return 2;
             }
         }
@@ -1191,6 +1198,7 @@ int main(int argc, char** argv) {
     songs.selected_song_key_count = menu_keys;
     songs.selected_song_layout = std::to_string(menu_keys) + " KEYS";
     songs.selected_song_difficulty = aery_five_key && display_level == "12" ? "⑤LEVEL 12" : display_level;
+    songs.selected_song_bms_rank = bms_rank_fixture;
     songs.selected_song_difficulty_is_aery_five_key = aery_five_key && menu_keys == 5;
     songs.selected_song_difficulty_prefix_key_count = table_prefix_keys;
     songs.selected_song_bpm = 180;
@@ -1423,6 +1431,7 @@ int main(int argc, char** argv) {
         hud.note_height_scale = preview_note_height;
         hud.gameplay_field_offset_x = field_offset;
         hud.active = true; hud.title = loc("Gameplay", "게임플레이") + " / " + loc("LIVE PREVIEW", "미리보기");
+        hud.difficulty_label = "LV " + display_level;
         if (!song_title_file.empty()) {
             std::ifstream file(std::filesystem::u8path(song_title_file), std::ios::binary);
             if (!file) { std::cerr << "Cannot read the song title fixture.\n"; return 2; }
@@ -1452,6 +1461,7 @@ int main(int argc, char** argv) {
             hud.key_labels[lane] = labels[lane];
         }
         hud.artist = "LUMA KEYS / " + std::to_string(preview_keys) + "K / SYNTHETIC PREVIEW";
+        if (!artist_fixture.empty()) hud.artist = artist_fixture;
         hud.has_feedback = true; hud.feedback = "PG"; hud.combo = 123;
         hud.peer_visible = players > 0; hud.peer_score_available = players > 0;
         hud.peer_score = 8860; hud.score = 9500;
@@ -1764,21 +1774,26 @@ int main(int argc, char** argv) {
             hud.has_timing_feedback = hud.has_non_pg_feedback;
             hud.timing_feedback_delta_ms = hud.feedback_delta_ms;
             if (!timing_feedback_case.empty()) {
-                const bool retained = timing_feedback_case == "retained-pg";
+                const bool retained = timing_feedback_case == "retained-pg" || timing_feedback_case == "always-expired";
                 const bool poor = timing_feedback_case == "poor";
                 hud.has_feedback = true;
                 hud.feedback = poor ? "POOR" : "PG";
                 hud.feedback_delta_ms = 0;
-                hud.has_non_pg_feedback = retained || poor;
+                hud.has_non_pg_feedback = timing_feedback_case == "retained-pg" || poor;
                 hud.has_timing_feedback = retained;
                 hud.timing_feedback_delta_ms = retained ? -28.0 : 0.0;
-                if (timing_feedback_case == "always-pg") hud.timing_bar_always_visible = true;
+                if (timing_feedback_case == "always-pg" || timing_feedback_case == "always-expired") hud.timing_bar_always_visible = true;
             }
             hud.text_revision = static_cast<uint64_t>(hit + 1);
             hud.motion_revision++;
             hud.combo = 123 + hit; hud.pg = hit + 1;
             hud.current_sample = static_cast<int64_t>(seconds * 48000);
             hud.current_visual_position = seconds;
+            if (measure_lines_fixture) {
+                hud.measure_line_count = 5;
+                for (std::size_t i = 0; i < hud.measure_line_count; ++i)
+                    hud.measure_line_positions[i] = std::floor(seconds / 0.5) * 0.5 + i * 0.5;
+            }
             if (fixture_progress >= 0.0) {
                 hud.current_sample = static_cast<int64_t>(fixture_progress * hud.duration_samples);
                 hud.current_visual_position = static_cast<double>(hud.current_sample) / hud.sample_rate;

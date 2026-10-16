@@ -333,6 +333,63 @@ TEST_CASE("gameplay engine treats LR2-style early non-consuming input as poor") 
     CHECK(engine.stats().combo == 0);
 }
 
+TEST_CASE("empty POOR damages gauge without changing current accuracy score or combo") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes = {NoteEvent{1, 1000, std::nullopt}, NoteEvent{1, 2000, std::nullopt}};
+    GameplayConfig modern;
+    modern.sample_rate = 1000;
+    auto legacy = modern;
+    legacy.empty_poor_affects_accuracy = true;
+    GameplayEngine current(chart, modern), historical(chart, legacy), clean(chart, modern);
+    const double initial_gauge = current.gauge_state().value;
+    for (auto* engine : {&current, &historical}) {
+        (void)engine->handle_input(1, InputState::Pressed, 100);
+        (void)engine->handle_input(1, InputState::Released, 101);
+    }
+    CHECK(current.gauge_state().value < initial_gauge);
+    CHECK(current.gauge_state().value == historical.gauge_state().value);
+    CHECK(current.stats().counts.pr == 1);
+    CHECK(current.stats().accuracy_weight == 0.0);
+    for (auto* engine : {&current, &historical, &clean}) {
+        for (const int sample : {1000, 2000}) {
+            (void)engine->handle_input(1, InputState::Pressed, sample);
+            (void)engine->handle_input(1, InputState::Released, sample + 1);
+        }
+        engine->advance(3000);
+    }
+    CHECK(current.stats().accuracy_percent() == doctest::Approx(100.0));
+    CHECK(current.stats().detailed_accuracy_percent() == doctest::Approx(100.0));
+    CHECK(historical.stats().accuracy_percent() == doctest::Approx(200.0 / 3.0));
+    CHECK(historical.stats().detailed_accuracy_percent() == doctest::Approx(200.0 / 3.0));
+    CHECK(current.stats().raw_score == clean.stats().raw_score);
+    CHECK(current.stats().raw_score == historical.stats().raw_score);
+    CHECK(current.stats().detail_score == historical.stats().detail_score);
+    CHECK(current.stats().combo == historical.stats().combo);
+    CHECK(current.stats().combo == clean.stats().combo);
+    CHECK(current.gauge_state().value == historical.gauge_state().value);
+    CHECK(current.stats().analysis.total.event_count == 3);
+}
+
+TEST_CASE("missed-note POOR continues to lower current accuracy") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes = {NoteEvent{1, 1000, std::nullopt}, NoteEvent{1, 2000, std::nullopt}};
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.judge.indirect_miss_enabled = true;
+    GameplayEngine engine(chart, config);
+    (void)engine.handle_input(1, InputState::Pressed, 1000);
+    (void)engine.handle_input(1, InputState::Released, 1001);
+    engine.advance(3000);
+    CHECK(engine.stats().counts.pr == 1);
+    CHECK(engine.stats().accuracy_percent() == doctest::Approx(50.0));
+    CHECK(engine.stats().detailed_accuracy_percent() == doctest::Approx(50.0));
+    CHECK(engine.stats().combo == 0);
+}
+
 TEST_CASE("gameplay engine raw score keeps earlier penalties after later hits") {
     GameplayChart chart;
     chart.lane_count = 1;

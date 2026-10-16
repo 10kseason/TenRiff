@@ -47,7 +47,8 @@ void ResultStats::record_judgement(game::Judgement judgement,
                                    double delta_ms,
                                    ComboImpact combo_impact,
                                    double weight,
-                                   double detailed_accuracy_credit) {
+                                   double detailed_accuracy_credit,
+                                   bool contributes_accuracy) {
     switch (judgement) {
         case game::Judgement::PG: ++counts.pg; break;
         case game::Judgement::GR: ++counts.gr; break;
@@ -59,15 +60,18 @@ void ResultStats::record_judgement(game::Judgement judgement,
     const double safe_weight = (std::isfinite(weight) && weight > 0.0) ? weight : 1.0;
     judgement_score_points += judgement_score_credit(judgement) * safe_weight;
     detail_score += detail_score_credit(judgement);
-    accuracy_points += categorical_accuracy_credit(judgement) * safe_weight;
-    accuracy_weight += safe_weight;
-
-    const double resolved_detail_credit =
-        std::isfinite(detailed_accuracy_credit) && detailed_accuracy_credit >= 0.0
-            ? std::clamp(detailed_accuracy_credit, 0.0, 1.0)
-            : categorical_accuracy_credit(judgement);
-    detailed_accuracy_points += resolved_detail_credit * safe_weight;
-    detailed_accuracy_weight += safe_weight;
+    // Empty presses still produce a POOR event and gauge damage. Their absence
+    // of a chart object must not enlarge either accuracy denominator in R7/R8.
+    if (contributes_accuracy) {
+        accuracy_points += categorical_accuracy_credit(judgement) * safe_weight;
+        accuracy_weight += safe_weight;
+        const double resolved_detail_credit =
+            std::isfinite(detailed_accuracy_credit) && detailed_accuracy_credit >= 0.0
+                ? std::clamp(detailed_accuracy_credit, 0.0, 1.0)
+                : categorical_accuracy_credit(judgement);
+        detailed_accuracy_points += resolved_detail_credit * safe_weight;
+        detailed_accuracy_weight += safe_weight;
+    }
 
     if (judgement == game::Judgement::PG && std::isfinite(delta_ms)) {
         if (highest_judgement_timing_weight <= 0.0) {

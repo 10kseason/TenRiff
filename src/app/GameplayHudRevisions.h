@@ -54,6 +54,8 @@ struct GameplayHudRevisionInput {
     double current_visual_position = 0.0;
     double visual_velocity = 1.0;
     std::shared_ptr<const std::vector<gameplay::ScrollSegment>> visual_scroll_segments;
+    std::size_t measure_line_count = 0;
+    std::array<double, kGameplayHudMaxMeasureLines> measure_line_positions{};
     double future_visual_span = 1.0;
     double past_visual_span = 1.0;
     int64_t past_samples = 0;
@@ -78,6 +80,7 @@ struct GameplayHudRevisionInput {
     double feedback_delta_ms = 0.0;
     bool has_non_pg_feedback = false;
     bool has_timing_feedback = false;
+    bool has_retained_timing_feedback = false;
     double timing_feedback_delta_ms = 0.0;
     std::uint64_t peer_revision = 0;
     std::size_t timing_history_count = 0;
@@ -104,6 +107,7 @@ struct GameplayHudRevisionInput {
     double ghost_feedback_delta_ms = 0.0;
     bool ghost_has_non_pg_feedback = false;
     bool ghost_has_timing_feedback = false;
+    bool ghost_has_retained_timing_feedback = false;
     double ghost_timing_feedback_delta_ms = 0.0;
     std::size_t ghost_timing_history_count = 0;
     std::array<double, kGameplayTimingHistoryMaxEntries> ghost_timing_history_delta_ms{};
@@ -252,6 +256,7 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.feedback_delta_ms != next.feedback_delta_ms ||
         previous.has_non_pg_feedback != next.has_non_pg_feedback ||
         previous.has_timing_feedback != next.has_timing_feedback ||
+        previous.has_retained_timing_feedback != next.has_retained_timing_feedback ||
         previous.timing_feedback_delta_ms != next.timing_feedback_delta_ms ||
         previous.paused != next.paused ||
         previous.pause_menu_cursor != next.pause_menu_cursor ||
@@ -275,6 +280,7 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.ghost_feedback_delta_ms != next.ghost_feedback_delta_ms ||
         previous.ghost_has_non_pg_feedback != next.ghost_has_non_pg_feedback ||
         previous.ghost_has_timing_feedback != next.ghost_has_timing_feedback ||
+        previous.ghost_has_retained_timing_feedback != next.ghost_has_retained_timing_feedback ||
         previous.ghost_timing_feedback_delta_ms != next.ghost_timing_feedback_delta_ms;
 
     flags.motion_changed =
@@ -307,11 +313,14 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.current_visual_position != next.current_visual_position ||
         previous.visual_velocity != next.visual_velocity ||
         previous.visual_scroll_segments != next.visual_scroll_segments ||
+        previous.measure_line_count != next.measure_line_count ||
+        previous.measure_line_positions != next.measure_line_positions ||
         previous.future_visual_span != next.future_visual_span ||
         previous.past_visual_span != next.past_visual_span ||
         previous.feedback_delta_ms != next.feedback_delta_ms ||
         previous.has_non_pg_feedback != next.has_non_pg_feedback ||
         previous.has_timing_feedback != next.has_timing_feedback ||
+        previous.has_retained_timing_feedback != next.has_retained_timing_feedback ||
         previous.timing_feedback_delta_ms != next.timing_feedback_delta_ms ||
         !gameplay_hud_timing_history_equal(previous, next) ||
         !gameplay_hud_lane_activity_equal(previous, next) ||
@@ -322,6 +331,7 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.ghost_feedback_delta_ms != next.ghost_feedback_delta_ms ||
         previous.ghost_has_non_pg_feedback != next.ghost_has_non_pg_feedback ||
         previous.ghost_has_timing_feedback != next.ghost_has_timing_feedback ||
+        previous.ghost_has_retained_timing_feedback != next.ghost_has_retained_timing_feedback ||
         previous.ghost_timing_feedback_delta_ms != next.ghost_timing_feedback_delta_ms ||
         !gameplay_hud_ghost_timing_history_equal(previous, next) ||
         !gameplay_hud_ghost_lane_activity_equal(previous, next) ||

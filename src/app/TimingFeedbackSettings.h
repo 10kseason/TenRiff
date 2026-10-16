@@ -5,6 +5,10 @@
 namespace tenriff::app {
 struct TimingFeedbackVisibility { bool text; bool bar; bool always_visible; };
 
+inline bool timing_feedback_should_display(bool recent, bool retained, bool always_visible) {
+    return recent || (always_visible && retained);
+}
+
 // A legacy manifest's single switch still governs both elements until the user
 // edits either switch. Afterwards the saved profile wins, including after reload.
 inline TimingFeedbackVisibility resolve_timing_feedback_visibility(

@@ -78,6 +78,8 @@ public:
         double current_visual_position = 0.0;
         double visual_velocity = 1.0;
         std::shared_ptr<const std::vector<gameplay::ScrollSegment>> visual_scroll_segments;
+        std::size_t measure_line_count = 0;
+        std::array<double, kGameplayHudMaxMeasureLines> measure_line_positions{};
         double future_visual_span = 1.0;
         double past_visual_span = 1.0;
         int64_t hud_publish_time_ns = 0;
@@ -118,6 +120,7 @@ public:
         double feedback_delta_ms = 0.0;
         bool has_non_pg_feedback = false;
         bool has_timing_feedback = false;
+        bool has_retained_timing_feedback = false;
         double timing_feedback_delta_ms = 0.0;
         std::size_t timing_history_count = 0;
         std::array<double, kGameplayTimingHistoryMaxEntries> timing_history_delta_ms{};
@@ -145,6 +148,7 @@ public:
         double ghost_feedback_delta_ms = 0.0;
         bool ghost_has_non_pg_feedback = false;
         bool ghost_has_timing_feedback = false;
+        bool ghost_has_retained_timing_feedback = false;
         double ghost_timing_feedback_delta_ms = 0.0;
         std::size_t ghost_timing_history_count = 0;
         std::array<double, kGameplayTimingHistoryMaxEntries> ghost_timing_history_delta_ms{};

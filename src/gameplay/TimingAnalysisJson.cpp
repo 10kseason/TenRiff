@@ -120,8 +120,9 @@ bool valid_analysis(const TimingAnalysis& a) {
             !std::isfinite(bucket.accuracy_points) || !std::isfinite(bucket.accuracy_weight) ||
             bucket.accuracy_points < 0.0 || bucket.accuracy_weight < 0.0 ||
             bucket.accuracy_points > bucket.accuracy_weight ||
-            bucket.accuracy_weight > static_cast<double>(bucket.event_count) ||
-            (bucket.event_count > 0 && bucket.accuracy_weight == 0.0)) return false;
+            bucket.accuracy_weight > static_cast<double>(bucket.event_count)) return false;
+        // R7/R8 may contain a segment made entirely of empty presses: its event
+        // count remains observable while both accuracy accumulators stay zero.
         segment_events += bucket.event_count;
     }
     return segment_events == a.total.event_count;

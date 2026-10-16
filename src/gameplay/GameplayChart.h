@@ -100,6 +100,7 @@ struct GameplayChart {
     std::vector<NoteEvent> notes;
     std::vector<MineEvent> mines;
     std::vector<ScrollSegment> scroll_segments;
+    std::vector<int64_t> measure_samples;
     std::vector<AudioCueEvent> audio_cues;
     std::vector<VisualAsset> visual_assets;
     std::vector<VisualCueEvent> visual_cues;

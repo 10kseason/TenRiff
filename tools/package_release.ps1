@@ -3,7 +3,7 @@ param(
     [string]$BuildReleaseDirectory,
     [Parameter(Mandatory = $true)]
     [string]$OutputDirectory,
-    [string]$Version = "1.9.2",
+    [string]$Version = "1.9.3",
     [switch]$BinaryOnly
 )
 
@@ -116,6 +116,8 @@ Copy-Item -LiteralPath (Join-Path $repoRoot "third_party\ncnn-20260526\LICENSE.t
 New-Item -ItemType Directory -Path (Join-Path $binaryRoot "tools\onnx_upscaler") -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repoRoot "tools\onnx_upscaler\README.md") `
     -Destination (Join-Path $binaryRoot "tools\onnx_upscaler\README.md")
+Copy-Item -LiteralPath (Join-Path $repoRoot "tools\onnx_upscaler\convert_safetensors.py") `
+    -Destination (Join-Path $binaryRoot "tools\onnx_upscaler\convert_safetensors.py")
 
 # The editor runs directly from disk and uses no CDN or local server.
 $editorRoot = Join-Path $binaryRoot "tools\skin_editor"
@@ -192,6 +194,13 @@ foreach ($line in Get-Content -LiteralPath (Join-Path $repoRoot "models\NK3-ONNX
 }
 foreach ($deliveryRoot in @($binaryRoot, $sourceRoot)) {
     if (-not (Test-Path -LiteralPath $deliveryRoot)) { continue }
+    # External BGA weights must stay outside both archives, including the newly
+    # supported Safetensors format and training checkpoints staged by mistake.
+    foreach ($weights in Get-ChildItem -LiteralPath $deliveryRoot -Recurse -File |
+            Where-Object { $_.Extension.ToLowerInvariant() -in @('.safetensors', '.pt', '.pth', '.ckpt') }) {
+        $relative = [System.IO.Path]::GetRelativePath($deliveryRoot, $weights.FullName).Replace('\', '/')
+        throw "External model weights must not ship: $relative"
+    }
     foreach ($model in Get-ChildItem -LiteralPath $deliveryRoot -Recurse -File -Filter '*.onnx') {
         $relative = [System.IO.Path]::GetRelativePath($deliveryRoot, $model.FullName).Replace('\', '/')
         if (-not $allowedOnnx.ContainsKey($relative) -or

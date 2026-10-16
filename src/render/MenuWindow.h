@@ -202,6 +202,7 @@ struct SongSelectData {
     std::string selected_song_layout;
     std::string selected_song_chart_name;
     std::string selected_song_difficulty;
+    std::string selected_song_bms_rank;
     bool selected_song_difficulty_is_aery_five_key = false;
     int selected_song_difficulty_prefix_key_count = 0;
     int selected_song_key_count = 0;
@@ -221,6 +222,7 @@ struct SongSelectData {
     std::string selected_song_background_path;
     std::string background_upscale_mode = "off";
     std::string background_upscale_model_path;
+    std::string background_upscale_output_mode = "auto";
     bool background_upscale_prefer_npu = false;
     std::string selected_song_lamp;
     bool selected_song_favorite = false;
@@ -453,6 +455,7 @@ struct GameplayHudData {
     double pacemaker_delta = 0.0;
     std::string title;
     std::string artist;
+    std::string difficulty_label;
     uint64_t motion_revision = 0;
     uint64_t text_revision = 0;
     bool active = false;
@@ -477,6 +480,8 @@ struct GameplayHudData {
     double current_visual_position = 0.0;
     double visual_velocity = 1.0;
     std::shared_ptr<const std::vector<gameplay::ScrollSegment>> visual_scroll_segments;
+    std::size_t measure_line_count = 0;
+    std::array<double, kGameplayHudMaxMeasureLines> measure_line_positions{};
     double future_visual_span = 1.0;
     double past_visual_span = 1.0;
     uint32_t audio_buffer_frames = 0;
@@ -489,6 +494,7 @@ struct GameplayHudData {
     int64_t background_overlay_start_sample = 0;
     std::string background_upscale_mode = "off";
     std::string background_upscale_model_path;
+    std::string background_upscale_output_mode = "auto";
     bool background_upscale_prefer_npu = false;
     bool show_cursor_in_gameplay = true;
     double judgement_line_position = 0.82;
@@ -587,6 +593,7 @@ struct GameplayHudData {
     double feedback_delta_ms = 0.0;
     bool has_non_pg_feedback = false;
     bool has_timing_feedback = false;
+    bool has_retained_timing_feedback = false;
     double timing_feedback_delta_ms = 0.0;
     std::size_t timing_history_count = 0;
     std::array<double, kGameplayTimingHistoryMaxEntries> timing_history_delta_ms{};
@@ -648,6 +655,7 @@ struct GameplayHudData {
     double ghost_feedback_delta_ms = 0.0;
     bool ghost_has_non_pg_feedback = false;
     bool ghost_has_timing_feedback = false;
+    bool ghost_has_retained_timing_feedback = false;
     double ghost_timing_feedback_delta_ms = 0.0;
     std::size_t ghost_timing_history_count = 0;
     std::array<double, kGameplayTimingHistoryMaxEntries> ghost_timing_history_delta_ms{};
@@ -973,7 +981,7 @@ private:
     void invalidate_gameplay_note_sprite_cache();
     [[nodiscard]] bool ensure_gameplay_note_sprites(const GameplayHudData& data);
     void invalidate_gameplay_background_cache();
-    void set_background_upscale_model_path(std::string model_path, bool prefer_npu);
+    void set_background_upscale_model_path(std::string model_path, bool prefer_npu, std::string output_mode);
     [[nodiscard]] bool ensure_gameplay_background_bitmap(const GameplayHudData& data);
     void invalidate_song_select_preview_cache();
     [[nodiscard]] bool ensure_song_select_preview_bitmap(const SongSelectData& data);
@@ -1140,6 +1148,7 @@ private:
         std::array<std::wstring, 4> ghost_battle_summary_text{};
         std::wstring title_text{};
         std::wstring artist_text{};
+        std::wstring level_text{};
         std::wstring speed_text{};
         std::wstring score_text{};
         std::wstring combo_text{};
@@ -1323,6 +1332,7 @@ private:
     int64_t native_key_frame_time_ns_ = 0;
     GameplayBackgroundCache gameplay_background_cache_{};
     std::string active_background_upscale_model_path_{};
+    std::string active_background_upscale_output_mode_ = "auto";
     bool active_background_upscale_prefer_npu_ = false;
     std::unique_ptr<BgaVideoDecoder> gameplay_base_video_decoder_{};
     std::unique_ptr<BgaVideoDecoder> gameplay_overlay_video_decoder_{};

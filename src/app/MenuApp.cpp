@@ -1017,6 +1017,8 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
     input.current_visual_position = state.current_visual_position;
     input.visual_velocity = state.visual_velocity;
     input.visual_scroll_segments = state.visual_scroll_segments;
+    input.measure_line_count = state.measure_line_count;
+    input.measure_line_positions = state.measure_line_positions;
     input.future_visual_span = state.future_visual_span;
     input.past_visual_span = state.past_visual_span;
     input.combo = state.combo;
@@ -1036,6 +1038,7 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
     input.feedback_delta_ms = state.feedback_delta_ms;
     input.has_non_pg_feedback = state.has_non_pg_feedback;
     input.has_timing_feedback = state.has_timing_feedback;
+    input.has_retained_timing_feedback = state.has_retained_timing_feedback;
     input.timing_feedback_delta_ms = state.timing_feedback_delta_ms;
     input.peer_revision = state.peer_revision;
     input.timing_history_count = state.timing_history_count;
@@ -1074,6 +1077,7 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
     input.ghost_feedback_delta_ms = state.ghost_feedback_delta_ms;
     input.ghost_has_non_pg_feedback = state.ghost_has_non_pg_feedback;
     input.ghost_has_timing_feedback = state.ghost_has_timing_feedback;
+    input.ghost_has_retained_timing_feedback = state.ghost_has_retained_timing_feedback;
     input.ghost_timing_feedback_delta_ms = state.ghost_timing_feedback_delta_ms;
     input.ghost_timing_history_count = state.ghost_timing_history_count;
     std::copy_n(state.ghost_timing_history_delta_ms.begin(),
@@ -2836,7 +2840,8 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
         } catch (...) {
             dropped_extension.clear();
         }
-        if (current_screen() == Screen::SettingsGraphics && dropped_extension == ".onnx") {
+        if (current_screen() == Screen::SettingsGraphics &&
+            (dropped_extension == ".onnx" || dropped_extension == ".safetensors")) {
             auto effects = graphics_settings_controller_.set_onnx_model_path(
                 config_, event.path);
             effects.menu.persist_config = effects.menu.render_changed;

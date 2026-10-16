@@ -668,6 +668,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_string(*graphics,
                        "background_upscale_model_path",
                        config.graphics.background_upscale_model_path);
+        config.graphics.background_upscale_output_mode = normalize_background_upscale_output_mode(
+            get_string(*graphics, "background_upscale_output_mode", config.graphics.background_upscale_output_mode));
         config.graphics.background_upscale_prefer_npu =
             get_bool(*graphics,
                      "background_upscale_prefer_npu",
@@ -1204,6 +1206,8 @@ JsonValue build_json_root(const RuntimeConfig& config) {
                          config.graphics.background_upscale_mode)});
     graphics.emplace("background_upscale_model_path",
                      JsonValue{config.graphics.background_upscale_model_path});
+    graphics.emplace("background_upscale_output_mode",
+                     JsonValue{normalize_background_upscale_output_mode(config.graphics.background_upscale_output_mode)});
     graphics.emplace("background_upscale_prefer_npu",
                      JsonValue{config.graphics.background_upscale_prefer_npu});
     root.emplace("graphics", JsonValue{std::move(graphics)});
@@ -1430,6 +1434,11 @@ JsonValue build_json_root(const RuntimeConfig& config) {
 }
 
 }  // namespace
+
+std::string normalize_background_upscale_output_mode(std::string_view token) {
+    const auto normalized = to_lower_ascii(std::string(token));
+    return normalized == "residual" || normalized == "image" ? normalized : "auto";
+}
 
 std::string normalize_background_upscale_mode(std::string_view token) {
     const std::string normalized = to_lower_ascii(std::string(token));
@@ -2102,6 +2111,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.graphics.bga_enabled = true;
     config.graphics.background_upscale_mode = "off";
     config.graphics.background_upscale_model_path.clear();
+    config.graphics.background_upscale_output_mode = "auto";
     config.graphics.background_upscale_prefer_npu = false;
 
     config.mode.key_mode = "none";
@@ -2119,7 +2129,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.mode.auto_scratch_hide_lanes = false;
     config.mode.pacemaker_target_accuracy = kPacemakerAccuracyDefault;
     config.mode.pacemaker_target_score = kPacemakerScoreDefault;
-    config.mode.song_index_profile = "fast";
+    config.mode.song_index_profile = "safe";
     config.mode.calculate_song_index_difficulty = false;
 
     config.ui.profile_nickname.clear();

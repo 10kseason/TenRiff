@@ -633,6 +633,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         replay_uses_legacy_hold_release(replay_source_);
     gameplay_config.chronological_judgement = !replay_playback_enabled_ ||
         replay_uses_chronological_judgement(replay_source_);
+    gameplay_config.empty_poor_affects_accuracy = replay_playback_enabled_ &&
+        replay_empty_poor_affects_accuracy(replay_source_);
     chronological_judgement_ = gameplay_config.chronological_judgement;
     gameplay_config.gauge = config_.gauge;
     gameplay_config.input_offset_ms = config_.input_offset_ms;
@@ -940,6 +942,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         ghost_config.judge = replay_judge_config_for_playback(ghost_replay_source_, ghost_base_judge, chart_.bms_rank);
         ghost_config.legacy_hold_release = replay_uses_legacy_hold_release(ghost_replay_source_);
         ghost_config.chronological_judgement = replay_uses_chronological_judgement(ghost_replay_source_);
+        ghost_config.empty_poor_affects_accuracy = replay_empty_poor_affects_accuracy(ghost_replay_source_);
         ghost_chronological_judgement_ = ghost_config.chronological_judgement;
         ghost_config.gauge_shift_enabled = true;
         ghost_config.gauge_policy = {};
@@ -1300,7 +1303,8 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         const auto& timing = engine_->timing_feedback();
         snapshot.has_timing_feedback = gameplay::timing_feedback_visible(
             timing, snapshot.current_sample, sample_rate_);
-        snapshot.timing_feedback_delta_ms = snapshot.has_timing_feedback ? timing.delta_ms : 0.0;
+        snapshot.has_retained_timing_feedback = timing.has_value;
+        snapshot.timing_feedback_delta_ms = timing.has_value ? timing.delta_ms : 0.0;
         snapshot.has_non_pg_feedback = gameplay::timing_feedback_visible(
             engine_->non_pg_feedback(), snapshot.current_sample, sample_rate_);
         engine_->collect_recent_timing_deltas(snapshot.timing_history_delta_ms, &snapshot.timing_history_count);
@@ -1346,7 +1350,8 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             const auto& ghost_timing = ghost_engine_->timing_feedback();
             snapshot.ghost_has_timing_feedback = gameplay::timing_feedback_visible(
                 ghost_timing, snapshot.current_sample, sample_rate_);
-            snapshot.ghost_timing_feedback_delta_ms = snapshot.ghost_has_timing_feedback ? ghost_timing.delta_ms : 0.0;
+            snapshot.ghost_has_retained_timing_feedback = ghost_timing.has_value;
+            snapshot.ghost_timing_feedback_delta_ms = ghost_timing.has_value ? ghost_timing.delta_ms : 0.0;
             snapshot.ghost_has_non_pg_feedback = gameplay::timing_feedback_visible(
                 ghost_engine_->non_pg_feedback(), snapshot.current_sample, sample_rate_);
             ghost_engine_->collect_recent_timing_deltas(snapshot.ghost_timing_history_delta_ms,
@@ -1395,6 +1400,15 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
     snapshot.current_visual_position = chart_.visual_position_at(snapshot.current_sample);
     snapshot.visual_velocity = chart_.visual_velocity_at(snapshot.current_sample);
     snapshot.visual_scroll_segments = visual_scroll_segments_;
+    // The same expanded time window and scroll map as notes keeps bars aligned
+    // through rate changes, STOP, SCROLL and visual latency without new clocks.
+    const auto measure_begin = std::lower_bound(chart_.measure_samples.begin(), chart_.measure_samples.end(),
+        snapshot.current_sample - expanded_window.past_samples);
+    const int64_t measure_end = snapshot.current_sample + expanded_window.lookahead_samples;
+    for (auto it = measure_begin; it != chart_.measure_samples.end() && *it <= measure_end &&
+         snapshot.measure_line_count < kGameplayHudMaxMeasureLines; ++it) {
+        snapshot.measure_line_positions[snapshot.measure_line_count++] = chart_.visual_position_at(*it);
+    }
     // Keep the field scale anchored to the starting BPM. Follow actual visual
     // travel through BPM, #SCROLL, STOP, and reverse segments when choosing the
     // HUD horizon so slow sections still enter from the same top edge without
@@ -2494,7 +2508,7 @@ void GameSession::shutdown() {
                                                               course_gauge_enabled_,
                                                               "off", result_.mods);
             if (auto_scratch_enabled_ || stale_input_catchup_used_) {
-                replay.ruleset_id = mode_mod_judge_ex(result_.mods) ? "custom-ruleset-6" : "custom-ruleset-5";
+                replay.ruleset_id = mode_mod_judge_ex(result_.mods) ? "custom-ruleset-8" : "custom-ruleset-7";
             }
             if (stale_input_catchup_used_) {
                 const std::string warning = "Official scoring disabled: stale input state catch-up is not represented in the replay trace.";

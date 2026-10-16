@@ -226,6 +226,8 @@ GraphicsSettingsEffects GraphicsSettingsController::set_onnx_model_path(
         return {};
     }
     runtime.graphics.background_upscale_model_path = std::move(model_path);
+    // Output semantics belong to the selected model, not to the next file.
+    runtime.graphics.background_upscale_output_mode = "auto";
     return mark_changed();
 }
 
@@ -389,6 +391,12 @@ GraphicsSettingsEffects GraphicsSettingsController::apply_selected_action(
             GraphicsSettingsEffects effects;
             effects.choose_onnx_model = true;
             return effects;
+        }
+        case GraphicsSettingId::OnnxOutput: {
+            static constexpr std::array<std::string_view, 3> modes{"auto", "residual", "image"};
+            runtime.graphics.background_upscale_output_mode = cycle_token(modes,
+                config::normalize_background_upscale_output_mode(runtime.graphics.background_upscale_output_mode), direction);
+            return mark_changed();
         }
         case GraphicsSettingId::PreferLowPowerDirectX:
             runtime.graphics.background_upscale_prefer_npu =

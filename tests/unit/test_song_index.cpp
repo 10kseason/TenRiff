@@ -743,6 +743,34 @@ TEST_CASE("schema 13 cache persists hashes and reapplies the current local diffi
     CHECK(force_refreshed.entries.front().sha256 == hashes.sha256);
 }
 
+TEST_CASE("BMS authored judgement rank survives Safe Fast and index cache round trips") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    for (int rank = 0; rank < 5; ++rank)
+        write_file(temp.path / ("rank" + std::to_string(rank) + ".bms"),
+            "#TITLE Rank\n#BPM 120\n#RANK " + std::to_string(rank) + "\n#00011:01\n");
+    write_file(temp.path / "missing.bms", "#TITLE Missing\n#BPM 120\n#00011:01\n");
+    for (const auto profile : {tenriff::app::SongIndexProfile::Safe, tenriff::app::SongIndexProfile::Fast}) {
+        SongIndexOptions options;
+        options.profile = profile;
+        std::vector<std::string> warnings;
+        const auto index = scan_songs(temp.path.u8string(), nullptr, warnings, {}, options);
+        REQUIRE(index.entries.size() == 6);
+        for (const auto& entry : index.entries) {
+            const auto name = std::filesystem::path(entry.path).filename().string();
+            CHECK(entry.bms_rank == (name == "missing.bms" ? 3 : name[4] - '0'));
+        }
+        const auto cache = (temp.path / "index.json").u8string();
+        REQUIRE(save_song_index(cache, index, options));
+        const auto loaded = load_song_index(cache, options);
+        REQUIRE(loaded.success());
+        REQUIRE(loaded.index.entries.size() == index.entries.size());
+        for (std::size_t i = 0; i < index.entries.size(); ++i)
+            CHECK(loaded.index.entries[i].bms_rank == index.entries[i].bms_rank);
+    }
+}
+
 TEST_CASE("cached song index load drops non-BMS menu entries") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
@@ -751,7 +779,7 @@ TEST_CASE("cached song index load drops non-BMS menu entries") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 19,\n"
+               "  \"version\": 20,\n"
                "  \"entries\": [\n"
                "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"chart_name\":\"MX\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
                "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"chart_name\":\"Another\",\"format\":\"bms\",\"layout_label\":\"5+1 SP\",\"key_count\":6,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1},\n"
@@ -786,7 +814,7 @@ TEST_CASE("cached song index filters non-BMS entries") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 19,\n"
+               "  \"version\": 20,\n"
                "  \"entries\": [\n"
                 "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"chart_name\":\"MX\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
                 "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"format\":\"bms\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
@@ -808,7 +836,7 @@ TEST_CASE("streaming song index loader parses compact single-line current caches
 
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
-               "{\"version\":19,\"entries\":["
+               "{\"version\":20,\"entries\":["
                "{\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"Composer\",\"chart_name\":\"Hyper\",\"format\":\"bms\",\"layout_label\":\"7+1 SP\",\"key_count\":8,\"level\":12,\"rating\":7.5,\"bpm\":150,\"mtime\":1},"
                "{\"path\":\"ignored.osu\",\"title\":\"Ignored\",\"artist\":\"Mapper\",\"format\":\"osu\",\"key_count\":10,\"level\":13,\"rating\":8.5,\"bpm\":180,\"mtime\":2}"
                "]}");
@@ -960,7 +988,7 @@ TEST_CASE("cached song index sanitizes control heavy metadata on load") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 19,\n"
+               "  \"version\": 20,\n"
                "  \"entries\": [\n"
                 "    {\"path\":\"legacy.bms\",\"title\":\"Bad\\nTitle\",\"artist\":\"Artist\\tName\",\"chart_name\":\"Hyper\\r\",\"format\":\"bms\\r\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
                "  ]\n"
