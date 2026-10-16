@@ -55,6 +55,7 @@ inline GameplayHudData make_skin_gameplay_preview(const SkinPreviewData& preview
     hud.show_timing_feedback = preview.show_timing_feedback;
     hud.show_timing_bar = preview.show_timing_bar;
     hud.timing_bar_always_visible = preview.timing_bar_always_visible;
+    hud.timing_marker_style = preview.timing_marker_style;
     hud.note_fade_in = preview.note_fade_in;
     hud.note_fade_out = preview.note_fade_out;
     hud.timing_text_offset_x = preview.timing_text_offset_x;

@@ -16,6 +16,7 @@
 #include "app/SitesLeaderboardClient.h"
 #include "app/ProfileSetupFlow.h"
 #include "config/KeycodeMap.h"
+#include "audio/WasapiBackend.h"
 #include "config/SimpleJson.h"
 #include "timing/HighResClock.h"
 #include "../tests/unit/bms_timing_fixture.h"
@@ -622,6 +623,25 @@ struct MenuAppVisualTestAccess {
         key(app, "Escape");
         report.check("profile.speed_capture_cancel", app.config_.ui.hispeed_increase_key == increase &&
             !app.profile_control_key_capture_active_);
+        click(app, Kind::SettingsRow, profile_setup::kFunctionKeysFirstRow);
+        key(app, "F10");
+        report.check("profile.function_conflict_rejected", app.profile_control_key_capture_active_ &&
+            config::function_key(app.config_.ui, 1) == "F1");
+        key(app, "F12");
+        report.check("profile.function_assigned", !app.profile_control_key_capture_active_ && app.key_f1_ ==
+            config::KeycodeMap::to_keycode("F12").value());
+        const auto saved_function = config::ConfigLoader{}.load_profile(app.profile_dir_);
+        report.check("profile.function_persisted", saved_function.success() &&
+            config::function_key(saved_function.config.ui, 1) == "F12");
+        report.check("profile.function_hint", app.ui_text("F1 / F10", "F1 / F10") == "F12 / F10");
+        key(app, "F1");
+        report.check("profile.old_function_inactive", !app.help_overlay_visible_);
+        key(app, "F12");
+        report.check("profile.new_function_dispatch", app.help_overlay_visible_);
+        key(app, "F12");
+        click(app, Kind::SettingsRow, profile_setup::kFunctionKeysFirstRow);
+        key(app, "F1");
+        report.check("profile.function_restored", app.key_f1_ == config::KeycodeMap::to_keycode("F1").value());
         // Synthetic stale Enter edges model input collected inside a modal
         // picker. The real picker smoke below checks native ownership too.
         app.input_thread_.queue().push({app.key_enter_, input::InputState::Pressed, 1});
@@ -680,7 +700,8 @@ struct MenuAppVisualTestAccess {
         app.publish_snapshot();
         render::MenuRenderData profile_view;
         app.populate_quick_setup_render_data(profile_view);
-        report.check("profile.has_assignable_speed_rows", profile_view.generic.rows.size() == 18);
+        report.check("profile.has_assignable_speed_rows", profile_view.generic.rows.size() ==
+            static_cast<std::size_t>(profile_setup::row_count(profile_setup::Entry::Options)));
         app.menu_window_.request_screenshot();
         std::string detail;
         report.check("profile.final_controls_present", present(app, detail), detail);
@@ -1330,7 +1351,7 @@ struct MenuAppFeedbackTestAccess {
         const double initial = session.config_.speed.hi_speed;
         static_cast<void>(session.handle_control_input({rb, input::InputState::Pressed, 1}));
         static_cast<void>(session.handle_control_input({rb, input::InputState::Pressed, 2}));
-        report.check("xinput.coarse_speed_once", session.config_.speed.hi_speed == std::min(50.0, initial + 10.0));
+        report.check("xinput.coarse_speed_once", session.config_.speed.hi_speed == std::min(50.0, initial * 2.0));
         static_cast<void>(session.handle_control_input({rb, input::InputState::Released, 3}));
         static_cast<void>(session.handle_control_input({lb, input::InputState::Pressed, 4}));
         report.check("xinput.coarse_speed_decrease", session.config_.speed.hi_speed == initial);
@@ -1530,6 +1551,26 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
             Access::click(app, Kind::SettingsRow,
                 static_cast<int>(tenriff::app::menu::settings::AudioSettingId::Normalize), Part::Increment);
             report.check("audio.normalize_toggle", Access::config(app).audio_ui.normalize_audio);
+            const auto outputs = tenriff::audio::WasapiBackend::enumerate_output_devices();
+            report.check("audio.output_list", !outputs.empty());
+            if (!outputs.empty()) {
+                Access::click(app, Kind::SettingsRow,
+                    static_cast<int>(tenriff::app::menu::settings::AudioSettingId::OutputDevice), Part::Increment);
+                report.check("audio.output_selection", Access::config(app).audio.device_id == outputs.front().id);
+                tenriff::audio::WasapiBackend selected;
+                auto selected_config = Access::config(app).audio;
+                selected_config.exclusive_mode = false;
+                const auto initialized = selected.initialize(selected_config);
+                report.check("audio.selected_output_initialize", initialized == tenriff::audio::AudioResult::Success);
+                selected.shutdown();
+                Access::click(app, Kind::SettingsRow,
+                    static_cast<int>(tenriff::app::menu::settings::AudioSettingId::OutputDevice), Part::Decrement);
+                report.check("audio.output_default_restored", Access::config(app).audio.device_id.empty());
+            }
+            tenriff::audio::WasapiBackend missing;
+            auto invalid = Access::config(app).audio;
+            invalid.device_id = "tenriff-nonexistent-output-test";
+            report.check("audio.missing_output_no_fallback", missing.initialize(invalid) == tenriff::audio::AudioResult::DeviceNotFound);
         } else if (page.index == 7) {
             Access::check_start_controls(app, report);
         }

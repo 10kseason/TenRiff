@@ -1017,6 +1017,9 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     true);
     append_menu_row(render.generic, ui_text("FAST/SLOW Bar", "FAST/SLOW 막대"), ui_on_off(timing_visibility.bar),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TimingBar), false, true);
+    append_menu_row(render.generic, ui_text("Indicator Shape", "인디케이터 모양"),
+                    config_.skin.timing_marker_style == "barcode" ? ui_text("Barcode", "바코드") : ui_text("Dot", "점"),
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TimingMarkerStyle), false, true);
     append_menu_row(render.generic, ui_text("FAST/SLOW Display", "FAST/SLOW 표시 방식"),
                     timing_visibility.always_visible ? ui_text("Always", "항상") : ui_text("After non-PG", "피그렛 외 판정 후"),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TimingBarMode), false, true);
@@ -1135,6 +1138,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.skin_preview.show_timing_feedback = timing_visibility.text;
     render.generic.skin_preview.show_timing_bar = timing_visibility.bar;
     render.generic.skin_preview.timing_bar_always_visible = timing_visibility.always_visible;
+    render.generic.skin_preview.timing_marker_style = config_.skin.timing_marker_style;
     render.generic.skin_preview.note_fade_in = config_.skin.note_fade_in;
     render.generic.skin_preview.note_fade_out = config_.skin.note_fade_out;
     render.generic.skin_preview.timing_text_offset_x = config_.skin.timing_text_offset_x;

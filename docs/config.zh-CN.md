@@ -1,3 +1,5 @@
+**2026-10-17 · 1.9.3 local:** [指示器、输出设备与配置快捷键](input-feedback-20261017.zh-CN.md).
+
 # TenRiff 配置模式（当前）
 
 **1.9.3当前契约：** 使用安全加载默认值、空POOR准确率排除R7/R8、一般ONNX及受支持Safetensors。正式Sites v19接受符合条件的新Online记录，Guest及未标注来源的历史记录永久排除。不附带BGA权重，保持OFF/空路径及1.9.0基准。[1.9.3范围](release-1.9.3.zh-CN.md)优先于下方带日期历史。
@@ -43,6 +45,8 @@
 
 - `backend` (string)
   - `wasapi | asio`，默认为 `wasapi`。用于游玩和曲目试听；菜单和结果 BGM 保留独立的 Windows MCI 路径。
+- `device_id` (string)
+  - 默认为空（系统默认）。用于游玩和 BMS 试听的 WASAPI 输出设备 ID，可在声音选项中选择。指定设备不可用时不会自动切换。内置菜单和结果音乐保留独立的 MCI 系统默认输出。
 - `asio_driver` (string)
   - 已安装64位 ASIO 驱动的 CLSID。空值表示 Auto，使用按名称排列的第一个驱动。Audio 设置中选择，F5 刷新列表。
 - `rate` (int)
@@ -293,8 +297,9 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | 配置档和首次设置中的菜单字号：100%、115%、130%。游戏内字体继续由皮肤控制。 |
 | `skip_start_countdown` | bool; `false` | 跳过单人游玩开始时的 `3 / 2 / 1` 显示；适用于正常开始、菜单重新开始及结果页重试。 |
 | `instant_restart_key` | string; `""`（未分配） | 从头重新开始正在进行的单人谱面的键名。新一轮始终跳过初始倒计时；中断的尝试不保存结果或回放。 |
-| `hispeed_decrease_key` | string; `"F5"` | Hi-Speed -10按键。在档案中绑定，空字符串禁用。 |
-| `hispeed_increase_key` | string; `"F6"` | Hi-Speed +10按键。在档案中绑定，空字符串禁用。 |
+| `hispeed_decrease_key` | string; `"F5"` | Note Speed ×0.5按键。在档案中绑定，空字符串禁用。 |
+| `hispeed_increase_key` | string; `"F6"` | Note Speed ×2按键。在档案中绑定，空字符串禁用。 |
+| `function_keys` | object; F1–F11 | 配置中指定F1–F11功能及提示按键。空值解除。 |
 | `all_song_sources` | bool; `false` | 恢复 ALL SONG，合并已登记文件夹的缓存并去除相同谱面路径的重复项。 |
 | `result_tail_ms` | double; `500` ms | 判定完成后结果切换的额外等待时间。`audio.play_to_end=true` 时同时考虑谱面音频结束时刻。 |
 | `require_enter_to_exit` | bool; `true` | 为读写兼容保留；当前 Windows 结果输入路径不使用此值自动退出。 |
@@ -339,7 +344,8 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `show_gear_boundary_line` | bool; `false` | 显示轨道面板边界线。 |
 | `show_timing_feedback` | bool; `true` | 独立显示 FAST/SLOW 文字。 |
 | `show_timing_bar` | bool; `true` | 显示时机条；旧配置缺少此字段时继承文字开关。 |
-| `timing_bar_always_visible` | bool; `false` | `true`始终显示刻度，`false`在非PG判定后显示0.75秒。文字和当前误差标记保留0.75秒，之后的PG不会清除。`show_timing_bar`仍单独控制开关。 |
+| `timing_bar_always_visible` | bool; `false` | `true`保持刻度及最后的FAST/SLOW文字。每个点/竖线在0.7秒后消失。`false`保留非PG后0.75秒显示；`show_timing_bar`单独控制条形开关。 |
+| `timing_marker_style` | `dot` / `barcode`; `dot` | 判定标记形状：圆点或竖线。 |
 | `timing_feedback_override` | bool; `false` | 用户修改开关后，配置中的显示选项优先于皮肤。 |
 | `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | 文字和条的独立 X 偏移，叠加于原判定布局，以 1920x1080 像素为基准。 |
 | `timing_text_offset_y`, `timing_bar_offset_y` | double: `-400..400`; `0` | 文字和条的独立 Y 偏移；正值向下。 |

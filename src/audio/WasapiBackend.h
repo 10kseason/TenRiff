@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "audio/AudioConfig.h"
 
@@ -18,6 +19,10 @@ namespace tenriff::audio {
 /// Thread-safety: Methods must be called from the main thread, except where noted.
 class WasapiBackend {
 public:
+    struct OutputDevice { std::string id; std::string name; };
+    // Active render endpoints only; empty configuration selects the OS default.
+    [[nodiscard]] static std::vector<OutputDevice> enumerate_output_devices();
+
     WasapiBackend();
     ~WasapiBackend();
 

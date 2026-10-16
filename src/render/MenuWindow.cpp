@@ -1,6 +1,8 @@
+#include "app/MemoryReclamation.h"
 #include "render/SettingsListLayout.h"
 #include "render/DifficultyLabel.h"
 #include "render/MenuWindow.h"
+#include "ui/FunctionKeyLabels.h"
 #include "render/GameplaySpriteBatch.h"
 #include "config/BuiltinDifficultyTables.h"
 #include "config/GraphicsResolution.h"
@@ -2504,7 +2506,7 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<ID2D1Bitmap> gameplay_background_overlay_bitmap;
     std::unordered_map<std::string, GameplayBackgroundBitmapEntry>
         gameplay_background_bitmaps{};
-    std::deque<std::string> gameplay_background_lru{};
+    bool gameplay_background_used = false;
     std::size_t gameplay_background_bitmap_bytes = 0;
     std::unordered_map<std::string, SongCardPreviewBitmapEntry> song_card_preview_bitmaps{};
     std::deque<std::string> song_card_preview_lru{};
@@ -3227,6 +3229,12 @@ void MenuWindow::invalidate_gameplay_background_cache() {
     }
 }
 
+std::array<std::size_t, 2> MenuWindow::gameplay_background_retention_stats() const {
+    return d2d_ ? std::array<std::size_t, 2>{d2d_->gameplay_background_bitmaps.size(),
+                                           d2d_->gameplay_background_bitmap_bytes}
+                : std::array<std::size_t, 2>{};
+}
+
 void MenuWindow::set_background_upscale_model_path(std::string model_path, bool prefer_npu, std::string output_mode) {
     if (active_background_upscale_model_path_ == model_path &&
         active_background_upscale_prefer_npu_ == prefer_npu &&
@@ -3265,14 +3273,7 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
 
     const std::string upscale_mode =
         data.background_upscale_mode == "onnx" ? "onnx" : "off";
-    const auto touch_background_bitmap = [&](const std::string& path) {
-        auto& lru = d2d_->gameplay_background_lru;
-        const auto existing = std::find(lru.begin(), lru.end(), path);
-        if (existing != lru.end()) {
-            lru.erase(existing);
-        }
-        lru.push_back(path);
-    };
+    d2d_->gameplay_background_used = true;
     const auto use_cached_background_bitmap =
         [&](const std::string& path, Microsoft::WRL::ComPtr<ID2D1Bitmap>& destination) {
             const auto found = d2d_->gameplay_background_bitmaps.find(path);
@@ -3280,7 +3281,6 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
                 return false;
             }
             destination = found->second.bitmap;
-            touch_background_bitmap(path);
             return true;
         };
     const bool paths_changed =
@@ -3369,8 +3369,6 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
             if (!upload_bgra(frame->width, frame->height, frame->bgra, bitmap)) {
                 return;
             }
-            constexpr std::size_t kMaxCachedBackgroundBitmaps = 256;
-            constexpr std::size_t kMaxCachedBackgroundBytes = 192ull * 1024ull * 1024ull;
             auto existing = d2d_->gameplay_background_bitmaps.find(frame->source_path);
             if (existing != d2d_->gameplay_background_bitmaps.end()) {
                 d2d_->gameplay_background_bitmap_bytes -= existing->second.decoded_bytes;
@@ -3382,20 +3380,8 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
                     D2DResources::GameplayBackgroundBitmapEntry{frame->bgra.size(), bitmap});
             }
             d2d_->gameplay_background_bitmap_bytes += frame->bgra.size();
-            touch_background_bitmap(frame->source_path);
-
-            while ((!d2d_->gameplay_background_lru.empty()) &&
-                   (d2d_->gameplay_background_bitmaps.size() > kMaxCachedBackgroundBitmaps ||
-                    d2d_->gameplay_background_bitmap_bytes > kMaxCachedBackgroundBytes)) {
-                const std::string oldest = d2d_->gameplay_background_lru.front();
-                d2d_->gameplay_background_lru.pop_front();
-                const auto victim = d2d_->gameplay_background_bitmaps.find(oldest);
-                if (victim == d2d_->gameplay_background_bitmaps.end()) {
-                    continue;
-                }
-                d2d_->gameplay_background_bitmap_bytes -= victim->second.decoded_bytes;
-                d2d_->gameplay_background_bitmaps.erase(victim);
-            }
+            // Retain static BGA bitmaps until the menu transition. Evicting
+            // them here can release GPU resources on the gameplay render thread.
 
             if (frame->source_path == active_path) {
                 destination = std::move(bitmap);

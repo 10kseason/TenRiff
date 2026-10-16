@@ -6,6 +6,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <utility>
 
 #include "app/menu/MenuAction.h"
 #include "app/menu/settings/SettingsRowModel.h"
@@ -34,9 +35,10 @@ enum class AudioSettingId : std::uint8_t {
     PlayToEnd = 15,
     GameplayVolume = 16,
     MenuMusicVolume = 17,
+    OutputDevice = 18,
 };
 
-inline constexpr std::array<AudioSettingId, 16> kAudioSettingOrder{
+inline constexpr std::array<AudioSettingId, 17> kAudioSettingOrder{
     AudioSettingId::MasterVolume,
     AudioSettingId::GameplayVolume,
     AudioSettingId::MenuMusicVolume,
@@ -49,6 +51,7 @@ inline constexpr std::array<AudioSettingId, 16> kAudioSettingOrder{
     AudioSettingId::SoundOffset,
     AudioSettingId::Preset,
     AudioSettingId::Backend,
+    AudioSettingId::OutputDevice,
     AudioSettingId::AsioDriver,
     AudioSettingId::SampleRate,
     AudioSettingId::BufferFrames,
@@ -71,6 +74,8 @@ public:
     [[nodiscard]] AudioSettingId selected_id() const noexcept;
     [[nodiscard]] bool dirty() const noexcept;
     void set_asio_drivers(std::vector<AudioDriverChoice> drivers);
+    void set_output_devices(std::vector<AudioDriverChoice> devices) { output_devices_ = std::move(devices); }
+    [[nodiscard]] const std::vector<AudioDriverChoice>& output_devices() const noexcept { return output_devices_; }
     [[nodiscard]] bool asio_drivers_loaded() const noexcept { return asio_drivers_loaded_; }
     [[nodiscard]] const std::vector<AudioDriverChoice>& asio_drivers() const noexcept { return asio_drivers_; }
 
@@ -100,6 +105,7 @@ private:
     bool dirty_ = false;
     bool asio_drivers_loaded_ = false;
     std::vector<AudioDriverChoice> asio_drivers_;
+    std::vector<AudioDriverChoice> output_devices_;
 };
 
 }  // namespace tenriff::app::menu::settings

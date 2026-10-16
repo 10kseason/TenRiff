@@ -1,3 +1,5 @@
+**2026-10-17 · 1.9.3 local:** [인디케이터·출력 장치·프로필 단축키](input-feedback-20261017.ko.md).
+
 # TenRiff Config Schema (current)
 
 **1.9.3 현재 계약:** 안전 불러오기 기본값, 공푸어 정확도 제외 R7/R8, 일반 ONNX와 지원 Safetensors를 적용합니다. 운영 Sites v19는 조건에 맞는 새 Online 기록을 받고 Guest/출처 없는 과거 기록은 영구 제외합니다. BGA 가중치 미동봉·OFF/빈 경로·기준선1.9.0을 유지합니다. [1.9.3 범위](release-1.9.3.ko.md)가 아래 날짜별 이력보다 우선합니다.
@@ -47,6 +49,8 @@
 
 - `backend` (string)
   - `wasapi | asio`; 기본 `wasapi`. 게임플레이와 선곡 미리듣기의 출력 백엔드. 메뉴·결과 배경음악은 별도 Windows MCI 경로를 유지.
+- `device_id` (string)
+  - 기본값은 빈 문자열(시스템 기본). WASAPI 게임플레이·BMS 미리듣기 출력 장치 ID. 사운드 옵션에서 선택하며, 선택한 장치가 없으면 자동 대체하지 않습니다. 자체 메뉴·결과 음악의 MCI 출력은 Windows 기본 장치를 유지합니다.
 - `asio_driver` (string)
   - 설치된 64비트 ASIO 드라이버의 CLSID. 빈 문자열은 Auto이며 이름순 첫 드라이버를 선택. Audio 화면에서 드라이버를 고르고 F5로 목록을 새로 읽음.
 - `rate` (int)
@@ -301,8 +305,9 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | 프로필/첫 실행에서 보통·크게·더 크게 선택. 메뉴 글자 100%·115%·130%, 게임플레이 스킨 글자는 별도 유지. |
 | `skip_start_countdown` | bool; `false` | 단독 플레이의 초기 `3 / 2 / 1` 표시 생략. 일반 곡 시작과 메뉴 재시작·결과 재시도에 적용. |
 | `instant_restart_key` | string; `""` (미지정) | 진행 중인 단독 곡을 처음부터 다시 시작할 키 이름. 새 시도의 초기 카운트다운은 항상 생략하며, 중단한 시도는 결과·리플레이로 저장하지 않음. |
-| `hispeed_decrease_key` | string; `"F5"` | Hi-Speed -10 키. 프로필에서 지정; 빈 문자열로 해제. |
-| `hispeed_increase_key` | string; `"F6"` | Hi-Speed +10 키. 프로필에서 지정; 빈 문자열로 해제. |
+| `hispeed_decrease_key` | string; `"F5"` | Note Speed ×0.5 키. 프로필에서 지정; 빈 문자열로 해제. |
+| `hispeed_increase_key` | string; `"F6"` | Note Speed ×2 키. 프로필에서 지정; 빈 문자열로 해제. |
+| `function_keys` | object; F1–F11 | F1–F11 기능을 프로필에서 지정. 안내도 지정한 키로 변경. 빈 값은 해제. |
 | `all_song_sources` | bool; `false` | `ALL SONG` 통합 목록을 다음 실행에서도 복원. 등록된 폴더 캐시를 순서대로 읽고 경로가 같은 차트는 한 번만 표시. |
 | `result_tail_ms` | double; `500` ms | 판정 완료 후 결과 전환 시 추가 대기 시간. `audio.play_to_end=true`이면 차트 오디오 종료 시점도 함께 고려합니다. |
 | `require_enter_to_exit` | bool; `true` | 읽기·저장 호환 필드. 현재 Windows 결과 입력 경로는 이 값으로 자동 종료하지 않습니다. |
@@ -347,7 +352,8 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `show_gear_boundary_line` | bool; `false` | 기어 경계선 표시. |
 | `show_timing_feedback` | bool; `true` | FAST/SLOW 글자 표시. 타이밍 막대는 별도 설정. |
 | `show_timing_bar` | bool; `true` | 타이밍 막대 표시. 값이 없는 이전 프로필/스킨은 기존 글자 표시 값을 상속. |
-| `timing_bar_always_visible` | bool; `false` | 막대를 피그렛 외 판정 뒤 0.75초 동안만 표시(`false`)하거나 항상 표시(`true`). 글자·현재 오차 마커는 유효한 최근 비PG 오차 뒤 0.75초 동안 유지되며 뒤이은 피그렛으로 지워지지 않음. 막대 끄기는 `show_timing_bar`로 별도 설정. |
+| `timing_bar_always_visible` | bool; `false` | `true`는 눈금과 마지막 FAST/SLOW 글자를 유지합니다. 판정별 점/바코드는 0.7초 뒤 만료됩니다. `false`는 기존 비PG 후 0.75초 표시를 유지하며, 막대 끄기는 `show_timing_bar`로 설정합니다. |
+| `timing_marker_style` | `dot` / `barcode`; `dot` | 판정 표시 모양. 점 또는 곧은 세로줄. |
 | `timing_feedback_override` | bool; `false` | 사용자가 표시 설정을 바꾼 후 스킨 매니페스트보다 프로필의 두 표시 값을 우선. |
 | `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | 글자/막대의 독립 X 이동. 기존 판정 주변 배치에 더하는 1920×1080 기준 픽셀. |
 | `timing_text_offset_y`, `timing_bar_offset_y` | double: `-400..400`; `0` | 글자/막대의 독립 Y 이동. 양수는 아래, 음수는 위. 기준 픽셀. |

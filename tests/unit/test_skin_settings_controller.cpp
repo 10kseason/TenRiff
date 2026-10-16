@@ -751,3 +751,15 @@ TEST_CASE("timing bar display mode adopts skin defaults without changing its vis
     CHECK(runtime.skin.timing_bar_always_visible);
     CHECK_FALSE(runtime.skin.show_timing_bar);
 }
+
+TEST_CASE("indicator shape selection changes preview settings and persists on exit") {
+    SkinSettingsController controller;
+    tenriff::config::RuntimeConfig runtime;
+    controller.reset("10k");
+    CHECK(runtime.skin.timing_marker_style == "dot");
+    const auto effects = controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames,
+                                          SkinSettingsRowId::TimingMarkerStyle);
+    CHECK(runtime.skin.timing_marker_style == "barcode");
+    CHECK(effects.menu.render_changed);
+    CHECK(controller.handle(MenuAction::back(), runtime, kLr2Names, kTenRiffNames).menu.persist_config);
+}

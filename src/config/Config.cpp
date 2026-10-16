@@ -538,6 +538,7 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         });
         config.audio.backend = backend == "asio" ? audio::AudioBackend::ASIO : audio::AudioBackend::WASAPI;
         config.audio.asio_driver = get_string(*audio, "asio_driver", config.audio.asio_driver);
+        config.audio.device_id = get_string(*audio, "device_id", config.audio.device_id);
         config.audio.sample_rate = static_cast<uint32_t>(get_number(*audio, "rate", config.audio.sample_rate));
         config.audio.frames_per_buffer =
             static_cast<uint32_t>(get_number(*audio, "frames", config.audio.frames_per_buffer));
@@ -738,6 +739,13 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.ui.hispeed_increase_key = get_string(*ui, "hispeed_increase_key", config.ui.hispeed_increase_key);
         if (config.ui.hispeed_decrease_key.size() > 32) config.ui.hispeed_decrease_key.clear();
         if (config.ui.hispeed_increase_key.size() > 32) config.ui.hispeed_increase_key.clear();
+        if (const auto* keys = get_object(*ui, "function_keys")) {
+            for (int number = 1; number <= 11; ++number) {
+                auto& binding = function_key(config.ui, number);
+                binding = get_string(*keys, "F" + std::to_string(number), binding);
+                if (binding.size() > 32) binding.clear();
+            }
+        }
         config.ui.active_song_source =
             get_string(*ui, "active_song_source", config.ui.active_song_source);
         config.ui.last_played_chart_path =
@@ -846,6 +854,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         // Older profiles used one switch for both text and bar.
         config.skin.show_timing_bar = get_bool(*skin, "show_timing_bar", config.skin.show_timing_feedback);
         config.skin.timing_bar_always_visible = get_bool(*skin, "timing_bar_always_visible", false);
+        config.skin.timing_marker_style = get_string(*skin, "timing_marker_style", "dot");
+        if (config.skin.timing_marker_style != "barcode") config.skin.timing_marker_style = "dot";
         config.skin.timing_feedback_override = get_bool(*skin, "timing_feedback_override", false);
         config.skin.note_fade_in = get_number(*skin, "note_fade_in", 0.0);
         config.skin.note_fade_out = get_number(*skin, "note_fade_out", 0.0);
@@ -1104,6 +1114,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     audio.emplace("backend", JsonValue{std::string(
         config.audio.backend == audio::AudioBackend::ASIO ? "asio" : "wasapi")});
     audio.emplace("asio_driver", JsonValue{config.audio.asio_driver});
+    audio.emplace("device_id", JsonValue{config.audio.device_id});
     audio.emplace("rate", JsonValue{static_cast<double>(config.audio.sample_rate)});
     audio.emplace("frames", JsonValue{static_cast<double>(config.audio.frames_per_buffer)});
     audio.emplace("periods", JsonValue{static_cast<double>(config.audio.periods)});
@@ -1258,6 +1269,10 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     ui.emplace("instant_restart_key", JsonValue{config.ui.instant_restart_key});
     ui.emplace("hispeed_decrease_key", JsonValue{config.ui.hispeed_decrease_key});
     ui.emplace("hispeed_increase_key", JsonValue{config.ui.hispeed_increase_key});
+    JsonObject function_keys;
+    for (int number = 1; number <= 11; ++number)
+        function_keys.emplace("F" + std::to_string(number), JsonValue{function_key(config.ui, number)});
+    ui.emplace("function_keys", JsonValue{std::move(function_keys)});
     ui.emplace("active_song_source", JsonValue{config.ui.active_song_source});
     ui.emplace("last_played_chart_path", JsonValue{config.ui.last_played_chart_path});
     ui.emplace("song_sources_initialized", JsonValue{config.ui.song_sources_initialized});
@@ -1326,6 +1341,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("show_timing_feedback", JsonValue{config.skin.show_timing_feedback});
     skin.emplace("show_timing_bar", JsonValue{config.skin.show_timing_bar});
     skin.emplace("timing_bar_always_visible", JsonValue{config.skin.timing_bar_always_visible});
+    skin.emplace("timing_marker_style", JsonValue{config.skin.timing_marker_style});
     skin.emplace("timing_feedback_override", JsonValue{config.skin.timing_feedback_override});
     skin.emplace("note_fade_in", JsonValue{config.skin.note_fade_in});
     skin.emplace("note_fade_out", JsonValue{config.skin.note_fade_out});

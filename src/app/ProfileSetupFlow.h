@@ -37,8 +37,18 @@ inline constexpr int kSkipStartCountdownRow = 13;
 inline constexpr int kInstantRestartKeyRow = 14;
 inline constexpr int kHispeedDecreaseKeyRow = 15;
 inline constexpr int kHispeedIncreaseKeyRow = 16;
-inline constexpr int kDoneRow = 17;
-inline constexpr int kFirstRunSkipRow = 18;
+inline constexpr int kFunctionKeysFirstRow = 17;
+inline constexpr int kFunctionKeysLastRow = 25;
+inline constexpr int kDoneRow = 26;
+inline constexpr int kFirstRunSkipRow = 27;
+
+[[nodiscard]] inline constexpr int function_for_row(int row) {
+    if (row == kHispeedDecreaseKeyRow) return 5;
+    if (row == kHispeedIncreaseKeyRow) return 6;
+    if (row < kFunctionKeysFirstRow || row > kFunctionKeysLastRow) return 0;
+    const int slot = row - kFunctionKeysFirstRow;
+    return slot < 4 ? slot + 1 : slot + 3;
+}
 
 [[nodiscard]] inline constexpr Entry entry(bool first_run_profile) {
     return first_run_profile ? Entry::FirstRun : Entry::Options;

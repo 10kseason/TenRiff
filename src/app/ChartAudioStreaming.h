@@ -11,7 +11,6 @@ namespace tenriff::app {
 
 struct ChartAudioBudgetChoice {
     std::uint64_t startup_preload_bytes = 96u * 1024u * 1024u;
-    std::uint64_t runtime_cache_bytes = 192u * 1024u * 1024u;
 };
 
 struct ChartAudioStartupCandidate {
@@ -36,9 +35,6 @@ inline ChartAudioBudgetChoice choose_chart_audio_budgets(SystemMemorySnapshot sn
     choice.startup_preload_bytes = clamp_budget((snapshot.available_bytes > 0) ? (snapshot.available_bytes / 16u) : 0u,
                                                 96u * 1024u * 1024u,
                                                 384u * 1024u * 1024u);
-    choice.runtime_cache_bytes = clamp_budget((snapshot.available_bytes > 0) ? (snapshot.available_bytes / 8u) : 0u,
-                                              192u * 1024u * 1024u,
-                                              768u * 1024u * 1024u);
     return choice;
 }
 

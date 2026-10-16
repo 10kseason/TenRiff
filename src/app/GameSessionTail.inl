@@ -142,6 +142,7 @@ GameSession::~GameSession() {
 }
 
 bool GameSession::initialize(const CommandLineOptions& options) {
+    memory_deferral_.begin();
     options_ = options;
     result_ = {};
     stop_requested_.store(false, std::memory_order_release);
@@ -224,7 +225,6 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     chart_audio_events_.clear();
     chart_audio_voices_.clear();
     chart_audio_load_queue_.clear();
-    chart_audio_active_until_samples_.reset();
     chart_audio_pcm_registry_.clear();
     chart_audio_deduplicator_.clear();
     pending_input_events_.clear();
@@ -234,10 +234,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     ghost_active_holds_buffer_.clear();
     next_chart_audio_event_ = 0;
     startup_preload_budget_bytes_ = 0;
-    runtime_chart_audio_budget_bytes_ = 0;
     chart_audio_decoded_bytes_ = 0;
     chart_audio_deferred_count_ = 0;
-    chart_audio_eviction_count_ = 0;
     last_chart_audio_service_sample_ = (std::numeric_limits<int64_t>::min)();
     chart_audio_startup_logged_ = false;
     chart_audio_steady_state_logged_ = false;
@@ -363,19 +361,19 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     up_keycode_ = config::KeycodeMap::to_keycode("Up").value_or(0);
     down_keycode_ = config::KeycodeMap::to_keycode("Down").value_or(0);
     enter_keycode_ = config::KeycodeMap::to_keycode("Enter").value_or(0);
-    f1_keycode_ = config::KeycodeMap::to_keycode("F1").value_or(0);
-    f2_keycode_ = config::KeycodeMap::to_keycode("F2").value_or(0);
-    f3_keycode_ = config::KeycodeMap::to_keycode("F3").value_or(0);
-    f4_keycode_ = config::KeycodeMap::to_keycode("F4").value_or(0);
+    f1_keycode_ = config::KeycodeMap::to_keycode(config::function_key(config_.ui, 1)).value_or(0);
+    f2_keycode_ = config::KeycodeMap::to_keycode(config::function_key(config_.ui, 2)).value_or(0);
+    f3_keycode_ = config::KeycodeMap::to_keycode(config::function_key(config_.ui, 3)).value_or(0);
+    f4_keycode_ = config::KeycodeMap::to_keycode(config::function_key(config_.ui, 4)).value_or(0);
     f5_keycode_ = 0;
     f6_keycode_ = 0;
     hispeed_coarse_decrease_held_ = false;
     hispeed_coarse_increase_held_ = false;
-    f7_keycode_ = config::KeycodeMap::to_keycode("F7").value_or(0);
-    f8_keycode_ = config::KeycodeMap::to_keycode("F8").value_or(0);
-    f9_keycode_ = config::KeycodeMap::to_keycode("F9").value_or(0);
-    f10_keycode_ = config::KeycodeMap::to_keycode("F10").value_or(0);
-    f11_keycode_ = config::KeycodeMap::to_keycode("F11").value_or(0);
+    f7_keycode_ = config::KeycodeMap::to_keycode(config::function_key(config_.ui, 7)).value_or(0);
+    f8_keycode_ = config::KeycodeMap::to_keycode(config::function_key(config_.ui, 8)).value_or(0);
+    f9_keycode_ = config::KeycodeMap::to_keycode(config::function_key(config_.ui, 9)).value_or(0);
+    f10_keycode_ = config::KeycodeMap::to_keycode(config::function_key(config_.ui, 10)).value_or(0);
+    f11_keycode_ = config::KeycodeMap::to_keycode(config::function_key(config_.ui, 11)).value_or(0);
 
     if (!options.replay_path.empty()) {
         auto replay_load = gameplay::load_replay_json(options.replay_path);
@@ -870,9 +868,23 @@ bool GameSession::initialize(const CommandLineOptions& options) {
                   << std::endl;
     }
     instant_restart_keycode_ = resolve_instant_restart_key(config_.ui.instant_restart_key, key_to_lane_);
-    f5_keycode_ = resolve_hispeed_key(config_.ui.hispeed_decrease_key, key_to_lane_, instant_restart_keycode_);
-    f6_keycode_ = resolve_hispeed_key(config_.ui.hispeed_increase_key, key_to_lane_, instant_restart_keycode_);
-    if (f5_keycode_ == f6_keycode_) f5_keycode_ = f6_keycode_ = 0;
+    const auto resolved_functions = resolve_function_keys(config_.ui, key_to_lane_);
+    lane_conflicting_overlay_keys_.fill(0);
+    for (int number = 10; number <= 11; ++number) {
+        const auto key = config::KeycodeMap::to_keycode(config::function_key(config_.ui, number)).value_or(0);
+        if (key_to_lane_.count(key)) lane_conflicting_overlay_keys_[number - 10] = key;
+    }
+    f1_keycode_ = resolved_functions[0];
+    f2_keycode_ = resolved_functions[1];
+    f3_keycode_ = resolved_functions[2];
+    f4_keycode_ = resolved_functions[3];
+    f5_keycode_ = resolved_functions[4];
+    f6_keycode_ = resolved_functions[5];
+    f7_keycode_ = resolved_functions[6];
+    f8_keycode_ = resolved_functions[7];
+    f9_keycode_ = resolved_functions[8];
+    f10_keycode_ = resolved_functions[9];
+    f11_keycode_ = resolved_functions[10];
     if (!config_.ui.instant_restart_key.empty() && instant_restart_keycode_ == 0) {
         std::cerr << "[warn] Instant Restart Key is invalid, reserved or bound to a lane; disabled for this chart." << std::endl;
     }
@@ -1307,7 +1319,8 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         snapshot.timing_feedback_delta_ms = timing.has_value ? timing.delta_ms : 0.0;
         snapshot.has_non_pg_feedback = gameplay::timing_feedback_visible(
             engine_->non_pg_feedback(), snapshot.current_sample, sample_rate_);
-        engine_->collect_recent_timing_deltas(snapshot.timing_history_delta_ms, &snapshot.timing_history_count);
+        engine_->collect_recent_timing_deltas(snapshot.timing_history_delta_ms, &snapshot.timing_history_count,
+            snapshot.current_sample - ms_to_samples(700.0, sample_rate_), snapshot.current_sample);
         engine_->collect_active_holds(active_holds_buffer_);
         if (!process_owns_foreground_window()) {
             std::fill(lane_pressed_.begin(), lane_pressed_.end(), 0);
@@ -1355,7 +1368,8 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             snapshot.ghost_has_non_pg_feedback = gameplay::timing_feedback_visible(
                 ghost_engine_->non_pg_feedback(), snapshot.current_sample, sample_rate_);
             ghost_engine_->collect_recent_timing_deltas(snapshot.ghost_timing_history_delta_ms,
-                                                        &snapshot.ghost_timing_history_count);
+                                                        &snapshot.ghost_timing_history_count,
+                snapshot.current_sample - ms_to_samples(700.0, sample_rate_), snapshot.current_sample);
             ghost_engine_->collect_active_holds(ghost_active_holds_buffer_);
             snapshot.ghost_lane_activity.fill(0.0f);
             snapshot.ghost_lane_activity_count =
@@ -1791,15 +1805,12 @@ bool GameSession::prepare_chart_audio() {
     chart_audio_events_.clear();
     chart_audio_voices_.clear();
     chart_audio_load_queue_.clear();
-    chart_audio_active_until_samples_.reset();
     chart_audio_pcm_registry_.clear();
     chart_audio_deduplicator_.clear();
     next_chart_audio_event_ = 0;
     startup_preload_budget_bytes_ = 0;
-    runtime_chart_audio_budget_bytes_ = 0;
     chart_audio_decoded_bytes_ = 0;
     chart_audio_deferred_count_ = 0;
-    chart_audio_eviction_count_ = 0;
     last_chart_audio_service_sample_ = (std::numeric_limits<int64_t>::min)();
     chart_audio_startup_logged_ = false;
     chart_audio_steady_state_logged_ = false;
@@ -1816,12 +1827,10 @@ bool GameSession::prepare_chart_audio() {
 
     chart_audio_assets_.resize(asset_count);
     std::vector<ChartAudioDeduplicator::Occurrence> audio_occurrences;
-    chart_audio_active_until_samples_ = std::make_unique<std::atomic<int64_t>[]>(asset_count);
     for (std::size_t i = 0; i < asset_count; ++i) {
         chart_audio_assets_[i].path = chart_.audio_assets[i].path;
         chart_audio_assets_[i].estimated_decoded_bytes = estimate_audio_decoded_bytes(chart_.audio_assets[i].path,
                                                                                       sample_rate_);
-        chart_audio_active_until_samples_[i].store(0, std::memory_order_release);
     }
 
     chart_audio_events_.reserve(chart_.audio_cues.size());
@@ -1885,7 +1894,6 @@ bool GameSession::prepare_chart_audio() {
 
     const auto budgets = choose_chart_audio_budgets(query_system_memory_snapshot());
     startup_preload_budget_bytes_ = budgets.startup_preload_bytes;
-    runtime_chart_audio_budget_bytes_ = budgets.runtime_cache_bytes;
 
     const std::size_t worker_count = (std::min)(static_cast<std::size_t>(2u), chart_audio_assets_.size());
     start_chart_audio_workers(worker_count);
@@ -1921,7 +1929,6 @@ bool GameSession::prepare_chart_audio() {
         chart_audio_assets_.clear();
         chart_audio_events_.clear();
         chart_audio_voices_.clear();
-        chart_audio_active_until_samples_.reset();
         chart_audio_pcm_registry_.clear();
         chart_audio_deduplicator_.clear();
         return false;
@@ -2096,13 +2103,11 @@ void GameSession::log_chart_audio_memory(std::string_view phase) {
     std::size_t asset_count = 0;
     std::uint64_t decoded_bytes = 0;
     std::size_t deferred_count = 0;
-    std::size_t eviction_count = 0;
     {
         std::lock_guard<std::mutex> lock(chart_audio_stream_mutex_);
         asset_count = chart_audio_assets_.size();
         decoded_bytes = chart_audio_decoded_bytes_;
         deferred_count = chart_audio_deferred_count_;
-        eviction_count = chart_audio_eviction_count_;
     }
     log_memory_phase("GameSession",
                      phase,
@@ -2110,7 +2115,7 @@ void GameSession::log_chart_audio_memory(std::string_view phase) {
                      "asset_count=" + std::to_string(asset_count) +
                          " decoded=" + format_memory_bytes(decoded_bytes) +
                          " deferred=" + std::to_string(deferred_count) +
-                         " evictions=" + std::to_string(eviction_count));
+                         " retention=until-session-stop");
 }
 
 void GameSession::service_chart_audio_streaming(int64_t current_sample) {
@@ -2125,7 +2130,8 @@ void GameSession::service_chart_audio_streaming(int64_t current_sample) {
 
     last_chart_audio_service_sample_ = current_sample;
     queue_chart_audio_prefetch(current_sample);
-    trim_chart_audio_cache(current_sample);
+    // Keep decoded PCM pinned through the entire session, including pauses.
+    // Only shutdown, after the mixer and decode workers stop, releases it.
 
     if (!chart_audio_steady_state_logged_ &&
         current_sample >= ms_to_samples(static_cast<double>(kChartAudioPrefetchWindowMs), sample_rate_)) {
@@ -2161,85 +2167,6 @@ void GameSession::queue_chart_audio_prefetch(int64_t current_sample) {
 
     if (queued_any) {
         chart_audio_stream_cv_.notify_all();
-    }
-}
-
-void GameSession::trim_chart_audio_cache(int64_t current_sample) {
-    if (chart_audio_decoded_bytes_ <= runtime_chart_audio_budget_bytes_) {
-        return;
-    }
-
-    struct EvictCandidate {
-        std::size_t asset_id = 0;
-        int64_t next_use_sample = (std::numeric_limits<int64_t>::max)();
-    };
-
-    const int64_t horizon_sample =
-        current_sample + ms_to_samples(static_cast<double>(kChartAudioPrefetchWindowMs), sample_rate_);
-
-    std::lock_guard<std::mutex> lock(chart_audio_stream_mutex_);
-    auto evict_until = [&](bool include_prefetch_window) {
-        std::vector<EvictCandidate> candidates;
-        for (std::size_t asset_id = 0; asset_id < chart_audio_assets_.size(); ++asset_id) {
-            auto& asset = chart_audio_assets_[asset_id];
-            if (asset.state != ChartAudioAssetState::Ready || asset.decoded_bytes == 0) {
-                continue;
-            }
-
-            while (asset.next_use_index < asset.use_samples.size() &&
-                   asset.use_samples[asset.next_use_index] < current_sample) {
-                ++asset.next_use_index;
-            }
-
-            const int64_t active_until = chart_audio_active_until_samples_
-                                             ? chart_audio_active_until_samples_[asset_id].load(std::memory_order_acquire)
-                                             : 0;
-            if (active_until > current_sample) {
-                continue;
-            }
-
-            const int64_t next_use =
-                (asset.next_use_index < asset.use_samples.size()) ? asset.use_samples[asset.next_use_index]
-                                                                  : (std::numeric_limits<int64_t>::max)();
-            if (!include_prefetch_window && next_use <= horizon_sample) {
-                continue;
-            }
-            candidates.push_back(EvictCandidate{asset_id, next_use});
-        }
-
-        std::stable_sort(candidates.begin(), candidates.end(), [](const EvictCandidate& lhs,
-                                                                  const EvictCandidate& rhs) {
-            if (lhs.next_use_sample != rhs.next_use_sample) {
-                return lhs.next_use_sample > rhs.next_use_sample;
-            }
-            return lhs.asset_id < rhs.asset_id;
-        });
-
-        for (const auto& candidate : candidates) {
-            if (chart_audio_decoded_bytes_ <= runtime_chart_audio_budget_bytes_) {
-                break;
-            }
-            auto& asset = chart_audio_assets_[candidate.asset_id];
-            auto samples = std::atomic_load_explicit(&asset.clip.samples, std::memory_order_acquire);
-            if (!samples) {
-                continue;
-            }
-            std::atomic_store_explicit(&asset.clip.samples,
-                                       std::shared_ptr<const std::vector<float>>{},
-                                       std::memory_order_release);
-            std::atomic_store_explicit(&asset.clip.identity,
-                                       std::shared_ptr<const ChartAudioPcmIdentity>{},
-                                       std::memory_order_release);
-            chart_audio_decoded_bytes_ -= asset.decoded_bytes;
-            asset.decoded_bytes = 0;
-            asset.state = ChartAudioAssetState::Unloaded;
-            ++chart_audio_eviction_count_;
-        }
-    };
-
-    evict_until(false);
-    if (chart_audio_decoded_bytes_ > runtime_chart_audio_budget_bytes_) {
-        evict_until(true);
     }
 }
 
@@ -2336,15 +2263,6 @@ void GameSession::mix_chart_audio(float* output, uint32_t frames, int64_t buffer
         const int64_t source_frames = static_cast<int64_t>(samples->size() / 2u);
         const int64_t playback_frames =
             chart_audio_playback_duration_frames(source_frames, config_.speed.rate);
-        const int64_t active_until = voice.start_sample + playback_frames;
-        if (chart_audio_active_until_samples_) {
-            auto& slot = chart_audio_active_until_samples_[voice.asset_id];
-            int64_t observed = slot.load(std::memory_order_acquire);
-            while (observed < active_until &&
-                   !slot.compare_exchange_weak(observed, active_until, std::memory_order_acq_rel)) {
-            }
-        }
-
         const int64_t clip_end = voice.start_sample + playback_frames;
         if (clip_end <= buffer_start_samples) {
             continue;
@@ -2671,15 +2589,12 @@ void GameSession::shutdown() {
     chart_audio_events_.clear();
     chart_audio_voices_.clear();
     chart_audio_load_queue_.clear();
-    chart_audio_active_until_samples_.reset();
     chart_audio_pcm_registry_.clear();
     chart_audio_deduplicator_.clear();
     next_chart_audio_event_ = 0;
     startup_preload_budget_bytes_ = 0;
-    runtime_chart_audio_budget_bytes_ = 0;
     chart_audio_decoded_bytes_ = 0;
     chart_audio_deferred_count_ = 0;
-    chart_audio_eviction_count_ = 0;
     last_chart_audio_service_sample_ = (std::numeric_limits<int64_t>::min)();
     chart_audio_startup_logged_ = false;
     chart_audio_steady_state_logged_ = false;
@@ -2723,6 +2638,8 @@ void GameSession::shutdown() {
     hud_scan_cutoff_sample_ = (std::numeric_limits<int64_t>::min)();
     hud_callback_ = nullptr;
     screenshot_callback_ = nullptr;
+    // The stopped-session transition is complete. Menus may now drain queued trims.
+    memory_deferral_.end();
 }
 
 void GameSession::audio_callback(float* output,
@@ -3166,7 +3083,11 @@ bool GameSession::handle_control_input(const input::InputEvent& incoming_event) 
     }
     const bool restart_key = instant_restart_keycode_ != 0 && event.keycode == instant_restart_keycode_;
     if (restart_key && event.state == input::InputState::Released) instant_restart_key_armed_ = true;
-    if (control_input_callback_ && control_input_callback_(event)) {
+    // A later lane-key edit can invalidate a profile overlay shortcut. Do not
+    // let the menu callback consume that lane even though it retains the label.
+    const bool invalid_overlay_key = event.keycode != 0 &&
+        (event.keycode == lane_conflicting_overlay_keys_[0] || event.keycode == lane_conflicting_overlay_keys_[1]);
+    if (!invalid_overlay_key && control_input_callback_ && control_input_callback_(event)) {
         if (restart_key && event.state == input::InputState::Pressed) instant_restart_key_armed_ = false;
         reset_tuning_repeats();
         return true;
@@ -3237,11 +3158,11 @@ bool GameSession::handle_control_input(const input::InputEvent& incoming_event) 
             return true;
         }
         if (f5_keycode_ != 0 && event.keycode == f5_keycode_) {
-            if (coarse_press) adjust_hispeed(-10.0);
+            if (coarse_press) adjust_hispeed(-config_.speed.hi_speed * 0.5);
             return true;
         }
         if (f6_keycode_ != 0 && event.keycode == f6_keycode_) {
-            if (coarse_press) adjust_hispeed(10.0);
+            if (coarse_press) adjust_hispeed(config_.speed.hi_speed);
             return true;
         }
         if (f7_keycode_ != 0 && event.keycode == f7_keycode_) {
@@ -3294,11 +3215,11 @@ bool GameSession::handle_control_input(const input::InputEvent& incoming_event) 
     }
     if (event.state == input::InputState::Pressed) {
         if (f5_keycode_ != 0 && event.keycode == f5_keycode_) {
-            if (coarse_press) adjust_hispeed(-10.0);
+            if (coarse_press) adjust_hispeed(-config_.speed.hi_speed * 0.5);
             return true;
         }
         if (f6_keycode_ != 0 && event.keycode == f6_keycode_) {
-            if (coarse_press) adjust_hispeed(10.0);
+            if (coarse_press) adjust_hispeed(config_.speed.hi_speed);
             return true;
         }
         if (f9_keycode_ != 0 && event.keycode == f9_keycode_) {

@@ -347,10 +347,10 @@ void GameplayEngine::collect_active_holds(std::vector<ActiveHoldView>& out) cons
 }
 
 void GameplayEngine::collect_recent_timing_deltas(std::array<double, kGameplayTimingHistoryMaxEntries>& out,
-                                                  std::size_t* out_count) const {
+                                                  std::size_t* out_count, int64_t after_sample, int64_t through_sample) const {
     const std::size_t count = std::min(recent_timing_delta_count_, recent_timing_deltas_.size());
     if (out_count) {
-        *out_count = count;
+        *out_count = 0;
     }
     out.fill(0.0);
     if (count == 0) {
@@ -359,9 +359,13 @@ void GameplayEngine::collect_recent_timing_deltas(std::array<double, kGameplayTi
 
     const std::size_t start =
         (recent_timing_delta_head_ + recent_timing_deltas_.size() - count) % recent_timing_deltas_.size();
+    std::size_t visible = 0;
     for (std::size_t i = 0; i < count; ++i) {
-        out[i] = recent_timing_deltas_[(start + i) % recent_timing_deltas_.size()];
+        const auto index = (start + i) % recent_timing_deltas_.size();
+        if (recent_timing_samples_[index] > after_sample && recent_timing_samples_[index] <= through_sample)
+            out[visible++] = recent_timing_deltas_[index];
     }
+    if (out_count) *out_count = visible;
 }
 
 bool GameplayEngine::process_mines_until(LaneState& lane, int lane_number, int64_t sample) {
@@ -444,7 +448,7 @@ void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms,
         }
     }
     if (std::isfinite(delta_ms)) {
-        push_recent_timing_delta(delta_ms);
+        push_recent_timing_delta(delta_ms, sample);
     }
 
     const auto previous_type = gauge_state_.type;
@@ -538,12 +542,13 @@ double GameplayEngine::detailed_accuracy_credit_for(game::Judgement judgement, d
     return std::clamp(std::exp(-0.125 * normalized_error * normalized_error), 0.0, 1.0);
 }
 
-void GameplayEngine::push_recent_timing_delta(double delta_ms) {
+void GameplayEngine::push_recent_timing_delta(double delta_ms, int64_t sample) {
     if (!std::isfinite(delta_ms) || recent_timing_deltas_.empty()) {
         return;
     }
 
     recent_timing_deltas_[recent_timing_delta_head_] = delta_ms;
+    recent_timing_samples_[recent_timing_delta_head_] = sample;
     recent_timing_delta_head_ = (recent_timing_delta_head_ + 1) % recent_timing_deltas_.size();
     if (recent_timing_delta_count_ < recent_timing_deltas_.size()) {
         ++recent_timing_delta_count_;

@@ -1,3 +1,5 @@
+**2026-10-17 · 1.9.4:** Retain chart PCM and static BGA during play, defer forced trims, and add indicator shape/0.7-second markers, output selection, profile shortcuts, ×0.5/×2 and aligned measure lines. [Memory reclamation and play controls](docs/release-1.9.4.en.md).
+
 **2026-10-16 · 1.9.3 release scope:** Adds Empty Poor accuracy exclusion (R7/R8), the BMS rank badge, in-game levels and measure lines, retained FAST/SLOW, Safe indexing defaults, general residual/image ONNX and supported external Safetensors conversion. Runtime/source packages contain no BGA weights; OFF/empty-path defaults remain. Guest upload exclusion, fixed grades and baseline 1.9.0 are preserved. [Changes and compatibility](docs/release-1.9.3.en.md) · [Verification gate](docs/release-1.9.3-gate.md). The [1.9.3 release page](https://github.com/10kseason/TenRiff/releases/tag/1.9.3) determines publication and downloads; dated entries below retain their historical scope.
 
 > Previous 1.9.2: [Guest/Online, original-resolution upscaling and UI changes](docs/release-1.9.2.en.md).

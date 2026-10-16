@@ -1,3 +1,5 @@
+**2026-10-17 · 1.9.3 local:** [Indicators, output devices and profile shortcuts](input-feedback-20261017.en.md).
+
 # TenRiff Config Schema (current)
 
 **Current 1.9.3 contract:** Safe indexing defaults, Empty Poor accuracy exclusion with R7/R8, general ONNX and supported Safetensors apply. Production Sites v19 accepts eligible fresh Online records; Guest/unmarked historical records remain permanently excluded. No BGA weights ship; OFF/empty-path defaults and baseline1.9.0 remain. The [1.9.3 scope](release-1.9.3.en.md) supersedes dated history below.
@@ -43,6 +45,8 @@ The 1.9.0.2 candidate adjusts all five audio UI volumes—master, BMS song, TenR
 
 - `backend` (string)
   - `wasapi | asio`; default `wasapi`. Selects gameplay and song-preview output; menu/result background music keeps its separate Windows MCI path.
+- `device_id` (string)
+  - Empty by default (system default). WASAPI endpoint ID for gameplay and BMS previews, selected in Sound options. Missing selected endpoints do not silently fall back. Built-in menu/result music keeps the separate MCI system-default output.
 - `asio_driver` (string)
   - CLSID of an installed 64-bit ASIO driver. Empty means Auto, the first driver sorted by name. Select in Audio settings; F5 refreshes the list.
 - `rate` (int)
@@ -291,8 +295,9 @@ These controls do not change Sites submission policy. Long LN Mix v2 exclusion f
 | `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | Profile and first-run menu text at 100%, 115%, or 130%. Gameplay fonts remain skin-controlled. |
 | `skip_start_countdown` | bool; `false` | Skip the initial `3 / 2 / 1` display in solo play, including normal starts, menu restarts and result retries. |
 | `instant_restart_key` | string; `""` (unassigned) | Key name for restarting an active solo chart from the beginning. The new attempt always skips the initial countdown; the interrupted attempt saves no result or replay. |
-| `hispeed_decrease_key` | string; `"F5"` | Hi-Speed -10 key, assigned in Profile; empty disables. |
-| `hispeed_increase_key` | string; `"F6"` | Hi-Speed +10 key, assigned in Profile; empty disables. |
+| `hispeed_decrease_key` | string; `"F5"` | Note Speed ×0.5 key, assigned in Profile; empty disables. |
+| `hispeed_increase_key` | string; `"F6"` | Note Speed ×2 key, assigned in Profile; empty disables. |
+| `function_keys` | object; F1–F11 | Profile mappings for F1–F11 actions and displayed hints. Empty unassigns. |
 | `all_song_sources` | bool; `false` | Restore ALL SONG, combining registered folder caches and deduplicating identical chart paths. |
 | `result_tail_ms` | double; `500` ms | Extra result-transition delay after judgement completion; the chart audio end is also considered when `audio.play_to_end=true`. |
 | `require_enter_to_exit` | bool; `true` | Retained for read/write compatibility; the current Windows result-input path does not use it to auto-exit. |
@@ -337,7 +342,8 @@ These are profile `config.json` skin settings. For a skin package's `skin.json` 
 | `show_gear_boundary_line` | bool; `false` | Show the gear boundary line. |
 | `show_timing_feedback` | bool; `true` | Show FAST/SLOW text independently of the bar. |
 | `show_timing_bar` | bool; `true` | Show the timing bar; older profiles/skins without this field inherit the text switch. |
-| `timing_bar_always_visible` | bool; `false` | Keep the timing scale visible (`true`) or show it for 0.75 seconds after a non-PG judgement (`false`). Text/live error markers retain the last valid non-PG error for 0.75 seconds even after PG. `show_timing_bar` remains the independent off switch. |
+| `timing_bar_always_visible` | bool; `false` | `true` keeps the scale and last FAST/SLOW text visible. Each dot/barcode expires after 0.7s. `false` retains the existing 0.75s post-non-PG visibility. `show_timing_bar` independently disables the bar. |
+| `timing_marker_style` | `dot` / `barcode`; `dot` | Judgement markers: round dots or straight vertical strokes. |
 | `timing_feedback_override` | bool; `false` | After the user edits a switch, profile visibility choices take priority over the skin manifest. |
 | `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | Independent text/bar X offsets added to the existing judgement-area layout, in 1920x1080 base pixels. |
 | `timing_text_offset_y`, `timing_bar_offset_y` | double: `-400..400`; `0` | Independent text/bar Y offsets in base pixels; positive moves down. |

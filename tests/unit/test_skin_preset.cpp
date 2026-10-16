@@ -85,6 +85,7 @@ TEST_CASE("skin preset native settings round trip only appearance in Unicode pat
     skin.show_timing_feedback = false;
     skin.show_timing_bar = true;
     skin.timing_bar_always_visible = true;
+    skin.timing_marker_style = "barcode";
     skin.timing_feedback_override = true;
     skin.timing_text_offset_x = 180;
     skin.timing_text_offset_y = -100;
@@ -119,6 +120,7 @@ TEST_CASE("skin preset native settings round trip only appearance in Unicode pat
     CHECK_FALSE(imported.skin.show_timing_feedback);
     CHECK(imported.skin.show_timing_bar);
     CHECK(imported.skin.timing_bar_always_visible);
+    CHECK(imported.skin.timing_marker_style == "barcode");
     CHECK(imported.skin.timing_feedback_override);
     CHECK(imported.skin.timing_text_offset_x == 180);
     CHECK(imported.skin.timing_text_offset_y == -100);
@@ -376,6 +378,9 @@ TEST_CASE("portable profile round trip preserves keys skin settings and backs up
     config.ui.instant_restart_key = "F12";
     config.ui.hispeed_decrease_key = "Q";
     config.ui.hispeed_increase_key.clear();
+    config.ui.function_keys[0] = "F2";
+    config.ui.function_keys[1] = "F1";
+    config.audio.device_id = "private-endpoint-id";
     config.ui.active_song_source = "private-source-do-not-export";
     config.ui.private_server_url = "https://private.example.test";
     config.ui.profile_avatar_path = "private-avatar-do-not-export";
@@ -393,8 +398,10 @@ TEST_CASE("portable profile round trip preserves keys skin settings and backs up
     CHECK(bytes.find("private.example.test") == std::string::npos);
     CHECK(bytes.find("private-avatar-do-not-export") == std::string::npos);
     CHECK(bytes.find("private-model-do-not-export") == std::string::npos);
+    CHECK(bytes.find("private-endpoint-id") == std::string::npos);
     auto current = loader.defaults();
     current.ui.active_song_source = "keep-current-library";
+    current.audio.device_id = "this-pc-endpoint";
     current.ui.private_server_url = "https://keep-current.example.test";
     current.graphics.background_upscale_model_path = "keep-local.onnx";
     current.graphics.background_upscale_output_mode = "image";
@@ -421,6 +428,9 @@ TEST_CASE("portable profile round trip preserves keys skin settings and backs up
     CHECK(reloaded.config.ui.instant_restart_key == "F12");
     CHECK(reloaded.config.ui.hispeed_decrease_key == "Q");
     CHECK(reloaded.config.ui.hispeed_increase_key.empty());
+    CHECK(reloaded.config.ui.function_keys[0] == "F2");
+    CHECK(reloaded.config.ui.function_keys[1] == "F1");
+    CHECK(reloaded.config.audio.device_id == "this-pc-endpoint");
     const auto reloaded_keys = manager.load_profile(profile.u8string());
     REQUIRE(reloaded_keys.success());
     CHECK(reloaded_keys.keymap.mode_bindings.at("7k").at("lane1") == "A");

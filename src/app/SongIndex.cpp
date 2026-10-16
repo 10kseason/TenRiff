@@ -1,4 +1,5 @@
 #include "app/SongIndex.h"
+#include "app/MemoryReclamation.h"
 #include "app/BmsRankLabel.h"
 #include "app/SongIndexBudget.h"
 #include "app/MenuSongUtils.h"
@@ -871,10 +872,7 @@ SongIndexMemorySnapshot query_song_index_memory_snapshot() {
 }
 
 void trim_song_index_process_memory() {
-#ifdef _WIN32
-    _heapmin();
-    SetProcessWorkingSetSize(GetCurrentProcess(), static_cast<SIZE_T>(-1), static_cast<SIZE_T>(-1));
-#endif
+    process_memory_reclamation().request();
 }
 
 bool should_trim_song_index_process_memory(SongIndexProfile profile, int processed, int total) {

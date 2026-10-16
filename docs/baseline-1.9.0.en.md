@@ -1,3 +1,5 @@
+**2026-10-17 · 1.9.4:** Retain chart PCM and static BGA during play, defer forced trims, and add indicator shape/0.7-second markers, output selection, profile shortcuts, ×0.5/×2 and aligned measure lines. [Memory reclamation and play controls](release-1.9.4.en.md).
+
 # TenRiff 1.9.0 Fixed Baseline
 
 [한국어](baseline-1.9.0.md) | [English](baseline-1.9.0.en.md) | [日本語](baseline-1.9.0.ja.md) | [简体中文](baseline-1.9.0.zh-CN.md)

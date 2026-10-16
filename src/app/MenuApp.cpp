@@ -57,6 +57,7 @@
 #include "app/MultiplayerPresentation.h"
 #include "app/RankedRecordsClient.h"
 #include "app/ProfileSetupFlow.h"
+#include "ui/FunctionKeyLabels.h"
 #include "app/GameplayStartPolicy.h"
 #include "app/ProfilePreset.h"
 #include "app/PortableFileDialog.h"
@@ -826,7 +827,7 @@ ui::Language MenuApp::ui_language() const {
 }
 
 std::string MenuApp::ui_text(std::string_view english, std::string_view korean) const {
-    return ui::text(ui_language(), english, korean);
+    return ui::function_key_labels(ui::text(ui_language(), english, korean), config::function_key_labels(config_.ui));
 }
 
 std::string MenuApp::ui_on_off(bool enabled) const {
@@ -1296,15 +1297,7 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     key_h_ = config::KeycodeMap::to_keycode("H").value_or(0);
     key_o_ = config::KeycodeMap::to_keycode("O").value_or(0);
     key_t_ = config::KeycodeMap::to_keycode("T").value_or(0);
-    key_f6_ = config::KeycodeMap::to_keycode("F6").value_or(0);
-    key_f7_ = config::KeycodeMap::to_keycode("F7").value_or(0);
-    key_f1_ = config::KeycodeMap::to_keycode("F1").value_or(0);
-    key_f2_ = config::KeycodeMap::to_keycode("F2").value_or(0);
-    key_f5_ = config::KeycodeMap::to_keycode("F5").value_or(0);
-    key_f8_ = config::KeycodeMap::to_keycode("F8").value_or(0);
-    key_f9_ = config::KeycodeMap::to_keycode("F9").value_or(0);
-    key_f10_ = config::KeycodeMap::to_keycode("F10").value_or(0);
-    key_f11_ = config::KeycodeMap::to_keycode("F11").value_or(0);
+    refresh_function_keys();
     key_minus_ = config::KeycodeMap::to_keycode("Minus").value_or(0);
     key_plus_ = config::KeycodeMap::to_keycode("Plus").value_or(0);
 
@@ -2091,7 +2084,22 @@ bool MenuApp::remember_song_source(const std::string& source_path) {
     return changed;
 }
 
+void MenuApp::refresh_function_keys() {
+    function_keycodes_ = resolve_function_keys(config_.ui);
+    const auto& resolved = function_keycodes_;
+    key_f1_ = resolved[0];
+    key_f2_ = resolved[1];
+    key_f5_ = resolved[4];
+    key_f6_ = resolved[5];
+    key_f7_ = resolved[6];
+    key_f8_ = resolved[7];
+    key_f9_ = resolved[8];
+    key_f10_ = resolved[9];
+    key_f11_ = resolved[10];
+}
+
 void MenuApp::persist_runtime_config() {
+    refresh_function_keys();
     config::ConfigLoader loader;
     std::string error;
     const config::RuntimeConfig persisted = build_persisted_runtime_config(config_);
@@ -2176,7 +2184,9 @@ uint32_t MenuApp::menu_key_alias(uint32_t keycode) const {
     const bool capture = (current_screen() == Screen::Keymap && keymap_settings_controller_.capture_active()) ||
         (current_screen() == Screen::QuickSetup && profile_control_key_capture_active_) ||
         current_screen() == Screen::KeymapTest;
-    if (!capture) {
+    bool assigned = false;
+    for (const auto resolved : function_keycodes_) assigned |= resolved != 0 && resolved == keycode;
+    if (!capture && !assigned) {
         if (const auto index = input::gamepad::keycode_index(keycode)) {
             switch (*index) {
                 case 0: keycode = key_up_; break;
@@ -2260,6 +2270,19 @@ void MenuApp::handle_input_event(const input::InputEvent& incoming_event) {
     if (current_screen() == Screen::QuickSetup && profile_control_key_capture_active_) {
         if (event.state == input::InputState::Pressed) handle_quick_setup_input(event.keycode);
         return;
+    }
+    const auto printable_vk = config::KeycodeMap::polling_vk_for_keycode(event.keycode);
+    const bool printable_shortcut = printable_vk && ((*printable_vk >= 0x30 && *printable_vk <= 0x5a) ||
+        (*printable_vk >= 0x60 && *printable_vk <= 0x6f) || *printable_vk >= 0xba);
+    if (printable_shortcut && event.state == input::InputState::Pressed) {
+        if (current_screen() == Screen::QuickSetup && profile_nickname_edit_active_) {
+            handle_quick_setup_input(event.keycode); return;
+        }
+        if (current_screen() == Screen::SongSelect && song_select_search_active_) {
+            handle_song_select_input(event.keycode); return;
+        }
+        if (chat_overlay_visible_) { (void)handle_multiplayer_chat_overlay_input(event.keycode); return; }
+        if (ranked_account_overlay_visible_) { (void)handle_ranked_account_overlay_input(event.keycode); return; }
     }
     if (current_screen() == Screen::SettingsSkins &&
         (skin_preview_fullscreen_ || (key_f6_ != 0 && event.keycode == key_f6_))) {
@@ -3724,14 +3747,20 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
     const auto setup_entry = profile_setup::entry(first_run_profile_);
     const int item_count = profile_setup::row_count(setup_entry);
     if (profile_control_key_capture_active_) {
-        const bool decrease = profile_control_key_capture_row_ == profile_setup::kHispeedDecreaseKeyRow;
-        const bool increase = profile_control_key_capture_row_ == profile_setup::kHispeedIncreaseKeyRow;
-        auto& binding = decrease ? config_.ui.hispeed_decrease_key :
-            increase ? config_.ui.hispeed_increase_key : config_.ui.instant_restart_key;
-        const bool control_conflict =
-            (!decrease && config::KeycodeMap::to_keycode(config_.ui.hispeed_decrease_key).value_or(0) == keycode) ||
-            (!increase && config::KeycodeMap::to_keycode(config_.ui.hispeed_increase_key).value_or(0) == keycode) ||
-            ((decrease || increase) && config::KeycodeMap::to_keycode(config_.ui.instant_restart_key).value_or(0) == keycode);
+        const int function = profile_setup::function_for_row(profile_control_key_capture_row_);
+        auto& binding = function ? config::function_key(config_.ui, function) : config_.ui.instant_restart_key;
+        bool control_conflict = function && config::KeycodeMap::to_keycode(config_.ui.instant_restart_key).value_or(0) == keycode;
+        for (int number = 1; number <= 11; ++number) {
+            if (number != function && config::KeycodeMap::to_keycode(config::function_key(config_.ui, number)).value_or(0) == keycode)
+                control_conflict = true;
+        }
+        if (function) {
+            for (const auto fixed : {key_space_, key_tab_, key_minus_, key_plus_, key_r_, key_o_, key_p_,
+                                     key_h_, key_t_, key_i_, key_m_, key_k_})
+                control_conflict |= fixed != 0 && keycode == fixed;
+            if (const auto pad = input::gamepad::keycode_index(keycode))
+                control_conflict |= *pad <= 5 || *pad == 10 || *pad == 11;
+        }
         // This is one physical key, not a chord. In particular, returning from
         // Alt+Tab or Ctrl shortcuts must not accidentally assign the next key.
         bool modifier_held = false;
@@ -3752,7 +3781,7 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
             profile_control_key_capture_active_ = false;
             profile_control_key_status_.clear();
             persist_runtime_config();
-        } else if (((decrease || increase) ? hispeed_key_reserved(keycode) : instant_restart_key_reserved(keycode)) ||
+        } else if ((function ? function_key_reserved(keycode) : instant_restart_key_reserved(keycode)) ||
                    modifier_held || control_conflict) {
             profile_control_key_status_ = ui_text("Reserved key. Choose an unused key, such as F12.",
                                                   "예약된 키입니다. F12 등 사용하지 않는 키를 고르세요.");
@@ -3783,8 +3812,7 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
         return;
     }
     if ((settings_cursor_ == profile_setup::kInstantRestartKeyRow ||
-         settings_cursor_ == profile_setup::kHispeedDecreaseKeyRow ||
-         settings_cursor_ == profile_setup::kHispeedIncreaseKeyRow) && keycode == key_enter_) {
+         profile_setup::function_for_row(settings_cursor_) != 0) && keycode == key_enter_) {
         profile_control_key_capture_row_ = settings_cursor_;
         profile_control_key_capture_active_ = true;
         profile_control_key_status_.clear();
@@ -3884,6 +3912,7 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
                 const auto loaded = import_profile_preset(picked.path, profile_dir_, config_);
                 if (loaded.success()) {
                     config_ = loaded.config;
+                    refresh_function_keys();
                     keymap_ = loaded.keymap;
                     working_keymap_ = keymap_;
                     refresh_available_lr2_skins();
@@ -4659,14 +4688,14 @@ void MenuApp::handle_difficulty_table_input(uint32_t keycode) {
     // Cancelling, applying, replacing or reopening the draft ends any held erase.
     if (keycode != key_backspace_) reset_song_select_repeat();
     if (difficulty_table_url_editing_) {
-        const auto f4 = config::KeycodeMap::to_keycode("F4").value_or(0);
+        const auto f4 = config::KeycodeMap::to_keycode(config::function_key(config_.ui, 4)).value_or(0);
         if (f4 != 0 && keycode == f4) {
             select_native_difficulty_levels();
             return;
         }
         for (std::size_t index = 0; index < config::kBuiltinDifficultyTables.size(); ++index) {
             const auto shortcut = config::KeycodeMap::to_keycode(
-                "F" + std::to_string(config::kBuiltinDifficultyTables[index].function_key)).value_or(0);
+                config::function_key(config_.ui, config::kBuiltinDifficultyTables[index].function_key)).value_or(0);
             if (shortcut != 0 && keycode == shortcut) {
                 apply_builtin_difficulty_table(static_cast<int>(index));
                 return;

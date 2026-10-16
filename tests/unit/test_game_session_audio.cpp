@@ -37,6 +37,28 @@ struct CompletionTestDirectory {
 // Exercise the production input-to-voice-to-mixer path without starting a device,
 // input thread, decoder, profile or record writer.
 struct GameSessionAudioTestAccess {
+    static void check_pcm_retention_until_stop() {
+        GameSession session;
+        session.sample_rate_ = 1000;
+        session.chart_audio_assets_.resize(1);
+        auto& asset = session.chart_audio_assets_[0];
+        auto samples = std::make_shared<const std::vector<float>>(2048, 0.25f);
+        std::weak_ptr<const std::vector<float>> retained = samples;
+        asset.clip.samples = samples;
+        asset.state = GameSession::ChartAudioAssetState::Ready;
+        asset.decoded_bytes = samples->size() * sizeof(float);
+        asset.use_samples = {0};
+        session.chart_audio_decoded_bytes_ = 1024ull * 1024ull * 1024ull;
+        samples.reset();
+        for (const int64_t now : {10'000, 20'000, 120'000}) {
+            session.service_chart_audio_streaming(now);
+            CHECK_FALSE(retained.expired());
+            CHECK(asset.state == GameSession::ChartAudioAssetState::Ready);
+        }
+        session.shutdown();
+        CHECK(retained.expired());
+    }
+
     static void callback_with_sample_clock(GameSession& session, float* output, uint32_t frames,
                                             int64_t write, int64_t playback) {
         session.audio_thread_.callback_ = [&session](float* out, uint32_t count, int64_t start, int64_t head) {
@@ -1280,11 +1302,11 @@ struct GameSessionAudioTestAccess {
         session->f7_keycode_ = 118; session->f8_keycode_ = 119;
         session->config_.speed.hi_speed = 4.0;
         control(*session, 116);
-        CHECK(session->config_.speed.hi_speed == 0.5);
+        CHECK(session->config_.speed.hi_speed == 2.0);
         control(*session, 117);
-        CHECK(session->config_.speed.hi_speed == 10.5);
+        CHECK(session->config_.speed.hi_speed == 4.0);
         control(*session, 117); // Duplicate pressed edges cannot repeat a coarse step.
-        CHECK(session->config_.speed.hi_speed == 10.5);
+        CHECK(session->config_.speed.hi_speed == 4.0);
         session->f5_keycode_ = 123; // Assigned F12 / Q, unrelated to the Shift lane.
         session->f6_keycode_ = 'Q';
         session->hispeed_coarse_decrease_held_ = false;
@@ -1293,10 +1315,15 @@ struct GameSessionAudioTestAccess {
         control(*session, 'Q');
         CHECK(session->config_.speed.hi_speed == 50.0);
         control(*session, 123);
-        CHECK(session->config_.speed.hi_speed == 40.0);
+        CHECK(session->config_.speed.hi_speed == 25.0);
+        session->config_.speed.hi_speed = 0.5;
+        (void)session->handle_control_input({123, input::InputState::Released});
+        control(*session, 123);
+        CHECK(session->config_.speed.hi_speed == 0.5);
+        session->config_.speed.hi_speed = 25.0;
         input::InputEvent unassigned_f5{116, input::InputState::Pressed};
         CHECK_FALSE(session->handle_control_input(unassigned_f5));
-        CHECK(session->config_.speed.hi_speed == 40.0);
+        CHECK(session->config_.speed.hi_speed == 25.0);
         control(*session, 118);
         CHECK(session->config_.visual_offset_ms == -1.0);
         control(*session, 119);
@@ -1308,7 +1335,7 @@ struct GameSessionAudioTestAccess {
         session->request_pause_adjust(2, 1);
         session->process_paused_input_queue();
         CHECK(session->config_.skin.judgement_line_position == doctest::Approx(original_line - 0.01));
-        CHECK(session->config_.speed.hi_speed == 40.25);
+        CHECK(session->config_.speed.hi_speed == 25.25);
         CHECK(session->config_.visual_offset_ms == 1.0);
         session->request_pause_action(0);
         session->process_paused_input_queue();
@@ -1507,11 +1534,11 @@ struct GameSessionAudioTestAccess {
         if (held) queue_physical_edge(*session, key, input::InputState::Pressed, 48000);
         if (paused) control(*session, 27);
         control(*session, 116);
-        CHECK(session->config_.speed.hi_speed == 0.5);
+        CHECK(session->config_.speed.hi_speed == 2.0);
         control(*session, 117);
-        CHECK(session->config_.speed.hi_speed == 10.5);
+        CHECK(session->config_.speed.hi_speed == 4.0);
         control(*session, 117); // Duplicate pressed edges cannot repeat a coarse step.
-        CHECK(session->config_.speed.hi_speed == 10.5);
+        CHECK(session->config_.speed.hi_speed == 4.0);
         control(*session, 119);
         CHECK(session->config_.visual_offset_ms == 1.0);
         input::InputEvent release{};
@@ -3066,4 +3093,8 @@ TEST_CASE("whole chart riff map crosses the production HUD snapshot with unique 
 
 TEST_CASE("BMS chart volume controls BGM and keysounds independently of menu music") {
     tenriff::app::GameSessionAudioTestAccess::check_independent_chart_volume();
+}
+
+TEST_CASE("decoded chart PCM survives runtime maintenance and releases at session stop") {
+    tenriff::app::GameSessionAudioTestAccess::check_pcm_retention_until_stop();
 }

@@ -21,7 +21,7 @@
                 draw_glass_panel(button, 10, 1, 0, false, 0);
                 register_hit(button, MenuHitTargetKind::SongDifficultyTable,
                     static_cast<int>(SongDifficultyTableAction::PresetAery5) + static_cast<int>(index));
-                const std::wstring label = L"F" + std::to_wstring(preset.function_key) + L"  " +
+                const std::wstring label = to_wide(data.function_keys.at(static_cast<std::size_t>(preset.function_key - 1)).empty() ? "--" : data.function_keys.at(static_cast<std::size_t>(preset.function_key - 1))) + L"  " +
                     wloc(preset.name_en.data(), preset.name_ko.data());
                 draw_centered_text(label, d2d_->body_format.Get(), button, d2d_->accent_brush.Get(), true);
             }

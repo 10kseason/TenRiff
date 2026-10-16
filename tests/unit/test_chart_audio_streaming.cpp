@@ -5,12 +5,11 @@
 
 #include "app/ChartAudioStreaming.h"
 
-TEST_CASE("chart audio budget choice clamps startup and runtime budgets") {
+TEST_CASE("chart audio budget choice clamps the startup prefetch budget") {
     const auto budgets = tenriff::app::choose_chart_audio_budgets(
         tenriff::app::SystemMemorySnapshot{16ull * 1024ull * 1024ull * 1024ull, 32ull * 1024ull * 1024ull * 1024ull});
 
     CHECK(budgets.startup_preload_bytes == 384ull * 1024ull * 1024ull);
-    CHECK(budgets.runtime_cache_bytes == 768ull * 1024ull * 1024ull);
 }
 
 TEST_CASE("chart audio startup only blocks on early assets and streams later BGM") {

@@ -6,7 +6,7 @@
 using namespace tenriff::app::profile_setup;
 
 TEST_CASE("first-run profile setup keeps its original song-select and title exits") {
-    CHECK(row_count(Entry::FirstRun) == 19);
+    CHECK(row_count(Entry::FirstRun) == 28);
     CHECK(kLanguageRow == 0);
     CHECK(kMenuFontSizeRow == 1);
     CHECK(kBackendRow == kNicknameRow - 1);
@@ -17,14 +17,15 @@ TEST_CASE("first-run profile setup keeps its original song-select and title exit
     CHECK(kSkipStartCountdownRow == kInstantRestartKeyRow - 1);
     CHECK(kInstantRestartKeyRow == kHispeedDecreaseKeyRow - 1);
     CHECK(kHispeedDecreaseKeyRow == kHispeedIncreaseKeyRow - 1);
-    CHECK(kHispeedIncreaseKeyRow == kDoneRow - 1);
+    CHECK(kHispeedIncreaseKeyRow == kFunctionKeysFirstRow - 1);
+    CHECK(kFunctionKeysLastRow == kDoneRow - 1);
     CHECK(enter_destination(Entry::FirstRun, kDoneRow) == Destination::SongSelect);
     CHECK(enter_destination(Entry::FirstRun, kFirstRunSkipRow) == Destination::Title);
     CHECK(cancel_destination(Entry::FirstRun) == Destination::Title);
 }
 
 TEST_CASE("reopened profile setup returns to the options hub") {
-    CHECK(row_count(Entry::Options) == 18);
+    CHECK(row_count(Entry::Options) == 27);
     CHECK(enter_destination(Entry::Options, kDoneRow) == Destination::OptionsHub);
     CHECK(enter_destination(Entry::Options, 2) == Destination::Stay);
     CHECK(cancel_destination(Entry::Options) == Destination::OptionsHub);
@@ -113,7 +114,35 @@ TEST_CASE("profile coarse speed keys reject lanes reserved keys and restart conf
     CHECK(resolve_hispeed_key("R", {}, 0) == letter);
     CHECK(resolve_hispeed_key("R", {{letter, 1}}, 0) == 0);
     CHECK(resolve_hispeed_key("R", {}, letter) == 0);
-    CHECK(resolve_hispeed_key("F9", {}, 0) == 0);
+    CHECK(resolve_hispeed_key("F9", {}, 0) != 0); // A freed function key is assignable.
     CHECK(resolve_hispeed_key("UnknownKey", {}, 0) == 0);
     CHECK(resolve_hispeed_key("", {}, 0) == 0);
+}
+
+
+#include "ui/FunctionKeyLabels.h"
+TEST_CASE("function shortcuts resolve collisions and remap authored hints without cascading") {
+    using namespace tenriff;
+    config::UiConfig ui;
+    config::function_key(ui, 1) = "F12";
+    config::function_key(ui, 9) = "Q";
+    auto resolved = app::resolve_function_keys(ui);
+    CHECK(resolved[0] == config::KeycodeMap::to_keycode("F12").value());
+    CHECK(resolved[8] == config::KeycodeMap::to_keycode("Q").value());
+    CHECK(ui::function_key_labels("F1 / F9 / F10 / F11; F1로; AF1 F12", config::function_key_labels(ui)) ==
+          "F12 / Q / F10 / F11; F12로; AF1 F12");
+    config::function_key(ui, 2) = "F1";
+    CHECK(ui::function_key_labels("F1 F2", config::function_key_labels(ui)) == "F12 F1");
+    config::function_key(ui, 3).clear();
+    CHECK(ui::function_key_labels("F3", config::function_key_labels(ui)) == "--");
+    config::function_key(ui, 2) = "Q";
+    resolved = app::resolve_function_keys(ui);
+    CHECK(resolved[1] == 0); CHECK(resolved[8] == 0);
+    config::function_key(ui, 2) = "Escape";
+    CHECK(app::resolve_function_keys(ui)[1] == 0);
+    CHECK(app::resolve_function_keys(ui, {{config::KeycodeMap::to_keycode("F12").value(), 1}})[0] == 0);
+    ui.instant_restart_key = "F12";
+    CHECK(app::resolve_function_keys(ui)[0] == 0);
+    CHECK(app::profile_setup::function_for_row(app::profile_setup::kHispeedDecreaseKeyRow) == 5);
+    CHECK(app::profile_setup::function_for_row(app::profile_setup::kFunctionKeysLastRow) == 11);
 }

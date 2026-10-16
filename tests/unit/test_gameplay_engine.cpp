@@ -2559,3 +2559,32 @@ TEST_CASE("chronological mixed timelines preserve results and replay prefixes un
     CHECK(comparisons == 128);
     CHECK(mismatches == 0);
 }
+
+
+TEST_CASE("indicator history expires each judgement exactly at seven hundred milliseconds") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 10000;
+    chart.notes = {{1,1000,std::nullopt},{1,1100,std::nullopt},{1,1200,std::nullopt}};
+    GameplayConfig config; config.sample_rate = 1000;
+    GameplayEngine engine(chart, config);
+    (void)engine.handle_input(1, InputState::Pressed, 1000);
+    (void)engine.handle_input(1, InputState::Pressed, 1110);
+    (void)engine.handle_input(1, InputState::Pressed, 1180);
+    const auto score = engine.stats().raw_score;
+    const auto replay_count = engine.replay().events.size();
+    std::array<double, tenriff::kGameplayTimingHistoryMaxEntries> values{};
+    std::size_t count = 0;
+    engine.collect_recent_timing_deltas(values, &count, 999, 1699);
+    CHECK(count == 3);
+    engine.collect_recent_timing_deltas(values, &count, 1000, 1700);
+    REQUIRE(count == 2); CHECK(values[0] == doctest::Approx(10)); CHECK(values[1] == doctest::Approx(-20));
+    engine.collect_recent_timing_deltas(values, &count, 1110, 1810);
+    REQUIRE(count == 1); CHECK(values[0] == doctest::Approx(-20));
+    engine.collect_recent_timing_deltas(values, &count, 1180, 1880);
+    CHECK(count == 0); CHECK(values[0] == 0.0);
+    engine.collect_recent_timing_deltas(values, &count, 0, 1099);
+    REQUIRE(count == 1); CHECK(values[0] == 0.0);
+    CHECK(engine.stats().raw_score == score);
+    CHECK(engine.replay().events.size() == replay_count);
+}
