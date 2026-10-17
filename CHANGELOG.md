@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.5] - 2026-10-17
+
+- Route menu/result music through the selected WASAPI endpoint or ASIO driver using asynchronous decoding and existing AudioThread; preserve scene gain, focus mute and exclusive ownership at transitions.
+- Color indicator ranges and all Dot/Barcode markers blue FAST, green maximum judgement and red LATE using each engine's actual PG window. Refresh FAST/SLOW on PG too; exact/rounded-zero hits clear stale text.
+- Cycle lobby random modes OFF → Mirror → Random → S-Random → Random (Scratch Fixed) → OFF. Rename R-Random for display only and show Korean disabled values as OFF; preserve stored tokens, seeds and algorithms.
+- Preserve 1.9.4 reclamation/controls, historical replay/scoring/Guest/grade contracts and fixed baseline 1.9.0.
+
 ## [1.9.4] - 2026-10-17
 
 - Retain decoded chart PCM and static BGA during play/pause; release at stopped-session/menu transitions. Defer forced indexer heap/working-set trims while a session is loading or active. Memory use may increase; ordinary lifetimes, video recycling and device-loss recovery remain.

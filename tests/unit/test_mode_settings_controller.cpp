@@ -208,5 +208,5 @@ TEST_CASE("nested mods filter judge without changing the registry or scratch row
     CHECK(mode_mod_category_label(categories[0], ui::Language::Korean) == "더블 플레이 배치");
     CHECK(mode_mod_category_ui_value("dp_layout", runtime.mode.mods, ui::Language::Korean) == "좌우 필드 교환");
     CHECK(mode_mod_category_ui_value("scratch_assist", runtime.mode.mods, ui::Language::Korean) == "자동 스크래치 (연습)");
-    CHECK(mode_mod_category_ui_value("note_add", runtime.mode.mods, ui::Language::Korean) == "끔");
+    CHECK(mode_mod_category_ui_value("note_add", runtime.mode.mods, ui::Language::Korean) == "OFF");
 }

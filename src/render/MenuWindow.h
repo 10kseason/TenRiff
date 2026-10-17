@@ -598,6 +598,8 @@ struct GameplayHudData {
     double timing_feedback_delta_ms = 0.0;
     std::size_t timing_history_count = 0;
     std::array<double, kGameplayTimingHistoryMaxEntries> timing_history_delta_ms{};
+        std::array<bool, kGameplayTimingHistoryMaxEntries> timing_history_maximums{};
+        double timing_maximum_window_ms = 21.0;
 
     bool finished = false;
     bool game_over = false;
@@ -660,6 +662,8 @@ struct GameplayHudData {
     double ghost_timing_feedback_delta_ms = 0.0;
     std::size_t ghost_timing_history_count = 0;
     std::array<double, kGameplayTimingHistoryMaxEntries> ghost_timing_history_delta_ms{};
+        std::array<bool, kGameplayTimingHistoryMaxEntries> ghost_timing_history_maximums{};
+        double ghost_timing_maximum_window_ms = 21.0;
     bool ghost_finished = false;
     bool ghost_game_over = false;
     std::size_t ghost_lane_activity_count = 0;

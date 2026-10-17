@@ -28,7 +28,8 @@ AudioResult AudioThread::initialize(const AudioConfig& config, Callback callback
     config_ = config;
     callback_ = std::move(callback);
     if (config.backend == AudioBackend::ASIO) {
-        asio_backend_ = std::make_unique<AsioBackend>();
+        asio_backend_ = asio_test_factory_ ? std::make_unique<AsioBackend>(asio_test_factory_)
+                                          : std::make_unique<AsioBackend>();
         return asio_backend_->initialize(config, callback_);
     }
     backend_ = std::make_unique<WasapiBackend>();

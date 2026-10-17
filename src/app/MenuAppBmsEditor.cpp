@@ -225,6 +225,8 @@ void MenuApp::launch_bms_editor_practice() {
     }
     bms_editor_practice_path_ = practice_path.u8string();
     bms_editor_practice_start_seconds_ = *start_seconds;
+    // A pending editor decode must not reopen the device during practice/results.
+    stop_bms_editor_preview();
     std::cerr << "[MenuApp] BMS editor practice launch at " << *start_seconds
               << "s with no-fail enabled." << std::endl;
     launch_gameplay(bms_editor_practice_path_);
@@ -401,6 +403,11 @@ void MenuApp::request_bms_editor_preview(bool from_start, std::string keysound_t
 }
 
 void MenuApp::service_bms_editor_preview() {
+    if (current_screen() != Screen::BmsEditor) {
+        if (bms_editor_preview_future_.valid() || bms_editor_preview_active_)
+            stop_bms_editor_preview();
+        return;
+    }
     if (!bms_editor_preview_future_.valid() && bms_editor_preview_active_ &&
         bms_editor_preview_finished_ &&
         bms_editor_preview_finished_->load(std::memory_order_acquire)) {
@@ -433,6 +440,7 @@ void MenuApp::service_bms_editor_preview() {
     const auto finished = bms_editor_preview_finished_;
     const float gain = static_cast<float>(menu_background_gain(
         true, config_.audio_ui.master_volume, config_.audio_ui.gameplay_volume));
+    menu_music_.stop();
     const auto initialized = audio_thread_.initialize(
         preview_config,
         [this, samples, finished, gain, frame_cursor = std::size_t{0}](float* output, std::uint32_t frames,

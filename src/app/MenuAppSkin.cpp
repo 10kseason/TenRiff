@@ -1021,7 +1021,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     config_.skin.timing_marker_style == "barcode" ? ui_text("Barcode", "바코드") : ui_text("Dot", "점"),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TimingMarkerStyle), false, true);
     append_menu_row(render.generic, ui_text("FAST/SLOW Display", "FAST/SLOW 표시 방식"),
-                    timing_visibility.always_visible ? ui_text("Always", "항상") : ui_text("After non-PG", "피그렛 외 판정 후"),
+                    timing_visibility.always_visible ? ui_text("Always", "항상") : ui_text("After judgement", "판정 후"),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TimingBarMode), false, true);
     append_menu_row(render.generic, ui_text("FAST/SLOW Indicator X", "FAST/SLOW 인디케이터 X"), std::to_string(static_cast<int>(config_.skin.timing_text_offset_x)) + " px",
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TimingTextX), false, true);
@@ -1278,7 +1278,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
         "왼쪽부터 레인을 선택합니다: 1-9, 0=10, Shift+1-6=11-16. 현재 설정 행은 그대로 유지됩니다."));
     render.generic.notes.push_back(ui_text(
         "Key backdrop has separate On/Off, opacity, brightness (0-200%) and maximum height (0-100%, from the field bottom). Hit-burst brightness is separate.",
-        "키 빔은 켬/끔, 농도, 밝기(0~200%), 최대 높이(필드 아래부터 0~100%)를 따로 조절합니다. 키 키밤 밝기는 별도입니다."));
+        "키 빔은 켬/OFF, 농도, 밝기(0~200%), 최대 높이(필드 아래부터 0~100%)를 따로 조절합니다. 키 키밤 밝기는 별도입니다."));
     render.generic.notes.push_back(ui_text(
         "Judgement line thickness scales with Note Height; the preview uses the gameplay renderer.",
         "판정선 두께는 노트 높이 비율을 따릅니다. 미리보기는 실제 게임 렌더러를 사용합니다."));

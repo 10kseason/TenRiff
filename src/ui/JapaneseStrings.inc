@@ -385,7 +385,7 @@
 {"FAST/SLOW Indicator", "FAST/SLOW文字"},
 {"FAST/SLOW Bar", "FAST/SLOWバー"},
 {"FAST/SLOW Display", "FAST/SLOW表示方式"},
-{"After non-PG", "PG以外の判定後"},
+{"After judgement", "判定後"},
 {"Always", "常時"},
 {"FAST/SLOW Indicator X", "FAST/SLOW文字 X"},
 {"FAST/SLOW Indicator Size", "FAST/SLOW文字サイズ"},

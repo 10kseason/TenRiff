@@ -653,6 +653,8 @@ int main(int argc, char** argv) {
     bool indicator_background_off = false;
     bool timing_bar_always = false;
     std::string timing_marker_style = "dot";
+    std::string timing_color_case;
+    double timing_maximum_ms = 21.0;
     bool remapped_functions = false;
     bool measure_lines_fixture = false;
     bool measure_alignment_fixture = false;
@@ -770,6 +772,19 @@ int main(int argc, char** argv) {
     data.ui_language = tenriff::ui::Language::Korean;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
+        if (arg == "--timing-colors" && i + 1 < argc) {
+            timing_color_case = argv[++i];
+            if (timing_color_case != "fast" && timing_color_case != "maximum" &&
+                timing_color_case != "late" && timing_color_case != "awarded" &&
+                timing_color_case != "expired") return 2;
+            gameplay = true; timing_bar_always = true;
+            continue;
+        }
+        if (arg == "--timing-maximum-ms" && i + 1 < argc) {
+            timing_maximum_ms = std::stod(argv[++i]);
+            if (!(timing_maximum_ms > 0 && timing_maximum_ms <= 80)) return 2;
+            continue;
+        }
         // Keep new independent flags outside the legacy nested else-if chain (MSVC limit).
         if (arg == "--bga-retention-probe" && i + 1 < argc) {
             retention_probe_directory = argv[++i];
@@ -1183,7 +1198,7 @@ int main(int argc, char** argv) {
                 data.ui_text_scale > 1.0f ? loc("Large", "크게") : loc("Normal", "보통"),
             "ALL SONG", "NORMAL", "1.00x", "0 ms", "Follow", "RawInput", "PLAYER",
             avatar_path.empty() ? loc("Not set", "설정 안 됨") : "preview-avatar.png",
-            loc("Clear", "지우기"), ".trprofile", ".trprofile", loc("Off", "꺼짐"), "--", "F5", "F6",
+            loc("Clear", "지우기"), ".trprofile", ".trprofile", loc("Off", "OFF"), "--", "F5", "F6",
             "F1", "F2", "F3", "F4", "F7", "F8", "F9", "F10", "F11", loc("Back", "돌아가기")};
         for (int i = 0; i < static_cast<int>(labels.size()); ++i) {
             MenuRowData row;
@@ -1275,7 +1290,7 @@ int main(int argc, char** argv) {
     songs.current_gauge = loc("Normal", "노말");
     songs.current_hi_speed = "3.50";
     songs.current_visual_latency = "+0 ms";
-    songs.current_random = loc("Off", "꺼짐");
+    songs.current_random = loc("Off", "OFF");
     songs.difficulty_table_name = empty || native_level_table ? loc("Native LV", "기본 LV") :
         (aery_five_key ? "5K Aery" : "発狂BMS難易度表");
     songs.difficulty_table_active = !empty && !native_level_table;
@@ -1859,6 +1874,19 @@ int main(int argc, char** argv) {
                 if (timing_feedback_case == "always-pg" || timing_feedback_case == "always-expired") hud.timing_bar_always_visible = true;
                 if (timing_feedback_case == "expired" || timing_feedback_case == "always-expired") hud.timing_history_count = 0;
             }
+            if (!timing_color_case.empty()) {
+                hud.timing_maximum_window_ms = timing_maximum_ms;
+                hud.timing_history_count = timing_color_case == "expired" ? 0 : 3;
+                const double last = timing_color_case == "fast" ? -50.0 :
+                    timing_color_case == "late" ? 50.0 : timing_color_case == "awarded" ? 60.0 : 5.0;
+                hud.timing_history_delta_ms = {-55.0, 55.0, last};
+                hud.timing_history_maximums = {false, false, timing_color_case == "awarded" || timing_color_case == "maximum"};
+                hud.feedback = (timing_color_case == "maximum" || timing_color_case == "awarded") ? "PG" : "GR";
+                hud.feedback_delta_ms = hud.timing_feedback_delta_ms = last;
+                hud.has_timing_feedback = hud.has_retained_timing_feedback = timing_color_case != "expired";
+                hud.timing_bar_always_visible = true;
+            }
+
             hud.text_revision = static_cast<uint64_t>(hit + 1);
             hud.motion_revision++;
             hud.combo = 123 + hit; hud.pg = hit + 1;
@@ -1957,6 +1985,8 @@ int main(int argc, char** argv) {
                 hud.ghost_timing_feedback_delta_ms = hud.timing_feedback_delta_ms;
                 hud.ghost_timing_history_count = hud.timing_history_count;
                 hud.ghost_timing_history_delta_ms = hud.timing_history_delta_ms;
+                hud.ghost_timing_history_maximums = hud.timing_history_maximums;
+                hud.ghost_timing_maximum_window_ms = hud.timing_maximum_window_ms;
                 hud.ghost_lane_activity_count = hud.lane_activity_count;
                 hud.ghost_lane_activity = hud.lane_activity;
                 hud.ghost_lane_pressed_count = hud.lane_pressed_count;

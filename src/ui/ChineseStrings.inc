@@ -385,7 +385,7 @@
 {"FAST/SLOW Indicator", "FAST/SLOW 指示器"},
 {"FAST/SLOW Bar", "FAST/SLOW 条"},
 {"FAST/SLOW Display", "FAST/SLOW 显示方式"},
-{"After non-PG", "非 PG 判定后"},
+{"After judgement", "判定后"},
 {"Always", "始终显示"},
 {"FAST/SLOW Indicator X", "FAST/SLOW 指示器 X"},
 {"FAST/SLOW Indicator Size", "FAST/SLOW 指示器大小"},
@@ -1250,3 +1250,5 @@
 {"Guest / Online", "访客 / 在线"},
 {"Chat", "聊天"},
 {"HI-SPEED  F3/F4  +/-0.25   F5 x0.5 / F6 x2", "音符速度  F3/F4  +/-0.25   F5 ×0.5 / F6 ×2"},
+
+{"Choose the output for gameplay, BMS previews, and menu/result music. F5 refreshes; Back applies. ASIO has its own driver selector.", "选择游玩、BMS试听、菜单和结果音乐的输出。F5刷新，返回时应用。ASIO单独选择驱动。"},

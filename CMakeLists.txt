@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.9.4 LANGUAGES C CXX)
+project(TenRiff VERSION 1.9.5 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -478,6 +478,8 @@ if(WIN32)
     # synthetic charts/profiles. Never packaged as an end-user executable.
     add_executable(menu_app_smoke EXCLUDE_FROM_ALL tools/menu_app_smoke.cpp)
     target_link_libraries(menu_app_smoke PRIVATE tenriff_app)
+    add_executable(scene_music_smoke EXCLUDE_FROM_ALL tools/scene_music_smoke.cpp)
+    target_link_libraries(scene_music_smoke PRIVATE tenriff_app)
     if(COMMAND tenriff_copy_ffmpeg_deblock)
         tenriff_copy_ffmpeg_deblock(menu_visual_preview)
         tenriff_copy_ffmpeg_deblock(menu_app_smoke)

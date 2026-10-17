@@ -347,12 +347,14 @@ void GameplayEngine::collect_active_holds(std::vector<ActiveHoldView>& out) cons
 }
 
 void GameplayEngine::collect_recent_timing_deltas(std::array<double, kGameplayTimingHistoryMaxEntries>& out,
-                                                  std::size_t* out_count, int64_t after_sample, int64_t through_sample) const {
+                                                  std::size_t* out_count, int64_t after_sample, int64_t through_sample,
+                                                  std::array<bool, kGameplayTimingHistoryMaxEntries>* maximums) const {
     const std::size_t count = std::min(recent_timing_delta_count_, recent_timing_deltas_.size());
     if (out_count) {
         *out_count = 0;
     }
     out.fill(0.0);
+    if (maximums) maximums->fill(false);
     if (count == 0) {
         return;
     }
@@ -362,8 +364,10 @@ void GameplayEngine::collect_recent_timing_deltas(std::array<double, kGameplayTi
     std::size_t visible = 0;
     for (std::size_t i = 0; i < count; ++i) {
         const auto index = (start + i) % recent_timing_deltas_.size();
-        if (recent_timing_samples_[index] > after_sample && recent_timing_samples_[index] <= through_sample)
+        if (recent_timing_samples_[index] > after_sample && recent_timing_samples_[index] <= through_sample) {
+            if (maximums) (*maximums)[visible] = recent_timing_maximums_[index];
             out[visible++] = recent_timing_deltas_[index];
+        }
     }
     if (out_count) *out_count = visible;
 }
@@ -443,12 +447,14 @@ void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms,
     live_feedback_.sample = sample;
     if (judgement != game::Judgement::PG) {
         non_pg_feedback_ = live_feedback_;
-        if (std::isfinite(delta_ms) && std::llround(delta_ms) != 0) {
-            timing_feedback_ = live_feedback_;
-        }
+    }
+    // A maximum hit replaces the previous FAST/SLOW too; an exact hit clears
+    // its text instead of leaving an old error frozen in always-visible mode.
+    if (std::isfinite(delta_ms) && (judgement == game::Judgement::PG || std::llround(delta_ms) != 0)) {
+        timing_feedback_ = live_feedback_;
     }
     if (std::isfinite(delta_ms)) {
-        push_recent_timing_delta(delta_ms, sample);
+        push_recent_timing_delta(delta_ms, sample, judgement == game::Judgement::PG);
     }
 
     const auto previous_type = gauge_state_.type;
@@ -542,10 +548,11 @@ double GameplayEngine::detailed_accuracy_credit_for(game::Judgement judgement, d
     return std::clamp(std::exp(-0.125 * normalized_error * normalized_error), 0.0, 1.0);
 }
 
-void GameplayEngine::push_recent_timing_delta(double delta_ms, int64_t sample) {
+void GameplayEngine::push_recent_timing_delta(double delta_ms, int64_t sample, bool maximum) {
     if (!std::isfinite(delta_ms) || recent_timing_deltas_.empty()) {
         return;
     }
+    recent_timing_maximums_[recent_timing_delta_head_] = maximum;
 
     recent_timing_deltas_[recent_timing_delta_head_] = delta_ms;
     recent_timing_samples_[recent_timing_delta_head_] = sample;

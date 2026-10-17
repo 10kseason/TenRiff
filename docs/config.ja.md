@@ -1,3 +1,5 @@
+**2026-10-17 · 1.9.5:** メニュー・結果音楽も選択した出力先を使用します。FASTは青、最高判定は緑、LATEは赤。最高判定でもFAST/SLOWを更新します。ロビーはOFF → ミラー → ランダム → Sランダム → スクラッチ固定ランダム → OFFの順です。 [音楽の出力先統合と判定インジケーター](release-1.9.5.ja.md).
+
 **2026-10-17 · 1.9.3 local:** [インジケーター・出力・プロファイルキー](input-feedback-20261017.ja.md).
 
 # TenRiff Config Schema (current)
@@ -44,9 +46,9 @@ profile が存在しない場合は初回起動時に自動生成されます。
 - `play_to_end` (bool; default `true`): 最後のノートとLN終端を処理した後も残りの音声を最後まで再生します。通常のシングルプレイではこの後奏中の `Esc` で一時停止を開かず通常結果へ進みます（自動プレイ・リプレイも対象）。Session Mix・マルチプレイの既存Esc方針は維持します。falseでは `ui.result_tail_ms` 後に結果へ進み、判定・スコア・リプレイ規則は変わりません。
 
 - `backend` (string)
-  - `wasapi | asio`、既定は `wasapi`。プレイと曲プレビューの出力を選択。メニュー・結果の BGM は独立した Windows MCI 経路を維持。
+  - `wasapi | asio`、既定は `wasapi`。ゲーム・試聴・メニュー・結果音楽に選択したWASAPI機器またはASIOドライバーを適用します。
 - `device_id` (string)
-  - 既定は空文字列（システム既定）。ゲームプレイと BMS プレビューの WASAPI 出力 ID。サウンド設定で選択します。指定機器が見つからなくても自動代替しません。内蔵メニュー・結果音楽の MCI 出力はシステム既定のままです。
+  - 既定は空文字列（システム既定）。サウンド設定でゲーム・BMS試聴・メニュー・結果音楽のWASAPI機器を選択します。メニューは共有モード、ゲームの排他設定は維持。指定機器不在時に自動代替しません。短い設定変更クリック音はWindows既定出力です。
 - `asio_driver` (string)
   - インストール済み64ビット ASIO ドライバーの CLSID。空は Auto（名前順の最初）。Audio 設定で選び、F5 で一覧を更新。
 - `rate` (int)
@@ -344,7 +346,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | `show_gear_boundary_line` | bool; `false` | ギア境界線を表示。 |
 | `show_timing_feedback` | bool; `true` | バーとは別にFAST/SLOW文字を表示。 |
 | `show_timing_bar` | bool; `true` | タイミングバーを表示。旧設定で省略時は文字のスイッチを継承。 |
-| `timing_bar_always_visible` | bool; `false` | `true`で目盛りと最後のFAST/SLOW文字を保持。各点/バーコードは0.7秒で消えます。`false`は従来の非PG後0.75秒表示。バー自体は`show_timing_bar`で切替。 |
+| `timing_bar_always_visible` | bool; `false` | trueで目盛りと最新FAST/SLOWを保持。最高判定も更新し0msは文字消去。各マーカー0.7秒、条件付きバーはマーカー存在中に表示。show_timing_barで無効化。 |
 | `timing_marker_style` | `dot` / `barcode`; `dot` | 判定表示を点か縦線にします。 |
 | `timing_feedback_override` | bool; `false` | ユーザーが表示を変更した後はプロファイルの設定をスキンより優先。 |
 | `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | 文字とバーの独立X移動。従来の判定周辺配置に加える1920x1080基準ピクセル。 |

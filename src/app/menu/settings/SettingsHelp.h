@@ -14,7 +14,7 @@ struct SettingsHelpText { std::string_view en, ko, ja; };
 inline std::string setting_help(Screen screen, int id, ui::Language language) {
     static constexpr SettingsHelpText audio[] = {
         {"Basic favors stable playback; High reduces buffering. Use Basic if audio crackles.", "기본은 안정적인 재생, 고성능은 작은 버퍼를 우선합니다. 소리가 끊기면 기본을 사용하세요.", "基本は安定性、高性能は小さいバッファを優先します。音が途切れる場合は基本を選びます。"},
-        {"Follow plays BMS key sounds when you hit notes. Autoplay plays them with the chart; Off silences them.", "연동은 노트를 누를 때 키음을 냅니다. 자동재생은 차트에 맞춰 키음을 재생하며, 끔은 키음을 제거합니다.", "連動はノート入力時、自動再生は譜面に合わせてキー音を鳴らします。オフではキー音を消します。"},
+        {"Follow plays BMS key sounds when you hit notes. Autoplay plays them with the chart; Off silences them.", "연동은 노트를 누를 때 키음을 냅니다. 자동재생은 차트에 맞춰 키음을 재생하며, OFF는 키음을 제거합니다.", "連動はノート入力時、自動再生は譜面に合わせてキー音を鳴らします。オフではキー音を消します。"},
         {"Toggle menu, result and song-preview music. Gameplay chart BGM keeps playing.", "메뉴·결과·곡 미리듣기 음악을 켜거나 끕니다. 플레이 중 차트 BGM은 계속 재생됩니다.", "メニュー・結果・試聴の音楽を切り替えます。プレイ中のBGMは継続します。"},
         {"Adjust the volume of all game audio together. Start low before raising it.", "게임 전체 음량을 조절합니다. 낮은 값에서 조금씩 올려 맞추세요.", "ゲーム全体の音量です。小さい値から調整してください。"},
         {}, // Reserved former BGM volume ID.
@@ -31,7 +31,7 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"After the last judgement, listen to the remaining audio or skip it after the result delay. Notes and scoring stay unchanged.", "마지막 판정 뒤 남은 음악을 끝까지 듣거나 결과 대기 시간 후 스킵합니다. 노트와 점수는 그대로입니다.", "最後の判定後、残りの音楽を最後まで聴くか結果待機時間後にスキップします。"},
         {"Adjust BMS accompaniment, keysounds and previews together. Default: 20%. TenRiff menu music is independent.", "BMS 반주·키음·미리듣기를 함께 조절합니다. 기본값은 20%이며 텐리프 메뉴 음악과는 별개입니다.", "BMSの伴奏・キー音・試聴をまとめて調整します。既定値は20%で、TenRiffメニュー音楽とは独立しています。"},
         {"Adjust TenRiff menu and result music. 100% uses a quiet 10% reference level; BMS songs are unchanged.", "텐리프 메뉴·결과 음악을 조절합니다. 100%는 기본 10% 음량이며 BMS 곡에는 적용되지 않습니다.", "TenRiffのメニュー・結果音楽です。100%は原音の10%を基準とし、BMS曲には適用しません。"},
-        {"Choose gameplay and BMS preview output. F5 refreshes; Back applies. Menu/result music uses System Default. ASIO has its own selector.", "플레이·BMS 미리듣기 출력을 고릅니다. F5 갱신, 뒤로 가기 적용. 메뉴·결과 음악은 시스템 기본 장치, ASIO는 별도 드라이버를 사용합니다.", "プレイ・BMS試聴の出力を選択。F5更新、戻るで適用。メニュー・結果音楽はシステム既定、ASIOは別途選択します。"},
+        {"Choose the output for gameplay, BMS previews, and menu/result music. F5 refreshes; Back applies. ASIO has its own driver selector.", "플레이·BMS 미리듣기·메뉴·결과 음악의 출력을 고릅니다. F5 갱신, 뒤로 가기 적용. ASIO는 별도 드라이버를 사용합니다.", "プレイ・BMS試聴・メニュー・結果音楽の出力を選択。F5更新、戻るで適用。ASIOは別途ドライバーを選択します。"},
     };
     static constexpr SettingsHelpText graphics[] = {
         {"Choose windowed, borderless, or fullscreen display.", "창 모드, 테두리 없는 창, 전체 화면 중 표시 방식을 고릅니다.", "ウィンドウ、ボーダーレス、全画面を選びます。"},
@@ -146,10 +146,10 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Move FAST/SLOW text on the Y axis in base pixels.", "FAST/SLOW 글자의 세로 위치를 기준 픽셀 단위로 옮깁니다.", "FAST/SLOW文字を上下に移動します。"},
         {"Move FAST/SLOW bar on the X axis in base pixels.", "FAST/SLOW 막대의 가로 위치를 기준 픽셀 단위로 옮깁니다.", "FAST/SLOWバーを左右に移動します。"},
         {"Move FAST/SLOW bar on the Y axis in base pixels.", "FAST/SLOW 막대의 세로 위치를 기준 픽셀 단위로 옮깁니다.", "FAST/SLOWバーを上下に移動します。"},
-        {"Black fog at the top makes notes fade in. 0% is off; higher values extend the fog toward the judgement line.", "상단의 검은 안개 아래에서 노트가 서서히 나타납니다. 0%는 끔이며 높일수록 안개 범위가 판정선 쪽으로 넓어집니다.", "上部の黒い霧からノートが現れます。0%はオフ、値を上げると範囲が広がります。"},
-        {"Black fog above the judgement line makes notes fade out. 0% is off; the judgement line, keys and HUD stay visible.", "판정선 위의 검은 안개로 노트가 서서히 사라집니다. 0%는 끔이며 판정선·키·HUD는 유지됩니다.", "判定ライン上の黒い霧でノートが消えます。0%はオフ。ライン・キー・HUDは表示されます。"},
+        {"Black fog at the top makes notes fade in. 0% is off; higher values extend the fog toward the judgement line.", "상단의 검은 안개 아래에서 노트가 서서히 나타납니다. 0%는 OFF이며 높일수록 안개 범위가 판정선 쪽으로 넓어집니다.", "上部の黒い霧からノートが現れます。0%はオフ、値を上げると範囲が広がります。"},
+        {"Black fog above the judgement line makes notes fade out. 0% is off; the judgement line, keys and HUD stay visible.", "판정선 위의 검은 안개로 노트가 서서히 사라집니다. 0%는 OFF이며 판정선·키·HUD는 유지됩니다.", "判定ライン上の黒い霧でノートが消えます。0%はオフ。ライン・キー・HUDは表示されます。"},
         {"Choose Classic or Studio Deck for Native or imported LR2 solo gameplay. Other image skins, ghost battles and multiplayer keep the classic layout.", "Native·가져온 LR2 스킨의 단독 플레이 HUD를 클래식 또는 스튜디오 덱으로 고릅니다. 다른 이미지 스킨·고스트 대전·멀티플레이는 기존 배치를 유지합니다.", "Native・取り込んだLR2スキンのソロプレイでクラシックかスタジオデッキを選びます。他の画像スキン・ゴースト対戦・マルチプレイは従来の配置を維持します。"},
-        {"Always keeps the indicator and last FAST/SLOW text visible. Each dot or barcode expires after 0.7 seconds. Text and bar can be toggled separately.", "항상은 인디케이터와 마지막 FAST/SLOW 글자를 유지합니다. 각 점·바코드는 0.7초 뒤 사라집니다. 글자와 막대는 따로 켜고 끕니다.", "常時表示はバーと最後のFAST/SLOW文字を保持します。点・バーコードは各0.7秒で消えます。文字とバーは別々に切替できます。"},
+        {"After judgement includes maximum hits. Always keeps the indicator and latest FAST/SLOW text; maximum hits refresh it and 0ms clears it. Each dot or barcode expires after 0.7 seconds.", "판정 후는 최대판정도 포함합니다. 항상은 눈금과 최신 FAST/SLOW를 유지하며 최대판정도 갱신하고 0ms면 지웁니다. 각 점·바코드는 0.7초 뒤 사라집니다.", "判定後は最高判定も含みます。常時表示は目盛りと最新FAST/SLOWを保持し、最高判定も更新、0msで消去。点・縦線は各0.7秒で消えます。"},
         {"Show or hide the chart-density graph and its clock to the left of the Studio Deck playfield. This does not change the Classic HUD.", "그래프 맵의 노트 밀도 그래프와 시계를 켜거나 끕니다. 클래식 HUD에는 영향을 주지 않습니다.", "スタジオデッキのプレイフィールド左側にあるノート密度グラフと時計を表示・非表示にします。クラシックHUDには影響しません。"},
         {"Show or hide the backing behind FAST/SLOW and timing indicators. Judgement remains text-only.", "FAST/SLOW·타이밍 표시 뒤 배경을 켜거나 끕니다. 판정은 항상 글자만 표시합니다.", "FAST/SLOW・タイミング表示の背景を切り替えます。判定は常に文字のみです。"},
         {"Scale FAST/SLOW text from 50% to 200% independently of judgement, combo and the bar.", "FAST/SLOW 글자 크기를 50~200%로 조절합니다. 판정·콤보·막대 크기와는 별개입니다.", "FAST/SLOW文字を50～200%で調整します。判定・コンボ・バーのサイズとは独立しています。"},

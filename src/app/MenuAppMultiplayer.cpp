@@ -366,7 +366,7 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
     }
     render.generic.notes.push_back(ui_text(
         "The leader sets Room Rate (0.50-2.00x); changes clear everyone's Ready. Gauge Shift/default judge apply, Random/Mods/Assist are off; local key-mode conversion is allowed.",
-        "리더가 대전 Rate(0.50~2.00배)를 정하며 변경 시 전원 준비가 해제됩니다. Gauge Shift·기본 판정·랜덤/모드/어시스트 끔과 로컬 키모드 변환을 사용합니다."));
+        "리더가 대전 Rate(0.50~2.00배)를 정하며 변경 시 전원 준비가 해제됩니다. Gauge Shift·기본 판정·랜덤/모드/어시스트 OFF과 로컬 키모드 변환을 사용합니다."));
     render.generic.notes.push_back(ui_text(
         "Signed-in players search rooms on the selected main/private server. Signed-out players can still search the LAN.",
         "로그인하면 선택한 메인/사설 서버의 방을 검색합니다. 로그아웃 상태에서는 기존 LAN 검색을 사용합니다."));

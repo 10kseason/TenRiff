@@ -831,7 +831,7 @@ std::string MenuApp::ui_text(std::string_view english, std::string_view korean) 
 }
 
 std::string MenuApp::ui_on_off(bool enabled) const {
-    return ui_text(enabled ? "On" : "Off", enabled ? "켜짐" : "꺼짐");
+    return ui_text(enabled ? "On" : "Off", enabled ? "켜짐" : "OFF");
 }
 
 std::string MenuApp::ui_language_label(std::string_view token) const {
@@ -878,7 +878,7 @@ std::string MenuApp::ui_keysound_policy_label(std::string_view token) const {
         return ui_text("Autoplay", "자동재생");
     }
     if (normalized == "ignore" || normalized == "off") {
-        return ui_text("Off", "끔");
+        return ui_text("Off", "OFF");
     }
     return ui_text("Follow", "연동");
 }
@@ -944,15 +944,15 @@ std::string MenuApp::ui_random_label(std::string_view token) const {
         return ui_text("Mirror", "미러");
     }
     if (normalized == "fr" || normalized == "frns" || normalized == "fr_no_scratch") {
-        return ui_text("Random (Scratch Fixed)", "랜덤 (스크래치 고정)");
+        return ui_text("Random (Scratch Fixed)", "스크고정 랜덤");
     }
     if (normalized == "rr") {
-        return "R-Random";
+        return ui_text("Random", "랜덤");
     }
     if (normalized == "sr") {
-        return "S-Random";
+        return ui_text("S-Random", "S랜덤");
     }
-    return ui_text("Off", "끔");
+    return ui_text("Off", "OFF");
 }
 
 std::string MenuApp::ui_skin_source_label(std::string_view token) const {
@@ -1388,6 +1388,7 @@ void MenuApp::play_speed_adjustment_if_changed(const config::SpeedConfig& previo
 }
 
 void MenuApp::run() {
+    auto next_scene_music_tick = std::chrono::steady_clock::now();
     while (!exit_requested_.load(std::memory_order_acquire)) {
         if (service_window_size_change()) publish_snapshot();
         if (menu_window_.should_close()) {
@@ -1398,6 +1399,13 @@ void MenuApp::run() {
         if (foreground != menu_audio_foreground_) {
             menu_audio_foreground_ = foreground;
             sync_menu_music();
+        }
+        const auto scene_now = std::chrono::steady_clock::now();
+        if (scene_now >= next_scene_music_tick) {
+            next_scene_music_tick = scene_now + std::chrono::milliseconds(20);
+            // A completed decode must start even while a menu is idle.
+            if (current_screen() != Screen::Gameplay && current_screen() != Screen::BmsEditor)
+                sync_menu_music();
         }
         service_input_backend_health();
         while (true) {

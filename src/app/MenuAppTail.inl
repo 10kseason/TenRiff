@@ -284,6 +284,8 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         gameplay_hud_.has_retained_timing_feedback, target.timing_bar_always_visible);
     target.timing_feedback_delta_ms = gameplay_hud_.timing_feedback_delta_ms;
     target.timing_history_count = gameplay_hud_.timing_history_count;
+        target.timing_history_maximums = gameplay_hud_.timing_history_maximums;
+        target.timing_maximum_window_ms = gameplay_hud_.timing_maximum_window_ms;
     target.timing_history_delta_ms.fill(0.0);
     std::copy_n(gameplay_hud_.timing_history_delta_ms.begin(),
                 gameplay_hud_.timing_history_count,
@@ -511,6 +513,8 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         gameplay_hud_.ghost_has_retained_timing_feedback, target.timing_bar_always_visible);
     target.ghost_timing_feedback_delta_ms = gameplay_hud_.ghost_timing_feedback_delta_ms;
     target.ghost_timing_history_count = gameplay_hud_.ghost_timing_history_count;
+        target.ghost_timing_history_maximums = gameplay_hud_.ghost_timing_history_maximums;
+        target.ghost_timing_maximum_window_ms = gameplay_hud_.ghost_timing_maximum_window_ms;
     target.ghost_timing_history_delta_ms.fill(0.0);
     std::copy_n(gameplay_hud_.ghost_timing_history_delta_ms.begin(),
                 gameplay_hud_.ghost_timing_history_count,
@@ -607,6 +611,8 @@ bool MenuApp::start_song_preview_audio(const SongSelectScreen::PreviewDecodeResu
     }
 
     stop_song_preview_audio();
+    // Release the selected ASIO driver before the preview opens it.
+    menu_music_.stop();
 
     audio::AudioConfig preview_config = config_.audio;
     preview_config.sample_rate = static_cast<std::uint32_t>(preview.sample_rate);
@@ -937,7 +943,7 @@ void MenuApp::sync_menu_music() {
 
     const double gain = tenriff_music_gain(
         true, config_.audio_ui.master_volume, config_.audio_ui.menu_music_volume);
-    menu_music_.play_looping_file(music_path, gain);
+    menu_music_.play_looping_file(music_path, gain, config_.audio);
 }
 
 void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
@@ -1055,7 +1061,7 @@ void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
                     settings_cursor_ == profile_setup::kImportSettingsRow, render::MenuHitTargetKind::SettingsRow,
                     profile_setup::kImportSettingsRow, true, false);
     append_menu_row(render.generic, ui_text("Skip Start Countdown", "시작 카운트다운 생략"),
-                    config_.ui.skip_start_countdown ? ui_text("On", "켜짐") : ui_text("Off", "꺼짐"),
+                    config_.ui.skip_start_countdown ? ui_text("On", "켜짐") : ui_text("Off", "OFF"),
                     settings_cursor_ == profile_setup::kSkipStartCountdownRow, render::MenuHitTargetKind::SettingsRow,
                     profile_setup::kSkipStartCountdownRow, false, true);
     append_menu_row(render.generic, ui_text("Instant Restart Key", "즉시 재시작 키"),
@@ -2471,6 +2477,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.timing_feedback_delta_ms = hud.timing_feedback_delta_ms;
         gameplay_hud_.peer_revision = peer_revision;
         gameplay_hud_.timing_history_count = hud.timing_history_count;
+        gameplay_hud_.timing_history_maximums = hud.timing_history_maximums;
+        gameplay_hud_.timing_maximum_window_ms = hud.timing_maximum_window_ms;
         gameplay_hud_.timing_history_delta_ms.fill(0.0);
         std::copy_n(hud.timing_history_delta_ms.begin(),
                     hud.timing_history_count,
@@ -2516,6 +2524,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.ghost_has_retained_timing_feedback = hud.ghost_has_retained_timing_feedback;
         gameplay_hud_.ghost_timing_feedback_delta_ms = hud.ghost_timing_feedback_delta_ms;
         gameplay_hud_.ghost_timing_history_count = hud.ghost_timing_history_count;
+        gameplay_hud_.ghost_timing_history_maximums = hud.ghost_timing_history_maximums;
+        gameplay_hud_.ghost_timing_maximum_window_ms = hud.ghost_timing_maximum_window_ms;
         gameplay_hud_.ghost_timing_history_delta_ms.fill(0.0);
         std::copy_n(hud.ghost_timing_history_delta_ms.begin(),
                     hud.ghost_timing_history_count,
@@ -3190,7 +3200,7 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
             target.title = ui_text("Mod Manager", "모드 관리자");
             target.lines = {
                 ui_text("Up / Down selects a mod category. Left / Right cycles Off and the registered preset for that category.",
-                        "위 / 아래 키로 모드 카테고리를 선택하고, 좌 / 우 키로 끔과 해당 카테고리의 등록 프리셋을 순환합니다."),
+                        "위 / 아래 키로 모드 카테고리를 선택하고, 좌 / 우 키로 OFF와 해당 카테고리의 등록 프리셋을 순환합니다."),
                 ui_text("Each pattern category keeps one active preset. Judge Window is in the parent Key Mode Settings.",
                         "노트 구성·롱노트 규칙 등 각 항목은 하나의 설정만 적용합니다. 판정 범위는 상위 키 모드 설정에 있습니다."),
                 ui_text("Final score uses the lowest multiplier between the current Rate and all active mods.",
