@@ -75,6 +75,31 @@ private:
     int64_t duration_samples_ = 0;
 };
 
+inline float gameplay_rotated_note_half_height(float width, float height, float degrees) {
+    const float radians = degrees * 0.017453292519943295f;
+    return (std::abs(std::sin(radians)) * width + std::abs(std::cos(radians)) * height) * 0.5f;
+}
+
+struct GameplayJudgementBand {
+    float top = 0.0f;
+    float bottom = 0.0f;
+    float note_offset = 0.0f;
+};
+
+// Type 2 uses the timing position as its lower edge, except at field endpoints
+// where the whole note must fit inside the same two-pixel clip as live notes.
+// This is only a pixel translation: samples and judgement windows never change.
+inline GameplayJudgementBand gameplay_judgement_band(
+    float hit_y, float field_top, float field_bottom, float head_half_height) {
+    const float half = std::max(0.0f, head_half_height);
+    const float min_center = field_top + 2.0f + half;
+    const float max_center = field_bottom - 2.0f - half;
+    const float center = min_center <= max_center
+        ? std::clamp(hit_y - half, min_center, max_center)
+        : (field_top + field_bottom) * 0.5f;
+    return {center - half, center + half, center - hit_y};
+}
+
 struct GameplayNoteShapeExtents {
     float half_width = 0.0f;
     float half_height = 0.0f;

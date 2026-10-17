@@ -2228,9 +2228,11 @@ bool MenuApp::aggregate_menu_key(input::InputEvent& event) {
 }
 
 void MenuApp::discard_native_dialog_input() {
-    while (input_thread_.queue().pop()) {}
-    while (menu_window_.poll_click_event()) {}
-    while (menu_window_.poll_text_input()) {}
+    // Producers can still be running while a shell dialog closes. Cleanup is
+    // bounded; late keyboard/click edges are rejected by the timestamp fence.
+    for (int i = 0; i < 4096 && input_thread_.queue().pop(); ++i) {}
+    for (int i = 0; i < 64 && menu_window_.poll_click_event(); ++i) {}
+    for (int i = 0; i < 256 && menu_window_.poll_text_input(); ++i) {}
     reset_song_select_repeat();
     bms_editor_repeat_key_ = 0;
     bms_editor_repeat_next_ns_ = 0;
@@ -2257,9 +2259,12 @@ void MenuApp::handle_input_event(const input::InputEvent& incoming_event) {
     const NativeFileDialogInputScope dialog_input(this, [](void* owner) {
         static_cast<MenuApp*>(owner)->discard_native_dialog_input();
     });
+    // Release edges still clear the close-key guard even when they arrived
+    // late. Otherwise a drained/misordered release can suppress a fresh press.
+    if (event.state == input::InputState::Released)
+        native_dialog_held_keys_.erase(event.keycode);
     if (event.input_time_ns > 0 && event.input_time_ns <= native_dialog_closed_ns_) return;
     if (native_dialog_held_keys_.count(event.keycode) != 0) {
-        if (event.state == input::InputState::Released) native_dialog_held_keys_.erase(event.keycode);
         return;
     }
     note_runtime_input_event_source(event);
@@ -2457,6 +2462,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
     const NativeFileDialogInputScope dialog_input(this, [](void* owner) {
         static_cast<MenuApp*>(owner)->discard_native_dialog_input();
     });
+    if (incoming.input_time_ns > 0 && incoming.input_time_ns <= native_dialog_closed_ns_) return;
     if (current_screen() == Screen::QuickSetup && profile_control_key_capture_active_) return;
     auto event = incoming;
     // Result buttons use render.result, not the generic settings-row snapshot.

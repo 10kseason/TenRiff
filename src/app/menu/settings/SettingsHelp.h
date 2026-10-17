@@ -156,6 +156,7 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Scale the timing bar and its markers from 50% to 200% without changing FAST/SLOW text.", "FAST/SLOW 글자 크기를 유지하면서 막대와 마커 크기를 50~200%로 조절합니다.", "FAST/SLOW文字は変えず、バーとマーカーを50～200%で調整します。"},
         {"Choose a local TTF/OTF font. Missing files use the default font.", "로컬 TTF·OTF 폰트를 선택합니다. 파일이 없어지면 기본 폰트를 사용합니다.", "ローカルのTTF・OTFフォントを選びます。ファイルがなければ標準フォントを使います。"},
         {"Choose round dots or straight vertical barcode markers. Each judgement marker disappears after 0.7 seconds.", "둥근 점 또는 곧은 세로줄 바코드를 고릅니다. 판정 마커는 각각 0.7초 뒤 사라집니다.", "丸い点か縦線バーコードを選びます。各判定マーカーは0.7秒で消えます。"},
+        {"Type 1 keeps the existing line. Type 2 aligns notes inside a note-height band. Judgement timing and scoring stay unchanged.", "타입 1은 기존 판정선입니다. 타입 2는 노트 높이의 영역 안에 노트를 맞춥니다. 판정 시간과 점수 계산은 같습니다.", "タイプ1は従来の判定線です。タイプ2はノートの高さの領域内にノートを揃えます。判定時刻と得点計算は変わりません。"},
     };
     static constexpr SettingsHelpText profile[] = {
         {"Choose the interface language. The change is applied and saved immediately.", "화면 언어를 선택합니다. 변경 즉시 적용하고 저장합니다.", "表示言語を選びます。すぐに適用・保存されます。"},

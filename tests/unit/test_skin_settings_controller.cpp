@@ -763,3 +763,24 @@ TEST_CASE("indicator shape selection changes preview settings and persists on ex
     CHECK(effects.menu.render_changed);
     CHECK(controller.handle(MenuAction::back(), runtime, kLr2Names, kTenRiffNames).menu.persist_config);
 }
+
+
+TEST_CASE("judgement line type cycles by keyboard and pointer and saves independently of visibility") {
+    SkinSettingsController controller;
+    tenriff::config::RuntimeConfig runtime;
+    controller.reset("10k");
+    const auto id = SkinSettingsRowId::JudgementLineType;
+    CHECK(runtime.skin.judgement_line_type == 1);
+    auto effects = controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames, id);
+    CHECK(effects.menu.render_changed);
+    CHECK(runtime.skin.judgement_line_type == 2);
+    CHECK(runtime.skin.show_judgement_line);
+    effects = controller.handle(MenuAction::activate(), runtime, kLr2Names, kTenRiffNames, id);
+    CHECK(effects.menu.render_changed);
+    CHECK(runtime.skin.judgement_line_type == 1);
+    runtime.skin.show_judgement_line = false;
+    static_cast<void>(controller.handle(MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames, id));
+    CHECK(runtime.skin.judgement_line_type == 2);
+    CHECK_FALSE(runtime.skin.show_judgement_line);
+    CHECK(controller.handle(MenuAction::back(), runtime, kLr2Names, kTenRiffNames).menu.persist_config);
+}

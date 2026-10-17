@@ -1,4 +1,5 @@
 #pragma once
+#include "input/ModalInputFence.h"
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -31,39 +32,71 @@ private:
 };
 
 #ifdef _WIN32
-inline HRESULT show_native_file_dialog(IFileDialog* dialog) {
-    static thread_local bool active = false;
-    if (active) return HRESULT_FROM_WIN32(ERROR_CANCELLED);
-    active = true;
-    struct Completion {
-        bool& active;
-        ~Completion() {
-            NativeFileDialogInputScope::discard_modal_input();
-            active = false;
+// Declare before shell interfaces so every early return releases them first.
+class NativeFileDialogApartment {
+public:
+    NativeFileDialogApartment() : result_(CoInitializeEx(nullptr,
+        COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE)) {}
+    ~NativeFileDialogApartment() { if (SUCCEEDED(result_)) CoUninitialize(); }
+    HRESULT result() const { return result_; }
+    NativeFileDialogApartment(const NativeFileDialogApartment&) = delete;
+    NativeFileDialogApartment& operator=(const NativeFileDialogApartment&) = delete;
+private:
+    HRESULT result_;
+};
+
+inline HWND native_file_dialog_owner() {
+    HWND owner = nullptr;
+    // A shell picker in the foreground is never the next picker's owner.
+    EnumWindows([](HWND window, LPARAM target) -> BOOL {
+        DWORD process = 0;
+        GetWindowThreadProcessId(window, &process);
+        wchar_t type[64]{};
+        GetClassNameW(window, type, 64);
+        if (process == GetCurrentProcessId() && IsWindowVisible(window) &&
+            lstrcmpW(type, L"TenRiffMenuWindow") == 0) {
+            *reinterpret_cast<HWND*>(target) = window;
+            return FALSE;
         }
-    } completion{active};
-    HWND owner = GetForegroundWindow();
-    DWORD process = 0;
-    if (owner) GetWindowThreadProcessId(owner, &process);
-    if (process != GetCurrentProcessId()) owner = nullptr;
-    if (!owner) {
-        // Focus can change between menu dispatch and opening the shell. Keep
-        // modal ownership on our primary window even in that transition.
-        EnumWindows([](HWND window, LPARAM target) -> BOOL {
-            DWORD process_id = 0;
-            GetWindowThreadProcessId(window, &process_id);
-            wchar_t class_name[64]{};
-            GetClassNameW(window, class_name, 64);
-            if (process_id == GetCurrentProcessId() && IsWindowVisible(window) &&
-                lstrcmpW(class_name, L"TenRiffMenuWindow") == 0) {
-                *reinterpret_cast<HWND*>(target) = window;
-                return FALSE;
+        return TRUE;
+    }, reinterpret_cast<LPARAM>(&owner));
+    return owner;
+}
+
+inline HRESULT show_native_file_dialog(IFileDialog* dialog) {
+    if (!dialog) return E_INVALIDARG;
+    static thread_local IFileDialog* active = nullptr;
+    static thread_local unsigned depth = 0;
+    // A newer explicit request cancels our previous picker. Permit one nested
+    // replacement only: shell callbacks cannot recursively spawn windows.
+    if (depth >= 2 || active == dialog) return HRESULT_FROM_WIN32(ERROR_CANCELLED);
+    IFileDialog* previous = active;
+    const HWND owner = native_file_dialog_owner();
+    const bool restore_owner = depth == 0 && owner && IsWindowEnabled(owner);
+    active = dialog;
+    ++depth;
+    struct Completion {
+        IFileDialog*& active;
+        IFileDialog* previous;
+        unsigned& depth;
+        HWND owner;
+        bool restore_owner;
+        ~Completion() {
+            active = previous;
+            --depth;
+            // The render thread owns the HWND. No menu/render locks may be
+            // held across Show or this synchronous owner restoration.
+            if (restore_owner && IsWindow(owner)) {
+                EnableWindow(owner, TRUE);
+                SetForegroundWindow(owner);
             }
-            return TRUE;
-        }, reinterpret_cast<LPARAM>(&owner));
-    }
-    // Owning the dialog disables the game window while the shell is modal.
-    // Never disable or attach to a foreground window from another process.
+            input::native_modal_input_fence.close(GetTickCount64());
+            NativeFileDialogInputScope::discard_modal_input();
+        }
+    } completion{active, previous, depth, owner, restore_owner};
+    // Reserve the slot before Close as even cancellation can pump COM calls.
+    if (previous && FAILED(previous->Close(HRESULT_FROM_WIN32(ERROR_CANCELLED))))
+        return HRESULT_FROM_WIN32(ERROR_CANCELLED);
     return dialog->Show(owner);
 }
 #endif

@@ -126,6 +126,7 @@ struct MenuAppVisualTestAccess {
         skin.lane_center_gap_scales[mode] = preview.lane_center_gap_scale;
         skin.hold_body_width_scale = preview.hold_body_width_scale;
         skin.judgement_line_position = preview.judgement_line_position;
+        skin.judgement_line_type = preview.judgement_line_type;
         skin.gameplay_field_offset_x = preview.gameplay_field_offset_x;
         skin.combo_position = preview.combo_position;
         skin.judgement_position = preview.judgement_position;
@@ -658,6 +659,9 @@ int main(int argc, char** argv) {
     bool remapped_functions = false;
     bool measure_lines_fixture = false;
     bool measure_alignment_fixture = false;
+    int judgement_line_type = 1;
+    double fixture_judge_position = -1;
+    bool timing_sequence = false;
     std::string bms_rank_fixture;
     std::string artist_fixture;
     double timing_text_x = 0, timing_text_y = 0, timing_bar_x = 0, timing_bar_y = 0;
@@ -796,6 +800,13 @@ int main(int argc, char** argv) {
             continue;
         }
         if (arg == "--remapped-functions") { remapped_functions = true; continue; }
+        if (arg == "--judge-line-position" && i + 1 < argc) { fixture_judge_position = std::clamp(std::stod(argv[++i]), 0.0, 1.0); continue; }
+        if (arg == "--timing-sequence") { timing_sequence = gameplay = true; continue; }
+        if (arg == "--judge-line-type" && i + 1 < argc) {
+            judgement_line_type = std::stoi(argv[++i]);
+            if (judgement_line_type != 1 && judgement_line_type != 2) return 2;
+            continue;
+        }
         if (arg == "--measure-lines") { measure_lines_fixture = true; continue; }
         if (arg == "--measure-alignment" || arg == "--measure-alignment-no-lines") {
             measure_alignment_fixture = true;
@@ -1082,6 +1093,7 @@ int main(int argc, char** argv) {
         auto& preview = data.generic.skin_preview;
         preview.visible = skin_settings;
         preview.note_height_scale = preview_note_height;
+        preview.judgement_line_type = judgement_line_type;
         preview.lane_count = preview_keys;
         preview.mode_label = seven_plus_one ? "7+1" : std::to_string(preview_keys) + "K";
         preview.gameplay_field_offset_x = field_offset;
@@ -1509,6 +1521,7 @@ int main(int argc, char** argv) {
         if (!menu_roundtrip) data.kind = MenuScreenKind::GameplayHud;
         auto& hud = data.gameplay;
         hud.note_height_scale = preview_note_height;
+        hud.judgement_line_type = judgement_line_type;
         hud.gameplay_field_offset_x = field_offset;
         hud.active = true; hud.title = loc("Gameplay", "게임플레이") + " / " + loc("LIVE PREVIEW", "미리보기");
         hud.difficulty_label = "LV " + display_level;
@@ -1638,6 +1651,8 @@ int main(int argc, char** argv) {
     data.gameplay.hud_riff_map_visible = data.generic.skin_preview.hud_riff_map_visible = riff_map_visible;
     data.gameplay.combo_font_scale = data.generic.skin_preview.combo_font_scale = combo_font_scale;
     data.gameplay.note_width_scale = data.generic.skin_preview.note_width_scale = preview_note_width;
+    if (fixture_judge_position >= 0) data.gameplay.judgement_line_position =
+        data.generic.skin_preview.judgement_line_position = fixture_judge_position;
     if (fixture_hold_opacity >= 0)
         data.gameplay.hold_body_opacity = data.generic.skin_preview.hold_body_opacity = fixture_hold_opacity;
     data.gameplay.paused = ghost_paused;
@@ -1863,7 +1878,7 @@ int main(int argc, char** argv) {
             hud.has_timing_feedback = hud.has_non_pg_feedback;
             hud.timing_feedback_delta_ms = hud.feedback_delta_ms;
             if (!timing_feedback_case.empty()) {
-                const bool retained = timing_feedback_case == "retained-pg" || timing_feedback_case == "always-expired";
+                const bool retained = timing_feedback_case == "retained-pg";
                 const bool poor = timing_feedback_case == "poor";
                 hud.has_feedback = true;
                 hud.feedback = poor ? "POOR" : "PG";
@@ -1874,6 +1889,9 @@ int main(int argc, char** argv) {
                 if (timing_feedback_case == "always-pg" || timing_feedback_case == "always-expired") hud.timing_bar_always_visible = true;
                 if (timing_feedback_case == "expired" || timing_feedback_case == "always-expired") hud.timing_history_count = 0;
             }
+            // Fixed 60Hz timeline: outside FAST at0ms, PG from100ms,
+            // expiry at350ms, then a new outside SLOW at500ms.
+            if (timing_sequence) timing_color_case = rendered_frames < 6 ? "fast" : rendered_frames < 30 ? "maximum" : "late";
             if (!timing_color_case.empty()) {
                 hud.timing_maximum_window_ms = timing_maximum_ms;
                 hud.timing_history_count = timing_color_case == "expired" ? 0 : 3;
@@ -1882,12 +1900,15 @@ int main(int argc, char** argv) {
                 hud.timing_history_delta_ms = {-55.0, 55.0, last};
                 hud.timing_history_maximums = {false, false, timing_color_case == "awarded" || timing_color_case == "maximum"};
                 hud.feedback = (timing_color_case == "maximum" || timing_color_case == "awarded") ? "PG" : "GR";
-                hud.feedback_delta_ms = hud.timing_feedback_delta_ms = last;
-                hud.has_timing_feedback = hud.has_retained_timing_feedback = timing_color_case != "expired";
+                hud.feedback_delta_ms = last;
+                const bool outside = timing_color_case == "fast" || timing_color_case == "late";
+                hud.timing_feedback_delta_ms = timing_sequence && rendered_frames < 30 ? -50.0 : last;
+                hud.has_timing_feedback = hud.has_retained_timing_feedback = timing_sequence
+                    ? (rendered_frames < 21 || (rendered_frames >= 30 && rendered_frames < 51)) : outside;
                 hud.timing_bar_always_visible = true;
             }
 
-            hud.text_revision = static_cast<uint64_t>(hit + 1);
+            hud.text_revision = timing_sequence ? static_cast<uint64_t>(rendered_frames + 1) : static_cast<uint64_t>(hit + 1);
             hud.motion_revision++;
             hud.combo = 123 + hit; hud.pg = hit + 1;
             hud.current_sample = static_cast<int64_t>(seconds * 48000);
@@ -1931,7 +1952,7 @@ int main(int argc, char** argv) {
                 note.start_sample = hud.current_sample + static_cast<int64_t>((0.1 + std::fmod(lane * 0.13 + seconds * 0.5, 1.0)) * 40000);
                 if (measure_alignment_fixture)
                     note.start_sample = static_cast<int64_t>((std::floor(seconds / 0.5) * 0.5 +
-                        (1 + (lane - 1) % 3) * 0.5) * 48000);
+                        ((lane - 1) % 3) * 0.5) * 48000);
                 note.visual_position = note.start_sample / 48000.0;
                 note.tail_visual_position = note.visual_position;
                 if (lane % 3 == 0) {

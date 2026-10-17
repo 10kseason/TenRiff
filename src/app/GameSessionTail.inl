@@ -1312,10 +1312,10 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         snapshot.has_feedback = feedback.has_value && feedback_age_samples <= feedback_display_samples;
         snapshot.feedback_judgement = feedback.judgement;
         snapshot.feedback_delta_ms = snapshot.has_feedback ? feedback.delta_ms : 0.0;
-        const auto& timing = engine_->timing_feedback();
-        snapshot.has_timing_feedback = gameplay::timing_feedback_visible(
+        const auto& timing = engine_->timing_text_feedback();
+        snapshot.has_timing_feedback = gameplay::timing_text_feedback_visible(
             timing, snapshot.current_sample, sample_rate_);
-        snapshot.has_retained_timing_feedback = timing.has_value;
+        snapshot.has_retained_timing_feedback = snapshot.has_timing_feedback;
         snapshot.timing_feedback_delta_ms = timing.has_value ? timing.delta_ms : 0.0;
         snapshot.has_non_pg_feedback = gameplay::timing_feedback_visible(
             engine_->non_pg_feedback(), snapshot.current_sample, sample_rate_);
@@ -1361,10 +1361,10 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             snapshot.ghost_feedback_judgement = ghost_feedback.judgement;
             snapshot.ghost_feedback_delta_ms =
                 snapshot.ghost_has_feedback ? ghost_feedback.delta_ms : 0.0;
-            const auto& ghost_timing = ghost_engine_->timing_feedback();
-            snapshot.ghost_has_timing_feedback = gameplay::timing_feedback_visible(
+            const auto& ghost_timing = ghost_engine_->timing_text_feedback();
+            snapshot.ghost_has_timing_feedback = gameplay::timing_text_feedback_visible(
                 ghost_timing, snapshot.current_sample, sample_rate_);
-            snapshot.ghost_has_retained_timing_feedback = ghost_timing.has_value;
+            snapshot.ghost_has_retained_timing_feedback = snapshot.ghost_has_timing_feedback;
             snapshot.ghost_timing_feedback_delta_ms = ghost_timing.has_value ? ghost_timing.delta_ms : 0.0;
             snapshot.ghost_has_non_pg_feedback = gameplay::timing_feedback_visible(
                 ghost_engine_->non_pg_feedback(), snapshot.current_sample, sample_rate_);

@@ -6,6 +6,54 @@
 
 #include "app/ModeManager.h"
 #include "gameplay/GameplayEngine.h"
+#include "input/ModalInputFence.h"
+
+TEST_CASE("modal input fence rejects delayed mouse and text at original message time") {
+    tenriff::input::ModalInputFence fence;
+    CHECK_FALSE(fence.rejects(90,100));
+    fence.close(100);
+    CHECK(fence.rejects(90,500));
+    CHECK(fence.rejects(100,500));
+    CHECK_FALSE(fence.rejects(101,500));
+    fence.close(0x100000010ull);
+    CHECK(fence.rejects(0xfffffff0u,0x100000020ull));
+    CHECK(fence.rejects(0x10,0x100000020ull));
+    CHECK_FALSE(fence.rejects(0x11,0x100000020ull));
+}
+
+TEST_CASE("timing text keeps outside judgement for 350ms without PG refresh") {
+    using namespace tenriff::gameplay;
+    for (const int rate : {1000, 44100, 48000}) {
+        GameplayChart chart;
+        chart.lane_count = 1;
+        chart.duration_samples = rate * 4;
+        chart.notes = {{1,rate,std::nullopt}, {1,rate + rate/10,std::nullopt},
+                       {1,rate + rate/5,std::nullopt}, {1,rate + rate/4,std::nullopt}};
+        GameplayConfig cfg; cfg.sample_rate = rate;
+        GameplayEngine engine(chart,cfg);
+        const int64_t first = rate - rate/20;
+        static_cast<void>(engine.handle_input(1,tenriff::input::InputState::Pressed,first));
+        static_cast<void>(engine.handle_input(1,tenriff::input::InputState::Released,first+1));
+        CHECK(engine.timing_text_feedback().sample == first);
+        CHECK(engine.timing_text_feedback().delta_ms < -49.0);
+        for (const int64_t pg : {int64_t(rate + rate/10),int64_t(rate + rate/5)}) {
+            static_cast<void>(engine.handle_input(1,tenriff::input::InputState::Pressed,pg));
+            static_cast<void>(engine.handle_input(1,tenriff::input::InputState::Released,pg+1));
+            CHECK(engine.timing_text_feedback().sample == first);
+            CHECK(engine.timing_feedback().sample == pg);
+        }
+        const auto& text = engine.timing_text_feedback();
+        const int64_t expiry = first + int64_t(rate)*35/100;
+        CHECK(timing_text_feedback_visible(text,expiry-1,rate));
+        CHECK_FALSE(timing_text_feedback_visible(text,expiry,rate));
+        CHECK_FALSE(timing_text_feedback_visible(text,first-1,rate));
+        const int64_t late = rate + rate/4 + rate/20;
+        static_cast<void>(engine.handle_input(1,tenriff::input::InputState::Pressed,late));
+        CHECK(engine.timing_text_feedback().sample == late);
+        CHECK(engine.timing_text_feedback().delta_ms > 49.0);
+        CHECK(timing_text_feedback_visible(engine.timing_text_feedback(),late,rate));
+    }
+}
 #include "render/GameplayTimingIndicator.h"
 
 using tenriff::gameplay::GameplayChart;

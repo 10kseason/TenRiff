@@ -847,6 +847,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             kNoteDividerGapPxMax);
         config.skin.show_judgement_line =
             get_bool(*skin, "show_judgement_line", config.skin.show_judgement_line);
+        config.skin.judgement_line_type =
+            get_number(*skin, "judgement_line_type", config.skin.judgement_line_type) == 2.0 ? 2 : 1;
         config.skin.show_gear_boundary_line =
             get_bool(*skin, "show_gear_boundary_line", config.skin.show_gear_boundary_line);
         config.skin.show_timing_feedback =
@@ -1337,6 +1339,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("show_lane_dividers", JsonValue{config.skin.show_lane_dividers});
     skin.emplace("note_divider_gap_px", JsonValue{config.skin.note_divider_gap_px});
     skin.emplace("show_judgement_line", JsonValue{config.skin.show_judgement_line});
+    skin.emplace("judgement_line_type", JsonValue{static_cast<double>(config.skin.judgement_line_type)});
     skin.emplace("show_gear_boundary_line", JsonValue{config.skin.show_gear_boundary_line});
     skin.emplace("show_timing_feedback", JsonValue{config.skin.show_timing_feedback});
     skin.emplace("show_timing_bar", JsonValue{config.skin.show_timing_bar});
@@ -2099,7 +2102,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.audio_ui.preset = "high";
     config.audio_ui.bms_keysound_policy = "follow";
     config.audio_ui.background_sound_enabled = true;
-    config.audio_ui.master_volume = 0.10;
+    config.audio_ui.master_volume = 0.30;
     config.audio_ui.bgm_volume = 1.0;
     config.audio_ui.keysound_volume = 1.0;
 

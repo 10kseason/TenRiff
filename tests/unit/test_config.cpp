@@ -356,6 +356,7 @@ TEST_CASE("profile start controls retain legacy defaults and roundtrip without c
     edited.ui.function_keys[0] = "F2";
     edited.ui.function_keys[1] = "F1";
     edited.skin.timing_marker_style = "barcode";
+    edited.skin.judgement_line_type = 2;
     edited.audio.device_id = "synthetic-endpoint";
     edited.input_offset_ms = 12.5;
     edited.sound_offset_ms = -8.0;
@@ -369,6 +370,7 @@ TEST_CASE("profile start controls retain legacy defaults and roundtrip without c
     CHECK(loaded.config.ui.function_keys[0] == "F2");
     CHECK(loaded.config.ui.function_keys[1] == "F1");
     CHECK(loaded.config.skin.timing_marker_style == "barcode");
+    CHECK(loaded.config.skin.judgement_line_type == 2);
     CHECK(loaded.config.audio.device_id == "synthetic-endpoint");
     CHECK(loaded.config.input_offset_ms == doctest::Approx(12.5));
     CHECK(loaded.config.sound_offset_ms == doctest::Approx(-8.0));
@@ -2512,14 +2514,14 @@ TEST_CASE("every 4K through 16K skin mode preserves its own palette and geometry
     }
 }
 
-TEST_CASE("new profiles start at 10 percent while explicit volume and mute persist") {
+TEST_CASE("new profiles start at 30 percent while explicit volume and mute persist") {
     TempDirGuard temp{make_temp_dir()};
     REQUIRE_FALSE(temp.path.empty());
     CurrentPathGuard cwd;
     std::filesystem::current_path(temp.path);
     std::filesystem::create_directories("profiles/player");
     ConfigLoader loader;
-    CHECK(loader.defaults().audio_ui.master_volume == doctest::Approx(0.10));
+    CHECK(loader.defaults().audio_ui.master_volume == doctest::Approx(0.30));
     write_file("profiles/player/config.json", R"({"audio":{"volume":1.0,"mute_when_inactive":true}})");
     auto loaded = loader.load_profile("profiles/player");
     REQUIRE(loaded.success());
@@ -2539,7 +2541,7 @@ TEST_CASE("new profiles start at 10 percent while explicit volume and mute persi
     write_file("profiles/player/config.json", "{}");
     loaded = loader.load_profile("profiles/player");
     REQUIRE(loaded.success());
-    CHECK(loaded.config.audio_ui.master_volume == doctest::Approx(0.10));
+    CHECK(loaded.config.audio_ui.master_volume == doctest::Approx(0.30));
     CHECK_FALSE(loaded.config.audio_ui.mute_when_inactive);
 }
 
@@ -2713,4 +2715,34 @@ TEST_CASE("BGA brightness preserves legacy profiles and clamps percent settings"
     CHECK(loader.load_profile("profiles/brightness").config.graphics.bga_brightness_percent == 100);
     write_file("profiles/brightness/config.json", R"({"graphics":{"bga_brightness_percent":-2}})");
     CHECK(loader.load_profile("profiles/brightness").config.graphics.bga_brightness_percent == 0);
+}
+
+
+TEST_CASE("judgement line type preserves legacy profiles and rejects unsupported values") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE_FALSE(temp.path.empty());
+    CurrentPathGuard cwd;
+    std::filesystem::current_path(temp.path);
+    std::filesystem::create_directories("profiles/player");
+    ConfigLoader loader;
+    CHECK(loader.defaults().skin.judgement_line_type == 1);
+    for (const auto value : {"null", "0", "3", "2.5", "\"2\""}) {
+        write_file("profiles/player/config.json",
+            std::string(R"({"skin":{"judgement_line_type":)") + value + "}}");
+        const auto loaded = loader.load_profile("profiles/player");
+        REQUIRE(loaded.success());
+        CHECK(loaded.config.skin.judgement_line_type == 1);
+    }
+    write_file("profiles/player/config.json", R"({"audio":{"volume":0.1}})");
+    const auto legacy = loader.load_profile("profiles/player");
+    REQUIRE(legacy.success());
+    CHECK(legacy.config.skin.judgement_line_type == 1);
+    CHECK(legacy.config.audio_ui.master_volume == doctest::Approx(0.10));
+    REQUIRE(loader.save_profile("profiles/player", legacy.config));
+    CHECK(loader.load_profile("profiles/player").config.audio_ui.master_volume == doctest::Approx(0.10));
+    std::filesystem::create_directories("config");
+    write_file("config/config.json", R"({"skin":{"judgement_line_type":2}})");
+    write_file("profiles/player/config.json", R"({"skin":{"show_judgement_line":false}})");
+    CHECK(loader.load_profile("profiles/player").config.skin.judgement_line_type == 2);
+
 }

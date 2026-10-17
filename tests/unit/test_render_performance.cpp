@@ -1,5 +1,6 @@
 #include "render/SettingsListLayout.h"
 #include "render/GameplayFeedbackText.h"
+#include "render/GameplayTimingIndicator.h"
 #include "doctest/doctest.h"
 
 #include "render/BgaVideoDecoder.h"
@@ -1227,4 +1228,56 @@ TEST_CASE("LN body alpha keeps the complete configured opacity range linear") {
     }
     CHECK(tenriff::render::gameplay_hold_body_alpha(-1, 1) == 0);
     CHECK(tenriff::render::gameplay_hold_body_alpha(2, 1) == 1);
+}
+
+
+TEST_CASE("judgement line types align note bounds while preserving LN length and preview timing") {
+    using namespace tenriff::render;
+    constexpr float hit_y = 840.0f;
+    for (float height : {0.5f, 1.8f, 4.0f}) {
+        const float half = 11.0f * height;
+        const float center = hit_y + gameplay_judgement_band(hit_y, 200.0f, 900.0f, half).note_offset;
+        CHECK(center + half == doctest::Approx(hit_y));
+        CHECK(center - half == doctest::Approx(hit_y - 2.0f * half));
+        const float tail_center = hit_y - 180.0f + gameplay_judgement_band(hit_y, 200.0f, 900.0f, half).note_offset;
+        CHECK(center - tail_center == doctest::Approx(180.0f));
+        for (float edge : {200.0f, 900.0f}) {
+            const auto band = gameplay_judgement_band(edge, 200.0f, 900.0f, half);
+            CHECK(band.top >= 202.0f);
+            CHECK(band.bottom <= 898.0f);
+            // Float subtraction near 900 px can lose about 0.000025 px.
+            CHECK(band.bottom - band.top == doctest::Approx(2.0f * half).epsilon(1e-4));
+            CHECK(edge + band.note_offset - half == doctest::Approx(band.top));
+            CHECK(edge + band.note_offset + half == doctest::Approx(band.bottom));
+        }
+    }
+    SkinPreviewData preview;
+    const auto old_hud = make_skin_gameplay_preview(preview);
+    preview.judgement_line_type = 2;
+    const auto band_hud = make_skin_gameplay_preview(preview);
+    CHECK(band_hud.judgement_line_type == 2);
+    CHECK(old_hud.text_revision != band_hud.text_revision);
+    CHECK(old_hud.current_sample == band_hud.current_sample);
+    CHECK(old_hud.current_visual_position == band_hud.current_visual_position);
+    CHECK(old_hud.judgement_line_position == band_hud.judgement_line_position);
+    REQUIRE(old_hud.note_count == band_hud.note_count);
+    for (std::size_t i = 0; i < old_hud.note_count; ++i) {
+        CHECK(old_hud.notes[i].start_sample == band_hud.notes[i].start_sample);
+        CHECK(old_hud.notes[i].tail_sample == band_hud.notes[i].tail_sample);
+        CHECK(old_hud.notes[i].visual_position == band_hud.notes[i].visual_position);
+    }
+}
+
+TEST_CASE("retained timing text survives current maximum grade") {
+    using namespace tenriff::render;
+    for (double window : {8.0, 14.0, 21.0, 26.25}) {
+        for (double delta : {-window, -1.0, 0.0, 1.0, window}) {
+            CHECK(timing_marker_color(delta, window) == kTimingMaximumColor);
+        }
+        CHECK(gameplay_timing_feedback_text(-window - 1.0, "PG").find(L"FAST") == 0);
+        CHECK(gameplay_timing_feedback_text(window + 1.0, "PG").find(L"SLOW") == 0);
+    }
+    CHECK(gameplay_rotated_note_half_height(80, 40, 0) == doctest::Approx(20));
+    CHECK(gameplay_rotated_note_half_height(80, 40, 90) == doctest::Approx(40));
+    CHECK(gameplay_rotated_note_half_height(80, 80, 45) == doctest::Approx(56.56854).epsilon(1e-5));
 }

@@ -1,3 +1,5 @@
+**2026-10-17 · 1.9.5.1:** [Judgement line, FAST/SLOW and file pickers](release-1.9.5.1.en.md). FAST/SLOW remains for 0.35 seconds from the last hit outside the maximum window. A maximum judgement neither clears it immediately nor extends its lifetime. Another outside-window hit replaces it immediately. The Always scale and 0.7-second dot/barcode lifetime remain separate.
+
 **2026-10-17 · 1.9.5:** Menu/result music follows the selected sound output. Indicator ranges and markers use blue FAST / green maximum judgement / red LATE. FAST/SLOW updates on maximum hits too. Lobby order is OFF → Mirror → Random → S-Random → Random (Scratch Fixed) → OFF. [Scene audio routing and timing indicators](release-1.9.5.en.md).
 
 **2026-10-17 · 1.9.3 local:** [Indicators, output devices and profile shortcuts](input-feedback-20261017.en.md).
@@ -71,7 +73,7 @@ The 1.9.0.2 candidate adjusts all five audio UI volumes—master, BMS song, TenR
 - `title_music` (string)
   - `none | default | random_bms | last_played`; default `default`. Selects no music, the bundled theme, a random loaded BMS, or the last played chart for Title and Quick Setup. Unavailable chart audio falls back to the default theme. BMS audio includes keysounds and is prepared asynchronously, capped at five minutes and looped.
 - `volume` (double)
-  - Master volume. 0–1, new default 0.10 (10%); explicitly saved values are retained.
+  - Master volume. 0–1, new default 0.30 (30%); explicitly saved values are retained.
 - `gameplay_volume` (double)
   - BMS performance volume (Korean: BMS 연주 볼륨), jointly controlling background audio, keysounds and previews. 0–1, new default 0.20 (20%); explicitly saved values are retained. The field name and existing UI-effect gain are unchanged.
 - `menu_music_volume` (double)

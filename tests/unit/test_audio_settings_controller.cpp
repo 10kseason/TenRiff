@@ -486,7 +486,7 @@ TEST_CASE("audio settings controller preserves every row behavior") {
         AudioSettingsController controller;
         static_cast<void>(controller.select(AudioSettingId::MasterVolume));
         check_render_only(controller.handle(MenuAction::adjust(-1), runtime));
-        CHECK(runtime.audio_ui.master_volume == doctest::Approx(0.09));
+        CHECK(runtime.audio_ui.master_volume == doctest::Approx(0.29));
     }
 
     {
@@ -1049,7 +1049,7 @@ TEST_CASE("audio outro choice toggles with keyboard and pointer without changing
     CHECK_FALSE(runtime.audio_ui.play_to_end);
     check_render_only(controller.handle(MenuAction::adjust(-1), runtime, AudioSettingId::PlayToEnd));
     CHECK(runtime.audio_ui.play_to_end);
-    CHECK(runtime.audio_ui.master_volume == doctest::Approx(0.10));
+    CHECK(runtime.audio_ui.master_volume == doctest::Approx(0.30));
     CHECK(controller.handle(MenuAction::back(), runtime).persist_config);
 }
 

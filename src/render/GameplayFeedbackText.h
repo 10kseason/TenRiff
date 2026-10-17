@@ -32,7 +32,7 @@ inline std::wstring gameplay_timing_feedback_text(double delta_ms) {
     return L"SLOW +" + std::to_wstring(rounded_ms) + L" ms";
 }
 
-// Judgement grade does not suppress the latest measured timing guidance.
+// The session selects the retained error independently of the current grade.
 inline std::wstring gameplay_timing_feedback_text(double delta_ms,
                                                   std::string_view /*judgement*/) {
     return gameplay_timing_feedback_text(delta_ms);

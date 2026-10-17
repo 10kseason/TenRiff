@@ -20,6 +20,7 @@ inline uint64_t skin_gameplay_preview_text_revision(const SkinPreviewData& previ
     for (const unsigned char ch : preview.hud_layout) mix(ch);
     mix(static_cast<uint64_t>(std::clamp(preview.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes))));
     mix(static_cast<uint64_t>(language));
+    mix(static_cast<uint64_t>(preview.judgement_line_type));
     mix(static_cast<uint64_t>(std::hash<double>{}(preview.judgement_line_position)));
     return revision | (uint64_t{1} << 63);  // Zero remains the cache's invalid sentinel.
 }
@@ -56,6 +57,7 @@ inline GameplayHudData make_skin_gameplay_preview(const SkinPreviewData& preview
     hud.show_timing_bar = preview.show_timing_bar;
     hud.timing_bar_always_visible = preview.timing_bar_always_visible;
     hud.timing_marker_style = preview.timing_marker_style;
+    hud.judgement_line_type = preview.judgement_line_type;
     hud.note_fade_in = preview.note_fade_in;
     hud.note_fade_out = preview.note_fade_out;
     hud.timing_text_offset_x = preview.timing_text_offset_x;

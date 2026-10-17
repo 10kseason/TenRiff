@@ -88,6 +88,13 @@ inline bool timing_feedback_visible(const LiveJudgementFeedback& feedback,
         current_sample - feedback.sample <= static_cast<int64_t>(sample_rate) * 3 / 4;
 }
 
+// Maximum hits do not extend the last outside-window timing label.
+inline bool timing_text_feedback_visible(const LiveJudgementFeedback& feedback,
+                                         int64_t current_sample, int sample_rate) {
+    return feedback.has_value && sample_rate > 0 && current_sample >= feedback.sample &&
+        current_sample - feedback.sample < static_cast<int64_t>(sample_rate) * 35 / 100;
+}
+
 struct ActiveHoldView {
     int lane = 0;
     int64_t end_sample = 0;
@@ -116,6 +123,7 @@ public:
     [[nodiscard]] const ReplayTrace& replay() const { return replay_; }
     [[nodiscard]] const LiveJudgementFeedback& live_feedback() const { return live_feedback_; }
     [[nodiscard]] const LiveJudgementFeedback& timing_feedback() const { return timing_feedback_; }
+    [[nodiscard]] const LiveJudgementFeedback& timing_text_feedback() const { return timing_text_feedback_; }
     [[nodiscard]] const LiveJudgementFeedback& non_pg_feedback() const { return non_pg_feedback_; }
     [[nodiscard]] bool is_note_pending(int lane, std::size_t note_id) const;
     [[nodiscard]] bool is_mine_pending(int lane, std::size_t mine_id) const;
@@ -184,6 +192,7 @@ private:
     LiveJudgementFeedback live_feedback_;
     // HUD-only feedback: latest measured PG also refreshes FAST/SLOW.
     LiveJudgementFeedback timing_feedback_;
+    LiveJudgementFeedback timing_text_feedback_;
     LiveJudgementFeedback non_pg_feedback_;
     std::vector<MineTrigger> pending_mine_triggers_;
     std::array<double, kGameplayTimingHistoryMaxEntries> recent_timing_deltas_{};

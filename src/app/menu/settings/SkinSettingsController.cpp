@@ -439,6 +439,9 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
         case SkinSettingsRowId::LaneDividers:
             runtime.skin.show_lane_dividers = !runtime.skin.show_lane_dividers;
             return mark_changed();
+        case SkinSettingsRowId::JudgementLineType:
+            runtime.skin.judgement_line_type = runtime.skin.judgement_line_type == 2 ? 1 : 2;
+            return mark_changed();
         case SkinSettingsRowId::JudgementLine:
             runtime.skin.show_judgement_line = !runtime.skin.show_judgement_line;
             return mark_changed();

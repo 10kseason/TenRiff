@@ -134,6 +134,7 @@ struct MenuClickEvent {
     double value = 0.0;
     double value_y = 0.0;
     std::string path;
+    int64_t input_time_ns = 0;
 };
 
 struct MenuButtonData {
@@ -517,6 +518,7 @@ struct GameplayHudData {
     bool show_lane_dividers = true;
     double note_divider_gap_px = kGameplayNoteDividerGapPxDefault;
     bool show_judgement_line = true;
+    int judgement_line_type = 1;
     bool show_gear_boundary_line = false;
     bool show_timing_feedback = true;
     bool show_timing_bar = true;
@@ -742,6 +744,7 @@ struct SkinPreviewData {
     bool show_lane_dividers = true;
     double note_divider_gap_px = kGameplayNoteDividerGapPxDefault;
     bool show_judgement_line = true;
+    int judgement_line_type = 1;
     bool show_gear_boundary_line = false;
     bool show_hold_tail = false;
     bool hold_tail_taper_enabled = false;
@@ -1212,6 +1215,7 @@ private:
         bool show_lane_dividers = true;
         double note_divider_gap_px = kGameplayNoteDividerGapPxDefault;
         bool show_judgement_line = true;
+        int judgement_line_type = 1;
         bool show_gear_boundary_line = false;
         bool judgement_line_glow_enabled = true;
         double lane_background_opacity = 0.18;
