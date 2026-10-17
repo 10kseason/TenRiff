@@ -1,3 +1,5 @@
+**2026-10-17 · 1.9.5.2:** [Note and field size down to10%](docs/release-1.9.5.2.en.md). Includes GOMazk’s contribution (PR #102). Note & Field Size expands from50–140% to10–140%. The100% default, saved values and per-key-mode settings are preserved; menus, gameplay, ghost and preview use the same lower limit. Judgement, score, input and audio calculations and the1.9.5.1 350ms FAST/SLOW/file-picker behavior remain unchanged.
+
 **2026-10-17 · 1.9.5.1:** [Judgement line, FAST/SLOW and file pickers](docs/release-1.9.5.1.en.md). FAST/SLOW remains for 0.35 seconds from the last hit outside the maximum window. A maximum judgement neither clears it immediately nor extends its lifetime. Another outside-window hit replaces it immediately. The Always scale and 0.7-second dot/barcode lifetime remain separate.
 
 **2026-10-17 · 1.9.5:** Menu/result music follows the selected sound output. Indicator ranges and markers use blue FAST / green maximum judgement / red LATE. FAST/SLOW updates on maximum hits too. Lobby order is OFF → Mirror → Random → S-Random → Random (Scratch Fixed) → OFF. [Scene audio routing and timing indicators](docs/release-1.9.5.en.md).
