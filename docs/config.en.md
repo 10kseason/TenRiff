@@ -374,7 +374,7 @@ These are profile `config.json` skin settings. For a skin package's `skin.json` 
 | `note_fade_out` | double: `0..1`; `0` | Black fog depth above the judgement line; notes gradually disappear. Zero is off. Receptors and HUD remain visible. |
 | `hold_body_opacity` | double: `0..1`; `1` | LN-body opacity. |
 | `lane_width_scales` | object: mode → number[]; `0.50..1.75` | Per-lane widths; array length equals lane count. |
-| `note_width_scale` | double: `0.50..1.40`; `1` | Note & Field Size: scales field, lanes, notes and adjacent gauge around the center. |
+| `note_width_scale` | double: `0.10..1.40`; `1` | Note & Field Size: scales field, lanes, notes and adjacent gauge around the center. |
 | `lane_spacing_scales` | object: mode → number[]; `0..2` | Lane-gap array with lane_count - 1 entries. |
 | `note_height_scale` | double: `0.50..4`; `1.8` | Note head/tail height scale. |
 | `lane_divider_width_scale` | double: `0..2`; `1` | Shared divider-width scale for all modes, including imported LR2 dividers. |

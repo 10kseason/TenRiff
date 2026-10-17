@@ -376,7 +376,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `note_fade_out` | double: `0..1`; `0` | 判定线上方黑雾深度，音符逐渐消失。0为关闭。按键与HUD仍可见。 |
 | `hold_body_opacity` | double: `0..1`; `1` | 长条主体不透明度。 |
 | `lane_width_scales` | object: mode → number[]; `0.50..1.75` | 每轨宽度数组，长度等于轨道数。 |
-| `note_width_scale` | double: `0.50..1.40`; `1` | Note & Field Size：以中心为基准同时调整区域、轨道、音符与相邻血条。 |
+| `note_width_scale` | double: `0.10..1.40`; `1` | Note & Field Size：以中心为基准同时调整区域、轨道、音符与相邻血条。 |
 | `lane_spacing_scales` | object: mode → number[]; `0..2` | 轨道间距数组，长度为 lane_count - 1。 |
 | `note_height_scale` | double: `0.50..4`; `1.8` | 音符头尾高度倍率。 |
 | `lane_divider_width_scale` | double: `0..2`; `1` | 所有模式共用的分隔线宽度倍率，也适用于导入的 LR2 分隔线。 |

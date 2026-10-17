@@ -207,7 +207,7 @@
   - 判定 X/Y とコンボ X/Y を個別に調整・保存。FAST/SLOW は該当方向のみ表示し、P-GREAT では省略。
   - P-GREAT のみ黄色・虹色のきらめき・220ms のポップを使います。GREAT は水色、GOOD は灰色。下位判定と FAST/SLOW 文字は静止し、コンボ数字の150ms ポップは独立して維持します。
   - judge line / lane width / lane spacing / note & field size / divider width / 16K center gap / note height / LN body width adjustment
-  - `Note & Field Size` は中央を固定したまま playfield、lane/divider、note、隣接 gauge を 50%～140% でまとめて拡大・縮小し、100% では隣接 note 間の合計 gap が既定で 24px
+  - `Note & Field Size` は中央を固定したまま playfield、lane/divider、note、隣接 gauge を 10%～140% でまとめて拡大・縮小し、100% では隣接 note 間の合計 gap が既定で 24px
   - Black Playfield は lane spacing を含む player/ghost playfield 全体を完全な黒で表示
   - キーモードごとの lane-width 配列と inter-lane spacing 配列が保存され、preview / live gameplay / ghost field の同じレイアウト計算に適用される
   - 対応 skin route は `native`、TenRiff `skin.json` v1、LR2 playskin。Skins で TenRiff/LR2 folder を選択または drop すると既存 install を上書きせず active profile へ移植

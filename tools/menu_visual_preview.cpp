@@ -998,7 +998,9 @@ int main(int argc, char** argv) {
         else if (arg == "--no-feedback") no_feedback = true;
         else if (arg == "--search-active") search_active = true;
         else if (arg == "--search-query" && i + 1 < argc) search_query = argv[++i];
-        else if (arg == "--note-width" && i + 1 < argc) preview_note_width = std::clamp(std::stod(argv[++i]), 0.5, 2.0);
+        else if (arg == "--note-width" && i + 1 < argc)
+            preview_note_width = std::clamp(std::stod(argv[++i]),
+                tenriff::config::kNoteWidthScaleMin, tenriff::config::kNoteWidthScaleMax);
         else if (arg == "--keys" && i + 1 < argc) {
             keys_explicit = true;
             preview_keys = std::stoi(argv[++i]);

@@ -148,6 +148,7 @@ TEST_CASE("skin preview preserves gameplay positions and imported geometry with 
     preview.judgement_offset_x = -120;
     preview.combo_position = 0.5;
     preview.combo_offset_x = 120;
+    preview.note_width_scale = 0.10;
     preview.note_height_scale = 4;
     preview.lane_center_gap_scale = 1.5;
     preview.lane_width_scale_count = 16;
@@ -167,6 +168,7 @@ TEST_CASE("skin preview preserves gameplay positions and imported geometry with 
     CHECK(hud.combo_offset_x == 120);
     CHECK(hud.judgement_position == 0.4);
     CHECK(hud.combo_position == 0.5);
+    CHECK(hud.note_width_scale == doctest::Approx(0.10));
     CHECK(hud.note_height_scale == 4);
     CHECK(hud.lane_center_gap_scale == 1.5);
     CHECK(hud.lane_spacing_scale_count == 15u);
@@ -750,16 +752,32 @@ TEST_CASE("note width scale resizes the playfield and notes together") {
     using tenriff::render::compute_gameplay_note_draw_width;
     using tenriff::render::compute_gameplay_playfield_width;
 
+    CHECK(compute_gameplay_playfield_width(980.0f, 0.05) == doctest::Approx(98.0f));
+    CHECK(compute_gameplay_playfield_width(980.0f, 0.10) == doctest::Approx(98.0f));
     CHECK(compute_gameplay_playfield_width(980.0f, 0.50) == doctest::Approx(490.0f));
     CHECK(compute_gameplay_playfield_width(980.0f, 1.00) == doctest::Approx(980.0f));
     CHECK(compute_gameplay_playfield_width(980.0f, 1.40) == doctest::Approx(1372.0f));
 
+    CHECK(compute_gameplay_note_draw_width(9.8f, 0.10) == doctest::Approx(7.4f));
+    CHECK(compute_gameplay_note_draw_width(6.125f, 0.10) == doctest::Approx(3.725f));
     CHECK(compute_gameplay_note_draw_width(49.0f, 0.50) == doctest::Approx(37.0f));
     CHECK(compute_gameplay_note_draw_width(98.0f, 1.00) == doctest::Approx(74.0f));
     CHECK(compute_gameplay_note_draw_width(137.2f, 1.40) == doctest::Approx(103.6f));
 
     // Imported LR2 art may still narrow inside the linked field without changing field scale.
     CHECK(compute_gameplay_note_draw_width(98.0f, 1.00, 0.50) == doctest::Approx(37.0f));
+    CHECK(compute_gameplay_note_draw_width(9.8f, 0.10, 0.50) == doctest::Approx(3.7f));
+    for (const int keys : {4, 10, 16}) {
+        const float lane_width = compute_gameplay_playfield_width(980.0f, 0.10) / keys;
+        for (const double art_ratio : {0.25, 1.0, 4.0}) {
+            for (const double divider_gap : {0.0, 12.0, 40.0}) {
+                const float width = compute_gameplay_note_draw_width(lane_width, 0.10, art_ratio, divider_gap);
+                CHECK(std::isfinite(width));
+                CHECK(width > 0.0f);
+                CHECK(width <= lane_width);
+            }
+        }
+    }
 }
 TEST_CASE("gameplay progress track stays outside the note fields") {
     using tenriff::render::compute_gameplay_progress_track_layout;
@@ -1210,12 +1228,12 @@ TEST_CASE("skin preview drives real lane activity for each hit burst style") {
 
 TEST_CASE("ghost battle reserves solo physical player width before fitting the ghost") {
     for (const int keys : {5, 8, 16}) {
-        for (const double scale : {0.50, 0.60, 1.0, 1.4}) {
+        for (const double scale : {0.10, 0.15, 0.50, 0.60, 1.0, 1.4}) {
             const auto widths = tenriff::render::compute_gameplay_battle_widths(scale);
             CHECK(widths.player / keys == doctest::Approx(
                 tenriff::render::compute_gameplay_playfield_width(980.0f, scale) / keys));
             CHECK(widths.ghost <= widths.player);
-            CHECK(widths.ghost >= 160);
+            CHECK(widths.ghost >= std::min(widths.player, 160.0f));
             CHECK(widths.player + widths.ghost + tenriff::render::kGameplayBattleReservedWidth <= 1920.01f);
         }
     }

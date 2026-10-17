@@ -1491,6 +1491,38 @@ TEST_CASE("config clamps visual and sound offsets into supported range") {
     CHECK(result.config.sound_offset_ms == doctest::Approx(-500.0));
 }
 
+TEST_CASE("note and field size preserves 10 percent in profiles and clamps smaller values") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    std::filesystem::create_directories(temp.path / "config");
+    write_file(temp.path / "config" / "config.json", "{}");
+    CurrentPathGuard cwd;
+    std::filesystem::current_path(temp.path);
+
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.skin.note_width_scale = 0.10;
+    config.skin.note_width_scales["10k"] = 0.10;
+    config.skin.note_width_scales["16k"] = 0.15;
+    REQUIRE(loader.save_profile("profiles/test", config));
+    auto result = loader.load_profile("profiles/test");
+    REQUIRE(result.success());
+    CHECK(result.config.skin.note_width_scale == doctest::Approx(0.10));
+    CHECK(tenriff::config::resolved_skin_note_width_scale(result.config.skin, "4k") == doctest::Approx(0.10));
+    CHECK(tenriff::config::resolved_skin_note_width_scale(result.config.skin, "10k") == doctest::Approx(0.10));
+    CHECK(tenriff::config::resolved_skin_note_width_scale(result.config.skin, "16k") == doctest::Approx(0.15));
+
+    write_file(temp.path / "profiles" / "test" / "config.json",
+               R"({"skin":{"note_width_scale":0.05,"note_width_scales":{"10k":0.05,"16k":0.15}}})");
+    result = loader.load_profile("profiles/test");
+    REQUIRE(result.success());
+    CHECK(result.config.skin.note_width_scale == doctest::Approx(0.10));
+    CHECK(tenriff::config::resolved_skin_note_width_scale(result.config.skin, "4k") == doctest::Approx(0.10));
+    CHECK(tenriff::config::resolved_skin_note_width_scale(result.config.skin, "10k") == doctest::Approx(0.10));
+    CHECK(tenriff::config::resolved_skin_note_width_scale(result.config.skin, "16k") == doctest::Approx(0.15));
+}
+
 TEST_CASE("config save and load preserve skin gameplay settings") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
@@ -1691,7 +1723,7 @@ TEST_CASE("config clamps skin gameplay settings into supported range") {
                "    \"note_height_scale\": 0.1,\n"
                "    \"lane_center_gap_scale\": 9.0,\n"
                "    \"note_width_scales\": {\n"
-               "      \"4k\": 0.1,\n"
+               "      \"4k\": 0.05,\n"
                "      \"16k\": 9.0\n"
                "    },\n"
                "    \"note_height_scales\": {\n"

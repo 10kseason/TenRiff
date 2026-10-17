@@ -8,6 +8,7 @@
 #include <string>
 #include <string_view>
 
+#include "config/Config.h"
 #include "gameplay/GameplayChart.h"
 
 namespace tenriff::render {
@@ -211,12 +212,11 @@ inline GameplayTextPopAnimation gameplay_judgement_animation(std::string_view ju
 }
 
 inline float gameplay_playfield_scale(double note_width_scale) {
-    constexpr double kMinScale = 0.50;
-    constexpr double kMaxScale = 1.40;
     if (!std::isfinite(note_width_scale)) {
         return 1.0f;
     }
-    return static_cast<float>(std::clamp(note_width_scale, kMinScale, kMaxScale));
+    return static_cast<float>(std::clamp(
+        note_width_scale, config::kNoteWidthScaleMin, config::kNoteWidthScaleMax));
 }
 
 inline float compute_gameplay_playfield_width(float baseline_width, double note_width_scale) {

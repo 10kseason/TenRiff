@@ -207,7 +207,7 @@ This is the document that the next agent or any new contributor should read firs
   - Judgement X/Y and combo X/Y are independently configurable and saved. FAST/SLOW shows only the applicable direction and is omitted for P-GREAT.
   - Only P-GREAT uses yellow text, rainbow sparkles and a 220ms pop. GREAT stays cyan and GOOD gray; lower judgement and FAST/SLOW text remain stationary. Combo numbers retain their separate 150ms pop.
   - judge line / lane width / lane spacing / note & field size / divider width / 16K center gap / note height / LN body width adjustment
-  - `Note & Field Size` scales the centered playfield, lanes/dividers, notes, and adjacent gauges together from 50% to 140%; adjacent notes keep a default combined 24px gap at 100%
+  - `Note & Field Size` scales the centered playfield, lanes/dividers, notes, and adjacent gauges together from 10% to 140%; adjacent notes keep a default combined 24px gap at 100%
   - Black Playfield fills the complete player/ghost playfield, including lane-spacing gaps, with solid black
   - per-key-mode lane-width arrays and inter-lane spacing arrays are persisted and applied through the same layout math in preview, live gameplay, and the ghost field
   - supported skin routes are `native`, TenRiff `skin.json` v1, and LR2 playskin; selecting or dropping a TenRiff/LR2 folder imports it into the active profile without overwriting an existing install
