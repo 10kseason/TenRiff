@@ -187,8 +187,12 @@ for (std::size_t note_index = 0; note_index < editor.notes.size(); ++note_index)
         if (note.long_note) {
             const float end_y = grid_top + (static_cast<float>(note.end_measure - view_start) +
                 static_cast<float>(note.end_slice) / static_cast<float>(std::max(1, note.end_slice_count))) * measure_height;
-            ctx->FillRectangle(D2D1::RectF(x + lane_width * 0.36f, y + note_height * 0.5f,
-                                            x + lane_width * 0.64f, std::max(y + note_height, end_y)), brush);
+            // Keep the old body at normal sizes; below 50% it must remain inside the head.
+            const float center_x = x + lane_width * 0.5f;
+            const float body_left = std::max(x + lane_width * 0.36f, center_x - note_width * 0.4f);
+            const float body_right = std::min(x + lane_width * 0.64f, center_x + note_width * 0.4f);
+            ctx->FillRectangle(D2D1::RectF(body_left, y + note_height * 0.5f,
+                                            body_right, std::max(y + note_height, end_y)), brush);
         }
         ctx->FillRoundedRectangle(D2D1::RoundedRect(
             D2D1::RectF(x + (lane_width - note_width) * 0.5f, y - note_height * 0.5f,

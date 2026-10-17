@@ -561,12 +561,32 @@ struct MenuWindowVisualTestAccess {
             {"hit_eligible", JsonValue(row.activatable || row.adjustable)}, {"slider", JsonValue(row.slider)}});
         JsonArray notes;
         for (const auto& note : source.generic.notes) notes.emplace_back(note);
+        // Editor notes are recorded for pixel checks, without pretending to dispatch editor input.
+        JsonArray editor_note_rects;
+        for (const auto& region : window.hit_regions_) {
+            if (region.kind != MenuHitTargetKind::BmsEditorNote) continue;
+            editor_note_rects.emplace_back(JsonObject{
+                {"id", JsonValue(static_cast<double>(region.index))},
+                {"client_rect", JsonValue(JsonArray{
+                    JsonValue(static_cast<double>(window.offset_x_ + region.left * window.scale_)),
+                    JsonValue(static_cast<double>(window.offset_y_ + region.top * window.scale_)),
+                    JsonValue(static_cast<double>(window.offset_x_ + region.right * window.scale_)),
+                    JsonValue(static_cast<double>(window.offset_y_ + region.bottom * window.scale_))})}});
+        }
         JsonObject report{
             {"ui_language", JsonValue(std::string(ui::language_token(source.ui_language)))},
             {"title_language_button_verified", JsonValue(title_language_verified)},
             {"preview_drag", std::move(preview_drag)},
             {"notes", JsonValue(std::move(notes))},
             {"selected_song_difficulty", JsonValue(source.song_select.selected_song_difficulty)},
+            {"gameplay_note_width_scale", JsonValue(source.gameplay.note_width_scale)},
+            {"editor_note_width_scale", JsonValue(source.bms_editor.note_width_scale)},
+            {"editor_lane_count", JsonValue(static_cast<double>(source.bms_editor.lane_count))},
+            {"editor_note_hit_kind", JsonValue(static_cast<double>(MenuHitTargetKind::BmsEditorNote))},
+            {"editor_note_rects", JsonValue(std::move(editor_note_rects))},
+            {"editor_long_note_count", JsonValue(static_cast<double>(std::count_if(
+                source.bms_editor.notes.begin(), source.bms_editor.notes.end(),
+                [](const BmsEditorNoteData& note) { return note.long_note; })))},
             {"width", JsonValue(static_cast<double>(window.width_))}, {"height", JsonValue(static_cast<double>(window.height_))},
             {"scale", JsonValue(static_cast<double>(window.scale_))}, {"foreground", JsonValue(foreground)},
             {"geometry_resolver_verified", JsonValue(verify && checked > 0 && failures.empty())},
@@ -1029,7 +1049,9 @@ int main(int argc, char** argv) {
         else if (arg == "--field-next" && i + 2 < argc) {
             const double next_offset = std::stod(argv[++i]);
             const double next_width = std::stod(argv[++i]);
-            if (!std::isfinite(next_offset) || !std::isfinite(next_width) || next_width < 0.5 || next_width > 2.0) return 2;
+            if (!std::isfinite(next_offset) || !std::isfinite(next_width) ||
+                next_width < tenriff::config::kNoteWidthScaleMin ||
+                next_width > tenriff::config::kNoteWidthScaleMax) return 2;
             next_field_layout = std::array<double, 2>{next_offset, next_width};
         }
         else if (arg == "--skin-settings") { settings = true; skin_settings = true; }
@@ -1758,10 +1780,15 @@ int main(int argc, char** argv) {
         editor.artist = "TenRiff UI Preview";
         editor.path = "examples/preview.bms";
         editor.status = loc("Preview only", "미리보기 전용");
-        editor.lane_count = 4; editor.measure_count = 16; editor.base_bpm = 180;
-        for (int lane = 1; lane <= 4; ++lane) {
+        editor.lane_count = keys_explicit ? preview_keys : 4;
+        editor.note_width_scale = preview_note_width;
+        editor.note_height_scale = preview_note_height;
+        editor.measure_count = 16; editor.base_bpm = 180;
+        for (int lane = 1; lane <= editor.lane_count; ++lane) {
             BmsEditorNoteData note;
-            note.id = lane; note.lane = lane; note.measure = lane;
+            note.id = lane; note.lane = lane; note.measure = 1 + (lane - 1) % 3;
+            note.long_note = lane == 1;
+            note.end_measure = note.measure + 1;
             note.token = "01"; editor.notes.push_back(note);
         }
         BmsEditorMarkerData marker;
@@ -2120,6 +2147,7 @@ int main(int argc, char** argv) {
         // Give the own-window test driver time to focus a newly created window.
         // Still emit an explicit unverified report after 60 frames if focus fails.
         if (!menu_roundtrip && !hitmap_written && rendered_frames >= 5 &&
+            (!next_field_layout || rendered_frames >= 40) &&
             (MenuWindowVisualTestAccess::owns_foreground(window) || rendered_frames >= 60) &&
             (verify_hits || !hitmap_path.empty())) {
             if (!MenuWindowVisualTestAccess::verify_and_write(window, data, hitmap_path, verify_hits)) {
