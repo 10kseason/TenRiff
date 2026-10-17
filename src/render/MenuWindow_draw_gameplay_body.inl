@@ -1177,6 +1177,9 @@
         const D2D1_RECT_F field_clip_rect =
             D2D1::RectF(field_left + 2.0f, field_top + 2.0f, field_right - 2.0f, field_bottom - 2.0f);
         const float hit_line_y = gameplay_field_y(field_top, field_height, judgement_line_position);
+        const auto note_alignment = gameplay_judgement_field(field_layout, hit_line_y,
+            note_height_scale, data.gameplay.judgement_line_type, *d2d_, gameplay_note_sprite_cache_,
+            note_shape, note_image_aspect);
 
         // The same black mask covers sprite and vector notes, including LN bodies.
         // Draw inside the note clip, before HUD text and above the receptor area.
@@ -1633,7 +1636,7 @@
             brush->SetOpacity(saved_opacity);
         };
 
-        const auto draw_measure_lines = [&](const GameplayFieldLayout& field) {
+        const auto draw_measure_lines = [&](const GameplayFieldLayout& field, const GameplayJudgementField& alignment) {
             if (!d2d_->lane_divider_brush) return;
             const auto opacity = d2d_->lane_divider_brush->GetOpacity();
             d2d_->lane_divider_brush->SetOpacity(0.44f);
@@ -1641,8 +1644,8 @@
                                                data.gameplay.measure_line_positions.size()); ++i) {
                 const float y = gameplay_field_y(field.top, field.bottom - field.top,
                     visual_to_y(data.gameplay.measure_line_positions[i])) +
-                    gameplay_note_head_half_height(note_height_scale) + 0.5f;
-                // Notes are centered on their timing position. Attach the top
+                    alignment.measure_offset + 0.5f;
+                // Follow the displayed note position in either line type. Attach the top
                 // of this one-pixel stroke to the note's bottom edge, including
                 // the configured/imported note height, without shifting time.
                 ctx->DrawLine(D2D1::Point2F(field.left, y), D2D1::Point2F(field.right, y),
@@ -1655,7 +1658,7 @@
         const bool player_has_gear_overlay =
             draw_imported_gear_overlay(field_layout, hit_line_y);
         draw_key_backdrop(field_layout, data.gameplay.lane_pressed, data.gameplay.lane_pressed_count);
-        draw_measure_lines(field_layout);
+        draw_measure_lines(field_layout, note_alignment);
         if (use_imported_metrics) {
             draw_key_labels(field_layout);
         }
@@ -1770,9 +1773,11 @@
                 gameplay_note_anchors_to_judgement_line(note.hold, note.head_visible)
                     ? display_visual_position
                     : note.visual_position;
-            const float y = gameplay_field_y(field_top, field_height, visual_to_y(render_visual_position));
+            const float note_alignment_offset = note.hold
+                ? note_alignment.hold_offsets[lane_index] : note_alignment.note_offsets[lane_index];
+            const float y = gameplay_field_y(field_top, field_height, visual_to_y(render_visual_position)) + note_alignment_offset;
             const float tail_y =
-                gameplay_field_y(field_top, field_height, visual_to_y(note.tail_visual_position));
+                gameplay_field_y(field_top, field_height, visual_to_y(note.tail_visual_position)) + note_alignment_offset;
             const float head_half_h = gameplay_note_head_half_height(note_height_scale);
             const float tail_half_h = gameplay_note_tail_half_height(note_height_scale);
             uint32_t lane_color = 0xF6F8FF;
@@ -2294,7 +2299,7 @@
                 draw_gameplay_hit_burst(ctx,
                                         lane_center,
                                         note_width,
-                                        hit_line_y,
+                                        hit_line_y + (sustained_hold ? note_alignment.hold_offsets[lane] : note_alignment.note_offsets[lane]),
                                         field_top,
                                         field_bottom,
                                         pulse,
@@ -2342,13 +2347,16 @@
                             ghost_field_right - 2.0f, ghost_field_bottom - 2.0f);
             const float ghost_hit_line_y =
                 gameplay_field_y(ghost_field_top, ghost_field_height, judgement_line_position);
+            const auto ghost_note_alignment = gameplay_judgement_field(ghost_field_layout, ghost_hit_line_y,
+                note_height_scale, data.gameplay.judgement_line_type, *d2d_, gameplay_note_sprite_cache_,
+                note_shape, note_image_aspect);
 
             const D2D1_ANTIALIAS_MODE ghost_saved_antialias = ctx->GetAntialiasMode();
             ctx->PushAxisAlignedClip(ghost_field_clip_rect, D2D1_ANTIALIAS_MODE_ALIASED);
             const bool ghost_has_gear_overlay =
                 draw_imported_gear_overlay(ghost_field_layout, ghost_hit_line_y);
             draw_key_backdrop(ghost_field_layout, data.gameplay.ghost_lane_pressed, data.gameplay.ghost_lane_pressed_count);
-            draw_measure_lines(ghost_field_layout);
+            draw_measure_lines(ghost_field_layout, ghost_note_alignment);
             if (use_imported_metrics) {
                 draw_key_labels(ghost_field_layout);
             }
@@ -2439,10 +2447,12 @@
                     gameplay_note_anchors_to_judgement_line(note.hold, note.head_visible)
                         ? display_visual_position
                         : note.visual_position;
+                const float ghost_note_alignment_offset = note.hold
+                    ? ghost_note_alignment.hold_offsets[lane_index] : ghost_note_alignment.note_offsets[lane_index];
                 const float y =
-                    gameplay_field_y(ghost_field_top, ghost_field_height, visual_to_y(render_visual_position));
+                    gameplay_field_y(ghost_field_top, ghost_field_height, visual_to_y(render_visual_position)) + ghost_note_alignment_offset;
                 const float tail_y = gameplay_field_y(
-                    ghost_field_top, ghost_field_height, visual_to_y(note.tail_visual_position));
+                    ghost_field_top, ghost_field_height, visual_to_y(note.tail_visual_position)) + ghost_note_alignment_offset;
                 const float head_half_h = gameplay_note_head_half_height(note_height_scale);
                 const float tail_half_h = gameplay_note_tail_half_height(note_height_scale);
                 uint32_t lane_color = 0xF6F8FF;
@@ -2657,7 +2667,7 @@
                     draw_gameplay_hit_burst(ctx,
                                             lane_center,
                                             ghost_note_width,
-                                            ghost_hit_line_y,
+                                            ghost_hit_line_y + (sustained_hold ? ghost_note_alignment.hold_offsets[lane] : ghost_note_alignment.note_offsets[lane]),
                                             ghost_field_top,
                                             ghost_field_bottom,
                                             pulse,

@@ -550,7 +550,13 @@ struct MenuAppVisualTestAccess {
         report.check("graphics.explicit_size_after_resize_present", present(app, detail), detail);
     }
     static void check_start_controls(MenuApp& app, Report& report) {
-        for (int attempt = 0; attempt < 2; ++attempt) {
+        const auto image_path = std::filesystem::absolute("dialog-fixture.png");
+        { // Valid 1x1 PNG owned by this disposable smoke sandbox.
+            const unsigned char png[] = {137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,1,0,0,0,1,8,4,0,0,0,181,28,12,2,0,0,0,11,73,68,65,84,120,218,99,100,248,15,0,1,5,1,1,39,24,227,102,0,0,0,0,73,69,78,68,174,66,96,130};
+            std::ofstream image(image_path,std::ios::binary);
+            image.write(reinterpret_cast<const char*>(png),sizeof(png));
+        }
+        for (int attempt = 0; attempt < 4; ++attempt) {
             HWND game = nullptr;
             EnumWindows([](HWND hwnd, LPARAM data) -> BOOL {
                 DWORD pid = 0; GetWindowThreadProcessId(hwnd, &pid);
@@ -562,6 +568,8 @@ struct MenuAppVisualTestAccess {
             }, reinterpret_cast<LPARAM>(&game));
             if (game) SetForegroundWindow(game);
             std::atomic<bool> done{false}, observed{false}, owned{false};
+            HWND acted_picker = nullptr;
+            const bool accept = attempt == 0 || attempt == 2;
             std::thread dismiss([&]() {
                 const auto deadline = Clock::now() + std::chrono::seconds(10);
                 while (!done.load() && Clock::now() < deadline) {
@@ -575,27 +583,62 @@ struct MenuAppVisualTestAccess {
                         }
                         return TRUE;
                     }, reinterpret_cast<LPARAM>(&picker));
-                    if (picker) {
+                    if (picker && !acted_picker) {
+                        acted_picker = picker;
                         observed = true;
                         if (GetWindow(picker, GW_OWNER) == game && game && !IsWindowEnabled(game)) owned = true;
-                        // Cancel only this smoke process's own file picker.
-                        PostMessageW(picker, WM_COMMAND, IDCANCEL, 0);
+                        // Act on exactly one owned picker once. Do not repeatedly
+                        // cancel unexpected replacements and conceal reopen loops.
+                        if (accept) {
+                            const auto path = image_path.wstring();
+                            HWND filename = nullptr;
+                            EnumChildWindows(picker,[](HWND child,LPARAM data)->BOOL {
+                                wchar_t type[64]{};GetClassNameW(child,type,64);
+                                if(lstrcmpW(type,L"Edit")==0) {
+                                    for(HWND parent=child;parent;parent=GetParent(parent)) {
+                                        if(GetDlgCtrlID(parent)==1148) {
+                                            *reinterpret_cast<HWND*>(data)=child;return FALSE;
+                                        }
+                                    }
+                                }
+                                return TRUE;
+                            },reinterpret_cast<LPARAM>(&filename));
+                            if(filename) SetWindowTextW(filename,path.c_str());
+                            else std::cerr << "Picker filename edit unavailable\n";
+                        }
+                        PostMessageW(picker, WM_COMMAND, accept ? IDOK : IDCANCEL, 0);
                     }
                     std::this_thread::sleep_for(std::chrono::milliseconds(20));
                 }
+                if (!done.load() && acted_picker) PostMessageW(acted_picker,WM_COMMAND,IDCANCEL,0);
             });
             const auto closed_before = app.native_dialog_closed_ns_;
+            const auto revision_before = app.profile_avatar_revision_;
             APTTYPE apartment{}; APTTYPEQUALIFIER qualifier{};
             const auto apartment_hr = CoGetApartmentType(&apartment, &qualifier);
             click(app, Kind::SettingsRow, profile_setup::kAvatarRow);
             done = true; dismiss.join();
-            report.check("dialog.native_avatar_cancel_" + std::to_string(attempt),
+            report.check("dialog.native_avatar_reopen_" + std::to_string(attempt),
                 observed && owned && app.native_dialog_closed_ns_ > closed_before &&
-                app.config_.ui.profile_avatar_path.empty() && !app.menu_window_.poll_click_event(),
+                (!accept || app.config_.ui.profile_avatar_path == config::normalize_profile_avatar_path(image_path.u8string())) &&
+                app.profile_avatar_revision_ == revision_before + (accept ? 1 : 0) &&
+                game && IsWindowEnabled(game) && !IsWindow(acted_picker) && !app.menu_window_.poll_click_event(),
                 "observed=" + std::to_string(observed.load()) + "; owned=" + std::to_string(owned.load()) +
                 "; input_reset=" + std::to_string(app.native_dialog_closed_ns_ > closed_before) +
+                "; revision_delta=" + std::to_string(app.profile_avatar_revision_-revision_before) +
                 "; apartment_hr=" + std::to_string(apartment_hr) + "; apartment=" + std::to_string(apartment));
         }
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        unsigned remaining_pickers = 0;
+        EnumWindows([](HWND hwnd,LPARAM data)->BOOL {
+            DWORD pid=0;GetWindowThreadProcessId(hwnd,&pid);wchar_t type[64]{};GetClassNameW(hwnd,type,64);
+            if(pid==GetCurrentProcessId() && IsWindowVisible(hwnd) && lstrcmpW(type,L"#32770")==0)
+                ++*reinterpret_cast<unsigned*>(data);
+            return TRUE;
+        },reinterpret_cast<LPARAM>(&remaining_pickers));
+        report.check("dialog.no_idle_reopen",remaining_pickers==0);
+        app.config_.ui.profile_avatar_path.clear();
+        app.publish_snapshot();
         const auto decrease = app.config_.ui.hispeed_decrease_key;
         const auto increase = app.config_.ui.hispeed_increase_key;
         click(app, Kind::SettingsRow, profile_setup::kHispeedDecreaseKeyRow);
@@ -1341,6 +1384,36 @@ struct MenuAppVisualTestAccess {
 };
 
 struct MenuAppFeedbackTestAccess {
+    static void check_maximum_text_sequence(Report& report) {
+        auto session = std::make_unique<GameSession>();
+        session->sample_rate_ = 1000;
+        session->chart_.lane_count = 1;
+        session->chart_.duration_samples = 2000;
+        session->chart_.notes = {{1,1000,std::nullopt}, {1,1100,std::nullopt}, {1,1200,std::nullopt}, {1,1400,std::nullopt}};
+        gameplay::GameplayConfig cfg;cfg.sample_rate=1000;
+        session->engine_=std::make_unique<gameplay::GameplayEngine>(session->chart_,cfg);
+        session->ghost_engine_=std::make_unique<gameplay::GameplayEngine>(session->chart_,cfg);
+        auto hit=[&](int64_t at) {
+            for(auto* engine:{session->engine_.get(),session->ghost_engine_.get()}) {
+                static_cast<void>(engine->handle_input(1,input::InputState::Pressed,at));
+                static_cast<void>(engine->handle_input(1,input::InputState::Released,at+1));
+            }
+        };
+        auto check=[&](int64_t at,bool visible,double delta) {
+            GameSession::AudioTimingState time{};time.playback_sample=at;session->last_audio_timing_.store(time);
+            const auto hud=session->hud_snapshot();
+            const auto name="timing.maximum_hold_"+std::to_string(at);
+            report.check(name+".player",hud.has_timing_feedback==visible && hud.has_retained_timing_feedback==visible && hud.timing_feedback_delta_ms==delta);
+            report.check(name+".ghost",hud.ghost_has_timing_feedback==visible && hud.ghost_has_retained_timing_feedback==visible && hud.ghost_timing_feedback_delta_ms==delta);
+            report.check(name+".markers",hud.timing_history_count>0 && hud.ghost_timing_history_count>0);
+        };
+        hit(950);check(951,true,-50);
+        hit(1100);check(1101,true,-50);
+        hit(1200);check(1299,true,-50);
+        check(1300,false,-50);check(1400,false,-50);
+        hit(1450);check(1451,true,50);check(1799,true,50);check(1800,false,50);
+    }
+
     static void check_gamepad_session(GameSession& session, Report& report) {
         const auto a = config::KeycodeMap::to_keycode("PadA").value();
         const auto lt = config::KeycodeMap::to_keycode("PadLT").value();
@@ -1591,6 +1664,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
     Access::check_browser_sort_and_range(app, report);
     Access::check_loading_pacing(app, report);
     Access::check_hud_feedback_followup(app, report);
+    tenriff::app::MenuAppFeedbackTestAccess::check_maximum_text_sequence(report);
     Access::check_launch_level_metadata(app, report);
 
     std::atomic<bool> observing{true};
@@ -2230,7 +2304,7 @@ int wmain(int argc, wchar_t** argv) {
             {"successful_presents", JsonValue(double(present_probe.successful_presents.load(std::memory_order_acquire)))},
             {"callbacks_without_present", JsonValue(double(present_probe.callbacks_without_present.load(std::memory_order_acquire)))},
             {"raw_zero_reads_after_progress", JsonValue(double(present_probe.raw_zero_reads_after_progress.load(std::memory_order_acquire)))}})},
-        {"limits", JsonValue("Synthetic library only. Presents mean liveness, not screenshot equality. No physical latency, device input, online, account, multiplayer, native file dialog, long-session or multi-PC coverage. External runner should impose a 90-second process timeout for driver hangs.")},
+        {"limits", JsonValue("Synthetic library only. Presents mean liveness, not screenshot equality. No physical latency, device input, online, account, multiplayer, arbitrary native file dialog configurations, long-session or multi-PC coverage. External runner should impose a 90-second process timeout for driver hangs.")},
         {"checks", JsonValue(std::move(report.checks))}};
     std::ofstream output(sandbox / "smoke-report.json", std::ios::binary);
     output << tenriff::config::json_stringify(JsonValue(result), 2) << '\n';

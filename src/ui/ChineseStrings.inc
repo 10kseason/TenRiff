@@ -1252,3 +1252,9 @@
 {"HI-SPEED  F3/F4  +/-0.25   F5 x0.5 / F6 x2", "音符速度  F3/F4  +/-0.25   F5 ×0.5 / F6 ×2"},
 
 {"Choose the output for gameplay, BMS previews, and menu/result music. F5 refreshes; Back applies. ASIO has its own driver selector.", "选择游玩、BMS试听、菜单和结果音乐的输出。F5刷新，返回时应用。ASIO单独选择驱动。"},
+
+{"Judgement Line Type", "判定线类型"},
+{"Type 1", "类型1"},
+{"Type 2", "类型2"},
+{"Judgement difficulty", "判定难度"},
+{ "Type 1 keeps the existing line. Type 2 aligns notes inside a note-height band. Judgement timing and scoring stay unchanged.", "类型1保留原判定线。类型2让音符对齐到音符高度的区域内。判定时刻与计分保持不变。" },

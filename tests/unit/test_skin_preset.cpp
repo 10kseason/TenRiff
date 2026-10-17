@@ -86,6 +86,7 @@ TEST_CASE("skin preset native settings round trip only appearance in Unicode pat
     skin.show_timing_bar = true;
     skin.timing_bar_always_visible = true;
     skin.timing_marker_style = "barcode";
+    skin.judgement_line_type = 2;
     skin.timing_feedback_override = true;
     skin.timing_text_offset_x = 180;
     skin.timing_text_offset_y = -100;
@@ -121,6 +122,7 @@ TEST_CASE("skin preset native settings round trip only appearance in Unicode pat
     CHECK(imported.skin.show_timing_bar);
     CHECK(imported.skin.timing_bar_always_visible);
     CHECK(imported.skin.timing_marker_style == "barcode");
+    CHECK(imported.skin.judgement_line_type == 2);
     CHECK(imported.skin.timing_feedback_override);
     CHECK(imported.skin.timing_text_offset_x == 180);
     CHECK(imported.skin.timing_text_offset_y == -100);

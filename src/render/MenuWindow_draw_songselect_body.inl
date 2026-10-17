@@ -63,11 +63,23 @@
                           d2d_->button_border_brush.Get(), 1.0f);
             d2d_->button_border_brush->SetOpacity(saved);
         };
+        auto draw_center_scaled = [&](const std::wstring& text, IDWriteTextFormat* format,
+                                      const D2D1_RECT_F& rect, ID2D1Brush* brush, float scale) {
+            if (scale >= 0.995f) { draw_text_clipped(text, format, rect, brush); return; }
+            D2D1_MATRIX_3X2_F saved{};
+            ctx->GetTransform(&saved);
+            ctx->SetTransform(D2D1::Matrix3x2F::Scale(scale, scale,
+                D2D1::Point2F(rect.left, rect.top)) * saved);
+            draw_text_clipped(text, format, D2D1::RectF(rect.left, rect.top,
+                rect.left + (rect.right - rect.left) / scale,
+                rect.top + (rect.bottom - rect.top) / scale), brush);
+            ctx->SetTransform(saved);
+        };
         auto draw_centered_text = [&](const std::wstring& text,
                                       IDWriteTextFormat* format,
                                       const D2D1_RECT_F& rect,
                                       ID2D1Brush* brush,
-                                      bool center_vertically = false) {
+                                      bool center_vertically = false, float scale = 1.0f) {
             if (!format || !brush) {
                 return;
             }
@@ -75,7 +87,7 @@
             const auto saved_paragraph_alignment = format->GetParagraphAlignment();
             format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
             if (center_vertically) format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
-            draw_text_clipped(text, format, rect, brush);
+            draw_center_scaled(text, format, rect, brush, scale);
             format->SetTextAlignment(saved_alignment);
             format->SetParagraphAlignment(saved_paragraph_alignment);
         };
@@ -279,10 +291,10 @@
                               d2d_->muted_brush.Get());
         }
 
-        const D2D1_RECT_F left_panel =
+        D2D1_RECT_F left_panel =
             skin_layout_rect(data, "song_select.left_panel",
                              native_rect("songselect.rect.017", D2D1::RectF(38.0f, 152.0f, 720.0f, 922.0f)));
-        const D2D1_RECT_F center_panel =
+        D2D1_RECT_F center_panel =
             skin_layout_rect(data, "song_select.center_panel",
                              native_rect("songselect.rect.018", D2D1::RectF(744.0f, 152.0f, 1373.0f, 922.0f)));
         const D2D1_RECT_F right_panel =
@@ -302,6 +314,11 @@
                     item.first == "songselect.rect.044" ||
                     (item.first >= "songselect.rect.050" && item.first <= "songselect.rect.058");
             }));
+        // Widen only the built-in library. Explicit skin rectangles keep their
+        // original coordinate system; right-hand song details remain in place.
+        const bool wide_library = modern_library_screen && !authored_library_layout;
+        if (wide_library) { left_panel.right += 130.0f; center_panel.left += 130.0f; }
+        const float center_text_scale = wide_library ? 499.0f / 629.0f : 1.0f;
         const bool library_header_controls = modern_library_screen && !authored_library_layout &&
             !data.song_select.showing_sources && !data.song_select.showing_records;
 
@@ -628,11 +645,12 @@
         if (has_selected_song) {
             if (!data.song_select.selected_song_bms_rank.empty()) {
                 const auto rank_chip = native_rect("songselect.bms_rank", D2D1::RectF(
-                    preview.right - 94.0f, preview.bottom - 48.0f,
+                    std::max(preview.left + 12.0f, preview.right - 300.0f), preview.bottom - 48.0f,
                     preview.right - 12.0f, preview.bottom - 12.0f));
                 draw_glass_panel(rank_chip, 7.0f, 0.94f, 0.62f, true, 1.0f);
-                draw_centered_text(to_wide(data.song_select.selected_song_bms_rank),
-                    d2d_->hud_format.Get(), rank_chip, d2d_->text_brush.Get());
+                draw_centered_text(wloc("Judgement difficulty", "판정난이도") + L" : " +
+                    to_wide(data.song_select.selected_song_bms_rank),
+                    d2d_->hud_format.Get(), rank_chip, d2d_->text_brush.Get(), true);
             }
             const D2D1_RECT_F chip =
                 native_rect("songselect.rect.041", D2D1::RectF(preview.left + 14.0f, preview.top + 14.0f,
@@ -682,20 +700,20 @@
             register_hit(best_panel, MenuHitTargetKind::SongResultPanel, 0);
         }
         if (d2d_->song_record_label_format && d2d_->muted_brush) {
-            draw_text_clipped(data.song_select.showing_records
+            draw_center_scaled(data.song_select.showing_records
                                   ? wloc("SELECTED PLAY", "선택한 플레이")
                                   : wloc("MY BEST", "내 최고 기록"),
                               d2d_->song_record_label_format.Get(),
                               native_rect("songselect.rect.045", D2D1::RectF(best_panel.left + 22.0f, best_panel.top + 16.0f,
                                           best_panel.right - 22.0f, best_panel.top + 46.0f)),
-                              d2d_->muted_brush.Get());
+                              d2d_->muted_brush.Get(), center_text_scale);
         }
         if (d2d_->header_format && d2d_->accent_brush) {
             draw_grade(1, to_wide(data.song_select.rank.empty() ? "--" : data.song_select.rank),
                        d2d_->grade_format.Get(),
                        native_rect("songselect.rect.046", D2D1::RectF(best_panel.left + 24.0f, best_panel.top + 44.0f,
                                    best_panel.right - 24.0f, best_panel.top + 130.0f + best_rank_extra)),
-                       1.0f, DWRITE_TEXT_ALIGNMENT_CENTER, 1.0f + best_rank_extra / 86.0f);
+                       1.0f, DWRITE_TEXT_ALIGNMENT_CENTER, (1.0f + best_rank_extra / 86.0f) * center_text_scale);
         }
         draw_rule(best_panel.left + 22.0f, best_panel.top + 136.0f + best_rank_extra,
                   best_panel.right - 22.0f, 0.28f);
@@ -760,7 +778,7 @@
                                    d2d_->song_record_label_format.Get(),
                                    native_rect("songselect.rect.047", D2D1::RectF(column_left, best_panel.top + 152.0f + best_rank_extra,
                                                column_right, best_panel.top + 184.0f + best_rank_extra)),
-                                   modern_library_screen ? semantic_color(best_colors[i]) : d2d_->muted_brush.Get());
+                                   modern_library_screen ? semantic_color(best_colors[i]) : d2d_->muted_brush.Get(), false, center_text_scale);
             }
             if (d2d_->song_record_value_format && d2d_->text_brush) {
                 draw_centered_text(to_wide(best_columns[i][1]),
@@ -768,13 +786,13 @@
                                    native_rect("songselect.rect.048", D2D1::RectF(column_left,
                                                best_panel.top + (modern_library_screen ? 186.0f : 188.0f) + best_rank_extra,
                                                column_right, best_panel.top + (modern_library_screen ? 242.0f : 228.0f) + best_rank_extra)),
-                                   modern_library_screen ? semantic_color(best_colors[i]) : d2d_->text_brush.Get());
+                                   modern_library_screen ? semantic_color(best_colors[i]) : d2d_->text_brush.Get(), false, center_text_scale);
             }
             if (modern_library_screen && !best_columns[i][2].empty() && d2d_->song_record_detail_format) {
                 draw_centered_text(to_wide(best_columns[i][2]), d2d_->song_record_detail_format.Get(),
                                    native_rect("songselect.rect.096", D2D1::RectF(column_left, best_panel.top + 246.0f + best_rank_extra,
                                                column_right, best_panel.top + 274.0f + best_rank_extra)),
-                                   semantic_color(best_colors[i]));
+                                   semantic_color(best_colors[i]), false, center_text_scale);
             }
             if (!best_columns[i][3].empty() && d2d_->song_record_detail_format &&
                 d2d_->muted_brush) {
@@ -783,7 +801,7 @@
                                    native_rect("songselect.rect.049", D2D1::RectF(column_left,
                                                best_panel.top + (modern_library_screen ? 276.0f : 234.0f) + best_rank_extra,
                                                column_right, best_panel.bottom - 22.0f)),
-                                   modern_library_screen ? semantic_color(best_colors[i]) : d2d_->muted_brush.Get());
+                                   modern_library_screen ? semantic_color(best_colors[i]) : d2d_->muted_brush.Get(), false, center_text_scale);
             }
         }
 

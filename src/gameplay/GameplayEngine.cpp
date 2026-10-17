@@ -453,6 +453,13 @@ void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms,
     if (std::isfinite(delta_ms) && (judgement == game::Judgement::PG || std::llround(delta_ms) != 0)) {
         timing_feedback_ = live_feedback_;
     }
+    // Text is a short-lived error hint; keep raw timing/history independent.
+    // This updates per judgement, not per rendered frame, so dense PG runs
+    // cannot lose or indefinitely refresh the preceding outside-window hit.
+    if (std::isfinite(delta_ms) && judgement != game::Judgement::PG &&
+        std::abs(delta_ms) > maximum_judgement_window_ms()) {
+        timing_text_feedback_ = live_feedback_;
+    }
     if (std::isfinite(delta_ms)) {
         push_recent_timing_delta(delta_ms, sample, judgement == game::Judgement::PG);
     }

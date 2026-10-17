@@ -1253,3 +1253,8 @@
 {"Guest / Online", "ゲスト / オンライン"},
 {"Chat", "チャット"},
 {"HI-SPEED  F3/F4  +/-0.25   F5 x0.5 / F6 x2", "ノート速度  F3/F4  +/-0.25   F5 ×0.5 / F6 ×2"},
+
+{"Judgement Line Type", "判定線タイプ"},
+{"Type 1", "タイプ1"},
+{"Type 2", "タイプ2"},
+{"Judgement difficulty", "判定難易度"},

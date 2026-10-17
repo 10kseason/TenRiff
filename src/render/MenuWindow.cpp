@@ -75,6 +75,7 @@
 #include "render/TextFit.h"
 #include "render/SkinGameplayPreview.h"
 #include "timing/HighResClock.h"
+#include "input/ModalInputFence.h"
 #include "util/Utf8Compat.h"
 
 namespace tenriff::render {
@@ -1209,6 +1210,61 @@ D2D1_RECT_F gameplay_note_bitmap_dest_rect(const D2D1_RECT_F& note_rect,
                        center_y + height * 0.5f);
 }
 
+struct GameplayJudgementField {
+    GameplayJudgementBand band{};
+    std::array<float, kGameplayHudMaxLanes> note_offsets{};
+    std::array<float, kGameplayHudMaxLanes> hold_offsets{};
+    float measure_offset = 0.0f;
+};
+
+// Static band and dynamic notes share actual sprite bounds. Width/contain modes
+// and rotated imported arrows can differ from the nominal note-height setting.
+template <typename RenderState, typename SpriteCache>
+GameplayJudgementField gameplay_judgement_field(const GameplayFieldLayout& field, float hit_y,
+    double note_height, int type, const RenderState& state, const SpriteCache& cache,
+    std::string_view shape, NoteImageAspect aspect) {
+    GameplayJudgementField result;
+    const float nominal_half = gameplay_note_head_half_height(note_height);
+    result.measure_offset = nominal_half;
+    if (type != 2) return result;
+    std::array<float, kGameplayHudMaxLanes> heads{}, holds{};
+    float largest_half = 0.0f;
+    float polygon_height_ratio = 1.0f;
+    if (auto* geometry = gameplay_note_polygon_geometry(state.gameplay_note_shape_geometries, shape)) {
+        D2D1_RECT_F bounds{};
+        if (SUCCEEDED(geometry->GetBounds(nullptr, &bounds))) polygon_height_ratio = bounds.bottom - bounds.top;
+    }
+    for (int lane = 0; lane < field.lane_count; ++lane) {
+        const auto i = static_cast<std::size_t>(lane);
+        const float width = gameplay_note_width(field, lane);
+        const auto nominal = D2D1::RectF(0.0f, -nominal_half, width, nominal_half);
+        const float rotation = i < cache.note_rotation_count ? cache.note_rotations[i] : 0.0f;
+        const auto half_height = [&](ID2D1Bitmap* bitmap, const D2D1_RECT_F& source) {
+            if (!bitmap) {
+                const auto extents = gameplay_note_shape_extents(width, nominal_half * 2.0f, shape);
+                return shape == "circle" ? std::max(1.0f, extents.half_width - 1.0f)
+                    : gameplay_note_polygon_index(shape).has_value() ? width * polygon_height_ratio * 0.5f : extents.half_height;
+            }
+            const auto dest = gameplay_note_bitmap_dest_rect(nominal, bitmap,
+                bitmap_source_rect_or_null(source), shape, aspect);
+            return gameplay_rotated_note_half_height(dest.right - dest.left, dest.bottom - dest.top, rotation);
+        };
+        heads[i] = half_height(state.lane_note_head_bitmaps[i].Get(), state.lane_note_head_source_rects[i]);
+        holds[i] = state.lane_note_hold_head_bitmaps[i]
+            ? half_height(state.lane_note_hold_head_bitmaps[i].Get(), state.lane_note_hold_head_source_rects[i])
+            : heads[i];
+        // Hidden scratch lanes have zero width and must not enlarge the band.
+        if (width > 0.0f) largest_half = std::max({largest_half, heads[i], holds[i]});
+    }
+    result.band = gameplay_judgement_band(hit_y, field.top, field.bottom, largest_half);
+    result.measure_offset = result.band.bottom - hit_y;
+    for (int lane = 0; lane < field.lane_count; ++lane) {
+        result.note_offsets[lane] = result.measure_offset - heads[lane];
+        result.hold_offsets[lane] = result.measure_offset - holds[lane];
+    }
+    return result;
+}
+
 float gameplay_lane_sprite_rotation(const std::array<float, kGameplayHudMaxLanes>& rotations,
                                     std::size_t count,
                                     std::size_t lane) {
@@ -2140,6 +2196,10 @@ bool menu_scene_enabled(MenuScreenKind kind) {
 }
 
 LRESULT CALLBACK menu_window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
+    if ((msg == WM_CHAR || msg == WM_LBUTTONDOWN || msg == WM_LBUTTONUP ||
+         msg == WM_LBUTTONDBLCLK || msg == WM_RBUTTONUP || msg == WM_MOUSEWHEEL) &&
+        input::native_modal_input_fence.rejects(static_cast<uint32_t>(GetMessageTime()), GetTickCount64()))
+        return 0;
     if (msg == WM_NCCREATE) {
         auto* create = reinterpret_cast<CREATESTRUCTW*>(lparam);
         auto* window = static_cast<MenuWindow*>(create->lpCreateParams);
@@ -2839,6 +2899,8 @@ bool MenuWindow::fail_fatal(std::string_view message) {
 }
 
 void MenuWindow::invalidate_gameplay_note_sprite_cache() {
+    // Type 2's cached band depends on the actual imported sprite bounds.
+    invalidate_gameplay_static_cache();
     gameplay_note_sprite_cache_ = GameplayNoteSpriteCache{};
     native_key_travel_.fill(0.0f);
     native_ghost_key_travel_.fill(0.0f);
@@ -3864,6 +3926,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
     desired.lane_center_gap_scale = data.lane_center_gap_scale;
     desired.show_lane_dividers = data.show_lane_dividers;
     desired.show_judgement_line = data.show_judgement_line;
+    desired.judgement_line_type = data.judgement_line_type;
     desired.note_divider_gap_px = data.note_divider_gap_px;
     desired.show_gear_boundary_line = data.show_gear_boundary_line;
     desired.judgement_line_glow_enabled = data.judgement_line_glow_enabled;
@@ -3910,6 +3973,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
         gameplay_static_cache_.lane_center_gap_scale == desired.lane_center_gap_scale &&
         gameplay_static_cache_.show_lane_dividers == desired.show_lane_dividers &&
         gameplay_static_cache_.show_judgement_line == desired.show_judgement_line &&
+        gameplay_static_cache_.judgement_line_type == desired.judgement_line_type &&
         gameplay_static_cache_.note_divider_gap_px == desired.note_divider_gap_px &&
         gameplay_static_cache_.show_gear_boundary_line == desired.show_gear_boundary_line &&
         gameplay_static_cache_.judgement_line_glow_enabled == desired.judgement_line_glow_enabled &&
@@ -4063,7 +4127,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
             fill->SetColor(native_gameplay_d2d_color(native_style,"chassis",color_from_rgb(desired.studio ? 0x0A1119 : 0x142332, static_cast<float>(desired.visual_opacity))));
             d2d_->d2d_context->FillRectangle(D2D1::RectF(field_layout.left + 2.0f, key_top - 2.0f,
                 field_layout.right - 2.0f, field_layout.bottom - 1.0f), fill);
-            if (desired.show_judgement_line) {
+            if (desired.show_judgement_line && desired.judgement_line_type != 2) {
                 const float y = std::clamp(hit_line_y, field_layout.top + 2.0f, field_layout.bottom - 2.0f);
                 if (desired.judgement_line_glow_enabled) {
                     // Recorded once into the static layer: a faint light pooling above
@@ -4106,7 +4170,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
             }
             fill->SetColor(saved);
         }
-        if (!desired.native_instrument && desired.show_judgement_line && d2d_->judgement_line_brush) {
+        if (!desired.native_instrument && desired.show_judgement_line && desired.judgement_line_type != 2 && d2d_->judgement_line_brush) {
             const D2D1_RECT_F line_rect =
                 gameplay_judgement_line_rect(field_layout, hit_line_y, note_height_scale);
             if (desired.judgement_line_glow_enabled) {
@@ -4154,6 +4218,27 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
                 d2d_->accent_brush->SetColor(saved_color);
                 d2d_->accent_brush->SetOpacity(saved_opacity);
             }
+        }
+        if (desired.show_judgement_line && desired.judgement_line_type == 2 && d2d_->note_fill_brush) {
+            auto* brush = d2d_->note_fill_brush.Get();
+            const auto saved = brush->GetColor();
+            // The lower edge retains the configured timing position. The band
+            // and note translation use the same effective (including skin) height.
+            const auto placement = gameplay_judgement_field(field_layout, hit_line_y,
+                desired.note_height_scale, 2, *d2d_, gameplay_note_sprite_cache_, data.note_shape,
+                use_imported_metrics && gameplay_note_sprite_cache_.has_imported_note_aspect
+                    ? gameplay_note_sprite_cache_.imported_note_aspect : data.note_image_aspect).band;
+            const auto band = D2D1::RectF(field_layout.left + 2.0f, placement.top,
+                                         field_layout.right - 2.0f, placement.bottom);
+            d2d_->d2d_context->PushAxisAlignedClip(D2D1::RectF(field_layout.left, field_layout.top,
+                field_layout.right, field_layout.bottom), D2D1_ANTIALIAS_MODE_ALIASED);
+            const float opacity = static_cast<float>(desired.visual_opacity);
+            brush->SetColor(color_from_rgb(0x20B85A, 0.08f * opacity));
+            d2d_->d2d_context->FillRectangle(band, brush);
+            brush->SetColor(color_from_rgb(0x20B85A, opacity));
+            d2d_->d2d_context->DrawRectangle(band, brush, 2.0f);
+            d2d_->d2d_context->PopAxisAlignedClip();
+            brush->SetColor(saved);
         }
         if (desired.show_gear_boundary_line && d2d_->accent_brush) {
             const float gear_top = gameplay_osu_gear_top(field_layout, hit_line_y, note_height_scale);
@@ -5201,6 +5286,7 @@ std::optional<std::string> MenuWindow::poll_text_input() {
 
 
 void MenuWindow::push_click_event(MenuClickEvent event) {
+    if (event.input_time_ns == 0) event.input_time_ns = timing::HighResClock::now_ns();
     if (event.kind == MenuHitTargetKind::GenericHelpPage) {
         generic_help_page_.store(std::max(0, event.index), std::memory_order_relaxed);
         return;

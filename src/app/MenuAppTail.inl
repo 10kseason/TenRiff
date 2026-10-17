@@ -163,6 +163,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.show_timing_bar = timing_visibility.bar;
     target.timing_bar_always_visible = timing_visibility.always_visible;
     target.timing_marker_style = config_.skin.timing_marker_style;
+    target.judgement_line_type = config_.skin.judgement_line_type;
     target.note_fade_in = config_.skin.note_fade_in;
     target.note_fade_out = config_.skin.note_fade_out;
     target.timing_text_offset_x = config_.skin.timing_text_offset_x;

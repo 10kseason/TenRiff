@@ -125,7 +125,7 @@ struct AudioUiConfig {
     std::string bms_keysound_policy = "follow";
     bool background_sound_enabled = true;
     std::string title_music = "default";
-    double master_volume = 0.10;
+    double master_volume = 0.30;
     // Chart-wide gain is independent of TenRiff menu/scene music.
     double gameplay_volume = 0.20;
     double menu_music_volume = 1.0;
@@ -214,6 +214,7 @@ struct SkinConfig {
     // makes notes meet the dividers; the default reproduces the historic inset.
     double note_divider_gap_px = kNoteDividerGapPxDefault;
     bool show_judgement_line = true;
+    int judgement_line_type = 1;
     bool show_gear_boundary_line = false;
     bool show_timing_feedback = true;
     bool show_timing_bar = true;

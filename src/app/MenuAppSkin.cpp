@@ -123,41 +123,29 @@ std::optional<std::string> pick_ui_font_dialog_utf8() {
 }
 
 std::optional<std::string> pick_folder_dialog_utf8() {
-    const HRESULT init_hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-    const bool should_uninitialize = SUCCEEDED(init_hr);
+    const NativeFileDialogApartment apartment;
+    if (FAILED(apartment.result())) return std::nullopt;
     Microsoft::WRL::ComPtr<IFileOpenDialog> dialog;
     const HRESULT create_hr = CoCreateInstance(CLSID_FileOpenDialog,
                                                nullptr,
                                                CLSCTX_INPROC_SERVER,
                                                IID_PPV_ARGS(&dialog));
     if (FAILED(create_hr) || !dialog) {
-        if (should_uninitialize) {
-            CoUninitialize();
-        }
         return std::nullopt;
     }
 
     DWORD options = 0;
     if (FAILED(dialog->GetOptions(&options))) {
-        if (should_uninitialize) {
-            CoUninitialize();
-        }
         return std::nullopt;
     }
     dialog->SetOptions(options | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST);
 
     if (FAILED(show_native_file_dialog(dialog.Get()))) {
-        if (should_uninitialize) {
-            CoUninitialize();
-        }
         return std::nullopt;
     }
 
     Microsoft::WRL::ComPtr<IShellItem> item;
     if (FAILED(dialog->GetResult(&item)) || !item) {
-        if (should_uninitialize) {
-            CoUninitialize();
-        }
         return std::nullopt;
     }
 
@@ -169,9 +157,6 @@ std::optional<std::string> pick_folder_dialog_utf8() {
         CoTaskMemFree(raw_path);
     }
 
-    if (should_uninitialize) {
-        CoUninitialize();
-    }
     return result;
 }
 
@@ -922,6 +907,9 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::LaneDividers), false, true);
     append_menu_row(render.generic, ui_text("Judgement Line", "판정선 표시"), ui_on_off(config_.skin.show_judgement_line),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::JudgementLine), false, true);
+    append_menu_row(render.generic, ui_text("Judgement Line Type", "판정선 타입"),
+                    config_.skin.judgement_line_type == 2 ? ui_text("Type 2", "타입 2") : ui_text("Type 1", "타입 1"),
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::JudgementLineType), false, true);
     append_menu_row(render.generic, ui_text("Gear Boundary", "기어 경계선"), ui_on_off(config_.skin.show_gear_boundary_line),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::GearBoundary), false, true);
     append_menu_row(render.generic, ui_text("LN Tail Cap", "LN 끝 표시"), ui_on_off(config_.skin.show_hold_tail),
@@ -1139,6 +1127,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.skin_preview.show_timing_bar = timing_visibility.bar;
     render.generic.skin_preview.timing_bar_always_visible = timing_visibility.always_visible;
     render.generic.skin_preview.timing_marker_style = config_.skin.timing_marker_style;
+    render.generic.skin_preview.judgement_line_type = config_.skin.judgement_line_type;
     render.generic.skin_preview.note_fade_in = config_.skin.note_fade_in;
     render.generic.skin_preview.note_fade_out = config_.skin.note_fade_out;
     render.generic.skin_preview.timing_text_offset_x = config_.skin.timing_text_offset_x;

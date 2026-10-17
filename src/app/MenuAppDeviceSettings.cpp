@@ -31,9 +31,8 @@ namespace {
 
 #ifdef _WIN32
 std::optional<std::string> pick_onnx_model_dialog_utf8() {
-    const HRESULT init_hr =
-        CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-    const bool should_uninitialize = SUCCEEDED(init_hr);
+    const NativeFileDialogApartment apartment;
+    if (FAILED(apartment.result())) return std::nullopt;
 
     Microsoft::WRL::ComPtr<IFileOpenDialog> dialog;
     if (FAILED(CoCreateInstance(CLSID_FileOpenDialog,
@@ -41,17 +40,11 @@ std::optional<std::string> pick_onnx_model_dialog_utf8() {
                                 CLSCTX_INPROC_SERVER,
                                 IID_PPV_ARGS(&dialog))) ||
         !dialog) {
-        if (should_uninitialize) {
-            CoUninitialize();
-        }
         return std::nullopt;
     }
 
     DWORD options = 0;
     if (FAILED(dialog->GetOptions(&options))) {
-        if (should_uninitialize) {
-            CoUninitialize();
-        }
         return std::nullopt;
     }
     dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST);
@@ -74,9 +67,6 @@ std::optional<std::string> pick_onnx_model_dialog_utf8() {
                 CoTaskMemFree(raw_path);
             }
         }
-    }
-    if (should_uninitialize) {
-        CoUninitialize();
     }
     return result;
 }
