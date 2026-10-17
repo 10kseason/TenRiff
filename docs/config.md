@@ -385,7 +385,7 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `note_fade_out` | double: `0..1`; `0` | 판정선 위 검은 안개의 깊이. 노트가 서서히 사라집니다. 0은 OFF. 판정선·키·HUD는 유지합니다. |
 | `hold_body_opacity` | double: `0..1`; `1` | LN 몸통 불투명도. |
 | `lane_width_scales` | object: mode → number[]; `0.50..1.75` | 레인 수 길이의 개별 폭 배열. |
-| `note_width_scale` | double: `0.50..1.40`; `1` | Note & Field Size. 중심을 유지하며 필드·레인·노트·인접 게이지를 함께 조절. |
+| `note_width_scale` | double: `0.10..1.40`; `1` | Note & Field Size. 중심을 유지하며 필드·레인·노트·인접 게이지를 함께 조절. |
 | `lane_spacing_scales` | object: mode → number[]; `0..2` | 레인 사이 간격 배열. 길이는 lane_count - 1. |
 | `note_height_scale` | double: `0.50..4`; `1.8` | 노트 머리·꼬리 높이 배율. |
 | `lane_divider_width_scale` | double: `0..2`; `1` | 모든 키 모드 공용 구분선 폭. 가져온 LR2 구분선 폭에도 적용. |

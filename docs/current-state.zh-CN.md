@@ -207,7 +207,7 @@
   - 判定 X/Y 与连击 X/Y 可分别调整并保存。FAST/SLOW 仅显示对应方向，P-GREAT 时省略。
   - 仅 P-GREAT 使用黄色文字、彩虹闪光与220ms 弹跳。GREAT 保持青色，GOOD 为灰色；其余判定与 FAST/SLOW 文字静止，连击数字保留独立的150ms 弹跳。
   - judge line / lane width / lane spacing / note & field size / divider width / 16K center gap / note height 调整
-  - `Note & Field Size` 以中心为基准，将 playfield、lane/divider、note 与相邻 gauge 一起按 50%～140% 缩放；100% 下相邻 note 边缘的默认总间距为 24px
+  - `Note & Field Size` 以中心为基准，将 playfield、lane/divider、note 与相邻 gauge 一起按 10%～140% 缩放；100% 下相邻 note 边缘的默认总间距为 24px
   - Black Playfield 会将包含 lane spacing 在内的 player/ghost playfield 全部显示为纯黑
   - 会按 key mode 保存单独的 lane 宽度数组和 lane 间距数组，并在 preview、实际 gameplay、ghost field 中共用同一套布局计算
   - 支持的 skin route 包含 `native`、TenRiff `skin.json` v1 与 LR2 playskin；在 Skins 中选择或拖入 TenRiff/LR2 folder 会导入当前 profile 且不覆盖已有安装

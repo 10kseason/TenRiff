@@ -174,7 +174,7 @@ for (std::size_t note_index = 0; note_index < editor.notes.size(); ++note_index)
     const float y = grid_top + (static_cast<float>(note.measure - view_start) +
         static_cast<float>(note.slice) / static_cast<float>(std::max(1, note.slice_count))) * measure_height;
     const float note_width = std::clamp(lane_width * 0.72f *
-        static_cast<float>(std::clamp(editor.note_width_scale, 0.5, 1.4)), 8.0f, lane_width * 0.95f);
+        gameplay_playfield_scale(editor.note_width_scale), 8.0f, lane_width * 0.95f);
     const float note_height = std::clamp(measure_height / 72.0f *
         static_cast<float>(std::clamp(editor.note_height_scale / 1.8, 0.5, 4.0)), 5.0f, 28.0f);
     const auto color = lane_colors[static_cast<std::size_t>(note.lane - 1) % lane_color_count];

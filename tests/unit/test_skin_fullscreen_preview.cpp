@@ -108,7 +108,7 @@ struct MenuAppSkinPreviewTestAccess {
         menu->config_.mode.key_mode = "10k";
         menu->config_.skin.note_width_scale = 1.3;
         menu->config_.skin.note_height_scale = 2.4;
-        menu->config_.skin.note_width_scales["7k"] = 1.25;
+        menu->config_.skin.note_width_scales["7k"] = 0.10;
         menu->config_.skin.note_height_scales["7k"] = 2.15;
         menu->reset_screen(MenuApp::Screen::OptionsHub);
         menu->push_screen(MenuApp::Screen::SettingsSkins);
@@ -144,7 +144,7 @@ struct MenuAppSkinPreviewTestAccess {
         CHECK(menu.config_.skin.note_height_scale == doctest::Approx(2.4));
         REQUIRE(menu.config_.skin.note_width_scales.count("7k") == 1);
         REQUIRE(menu.config_.skin.note_height_scales.count("7k") == 1);
-        CHECK(menu.config_.skin.note_width_scales.at("7k") == doctest::Approx(1.25));
+        CHECK(menu.config_.skin.note_width_scales.at("7k") == doctest::Approx(0.10));
         CHECK(menu.config_.skin.note_height_scales.at("7k") == doctest::Approx(2.15));
         CHECK(menu.skin_settings_controller_.edit_mode() == "7k");
         CHECK(menu.skin_settings_controller_.selected_id() == SkinSettingsRowId::NoteHeight);
@@ -156,6 +156,7 @@ struct MenuAppSkinPreviewTestAccess {
             auto menu = fixture(display_mode);
             const auto depth = menu->menu_navigator_.depth();
             REQUIRE(menu->snapshot_.render.kind == render::MenuScreenKind::GenericList);
+            CHECK(menu->snapshot_.render.generic.skin_preview.note_width_scale == doctest::Approx(0.10));
             tap(*menu, menu->key_f6_);
             REQUIRE(menu->skin_preview_fullscreen_);
             CHECK(menu->current_screen() == MenuApp::Screen::SettingsSkins);
@@ -164,7 +165,7 @@ struct MenuAppSkinPreviewTestAccess {
             CHECK(menu->snapshot_.render.generic.skin_preview.fullscreen);
             CHECK(menu->snapshot_.render.gameplay.active);
             CHECK(menu->snapshot_.render.gameplay.lane_count == 7);
-            CHECK(menu->snapshot_.render.gameplay.note_width_scale == doctest::Approx(1.25));
+            CHECK(menu->snapshot_.render.gameplay.note_width_scale == doctest::Approx(0.10));
             CHECK(menu->snapshot_.render.gameplay.note_height_scale == doctest::Approx(2.15));
             CHECK(menu->current_window_config().display_mode ==
                 (std::string(display_mode) == "windowed" ? "borderless" : display_mode));

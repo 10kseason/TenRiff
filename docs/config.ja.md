@@ -376,7 +376,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | `note_fade_out` | double: `0..1`; `0` | 判定ライン上の黒い霧の深さ。ノートが徐々に消えます。0はオフ。キーとHUDは表示されます。 |
 | `hold_body_opacity` | double: `0..1`; `1` | LN 本体の不透明度。 |
 | `lane_width_scales` | object: mode → number[]; `0.50..1.75` | レーン数と同じ長さの個別幅配列。 |
-| `note_width_scale` | double: `0.50..1.40`; `1` | Note & Field Size。中心を保ちフィールド・レーン・ノート・隣接ゲージを調整。 |
+| `note_width_scale` | double: `0.10..1.40`; `1` | Note & Field Size。中心を保ちフィールド・レーン・ノート・隣接ゲージを調整。 |
 | `lane_spacing_scales` | object: mode → number[]; `0..2` | レーン間隔配列。長さは lane_count - 1。 |
 | `note_height_scale` | double: `0.50..4`; `1.8` | ノート頭部・尾部の高さ倍率。 |
 | `lane_divider_width_scale` | double: `0..2`; `1` | 全モード共通の区切り線幅。取り込んだ LR2 区切り線にも適用。 |

@@ -224,7 +224,7 @@
   - small key labels can be shown at the lane top/bottom or hidden
   - 판정 X/Y와 콤보 X/Y를 각각 조절·저장합니다. FAST/SLOW는 해당 방향만 표시하며 P-GREAT에는 생략합니다.
   - judge line / lane width / lane spacing / note & field size / divider width / 16K center gap / note height / LN body width 조절
-  - `Note & Field Size`는 중앙을 고정한 채 플레이필드·lane/divider·노트·인접 게이지를 함께 `50%..140%`로 조절하며, 100%에서 인접 노트 사이 기본 합산 여백은 24px
+  - `Note & Field Size`는 중앙을 고정한 채 플레이필드·lane/divider·노트·인접 게이지를 함께 `10%..140%`로 조절하며, 100%에서 인접 노트 사이 기본 합산 여백은 24px
   - Black Playfield를 켜면 lane spacing을 포함한 player/ghost 플레이필드 전체를 완전한 검정으로 렌더링
   - key mode별 개별 lane 폭과 lane 사이 간격을 각각 저장하고 미리보기/실플레이/ghost field에 같은 레이아웃 계산을 적용
   - 지원 스킨 경로는 `native`, TenRiff `skin.json` v1, LR2 playskin이며, Skins 화면에서 TenRiff/LR2 폴더를 선택하거나 드롭하면 활성 프로필에 덮어쓰기 없이 이식

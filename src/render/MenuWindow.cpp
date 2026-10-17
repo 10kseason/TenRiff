@@ -107,8 +107,6 @@ constexpr float kGameplayGaugeWidth = 60.0f;
 constexpr double kGameplayJudgementLineMin = config::kJudgementLinePositionMin;
 constexpr double kGameplayJudgementLineMax = config::kJudgementLinePositionMax;
 constexpr double kGameplayJudgementLineDefault = config::kJudgementLinePositionDefault;
-constexpr double kGameplayNoteWidthScaleMin = 0.50;
-constexpr double kGameplayNoteWidthScaleMax = 1.40;
 constexpr double kGameplayLaneWidthScaleMin = 0.50;
 constexpr double kGameplayLaneWidthScaleMax = 1.75;
 constexpr double kGameplayLaneWidthScaleDefault = 1.00;
@@ -359,10 +357,7 @@ double clamp_gameplay_judgement_line(double value) {
 }
 
 float clamp_gameplay_note_width_scale(double value) {
-    if (!std::isfinite(value)) {
-        return 1.0f;
-    }
-    return static_cast<float>(std::clamp(value, kGameplayNoteWidthScaleMin, kGameplayNoteWidthScaleMax));
+    return gameplay_playfield_scale(value);
 }
 
 float clamp_gameplay_lane_width_scale(double value) {

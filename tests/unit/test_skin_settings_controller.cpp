@@ -268,6 +268,43 @@ TEST_CASE("skin appearance rows mutate through one typed action path") {
     CHECK(runtime.visual_offset_ms == doctest::Approx(old_offset + 1.0));
 }
 
+TEST_CASE("note and field size controls reach 10 percent without changing other modes") {
+    std::vector<std::string> modes{"7+1"};
+    for (int keys = 4; keys <= 16; ++keys) modes.push_back(std::to_string(keys) + "k");
+    for (const auto& mode : modes) {
+        tenriff::config::RuntimeConfig runtime;
+        runtime.skin.note_width_scale = 0.15;
+        const std::string other_mode = mode == "4k" ? "16k" : "4k";
+        runtime.skin.note_width_scales[other_mode] = 0.80;
+        SkinSettingsController controller;
+        controller.reset(mode);
+        for (int press = 0; press < 2; ++press) {
+            static_cast<void>(controller.handle(
+                MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames,
+                SkinSettingsRowId::NoteWidth));
+            const double width = tenriff::config::resolved_skin_note_width_scale(runtime.skin, mode);
+            CHECK(width == doctest::Approx(0.10));
+            CHECK(tenriff::app::format_percent(width) == "10%");
+        }
+        static_cast<void>(controller.handle(
+            MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames,
+            SkinSettingsRowId::NoteWidth));
+        CHECK(tenriff::config::resolved_skin_note_width_scale(runtime.skin, mode) == doctest::Approx(0.15));
+        CHECK(runtime.skin.note_width_scale == doctest::Approx(0.15));
+        CHECK(runtime.skin.note_width_scales.at(other_mode) == doctest::Approx(0.80));
+        CHECK(runtime.skin.note_width_scales.size() == 2u);
+
+        runtime.skin.note_width_scales[mode] = 1.35;
+        for (int press = 0; press < 2; ++press) {
+            static_cast<void>(controller.handle(
+                MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames,
+                SkinSettingsRowId::NoteWidth));
+        }
+        CHECK(tenriff::config::resolved_skin_note_width_scale(runtime.skin, mode) == doctest::Approx(1.40));
+        CHECK(controller.dirty());
+    }
+}
+
 TEST_CASE("note height controls stop at 50 and 400 percent for every supported key count") {
     tenriff::config::RuntimeConfig runtime;
     SkinSettingsController controller;
