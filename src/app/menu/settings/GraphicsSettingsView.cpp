@@ -26,7 +26,7 @@ std::string to_lower_ascii(std::string value) {
 }
 
 std::string on_off(bool enabled, ui::Language language) {
-    return localized(language, enabled ? "On" : "Off", enabled ? "켜짐" : "꺼짐");
+    return localized(language, enabled ? "On" : "Off", enabled ? "켜짐" : "OFF");
 }
 
 std::string display_mode_label(std::string value, ui::Language language) {

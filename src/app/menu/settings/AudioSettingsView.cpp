@@ -38,7 +38,7 @@ std::string keysound_policy_label(std::string_view policy, ui::Language language
         return localized(language, "Autoplay", "자동재생");
     }
     if (normalized == "ignore" || normalized == "off") {
-        return localized(language, "Off", "끔");
+        return localized(language, "Off", "OFF");
     }
     return localized(language, "Follow", "연동");
 }
@@ -47,7 +47,7 @@ std::string on_off(bool enabled, ui::Language language) {
     return localized(
         language,
         enabled ? "On" : "Off",
-        enabled ? "켜짐" : "꺼짐");
+        enabled ? "켜짐" : "OFF");
 }
 
 std::string title_music_label(std::string_view mode, ui::Language language) {
@@ -259,7 +259,7 @@ AudioSettingsViewModel AudioSettingsView::build(
     view.notes.push_back(localized(
         language,
         "Off: skip note keysounds. Autoplay mixes note keysounds into the song at the same BMS performance volume.",
-        "끔: 노트 키음을 재생하지 않습니다. 자동재생은 노트 키음을 곡에 섞으며 같은 BMS 연주 볼륨을 사용합니다."));
+        "OFF: 노트 키음을 재생하지 않습니다. 자동재생은 노트 키음을 곡에 섞으며 같은 BMS 연주 볼륨을 사용합니다."));
     view.notes.push_back(localized(
         language,
         "Sound Offset shifts chart BGM and autoplay keysounds only. Positive delays sound; negative advances it.",

@@ -8,6 +8,7 @@
 #include "config/GraphicsResolution.h"
 #include "render/GameplayFeedbackText.h"
 #include "render/GameplayStudioDeck.h"
+#include "render/GameplayTimingIndicator.h"
 #include "render/GameplaySongTitle.h"
 #include "render/NativeMenuAssets.h"
 #include "render/NativeMenuPalette.h"

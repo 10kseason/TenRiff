@@ -124,7 +124,9 @@ public:
     void collect_recent_timing_deltas(std::array<double, kGameplayTimingHistoryMaxEntries>& out,
                                       std::size_t* out_count,
                                       int64_t after_sample = std::numeric_limits<int64_t>::min(),
-                                      int64_t through_sample = std::numeric_limits<int64_t>::max()) const;
+                                      int64_t through_sample = std::numeric_limits<int64_t>::max(),
+                                      std::array<bool, kGameplayTimingHistoryMaxEntries>* maximums = nullptr) const;
+    [[nodiscard]] double maximum_judgement_window_ms() const { return samples_to_ms(windows_.pg); }
 
     [[nodiscard]] int lane_count() const { return lane_count_; }
     [[nodiscard]] int64_t duration_samples() const { return duration_samples_; }
@@ -156,7 +158,7 @@ private:
     void finalize_if_done(int64_t current_sample);
     void update_lane_input_state(LaneState& lane, input::InputState state, int64_t input_sample);
     [[nodiscard]] bool should_apply_early_empty_poor(const LaneState& lane, int64_t input_sample) const;
-    void push_recent_timing_delta(double delta_ms, int64_t sample);
+    void push_recent_timing_delta(double delta_ms, int64_t sample, bool maximum);
 
     [[nodiscard]] double samples_to_ms(int64_t samples) const;
     [[nodiscard]] double detailed_accuracy_credit_for(game::Judgement judgement, double delta_ms) const;
@@ -180,12 +182,13 @@ private:
     ResultStats stats_;
     ReplayTrace replay_;
     LiveJudgementFeedback live_feedback_;
-    // HUD-only memories: PG must not erase a recent correctable timing error.
+    // HUD-only feedback: latest measured PG also refreshes FAST/SLOW.
     LiveJudgementFeedback timing_feedback_;
     LiveJudgementFeedback non_pg_feedback_;
     std::vector<MineTrigger> pending_mine_triggers_;
     std::array<double, kGameplayTimingHistoryMaxEntries> recent_timing_deltas_{};
     std::array<int64_t, kGameplayTimingHistoryMaxEntries> recent_timing_samples_{};
+    std::array<bool, kGameplayTimingHistoryMaxEntries> recent_timing_maximums_{};
     std::size_t recent_timing_delta_count_ = 0;
     std::size_t recent_timing_delta_head_ = 0;
 

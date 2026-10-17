@@ -209,7 +209,7 @@ inline std::string mode_mod_category_ui_value(std::string_view category, const s
         const auto* mod = find_mode_mod_descriptor(token);
         if (mod && mod->category_token == category) return mode_mod_value_label(*mod, language);
     }
-    return ui::text(language, "Off", "끔");
+    return ui::text(language, "Off", "OFF");
 }
 
 inline std::string mode_patterns_score_summary(const std::vector<std::string>& mods, double rate,
@@ -221,7 +221,7 @@ inline std::string mode_patterns_score_summary(const std::vector<std::string>& m
         if (!summary.empty()) summary += " + ";
         summary += mode_mod_value_label(*mod, language);
     }
-    if (summary.empty()) summary = ui::text(language, "Off", "끔");
+    if (summary.empty()) summary = ui::text(language, "Off", "OFF");
     return summary + " / " + format_multiplier(final_score_multiplier(mods, rate));
 }
 
@@ -512,16 +512,16 @@ inline std::string random_label(const std::string& value) {
         return "Random (Scratch Fixed)";
     }
     if (normalized == "rr") {
-        return "R-Random";
+        return "Random";
     }
     if (normalized == "sr") {
         return "S-Random";
     }
-    return "Off";
+    return "OFF";
 }
 
 inline std::string cycle_random_mode(std::string current, int direction) {
-    static constexpr const char* kRandomModes[] = {"off", "mirror", "frns", "rr", "sr"};
+    static constexpr const char* kRandomModes[] = {"off", "mirror", "rr", "sr", "frns"};
     const int option_count = static_cast<int>(sizeof(kRandomModes) / sizeof(kRandomModes[0]));
     current = to_lower_ascii(std::move(current));
     if (current == "fr" || current == "fr_no_scratch" || current == "random_no_scratch") {
@@ -574,7 +574,7 @@ inline std::string keysound_policy_label(std::string_view policy) {
         return "Autoplay";
     }
     if (normalized == "ignore" || normalized == "off") {
-        return "Off";
+        return "OFF";
     }
     return "Follow";
 }

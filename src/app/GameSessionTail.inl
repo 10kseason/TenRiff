@@ -1319,8 +1319,9 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         snapshot.timing_feedback_delta_ms = timing.has_value ? timing.delta_ms : 0.0;
         snapshot.has_non_pg_feedback = gameplay::timing_feedback_visible(
             engine_->non_pg_feedback(), snapshot.current_sample, sample_rate_);
+        snapshot.timing_maximum_window_ms = engine_->maximum_judgement_window_ms();
         engine_->collect_recent_timing_deltas(snapshot.timing_history_delta_ms, &snapshot.timing_history_count,
-            snapshot.current_sample - ms_to_samples(700.0, sample_rate_), snapshot.current_sample);
+            snapshot.current_sample - ms_to_samples(700.0, sample_rate_), snapshot.current_sample, &snapshot.timing_history_maximums);
         engine_->collect_active_holds(active_holds_buffer_);
         if (!process_owns_foreground_window()) {
             std::fill(lane_pressed_.begin(), lane_pressed_.end(), 0);
@@ -1367,9 +1368,10 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             snapshot.ghost_timing_feedback_delta_ms = ghost_timing.has_value ? ghost_timing.delta_ms : 0.0;
             snapshot.ghost_has_non_pg_feedback = gameplay::timing_feedback_visible(
                 ghost_engine_->non_pg_feedback(), snapshot.current_sample, sample_rate_);
+            snapshot.ghost_timing_maximum_window_ms = ghost_engine_->maximum_judgement_window_ms();
             ghost_engine_->collect_recent_timing_deltas(snapshot.ghost_timing_history_delta_ms,
                                                         &snapshot.ghost_timing_history_count,
-                snapshot.current_sample - ms_to_samples(700.0, sample_rate_), snapshot.current_sample);
+                snapshot.current_sample - ms_to_samples(700.0, sample_rate_), snapshot.current_sample, &snapshot.ghost_timing_history_maximums);
             ghost_engine_->collect_active_holds(ghost_active_holds_buffer_);
             snapshot.ghost_lane_activity.fill(0.0f);
             snapshot.ghost_lane_activity_count =

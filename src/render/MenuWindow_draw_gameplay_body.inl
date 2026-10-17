@@ -478,8 +478,8 @@
                                          float combo_anchor_y,
                                          const std::array<double, kGameplayTimingHistoryMaxEntries>& timing_history,
                                          std::size_t timing_history_count,
-                                         bool /*has_live_feedback*/,
-                                         double /*live_feedback_delta_ms*/) {
+                                         const std::array<bool, kGameplayTimingHistoryMaxEntries>& maximums,
+                                         double maximum_ms) {
             if (!scene_body_format || !d2d_->text_brush) {
                 return;
             }
@@ -508,9 +508,15 @@
             // Keep only the timing marks, including for older presets that enable a backing.
             const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
             const float indicator_center_y = (indicator_rect.top + indicator_rect.bottom) * 0.5f;
-            d2d_->text_brush->SetColor(ng_color("timing", D2D1::ColorF(0x6E7A8C, 0.8f)));
-            ctx->FillRectangle(D2D1::RectF(indicator_rect.left, indicator_center_y - 0.5f,
-                indicator_rect.right, indicator_center_y + 0.5f), d2d_->text_brush.Get());
+            const float maximum_half_width = kGameplayTimingIndicatorHalfWidth * timing_maximum_fraction(maximum_ms);
+            const auto range_segment = [&](float left, float right, uint32_t color) {
+                d2d_->text_brush->SetColor(D2D1::ColorF(color, 0.9f));
+                ctx->FillRectangle(D2D1::RectF(left, indicator_center_y - 1.5f,
+                    right, indicator_center_y + 1.5f), d2d_->text_brush.Get());
+            };
+            range_segment(indicator_rect.left, feedback_center_x - maximum_half_width, kTimingFastColor);
+            range_segment(feedback_center_x - maximum_half_width, feedback_center_x + maximum_half_width, kTimingMaximumColor);
+            range_segment(feedback_center_x + maximum_half_width, indicator_rect.right, kTimingLateColor);
             d2d_->text_brush->SetColor(ng_color("timing",D2D1::ColorF(0xF7FAFD, 0.92f)));
             ctx->FillRectangle(D2D1::RectF(feedback_center_x - 1.0f, indicator_rect.top - 3.0f,
                                            feedback_center_x + 1.0f, indicator_rect.bottom + 3.0f),
@@ -525,12 +531,8 @@
                     static_cast<float>(std::clamp(delta_ms / kGameplayTimingIndicatorRangeMs, -1.0, 1.0)) *
                         kGameplayTimingIndicatorHalfWidth;
                 const float marker_half_height = 1.4f + 2.4f * history_weight;
-                D2D1_COLOR_F marker_color = ng_color("timing",D2D1::ColorF(0xF7FAFD, 0.12f + 0.50f * history_weight * history_weight));
-                if (delta_ms < -0.05) {
-                    marker_color = ng_color("timing_fast",D2D1::ColorF(0x5DA9FF, 0.12f + 0.50f * history_weight * history_weight));
-                } else if (delta_ms > 0.05) {
-                    marker_color = ng_color("timing_slow",D2D1::ColorF(0xFF5A6B, 0.12f + 0.50f * history_weight * history_weight));
-                }
+                const auto marker_color = D2D1::ColorF(timing_marker_color(delta_ms, maximum_ms, maximums[i]),
+                    0.12f + 0.50f * history_weight * history_weight);
                 d2d_->text_brush->SetColor(marker_color);
                 if (data.gameplay.timing_marker_style == "barcode") {
                     ctx->FillRectangle(D2D1::RectF(marker_center_x - 1.0f, indicator_center_y - 9.0f,
@@ -549,7 +551,8 @@
                                                   -1.0,
                                                   1.0)) *
                         kGameplayTimingIndicatorHalfWidth;
-                d2d_->text_brush->SetColor(ng_color("timing",D2D1::ColorF(0xF7FAFD, 0.98f)));
+                d2d_->text_brush->SetColor(D2D1::ColorF(timing_marker_color(
+                    live_feedback_delta_ms, maximum_ms, maximums[timing_history_count - 1]), 0.98f));
                 if (data.gameplay.timing_marker_style == "barcode") {
                     ctx->FillRectangle(D2D1::RectF(live_marker_center_x - 1.5f, indicator_center_y - 10.0f,
                         live_marker_center_x + 1.5f, indicator_center_y + 10.0f), d2d_->text_brush.Get());
@@ -1953,11 +1956,13 @@
                                          const std::wstring& feedback_timing_text,
                                          const std::array<double, kGameplayTimingHistoryMaxEntries>& timing_history,
                                          std::size_t timing_history_count,
+                                         const std::array<bool, kGameplayTimingHistoryMaxEntries>& maximums,
+                                         double maximum_ms,
                                          const GameplayTextPopAnimation& feedback_animation,
                                          int64_t feedback_started_ns) {
             if (studio) { draw_studio_feedback(feedback_field, has_feedback, feedback, feedback_delta_ms,
                                                has_non_pg_feedback, has_timing_feedback, feedback_text,
-                                               feedback_timing_text, feedback_animation, timing_history, timing_history_count); return; }
+                                               feedback_timing_text, feedback_animation, timing_history, timing_history_count, maximums, maximum_ms); return; }
             const bool show_feedback_overlay = has_feedback && !feedback_text.empty();
             const bool show_timing_feedback = data.gameplay.show_timing_feedback && has_timing_feedback &&
                 !feedback_timing_text.empty();
@@ -1965,7 +1970,7 @@
                 gameplay_combo_anchor_y(feedback_field, data.gameplay.judgement_position, 74.0f, 82.0f);
             const float timing_anchor_y = gameplay_combo_anchor_y(feedback_field, 0.24, 74.0f, 82.0f);
             const bool show_timing_bar = data.gameplay.show_timing_bar &&
-                (data.gameplay.timing_bar_always_visible || has_non_pg_feedback);
+                (data.gameplay.timing_bar_always_visible || timing_history_count > 0);
             if ((show_feedback_overlay || show_timing_feedback || show_timing_bar) && d2d_->text_brush) {
                 if (show_feedback_overlay && scene_header_format) {
                     D2D1_RECT_F feedback_rect =
@@ -2049,8 +2054,8 @@
                                           timing_anchor_y,
                                           timing_history,
                                           timing_history_count,
-                                          has_timing_feedback,
-                                          feedback_delta_ms);
+                                          maximums,
+                                          maximum_ms);
                 }
             }
 
@@ -2059,7 +2064,8 @@
                               data.gameplay.timing_feedback_delta_ms, data.gameplay.has_non_pg_feedback,
                               data.gameplay.has_timing_feedback, scene_hud_cache.feedback_text,
                               scene_hud_cache.feedback_timing_text, data.gameplay.timing_history_delta_ms,
-                              data.gameplay.timing_history_count, judgement_text_animation,
+                              data.gameplay.timing_history_count, data.gameplay.timing_history_maximums,
+                              data.gameplay.timing_maximum_window_ms, judgement_text_animation,
                               scene_hud_cache.judgement_animation_started_ns);
 
         if (data.gameplay.combo > 0) {
@@ -2609,6 +2615,7 @@
                                   data.gameplay.ghost_has_non_pg_feedback, data.gameplay.ghost_has_timing_feedback,
                                   scene_hud_cache.ghost_feedback_text, scene_hud_cache.ghost_feedback_timing_text,
                                   data.gameplay.ghost_timing_history_delta_ms, data.gameplay.ghost_timing_history_count,
+                                  data.gameplay.ghost_timing_history_maximums, data.gameplay.ghost_timing_maximum_window_ms,
                                   ghost_judgement_text_animation, scene_hud_cache.ghost_judgement_animation_started_ns);
             if (data.gameplay.ghost_combo > 0) {
                 draw_combo_overlay(ghost_field_layout,

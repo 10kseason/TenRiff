@@ -1,3 +1,5 @@
+**2026-10-17 · 1.9.5:** 메뉴·결과 음악도 사운드에서 선택한 장치로 재생합니다. 인디케이터는 FAST 파랑 / 최대판정 초록 / LATE 빨강이며 FAST/SLOW도 최대판정 입력으로 갱신합니다. 로비 랜덤 순서는 OFF → 미러 → 랜덤 → S랜덤 → 스크고정 랜덤 → OFF입니다. [출력 장치 통합과 판정 인디케이터](release-1.9.5.ko.md).
+
 **2026-10-17 · 1.9.3 local:** [인디케이터·출력 장치·프로필 단축키](input-feedback-20261017.ko.md).
 
 # TenRiff Config Schema (current)
@@ -48,9 +50,9 @@
 - `play_to_end` (bool; default `true`): 마지막 노트와 LN 끝 처리 뒤 남은 음악을 끝까지 듣습니다. 일반 싱글플레이는 이 후주 구간에서 `Esc`를 누르면 일시정지 창 없이 정상 결과로 이동합니다(자동재생·리플레이 포함). 세션 믹스·멀티플레이의 기존 Esc 정책은 유지합니다. `false`면 `ui.result_tail_ms`만 기다린 뒤 정상 결과로 넘어갑니다. 판정·점수·리플레이 규칙은 바뀌지 않습니다.
 
 - `backend` (string)
-  - `wasapi | asio`; 기본 `wasapi`. 게임플레이와 선곡 미리듣기의 출력 백엔드. 메뉴·결과 배경음악은 별도 Windows MCI 경로를 유지.
+  - `wasapi | asio`; 기본 `wasapi`. 게임·미리듣기·메뉴·결과 음악에 선택한 WASAPI 장치 또는 ASIO 드라이버를 적용합니다.
 - `device_id` (string)
-  - 기본값은 빈 문자열(시스템 기본). WASAPI 게임플레이·BMS 미리듣기 출력 장치 ID. 사운드 옵션에서 선택하며, 선택한 장치가 없으면 자동 대체하지 않습니다. 자체 메뉴·결과 음악의 MCI 출력은 Windows 기본 장치를 유지합니다.
+  - 기본값은 빈 문자열(시스템 기본). 사운드 옵션에서 선택한 WASAPI 출력 장치 ID를 게임·BMS 미리듣기·메뉴·결과 음악이 공유합니다. 메뉴는 공유 모드이며 게임의 독점 설정은 유지합니다. 선택 장치가 없으면 자동 대체하지 않습니다. 짧은 설정 조절 클릭음은 Windows 기본 출력입니다.
 - `asio_driver` (string)
   - 설치된 64비트 ASIO 드라이버의 CLSID. 빈 문자열은 Auto이며 이름순 첫 드라이버를 선택. Audio 화면에서 드라이버를 고르고 F5로 목록을 새로 읽음.
 - `rate` (int)
@@ -352,7 +354,7 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `show_gear_boundary_line` | bool; `false` | 기어 경계선 표시. |
 | `show_timing_feedback` | bool; `true` | FAST/SLOW 글자 표시. 타이밍 막대는 별도 설정. |
 | `show_timing_bar` | bool; `true` | 타이밍 막대 표시. 값이 없는 이전 프로필/스킨은 기존 글자 표시 값을 상속. |
-| `timing_bar_always_visible` | bool; `false` | `true`는 눈금과 마지막 FAST/SLOW 글자를 유지합니다. 판정별 점/바코드는 0.7초 뒤 만료됩니다. `false`는 기존 비PG 후 0.75초 표시를 유지하며, 막대 끄기는 `show_timing_bar`로 설정합니다. |
+| `timing_bar_always_visible` | bool; `false` | `true`는 눈금과 최신 FAST/SLOW 글자를 유지합니다. 최대판정도 글자를 갱신하며 0ms면 지웁니다. 마커별 0.7초 만료, 조건부 막대는 마커가 있을 때 표시합니다. `show_timing_bar`로 막대를 끕니다. |
 | `timing_marker_style` | `dot` / `barcode`; `dot` | 판정 표시 모양. 점 또는 곧은 세로줄. |
 | `timing_feedback_override` | bool; `false` | 사용자가 표시 설정을 바꾼 후 스킨 매니페스트보다 프로필의 두 표시 값을 우선. |
 | `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | 글자/막대의 독립 X 이동. 기존 판정 주변 배치에 더하는 1920×1080 기준 픽셀. |

@@ -186,7 +186,9 @@
                                         const std::wstring& text, const std::wstring& timing_text,
                                         const GameplayTextPopAnimation& animation,
                                         const std::array<double, kGameplayTimingHistoryMaxEntries>& timing_history,
-                                        std::size_t timing_history_count) {
+                                        std::size_t timing_history_count,
+                                        const std::array<bool, kGameplayTimingHistoryMaxEntries>& maximums,
+                                        double maximum_ms) {
             auto* fill = d2d_->note_fill_brush.Get();
             if (!fill) return;
             const auto saved_color = fill->GetColor();
@@ -226,7 +228,7 @@
                 studio_text(timing_text, ng_font("timing", studio_fonts.studio_timing.Get()), text_rect, timing_color, DWRITE_TEXT_ALIGNMENT_CENTER);
                 ctx->SetTransform(saved);
             }
-            if (data.gameplay.show_timing_bar && (data.gameplay.timing_bar_always_visible || has_non_pg_feedback)) {
+            if (data.gameplay.show_timing_bar && (data.gameplay.timing_bar_always_visible || timing_history_count > 0)) {
                 auto timing_rect = ng_rect("timing", D2D1::RectF(center_x - 100, anchor + 16, center_x + 100, anchor + 18));
                 const float cx = (timing_rect.left + timing_rect.right) * .5f + static_cast<float>(data.gameplay.timing_bar_offset_x);
                 const float by = timing_rect.top + static_cast<float>(data.gameplay.timing_bar_offset_y);
@@ -235,13 +237,18 @@
                 const float bar_scale = hud_font_scale(data.gameplay.timing_bar_scale);
                 ctx->SetTransform(D2D1::Matrix3x2F::Scale(bar_scale, bar_scale,
                     D2D1::Point2F(cx, by + 1)) * saved);
-                fill->SetColor(D2D1::ColorF(0x6E7A8C)); ctx->FillRectangle(D2D1::RectF(cx - half_width, by, cx + half_width, by + 2), fill);
+                const float maximum_half_width = half_width * timing_maximum_fraction(maximum_ms);
+                const auto range_segment = [&](float left, float right, uint32_t color) {
+                    fill->SetColor(D2D1::ColorF(color, 0.9f));
+                    ctx->FillRectangle(D2D1::RectF(left, by - 0.5f, right, by + 2.5f), fill);
+                };
+                range_segment(cx - half_width, cx - maximum_half_width, kTimingFastColor);
+                range_segment(cx - maximum_half_width, cx + maximum_half_width, kTimingMaximumColor);
+                range_segment(cx + maximum_half_width, cx + half_width, kTimingLateColor);
                 fill->SetColor(D2D1::ColorF(0xC9CED6)); ctx->FillRectangle(D2D1::RectF(cx - 1, by - 5, cx + 1, by + 7), fill);
                 for (std::size_t i = 0; i < timing_history_count; ++i) {
                     const double marker_delta = timing_history[i];
-                    auto color = marker_delta < -0.05 ? ng_color("timing_fast", D2D1::ColorF(0x5DA9FF))
-                        : marker_delta > 0.05 ? ng_color("timing_slow", D2D1::ColorF(0xFF6B7A))
-                        : ng_color("timing", D2D1::ColorF(0xF7FAFD));
+                    auto color = D2D1::ColorF(timing_marker_color(marker_delta, maximum_ms, maximums[i]));
                     color.a *= 0.3f + 0.7f * static_cast<float>(i + 1) / static_cast<float>(timing_history_count);
                     fill->SetColor(color);
                     const float x = cx + static_cast<float>(std::clamp(marker_delta / 80.0, -1.0, 1.0)) * half_width;

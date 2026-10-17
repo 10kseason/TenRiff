@@ -9,7 +9,7 @@
 #include "audio/AsioBackend.h"
 #include "audio/WasapiBackend.h"
 
-namespace tenriff::app { struct GameSessionAudioTestAccess; }
+namespace tenriff::app { struct GameSessionAudioTestAccess; struct MenuMusicControllerTestAccess; }
 
 namespace tenriff::audio {
 
@@ -79,6 +79,7 @@ public:
 
 private:
     friend struct tenriff::app::GameSessionAudioTestAccess;
+    friend struct tenriff::app::MenuMusicControllerTestAccess;
     void thread_main();
     void process_buffer();
     void invoke_callback(float* output, uint32_t frames, int64_t buffer_start_samples,
@@ -86,6 +87,8 @@ private:
 
     std::unique_ptr<WasapiBackend> backend_;
     std::unique_ptr<AsioBackend> asio_backend_;
+    // Empty in production; lets controller tests exercise native ASIO ownership.
+    AsioBackend::DriverFactory asio_test_factory_;
     Callback callback_;
     AudioConfig config_{};
 

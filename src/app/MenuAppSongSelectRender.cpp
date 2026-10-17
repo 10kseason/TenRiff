@@ -659,7 +659,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             render.song_select.selected_song_favorite = selected_song_is_favorite();
             render.song_select.selected_song_collection_filter = song_collection_filter_label();
             if (!config_.mode.ghost_battle_enabled) {
-                render.song_select.selected_song_ghost_status = ui_text("OFF", "끔");
+                render.song_select.selected_song_ghost_status = ui_text("OFF", "OFF");
             } else if (!best_replay_path_for_selected_song().empty()) {
                 render.song_select.selected_song_ghost_status = ui_text("READY", "준비됨");
             } else {

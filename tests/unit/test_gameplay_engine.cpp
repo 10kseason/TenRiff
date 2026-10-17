@@ -6,6 +6,7 @@
 
 #include "app/ModeManager.h"
 #include "gameplay/GameplayEngine.h"
+#include "render/GameplayTimingIndicator.h"
 
 using tenriff::gameplay::GameplayChart;
 using tenriff::gameplay::GameplayConfig;
@@ -2082,7 +2083,7 @@ TEST_CASE("initial released-key synchronization does not invalidate a native rep
     CHECK(tenriff::gameplay::validate_replay_evidence(replay).success());
 }
 
-TEST_CASE("timing guidance survives a following PG and expires after 750 milliseconds") {
+TEST_CASE("timing guidance refreshes on following PG and expires after 750 milliseconds") {
     GameplayChart chart;
     chart.lane_count = 2;
     chart.duration_samples = 5000;
@@ -2101,11 +2102,11 @@ TEST_CASE("timing guidance survives a following PG and expires after 750 millise
     CHECK(engine.stats().counts.gr == 1);
     CHECK(engine.stats().counts.pg == 1);
     const auto timing = engine.timing_feedback();
-    CHECK(timing.judgement == Judgement::GR);
-    CHECK(timing.delta_ms == doctest::Approx(-20));
-    CHECK(timing.sample == 980);
-    CHECK(tenriff::gameplay::timing_feedback_visible(timing, 1730, 1000));
-    CHECK_FALSE(tenriff::gameplay::timing_feedback_visible(timing, 1731, 1000));
+    CHECK(timing.judgement == Judgement::PG);
+    CHECK(timing.delta_ms == doctest::Approx(0));
+    CHECK(timing.sample == 1100);
+    CHECK(tenriff::gameplay::timing_feedback_visible(timing, 1850, 1000));
+    CHECK_FALSE(tenriff::gameplay::timing_feedback_visible(timing, 1851, 1000));
     (void)engine.handle_input(1, InputState::Released, 2800);
     (void)engine.handle_input(1, InputState::Pressed, 3025);
     CHECK(engine.timing_feedback().delta_ms == doctest::Approx(25));
@@ -2587,4 +2588,57 @@ TEST_CASE("indicator history expires each judgement exactly at seven hundred mil
     REQUIRE(count == 1); CHECK(values[0] == 0.0);
     CHECK(engine.stats().raw_score == score);
     CHECK(engine.replay().events.size() == replay_count);
+}
+
+TEST_CASE("indicator maximum range matches inclusive sample quantized judgement boundaries") {
+    using namespace tenriff::render;
+    for (const int rate : {44100, 48000}) {
+        for (const double pg_ms : {6.0, 8.75, 10.5, 14.0, 17.5, 21.0, 26.25}) {
+            for (const double song_rate : {0.5, 1.0, 2.0}) {
+                for (const int side : {-1, 1}) {
+                    for (const int step : {-1, 0, 1}) {
+                        GameplayConfig config; config.sample_rate = rate; config.rate = song_rate;
+                        config.judge.pg_ms = pg_ms;
+                        GameplayChart chart; chart.lane_count = 1; chart.duration_samples = rate * 4;
+                        chart.notes = {{1,rate,std::nullopt}};
+                        GameplayEngine engine(chart, config);
+                        const auto boundary = static_cast<int64_t>(std::llround(pg_ms * rate / 1000.0));
+                        const auto delta = side * (boundary + step);
+                        (void)engine.handle_input(1, InputState::Pressed, rate + delta);
+                        std::array<double, tenriff::kGameplayTimingHistoryMaxEntries> values{};
+                        std::array<bool, tenriff::kGameplayTimingHistoryMaxEntries> maximums{};
+                        std::size_t count = 0;
+                        engine.collect_recent_timing_deltas(values, &count, 0, rate * 2, &maximums);
+                        REQUIRE(count == 1);
+                        CHECK(maximums[0] == (step <= 0));
+                        CHECK(engine.maximum_judgement_window_ms() == doctest::Approx(boundary * 1000.0 / rate));
+                        const auto expected = step <= 0 ? kTimingMaximumColor : side < 0 ? kTimingFastColor : kTimingLateColor;
+                        CHECK(timing_marker_color(values[0], engine.maximum_judgement_window_ms(), maximums[0]) == expected);
+                        engine.collect_recent_timing_deltas(values, &count, rate + delta, rate * 3, &maximums);
+                        CHECK(count == 0); CHECK_FALSE(maximums[0]);
+                    }
+                }
+            }
+        }
+    }
+    CHECK(timing_marker_color(-65.0, 21.0, true) == kTimingMaximumColor);
+    CHECK(timing_marker_color(65.0, 21.0, true) == kTimingMaximumColor);
+    CHECK(timing_maximum_fraction(20.0) == doctest::Approx(0.25));
+    CHECK(timing_maximum_fraction(100.0) == 1.0f);
+    CHECK(timing_maximum_fraction(-1.0) == 0.0f);
+}
+
+TEST_CASE("consecutive maximum hits refresh FAST SLOW rather than retaining an older error") {
+    GameplayChart chart; chart.lane_count = 1; chart.duration_samples = 6000;
+    chart.notes = {{1,1000,std::nullopt},{1,2000,std::nullopt},{1,3000,std::nullopt},{1,4000,std::nullopt}};
+    GameplayConfig config; config.sample_rate = 1000; config.judge.pg_ms = 10;
+    GameplayEngine engine(chart, config);
+    for (const auto sample : {980,2005,2997,4000}) {
+        (void)engine.handle_input(1, InputState::Pressed, sample);
+        const auto& timing=engine.timing_feedback();
+        CHECK(timing.sample == sample);
+        CHECK(timing.delta_ms == doctest::Approx(sample == 980 ? -20 : sample == 2005 ? 5 : sample == 2997 ? -3 : 0));
+        CHECK(timing.judgement == (sample == 980 ? Judgement::GR : Judgement::PG));
+        (void)engine.handle_input(1, InputState::Released, sample+1);
+    }
 }

@@ -1,3 +1,5 @@
+**2026-10-17 · 1.9.5:** 菜单和结果音乐也使用声音选项中选定的设备。FAST为蓝色，最高判定为绿色，LATE为红色；最高判定也会更新FAST/SLOW。选曲循环为OFF → 镜像 → 随机 → S随机 → 固定搓盘随机 → OFF。 [音乐输出统一与判定指示器](release-1.9.5.zh-CN.md).
+
 **2026-10-17 · 1.9.3 local:** [指示器、输出设备与配置快捷键](input-feedback-20261017.zh-CN.md).
 
 # TenRiff 配置模式（当前）
@@ -44,9 +46,9 @@
 - `play_to_end` (bool; default `true`): 最后音符和LN尾端处理完毕后继续播放剩余音乐。普通单人模式在此尾奏阶段按 `Esc` 可直接进入正常结果，不打开暂停菜单（包括自动游玩和回放）。保留Session Mix、多人模式原有Esc规则。false时仅等待 `ui.result_tail_ms` 后进入结果，判定、分数及回放规则不变。
 
 - `backend` (string)
-  - `wasapi | asio`，默认为 `wasapi`。用于游玩和曲目试听；菜单和结果 BGM 保留独立的 Windows MCI 路径。
+  - `wasapi | asio`，默认为 `wasapi`。游戏、试听、菜单和结果音乐均使用选定WASAPI设备或ASIO驱动。
 - `device_id` (string)
-  - 默认为空（系统默认）。用于游玩和 BMS 试听的 WASAPI 输出设备 ID，可在声音选项中选择。指定设备不可用时不会自动切换。内置菜单和结果音乐保留独立的 MCI 系统默认输出。
+  - 默认为空（系统默认）。声音选项为游戏、BMS试听、菜单和结果音乐选择WASAPI设备。菜单使用共享模式，游戏保留独占设置。指定设备缺失时不会自动切换。短促的设置调整点击音仍使用Windows默认输出。
 - `asio_driver` (string)
   - 已安装64位 ASIO 驱动的 CLSID。空值表示 Auto，使用按名称排列的第一个驱动。Audio 设置中选择，F5 刷新列表。
 - `rate` (int)
@@ -344,7 +346,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `show_gear_boundary_line` | bool; `false` | 显示轨道面板边界线。 |
 | `show_timing_feedback` | bool; `true` | 独立显示 FAST/SLOW 文字。 |
 | `show_timing_bar` | bool; `true` | 显示时机条；旧配置缺少此字段时继承文字开关。 |
-| `timing_bar_always_visible` | bool; `false` | `true`保持刻度及最后的FAST/SLOW文字。每个点/竖线在0.7秒后消失。`false`保留非PG后0.75秒显示；`show_timing_bar`单独控制条形开关。 |
+| `timing_bar_always_visible` | bool; `false` | true保留刻度和最新FAST/SLOW，最高判定也更新，0ms清除文字。标记0.7秒到期，条件条在存在标记时显示；show_timing_bar控制开关。 |
 | `timing_marker_style` | `dot` / `barcode`; `dot` | 判定标记形状：圆点或竖线。 |
 | `timing_feedback_override` | bool; `false` | 用户修改开关后，配置中的显示选项优先于皮肤。 |
 | `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | 文字和条的独立 X 偏移，叠加于原判定布局，以 1920x1080 像素为基准。 |

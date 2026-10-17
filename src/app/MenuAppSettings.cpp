@@ -187,7 +187,7 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
     const std::string pacemaker_mode_label =
         pacemaker_mode == "accuracy"
             ? ui_text("Accuracy", "정확도")
-            : (pacemaker_mode == "score" ? ui_text("Score", "점수") : ui_text("Off", "끔"));
+            : (pacemaker_mode == "score" ? ui_text("Score", "점수") : ui_text("Off", "OFF"));
     const std::string pacemaker_target_label =
         pacemaker_mode == "accuracy"
             ? (format_decimal(config_.mode.pacemaker_target_accuracy) + "%")

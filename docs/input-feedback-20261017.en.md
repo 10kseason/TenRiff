@@ -1,3 +1,6 @@
+> **1.9.5:** [Scene audio routing and timing indicators](release-1.9.5.en.md). Menu/result music follows the selected sound output. Indicator ranges and markers use blue FAST / green maximum judgement / red LATE. FAST/SLOW updates on maximum hits too. Lobby order is OFF → Mirror → Random → S-Random → Random (Scratch Fixed) → OFF.
+> Earlier 1.9.4 behavior below is historical where superseded by this update.
+
 > **1.9.4:** [Memory reclamation and play controls](release-1.9.4.en.md). Retain chart PCM and static BGA during play, defer forced trims, and add indicator shape/0.7-second markers, output selection, profile shortcuts, ×0.5/×2 and aligned measure lines.
 
 # Indicators, output devices and profile shortcuts

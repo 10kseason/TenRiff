@@ -1,3 +1,5 @@
+**2026-10-17 · 1.9.5:** Menu/result music follows the selected sound output. Indicator ranges and markers use blue FAST / green maximum judgement / red LATE. FAST/SLOW updates on maximum hits too. Lobby order is OFF → Mirror → Random → S-Random → Random (Scratch Fixed) → OFF. [Scene audio routing and timing indicators](release-1.9.5.en.md).
+
 **2026-10-17 · 1.9.3 local:** [Indicators, output devices and profile shortcuts](input-feedback-20261017.en.md).
 
 # TenRiff Config Schema (current)
@@ -44,9 +46,9 @@ The 1.9.0.2 candidate adjusts all five audio UI volumes—master, BMS song, TenR
 - `play_to_end` (bool; default `true`): Listen to the remaining audio after the final note and LN tail have been processed. During this outro, ordinary single-player `Esc` goes directly to normal results without opening Pause, including autoplay and replay. Existing Session Mix/multiplayer Esc policies remain. When false, finish normally after `ui.result_tail_ms` without waiting for the outro. Judgement, score and replay rules are unchanged.
 
 - `backend` (string)
-  - `wasapi | asio`; default `wasapi`. Selects gameplay and song-preview output; menu/result background music keeps its separate Windows MCI path.
+  - `wasapi | asio`; default `wasapi`. Gameplay, previews, menu and result music use the selected WASAPI endpoint or ASIO driver.
 - `device_id` (string)
-  - Empty by default (system default). WASAPI endpoint ID for gameplay and BMS previews, selected in Sound options. Missing selected endpoints do not silently fall back. Built-in menu/result music keeps the separate MCI system-default output.
+  - Empty by default (system default). Sound options select the WASAPI endpoint for gameplay, BMS previews, menu and result music. Menus use shared mode; gameplay retains its exclusive preference. Missing selected endpoints never silently fall back. The short settings-adjustment click retains Windows-default output.
 - `asio_driver` (string)
   - CLSID of an installed 64-bit ASIO driver. Empty means Auto, the first driver sorted by name. Select in Audio settings; F5 refreshes the list.
 - `rate` (int)
@@ -342,7 +344,7 @@ These are profile `config.json` skin settings. For a skin package's `skin.json` 
 | `show_gear_boundary_line` | bool; `false` | Show the gear boundary line. |
 | `show_timing_feedback` | bool; `true` | Show FAST/SLOW text independently of the bar. |
 | `show_timing_bar` | bool; `true` | Show the timing bar; older profiles/skins without this field inherit the text switch. |
-| `timing_bar_always_visible` | bool; `false` | `true` keeps the scale and last FAST/SLOW text visible. Each dot/barcode expires after 0.7s. `false` retains the existing 0.75s post-non-PG visibility. `show_timing_bar` independently disables the bar. |
+| `timing_bar_always_visible` | bool; `false` | `true` keeps ranges and latest FAST/SLOW text. Maximum hits refresh text; 0ms clears it. Markers expire at 0.7s; conditional bars show while markers exist. `show_timing_bar` switches the bar off. |
 | `timing_marker_style` | `dot` / `barcode`; `dot` | Judgement markers: round dots or straight vertical strokes. |
 | `timing_feedback_override` | bool; `false` | After the user edits a switch, profile visibility choices take priority over the skin manifest. |
 | `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | Independent text/bar X offsets added to the existing judgement-area layout, in 1920x1080 base pixels. |
