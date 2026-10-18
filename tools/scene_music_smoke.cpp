@@ -5,6 +5,7 @@
 #include "../tests/support/MockAsioDriver.h"
 
 #include <chrono>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -72,11 +73,18 @@ struct MenuAppAudioSettingsTestAccess {
             app->menu_music_scene_key_=key;
             app->menu_music_scene_path_=std::filesystem::absolute(std::filesystem::path("Mainmusic")/file).u8string();
             app->last_game_over_=std::string(key)=="result_failed";
-            const auto end=Clock::now()+std::chrono::seconds(5);
+            // These are complete bundled MP3s, not the short synthetic WAV.
+            // Keep a bounded cold-decode budget and expose its actual duration.
+            const auto began=Clock::now();
+            const auto end=began+std::chrono::seconds(20);
             do { app->sync_menu_music(); std::this_thread::sleep_for(std::chrono::milliseconds(20)); }
             while(!MenuMusicControllerTestAccess::open(app->menu_music_) && Clock::now()<end);
+            std::cout << "scene." << key << ".decode_open_ms="
+                << std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now()-began).count() << '\n';
             report.check(std::string("scene.")+key+".selected_driver", MenuMusicControllerTestAccess::open(app->menu_music_) &&
                 MenuMusicControllerTestAccess::config(app->menu_music_).asio_driver=="fixture-scene-driver");
+            report.check(std::string("scene.")+key+".reference_gain", MenuMusicControllerTestAccess::open(app->menu_music_) &&
+                std::abs(MenuMusicControllerTestAccess::gain(app->menu_music_)-0.025f)<0.000001f);
         }
         app->menu_navigator_.reset(MenuApp::Screen::SongSelect);
         SongSelectScreen::PreviewDecodeResult preview;
