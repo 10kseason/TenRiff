@@ -137,6 +137,7 @@
     "judgement_line_type": 1,
     "show_timing_feedback": true,
     "show_timing_bar": true,
+    "show_judgement_counts": false,
     "timing_bar_always_visible": false,
     "timing_marker_style": "dot",
     "indicator_background_visible": false,

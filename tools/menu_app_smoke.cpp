@@ -1300,6 +1300,20 @@ struct MenuAppVisualTestAccess {
             hud.timing_feedback_delta_ms == -28 && hud.ghost_has_timing_feedback &&
             hud.ghost_timing_feedback_delta_ms == 31);
         report.check("hud.always_preserves_independent_text_bar", hud.show_timing_feedback && !hud.show_timing_bar);
+        {
+            std::lock_guard<std::mutex> lock(app.gameplay_hud_mutex_);
+            app.gameplay_hud_.counts = {119, 21, 3, 4, 5};
+            app.gameplay_hud_.ghost_counts = {91, 12, 6, 7, 8};
+        }
+        app.config_.skin.show_judgement_counts = true;
+        app.populate_gameplay_render_data(hud);
+        report.check("hud.field_counts_use_real_player_and_ghost", hud.show_judgement_counts &&
+            hud.pg == 119 && hud.gr == 21 && hud.gd == 3 && hud.bd == 4 && hud.pr == 5 &&
+            hud.ghost_pg == 91 && hud.ghost_gr == 12 && hud.ghost_gd == 6 && hud.ghost_bd == 7 && hud.ghost_pr == 8);
+        app.config_.skin.show_judgement_counts = false;
+        app.populate_gameplay_render_data(hud);
+        report.check("hud.field_counts_off_retains_statistics", !hud.show_judgement_counts && hud.pg == 119 && hud.ghost_pr == 8);
+
         report.check("hud.measure_positions_reach_render", hud.measure_line_count == 2 &&
             hud.measure_line_positions[0] == 1.25 && hud.measure_line_positions[1] == 1.75);
         app.config_.skin.timing_bar_always_visible = false;

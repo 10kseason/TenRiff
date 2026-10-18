@@ -1269,3 +1269,5 @@
     {"OPEN LEVEL", "レベルを開く"},
 
     {"Click the numbered preview buttons or press 1-9, 0=10, Shift+1-6=11-16 to select a lane.", "プレビューの番号ボタンをクリックするか、1–9、0=10、Shift+1–6=11–16でレーンを選択します。"},
+
+    {"In-field Judgement Counts", "フィールド内判定数"},

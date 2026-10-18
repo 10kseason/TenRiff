@@ -1269,3 +1269,5 @@
     {"OPEN LEVEL", "打开等级"},
 
     {"Click the numbered preview buttons or press 1-9, 0=10, Shift+1-6=11-16 to select a lane.", "点击预览编号按钮，或按1–9、0=10、Shift+1–6=11–16选择轨道。"},
+
+    {"In-field Judgement Counts", "轨道内判定计数"},

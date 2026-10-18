@@ -672,6 +672,9 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
         case SkinSettingsRowId::TimingBar:
             runtime.skin.show_timing_bar = !runtime.skin.show_timing_bar;
             return mark_changed();
+        case SkinSettingsRowId::JudgementCounts:
+            runtime.skin.show_judgement_counts = !runtime.skin.show_judgement_counts;
+            return mark_changed();
         case SkinSettingsRowId::TimingMarkerStyle:
             runtime.skin.timing_marker_style = runtime.skin.timing_marker_style == "barcode" ? "dot" : "barcode";
             return mark_changed();

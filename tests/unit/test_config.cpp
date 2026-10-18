@@ -2835,3 +2835,17 @@ TEST_CASE("skin cleanup defaults preserve saved legacy values through serializat
     CHECK(restored.key_label_position == "top");
     for (auto gap : resolved_skin_lane_spacing_scales(restored, "5k")) CHECK(gap == doctest::Approx(0.2));
 }
+
+TEST_CASE("field judgement counts default off and portable skin roundtrip preserves opt in") {
+    tenriff::config::SkinConfig skin;
+    CHECK_FALSE(skin.show_judgement_counts);
+    REQUIRE(tenriff::config::deserialize_skin_config(R"({"note_width_scale":0.6})", skin));
+    CHECK_FALSE(skin.show_judgement_counts);
+    REQUIRE(tenriff::config::deserialize_skin_config(R"({"show_judgement_counts":true})", skin));
+    CHECK(skin.show_judgement_counts);
+    tenriff::config::SkinConfig restored;
+    REQUIRE(tenriff::config::deserialize_skin_config(tenriff::config::serialize_skin_config(skin), restored));
+    CHECK(restored.show_judgement_counts);
+    REQUIRE(tenriff::config::deserialize_skin_config(R"({"show_judgement_counts":false})", restored));
+    CHECK_FALSE(restored.show_judgement_counts);
+}

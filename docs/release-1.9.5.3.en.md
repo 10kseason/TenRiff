@@ -1,5 +1,7 @@
 # TenRiff 1.9.5.3 — Skin settings cleanup and search/input fixes
 
+- Skin Settings adds **In-field Judgement Counts** (default Off): cumulative PG / GR / G / BAD / PR counts appear immediately below the timing indicator, follow its position and fit inside the note field. Counts stay visible between hits and use separate player/ghost totals. Judgement names and calculations remain unchanged.
+
 - Select the edit lane with numbered preview buttons. UI font, font file and Gameplay Cursor live in Profile. Scratch Position appears only in Original runtime key mode and is adjustable for a 7+1 layout.
 
 - Fresh defaults: note/field 60%, maximum key beam height 50%, 5K white/blue/white/blue/white, simple rectangle. F1 speed +0.25 / F2 -0.25; F3 judgement line up 1% / F4 down 1%. F5/F6 x0.5/x2 remain.

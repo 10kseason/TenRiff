@@ -870,3 +870,21 @@ TEST_CASE("skin cleanup hides legacy controls and rejects stale pointer targets"
     CHECK(runtime.skin.scratch_position == "right");
     CHECK(controller.selected_id() == SkinSettingsRowId::KeyMode);
 }
+
+TEST_CASE("field judgement counts toggle independently from timing visibility") {
+    SkinSettingsController controller;
+    tenriff::config::RuntimeConfig runtime;
+    controller.reset("5k");
+    runtime.skin.show_timing_bar = false;
+    runtime.skin.show_timing_feedback = false;
+    auto result = controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames,
+        SkinSettingsRowId::JudgementCounts);
+    CHECK(result.menu.render_changed);
+    CHECK(runtime.skin.show_judgement_counts);
+    CHECK_FALSE(runtime.skin.show_timing_bar);
+    CHECK_FALSE(runtime.skin.show_timing_feedback);
+    CHECK(controller.dirty());
+    CHECK(controller.handle(MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames,
+        SkinSettingsRowId::JudgementCounts).menu.render_changed);
+    CHECK_FALSE(runtime.skin.show_judgement_counts);
+}

@@ -854,6 +854,7 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.skin.show_timing_feedback =
             get_bool(*skin, "show_timing_feedback", config.skin.show_timing_feedback);
         // Older profiles used one switch for both text and bar.
+        config.skin.show_judgement_counts = get_bool(*skin, "show_judgement_counts", config.skin.show_judgement_counts);
         config.skin.show_timing_bar = get_bool(*skin, "show_timing_bar", config.skin.show_timing_feedback);
         config.skin.timing_bar_always_visible = get_bool(*skin, "timing_bar_always_visible", false);
         config.skin.timing_marker_style = get_string(*skin, "timing_marker_style", "dot");
@@ -1342,6 +1343,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("judgement_line_type", JsonValue{static_cast<double>(config.skin.judgement_line_type)});
     skin.emplace("show_gear_boundary_line", JsonValue{config.skin.show_gear_boundary_line});
     skin.emplace("show_timing_feedback", JsonValue{config.skin.show_timing_feedback});
+    skin.emplace("show_judgement_counts", JsonValue{config.skin.show_judgement_counts});
     skin.emplace("show_timing_bar", JsonValue{config.skin.show_timing_bar});
     skin.emplace("timing_bar_always_visible", JsonValue{config.skin.timing_bar_always_visible});
     skin.emplace("timing_marker_style", JsonValue{config.skin.timing_marker_style});

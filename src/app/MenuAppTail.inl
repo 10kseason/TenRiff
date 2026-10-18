@@ -161,6 +161,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         manifest_style ? manifest_style->timing_bar_always_visible : std::optional<bool>{});
     target.show_timing_feedback = timing_visibility.text;
     target.show_timing_bar = timing_visibility.bar;
+    target.show_judgement_counts = config_.skin.show_judgement_counts;
     target.timing_bar_always_visible = timing_visibility.always_visible;
     target.timing_marker_style = config_.skin.timing_marker_style;
     target.judgement_line_type = config_.skin.judgement_line_type;

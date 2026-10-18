@@ -993,6 +993,9 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TimingTextY), false, true);
     append_menu_row(render.generic, ui_text("FAST/SLOW Bar X", "FAST/SLOW 막대 X"), std::to_string(static_cast<int>(config_.skin.timing_bar_offset_x)) + " px",
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TimingBarX), false, true);
+    append_menu_row(render.generic, ui_text("In-field Judgement Counts", "필드 내 판정 개수"),
+                    ui_on_off(config_.skin.show_judgement_counts), false,
+                    render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::JudgementCounts), false, true);
     append_menu_row(render.generic, ui_text("FAST/SLOW Bar Y", "FAST/SLOW 막대 Y"), std::to_string(static_cast<int>(config_.skin.timing_bar_offset_y)) + " px",
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TimingBarY), false, true);
     append_menu_row(render.generic, ui_text("Judgement Y", "판정 Y"), format_percent(config_.skin.judgement_position),
@@ -1094,6 +1097,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.skin_preview.judgement_position = config_.skin.judgement_position;
     render.generic.skin_preview.show_timing_feedback = timing_visibility.text;
     render.generic.skin_preview.show_timing_bar = timing_visibility.bar;
+    render.generic.skin_preview.show_judgement_counts = config_.skin.show_judgement_counts;
     render.generic.skin_preview.timing_bar_always_visible = timing_visibility.always_visible;
     render.generic.skin_preview.timing_marker_style = config_.skin.timing_marker_style;
     render.generic.skin_preview.judgement_line_type = config_.skin.judgement_line_type;

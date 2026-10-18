@@ -147,6 +147,7 @@ struct MenuAppVisualTestAccess {
         skin.judgement_offset_x = preview.judgement_offset_x;
         skin.show_timing_feedback = preview.show_timing_feedback;
         skin.show_timing_bar = preview.show_timing_bar;
+        skin.show_judgement_counts = preview.show_judgement_counts;
         skin.timing_bar_always_visible = preview.timing_bar_always_visible;
         skin.timing_feedback_override = true;
         skin.timing_text_offset_x = preview.timing_text_offset_x;
@@ -684,6 +685,7 @@ int main(int argc, char** argv) {
     bool resume_countdown = false;
     bool no_feedback = false;
     bool timing_text_off = false, timing_bar_off = false;
+    bool judgement_counts = false;
     bool indicator_background_off = false;
     bool timing_bar_always = false;
     std::string timing_marker_style = "dot";
@@ -809,6 +811,7 @@ int main(int argc, char** argv) {
     data.ui_language = tenriff::ui::Language::Korean;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
+        if (arg == "--judgement-counts") { judgement_counts = true; continue; }
         if (arg == "--timing-colors" && i + 1 < argc) {
             timing_color_case = argv[++i];
             if (timing_color_case != "fast" && timing_color_case != "maximum" &&
@@ -1684,6 +1687,7 @@ int main(int argc, char** argv) {
     data.gameplay.show_timing_feedback = data.generic.skin_preview.show_timing_feedback = !timing_text_off;
     data.gameplay.indicator_background_visible = data.generic.skin_preview.indicator_background_visible = !indicator_background_off;
     data.gameplay.show_timing_bar = data.generic.skin_preview.show_timing_bar = !timing_bar_off;
+    data.gameplay.show_judgement_counts = data.generic.skin_preview.show_judgement_counts = judgement_counts;
     data.gameplay.timing_bar_always_visible = data.generic.skin_preview.timing_bar_always_visible = timing_bar_always;
     data.gameplay.timing_marker_style = data.generic.skin_preview.timing_marker_style = timing_marker_style;
     if (remapped_functions) {

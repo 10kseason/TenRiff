@@ -88,11 +88,12 @@ enum class SkinSettingsRowId {
     UiFontFile,
     TimingMarkerStyle,
     JudgementLineType,
+    JudgementCounts,
 };
 
 // The same order drives keyboard navigation, rendered rows and mouse hit targets.
 // Keep related controls adjacent instead of deriving positions from row labels.
-inline constexpr std::array<SkinSettingsRowId, 52> kSkinSettingsRowOrder = {
+inline constexpr std::array<SkinSettingsRowId, 53> kSkinSettingsRowOrder = {
     SkinSettingsRowId::KeyMode,
     SkinSettingsRowId::ScratchPosition,
     SkinSettingsRowId::SkinSource,
@@ -132,6 +133,7 @@ inline constexpr std::array<SkinSettingsRowId, 52> kSkinSettingsRowOrder = {
     SkinSettingsRowId::TimingBar,
     SkinSettingsRowId::TimingBarMode,
     SkinSettingsRowId::TimingMarkerStyle,
+    SkinSettingsRowId::JudgementCounts,
     SkinSettingsRowId::TimingTextSize,
     SkinSettingsRowId::TimingTextX,
     SkinSettingsRowId::TimingTextY,
@@ -190,6 +192,7 @@ enum class SkinSettingsCategory { Source, Geometry, Notes, LongNotes, Effects, H
         case SkinSettingsRowId::GearBoundary: case SkinSettingsRowId::KeyLabelPosition:
         case SkinSettingsRowId::TimingBar:
         case SkinSettingsRowId::TimingBarMode:
+        case SkinSettingsRowId::JudgementCounts:
         case SkinSettingsRowId::TimingMarkerStyle:
         case SkinSettingsRowId::TimingTextSize:
         case SkinSettingsRowId::TimingBarSize:

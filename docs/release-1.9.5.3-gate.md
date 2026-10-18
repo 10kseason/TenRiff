@@ -2,6 +2,7 @@
 
 Base: released 1.9.5.2 f43b8d53d38b8de649e2940870e2b91548316ef1 plus the preserved feedback and skin-overhaul candidates. Fixed baseline 1.9.0 remains.
 
+- Verify optional in-field counts: default Off, saved toggle, independent player/ghost totals, indicator-relative placement and visible counts between hits.
 - Review hidden controls, defaults, saved-value compatibility, Original-only scratch visibility, profile cursor persistence and stable keyboard/mouse navigation.
 - Verify previous F1/F2 speed and F3/F4 line directions, 5K white center, F6 preview, preset save, UTF-8 Backspace repeat, exact levels, title/artist search and Enter-only outro.
 - Release and independent exact-source builds, focused/full CTest, native menu/session, editor and native rendering fixtures.

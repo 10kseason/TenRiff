@@ -219,6 +219,7 @@ struct SkinConfig {
     bool show_gear_boundary_line = false;
     bool show_timing_feedback = true;
     bool show_timing_bar = true;
+    bool show_judgement_counts = false;
     bool timing_bar_always_visible = false;
     std::string timing_marker_style = "dot";  // dot | barcode
     double timing_text_offset_x = 0.0;

@@ -173,7 +173,8 @@
             D2D1_MATRIX_3X2_F saved{}; ctx->GetTransform(&saved);
             const float scale = animation.scale * hud_font_scale(data.gameplay.combo_font_scale);
             ctx->SetTransform(D2D1::Matrix3x2F::Scale(scale, scale, center) *
-                D2D1::Matrix3x2F::Translation(static_cast<float>(data.gameplay.combo_offset_x), animation.offset_y) * saved);
+                D2D1::Matrix3x2F::Translation(static_cast<float>(data.gameplay.combo_offset_x), animation.offset_y +
+                    avoid_field_counts(field, rect, scale, animation.offset_y, 20)) * saved);
             auto color = ng_color("combo", D2D1::ColorF(0xFFFFFF, .92f)); color.a *= animation.opacity;
             studio_text(value, studio_fonts.studio_combo.Get(), rect, color, DWRITE_TEXT_ALIGNMENT_CENTER);
             static const std::wstring label = L"COMBO";
