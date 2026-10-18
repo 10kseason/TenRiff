@@ -2,6 +2,8 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#include <shellapi.h>
+#include <shlobj.h>
 
 // Developer integration smoke. Run only in a newly created sandbox; never point
 // it at an installed game, an account, a real song library, or a user profile.
@@ -26,6 +28,7 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -46,12 +49,18 @@ using Part = tenriff::render::MenuHitPart;
 
 struct Report {
     JsonArray checks;
+    JsonArray observations;
     unsigned failed = 0;
     void check(const std::string& name, bool passed, std::string detail = {}) {
         checks.emplace_back(JsonObject{{"name", JsonValue(name)}, {"passed", JsonValue(passed)},
                                       {"detail", JsonValue(std::move(detail))}});
         failed += !passed;
         std::cout << (passed ? "PASS " : "FAIL ") << name << '\n';
+    }
+    void observe(const std::string& name, bool observed, std::string detail) {
+        observations.emplace_back(JsonObject{{"name", JsonValue(name)}, {"observed", JsonValue(observed)},
+                                            {"detail", JsonValue(std::move(detail))}});
+        std::cout << (observed ? "OBSERVED " : "UNAVAILABLE ") << name << '\n';
     }
 };
 
@@ -749,9 +758,7 @@ struct MenuAppVisualTestAccess {
         std::string detail;
         report.check("profile.final_controls_present", present(app, detail), detail);
     }
-    static bool resize_owned_window(int width, int height) {
-        // Only the fixture's own window receives this native sizing sequence.
-        // It verifies the WM_SIZE/drag-end mailbox and profile path, not physical dragging.
+    static HWND owned_menu_window() {
         HWND owned = nullptr;
         EnumWindows([](HWND hwnd, LPARAM output) -> BOOL {
             DWORD pid = 0; GetWindowThreadProcessId(hwnd, &pid);
@@ -761,6 +768,12 @@ struct MenuAppVisualTestAccess {
             }
             return TRUE;
         }, reinterpret_cast<LPARAM>(&owned));
+        return owned;
+    }
+    static bool resize_owned_window(int width, int height) {
+        // Only the fixture's own window receives this native sizing sequence.
+        // It verifies the WM_SIZE/drag-end mailbox and profile path, not physical dragging.
+        const HWND owned = owned_menu_window();
         bool resized = false;
         if (owned) {
             RECT outer{}, client{};
@@ -775,6 +788,99 @@ struct MenuAppVisualTestAccess {
             resized = resized && client.right == width && client.bottom == height;
         }
         return resized;
+    }
+    static void check_native_song_drop(MenuApp& app, Report& report) {
+        app.choose_play_mode(false);
+        isolate(app);
+        app.config_.ui.all_song_sources = false;
+        std::string detail;
+        report.check("drop.initial_present", present(app, detail), detail);
+        const HWND original = owned_menu_window();
+        report.check("drop.owns_native_window", original != nullptr);
+        if (!original) return;
+        int transition = 0;
+        for (const std::string mode : {"windowed", "borderless", "windowed"}) {
+            app.config_.graphics.display_mode = mode;
+            app.apply_runtime_graphics_config();
+            app.publish_snapshot();
+            const bool rendered = present(app, detail);
+            const HWND current = owned_menu_window();
+            report.check("drop.transition_" + std::to_string(transition++) + "." + mode + ".same_window_accepts_files", rendered && current == original &&
+                (GetWindowLongPtrW(current, GWL_EXSTYLE) & WS_EX_ACCEPTFILES) != 0, detail);
+        }
+        const auto file_directory = std::filesystem::absolute(std::filesystem::u8path(u8"drop fixture/한국어 공백 파일"));
+        const auto folder_directory = std::filesystem::absolute(std::filesystem::u8path(u8"drop fixture/폴더 불러오기"));
+        write_chart(file_directory);
+        const auto file_chart = file_directory / L"UPPER CASE.BMS";
+        std::filesystem::rename(file_directory / "smoke.bms", file_chart);
+        write_chart(folder_directory);
+        // Foreground activation is an OS-controlled observation, not a condition
+        // of this explicit WM_DROPFILES dispatch. No physical Explorer drag occurs.
+        HWND sender = CreateWindowExW(0, L"STATIC", L"TenRiff synthetic drop sender",
+            WS_OVERLAPPEDWINDOW | WS_VISIBLE, 40, 40, 280, 100, nullptr, nullptr,
+            GetModuleHandleW(nullptr), nullptr);
+        if (sender) SetForegroundWindow(sender);
+        const bool non_game_foreground = sender && GetForegroundWindow() == sender;
+        report.check("drop.sender_window_created", sender && IsWindow(sender));
+        report.observe("drop.sender_window_foreground", non_game_foreground,
+            non_game_foreground ? "Owned synthetic sender was foreground at dispatch setup; physical Explorer drag remains unverified."
+                                : "OS foreground grant unavailable. Explicit WM_DROPFILES and acceptance-bit checks still run; sender-foreground and physical Explorer drag coverage are unverified.");
+        const auto dispatch = [&](const std::filesystem::path& path, const std::string& name) {
+            while (app.menu_window_.poll_click_event()) {}
+            const auto wide = path.wstring();
+            const SIZE_T bytes = sizeof(DROPFILES) + (wide.size() + 2) * sizeof(wchar_t);
+            HGLOBAL memory = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, bytes);
+            auto* header = memory ? static_cast<DROPFILES*>(GlobalLock(memory)) : nullptr;
+            if (!header) {
+                if (memory) GlobalFree(memory);
+                report.check(name + ".native_dispatch", false, "Cannot allocate owned DROPFILES fixture");
+                return false;
+            }
+            header->pFiles = sizeof(DROPFILES);
+            header->fWide = TRUE;
+            std::memcpy(reinterpret_cast<char*>(header) + sizeof(DROPFILES), wide.c_str(), (wide.size() + 1) * sizeof(wchar_t));
+            GlobalUnlock(memory);
+            DWORD_PTR native_result = 0;
+            const bool sent = SendMessageTimeoutW(original, WM_DROPFILES, reinterpret_cast<WPARAM>(memory), 0,
+                SMTO_ABORTIFHUNG | SMTO_BLOCK, 2000, &native_result) != 0;
+            // A successful receiver owns DragFinish. On timeout ownership is
+            // ambiguous; the bounded fixture process retains it until exit.
+            report.check(name + ".native_dispatch", sent);
+            if (!sent) return false;
+            const auto event = app.menu_window_.poll_click_event();
+            const bool mailbox = event && event->kind == Kind::FileDrop && event->path == path.u8string();
+            report.check(name + ".unicode_path_mailbox", mailbox);
+            if (!mailbox) return false;
+            app.handle_menu_click(*event);
+            report.check(name + ".single_drop_event", !app.menu_window_.poll_click_event());
+            return true;
+        };
+        const std::array<std::filesystem::path, 2> paths{file_chart, folder_directory};
+        for (std::size_t index = 0; index < paths.size(); ++index) {
+            const auto name = std::string("drop.") + (index == 0 ? "unicode_bms" : "unicode_folder");
+            app.song_select_search_active_ = true;
+            if (!dispatch(paths[index], name)) continue;
+            const auto expected_chart = index == 0 ? file_chart : folder_directory / "smoke.bms";
+            bool indexed = false;
+            const auto deadline = Clock::now() + std::chrono::seconds(5);
+            do {
+                (void)poll_library(app);
+                std::error_code ec;
+                const auto* selected = app.visible_song_count() == 1 ? app.visible_song_entry(0) : nullptr;
+                indexed = selected && std::filesystem::equivalent(
+                    std::filesystem::u8path(app.song_absolute_path(*selected)), expected_chart, ec) && !ec;
+                if (!indexed) std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            } while (!indexed && Clock::now() < deadline);
+            std::error_code ec;
+            const bool parent_selected = std::filesystem::equivalent(
+                std::filesystem::u8path(app.songs_path_), expected_chart.parent_path(), ec) && !ec;
+            report.check(name + ".opens_imported_source", indexed && parent_selected &&
+                screen(app) == Screen::SongSelect && app.song_select_view_ == MenuApp::SongSelectView::Songs &&
+                !app.song_select_search_active_);
+        }
+        if (sender) DestroyWindow(sender);
+        report.check("drop.native_window_still_alive", IsWindow(original) &&
+            (GetWindowLongPtrW(original, GWL_EXSTYLE) & WS_EX_ACCEPTFILES) != 0);
     }
     static void check_result_screenshot(MenuApp& app, Report& report, const std::string& page) {
         const auto directory = std::filesystem::current_path() / "screenshots";
@@ -1274,6 +1380,110 @@ struct MenuAppVisualTestAccess {
         app.skin_settings_controller_ = saved_controller;
         app.publish_snapshot();
     }
+    static void check_skin_tabs_search_and_sources(MenuApp& app, Report& report) {
+        const auto saved_config = app.config_;
+        const auto saved_controller = app.skin_settings_controller_;
+        const auto saved_query = app.skin_search_query_;
+        const bool saved_search = app.skin_search_active_;
+        const bool saved_tabs = app.skin_mode_tabs_focused_;
+        app.config_.ui.language = "en";
+        app.config_.mode.key_mode = "auto";
+        app.config_.skin.source = "native";
+        app.config_.skin.show_gear_boundary_line = true;
+        app.config_.skin.judgement_offset_x = 17;
+        app.config_.skin.combo_offset_x = -23;
+        app.config_.skin.timing_text_offset_x = 29;
+        app.config_.skin.timing_bar_offset_x = -31;
+        app.skin_search_query_.clear();
+        app.skin_search_active_ = app.skin_mode_tabs_focused_ = false;
+        const auto view = [&]() {
+            render::MenuRenderData data;
+            app.populate_skin_settings_render_data(data);
+            return data.generic;
+        };
+        const auto has = [](const render::GenericMenuData& data, SkinSettingsRowId id) {
+            return std::any_of(data.rows.begin(), data.rows.end(), [&](const auto& row) {
+                return row.row_index == static_cast<int>(id);
+            });
+        };
+        auto data = view();
+        const std::array<const char*, 14> labels{
+            "4K", "5K", "6K", "7K", "7+1", "8K", "9K", "10K", "11K", "12K", "13K", "14K", "15K", "16K"};
+        bool labels_match = data.skin_mode_tabs.size() == labels.size();
+        for (std::size_t index = 0; labels_match && index < labels.size(); ++index)
+            labels_match = data.skin_mode_tabs[index].label == labels[index];
+        report.check("skin.tabs_fourteen_modes_in_order", labels_match);
+        click(app, Kind::SkinModeTab, 4);
+        data = view();
+        report.check("skin.tabs_click_seven_plus_one", app.skin_settings_controller_.edit_mode() == "7+1" &&
+            data.skin_mode_tabs.size() == 14 && data.skin_mode_tabs[4].selected &&
+            data.skin_preview.lane_count == 8 && app.skin_mode_tabs_focused_);
+        key(app, "Right");
+        report.check("skin.tabs_right_selects_eight", app.skin_settings_controller_.edit_mode() == "8k");
+        key(app, "Left");
+        report.check("skin.tabs_left_restores_seven_plus_one", app.skin_settings_controller_.edit_mode() == "7+1");
+        const auto control = config::KeycodeMap::to_keycode("LControl").value();
+        app.handle_input_event({control, input::InputState::Pressed, timing::HighResClock::now_ns()});
+        key(app, "Tab");
+        app.handle_input_event({control, input::InputState::Released, timing::HighResClock::now_ns()});
+        report.check("skin.tabs_control_tab_cycles", app.skin_settings_controller_.edit_mode() == "8k" &&
+            app.skin_mode_tabs_focused_ && !app.skin_search_active_);
+        key(app, "Tab");
+        report.check("skin.tabs_tab_focuses_search", app.skin_search_active_ && !app.skin_mode_tabs_focused_);
+        // Use the normal app text consumer, without claiming physical typing/IME.
+        app.handle_text_input("cOmBo");
+        data = view();
+        report.check("skin.search_case_insensitive_rows", data.rows.size() == 2 &&
+            has(data, SkinSettingsRowId::ComboY) && has(data, SkinSettingsRowId::ComboFontSize));
+        key(app, "Tab");
+        key(app, "Down");
+        const auto selected = app.skin_settings_controller_.selected_id();
+        report.check("skin.search_keyboard_stays_in_filtered_rows", !app.skin_search_active_ &&
+            (selected == SkinSettingsRowId::ComboY || selected == SkinSettingsRowId::ComboFontSize));
+        click(app, Kind::SkinSettingsSearch, 0);
+        key(app, "Delete");
+        app.handle_text_input("zz_no_matching_setting_zz");
+        data = view();
+        report.check("skin.search_empty_result_keeps_header", data.rows.empty() && data.skin_mode_tabs.size() == 14 &&
+            !data.skin_search_empty.empty() && app.skin_search_active_);
+        key(app, "Delete");
+        app.config_.ui.language = "ko";
+        app.handle_text_input(u8"콤보");
+        data = view();
+        report.check("skin.search_localized_utf8", data.rows.size() == 2 && has(data, SkinSettingsRowId::ComboY));
+        key(app, "Backspace");
+        report.check("skin.search_backspace_whole_codepoint", app.skin_search_query_ == u8"콤");
+        key(app, "Esc");
+        report.check("skin.search_escape_exits_focus", !app.skin_search_active_ && app.skin_search_query_ == u8"콤");
+        key(app, "Esc");
+        report.check("skin.search_escape_clears_filter", screen(app) == Screen::SettingsSkins && app.skin_search_query_.empty());
+        app.config_.ui.language = "en";
+        for (const std::string source : {"native", "lr2", "tenriff"}) {
+            app.config_.skin.source = source;
+            data = view();
+            report.check("skin.source." + source + ".options", has(data, SkinSettingsRowId::ImportSkin) &&
+                has(data, SkinSettingsRowId::ImportedSkin) == (source != "native") &&
+                has(data, SkinSettingsRowId::Lr2Resolution) == (source == "lr2") &&
+                has(data, SkinSettingsRowId::CreateSkin) == (source == "tenriff") &&
+                has(data, SkinSettingsRowId::OpenSkinFolder) == (source == "tenriff") &&
+                has(data, SkinSettingsRowId::ReloadSkin) == (source == "tenriff"));
+            bool removed = true;
+            for (const auto id : {SkinSettingsRowId::KeyMode, SkinSettingsRowId::GearBoundary,
+                SkinSettingsRowId::JudgementX, SkinSettingsRowId::ComboX,
+                SkinSettingsRowId::TimingTextX, SkinSettingsRowId::TimingBarX}) removed &= !has(data, id);
+            report.check("skin.source." + source + ".retired_rows_hidden", removed);
+        }
+        report.check("skin.hidden_values_preserved", app.config_.skin.show_gear_boundary_line &&
+            app.config_.skin.judgement_offset_x == 17 && app.config_.skin.combo_offset_x == -23 &&
+            app.config_.skin.timing_text_offset_x == 29 && app.config_.skin.timing_bar_offset_x == -31);
+        app.config_ = saved_config;
+        app.skin_settings_controller_ = saved_controller;
+        app.skin_search_query_ = saved_query;
+        app.skin_search_active_ = saved_search;
+        app.skin_mode_tabs_focused_ = saved_tabs;
+        app.persist_runtime_config();
+        app.publish_snapshot();
+    }
     static void check_hud_feedback_followup(MenuApp& app, Report& report) {
         const auto saved_skin = app.config_.skin;
         MenuApp::GameplayHudState saved_hud;
@@ -1542,14 +1752,16 @@ struct MenuAppFeedbackTestAccess {
             session.dispatch_lane_input(event.lane, event.state, event.sample, playback);
         }
     }
-    static void submit_judge_fixture_notes(GameSession& session, std::size_t& index, int64_t playback) {
+    static void submit_judge_fixture_notes(GameSession& session, std::size_t& index, int64_t playback,
+                                           double expected_pg_ms) {
         std::lock_guard<std::mutex> lock(session.engine_mutex_);
         while (index < session.chart_.notes.size()) {
             const auto& note = session.chart_.notes[index];
             if (playback < note.start_sample + session.sample_rate_ / 100) break;
-            // Script a precise sample-domain input through the production lane
-            // dispatcher. This checks rules, not physical keyboard latency.
-            const int64_t sample = note.start_sample + session.sample_rate_ / 50; // +20 ms
+            // Independent pinned values exercise two PG edges and two edges+1
+            // through the production dispatcher, not physical keyboard latency.
+            const int64_t edge = static_cast<int64_t>(std::llround(expected_pg_ms * session.sample_rate_ / 1000.0));
+            const int64_t sample = note.start_sample + edge + static_cast<int64_t>(index % 2);
             session.dispatch_lane_input(note.lane, input::InputState::Pressed, sample, sample);
             session.dispatch_lane_input(note.lane, input::InputState::Released, sample + 1, sample);
             ++index;
@@ -1666,6 +1878,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
             expect_screen(app, report, "keymap.nested_test.back", Screen::Keymap);
         } else if (page.index == 2) {
             Access::check_lane_shortcuts(app, report);
+            Access::check_skin_tabs_search_and_sources(app, report);
         } else if (page.index == 3) {
             Access::check_free_resolution(app, report);
             Access::click(app, Kind::SettingsRow,
@@ -1938,7 +2151,8 @@ void separate_restart_flow(tenriff::app::CommandLineOptions options, Report& rep
 }
 void separate_judge_flow(tenriff::app::CommandLineOptions options, Report& report) {
     using namespace tenriff;
-    // This fixture builds an eligible payload locally; it never sends HTTP.
+    // Prove native fixed timing results meet the current Sites payload contract.
+    // This fixture only calls the serializer; it never sends HTTP.
     options.online_recording_enabled = true;
     using Session = app::GameSession;
     using SessionAccess = app::MenuAppFeedbackTestAccess;
@@ -1952,16 +2166,20 @@ void separate_judge_flow(tenriff::app::CommandLineOptions options, Report& repor
     }
     options.chart_path = "judge-fixture/judge.bms";
     config::ConfigLoader loader;
-    for (const bool hard : {false, true}) {
-        const std::string name = hard ? "judge.hard" : "judge.normal";
-        options.profile = hard ? "judge-hard-smoke" : "judge-normal-smoke";
+    struct JudgeCase { const char* name; const char* mod; double pg_ms; };
+    const JudgeCase judges[] = {{"normal", "", 22.0}, {"hard", "judge_hard", 19.0}, {"ex", "judge_ex", 10.0}};
+    for (const auto& judge : judges) {
+        const std::string name = "judge." + std::string(judge.name);
+        options.profile = "judge-" + std::string(judge.name) + "-smoke";
+        const auto expected_ruleset = std::string_view(judge.mod) == "judge_ex"
+            ? app::kExReplayRulesetId : app::kCanonicalReplayRulesetId;
         const std::string profile = "profiles/" + options.profile;
         auto config = loader.load_profile("profiles/menu-smoke").config;
         config.ui.skip_start_countdown = true;
         config.mode.practice_no_fail_enabled = false;
         config.mode.autoplay_enabled = false;
         config.mode.one_miss_fail_enabled = false;
-        config.mode.mods = hard ? std::vector<std::string>{"judge_hard"} : std::vector<std::string>{};
+        config.mode.mods = *judge.mod ? std::vector<std::string>{judge.mod} : std::vector<std::string>{};
         config.mode.key_mode = "4k";
         config.mode.random = "off";
         config.mode.gauge = "normal";
@@ -1979,7 +2197,8 @@ void separate_judge_flow(tenriff::app::CommandLineOptions options, Report& repor
         const auto deadline = Clock::now() + std::chrono::seconds(15);
         session->set_hud_callback([&](const Session::HudSnapshot& hud) {
             if (Clock::now() > deadline) { timed_out = true; SessionAccess::timeout(*session); return; }
-            if (session->did_start_gameplay()) SessionAccess::submit_judge_fixture_notes(*session, submitted, hud.current_sample);
+            if (session->did_start_gameplay())
+                SessionAccess::submit_judge_fixture_notes(*session, submitted, hud.current_sample, judge.pg_ms);
         });
         const bool initialized = session->initialize(options);
         report.check(name + ".initialize", initialized);
@@ -1990,10 +2209,11 @@ void separate_judge_flow(tenriff::app::CommandLineOptions options, Report& repor
         }
         session->shutdown();
         const auto& result = session->result();
-        report.check(name + ".twenty_ms_boundary", result.has_value && result.finished && submitted == 4 &&
-            result.stats.counts.pg == (hard ? 0 : 4) && result.stats.counts.gr == (hard ? 4 : 0) &&
+        report.check(name + ".pinned_pg_sample_boundaries", result.has_value && result.finished && submitted == 4 &&
+            result.stats.counts.pg == 2 && result.stats.counts.gr == 2 &&
             result.stats.counts.gd == 0 && result.stats.counts.bd == 0 && result.stats.counts.pr == 0,
-            "BMS RANK 3, scripted +20 ms: Normal PG / Judge Hard GR");
+            "BMS RANK 3, two hits at +" + std::to_string(judge.pg_ms) +
+            "ms and two one sample later: expected 2 PG / 2 GR");
         report.check(name + ".result_mods", result.mods == config.mode.mods);
         const auto replay = gameplay::load_replay_json(result.replay_path);
         report.check(name + ".replay_mods", replay.success() && replay.replay->mods == config.mode.mods);
@@ -2001,19 +2221,41 @@ void separate_judge_flow(tenriff::app::CommandLineOptions options, Report& repor
         const auto local = app::menu_records::parse_result_file(std::filesystem::u8path(result.result_path), &error);
         report.check(name + ".local_record_mods", local && local->mods == config.mode.mods &&
             local->stats.counts.pg == result.stats.counts.pg && local->stats.counts.gr == result.stats.counts.gr, error);
+        report.check(name + ".local_record_fixed_ruleset", local && local->ruleset_id == expected_ruleset, error);
         if (replay.success()) {
+            report.check(name + ".replay_fixed_ruleset", replay.replay->ruleset_id == expected_ruleset);
             const auto verified = app::verify_replay_file(std::filesystem::u8path(result.replay_path),
                 std::filesystem::u8path(options.chart_path), result.replay_sha256);
             report.check(name + ".replay_verifies", verified.verified() && verified.claims_match, verified.detail);
             std::string payload;
             const bool built = app::build_sites_score_json(*replay.replay, result.replay_sha256,
                 "Judge Boundary Fixture", result.clear_status, payload, error);
-            report.check(name + ".new_bms_policy_upload_metadata", built && error.empty() &&
-                replay.replay->mode.bms_gauge_version == 2 &&
-                payload.find("\"bms_gauge_version\":2") != std::string::npos &&
-                payload.find("\"bms_control_flow_version\":1") != std::string::npos &&
-                payload.find("bms_random_seed") == std::string::npos &&
-                payload.find("bms_branch_sha256") == std::string::npos, error);
+            report.check(name + ".fixed_ruleset_upload_eligible", built && !payload.empty() &&
+                replay.replay->record_play_mode == "online" && error.empty(), error);
+            if (built) {
+                const auto json = config::parse_json(payload);
+                const auto* fields = json.success() ? json.root->as_object() : nullptr;
+                report.check(name + ".fixed_payload_identity", fields &&
+                    fields->at("schema_version").as_number() == 1 &&
+                    fields->at("ruleset_id").as_string() == expected_ruleset &&
+                    fields->at("timing_profile").as_string() == "bms-easy" &&
+                    fields->at("mods").as_array()->size() == config.mode.mods.size());
+            }
+            auto historical = *replay.replay;
+            historical.ruleset_id = std::string(expected_ruleset == app::kExReplayRulesetId
+                ? app::kRuleset8ReplayRulesetId : app::kRuleset7ReplayRulesetId);
+            report.check(name + ".older_public_generation_stays_local",
+                !app::build_sites_score_json(historical, result.replay_sha256,
+                    "Judge Boundary Fixture", result.clear_status, payload, error) && payload.empty() &&
+                error == "Sites upload skipped: older or unsupported judgement timing remains local.", error);
+            report.check(name + ".bms_policy_metadata_preserved", local &&
+                result.bms_gauge_version == 2 && result.bms_control_flow_version == 1 && !result.bms_random_seed &&
+                replay.replay->mode.bms_gauge_version == result.bms_gauge_version &&
+                replay.replay->mode.bms_control_flow_version == result.bms_control_flow_version &&
+                replay.replay->mode.bms_random_seed == result.bms_random_seed &&
+                local->bms_gauge_version == result.bms_gauge_version &&
+                local->bms_control_flow_version == result.bms_control_flow_version &&
+                local->bms_random_seed == result.bms_random_seed);
         }
         const auto saved = loader.load_profile(profile);
         report.check(name + ".profile_stays_unmodified", saved.success() && saved.config.mode.mods.empty());
@@ -2330,6 +2572,22 @@ int wmain(int argc, wchar_t** argv) {
             }
             restarted->shutdown();
         }
+        {
+            auto drop_options = options;
+            drop_options.profile = "drop-smoke";
+            if (!loader.save_profile("profiles/drop-smoke", config) ||
+                !keymaps.save_profile("profiles/drop-smoke", keymaps.default_keymap()))
+                throw std::runtime_error("Cannot seed isolated drop fixture profile");
+            auto dropped = std::make_unique<tenriff::app::MenuApp>();
+            const bool initialized = dropped->initialize(drop_options);
+            report.check("drop.initialize", initialized);
+            if (initialized) {
+                Access::attach_present_probe(*dropped);
+                Access::check_native_song_drop(*dropped, report);
+            }
+            dropped->shutdown();
+            report.check("drop.exit_code", dropped->exit_code() == 0);
+        }
         options.chart_path = "songs/fixture/smoke.bms";
         separate_pause_flow(options, report);
         separate_restart_flow(options, report);
@@ -2348,7 +2606,7 @@ int wmain(int argc, wchar_t** argv) {
     const JsonObject result{
         {"passed", JsonValue(report.failed == 0)}, {"failed_checks", JsonValue(double(report.failed))},
         {"elapsed_seconds", JsonValue(std::chrono::duration<double>(Clock::now() - began).count())},
-        {"scope", JsonValue("Actual MenuApp initialize/index/controller/launch/GameSession/result/return with real window, renderer and muted shared audio; owner-thread internal input dispatch, not MenuApp::run main-loop or physical OS input.")},
+        {"scope", JsonValue("Actual MenuApp initialize/index/controller/launch/GameSession/result/return with real window, renderer and muted shared audio; owner-thread internal input dispatch, not MenuApp::run main-loop or physical OS input. Drop fixture separately sends real WM_DROPFILES to the owned HWND after windowed/borderless/windowed changes, consumes its mailbox, then invokes the normal MenuApp event handler.")},
         {"pause_scope", JsonValue("Separate real GameSession, serialized internal Escape and public pause actions; its physical input producer is stopped. No claim of full MenuApp pause-overlay integration.")},
         {"present_observer", JsonValue(JsonObject{
             {"method", JsonValue("Smoke-only render callback wraps unchanged MenuApp::render_tick and accumulates its successful Present result before the next render clears it. One fixture window restart installs the callback before transition checks; FPS, VSync and overlay settings are unchanged by the observer.")},
@@ -2356,6 +2614,7 @@ int wmain(int argc, wchar_t** argv) {
             {"callbacks_without_present", JsonValue(double(present_probe.callbacks_without_present.load(std::memory_order_acquire)))},
             {"raw_zero_reads_after_progress", JsonValue(double(present_probe.raw_zero_reads_after_progress.load(std::memory_order_acquire)))}})},
         {"limits", JsonValue("Synthetic library only. Presents mean liveness, not screenshot equality. No physical latency, device input, online, account, multiplayer, arbitrary native file dialog configurations, long-session or multi-PC coverage. External runner should impose a 90-second process timeout for driver hangs.")},
+        {"observations", JsonValue(std::move(report.observations))},
         {"checks", JsonValue(std::move(report.checks))}};
     std::ofstream output(sandbox / "smoke-report.json", std::ios::binary);
     output << tenriff::config::json_stringify(JsonValue(result), 2) << '\n';

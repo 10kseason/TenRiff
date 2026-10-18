@@ -2252,6 +2252,7 @@ int MenuApp::selected_adjustment_repeat_row(uint32_t keycode) {
 
 bool MenuApp::is_song_select_repeat_key(uint32_t keycode) {
     if (skin_preview_fullscreen_) return false;
+    if (current_screen() == Screen::SettingsSkins && (skin_search_active_ || skin_mode_tabs_focused_)) return false;
     if (help_overlay_visible_ || profile_nickname_edit_active_ ||
         (song_select_search_active_ && current_screen() != Screen::SongSelect) ||
         online_records_url_editing_ ||
@@ -2814,6 +2815,11 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
                                          "웹 등록 제외 플레이 · 기록은 로컬에 저장");
     const bool online_record_allowed = online_play_mode_ && play_options.online_recording_enabled &&
         active_recording_permission_->load(std::memory_order_acquire);
+    // Current Normal/Hard/EX can enter the new boards. Hidden historical judge
+    // modes stay local; the worker also validates the actual exported identity
+    // and rejects custom/assisted records before reading connection credentials.
+    const bool sites_timing_supported = is_sites_supported_replay_ruleset(
+        mode_mod_judge_ex(result.mods) ? kExReplayRulesetId : kCanonicalReplayRulesetId, result.mods);
     if (!online_record_allowed) {
         sites_result_upload_status_ = ui_text("Guest record: local only; never uploaded later.",
                                              "게스트 기록: 로컬 전용 · 나중에도 업로드하지 않음");
@@ -2823,8 +2829,12 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     } else if (result.replay_path.empty() || result.replay_sha256.empty()) {
         sites_result_upload_status_ = ui_text("Web upload unavailable: replay export failed.",
                                              "웹 등록 불가 · 리플레이 저장 결과 확인 필요");
+    } else if (!sites_timing_supported) {
+        sites_result_upload_status_ = ui_text(
+            "Older or unsupported judgement timing stays in local records.",
+            "이전 또는 지원하지 않는 판정 기준의 기록은 로컬에 보관됩니다.");
     }
-    if (online_record_allowed && result.has_value && !session_aborted && (result.finished || result.game_over) &&
+    if (online_record_allowed && sites_timing_supported && result.has_value && !session_aborted && (result.finished || result.game_over) &&
         !replay_playback && !session_mix_active_ && !bms_editor_practice_start_seconds_.has_value() &&
         !result.pause_used &&
         !result.replay_path.empty() && !result.replay_sha256.empty()) {

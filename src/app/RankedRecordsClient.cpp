@@ -1,5 +1,6 @@
 #include "app/RankedRecordsClient.h"
 #include "app/MainApiTlsPin.h"
+#include "app/ReplayVerifier.h"
 #include "app/SitesLeaderboardClient.h"
 #include "app/SitesUploadResponse.h"
 #include "gameplay/Replay.h"
@@ -35,6 +36,11 @@ namespace {
 
 constexpr std::size_t kMaximumResponseBytes = 1024 * 1024;
 constexpr std::size_t kMaximumReplayBytes = 5 * 1024 * 1024;
+
+bool ranked_timing_requires_server_support(std::string_view ruleset_id) {
+    return ruleset_id == kCanonicalReplayRulesetId || ruleset_id == kExReplayRulesetId ||
+           ruleset_id == "custom-ruleset-9" || ruleset_id == "custom-ruleset-10";
+}
 
 struct Credentials {
     std::string username;
@@ -783,6 +789,10 @@ bool submit_ranked_replay(const std::string& base_url,
         error = "Ranked upload skipped: guest or historical records remain local permanently.";
         return false;
     }
+    if (ranked_timing_requires_server_support(replay.replay->ruleset_id)) {
+        error = "Ranked upload skipped: the fixed timing baseline remains local until server support is available.";
+        return false;
+    }
     if (replay.replay->mode.bms_gauge_version != 1 ||
         replay.replay->mode.bms_control_flow_version != 1 || replay.replay->mode.bms_random_seed) {
         // The deployed verifier/boards have not negotiated these optional policies.
@@ -798,13 +808,20 @@ bool submit_ranked_replay(const std::string& base_url,
         return false;
     }
     // Check the bytes actually sent too: a file replaced between replay
-    // validation and this read must not smuggle a guest record into the POST.
+    // validation and this read must not smuggle a guest record or unsupported
+    // timing generation into the POST.
     const auto uploaded_json = config::parse_json(std::string(bytes.begin(), bytes.end()));
     const auto* uploaded_root = uploaded_json.root ? uploaded_json.root->as_object() : nullptr;
     const auto origin = uploaded_root ? uploaded_root->find("record_play_mode") : config::JsonObject::const_iterator{};
     if (!uploaded_json.success() || !uploaded_root || origin == uploaded_root->end() ||
         !origin->second.is_string() || origin->second.as_string() != "online") {
         error = "Ranked upload skipped: guest or historical records remain local permanently.";
+        return false;
+    }
+    const auto uploaded_ruleset = uploaded_root->find("ruleset_id");
+    if (uploaded_ruleset != uploaded_root->end() && uploaded_ruleset->second.is_string() &&
+        ranked_timing_requires_server_support(uploaded_ruleset->second.as_string())) {
+        error = "Ranked upload skipped: the fixed timing baseline remains local until server support is available.";
         return false;
     }
     const std::string body =

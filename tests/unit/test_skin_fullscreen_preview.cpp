@@ -7,6 +7,11 @@
 #include <memory>
 #include <string>
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+
 #include "app/MenuApp.h"
 #include "app/GameSession.h"
 #include "app/ProfileSetupFlow.h"
@@ -16,6 +21,94 @@
 namespace tenriff::app {
 
 struct MenuAppSkinPreviewTestAccess {
+    static void check_mode_tabs_and_search() {
+        auto menu = fixture();
+        menu->skin_settings_controller_.reset("4k");
+        menu->key_tab_ = config::KeycodeMap::to_keycode("Tab").value_or(9);
+        menu->key_backspace_ = config::KeycodeMap::to_keycode("Backspace").value_or(8);
+        menu->key_delete_ = config::KeycodeMap::to_keycode("Delete").value_or(46);
+        menu->config_.ui.language = "en";
+        menu->publish_snapshot();
+        REQUIRE(menu->snapshot_.render.generic.skin_mode_tabs.size() == kSkinEditModes.size());
+        const auto saved = config::serialize_skin_config(menu->config_.skin);
+        for (int index = 0; index < static_cast<int>(kSkinEditModes.size()); ++index) {
+            render::MenuClickEvent event;
+            event.kind = render::MenuHitTargetKind::SkinModeTab;
+            event.index = index;
+            menu->handle_menu_click(event);
+            CHECK(menu->skin_settings_controller_.edit_mode() == kSkinEditModes[static_cast<std::size_t>(index)]);
+            CHECK(menu->snapshot_.render.generic.skin_mode_tabs[static_cast<std::size_t>(index)].selected);
+            CHECK(menu->snapshot_.render.generic.skin_preview.lane_count ==
+                lane_count_for_skin_mode(std::string(kSkinEditModes[static_cast<std::size_t>(index)])));
+        }
+        CHECK(config::serialize_skin_config(menu->config_.skin) == saved);
+        CHECK_FALSE(menu->skin_settings_controller_.dirty());
+        menu->handle_skins_settings_input(menu->key_right_);
+        CHECK(menu->skin_settings_controller_.edit_mode() == "4k");
+        menu->handle_skins_settings_input(menu->key_tab_);
+        REQUIRE(menu->skin_search_active_);
+        menu->handle_text_input("Combo");
+        REQUIRE(!menu->snapshot_.render.generic.rows.empty());
+        for (const auto& row : menu->snapshot_.render.generic.rows) CHECK(row.label.find("Combo") != std::string::npos);
+        // IME confirmation must not turn off the receiver before committed WM_CHAR text.
+        menu->handle_skins_settings_input(menu->key_enter_);
+        CHECK(menu->skin_search_active_);
+        menu->handle_skins_settings_input(menu->key_delete_);
+        menu->handle_text_input("no_such_setting_9876");
+        CHECK(menu->snapshot_.render.generic.rows.empty());
+        menu->handle_skins_settings_input(menu->key_tab_);
+        CHECK_FALSE(menu->skin_search_active_);
+        menu->handle_skins_settings_input(menu->key_right_);
+        CHECK(config::serialize_skin_config(menu->config_.skin) == saved);
+        menu->handle_skins_settings_input(menu->key_escape_);
+        CHECK(menu->skin_search_query_.empty());
+        CHECK(menu->current_screen() == MenuApp::Screen::SettingsSkins);
+        render::MenuClickEvent search;
+        search.kind = render::MenuHitTargetKind::SkinSettingsSearch; search.index = 0;
+        menu->handle_menu_click(search);
+        REQUIRE(menu->skin_search_active_);
+        menu->handle_text_input(std::string(255, 'x'));
+        menu->handle_text_input(u8"가");
+        CHECK(menu->skin_search_query_ == std::string(255, 'x'));
+        menu->handle_skins_settings_input(menu->key_delete_);
+        menu->handle_text_input(u8"한글");
+        menu->menu_window_.on_text_composition(true);
+        menu->handle_skins_settings_input(menu->key_backspace_);
+        menu->handle_skins_settings_input(menu->key_tab_);
+        CHECK(menu->skin_search_active_);
+        CHECK(menu->skin_search_query_ == u8"한글");
+        menu->menu_window_.on_text_composition(false);
+        menu->handle_skins_settings_input(menu->key_backspace_);
+        CHECK(menu->skin_search_query_ == u8"한");
+        menu->skin_search_query_.clear();
+        menu->skin_search_active_ = false;
+        menu->publish_snapshot();
+        menu->skin_mode_tabs_focused_ = true;
+        menu->publish_snapshot();
+        render::MenuClickEvent select;
+        select.kind = render::MenuHitTargetKind::SettingsRow;
+        select.index = static_cast<int>(menu->skin_settings_controller_.selected_id());
+        select.part = render::MenuHitPart::SelectOnly;
+        menu->handle_menu_click(select);
+        CHECK_FALSE(menu->snapshot_.render.generic.skin_mode_tabs_focused);
+        CHECK(std::any_of(menu->snapshot_.render.generic.rows.begin(), menu->snapshot_.render.generic.rows.end(),
+            [](const auto& row) { return row.selected; }));
+        for (const auto source : {"native", "lr2", "tenriff"}) {
+            menu->config_.skin.source = source;
+            menu->publish_snapshot();
+            const auto has = [&](SkinSettingsRowId id) {
+                const auto& rows = menu->snapshot_.render.generic.rows;
+                return std::any_of(rows.begin(), rows.end(), [&](const auto& row) { return row.row_index == static_cast<int>(id); });
+            };
+            CHECK(has(SkinSettingsRowId::ImportedSkin) == (std::string(source) != "native"));
+            for (auto id : {SkinSettingsRowId::CreateSkin, SkinSettingsRowId::ReloadSkin, SkinSettingsRowId::OpenSkinFolder})
+                CHECK(has(id) == (std::string(source) == "tenriff"));
+            for (auto id : {SkinSettingsRowId::KeyMode, SkinSettingsRowId::GearBoundary, SkinSettingsRowId::JudgementX,
+                           SkinSettingsRowId::ComboX, SkinSettingsRowId::TimingTextX, SkinSettingsRowId::TimingBarX})
+                CHECK_FALSE(has(id));
+        }
+    }
+
     static void check_overhaul() {
         auto menu = fixture();
         for (const char* mode : {"5k", "7+1", "16k"}) {
@@ -174,6 +267,7 @@ struct MenuAppSkinPreviewTestAccess {
 
     static std::unique_ptr<MenuApp> fixture(const char* display_mode = "windowed") {
         auto menu = std::make_unique<MenuApp>();
+        menu->physical_modifier_probe_ = [](int) { return false; };
         menu->key_left_ = 37;
         menu->key_up_ = 38;
         menu->key_right_ = 39;
@@ -567,6 +661,34 @@ struct MenuAppSkinPreviewTestAccess {
         CHECK(menu->skin_settings_controller_.edit_lane() == 0);
     }
 
+    static void check_physical_lane_modifiers() {
+        auto menu = fixture();
+        menu->skin_settings_controller_.reset("16k");
+        static_cast<void>(menu->skin_settings_controller_.select(SkinSettingsRowId::LaneWidth, false));
+        const auto one = config::KeycodeMap::to_keycode("1").value();
+        const auto three = config::KeycodeMap::to_keycode("3").value();
+        for (const int modifier : {VK_SHIFT, VK_LSHIFT, VK_RSHIFT}) {
+            menu->physical_modifier_probe_ = [modifier](int key) { return key == modifier; };
+            tap(*menu, one);
+            CHECK(menu->skin_settings_controller_.edit_lane() == 10);
+            CHECK(menu->pressed_keys_.empty());
+            menu->physical_modifier_probe_ = [](int) { return false; };
+            tap(*menu, three);
+            CHECK(menu->skin_settings_controller_.edit_lane() == 2);
+        }
+        for (const int modifier : {VK_LCONTROL, VK_RCONTROL, VK_MENU, VK_LMENU, VK_RMENU, VK_LWIN, VK_RWIN}) {
+            menu->physical_modifier_probe_ = [modifier](int key) { return key == modifier; };
+            tap(*menu, one);
+            CHECK(menu->skin_settings_controller_.edit_lane() == 2);
+            CHECK(menu->pressed_keys_.empty());
+        }
+        menu->physical_modifier_probe_ = [](int) { return false; };
+        tap(*menu, one);
+        CHECK(menu->skin_settings_controller_.edit_lane() == 0);
+        CHECK(menu->skin_settings_controller_.selected_id() == SkinSettingsRowId::LaneWidth);
+        CHECK_FALSE(menu->skin_settings_controller_.dirty());
+    }
+
     static void check_navigation_reset() {
         auto menu = fixture();
         tap(*menu, menu->key_f6_);
@@ -583,6 +705,9 @@ struct MenuAppSkinPreviewTestAccess {
 
 }  // namespace tenriff::app
 
+TEST_CASE("skin tabs search filtering source gates and UTF8 input share actual menu routing") {
+    tenriff::app::MenuAppSkinPreviewTestAccess::check_mode_tabs_and_search();
+}
 TEST_CASE("skin overhaul lane buttons select visual lanes and fonts persist from Profile") {
     tenriff::app::MenuAppSkinPreviewTestAccess::check_overhaul();
 }
@@ -629,6 +754,9 @@ TEST_CASE("difficulty table URL held Backspace repeats complete UTF8 characters 
 }
 TEST_CASE("skin lane number shortcuts honor visible order bounds and modal ownership") {
     tenriff::app::MenuAppSkinPreviewTestAccess::check_lane_number_shortcuts();
+}
+TEST_CASE("skin lane number shortcuts retain physical Shift Ctrl Alt and Win fallbacks") {
+    tenriff::app::MenuAppSkinPreviewTestAccess::check_physical_lane_modifiers();
 }
 #endif
 

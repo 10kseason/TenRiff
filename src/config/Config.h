@@ -86,6 +86,8 @@ inline constexpr int64_t kPacemakerScoreMax = 10'000;
 inline constexpr int64_t kPacemakerScoreDefault = 8'000;
 
 struct JudgeConfig {
+    // Stored reference calibration (R3-R8). R9/R10 apply the user-pinned
+    // effective windows in JudgeTimingPolicy without rewriting saved profiles.
     double pg_ms = 21.0;
     double gr_ms = 65.0;
     double gd_ms = 115.0;

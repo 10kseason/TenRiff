@@ -55,7 +55,7 @@
 {"Change song speed and timing together. 1.00x is original speed; this also affects score eligibility.", "同时改变曲目播放速度和音符时间。1.00x为原速，也会影响记录资格。"},
 {"Change note scrolling speed without changing song speed or judgement timing.", "仅改变音符滚动速度，不改变曲速或判定时间。"},
 {"Save mode settings and return.", "保存模式设置并返回。"},
-{"Choose Normal, Hard or EX. EX uses BMS RANK-scaled PG/GR/GD 14/44.5714/78.8571 ms at EASY rank, with fixed BAD 250 ms.", "选择Normal、Hard或EX判定范围。EX在EASY RANK下的PG/GR/GD为14/44.5714/78.8571 ms，并随BMS RANK缩放；BAD固定为250 ms。"},
+{"Choose Normal, Hard or EX. Hard uses the complete Normal NM row; EX uses the complete Normal VHD row, regardless of chart RANK and without rounding. Normal VEZ uses EZ timing.", "选择Normal、Hard或EX判定范围。Hard完整采用Normal NM行，EX完整采用Normal VHD行，不受谱面RANK影响且不取整。Normal VEZ与EZ相同。"},
 {"Choose the key layout to edit and preview. Each layout keeps its own lane settings.", "选择要编辑和预览的键位布局。各布局分别保存轨道设置。"},
 {"Choose 7+1 in Key Mode above to move the scratch lane left or right. Other layouts keep this option disabled.", "在上方键数模式中选择7+1后，可将转盘轨道移到左侧或右侧。其他布局无法使用此项。"},
 {"Choose Native, TenRiff skin.json, or an imported LR2 skin.", "选择Native、TenRiff skin.json或已导入的LR2皮肤。"},

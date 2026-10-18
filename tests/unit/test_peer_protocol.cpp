@@ -191,6 +191,27 @@ TEST_CASE("peer protocol rejects pre-rate version five before payload decoding")
     CHECK(tenriff::network::decode_peer_message(frame, decoded, consumed, error) == PeerDecodeStatus::Error);
     CHECK(error.find("version") != std::string::npos);
 }
+
+TEST_CASE("peer protocol accepts fixed timing version seven and rejects version six") {
+    PeerMessage message;
+    message.type = PeerMessageType::Hello;
+    message.text = "Fixed timing baseline client";
+    auto frame = tenriff::network::encode_peer_message(message);
+    REQUIRE(frame.size() > 5);
+    CHECK(frame[4] == 0);
+    CHECK(frame[5] == 7);
+    std::size_t consumed = 0;
+    std::string error;
+    PeerMessage decoded;
+    REQUIRE(tenriff::network::decode_peer_message(frame, decoded, consumed, error) == PeerDecodeStatus::Complete);
+    CHECK(decoded.text == message.text);
+    CHECK(consumed == frame.size());
+    // The payload layout did not change, but its timing contract did.
+    frame[5] = 6;
+    consumed = 0;
+    CHECK(tenriff::network::decode_peer_message(frame, decoded, consumed, error) == PeerDecodeStatus::Error);
+    CHECK(error.find("version") != std::string::npos);
+}
 TEST_CASE("peer protocol round-trips eight-player room metadata") {
     PeerMessage welcome;
     welcome.type = PeerMessageType::RoomWelcome;

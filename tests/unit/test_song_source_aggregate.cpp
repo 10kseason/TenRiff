@@ -23,6 +23,61 @@
 
 namespace tenriff::app {
 struct MenuAppSongSourceTestAccess {
+    static void check_fixed_timing_best_and_ghost(const std::string& root) {
+        auto menu = std::make_unique<MenuApp>();
+        menu->songs_path_ = root;
+        menu->config_.mode.mods.clear();
+        menu_records::ParsedResultRecord parsed;
+        parsed.chart_path = "timing-generation.bms";
+        ReplayVerificationResult verified;
+        verified.status = ReplayVerificationStatus::Verified;
+        verified.official_eligible = verified.claims_match = true;
+        verified.game_over = false;
+        verified.clear_status = "CLEAR";
+        verified.final_gauge = "normal";
+        const auto append = [&](std::string_view id, int64_t score, int expected_generation) {
+            parsed.ruleset_id = id;
+            verified.final_score = score;
+            const auto suffix = std::to_string(menu->local_play_records_.size());
+            menu->append_chart_result_record(parsed, "result-" + suffix, "replay-" + suffix, verified);
+            CHECK(menu->local_play_records_.back().judgement_generation == expected_generation);
+        };
+        append(kRuleset7ReplayRulesetId, 9000, 1);
+        REQUIRE_FALSE(menu->chart_best_results_.empty());
+        for (const auto& item : menu->chart_best_results_) CHECK(item.second.best_score == 9000);
+        append(kCanonicalReplayRulesetId, 1000, 2);
+        append(kRuleset7ReplayRulesetId, 9999, 1);
+        REQUIRE(menu->local_play_records_.size() == 3);
+        for (const auto& item : menu->chart_best_results_) {
+            CHECK(item.second.best_score == 1000);
+            CHECK(item.second.judgement_generation == 2);
+        }
+        // Feed score-sorted history: the current generation takes priority,
+        // while an old replay remains selectable when no current one exists.
+        menu->current_song_record_indices_ = {2, 0, 1};
+        CHECK(menu->best_replay_path_for_selected_song() == "replay-1");
+        menu->current_song_record_indices_ = {2, 0};
+        CHECK(menu->best_replay_path_for_selected_song() == "replay-2");
+        const auto keys = menu_songs::build_chart_path_keys(parsed.chart_path, root);
+        REQUIRE(keys.size() >= 2);
+        const auto current = menu->chart_best_results_.begin()->second;
+        auto historical = current;
+        historical.judgement_generation = 1;
+        historical.best_score = 99999;
+        // A higher old BMS policy must not outrank the new judgement baseline.
+        historical.bms_gauge_version = historical.bms_control_flow_version = historical.bms_timing_version = 2;
+        SongEntry entry;
+        entry.path = parsed.chart_path;
+        for (const bool reverse : {false, true}) {
+            menu->chart_best_results_.clear();
+            menu->chart_best_results_[keys[0]] = reverse ? current : historical;
+            menu->chart_best_results_[keys[1]] = reverse ? historical : current;
+            const auto best = menu->best_result_for_song_entry(entry);
+            CHECK(best.best_score == 1000);
+            CHECK(best.judgement_generation == 2);
+        }
+    }
+
     static void check_bms_policy_best(const std::string& root) {
         auto menu = std::make_unique<MenuApp>();
         menu->songs_path_ = root;
@@ -491,6 +546,11 @@ TEST_CASE("ALL SONG skips deleted folders inside a valid cache and continues wit
 }
 
 #ifdef _WIN32
+TEST_CASE("fixed timing BEST and automatic ghost separate historical scores while preserving history") {
+    AggregateFixture f;
+    MenuAppSongSourceTestAccess::check_fixed_timing_best_and_ghost(f.base.u8string());
+}
+
 TEST_CASE("BMS local best selects policy tuples without mixing old scores or partitioning branch seeds") {
     AggregateFixture f;
     MenuAppSongSourceTestAccess::check_bms_policy_best(f.base.u8string());

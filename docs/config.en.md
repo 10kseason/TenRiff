@@ -1,3 +1,9 @@
+**2026-10-18 · 1.9.6:** [Fixed judgement, skin tabs/search and windowed drops](release-1.9.6.en.md) · [Verification scope](release-1.9.6-gate.md). Sites accepts only new standard Online R9/R10 submissions; old boards and records remain legacy read-only. Unsupported separate Ranked rules and Guest/custom exclusions remain.
+
+[Pinned timing table](judgement-baseline-20261018.en.md): Normal PG22/19/15/10ms and exact existing GR/GD/BAD remain. Hard uses the complete Normal NM row and EX the complete Normal VHD row for every chart RANK, without integer-ms rounding. The general source baseline remains **1.9.0**.
+
+[Skin UI behavior and shortcuts](skin-ui-followup-20261018.en.md). Earlier version/local-candidate entries below are historical; 1.9.6 documents define the current scope.
+
 **2026-10-18 · 1.9.5.3:** [Skin settings cleanup and search/input fixes](release-1.9.5.3.en.md). Select the edit lane with numbered preview buttons. UI font, font file and Gameplay Cursor live in Profile. Scratch Position appears only in Original runtime key mode and is adjustable for a 7+1 layout.
 
 **2026-10-17 · 1.9.5.2:** [Note and field size down to10%](release-1.9.5.2.en.md). Includes GOMazk’s contribution (PR #102). Note & Field Size expands from50–140% to10–140%. The100% default, saved values and per-key-mode settings are preserved; menus, gameplay, ghost and preview use the same lower limit. Judgement, score, input and audio calculations and the1.9.5.1 350ms FAST/SLOW/file-picker behavior remain unchanged.
@@ -10,7 +16,7 @@
 
 # TenRiff Config Schema (current)
 
-**Current 1.9.3 contract:** Safe indexing defaults, Empty Poor accuracy exclusion with R7/R8, general ONNX and supported Safetensors apply. Production Sites v19 accepts eligible fresh Online records; Guest/unmarked historical records remain permanently excluded. No BGA weights ship; OFF/empty-path defaults and baseline1.9.0 remain. The [1.9.3 scope](release-1.9.3.en.md) supersedes dated history below.
+**Historical 1.9.3 contract:** Safe indexing defaults, Empty Poor accuracy exclusion with R7/R8, general ONNX and supported Safetensors apply. Production Sites v19 accepts eligible fresh Online records; Guest/unmarked historical records remain permanently excluded. No BGA weights ship; OFF/empty-path defaults and baseline1.9.0 remain. This is historical; the current contract follows the [1.9.6 scope](release-1.9.6.en.md) above.
 
 **2026-10-15 · 1.9.1:** The user-authorized 1.9.1 includes the earlier volume/input/outro fixes, BMS TOTAL/RANDOM compatibility, Result colors and the 10 mark. A Home language button cycles EN → KO → JA → ZH and saves the choice. New BMS gauge/branch records remain local until server verification supports them. The fixed baseline stays 1.9.0; earlier releases, installations and profiles are preserved. Dated local notes below retain their historical no-version-bump/unpublished status; this 1.9.1 scope supersedes that status. [Changes and compatibility](feedback-1.9.1.en.md) · [Release verification gate](release-1.9.1-gate.md).
 
@@ -134,18 +140,19 @@ The 1.9.0 release selects Normal / Hard / EX under `Options > Key Mode Settings 
 
 [Current timing windows, RANK tables and LN rules (Korean)](judgement-windows.md)
 
-- BMS `#RANK` selects chart timing: `3/EASY` PG21ms, `2/NORMAL` PG18ms, `1/HARD` PG15ms, `0/VERYHARD` PG8ms. EASY keeps GR/GD/BAD at 65/115/210ms; the other ranks scale these by 18/21, 15/21 and 8/21. Missing/unsupported headers use EASY. Judge Hard/EX mods apply afterward. RANK does not change `hold_grace`/`hold_break` settings or automatic-miss deadlines; tail PG/GR/GD boundaries do follow RANK.
+- New Normal BMS `#RANK` PG is VEZ/EZ 22ms, NM 19ms, HD 15ms, VHD 10ms. Normal GR/GD/BAD retain their exact previous values and ratios (1, 18/21, 15/21, 8/21). VEZ `#RANK 4` and missing/unsupported headers use EZ timing. Hold settings and automatic-miss deadlines remain unchanged; LN tail PG/GR/GD use the applicable table.
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - default `pg / gr / gd` values are `21ms / 65ms / 115ms`
+- Stored default `pg=21ms` remains the legacy profile calibration reference. Runtime applies `stored PG / 21` to the pinned table, giving default Normal EZ 22ms. Saved profiles are not migrated and custom values are not overwritten.
 - default `bd` is `210ms`
 - `Judge Easy` (historical replays only) scales RANK-adjusted PG/GR/GD and hold tolerances by `1.35x`. EASY PG/GR/GD=`28.35/87.75/155.25ms`; BAD is fixed at `210ms` for every RANK; mask is unchanged
-- `Judge Hard` uses EASY PG/GR/GD=`17.5/55.714286/98.571429ms`: multiply PG by `17.5/21` and GR/GD by `18/21` after RANK. BAD is fixed at `225ms` for every RANK; hold tolerances are unchanged
-- `Judge EX` uses EASY PG/GR/GD=`14/44.571429/78.857143ms` (80% of Hard), retaining BMS RANK scaling. BAD is fixed at 250ms; the separate automatic-miss deadline remains 340ms and the score factor remains Hard's 1.10.
+- `Judge Hard` reuses the complete Normal NM row (PG19/GR55.714286…/GD98.571429…/BAD180ms), regardless of chart RANK. No separate scaling or integer-ms rounding applies.
+- `Judge EX` reuses the complete Normal VHD row (PG10/GR24.761905…/GD43.809524…/BAD80ms), regardless of chart RANK. No separate scaling or integer-ms rounding applies; hold rules, automatic miss340ms and score factor1.10 remain.
 - `indirect_miss` (double, ms)
   - current profiles save and normalize this value to `340ms`, independently of the BAD hit window
   - default Normal/Easy/Hard automatically miss an unplayed note once it is more than `340ms` late. Normal/Easy record BAD; Hard records a combo-breaking indirect `POOR` / OD8 `MISS`
   - a late press outside BAD but before automatic timeout misses the expired note, then checks the next note; it cannot score a BAD hit outside the hit window
-- New Normal/Hard uses `tenriff-native-score-v2-ruleset-7`; EX uses `tenriff-native-score-v2-ruleset-8`. Only Empty Poor accuracy contribution changes, not numerical timing windows. Historical R1–R6/custom records retain their policy; new custom paths use the corresponding 7/8 IDs.
+- New Normal/Hard uses `tenriff-native-score-v2-ruleset-9`; EX uses `tenriff-native-score-v2-ruleset-10`. The pinned timing table retains Empty Poor accuracy exclusion. Historical R1–R8/custom records use their original policy; new custom paths use 9/10 IDs. Sites accepts only new standard Online R9/R10 submissions, rejects new legacy-rule submissions and preserves old boards/records as read-only. Guest/custom/LN Mix v2 exclusions and unsupported separate Ranked rules remain blocked.
 - R5 keeps the numerical timing windows, processes automatic events chronologically, and preserves R1–R4 processing order. [Timing fix](release-1.8.9.5-gate.md).
 - `hold_grace` (double, ms; default `80ms`)
   - retained for configuration compatibility and as the lower bound of `hold_break`; not the current native tail PG/GR boundary
@@ -440,6 +447,6 @@ Held-key backdrop RGB brightness uses `skin.key_backdrop_brightness` (0–2, def
 
 ## BMS replay/result compatibility (1.9.1)
 
-Three user-approved optional evidence fields are separate from profile settings: `bms_gauge_version`, `bms_control_flow_version`, and `bms_random_seed`. Missing versions mean 1; a missing branch seed falls back to historical `random_seed`, then 0. New ordinary BMS plays record gauge v2; charts with authored branching also record control-flow v2 and a uint32 branch seed. The lane RR/SR, conversion and LN Mix `random_seed` is independent from the authored branch seed. Audio-device reloads retain the same branch, and replay loads use the saved seed and policies. Courses keep their existing gauge and use the new branch parser. Protocol v6 peer battle retains gauge/control-flow v1 and branch seed 0. Sites has accepted supported gauge/branch evidence since 1.9.1.1; production v19 also accepts new R7/R8 in separate boards. Permanent Guest exclusion and separate Ranked restrictions remain. New plays use R7/R8 and old records retain their original IDs. Local BEST prefers the policy-version tuple; result comparison groups only matching policies and branch seeds.
+Three user-approved optional evidence fields are separate from profile settings: `bms_gauge_version`, `bms_control_flow_version`, and `bms_random_seed`. Missing versions mean 1; a missing branch seed falls back to historical `random_seed`, then 0. New ordinary BMS plays record gauge v2; charts with authored branching also record control-flow v2 and a uint32 branch seed. The lane RR/SR, conversion and LN Mix `random_seed` is independent from the authored branch seed. Audio-device reloads retain the same branch, and replay loads use the saved seed and policies. Courses keep their existing gauge and use the new branch parser. Peer protocol v7 retains the packet layout and uses new Normal timing, rejecting v6 peers. Gauge/control-flow v1 and branch seed 0 remain. Sites has supported eligible gauge/branch evidence since 1.9.1.1. For 1.9.6 it accepts only new standard Online R9/R10 submissions and rejects new legacy-rule submissions. Existing boards/records retain their IDs and rankings as legacy read-only. Permanent Guest, custom and LN Mix v2 exclusions and unsupported separate Ranked restrictions remain. Local BEST prefers the policy-version tuple; result comparison groups only matching policies and branch seeds.
 
 [Formulas, branching, compatibility and verification scope](bms-total-random-followup.en.md).

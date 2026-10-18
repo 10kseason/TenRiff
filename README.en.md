@@ -1,3 +1,9 @@
+**2026-10-18 · 1.9.6:** [Fixed judgement, skin tabs/search and windowed drops](docs/release-1.9.6.en.md) · [Verification scope](docs/release-1.9.6-gate.md). Sites accepts only new standard Online R9/R10 submissions; old boards and records remain legacy read-only. Unsupported separate Ranked rules and Guest/custom exclusions remain.
+
+[Pinned timing table](docs/judgement-baseline-20261018.en.md): Normal PG22/19/15/10ms and exact existing GR/GD/BAD remain. Hard uses the complete Normal NM row and EX the complete Normal VHD row for every chart RANK, without integer-ms rounding. The general source baseline remains **1.9.0**.
+
+[Skin UI behavior and shortcuts](docs/skin-ui-followup-20261018.en.md). Earlier version/local-candidate entries below are historical; 1.9.6 documents define the current scope.
+
 **2026-10-18 · 1.9.5.3:** [Skin settings cleanup and search/input fixes](docs/release-1.9.5.3.en.md). Select the edit lane with numbered preview buttons. UI font, font file and Gameplay Cursor live in Profile. Scratch Position appears only in Original runtime key mode and is adjustable for a 7+1 layout.
 
 **2026-10-17 · 1.9.5.2:** [Note and field size down to10%](docs/release-1.9.5.2.en.md). Includes GOMazk’s contribution (PR #102). Note & Field Size expands from50–140% to10–140%. The100% default, saved values and per-key-mode settings are preserved; menus, gameplay, ghost and preview use the same lower limit. Judgement, score, input and audio calculations and the1.9.5.1 350ms FAST/SLOW/file-picker behavior remain unchanged.

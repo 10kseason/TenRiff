@@ -28,6 +28,23 @@ TEST_CASE("feedback regression indicator backing visibility reaches fullscreen s
     CHECK_FALSE(hud.indicator_background_visible);
 }
 
+TEST_CASE("combo Y crosses the optional counts row in either direction") {
+    using tenriff::render::gameplay_combo_counts_offset;
+    const auto offset = [&](float top, float bottom) {
+        return gameplay_combo_counts_offset(0, 700, 20, top, 180, bottom, 10, 200, 190, 244);
+    };
+    CHECK(offset(80, 160) == 0);
+    CHECK(offset(160, 220) == -28); // overlap from above clears upward
+    CHECK(offset(230, 290) == 22);  // overlap from below clears downward
+    CHECK(offset(300, 380) == 0);
+    // The same geometry applies after classic/studio/ghost font and pop transforms.
+    CHECK(gameplay_combo_counts_offset(0, 700, 20, 100, 180, 260, 10, 200, 190, 244) == -68);
+    CHECK(gameplay_combo_counts_offset(0, 700, 20, 10, 180, 210, 10, 200, 190, 244) == 242);
+    CHECK(gameplay_combo_counts_offset(0, 300, 20, 170, 180, 280, 10, 200, 190, 244) == -88);
+    CHECK(gameplay_combo_counts_offset(0, 300, 20, 10, 180, 290, 10, 200, 190, 244) == 0);
+    CHECK(gameplay_combo_counts_offset(0, 700, 220, 160, 380, 220, 10, 200, 190, 244) == 0);
+}
+
 #ifdef _WIN32
 namespace tenriff::render {
 struct MenuWindowResolutionTestAccess {

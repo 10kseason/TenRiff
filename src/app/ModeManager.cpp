@@ -918,11 +918,10 @@ ModeManagerResult manage_modes(const gameplay::GameplayChart& chart,
     result.chart.measure_samples = chart.measure_samples;
     result.chart.bms_total = chart.bms_total;
     result.chart.bms_has_random = chart.bms_has_random;
-    const auto chart_judge = chart_format == ChartFormat::Bms && chart.bms_rank.has_value()
-        ? judge_timing_for_bms_rank(judge, *chart.bms_rank) : judge;
     result.judge_window_scale = judge_easy ? kCurrentEasyJudgeScale : 1.0;
-    result.judge = judge_ex ? judge_timing_for_ex(chart_judge)
-                           : judge_timing_for_policy(chart_judge, judge_easy, judge_hard);
+    result.judge = judge_timing_for_fixed_baseline(judge,
+        chart_format == ChartFormat::Bms ? chart.bms_rank : std::nullopt,
+        judge_easy, judge_hard, judge_ex);
 
     result.rate_multiplier = rate_score_multiplier(rate);
     result.mod_multiplier = mod_score_multiplier(result.active_mods);

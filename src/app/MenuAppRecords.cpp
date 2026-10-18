@@ -21,6 +21,15 @@ namespace tenriff::app {
 
 namespace {
 
+int judgement_generation_for_record(std::string_view ruleset_id) {
+    // New timing starts a fresh BEST without rewriting historical result files.
+    // Custom records share the generation for ghost selection, but still cannot
+    // become an official BEST unless the existing verification gate permits it.
+    return ruleset_id == "tenriff-native-score-v2-ruleset-9" ||
+           ruleset_id == "tenriff-native-score-v2-ruleset-10" ||
+           ruleset_id == "custom-ruleset-9" || ruleset_id == "custom-ruleset-10" ? 2 : 1;
+}
+
 std::filesystem::path utf8_path_or_empty(std::string_view value) {
     if (value.empty()) {
         return {};
@@ -138,6 +147,7 @@ void MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
     BestResultRecord candidate;
     candidate.has_value = true;
     candidate.replay_verified = replay_verified;
+    candidate.judgement_generation = judgement_generation_for_record(parsed.ruleset_id);
     candidate.bms_timing_version = parsed.bms_timing_version;
     candidate.bms_gauge_version = parsed.bms_gauge_version;
     candidate.bms_control_flow_version = parsed.bms_control_flow_version;
@@ -167,6 +177,7 @@ void MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
                                             effective_final_gauge);
 
     LocalPlayRecord record;
+    record.judgement_generation = candidate.judgement_generation;
     record.bms_timing_version = parsed.bms_timing_version;
     record.bms_gauge_version = parsed.bms_gauge_version;
     record.bms_control_flow_version = parsed.bms_control_flow_version;
@@ -233,12 +244,14 @@ void MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
             continue;
         }
 
-        // Each newer gauge/control-flow/timing policy starts a fresh BEST.
+        // Each newer judgement generation or gauge/control-flow/timing policy
+        // starts a fresh BEST. Judgement generation takes precedence so a new
+        // run is never compared with an old, numerically higher score.
         // Historical outcomes stay in history; random branch seeds identify a
         // performance but do not create a separate chart BEST for every play.
-        const auto candidate_policy = std::tie(candidate.bms_gauge_version,
+        const auto candidate_policy = std::tie(candidate.judgement_generation, candidate.bms_gauge_version,
             candidate.bms_control_flow_version, candidate.bms_timing_version);
-        const auto existing_policy = std::tie(existing->second.bms_gauge_version,
+        const auto existing_policy = std::tie(existing->second.judgement_generation, existing->second.bms_gauge_version,
             existing->second.bms_control_flow_version, existing->second.bms_timing_version);
         if (candidate_policy != existing_policy) {
             if (candidate_policy > existing_policy) existing->second = candidate;
@@ -716,10 +729,13 @@ std::string MenuApp::best_replay_path_for_selected_song() const {
                                                        record.practice_no_fail_enabled,
                                                        record.clear_status)) {
             // Histories are score-sorted. Preserve that ordering only within
-            // the same gauge/control-flow/timing policy; session setup checks
-            // branch-seed compatibility before actually applying a ghost.
-            if (!best || std::tie(record.bms_gauge_version, record.bms_control_flow_version, record.bms_timing_version) >
-                         std::tie(best->bms_gauge_version, best->bms_control_flow_version, best->bms_timing_version)) best = &record;
+            // the same judgement/gauge/control-flow/timing policy. Old ghosts
+            // remain available as a fallback and retain their recorded windows.
+            // Session setup checks branch-seed compatibility before playback.
+            if (!best || std::tie(record.judgement_generation, record.bms_gauge_version,
+                                 record.bms_control_flow_version, record.bms_timing_version) >
+                         std::tie(best->judgement_generation, best->bms_gauge_version,
+                                  best->bms_control_flow_version, best->bms_timing_version)) best = &record;
         }
     }
     return best ? best->replay_path : std::string{};

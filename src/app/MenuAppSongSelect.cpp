@@ -163,9 +163,9 @@ MenuApp::BestResultRecord MenuApp::best_result_for_song_entry(const SongEntry& e
 
             // Relative/canonical aliases may retain different generations of
             // BEST. Apply the same policy boundary used when storing records.
-            const auto found_policy = std::tie(found->second.bms_gauge_version,
+            const auto found_policy = std::tie(found->second.judgement_generation, found->second.bms_gauge_version,
                 found->second.bms_control_flow_version, found->second.bms_timing_version);
-            const auto best_policy = std::tie(best.bms_gauge_version,
+            const auto best_policy = std::tie(best.judgement_generation, best.bms_gauge_version,
                 best.bms_control_flow_version, best.bms_timing_version);
             if (found_policy != best_policy) {
                 if (found_policy > best_policy) best = found->second;

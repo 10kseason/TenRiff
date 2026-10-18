@@ -52,6 +52,17 @@ int main(int argc, char** argv) {
     replay.final_score = 9900;
     replay.mode.gauge = "normal";
     replay.mode.random = "off";
+    // Emit the same serializer contract for each current judgement mode without
+    // reading a protected connection or making a network request.
+    if (argc == 2 && std::string(argv[1]) == "--fixture-hard") {
+        replay.mods = {"judge_hard"};
+    } else if (argc == 2 && std::string(argv[1]) == "--fixture-ex") {
+        replay.ruleset_id = std::string(tenriff::app::kExReplayRulesetId);
+        replay.mods = {"judge_ex"};
+    } else if (argc != 1) {
+        std::cerr << "Use --fixture-hard or --fixture-ex for offline fixtures.";
+        return 2;
+    }
     std::string payload, error;
     if (!tenriff::app::build_sites_score_json(replay, std::string(64, 'b'),
          "QA Fixture - TenRiff", "FULLCOMBO", payload, error)) {

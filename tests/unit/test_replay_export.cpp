@@ -804,7 +804,7 @@ TEST_CASE("current and legacy replay rulesets reproduce their exact normal easy 
             REQUIRE(verified.verified());
             CHECK_EQ(verified.ruleset_id, std::string(ruleset));
             if (mod == "judge_hard") {
-                const bool wide_bad = legacy || ruleset == tenriff::app::kCanonicalReplayRulesetId ||
+                const bool wide_bad = legacy ||
                                       ruleset == tenriff::app::kRuleset4ReplayRulesetId;
                 CHECK(verified.stats.counts.bd == (wide_bad ? 1 : 0));
                 CHECK(verified.stats.counts.pr == (wide_bad ? 0 : 1));
@@ -850,11 +850,11 @@ TEST_CASE("legacy replay playback and ghost policy preserve old automatic miss b
     }
 }
 
-TEST_CASE("explicit R3 and R4 replay rules keep rank and LN timing without chart hash evidence") {
+TEST_CASE("explicit R3 R4 R7 replay rules keep rank and LN timing without chart hash evidence") {
     for (const auto ruleset : {tenriff::app::kRuleset3ReplayRulesetId,
                                tenriff::app::kRuleset4ReplayRulesetId,
-                               tenriff::app::kCanonicalReplayRulesetId}) {
-        const bool r4 = ruleset == tenriff::app::kCanonicalReplayRulesetId ||
+                               tenriff::app::kRuleset7ReplayRulesetId}) {
+        const bool r4 = ruleset == tenriff::app::kRuleset7ReplayRulesetId ||
                         ruleset == tenriff::app::kRuleset4ReplayRulesetId;
         for (const int format : {0, 1, 2, tenriff::gameplay::kReplayFormatVersion}) {
             ReplayFile replay;
@@ -941,7 +941,7 @@ TEST_CASE("R1 R2 and R3 judge modifier windows remain frozen across BMS ranks") 
     }
 }
 
-TEST_CASE("R4 replay verification respects both sides of every judge modifier boundary") {
+TEST_CASE("R7 replay verification respects both sides of every judge modifier boundary") {
     constexpr int rate = 48000;
     for (int rank = 0; rank <= 3; ++rank) {
         const double rank_scale = std::array<double, 4>{8.0, 15.0, 18.0, 21.0}[rank] / 21.0;
@@ -963,7 +963,7 @@ TEST_CASE("R4 replay verification respects both sides of every judge modifier bo
                     chart.notes = {{1, rate, std::nullopt}};
                     ReplayFile replay;
                     replay.chart_sha256 = std::string(64, 'd');
-                    replay.ruleset_id = std::string(tenriff::app::kCanonicalReplayRulesetId);
+                    replay.ruleset_id = std::string(tenriff::app::kRuleset7ReplayRulesetId);
                     replay.sample_rate = replay.trace.sample_rate = rate;
                     replay.rate = replay.trace.rate = 1.0;
                     replay.mode.key_mode = "auto";
@@ -1021,7 +1021,7 @@ TEST_CASE("BMS rank replay verification retains old rulesets and applies the new
                              ruleset == tenriff::app::kRuleset3ReplayRulesetId;
         const auto playback = tenriff::app::replay_judge_config_for_playback(
             replay, tenriff::config::JudgeConfig{}, chart.bms_rank);
-        CHECK(playback.pg_ms == doctest::Approx(current ? 8 : 20));
+        CHECK(playback.pg_ms == doctest::Approx(ruleset == tenriff::app::kCanonicalReplayRulesetId ? 10 : current ? 8 : 20));
         const auto verified = tenriff::app::verify_replay_against_chart(
             replay, chart, tenriff::app::ChartFormat::Bms, 120);
         REQUIRE(verified.verified());
@@ -1733,7 +1733,7 @@ TEST_CASE("LR2 course replay metadata rejects missing carry unknown policies and
     CHECK_FALSE(validate_replay_evidence(replay).success());
 }
 
-TEST_CASE("R7 R8 preserve old empty POOR replay accuracy and change only the new denominator") {
+TEST_CASE("R7 through R10 preserve old empty POOR replay accuracy and change only the new denominator") {
     using namespace tenriff;
     // Unlike the in-memory engine probes, a persisted v3 replay requires a
     // supported audio sample rate. Keep the same millisecond scenario at 48 kHz.
@@ -1752,14 +1752,14 @@ TEST_CASE("R7 R8 preserve old empty POOR replay accuracy and change only the new
     int sequence = 0;
     for (const auto ruleset : {app::kLegacyReplayRulesetId, app::kPreviousReplayRulesetId,
              app::kRuleset3ReplayRulesetId, app::kRuleset4ReplayRulesetId, app::kRuleset5ReplayRulesetId,
-             app::kRuleset6ReplayRulesetId, app::kCanonicalReplayRulesetId, app::kExReplayRulesetId}) {
+             app::kRuleset6ReplayRulesetId, app::kRuleset7ReplayRulesetId, app::kRuleset8ReplayRulesetId, app::kCanonicalReplayRulesetId, app::kExReplayRulesetId}) {
         ReplayFile replay;
         replay.ruleset_id = ruleset;
         replay.chart_format = "bms";
         replay.chart_sha256 = std::string(64, 'b');
         replay.bms_rank = 3;
         replay.sample_rate = sample_rate;
-        replay.mods = (ruleset == app::kRuleset6ReplayRulesetId || ruleset == app::kExReplayRulesetId)
+        replay.mods = (ruleset == app::kRuleset6ReplayRulesetId || ruleset == app::kRuleset8ReplayRulesetId || ruleset == app::kExReplayRulesetId)
             ? std::vector<std::string>{"judge_ex"} : std::vector<std::string>{};
         config::ModeConfig mode;
         mode.key_mode = "auto";
@@ -1801,7 +1801,8 @@ TEST_CASE("R7 R8 preserve old empty POOR replay accuracy and change only the new
         CHECK(verified.stats.counts.pg == 2);
         CHECK(verified.stats.raw_score == 10000);
         CHECK(verified.stats.max_combo == 2);
-        const bool historical = ruleset != app::kCanonicalReplayRulesetId && ruleset != app::kExReplayRulesetId;
+        const bool historical = ruleset != app::kCanonicalReplayRulesetId && ruleset != app::kExReplayRulesetId &&
+                                ruleset != app::kRuleset7ReplayRulesetId && ruleset != app::kRuleset8ReplayRulesetId;
         CHECK(verified.stats.accuracy_percent() == doctest::Approx(historical ? 200.0 / 3.0 : 100.0));
         CHECK(verified.stats.detailed_accuracy_percent() == doctest::Approx(historical ? 200.0 / 3.0 : 100.0));
         CHECK(restored.replay->stats.accuracy_percent() == doctest::Approx(verified.stats.accuracy_percent()));
@@ -1811,7 +1812,7 @@ TEST_CASE("R7 R8 preserve old empty POOR replay accuracy and change only the new
     std::filesystem::remove_all(directory);
 }
 
-TEST_CASE("R7 R8 empty POOR policy is independent of evidence envelope and preserves unknown replays") {
+TEST_CASE("R7 through R10 empty POOR policy is independent of evidence envelope and preserves unknown replays") {
     using namespace tenriff::app;
     ReplayFile replay;
     for (const int format : {0, 1, 2, tenriff::gameplay::kReplayFormatVersion}) {
@@ -1823,8 +1824,9 @@ TEST_CASE("R7 R8 empty POOR policy is independent of evidence envelope and prese
             replay.ruleset_id = historical;
             CHECK(replay_empty_poor_affects_accuracy(replay));
         }
-        for (const auto current : {kCanonicalReplayRulesetId, kExReplayRulesetId,
-                std::string_view("custom-ruleset-7"), std::string_view("custom-ruleset-8")}) {
+        for (const auto current : {kRuleset7ReplayRulesetId, kRuleset8ReplayRulesetId, kCanonicalReplayRulesetId, kExReplayRulesetId,
+                std::string_view("custom-ruleset-7"), std::string_view("custom-ruleset-8"),
+                std::string_view("custom-ruleset-9"), std::string_view("custom-ruleset-10")}) {
             replay.ruleset_id = current;
             CHECK_FALSE(replay_empty_poor_affects_accuracy(replay));
             CHECK(replay_uses_chronological_judgement(replay));
@@ -1833,7 +1835,7 @@ TEST_CASE("R7 R8 empty POOR policy is independent of evidence envelope and prese
     }
 }
 
-TEST_CASE("R5 identity selects chronological processing independently of replay envelope version") {
+TEST_CASE("R5 and newer identities select chronological processing independently of replay envelope version") {
     ReplayFile replay;
     for (int format : {0, 1, 2, tenriff::gameplay::kReplayFormatVersion}) {
         replay.replay_format_version = format;
@@ -1855,7 +1857,7 @@ TEST_CASE("R5 identity selects chronological processing independently of replay 
     }
 }
 
-TEST_CASE("R6 binds EX exclusively and preserves R1 through R5 judgement identities") {
+TEST_CASE("R9 R10 bind runtime identities and preserve historical EX timing") {
     using namespace tenriff::app;
     const tenriff::config::JudgeConfig judge;
     const tenriff::game::GaugeConfig gauge;
@@ -1865,11 +1867,11 @@ TEST_CASE("R6 binds EX exclusively and preserves R1 through R5 judgement identit
     CHECK(replay_ruleset_id_for_runtime(judge, gauge, true, false, "off", {"judge_easy"}) ==
           kCanonicalReplayRulesetId);
     CHECK(replay_ruleset_id_for_runtime(judge, gauge, true, false, "off", {"judge_ex"}) == kExReplayRulesetId);
-    CHECK(replay_ruleset_id_for_runtime(judge, gauge, false, false, "off", {"judge_ex"}) == "custom-ruleset-8");
-    CHECK(replay_ruleset_id_for_runtime(judge, gauge, true, true, "off", {"judge_ex"}) == "custom-ruleset-8");
+    CHECK(replay_ruleset_id_for_runtime(judge, gauge, false, false, "off", {"judge_ex"}) == "custom-ruleset-10");
+    CHECK(replay_ruleset_id_for_runtime(judge, gauge, true, true, "off", {"judge_ex"}) == "custom-ruleset-10");
     auto custom_judge = judge;
     custom_judge.pg_ms = 20.0;
-    CHECK(replay_ruleset_id_for_runtime(custom_judge, gauge, true, false, "off", {"judge_ex"}) == "custom-ruleset-8");
+    CHECK(replay_ruleset_id_for_runtime(custom_judge, gauge, true, false, "off", {"judge_ex"}) == "custom-ruleset-10");
     CHECK(is_current_canonical_replay_ruleset(kCanonicalReplayRulesetId, {"judge_hard"}));
     CHECK(is_current_canonical_replay_ruleset(kExReplayRulesetId, {"judge_ex", "no_ln_release"}));
     CHECK_FALSE(is_current_canonical_replay_ruleset(kExReplayRulesetId, {}));
@@ -1902,7 +1904,8 @@ TEST_CASE("R6 binds EX exclusively and preserves R1 through R5 judgement identit
     }
     for (int format : {0, 1, 2, tenriff::gameplay::kReplayFormatVersion}) {
         replay.replay_format_version = format;
-        for (const auto id : {kExReplayRulesetId, std::string_view("custom-ruleset-6")}) {
+        for (const auto id : {kRuleset6ReplayRulesetId, kRuleset8ReplayRulesetId,
+                              std::string_view("custom-ruleset-6"), std::string_view("custom-ruleset-8")}) {
             replay.ruleset_id = id;
             CHECK(replay_uses_chronological_judgement(replay));
             CHECK_FALSE(replay_uses_legacy_hold_release(replay));
@@ -1916,14 +1919,10 @@ TEST_CASE("R6 binds EX exclusively and preserves R1 through R5 judgement identit
     }
 }
 
-TEST_CASE("R6 EX replay verifies each RANK hit boundary and keeps the separate 340ms automatic miss") {
+TEST_CASE("R10 EX replay verifies each RANK hit boundary and keeps the separate 340ms automatic miss") {
     using namespace tenriff::app;
     constexpr int sample_rate = 48000;
-    const double windows[][4] = {
-        {5.333333333333333, 16.97959183673469, 30.04081632653061, 250.0},
-        {10.0, 31.83673469387755, 56.32653061224490, 250.0},
-        {12.0, 38.20408163265306, 67.59183673469388, 250.0},
-        {14.0, 44.57142857142857, 78.85714285714286, 250.0}};
+    const double windows[]{10, 65.0 * 8 / 21, 115.0 * 8 / 21, 80};
     for (int rank = 0; rank <= 3; ++rank) {
         tenriff::gameplay::GameplayChart source;
         source.lane_count = 1;
@@ -1947,7 +1946,7 @@ TEST_CASE("R6 EX replay verifies each RANK hit boundary and keeps the separate 3
             for (int outside : {0, 1}) for (int sign : {-1, 1}) {
                 if (boundary == 3 && outside && sign < 0) continue;
                 tenriff::gameplay::GameplayEngine live(live_chart, config);
-                const int64_t delta = sign * (static_cast<int64_t>(std::llround(windows[rank][boundary] * 48.0)) + outside);
+                const int64_t delta = sign * (static_cast<int64_t>(std::llround(windows[boundary] * 48.0)) + outside);
                 (void)live.handle_input(1, InputState::Pressed, sample_rate * 4 + delta);
                 (void)live.handle_input(1, InputState::Released, sample_rate * 4 + delta + 1);
                 live.advance(live_chart.duration_samples);
@@ -1976,7 +1975,7 @@ TEST_CASE("R6 EX replay verifies each RANK hit boundary and keeps the separate 3
             }
         }
         tenriff::gameplay::GameplayEngine missed(live_chart, config);
-        missed.advance(sample_rate * 4 + 250 * 48 + 1);
+        missed.advance(sample_rate * 4 + 80 * 48 + 1);
         CHECK(missed.stats().counts.pr == 0);
         CHECK(missed.stats().counts.bd == 0);
         missed.advance(sample_rate * 4 + 340 * 48);
@@ -1996,7 +1995,7 @@ TEST_CASE("course replay accepts versioned custom identities without admitting c
     replay.trace.duration_samples = 48000;
     replay.mode.course_gauge = kLr2CourseGaugeId;
     replay.mode.course_gauge_initial_value = 37.5;
-    for (const auto id : {"custom", "custom-ruleset-5", "custom-ruleset-6", "custom-ruleset-7", "custom-ruleset-8"}) {
+    for (const auto id : {"custom", "custom-ruleset-5", "custom-ruleset-6", "custom-ruleset-7", "custom-ruleset-8", "custom-ruleset-9", "custom-ruleset-10"}) {
         replay.ruleset_id = id;
         CHECK(validate_replay_evidence(replay).success());
     }
@@ -2090,4 +2089,141 @@ TEST_CASE("BMS branch and TOTAL replay reconstruction retains both policy genera
         }
     }
     std::filesystem::remove_all(directory);
+}
+
+
+TEST_CASE("R7 R8 timing tables remain exact while R9 R10 reuse pinned Normal rows for Hard and EX") {
+    using namespace tenriff::app;
+    const double normal[][4] = {
+        {10, 65.0 * 8 / 21, 115.0 * 8 / 21, 80}, {15, 65.0 * 15 / 21, 115.0 * 15 / 21, 150},
+        {19, 65.0 * 18 / 21, 115.0 * 18 / 21, 180}, {22, 65, 115, 210}};
+    for (int rank = 0; rank < 4; ++rank) for (int mode = 0; mode < 3; ++mode) {
+        ReplayFile replay;
+        if (mode) replay.mods = {mode == 1 ? "judge_hard" : "judge_ex"};
+        replay.ruleset_id = mode == 2 ? kRuleset8ReplayRulesetId : kRuleset7ReplayRulesetId;
+        const auto old = replay_judge_config_for_playback(replay, {}, rank);
+        const double scale = std::array<double, 4>{8, 15, 18, 21}[rank] / 21.0;
+        CHECK(old.pg_ms == doctest::Approx((mode == 2 ? 14.0 : mode == 1 ? 17.5 : 21.0) * scale));
+        CHECK(old.gr_ms == doctest::Approx(65.0 * scale * (mode ? 18.0 / 21.0 : 1.0) * (mode == 2 ? 0.8 : 1.0)));
+        CHECK(old.gd_ms == doctest::Approx(115.0 * scale * (mode ? 18.0 / 21.0 : 1.0) * (mode == 2 ? 0.8 : 1.0)));
+        CHECK(old.bd_ms == doctest::Approx(mode == 2 ? 250.0 : mode == 1 ? 225.0 : 210.0 * scale));
+        replay.ruleset_id = mode == 2 ? kExReplayRulesetId : kCanonicalReplayRulesetId;
+        const auto pinned = replay_judge_config_for_playback(replay, {}, rank);
+        const auto& expected = normal[mode == 2 ? 0 : mode == 1 ? 2 : rank];
+        CHECK(pinned.pg_ms == doctest::Approx(expected[0]));
+        CHECK(pinned.gr_ms == doctest::Approx(expected[1]));
+        CHECK(pinned.gd_ms == doctest::Approx(expected[2]));
+        CHECK(pinned.bd_ms == doctest::Approx(expected[3]));
+        CHECK(pinned.hold_grace_ms == old.hold_grace_ms);
+        CHECK(pinned.hold_break_ms == old.hold_break_ms);
+        CHECK(pinned.mask_ms == old.mask_ms);
+        CHECK(pinned.indirect_miss_ms == old.indirect_miss_ms);
+    }
+}
+
+TEST_CASE("fixed Hard and EX custom playback reuse the complete Normal reference row without rounding") {
+    using namespace tenriff::app;
+    tenriff::config::JudgeConfig custom;
+    custom.pg_ms = 20.25;
+    custom.gr_ms = 63.125;
+    custom.gd_ms = 112.75;
+    custom.bd_ms = 207.5;
+    for (const auto base : {tenriff::config::JudgeConfig{}, custom}) {
+        for (const bool ex : {false, true}) {
+            ReplayFile normal;
+            normal.ruleset_id = "custom-ruleset-9";
+            const auto reference = replay_judge_config_for_playback(normal, base, ex ? 0 : 2);
+            for (const auto id : {ex ? kExReplayRulesetId : kCanonicalReplayRulesetId,
+                                 std::string_view(ex ? "custom-ruleset-10" : "custom-ruleset-9")}) {
+                for (const auto rank : std::array<std::optional<int>, 7>{std::nullopt, -1, 0, 1, 2, 3, 4}) {
+                    ReplayFile replay;
+                    replay.ruleset_id = id;
+                    replay.mods = {ex ? "judge_ex" : "judge_hard"};
+                    const auto actual = replay_judge_config_for_playback(replay, base, rank);
+                    CHECK(actual.pg_ms == reference.pg_ms);
+                    CHECK(actual.gr_ms == reference.gr_ms);
+                    CHECK(actual.gd_ms == reference.gd_ms);
+                    CHECK(actual.bd_ms == reference.bd_ms);
+                    CHECK(actual.mask_ms == reference.mask_ms);
+                    CHECK(actual.hold_grace_ms == reference.hold_grace_ms);
+                    CHECK(actual.hold_break_ms == reference.hold_break_ms);
+                    CHECK(actual.indirect_miss_ms == reference.indirect_miss_ms);
+                    CHECK(actual.indirect_miss_enabled);
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("fixed timing baseline live and replay boundaries agree at 44k 48k and three playback rates") {
+    using namespace tenriff;
+    const double normal[][4] = {
+        {10, 65.0 * 8 / 21, 115.0 * 8 / 21, 80}, {15, 65.0 * 15 / 21, 115.0 * 15 / 21, 150},
+        {19, 65.0 * 18 / 21, 115.0 * 18 / 21, 180}, {22, 65, 115, 210}};
+    std::size_t probes = 0;
+    for (int sample_rate : {44100, 48000}) for (double rate : {0.75, 1.0, 1.5})
+    for (int rank = 0; rank < 4; ++rank) for (int mode = 0; mode < 3; ++mode) {
+        gameplay::GameplayChart source;
+        source.lane_count = 1;
+        source.bms_rank = rank;
+        source.duration_samples = sample_rate * 3;
+        source.notes = {{1, sample_rate, std::nullopt}};
+        config::ModeConfig selected;
+        selected.key_mode = "auto";
+        selected.random = "off";
+        selected.gauge = "normal";
+        if (mode) selected.mods = {mode == 1 ? "judge_hard" : "judge_ex"};
+        const auto managed = app::manage_modes(source, app::ChartFormat::Bms, selected, {}, rate, 120, sample_rate);
+        auto played = managed.chart;
+        const int64_t lead_in = static_cast<int64_t>(sample_rate) * app::kReplayVerificationLeadInMs / 1000;
+        gameplay::offset_gameplay_chart_samples(played, lead_in);
+        gameplay::GameplayConfig config;
+        config.sample_rate = sample_rate;
+        config.rate = rate;
+        config.judge = managed.judge;
+        config.chronological_judgement = true;
+        config.empty_poor_affects_accuracy = false;
+        config.gauge_shift_enabled = true;
+        for (std::size_t boundary = 0; boundary < 4; ++boundary)
+        for (int outside : {0, 1}) for (int sign : {-1, 1}) {
+            // Early BAD+1 creates an Empty POOR and a later miss; the existing
+            // empty-POOR roundtrip test covers that separate two-event policy.
+            if (boundary == 3 && outside && sign < 0) continue;
+            const int row = mode == 2 ? 0 : mode == 1 ? 2 : rank;
+            const int64_t edge = static_cast<int64_t>(std::llround(normal[row][boundary] * sample_rate / 1000.0));
+            const int64_t at = lead_in + sample_rate + sign * (edge + outside);
+            gameplay::GameplayEngine live(played, config);
+            (void)live.handle_input(1, InputState::Pressed, at);
+            (void)live.handle_input(1, InputState::Released, at + 1);
+            live.advance(played.duration_samples);
+            ReplayFile replay;
+            replay.chart_format = "bms";
+            replay.chart_sha256 = std::string(64, 'd');
+            replay.bms_rank = rank;
+            replay.ruleset_id = mode == 2 ? app::kExReplayRulesetId : app::kCanonicalReplayRulesetId;
+            replay.sample_rate = sample_rate;
+            replay.rate = rate;
+            replay.mods = managed.active_mods;
+            replay.mode.key_mode = "auto";
+            replay.mode.random = "off";
+            replay.mode.gauge = "normal";
+            replay.score_multiplier = managed.final_multiplier;
+            replay.rate_multiplier = managed.rate_multiplier;
+            replay.trace = live.replay();
+            replay.stats = live.stats();
+            replay.final_score = gameplay::scale_native_score(live.stats().raw_score, managed.final_multiplier);
+            const auto verified = app::verify_replay_against_chart(replay, source, app::ChartFormat::Bms, 120.0);
+            REQUIRE(verified.verified());
+            CHECK(verified.claims_match);
+            const auto& counts = verified.stats.counts;
+            const std::array<int, 5> actual{counts.pg, counts.gr, counts.gd, counts.bd, counts.pr};
+            const std::size_t expected = boundary == 3 && outside ? (mode ? 4 : 3) : boundary + outside;
+            for (std::size_t index = 0; index < actual.size(); ++index)
+                CHECK(actual[index] == (index == expected ? 1 : 0));
+            CHECK(verified.stats.raw_score == live.stats().raw_score);
+            CHECK(verified.final_gauge_value == doctest::Approx(live.gauge_state().value));
+            ++probes;
+        }
+    }
+    CHECK(probes == 1080);
 }

@@ -682,8 +682,8 @@ TEST_CASE("mode manager scales judge windows without touching the mask window") 
         make_judge_config(),
         1.0);
     CHECK(hard.judge_window_scale == doctest::Approx(1.0));
-    CHECK(hard.judge.pg_ms == doctest::Approx(10.0 * 17.5 / 21.0));
-    CHECK(hard.judge.bd_ms == doctest::Approx(225.0));
+    CHECK(hard.judge.pg_ms == doctest::Approx(10.0 * 19.0 / 21.0));
+    CHECK(hard.judge.bd_ms == doctest::Approx(40.0 * 18.0 / 21.0));
     CHECK(hard.judge.indirect_miss_ms == doctest::Approx(340.0));
     CHECK(hard.judge.indirect_miss_enabled);
     CHECK(hard.judge.hold_grace_ms == doctest::Approx(20.0));
@@ -714,13 +714,13 @@ TEST_CASE("BAD hit windows are separate from the common 340ms automatic miss dea
     CHECK(easy.judge.gr_ms == doctest::Approx(87.75));
     CHECK(easy.judge.gd_ms == doctest::Approx(155.25));
     CHECK(easy.judge.bd_ms == doctest::Approx(210.0));
-    CHECK(hard.judge.bd_ms == doctest::Approx(225.0));
+    CHECK(hard.judge.bd_ms == doctest::Approx(180.0));
     CHECK(normal.judge.indirect_miss_ms == doctest::Approx(340.0));
     CHECK(easy.judge.indirect_miss_ms == doctest::Approx(340.0));
     CHECK(hard.judge.indirect_miss_ms == doctest::Approx(340.0));
-    CHECK(hard.judge.pg_ms == doctest::Approx(17.5));
-    CHECK(hard.judge.gr_ms == doctest::Approx(55.7142857142857));
-    CHECK(hard.judge.gd_ms == doctest::Approx(98.5714285714286));
+    CHECK(hard.judge.pg_ms == doctest::Approx(19.0));
+    CHECK(hard.judge.gr_ms == doctest::Approx(65.0 * 18.0 / 21.0));
+    CHECK(hard.judge.gd_ms == doctest::Approx(115.0 * 18.0 / 21.0));
     CHECK(hard.judge.hold_grace_ms == doctest::Approx(base_judge.hold_grace_ms));
     CHECK(hard.judge.hold_break_ms == doctest::Approx(base_judge.hold_break_ms));
 }
@@ -749,8 +749,8 @@ TEST_CASE("mode manager safely combines key mode, super random, full long notes,
     CHECK(contains_token(result.active_mods, "full_long_notes"));
     CHECK(contains_token(result.active_mods, "judge_hard"));
     CHECK(result.judge_window_scale == doctest::Approx(1.0));
-    CHECK(result.judge.pg_ms == doctest::Approx(10.0 * 17.5 / 21.0));
-    CHECK(result.judge.bd_ms == doctest::Approx(225.0));
+    CHECK(result.judge.pg_ms == doctest::Approx(10.0 * 19.0 / 21.0));
+    CHECK(result.judge.bd_ms == doctest::Approx(40.0 * 18.0 / 21.0));
 
     for (const auto& note : result.chart.notes) {
         CHECK(note.lane >= 1);
@@ -1176,24 +1176,19 @@ TEST_CASE("Auto Scratch is a zero multiplier practice mod") {
     CHECK(tenriff::gameplay::scale_native_score(10000, 0.0) == 0);
 }
 
-TEST_CASE("R4 judge mods preserve RANK timing but use absolute Easy and Hard BAD windows") {
+TEST_CASE("fixed normal and Hard baseline tables preserve non-PG normal and hidden Easy windows") {
     // Spec examples, ordered VERYHARD/HARD/NORMAL/EASY. These values are
     // independent of the policy helper so an accidentally rescaled BAD fails.
     const double normal[][4] = {
-        {8, 24.76190476190476, 43.80952380952381, 80},
+        {10, 24.76190476190476, 43.80952380952381, 80},
         {15, 46.42857142857143, 82.14285714285714, 150},
-        {18, 55.71428571428572, 98.57142857142857, 180},
-        {21, 65, 115, 210}};
+        {19, 55.71428571428572, 98.57142857142857, 180},
+        {22, 65, 115, 210}};
     const double easy[][4] = {
         {10.8, 33.42857142857143, 59.14285714285714, 210},
         {20.25, 62.67857142857143, 110.8928571428571, 210},
         {24.3, 75.21428571428572, 133.0714285714286, 210},
         {28.35, 87.75, 155.25, 210}};
-    const double hard[][4] = {
-        {6.666666666666667, 21.22448979591837, 37.55102040816327, 225},
-        {12.5, 39.79591836734694, 70.40816326530613, 225},
-        {15, 47.75510204081633, 84.48979591836735, 225},
-        {17.5, 55.71428571428572, 98.57142857142857, 225}};
     for (int rank : {-1, 0, 1, 2, 3, 4}) {
         for (const auto token : {"", "judge_easy", "judge_hard"}) {
             for (int sample_rate : {44100, 48000, 96000}) {
@@ -1209,7 +1204,7 @@ TEST_CASE("R4 judge mods preserve RANK timing but use absolute Easy and Hard BAD
                     const int row = rank >= 0 && rank <= 3 ? rank : 3;
                     const bool is_easy = std::string_view(token) == "judge_easy";
                     const bool is_hard = std::string_view(token) == "judge_hard";
-                    const auto& expected = is_easy ? easy[row] : is_hard ? hard[row] : normal[row];
+                    const auto& expected = is_easy ? easy[row] : normal[is_hard ? 2 : row];
                     CHECK(managed.judge.pg_ms == doctest::Approx(expected[0]));
                     CHECK(managed.judge.gr_ms == doctest::Approx(expected[1]));
                     CHECK(managed.judge.gd_ms == doctest::Approx(expected[2]));
@@ -1224,14 +1219,9 @@ TEST_CASE("R4 judge mods preserve RANK timing but use absolute Easy and Hard BAD
     }
 }
 
-TEST_CASE("Judge EX scales authored RANK windows while retaining Hard miss and score policies") {
-    // Literal design examples, ordered VERYHARD/HARD/NORMAL/EASY. Neither rate
-    // nor audio sample rate changes the configured millisecond policy.
-    const double expected[][3] = {
-        {5.333333333333333, 16.97959183673469, 30.04081632653061},
-        {10.0, 31.83673469387755, 56.32653061224490},
-        {12.0, 38.20408163265306, 67.59183673469388},
-        {14.0, 44.57142857142857, 78.85714285714286}};
+TEST_CASE("fixed EX baseline table retains Hard miss and score policies") {
+    // EX is the Normal VHD row for every authored rank, including VEZ/fallback.
+    const double expected[]{10, 65.0 * 8 / 21, 115.0 * 8 / 21, 80};
     tenriff::config::ModeConfig mode;
     mode.mods = {"Judge EX"};
     CHECK(tenriff::app::mode_mod_judge_ex(mode.mods));
@@ -1241,7 +1231,7 @@ TEST_CASE("Judge EX scales authored RANK windows while retaining Hard miss and s
     CHECK(tenriff::app::mod_score_multiplier(mode.mods) == doctest::Approx(1.10));
     CHECK(tenriff::app::final_score_multiplier(mode.mods, 1.0) == doctest::Approx(1.0));
     CHECK(tenriff::app::final_score_multiplier(mode.mods, 2.0) == doctest::Approx(1.10));
-    for (int rank = 0; rank <= 3; ++rank) {
+    for (int rank : {-1, 0, 1, 2, 3, 4}) {
         for (int sample_rate : {44100, 48000, 96000}) {
             for (double rate : {0.75, 1.0, 1.5}) {
                 tenriff::gameplay::GameplayChart chart;
@@ -1251,10 +1241,10 @@ TEST_CASE("Judge EX scales authored RANK windows while retaining Hard miss and s
                     chart, tenriff::app::ChartFormat::Bms, mode,
                     tenriff::config::JudgeConfig{}, rate, 180.0, sample_rate);
                 CHECK(managed.active_mods == std::vector<std::string>{"judge_ex"});
-                CHECK(managed.judge.pg_ms == doctest::Approx(expected[rank][0]));
-                CHECK(managed.judge.gr_ms == doctest::Approx(expected[rank][1]));
-                CHECK(managed.judge.gd_ms == doctest::Approx(expected[rank][2]));
-                CHECK(managed.judge.bd_ms == doctest::Approx(250.0));
+                CHECK(managed.judge.pg_ms == doctest::Approx(expected[0]));
+                CHECK(managed.judge.gr_ms == doctest::Approx(expected[1]));
+                CHECK(managed.judge.gd_ms == doctest::Approx(expected[2]));
+                CHECK(managed.judge.bd_ms == doctest::Approx(expected[3]));
                 CHECK(managed.judge.indirect_miss_ms == doctest::Approx(340.0));
                 CHECK(managed.judge.indirect_miss_enabled);
                 CHECK(managed.judge.hold_grace_ms == doctest::Approx(80.0));
@@ -1270,8 +1260,75 @@ TEST_CASE("Judge EX scales authored RANK windows while retaining Hard miss and s
     for (auto format : {tenriff::app::ChartFormat::Bms, tenriff::app::ChartFormat::Unknown}) {
         const auto managed = tenriff::app::manage_modes(
             chart, format, mode, tenriff::config::JudgeConfig{}, 1.0);
-        CHECK(managed.judge.pg_ms == doctest::Approx(14.0));
-        CHECK(managed.judge.gr_ms == doctest::Approx(expected[3][1]));
-        CHECK(managed.judge.gd_ms == doctest::Approx(expected[3][2]));
+        CHECK(managed.judge.pg_ms == doctest::Approx(10.0));
+        CHECK(managed.judge.gr_ms == doctest::Approx(expected[1]));
+        CHECK(managed.judge.gd_ms == doctest::Approx(expected[2]));
+        CHECK(managed.judge.bd_ms == doctest::Approx(expected[3]));
+    }
+}
+
+TEST_CASE("fixed baseline scales custom PG calibration without migrating stored default values") {
+    tenriff::config::JudgeConfig base;
+    CHECK(base.pg_ms == 21.0);
+    CHECK(base.gr_ms == 65.0);
+    CHECK(base.gd_ms == 115.0);
+    CHECK(base.bd_ms == 210.0);
+    base.pg_ms = 10.0;
+    tenriff::gameplay::GameplayChart chart;
+    chart.lane_count = 4;
+    chart.bms_rank = 2;
+    for (const std::string token : {"", "judge_hard", "judge_ex", "judge_easy"}) {
+        tenriff::config::ModeConfig mode;
+        if (!token.empty()) mode.mods = {token};
+        const auto managed = tenriff::app::manage_modes(
+            chart, tenriff::app::ChartFormat::Bms, mode, base, 1.0);
+        const double expected_pg = token == "judge_ex" ? 10.0 * 10.0 / 21.0 :
+            token == "judge_easy" ? 10.0 * 18.0 / 21.0 * 1.35 : 10.0 * 19.0 / 21.0;
+        CHECK(managed.judge.pg_ms == doctest::Approx(expected_pg));
+        CHECK(managed.judge.mask_ms == base.mask_ms);
+        CHECK(managed.judge.hold_grace_ms == doctest::Approx(
+            token == "judge_easy" ? base.hold_grace_ms * 1.35 : base.hold_grace_ms));
+    }
+    CHECK(base.pg_ms == 10.0);
+    CHECK(base.gr_ms == 65.0);
+}
+
+TEST_CASE("Hard and EX exactly reuse calibrated Normal rows across authored ranks and formats") {
+    using namespace tenriff;
+    config::JudgeConfig custom;
+    custom.pg_ms = 20.25;
+    custom.gr_ms = 63.125;
+    custom.gd_ms = 112.75;
+    custom.bd_ms = 207.5;
+    custom.hold_grace_ms = 77.25;
+    custom.hold_break_ms = 198.75;
+    custom.mask_ms = 29.5;
+    for (const auto base : {config::JudgeConfig{}, custom}) {
+        for (const auto token : {"judge_hard", "judge_ex"}) {
+            const bool ex = std::string_view(token) == "judge_ex";
+            gameplay::GameplayChart reference;
+            reference.lane_count = 4;
+            reference.bms_rank = ex ? 0 : 2;
+            const auto normal = app::manage_modes(reference, app::ChartFormat::Bms, {}, base, 1.0).judge;
+            for (auto format : {app::ChartFormat::Bms, app::ChartFormat::Unknown}) {
+                for (const auto rank : std::array<std::optional<int>, 7>{std::nullopt, -1, 0, 1, 2, 3, 4}) {
+                    auto chart = reference;
+                    chart.bms_rank = rank;
+                    config::ModeConfig mode;
+                    mode.mods = {token};
+                    const auto actual = app::manage_modes(chart, format, mode, base, 1.0).judge;
+                    CHECK(actual.pg_ms == normal.pg_ms);
+                    CHECK(actual.gr_ms == normal.gr_ms);
+                    CHECK(actual.gd_ms == normal.gd_ms);
+                    CHECK(actual.bd_ms == normal.bd_ms);
+                    CHECK(actual.hold_grace_ms == normal.hold_grace_ms);
+                    CHECK(actual.hold_break_ms == normal.hold_break_ms);
+                    CHECK(actual.mask_ms == normal.mask_ms);
+                    CHECK(actual.indirect_miss_ms == normal.indirect_miss_ms);
+                    CHECK(actual.indirect_miss_enabled);
+                    CHECK_FALSE(normal.indirect_miss_enabled);
+                }
+            }
+        }
     }
 }

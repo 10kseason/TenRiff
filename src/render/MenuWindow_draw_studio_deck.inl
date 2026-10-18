@@ -167,14 +167,15 @@
             studio_text(scene_hud_cache.studio_gauge_name, studio_fonts.studio_numbers[0].Get(), D2D1::RectF(x, y + 43, x + 96, y + 65), color, DWRITE_TEXT_ALIGNMENT_LEADING, 2);
         };
         auto draw_studio_combo = [&](const GameplayFieldLayout& field, const std::wstring& value,
-                                     const GameplayTextPopAnimation& animation, float top, float bottom, float offset) {
+                                     const GameplayTextPopAnimation& animation, float top, float bottom, float offset, bool ghost) {
             auto rect = gameplay_combo_overlay_rect(field, combo_position, 47, top, bottom, offset, 8, 18);
             const auto center = D2D1::Point2F((rect.left + rect.right) * .5f, (rect.top + rect.bottom) * .5f);
             D2D1_MATRIX_3X2_F saved{}; ctx->GetTransform(&saved);
             const float scale = animation.scale * hud_font_scale(data.gameplay.combo_font_scale);
+            const float shift_y = animation.offset_y + avoid_field_counts(field, rect, scale, animation.offset_y, 20);
+            record_combo_placement(rect, scale, shift_y, 20, ghost);
             ctx->SetTransform(D2D1::Matrix3x2F::Scale(scale, scale, center) *
-                D2D1::Matrix3x2F::Translation(static_cast<float>(data.gameplay.combo_offset_x), animation.offset_y +
-                    avoid_field_counts(field, rect, scale, animation.offset_y, 20)) * saved);
+                D2D1::Matrix3x2F::Translation(static_cast<float>(data.gameplay.combo_offset_x), shift_y) * saved);
             auto color = ng_color("combo", D2D1::ColorF(0xFFFFFF, .92f)); color.a *= animation.opacity;
             studio_text(value, studio_fonts.studio_combo.Get(), rect, color, DWRITE_TEXT_ALIGNMENT_CENTER);
             static const std::wstring label = L"COMBO";

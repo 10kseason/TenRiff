@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.9.6 — 2026-10-18
+
+- Pin Normal PG to VEZ/EZ22, NM19, HD15 and VHD10ms while preserving exact Normal GR/GD/BAD. Hard reuses Normal NM and EX Normal VHD for all chart ranks, without integer-ms rounding. R9/R10 identify the new rules; old R1–R8 replay behavior and stored calibration remain.
+- Accept only new standard Online R9/R10 records on compatible Sites. Reject new legacy-rule submissions and retain all old boards/records as read-only, without recalculation. Preserve Guest/custom/LN Mix v2 exclusions, the client_submitted boundary and unsupported separate Ranked verifier gates. Peer protocol v7 rejects v6 timing mismatches.
+- Add a single row of 14 skin-mode tabs and localized search, preserve hidden X/gear settings, and show skin management/import controls only for their supported sources. Keep Original-only scratch controls and fixed divider width.
+- Preserve file-drop acceptance after display-mode changes; let combo Y pass above optional counts using nearest fitting placement; reduce the default album judgement badge. Keep explicit saved positions and authored rectangles.
+- Retain the general baseline 1.9.0 and prior releases/candidates. See [release scope](docs/release-1.9.6.en.md) and [verification gates](docs/release-1.9.6-gate.md); this entry does not certify completed checks or publication.
+
 ## 1.9.5.3 — 2026-10-18
 
 - Skin Settings adds **In-field Judgement Counts** (default Off): cumulative PG / GR / G / BAD / PR counts appear immediately below the timing indicator, follow its position and fit inside the note field. Counts stay visible between hits and use separate player/ghost totals. Judgement names and calculations remain unchanged.

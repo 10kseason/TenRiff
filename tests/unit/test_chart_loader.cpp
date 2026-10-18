@@ -339,9 +339,9 @@ TEST_CASE("BMS RANK chooses real-time judgement windows while Easy keeps other w
     TempDirGuard temp{make_temp_dir()};
     REQUIRE_FALSE(temp.path.empty());
     struct RankCase { const char* header; double pg; double scale; };
-    const RankCase cases[] = {{"", 21, 1}, {"#RANK 3\n", 21, 1},
-        {"#RANK 2\n", 18, 18.0 / 21.0}, {"#RANK 1\n", 15, 15.0 / 21.0},
-        {"#RANK 0\n", 8, 8.0 / 21.0}, {"#RANK invalid\n", 21, 1}};
+    const RankCase cases[] = {{"", 22, 1}, {"#RANK 3\n", 22, 1}, {"#RANK 4\n", 22, 1},
+        {"#RANK 2\n", 19, 18.0 / 21.0}, {"#RANK 1\n", 15, 15.0 / 21.0},
+        {"#RANK 0\n", 10, 8.0 / 21.0}, {"#RANK invalid\n", 22, 1}};
     for (const auto& item : cases) {
         const auto path = temp.path / "rank.bms";
         { std::ofstream file(path); file << "#TITLE Rank fixture\n#BPM 120\n" << item.header << "#00111:01\n"; }
