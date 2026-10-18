@@ -81,12 +81,13 @@ void SkinSettingsEffects::merge(const SkinSettingsEffects& other) noexcept {
 
 std::optional<SkinSettingsRowId> skin_setting_id_at(
     std::size_t index,
-    bool lr2_source) noexcept {
+    bool lr2_source, bool original_key_mode) noexcept {
     std::size_t visible_index = 0;
     for (const auto id : kSkinSettingsRowOrder) {
         if (!lr2_source && id == SkinSettingsRowId::Lr2Resolution) {
             continue;
         }
+        if (!original_key_mode && id == SkinSettingsRowId::ScratchPosition) continue;
         if (visible_index == index) {
             return id;
         }
@@ -95,8 +96,8 @@ std::optional<SkinSettingsRowId> skin_setting_id_at(
     return std::nullopt;
 }
 
-std::optional<std::size_t> skin_setting_index(SkinSettingsRowId id, bool lr2_source) noexcept {
-    const int index = SkinSettingsRows{lr2_source}.index_of(id);
+std::optional<std::size_t> skin_setting_index(SkinSettingsRowId id, bool lr2_source, bool original_key_mode) noexcept {
+    const int index = SkinSettingsRows{lr2_source, original_key_mode}.index_of(id);
     return index < 0 ? std::nullopt : std::optional<std::size_t>{static_cast<std::size_t>(index)};
 }
 
@@ -123,6 +124,7 @@ bool SkinSettingsController::dirty() const noexcept {
 void SkinSettingsController::reset(std::string_view runtime_key_mode) {
     selected_id_ = SkinSettingsRowId::KeyMode;
     edit_mode_ = normalize_skin_edit_mode(std::string(runtime_key_mode));
+    original_key_mode_ = skin_scratch_position_visible(runtime_key_mode);
     edit_lane_ = 0;
     edit_gap_ = 0;
     dirty_ = false;
@@ -131,8 +133,9 @@ void SkinSettingsController::reset(std::string_view runtime_key_mode) {
 
 SkinSettingsEffects SkinSettingsController::select(
     SkinSettingsRowId target,
-    bool lr2_source) noexcept {
-    if (SkinSettingsRows{lr2_source}.index_of(target) < 0 || selected_id_ == target) {
+    bool lr2_source, bool original_key_mode) noexcept {
+    original_key_mode_ = original_key_mode;
+    if (SkinSettingsRows{lr2_source, original_key_mode_}.index_of(target) < 0 || selected_id_ == target) {
         return {};
     }
     selected_id_ = target;
@@ -176,6 +179,10 @@ SkinSettingsEffects SkinSettingsController::handle(
     std::optional<SkinSettingsRowId> target) {
     const bool lr2_source =
         config::normalize_skin_source_token(runtime.skin.source) == "lr2";
+    original_key_mode_ = skin_scratch_position_visible(runtime.mode.key_mode);
+    if (SkinSettingsRows{lr2_source, original_key_mode_}.index_of(selected_id_) < 0) {
+        selected_id_ = SkinSettingsRowId::KeyMode;
+    }
     if (action.kind == MenuActionKind::Back) {
         return leave_screen();
     }
@@ -184,10 +191,10 @@ SkinSettingsEffects SkinSettingsController::handle(
     }
     SkinSettingsEffects effects;
     if (target.has_value()) {
-        if (SkinSettingsRows{lr2_source}.index_of(*target) < 0) {
+        if (SkinSettingsRows{lr2_source, original_key_mode_}.index_of(*target) < 0) {
             return effects;
         }
-        effects.merge(select(*target, lr2_source));
+        effects.merge(select(*target, lr2_source, original_key_mode_));
     }
     effects.merge(apply_selected_action(
         action, runtime, available_lr2_skin_names, available_tenriff_skin_names));
@@ -211,13 +218,13 @@ SkinSettingsEffects SkinSettingsController::move_selection(
     if (direction == 0) {
         return {};
     }
-    const SkinSettingsRows rows{lr2_source};
+    const SkinSettingsRows rows{lr2_source, original_key_mode_};
     const int current = rows.index_of(selected_id_);
     const int next = std::clamp(
         (current < 0 ? 0 : current) + (direction < 0 ? -1 : 1),
         0,
         rows.count() - 1);
-    const auto next_id = skin_setting_id_at(static_cast<std::size_t>(next), lr2_source);
+    const auto next_id = skin_setting_id_at(static_cast<std::size_t>(next), lr2_source, original_key_mode_);
     if (!next_id.has_value() || *next_id == selected_id_) {
         return {};
     }
@@ -285,6 +292,9 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
             case SkinSettingsRowId::ImportSkin:
                 effects.boundary_action = SkinBoundaryAction::ImportSkin;
                 return effects;
+            case SkinSettingsRowId::ExportPreset:
+                effects.boundary_action = SkinBoundaryAction::ExportPreset;
+                return effects;
             case SkinSettingsRowId::ImportPreset:
                 effects.boundary_action = SkinBoundaryAction::ImportPreset;
                 return effects;
@@ -296,9 +306,6 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
                 return effects;
             case SkinSettingsRowId::OpenSkinEditor:
                 effects.boundary_action = SkinBoundaryAction::OpenSkinEditor;
-                return effects;
-            case SkinSettingsRowId::UiFontFile:
-                effects.boundary_action = SkinBoundaryAction::ChooseUiFont;
                 return effects;
             case SkinSettingsRowId::ReloadSkin:
                 effects.boundary_action = SkinBoundaryAction::ReloadSkin;
@@ -329,7 +336,7 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
             return effects;
         }
         case SkinSettingsRowId::ScratchPosition:
-            if (config::normalize_skin_mode_token(edit_mode_) != "7+1") return {};
+            if (!original_key_mode_ || config::normalize_skin_mode_token(edit_mode_) != "7+1") return {};
             runtime.skin.scratch_position =
                 config::normalize_skin_scratch_position_token(runtime.skin.scratch_position) == "left"
                     ? "right"
@@ -664,6 +671,9 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
             return mark_changed();
         case SkinSettingsRowId::TimingBar:
             runtime.skin.show_timing_bar = !runtime.skin.show_timing_bar;
+            return mark_changed();
+        case SkinSettingsRowId::JudgementCounts:
+            runtime.skin.show_judgement_counts = !runtime.skin.show_judgement_counts;
             return mark_changed();
         case SkinSettingsRowId::TimingMarkerStyle:
             runtime.skin.timing_marker_style = runtime.skin.timing_marker_style == "barcode" ? "dot" : "barcode";

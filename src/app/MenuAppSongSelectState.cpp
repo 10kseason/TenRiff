@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "app/MemoryDiagnostics.h"
+#include "app/DifficultyTable.h"
 #include "app/MenuAppSettingsUtils.h"
 #include "app/MenuAppSongSelectUtils.h"
 #include "app/MenuSongUtils.h"
@@ -26,6 +27,33 @@ std::string song_group_sort_key(const SongEntry& entry, MenuApp::SongGroupMode m
 }
 
 }  // namespace
+
+bool MenuApp::showing_table_level_folders() const {
+    return song_select_view_ == SongSelectView::Songs && !config_.ui.difficulty_table_path.empty() &&
+        active_table_level_.empty() && song_search_query_.empty() && !song_select_search_active_;
+}
+
+void MenuApp::refresh_table_level_folders() {
+    if (table_levels_path_ == config_.ui.difficulty_table_path) return;
+    table_levels_path_ = config_.ui.difficulty_table_path;
+    table_levels_.clear();
+    active_table_level_.clear();
+    selected_table_level_ = 0;
+    if (table_levels_path_.empty()) return;
+    const auto loaded = load_difficulty_table_utf8(table_levels_path_);
+    if (loaded.success()) table_levels_ = loaded.table.levels();
+    std::stable_sort(table_levels_.begin(), table_levels_.end(), menu_song_select::table_level_less);
+    table_levels_.erase(std::unique(table_levels_.begin(), table_levels_.end()), table_levels_.end());
+}
+
+void MenuApp::open_selected_table_level() {
+    if (!showing_table_level_folders() || selected_table_level_ < 0 ||
+        static_cast<std::size_t>(selected_table_level_) >= table_levels_.size()) return;
+    active_table_level_ = table_levels_[static_cast<std::size_t>(selected_table_level_)];
+    selected_song_ = 0;
+    rebuild_visible_song_list();
+    publish_snapshot();
+}
 
 void MenuApp::apply_song_sort(SongSortMode mode) {
     song_sort_mode_ = mode;
@@ -70,6 +98,8 @@ void MenuApp::rebuild_visible_song_list(const std::string* selected_path) {
         if (peer.remote_library_ready) remote_library = peer.remote_library_sha256;
     }
 
+    refresh_table_level_folders();
+    table_level_counts_.assign(table_levels_.size(), 0);
     visible_song_indices_.clear();
     visible_song_indices_.reserve(indexed_songs_.size());
     for (std::size_t index = 0; index < indexed_songs_.size(); ++index) {
@@ -85,7 +115,10 @@ void MenuApp::rebuild_visible_song_list(const std::string* selected_path) {
             song_entry_matches_level_filter(entry, song_level_min_filter_, song_level_max_filter_,
                                             !config_.ui.difficulty_table_path.empty()) &&
             song_entry_matches_collection_filter(entry)) {
-            visible_song_indices_.push_back(index);
+            const auto tier = std::find(table_levels_.begin(), table_levels_.end(), entry.difficulty_table_level);
+            if (tier != table_levels_.end()) ++table_level_counts_[static_cast<std::size_t>(tier - table_levels_.begin())];
+            if (active_table_level_.empty() || entry.difficulty_table_level == active_table_level_)
+                visible_song_indices_.push_back(index);
         }
     }
 

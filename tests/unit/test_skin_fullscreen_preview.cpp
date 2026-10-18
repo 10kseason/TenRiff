@@ -3,17 +3,102 @@
 #ifdef _WIN32
 #include <array>
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <string>
 
 #include "app/MenuApp.h"
 #include "app/GameSession.h"
+#include "app/ProfileSetupFlow.h"
 #include "config/KeycodeMap.h"
 #include "timing/HighResClock.h"
 
 namespace tenriff::app {
 
 struct MenuAppSkinPreviewTestAccess {
+    static void check_overhaul() {
+        auto menu = fixture();
+        for (const char* mode : {"5k", "7+1", "16k"}) {
+            menu->skin_settings_controller_.reset(mode);
+            menu->config_.skin.scratch_position = "right";
+            menu->publish_snapshot();
+            const int count = menu->snapshot_.render.generic.skin_preview.lane_count;
+            if (std::string(mode) == "5k") {
+                CHECK(menu->snapshot_.render.generic.skin_preview.lane_colors[2] == 0xF6F8FFu);
+            }
+            CHECK(menu->snapshot_.render.generic.skin_preview.lane_center_gap_scale ==
+                  doctest::Approx(std::string(mode) == "16k" ? 1.0 : 0.0));
+            for (const auto& row : menu->snapshot_.render.generic.rows) {
+                CHECK(SkinSettingsRows{false}.index_of(static_cast<SkinSettingsRowId>(row.row_index)) >= 0);
+            }
+            static_cast<void>(menu->skin_settings_controller_.select(SkinSettingsRowId::LaneWidth, false));
+            for (int lane = 1; lane <= count; ++lane) {
+                render::MenuClickEvent click{};
+                click.kind = render::MenuHitTargetKind::SkinPreviewLane;
+                click.index = lane;
+                click.part = render::MenuHitPart::Activate;
+                menu->handle_menu_click(click);
+                const int source = std::string(mode) == "7+1" ? (lane == count ? 0 : lane) : lane - 1;
+                CHECK(menu->skin_settings_controller_.edit_lane() == source);
+                CHECK(menu->snapshot_.render.generic.skin_preview.selected_lane == lane);
+                CHECK(menu->skin_settings_controller_.selected_id() == SkinSettingsRowId::LaneWidth);
+                CHECK_FALSE(menu->skin_settings_controller_.dirty());
+            }
+            render::MenuClickEvent click{};
+            click.kind = render::MenuHitTargetKind::SkinPreviewLane; click.index = 1;
+            click.part = render::MenuHitPart::Activate;
+            menu->help_overlay_visible_ = true;
+            menu->handle_menu_click(click);
+            CHECK(menu->snapshot_.render.generic.skin_preview.selected_lane == count);
+            menu->help_overlay_visible_ = false;
+            click.index = count + 1; menu->handle_menu_click(click);
+            CHECK(menu->snapshot_.render.generic.skin_preview.selected_lane == count);
+            menu->skin_preview_fullscreen_ = true;
+            click.index = 1; menu->handle_menu_click(click);
+            CHECK(menu->skin_settings_controller_.edit_lane() == (std::string(mode) == "7+1" ? 0 : count - 1));
+            menu->skin_preview_fullscreen_ = false;
+        }
+        for (const char* mode : {"auto", "5k", "8k"}) {
+            menu->config_.mode.key_mode = mode;
+            menu->publish_snapshot();
+            bool scratch_visible = false;
+            for (const auto& row : menu->snapshot_.render.generic.rows) {
+                scratch_visible |= row.row_index == static_cast<int>(SkinSettingsRowId::ScratchPosition);
+            }
+            CHECK(scratch_visible == (std::string(mode) == "auto"));
+        }
+        menu->reset_screen(MenuApp::Screen::QuickSetup);
+        menu->publish_snapshot();
+        const auto& rows = menu->snapshot_.render.generic.rows;
+        CHECK(rows[profile_setup::kUiFontRow].row_index == profile_setup::kUiFontRow);
+        CHECK(rows[profile_setup::kUiFontFileRow].activatable);
+        CHECK(rows.size() == static_cast<std::size_t>(profile_setup::row_count(profile_setup::entry(menu->first_run_profile_))));
+        // Persist to a test-owned directory, never the user's active profile.
+        const auto path = std::filesystem::temp_directory_path() / ("tenriff_font_move_" + std::to_string(timing::HighResClock::now_ns()));
+        REQUIRE(std::filesystem::create_directory(path));
+        menu->profile_dir_ = path.u8string();
+        const auto before = menu->config_.skin.ui_font;
+        render::MenuClickEvent click{};
+        click.kind = render::MenuHitTargetKind::SettingsRow; click.index = profile_setup::kUiFontRow;
+        click.part = render::MenuHitPart::Increment;
+        menu->handle_menu_click(click);
+        CHECK(menu->config_.skin.ui_font != before);
+        CHECK(config::ConfigLoader{}.load_profile(path.u8string()).config.skin.ui_font == menu->config_.skin.ui_font);
+        menu->settings_cursor_ = profile_setup::kUiFontRow;
+        menu->handle_quick_setup_input(menu->key_left_);
+        CHECK(menu->config_.skin.ui_font == before);
+        click.index = profile_setup::kGameplayCursorRow;
+        click.part = render::MenuHitPart::Increment;
+        const bool cursor_before = menu->config_.ui.show_cursor_in_gameplay;
+        menu->handle_menu_click(click);
+        CHECK(menu->config_.ui.show_cursor_in_gameplay != cursor_before);
+        CHECK(config::ConfigLoader{}.load_profile(path.u8string()).config.ui.show_cursor_in_gameplay == !cursor_before);
+        menu->settings_cursor_ = profile_setup::kGameplayCursorRow;
+        menu->handle_quick_setup_input(menu->key_enter_);
+        CHECK(menu->config_.ui.show_cursor_in_gameplay == cursor_before);
+        std::error_code ec; std::filesystem::remove(path / "config.json", ec); std::filesystem::remove(path, ec);
+    }
+
     static void check_preview_drag() {
         struct TempProfile {
             std::filesystem::path path;
@@ -235,6 +320,8 @@ struct MenuAppSkinPreviewTestAccess {
         // Releasing a hidden key must not leave it latched after preview closes.
         CHECK(menu->pressed_keys_.empty());
         tap(*menu, menu->key_backspace_);
+        CHECK(menu->skin_preview_fullscreen_);
+        tap(*menu, menu->key_escape_);
         CHECK_FALSE(menu->skin_preview_fullscreen_);
         CHECK(menu->current_screen() == MenuApp::Screen::SettingsSkins);
     }
@@ -255,6 +342,103 @@ struct MenuAppSkinPreviewTestAccess {
             CHECK_FALSE(menu->skin_preview_fullscreen_);
             check_config_and_selection(*menu);
         }
+    }
+
+    static void check_feedback_keyboard() {
+        auto menu = fixture();
+        menu->config_.ui.hispeed_increase_key = "F12";
+        menu->refresh_function_keys();
+        const auto f6 = config::KeycodeMap::to_keycode("F6").value();
+        const auto probes = menu->current_menu_probe_keycodes();
+        CHECK(std::find(probes.begin(), probes.end(), f6) != probes.end());
+        key(*menu, f6, input::InputState::Pressed);
+        REQUIRE(menu->skin_preview_fullscreen_);
+        key(*menu, f6, input::InputState::Pressed);
+        CHECK(menu->skin_preview_fullscreen_);
+        key(*menu, f6, input::InputState::Released);
+        tap(*menu, f6);
+        CHECK_FALSE(menu->skin_preview_fullscreen_);
+
+        menu->reset_screen(MenuApp::Screen::SongSelect);
+        menu->song_select_search_active_ = true;
+        menu->song_search_query_ = u8"A가😀";
+        key(*menu, 8, input::InputState::Pressed);
+        CHECK(menu->song_search_query_ == u8"A가");
+        const auto due = menu->song_select_repeat_next_ns_;
+        REQUIRE(due > 0);
+        key(*menu, 8, input::InputState::Pressed);
+        CHECK(menu->song_search_query_ == u8"A가");
+        menu->service_song_select_repeat(due, true);
+        CHECK(menu->song_search_query_ == "A");
+        menu->service_song_select_repeat(menu->song_select_repeat_next_ns_, true);
+        CHECK(menu->song_search_query_.empty());
+        menu->service_song_select_repeat(menu->song_select_repeat_next_ns_, true);
+        CHECK(menu->song_select_search_active_);
+        CHECK(menu->current_screen() == MenuApp::Screen::SongSelect);
+        key(*menu, 8, input::InputState::Released);
+        tap(*menu, 27);
+        tap(*menu, 8);
+        CHECK(menu->current_screen() == MenuApp::Screen::SongSelect);
+    }
+
+    static void check_feedback_folders() {
+        const auto directory = std::filesystem::temp_directory_path() /
+            ("tenriff-level-folders-" + std::to_string(timing::HighResClock::now_ns()));
+        REQUIRE(std::filesystem::create_directory(directory));
+        struct Cleanup { std::filesystem::path path; ~Cleanup() { std::error_code ec; std::filesystem::remove_all(path,ec); } } cleanup{directory};
+        std::ofstream(directory / "header.json") << R"({"name":"Test","symbol":"T","level_order":["20","2","16+","1","16","10"],"data_url":"data.json"})";
+        std::ofstream(directory / "data.json") << R"([])";
+        auto menu = fixture();
+        menu->reset_screen(MenuApp::Screen::SongSelect);
+        menu->song_select_focus_ = MenuApp::SongSelectFocus::SongList;
+        menu->config_.ui.difficulty_table_path = (directory / "header.json").u8string();
+        for (const std::string level : {"1", "2", "16", "16+"}) {
+            SongEntry entry;
+            entry.path = level + ".bms";
+            entry.title = "Song " + level;
+            entry.artist = "Artist";
+            entry.difficulty_table_level = level;
+            menu->indexed_songs_.push_back(entry);
+        }
+        menu->rebuild_visible_song_list();
+        menu->publish_snapshot();
+        REQUIRE(menu->showing_table_level_folders());
+        CHECK((menu->table_levels_ == std::vector<std::string>{"1","2","10","16","16+","20"}));
+        CHECK(menu->snapshot_.render.song_select.songs.size() == 6);
+        CHECK((menu->table_level_counts_ == std::vector<int>{1,1,0,1,1,0}));
+        tap(*menu, 13);
+        REQUIRE(menu->visible_song_count() == 1);
+        CHECK(menu->visible_song_entry(0)->difficulty_table_level == "1");
+        tap(*menu, 27);
+        REQUIRE(menu->showing_table_level_folders());
+        tap(*menu, 40);
+        tap(*menu, 13);
+        REQUIRE(menu->visible_song_count() == 1);
+        CHECK(menu->visible_song_entry(0)->difficulty_table_level == "2");
+        tap(*menu, 27);
+        render::MenuClickEvent click{};
+        click.kind = render::MenuHitTargetKind::SongCard;
+        click.index = 4;
+        click.double_click = true;
+        menu->handle_menu_click(click);
+        REQUIRE(menu->visible_song_count() == 1);
+        CHECK(menu->visible_song_entry(0)->difficulty_table_level == "16+");
+        tap(*menu, 27);
+        click.index = 2;
+        menu->handle_menu_click(click);
+        CHECK(menu->visible_song_count() == 0);
+        CHECK(menu->active_table_level_ == "10");
+        tap(*menu, 27);
+        CHECK(menu->showing_table_level_folders());
+        click.kind = render::MenuHitTargetKind::SongScrollbar;
+        click.index = 5;
+        menu->handle_menu_click(click);
+        CHECK(menu->selected_table_level_ == 5);
+        CHECK(menu->selected_song_absolute_path().empty());
+        click.kind = render::MenuHitTargetKind::SongStartButton;
+        menu->handle_menu_click(click);
+        CHECK(menu->active_table_level_ == "20");
+        CHECK(menu->visible_song_count() == 0);
     }
 
     static void check_table_url_repeat() {
@@ -399,6 +583,18 @@ struct MenuAppSkinPreviewTestAccess {
 
 }  // namespace tenriff::app
 
+TEST_CASE("skin overhaul lane buttons select visual lanes and fonts persist from Profile") {
+    tenriff::app::MenuAppSkinPreviewTestAccess::check_overhaul();
+}
+TEST_CASE("skin overhaul automatic aspect follows configured destination dimensions") {
+    using tenriff::render::gameplay_note_auto_preserves_aspect;
+    CHECK(gameplay_note_auto_preserves_aspect(60, 60));
+    CHECK(gameplay_note_auto_preserves_aspect(10, 10.00001));
+    CHECK_FALSE(gameplay_note_auto_preserves_aspect(60, 32));
+    CHECK_FALSE(gameplay_note_auto_preserves_aspect(32, 60));
+    CHECK_FALSE(gameplay_note_auto_preserves_aspect(10, 10.01));
+    CHECK_FALSE(gameplay_note_auto_preserves_aspect(0, 0));
+}
 TEST_CASE("chart loading caps rendering without changing gameplay or saved graphics settings") {
     tenriff::app::MenuAppSkinPreviewTestAccess::check_loading_render_cap();
 }
@@ -421,6 +617,12 @@ TEST_CASE("skin fullscreen preview respects existing modal input ownership") {
 
 TEST_CASE("skin fullscreen preview cannot survive a navigation reset") {
     tenriff::app::MenuAppSkinPreviewTestAccess::check_navigation_reset();
+}
+TEST_CASE("feedback physical F6 is independent and search Backspace repeats without navigation") {
+    tenriff::app::MenuAppSkinPreviewTestAccess::check_feedback_keyboard();
+}
+TEST_CASE("feedback table folders retain empty tiers sort naturally and open exact levels") {
+    tenriff::app::MenuAppSkinPreviewTestAccess::check_feedback_folders();
 }
 TEST_CASE("difficulty table URL held Backspace repeats complete UTF8 characters only while focused") {
     tenriff::app::MenuAppSkinPreviewTestAccess::check_table_url_repeat();

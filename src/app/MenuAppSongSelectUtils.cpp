@@ -88,7 +88,11 @@ bool parse_search_level_range(std::string_view term, int& minimum, int& maximum)
         return parse_level(term.substr(0, separator), minimum) &&
                parse_level(term.substr(separator + 2), maximum) && minimum <= maximum;
     }
-    if (term.back() == '+') return parse_level(term.substr(0, term.size() - 1), minimum);
+    if (term.back() == '+') {
+        if (!parse_level(term.substr(0, term.size() - 1), minimum)) return false;
+        maximum = minimum;
+        return true;
+    }
     if (term.back() == '-') return parse_level(term.substr(0, term.size() - 1), maximum);
     if (!parse_level(term, minimum)) return false;
     maximum = minimum;
@@ -373,26 +377,21 @@ std::string format_int_with_commas(int64_t value) {
     return out;
 }
 
+bool table_level_less(std::string_view lhs, std::string_view rhs) {
+    return compare_natural_ascii(lhs, rhs) < 0;
+}
+
 bool song_entry_matches_search(const SongEntry& entry, std::string_view query, bool table_active) {
     const std::string normalized_query = to_lower_ascii(std::string(query));
     if (normalized_query.find_first_not_of(" \t") == std::string::npos) {
         return true;
     }
 
-    // Every field the player can see on a card is searchable, so "cn 7k another"
-    // narrows by artist, layout and chart name at once.
+    // Ordinary text searches authored title/artist only. Display fallbacks can
+    // contain filesystem paths, so do not use song_title_for_ui here.
     const std::string haystacks[] = {
-        to_lower_ascii(song_title_for_ui(entry)),
-        to_lower_ascii(song_artist_for_ui(entry)),
-        to_lower_ascii(entry.path),
-        to_lower_ascii(entry.chart_name),
-        to_lower_ascii(entry.layout_label),
-        to_lower_ascii(entry.format),
-        to_lower_ascii(entry.difficulty_table_name),
-        to_lower_ascii(entry.difficulty_table_symbol),
-        to_lower_ascii(entry.difficulty_table_level),
-        std::to_string(entry.key_count) + "k",
-        "lv" + std::to_string(entry.level),
+        to_lower_ascii(entry.title),
+        to_lower_ascii(entry.artist),
     };
 
     // Space-separated terms all have to land, each in any one field.
@@ -412,6 +411,14 @@ bool song_entry_matches_search(const SongEntry& entry, std::string_view query, b
         if (parse_search_level_range(term, level_min, level_max)) {
             const auto level = song_filter_level(entry, table_active);
             if (!level.has_value() || *level < level_min || *level > level_max) return false;
+            // A plus is a distinct table tier, not an inclusive lower bound.
+            // Explicit ranges (lv:12to16 / lv:16-) keep their numeric semantics.
+            if (term.find("to") == std::string_view::npos && term.back() != '-') {
+                const auto label = entry.difficulty_table_level;
+                const auto last = label.find_last_not_of(" \t\r\n");
+                const bool plus_level = table_active && last != std::string::npos && label[last] == '+';
+                if (plus_level != (term.back() == '+')) return false;
+            }
             cursor = end;
             continue;
         }

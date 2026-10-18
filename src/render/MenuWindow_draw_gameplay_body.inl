@@ -208,7 +208,7 @@
         // A skin that declares note_aspect knows its own art, so it wins over the
         // player's Image Aspect setting; otherwise that setting decides.
         const NoteImageAspect note_image_aspect =
-            use_imported_metrics && gameplay_note_sprite_cache_.has_imported_note_aspect
+            data.gameplay.note_image_aspect != NoteImageAspect::Auto && use_imported_metrics && gameplay_note_sprite_cache_.has_imported_note_aspect
                 ? gameplay_note_sprite_cache_.imported_note_aspect
                 : data.gameplay.note_image_aspect;
         // Hit-burst brightness, 0% turns the explosion off entirely.
@@ -564,6 +564,73 @@
 
             d2d_->text_brush->SetColor(saved_text_color);
             ctx->SetTransform(timing_transform);
+        };
+
+        auto field_judgement_counts_rect = [&](const GameplayFieldLayout& field) {
+            // Follow the actual timing bar transform, independently of its marker lifetime.
+            // Clamp the counter inside the field even when a custom indicator is moved outside it.
+            const float anchor = gameplay_combo_anchor_y(field, 0.24, 74.0f, 82.0f);
+            const float center = (field.left + field.right) * 0.5f;
+            auto timing = ng_rect("timing", studio
+                ? D2D1::RectF(center - 100, anchor + 16, center + 100, anchor + 18)
+                : D2D1::RectF(field.left, anchor, field.right, anchor + 48));
+            const float bar_scale = hud_font_scale(data.gameplay.timing_bar_scale);
+            const float cx = (timing.left + timing.right) * .5f + static_cast<float>(data.gameplay.timing_bar_offset_x);
+            const float cy = (timing.top + timing.bottom) * .5f + static_cast<float>(data.gameplay.timing_bar_offset_y);
+            const float marker_bottom = studio ? cy + 10 * bar_scale
+                : cy + ((16 + kGameplayTimingIndicatorHeight + 10) / 48 - .5f) *
+                    (timing.bottom - timing.top) * bar_scale;
+
+            const float padding = std::min(8.0f, (field.right - field.left) * .1f);
+            const float width = std::min(340.0f, field.right - field.left - 2 * padding);
+            const float height = 44.0f * std::min(1.0f, width / 260.0f);
+            const float left = std::clamp(cx - width * .5f, field.left + padding, field.right - padding - width);
+            const float top = std::clamp(marker_bottom + 6, field.top + 8, std::max(field.top + 8, field.bottom - height - 8));
+            return D2D1::RectF(left, top, left + width, top + height);
+        };
+        auto avoid_field_counts = [&](const GameplayFieldLayout& field, const D2D1_RECT_F& combo,
+                                       float scale, float animation_y, float label_height) {
+            if (!data.gameplay.show_judgement_counts) return 0.0f;
+            const auto counts = field_judgement_counts_rect(field);
+            const float cx = (combo.left + combo.right) * .5f, cy = (combo.top + combo.bottom) * .5f;
+            const float x = static_cast<float>(data.gameplay.combo_offset_x);
+            const float left = cx + (combo.left - cx) * scale + x;
+            const float right = cx + (combo.right - cx) * scale + x;
+            const float top = cy + (combo.top - cy) * scale + animation_y;
+            const float bottom = cy + (combo.bottom + label_height - cy) * scale + animation_y;
+            if (right <= counts.left || left >= counts.right || bottom <= counts.top - 8 || top >= counts.bottom + 8) return 0.0f;
+            // Reserve the new row only while enabled, without changing the saved combo position.
+            const float down = counts.bottom + 8 - top;
+            if (bottom + down > field.bottom - 8 && counts.top - 8 - (bottom - top) >= field.top + 8)
+                return counts.top - 8 - bottom;
+            return down;
+        };
+        auto draw_field_judgement_counts = [&](const GameplayFieldLayout& field,
+                                               const std::array<int, 5>& values, bool ghost = false) {
+            if (!data.gameplay.show_judgement_counts || !scene_body_format || !d2d_->text_brush) return;
+            auto& cached_values = scene_hud_cache.field_judge_values[ghost ? 1 : 0];
+            auto& texts = scene_hud_cache.field_judge_counts[ghost ? 1 : 0];
+            if (cached_values != values) {
+                cached_values = values;
+                for (std::size_t i = 0; i < values.size(); ++i) texts[i] = std::to_wstring(values[i]);
+            }
+            const auto bounds = field_judgement_counts_rect(field);
+            const float left = bounds.left, top = bounds.top;
+            const float width = bounds.right - bounds.left, height = bounds.bottom - bounds.top;
+            static const std::array<std::wstring, 5> labels{L"PG", L"GR", L"G", L"BAD", L"PR"};
+            static const std::array<const char*, 5> tokens{"PG", "GR", "G", "BAD", "POOR"};
+            const auto color = d2d_->text_brush->GetColor();
+            for (std::size_t i = 0; i < values.size(); ++i) {
+                const float x = left + width * static_cast<float>(i) / 5;
+                const float right = x + width / 5 - 2;
+                d2d_->text_brush->SetColor(D2D1::ColorF(0xF2F5F8, .96f));
+                draw_fitted_readable_text(texts[i], scene_body_format.Get(),
+                    D2D1::RectF(x, top, right, top + height * .52f), d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+                d2d_->text_brush->SetColor(ng_judge_color(tokens[i]));
+                draw_fitted_readable_text(labels[i], scene_body_format.Get(),
+                    D2D1::RectF(x, top + height * .54f, right, top + height), d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+            }
+            d2d_->text_brush->SetColor(color);
         };
 
         auto format_progress_clock = [&](int64_t sample_count) -> std::string {
@@ -1129,8 +1196,8 @@
 
             if (scene_body_format && d2d_->muted_brush) {
                 const std::wstring hispeed_hint_w =
-                    wloc("HI-SPEED  F3/F4  +/-0.25   F5 x0.5 / F6 x2",
-                         "노트속도  F3/F4  +/-0.25   F5 ×0.5 / F6 ×2");
+                    wloc("HI-SPEED  F4 +0.25 / F3 -0.25   F5 x0.5 / F6 x2",
+                         "노트속도  F4 +0.25 / F3 -0.25   F5 ×0.5 / F6 ×2");
                 draw_readable_text_aligned(
                     hispeed_hint_w,
                     scene_body_format.Get(),
@@ -1139,8 +1206,8 @@
                     d2d_->muted_brush.Get(),
                     DWRITE_TEXT_ALIGNMENT_CENTER);
                 const std::wstring tuning_hint_w =
-                    wloc("JUDGE LINE  F1/F2  +/-1%   VISUAL LATENCY  F7/F8  -/+1ms",
-                         "판정선 위치  F1/F2  +/-1%   비주얼 레이턴시  F7/F8  -/+1ms");
+                    wloc("JUDGE LINE  F1 UP 1% / F2 DOWN 1%   LATENCY  F7/F8 -/+1ms",
+                         "판정선  F1 위 1% / F2 아래 1%   레이턴시  F7/F8 -/+1ms");
                 draw_readable_text_aligned(
                     tuning_hint_w,
                     scene_body_format.Get(),
@@ -1350,8 +1417,9 @@
             const D2D1_MATRIX_3X2_F animation_transform =
                 D2D1::Matrix3x2F::Scale(animation.scale * hud_font_scale(data.gameplay.combo_font_scale),
                                         animation.scale * hud_font_scale(data.gameplay.combo_font_scale), animation_center) *
-                D2D1::Matrix3x2F::Translation(static_cast<float>(data.gameplay.combo_offset_x), animation.offset_y) *
-                saved_transform;
+                D2D1::Matrix3x2F::Translation(static_cast<float>(data.gameplay.combo_offset_x), animation.offset_y +
+                    avoid_field_counts(combo_field_layout, combo_rect, animation.scale * hud_font_scale(data.gameplay.combo_font_scale),
+                        animation.offset_y, kComboLabelExtension)) * saved_transform;
             ctx->SetTransform(animation_transform);
             const auto combo_color=d2d_->accent_brush->GetColor();
             d2d_->accent_brush->SetColor(ng_color("combo",combo_color));
@@ -2072,6 +2140,8 @@
                               data.gameplay.timing_history_count, data.gameplay.timing_history_maximums,
                               data.gameplay.timing_maximum_window_ms, judgement_text_animation,
                               scene_hud_cache.judgement_animation_started_ns);
+        draw_field_judgement_counts(field_layout,
+            {data.gameplay.pg, data.gameplay.gr, data.gameplay.gd, data.gameplay.bd, data.gameplay.pr});
 
         if (data.gameplay.combo > 0) {
             draw_combo_overlay(field_layout,
@@ -2627,6 +2697,9 @@
                                   data.gameplay.ghost_timing_history_delta_ms, data.gameplay.ghost_timing_history_count,
                                   data.gameplay.ghost_timing_history_maximums, data.gameplay.ghost_timing_maximum_window_ms,
                                   ghost_judgement_text_animation, scene_hud_cache.ghost_judgement_animation_started_ns);
+            draw_field_judgement_counts(ghost_field_layout,
+                {data.gameplay.ghost_pg, data.gameplay.ghost_gr, data.gameplay.ghost_gd,
+                 data.gameplay.ghost_bd, data.gameplay.ghost_pr}, true);
             if (data.gameplay.ghost_combo > 0) {
                 draw_combo_overlay(ghost_field_layout,
                                    scene_hud_cache.ghost_combo_value_text,

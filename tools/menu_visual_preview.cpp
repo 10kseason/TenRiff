@@ -44,6 +44,17 @@ namespace tenriff::app {
 // Seed only in-memory state, then use the production settings builders.
 // MenuApp is never initialized: no profiles, indexing, services or input start.
 struct MenuAppVisualTestAccess {
+    static void populate_profile(render::MenuRenderData& source, const std::string& avatar, int selected) {
+        auto app = std::make_unique<MenuApp>();
+        app->config_.ui.language = ui::language_token(source.ui_language);
+        app->config_.ui.profile_avatar_path = avatar;
+        app->config_.ui.menu_font_size = source.ui_text_scale > 1.2f ? "extra_large" :
+            source.ui_text_scale > 1.0f ? "large" : "normal";
+        app->first_run_profile_ = false;
+        app->settings_cursor_ = std::max(0, selected);
+        source.generic.rows.clear(); source.generic.notes.clear();
+        app->populate_quick_setup_render_data(source);
+    }
     static void populate_inner_settings(render::MenuRenderData& source, bool graphics, int selected,
                                          bool edit_resolution = false, bool invalid_resolution = false,
                                          bool mods = false, std::string_view judge_window = "normal") {
@@ -136,6 +147,7 @@ struct MenuAppVisualTestAccess {
         skin.judgement_offset_x = preview.judgement_offset_x;
         skin.show_timing_feedback = preview.show_timing_feedback;
         skin.show_timing_bar = preview.show_timing_bar;
+        skin.show_judgement_counts = preview.show_judgement_counts;
         skin.timing_bar_always_visible = preview.timing_bar_always_visible;
         skin.timing_feedback_override = true;
         skin.timing_text_offset_x = preview.timing_text_offset_x;
@@ -362,7 +374,8 @@ struct MenuWindowVisualTestAccess {
         const bool skin_fixture = source.kind == MenuScreenKind::GenericList &&
             source.generic.heading == ui::text(source.ui_language, "Skin Settings", "스킨 설정");
         const bool inner_settings_fixture = source.kind == MenuScreenKind::GenericList &&
-            (source.generic.heading == ui::text(source.ui_language, "Key Mode Settings", "키 모드 설정") ||
+            (source.generic.heading == ui::text(source.ui_language, "Profile Setup", "프로필 설정") ||
+             source.generic.heading == ui::text(source.ui_language, "Key Mode Settings", "키 모드 설정") ||
              source.generic.heading == ui::text(source.ui_language, "Graphics Settings", "그래픽 설정") ||
              source.generic.heading == ui::text(source.ui_language, "Mod Manager", "모드 관리자") ||
              source.generic.heading == ui::text(source.ui_language, "Filter", "필터"));
@@ -398,7 +411,8 @@ struct MenuWindowVisualTestAccess {
                 const bool song_control = song_fixture &&
                     (region.kind == MenuHitTargetKind::SongCard || region.kind == MenuHitTargetKind::SongNavButton ||
                      region.kind == MenuHitTargetKind::SongDifficultyTable);
-                const bool preview_button = region.kind == MenuHitTargetKind::SkinPreviewButton;
+                const bool preview_button = region.kind == MenuHitTargetKind::SkinPreviewButton ||
+                    region.kind == MenuHitTargetKind::SkinPreviewLane;
                 const bool pause_control = region.kind == MenuHitTargetKind::GameplayPauseAction ||
                     region.kind == MenuHitTargetKind::GameplayPauseAdjust;
                 const bool result_control = result_fixture && region.kind == MenuHitTargetKind::SettingsRow &&
@@ -671,6 +685,7 @@ int main(int argc, char** argv) {
     bool resume_countdown = false;
     bool no_feedback = false;
     bool timing_text_off = false, timing_bar_off = false;
+    bool judgement_counts = false;
     bool indicator_background_off = false;
     bool timing_bar_always = false;
     std::string timing_marker_style = "dot";
@@ -796,6 +811,7 @@ int main(int argc, char** argv) {
     data.ui_language = tenriff::ui::Language::Korean;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
+        if (arg == "--judgement-counts") { judgement_counts = true; continue; }
         if (arg == "--timing-colors" && i + 1 < argc) {
             timing_color_case = argv[++i];
             if (timing_color_case != "fast" && timing_color_case != "maximum" &&
@@ -1210,46 +1226,7 @@ int main(int argc, char** argv) {
 
     }
     if (profile_settings) {
-        data.kind = MenuScreenKind::GenericList;
-        data.generic.heading = loc("Profile Setup", "프로필 설정");
-        data.generic.profile_preview_visible = true;
-        data.generic.profile_avatar_path = avatar_path;
-        const std::array<std::string, 27> labels{
-            loc("Language", "언어"), loc("Menu Font Size", "메뉴 글자 크기"),
-            loc("Songs Folder", "곡 폴더"), loc("Gauge", "게이지"), "Rate",
-            loc("Visual Latency", "비주얼 레이턴시"), loc("Keysound", "키음"),
-            loc("Input Backend", "입력 방식"), loc("Nickname", "닉네임"),
-            loc("Avatar Image", "프로필 사진"), loc("Clear Avatar", "사진 지우기"),
-            loc("Export All Settings", "전체 설정 내보내기"), loc("Import All Settings", "전체 설정 가져오기"),
-            loc("Skip Start Countdown", "시작 카운트다운 생략"), loc("Instant Restart Key", "즉시 재시작 키"),
-            loc("Note Speed x0.5 Key", "노트속도 ×0.5 키"), loc("Note Speed x2 Key", "노트속도 ×2 키"),
-            loc("Help / Judge Line -", "도움말 / 판정선 -"), loc("Song Folder / Judge Line +", "곡 폴더 / 판정선 +"),
-            loc("Note Speed -0.25", "노트속도 -0.25"), loc("Note Speed +0.25", "노트속도 +0.25"),
-            loc("Editor / Visual Latency -", "편집기 / 비주얼 레이턴시 -"), loc("Visual Latency +", "비주얼 레이턴시 +"),
-            loc("Screenshot", "스크린샷"), loc("Guest / Online", "게스트 / 온라인"), loc("Chat", "채팅"),
-            loc("Done", "완료")};
-        const std::array<std::string, 27> values{
-            std::string(tenriff::ui::language_native_label(data.ui_language)),
-            data.ui_text_scale > 1.2f ? loc("Extra Large", "더 크게") :
-                data.ui_text_scale > 1.0f ? loc("Large", "크게") : loc("Normal", "보통"),
-            "ALL SONG", "NORMAL", "1.00x", "0 ms", "Follow", "RawInput", "PLAYER",
-            avatar_path.empty() ? loc("Not set", "설정 안 됨") : "preview-avatar.png",
-            loc("Clear", "지우기"), ".trprofile", ".trprofile", loc("Off", "OFF"), "--", "F5", "F6",
-            "F1", "F2", "F3", "F4", "F7", "F8", "F9", "F10", "F11", loc("Back", "돌아가기")};
-        for (int i = 0; i < static_cast<int>(labels.size()); ++i) {
-            MenuRowData row;
-            row.label = labels[i]; row.value = values[i]; row.row_index = i;
-            row.target_kind = MenuHitTargetKind::SettingsRow;
-            row.selected = i == 1; row.adjustable = (i < 8 && i != 2) || i == 13;
-            row.activatable = !row.adjustable || i <= 1;
-            row.increment_enabled = row.decrement_enabled = row.adjustable;
-            data.generic.rows.push_back(std::move(row));
-        }
-        data.generic.notes = {
-            loc("Language and menu font size apply immediately and are saved to this profile.",
-                "언어와 메뉴 글자 크기는 즉시 적용되고 이 프로필에 저장됩니다."),
-            loc("Nickname is shown in saved records and multiplayer. Avatar Image accepts local PNG/JPG files.",
-                "닉네임은 저장 기록과 멀티플레이에 표시됩니다. 프로필 사진은 로컬 PNG/JPG 파일을 사용합니다.")};
+        tenriff::app::MenuAppVisualTestAccess::populate_profile(data, avatar_path, selected_row);
     }
     if (filter_settings) {
         data.kind = MenuScreenKind::GenericList;
@@ -1671,6 +1648,9 @@ int main(int argc, char** argv) {
             data.lobby_skin.layout_rects[item.first] = {r.left, r.top, r.right, r.bottom};
         }
     }
+    data.gameplay.note_image_aspect = data.generic.skin_preview.note_image_aspect = NoteImageAspect::Auto;
+    data.gameplay.lane_center_gap_scale = data.generic.skin_preview.lane_center_gap_scale =
+        preview_keys == 16 ? tenriff::config::kLaneCenterGapScaleDefault : 0.0;
     data.gameplay.hud_layout = data.generic.skin_preview.hud_layout = hud_style;
     data.gameplay.hud_riff_map_visible = data.generic.skin_preview.hud_riff_map_visible = riff_map_visible;
     data.gameplay.combo_font_scale = data.generic.skin_preview.combo_font_scale = combo_font_scale;
@@ -1707,6 +1687,7 @@ int main(int argc, char** argv) {
     data.gameplay.show_timing_feedback = data.generic.skin_preview.show_timing_feedback = !timing_text_off;
     data.gameplay.indicator_background_visible = data.generic.skin_preview.indicator_background_visible = !indicator_background_off;
     data.gameplay.show_timing_bar = data.generic.skin_preview.show_timing_bar = !timing_bar_off;
+    data.gameplay.show_judgement_counts = data.generic.skin_preview.show_judgement_counts = judgement_counts;
     data.gameplay.timing_bar_always_visible = data.generic.skin_preview.timing_bar_always_visible = timing_bar_always;
     data.gameplay.timing_marker_style = data.generic.skin_preview.timing_marker_style = timing_marker_style;
     if (remapped_functions) {

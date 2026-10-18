@@ -15,7 +15,7 @@ namespace tenriff::config {
 
 inline constexpr std::string_view kTenRiffMainApiUrl =
     "https://121.174.18.181:27303";
-inline constexpr double kJudgementLinePositionMin = 0.00;
+inline constexpr double kJudgementLinePositionMin = 0.01;
 inline constexpr double kJudgementLinePositionMax = 1.00;
 inline constexpr double kJudgementLinePositionDefault = 0.82;
 inline constexpr double kVisualOffsetMin = -500.0;
@@ -46,7 +46,7 @@ inline constexpr double kNoteDividerGapPxDefault = 12.0;
 inline constexpr double kNoteDividerGapPxStep = 1.0;
 inline constexpr double kLaneCenterGapScaleMin = 0.00;
 inline constexpr double kLaneCenterGapScaleMax = 2.00;
-inline constexpr double kLaneCenterGapScaleDefault = 0.00;
+inline constexpr double kLaneCenterGapScaleDefault = 1.00;
 inline constexpr double kHoldBodyWidthScaleMin = 0.50;
 inline constexpr double kHoldBodyWidthScaleMax = 1.20;
 inline constexpr double kHoldBodyWidthScaleDefault = 1.00;
@@ -77,7 +77,7 @@ inline constexpr double kSkinKeyBackdropBrightnessMax = 2.0;
 inline constexpr double kSkinKeyBackdropBrightnessDefault = 1.0;
 inline constexpr double kSkinKeyBackdropHeightMin = 0.0;
 inline constexpr double kSkinKeyBackdropHeightMax = 1.0;
-inline constexpr double kSkinKeyBackdropHeightDefault = 1.0;
+inline constexpr double kSkinKeyBackdropHeightDefault = 0.5;
 inline constexpr double kPacemakerAccuracyMin = 0.0;
 inline constexpr double kPacemakerAccuracyMax = 100.0;
 inline constexpr double kPacemakerAccuracyDefault = 90.0;
@@ -151,7 +151,8 @@ struct UiConfig {
     std::string instant_restart_key;
     std::string hispeed_decrease_key = "F5";
     std::string hispeed_increase_key = "F6";
-    std::array<std::string, 11> function_keys{"F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11"};
+    // Stable action slots: line up/down, speed down/up. Saved bindings keep their meaning.
+    std::array<std::string, 11> function_keys{"F3", "F4", "F2", "F1", "F5", "F6", "F7", "F8", "F9", "F10", "F11"};
     std::string active_song_source;
     std::string last_played_chart_path;
     // The aggregate library preserves the last individual source for switching back.
@@ -201,7 +202,7 @@ struct SkinConfig {
     // gameplay/replay lane identity remains canonical; only presentation moves.
     std::string scratch_position = "left";
     std::string visual_preset = "tenriff";
-    std::string note_shape = "rect";
+    std::string note_shape = "simple_rect";
     bool note_border_enabled = true;
     // How note art fills its rect: "stretch" ignores the image aspect, "contain"
     // shrinks the image to fit, and "width" keeps the lane width and derives the
@@ -218,6 +219,7 @@ struct SkinConfig {
     bool show_gear_boundary_line = false;
     bool show_timing_feedback = true;
     bool show_timing_bar = true;
+    bool show_judgement_counts = false;
     bool timing_bar_always_visible = false;
     std::string timing_marker_style = "dot";  // dot | barcode
     double timing_text_offset_x = 0.0;
@@ -270,7 +272,7 @@ struct SkinConfig {
     double note_outline_opacity = kSkinNoteOutlineOpacityDefault;
     double hold_body_opacity = kSkinHoldBodyOpacityDefault;
     std::unordered_map<std::string, std::vector<double>> lane_width_scales;
-    double note_width_scale = 1.0;
+    double note_width_scale = 0.6;
     std::unordered_map<std::string, double> note_width_scales;
     std::unordered_map<std::string, std::vector<double>> lane_spacing_scales;
     double note_height_scale = 1.8;

@@ -38,7 +38,8 @@ namespace tenriff::render {
 //   Contain — shrink the image inside the rect, keeping its aspect.
 //   Width   — keep the rect's width and derive height from the image aspect,
 //             so square arrow art stays square however short the note rect is.
-enum class NoteImageAspect { Stretch, Contain, Width };
+// Auto follows the configured destination dimensions, never the source image.
+enum class NoteImageAspect { Stretch, Contain, Width, Auto };
 
 struct MenuWindowConfig {
     std::string title = "TenRiff";
@@ -96,6 +97,7 @@ enum class MenuHitTargetKind {
     GameplayPauseAction,
     GameplayPauseAdjust,
     TitleLanguageButton,
+    SkinPreviewLane,
 };
 
 enum class SongDifficultyTableAction {
@@ -179,6 +181,7 @@ struct SongSelectData {
     int source_count = 0;
     int record_count = 0;
     bool showing_sources = false;
+    bool showing_level_folders = false;
     bool showing_records = false;
     bool online_records = false;
     bool sites_records = false;
@@ -522,6 +525,7 @@ struct GameplayHudData {
     bool show_gear_boundary_line = false;
     bool show_timing_feedback = true;
     bool show_timing_bar = true;
+    bool show_judgement_counts = false;
     bool timing_bar_always_visible = false;
     std::string timing_marker_style = "dot";
     double timing_text_offset_x = 0.0;
@@ -548,7 +552,7 @@ struct GameplayHudData {
     bool indicator_background_visible = false;
     std::string key_label_position = "bottom";
     bool note_border_enabled = true;
-    std::string note_shape = "rect";
+    std::string note_shape = "simple_rect";
     NoteImageAspect note_image_aspect = NoteImageAspect::Stretch;
     std::string skin_source = "native";
     std::string external_skin_root;
@@ -706,6 +710,7 @@ struct SkinPreviewData {
     bool fullscreen = false;
     bool show_timing_feedback = true;
     bool show_timing_bar = true;
+    bool show_judgement_counts = false;
     bool timing_bar_always_visible = false;
     std::string timing_marker_style = "dot";
     double timing_text_offset_x = 0.0;
@@ -761,7 +766,7 @@ struct SkinPreviewData {
     bool indicator_background_visible = false;
     std::string key_label_position = "bottom";
     bool note_border_enabled = true;
-    std::string note_shape = "rect";
+    std::string note_shape = "simple_rect";
     NoteImageAspect note_image_aspect = NoteImageAspect::Stretch;
     std::string skin_source = "native";
     std::string external_skin_root;
@@ -1137,6 +1142,8 @@ private:
         uint64_t studio_text_revision = std::numeric_limits<uint64_t>::max();
         std::array<std::wstring, 6> studio_setting_labels{}, studio_setting_values{};
         std::array<std::wstring, 5> studio_judge_counts{};
+        std::array<std::array<int, 5>, 2> field_judge_values{{{{-1,-1,-1,-1,-1}},{{-1,-1,-1,-1,-1}}}};
+        std::array<std::array<std::wstring, 5>, 2> field_judge_counts{};
         std::wstring studio_score_padded, studio_score_significant, studio_accuracy, studio_detail,
             studio_max, studio_pace, studio_gauge_name, studio_timing;
         int64_t studio_elapsed_second = -1, studio_total_second = -1;
@@ -1233,7 +1240,7 @@ private:
         std::size_t lane_color_count = 0;
         int lane_count = 0;
         bool note_border_enabled = true;
-        std::string note_shape = "rect";
+        std::string note_shape = "simple_rect";
         NoteImageAspect note_image_aspect = NoteImageAspect::Stretch;
         std::string skin_source = "native";
         std::string external_skin_root;

@@ -341,6 +341,8 @@ private:
     void apply_graphics_settings_effects(
         const menu::settings::GraphicsSettingsEffects& effects);
     void handle_skins_settings_input(uint32_t keycode);
+    void select_skin_preview_lane(int visual_lane);
+    void choose_profile_ui_font();
     void apply_skin_settings_effects(
         const menu::settings::SkinSettingsEffects& effects);
     void handle_input_settings_input(uint32_t keycode);
@@ -571,6 +573,9 @@ private:
     void remove_selected_song_source();
     void handle_difficulty_table_input(uint32_t keycode);
     [[nodiscard]] std::string difficulty_table_display_name();
+    void refresh_table_level_folders();
+    [[nodiscard]] bool showing_table_level_folders() const;
+    void open_selected_table_level();
 
     [[nodiscard]] std::string screen_title() const;
     [[nodiscard]] const SongEntry* visible_song_entry(std::size_t visible_index) const;
@@ -942,6 +947,11 @@ private:
     std::string difficulty_table_url_input_{};
     std::string difficulty_table_display_path_{};
     std::string difficulty_table_display_name_{};
+    std::string table_levels_path_;
+    std::vector<std::string> table_levels_;
+    std::vector<int> table_level_counts_;
+    std::string active_table_level_;
+    int selected_table_level_ = 0;
     bool online_records_url_editing_ = false;
     std::string online_records_url_input_{};
     std::string song_browser_status_message_{};

@@ -33,7 +33,7 @@
             draw_text_clipped(wloc("SETTINGS & TOOLS", "설정 및 도구"), d2d_->hud_format.Get(),
                               native_rect("generic.rect.008", D2D1::RectF(422, 82, 1470, 110)), d2d_->muted_brush.Get());
             draw_glass_panel(native_rect("generic.rect.009", D2D1::RectF(left, 984, right, 1048)), 12, 0.9f, 0, false, 0);
-            draw_text_clipped(wloc("ESC / BACKSPACE    Back or cancel", "ESC / BACKSPACE    뒤로 / 취소"),
+            draw_text_clipped(wloc("ESC    Back or cancel", "ESC    뒤로 / 취소"),
                               d2d_->body_format.Get(), native_rect("generic.rect.010", D2D1::RectF(left + 24, 1004, left + 530, 1034)), d2d_->text_brush.Get());
             draw_text_clipped_aligned(wloc("UP / DOWN  Select     LEFT / RIGHT  Adjust     ENTER  Open     F1  Help",
                                            "위 / 아래  선택     좌 / 우  조절     ENTER  열기     F1  도움말"),
@@ -65,7 +65,7 @@
             const auto fullscreen_rect = D2D1::RectF(rect.right - 304.0f, rect.top + 18.0f, rect.right - 24.0f, rect.top + 60.0f);
             if (d2d_->button_brush) ctx->FillRoundedRectangle(D2D1::RoundedRect(fullscreen_rect, 6, 6), d2d_->button_brush.Get());
             if (d2d_->button_border_brush) ctx->DrawRoundedRectangle(D2D1::RoundedRect(fullscreen_rect, 6, 6), d2d_->button_border_brush.Get(), 1.0f);
-            draw_text_clipped_aligned(wloc("Fullscreen Preview  [F6]", "전체화면 미리보기  [F6]"),
+            draw_text_clipped_aligned(to_wide(ui::text(data.ui_language, "Fullscreen Preview  [F6]", "전체화면 미리보기  [F6]")),
                 d2d_->body_format.Get(), fullscreen_rect, d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
             register_hit(fullscreen_rect, MenuHitTargetKind::SkinPreviewButton, 0, MenuHitPart::Activate);
             const std::wstring title_w = wloc("LIVE PREVIEW", "실시간 미리보기");
@@ -156,6 +156,7 @@
                 const float x0 = viewport.left + (viewport.right - viewport.left) * lane / lane_count;
                 const float x1 = viewport.left + (viewport.right - viewport.left) * (lane + 1) / lane_count;
                 const D2D1_RECT_F swatch_rect = native_rect("generic.rect.025", D2D1::RectF(x0 + 4.0f, swatch_top, x1 - 4.0f, swatch_top + swatch_height));
+                register_hit(swatch_rect, MenuHitTargetKind::SkinPreviewLane, lane + 1, MenuHitPart::Activate);
                 const D2D1_ROUNDED_RECT swatch_rr = D2D1::RoundedRect(swatch_rect, 10.0f, 10.0f);
                 if (d2d_->note_fill_brush) {
                     d2d_->note_fill_brush->SetColor(

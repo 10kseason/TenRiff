@@ -1299,3 +1299,18 @@ TEST_CASE("retained timing text survives current maximum grade") {
     CHECK(gameplay_rotated_note_half_height(80, 40, 90) == doctest::Approx(40));
     CHECK(gameplay_rotated_note_half_height(80, 80, 45) == doctest::Approx(56.56854).epsilon(1e-5));
 }
+
+TEST_CASE("field judgement counts preview preserves toggle with inactive timing markers") {
+    tenriff::render::SkinPreviewData preview;
+    CHECK_FALSE(tenriff::render::make_skin_gameplay_preview(preview).show_judgement_counts);
+    preview.show_judgement_counts = true;
+    preview.show_timing_bar = preview.show_timing_feedback = false;
+    const auto hud = tenriff::render::make_skin_gameplay_preview(preview);
+    CHECK(hud.show_judgement_counts);
+    CHECK_FALSE(hud.show_timing_bar);
+    CHECK(hud.pg == 118);
+    CHECK(hud.gr == 4);
+    CHECK(hud.gd == 1);
+    CHECK(hud.bd == 0);
+    CHECK(hud.pr == 0);
+}

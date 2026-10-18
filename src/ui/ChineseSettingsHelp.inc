@@ -173,3 +173,5 @@
 {"After judgement includes maximum hits. Always keeps the indicator and latest FAST/SLOW text; maximum hits refresh it and 0ms clears it. Each dot or barcode expires after 0.7 seconds.", "判定后模式包含最高判定。常显模式保留刻度和最新FAST/SLOW，最高判定也更新，0ms清除文字。每个点或竖线在0.7秒后消失。"},
 {"Choose gameplay and BMS preview output. F5 refreshes; Back applies. Menu/result music uses System Default. ASIO has its own selector.", "选择游玩和BMS试听输出。F5刷新，返回时应用。菜单与结果音乐使用系统默认，ASIO单独选择。"},
 {"Choose round dots or straight vertical barcode markers. Each judgement marker disappears after 0.7 seconds.", "选择圆点或竖直条形。每个判定标记在0.7秒后消失。"},
+
+    {"Show PG / GR / G / BAD / PR counts below the timing indicator inside the field. Counts remain visible between hits. Default: Off.", "在轨道内指示器正下方显示PG / GR / G / BAD / PR累计数量，击打间隔仍显示。默认关闭。"},

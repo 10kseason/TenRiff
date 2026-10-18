@@ -735,6 +735,7 @@ bool MenuApp::launch_selected_record_replay() {
 }
 
 std::string MenuApp::selected_song_absolute_path() const {
+    if (showing_table_level_folders()) return {};
     if (selected_song_ < 0) {
         return {};
     }

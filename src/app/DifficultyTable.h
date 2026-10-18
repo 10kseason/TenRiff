@@ -36,6 +36,8 @@ class DifficultyTable {
 public:
     [[nodiscard]] const std::string& name() const noexcept { return name_; }
     [[nodiscard]] const std::string& symbol() const noexcept { return symbol_; }
+    // Includes declared tiers with no locally owned or hashed chart.
+    [[nodiscard]] const std::vector<std::string>& levels() const noexcept { return levels_; }
     [[nodiscard]] std::size_t entry_count() const noexcept { return entries_.size(); }
 
     // SHA-256 is preferred when both supplied digests point at table entries.
@@ -52,6 +54,7 @@ private:
     std::string name_;
     std::string symbol_;
     std::vector<Entry> entries_;
+    std::vector<std::string> levels_;
     std::unordered_map<std::string, std::size_t> by_md5_;
     std::unordered_map<std::string, std::size_t> by_sha256_;
 

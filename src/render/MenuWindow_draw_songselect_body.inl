@@ -343,7 +343,8 @@
                            ? (data.song_select.online_records
                                   ? (data.song_select.sites_records ? wloc("WEB RECORDS", "웹 기록") : wloc("LEGACY SERVER RECORDS", "기존 서버 기록"))
                                   : wloc("LOCAL RECORDS", "로컬 기록"))
-                           : wloc("SONG LIBRARY", "곡 라이브러리"));
+                           : (data.song_select.showing_level_folders ? wloc("LEVEL FOLDERS", "레벨 폴더")
+                                                                    : wloc("SONG LIBRARY", "곡 라이브러리")));
             draw_text_clipped(library_title,
                               d2d_->title_format.Get(),
                               native_rect("songselect.rect.020", D2D1::RectF(left_panel.left + 18.0f,
@@ -358,7 +359,8 @@
                                        ? data.song_select.source_count
                                        : (data.song_select.showing_records
                                               ? data.song_select.record_count
-                                              : data.song_select.song_count);
+                                              : (data.song_select.showing_level_folders
+                                                    ? data.song_select.list_total_count : data.song_select.song_count));
             draw_trailing_text(to_wide(format_int_with_commas(item_count)),
                                d2d_->hud_format.Get(),
                                native_rect("songselect.rect.021", D2D1::RectF(
@@ -1274,7 +1276,8 @@
                            ? (data.song_select.online_records
                                   ? wloc("VIEW ONLY", "조회 전용")
                                   : wloc("OPEN RESULT", "결과 열기"))
-                           : wloc("START", "시작"));
+                           : (data.song_select.showing_level_folders ? wloc("OPEN LEVEL", "레벨 열기")
+                                                                    : wloc("START", "시작")));
             draw_centered_text(action_label, d2d_->header_format.Get(), start_button,
                                primary_enabled
                                    ? static_cast<ID2D1Brush*>(d2d_->text_brush.Get())

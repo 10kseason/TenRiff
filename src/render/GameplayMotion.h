@@ -13,6 +13,13 @@
 
 namespace tenriff::render {
 
+// Use relative tolerance for float layout rounding, not a pixel-sized threshold.
+[[nodiscard]] inline bool gameplay_note_auto_preserves_aspect(double width, double height) {
+    return std::isfinite(width) && std::isfinite(height) && width > 0.0 && height > 0.0 &&
+        std::abs(width - height) <= std::max(width, height) * 0.0001;
+}
+
+
 struct GameplayMotionState {
     int64_t current_sample = 0;
     int64_t duration_samples = 0;

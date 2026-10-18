@@ -58,6 +58,7 @@ void MenuApp::refresh_song_collection_membership_cache() {
 }
 
 std::string MenuApp::selected_song_path() const {
+    if (showing_table_level_folders()) return {};
     if (selected_song_ < 0) {
         return {};
     }

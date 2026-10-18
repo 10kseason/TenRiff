@@ -22,25 +22,28 @@ enum class Destination {
 
 inline constexpr int kLanguageRow = 0;
 inline constexpr int kMenuFontSizeRow = 1;
-inline constexpr int kSongsFolderRow = 2;
-inline constexpr int kGaugeRow = 3;
-inline constexpr int kRateRow = 4;
-inline constexpr int kVisualLatencyRow = 5;
-inline constexpr int kKeysoundRow = 6;
-inline constexpr int kBackendRow = 7;
-inline constexpr int kNicknameRow = 8;
-inline constexpr int kAvatarRow = 9;
-inline constexpr int kClearAvatarRow = 10;
-inline constexpr int kExportSettingsRow = 11;
-inline constexpr int kImportSettingsRow = 12;
-inline constexpr int kSkipStartCountdownRow = 13;
-inline constexpr int kInstantRestartKeyRow = 14;
-inline constexpr int kHispeedDecreaseKeyRow = 15;
-inline constexpr int kHispeedIncreaseKeyRow = 16;
-inline constexpr int kFunctionKeysFirstRow = 17;
-inline constexpr int kFunctionKeysLastRow = 25;
-inline constexpr int kDoneRow = 26;
-inline constexpr int kFirstRunSkipRow = 27;
+inline constexpr int kUiFontRow = 2;
+inline constexpr int kUiFontFileRow = 3;
+inline constexpr int kGameplayCursorRow = 4;
+inline constexpr int kSongsFolderRow = 5;
+inline constexpr int kGaugeRow = 6;
+inline constexpr int kRateRow = 7;
+inline constexpr int kVisualLatencyRow = 8;
+inline constexpr int kKeysoundRow = 9;
+inline constexpr int kBackendRow = 10;
+inline constexpr int kNicknameRow = 11;
+inline constexpr int kAvatarRow = 12;
+inline constexpr int kClearAvatarRow = 13;
+inline constexpr int kExportSettingsRow = 14;
+inline constexpr int kImportSettingsRow = 15;
+inline constexpr int kSkipStartCountdownRow = 16;
+inline constexpr int kInstantRestartKeyRow = 17;
+inline constexpr int kHispeedDecreaseKeyRow = 18;
+inline constexpr int kHispeedIncreaseKeyRow = 19;
+inline constexpr int kFunctionKeysFirstRow = 20;
+inline constexpr int kFunctionKeysLastRow = 28;
+inline constexpr int kDoneRow = 29;
+inline constexpr int kFirstRunSkipRow = 30;
 
 [[nodiscard]] inline constexpr int function_for_row(int row) {
     if (row == kHispeedDecreaseKeyRow) return 5;
@@ -68,6 +71,10 @@ inline constexpr int kFirstRunSkipRow = 27;
                                                        int row,
                                                        int direction) {
     if (direction == 0) return false;
+    if (row == kGameplayCursorRow) {
+        settings.show_cursor_in_gameplay = !settings.show_cursor_in_gameplay;
+        return true;
+    }
     if (row == kLanguageRow) {
         settings.language = ui::language_token(
             ui::cycle_language(ui::language_from_token(settings.language), direction));

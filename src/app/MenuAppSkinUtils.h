@@ -65,7 +65,7 @@ enum class SkinSettingsRowId {
     JudgementY,
     JudgementX,
     ComboX,
-    ExportPreset,  // Retired; keep this ID reserved so later mouse targets retain their identity.
+    ExportPreset,  // Reuses the original portable-preset row identity.
     ImportPreset,
     OpenSkinEditor,
     ComboFontSize,
@@ -88,11 +88,12 @@ enum class SkinSettingsRowId {
     UiFontFile,
     TimingMarkerStyle,
     JudgementLineType,
+    JudgementCounts,
 };
 
 // The same order drives keyboard navigation, rendered rows and mouse hit targets.
 // Keep related controls adjacent instead of deriving positions from row labels.
-inline constexpr std::array<SkinSettingsRowId, 70> kSkinSettingsRowOrder = {
+inline constexpr std::array<SkinSettingsRowId, 53> kSkinSettingsRowOrder = {
     SkinSettingsRowId::KeyMode,
     SkinSettingsRowId::ScratchPosition,
     SkinSettingsRowId::SkinSource,
@@ -103,32 +104,18 @@ inline constexpr std::array<SkinSettingsRowId, 70> kSkinSettingsRowOrder = {
     SkinSettingsRowId::CreateSkin,
     SkinSettingsRowId::OpenSkinFolder,
     SkinSettingsRowId::ReloadSkin,
+    SkinSettingsRowId::ExportPreset,
     SkinSettingsRowId::ImportPreset,
     SkinSettingsRowId::OpenSkinEditor,
     SkinSettingsRowId::JudgeLinePosition,
     SkinSettingsRowId::LaneWidth,
     SkinSettingsRowId::NoteWidth,
-    SkinSettingsRowId::LaneSpacing,
-    SkinSettingsRowId::DividerWidth,
-    SkinSettingsRowId::CenterGap,
     SkinSettingsRowId::NoteGap,
-    SkinSettingsRowId::TargetLane,
     SkinSettingsRowId::LaneColor,
-    SkinSettingsRowId::SingleColor,
     SkinSettingsRowId::NoteShape,
-    SkinSettingsRowId::NoteBorder,
-    SkinSettingsRowId::ImageAspect,
     SkinSettingsRowId::NoteHeight,
-    SkinSettingsRowId::VisualOpacity,
-    SkinSettingsRowId::NoteOutlineOpacity,
     SkinSettingsRowId::NoteFadeIn,
     SkinSettingsRowId::NoteFadeOut,
-    SkinSettingsRowId::ShowHoldTail,
-    SkinSettingsRowId::LnTailTaper,
-    SkinSettingsRowId::LnBodyWidth,
-    SkinSettingsRowId::LnBodyOpacity,
-    SkinSettingsRowId::LaneBackgroundOpacity,
-    SkinSettingsRowId::BlackPlayfield,
     SkinSettingsRowId::KeyBackdrop,
     SkinSettingsRowId::KeyBackdropOpacity,
     SkinSettingsRowId::KeyBackdropBrightness,
@@ -142,11 +129,11 @@ inline constexpr std::array<SkinSettingsRowId, 70> kSkinSettingsRowOrder = {
     SkinSettingsRowId::JudgementLine,
     SkinSettingsRowId::JudgementLineType,
     SkinSettingsRowId::GearBoundary,
-    SkinSettingsRowId::KeyLabelPosition,
     SkinSettingsRowId::TimingFeedback,
     SkinSettingsRowId::TimingBar,
     SkinSettingsRowId::TimingBarMode,
     SkinSettingsRowId::TimingMarkerStyle,
+    SkinSettingsRowId::JudgementCounts,
     SkinSettingsRowId::TimingTextSize,
     SkinSettingsRowId::TimingTextX,
     SkinSettingsRowId::TimingTextY,
@@ -160,9 +147,6 @@ inline constexpr std::array<SkinSettingsRowId, 70> kSkinSettingsRowOrder = {
     SkinSettingsRowId::ComboX,
     SkinSettingsRowId::ComboFontSize,
     SkinSettingsRowId::JudgementFontSize,
-    SkinSettingsRowId::UiFont,
-    SkinSettingsRowId::UiFontFile,
-    SkinSettingsRowId::GameplayCursor,
     SkinSettingsRowId::Back,
 };
 
@@ -175,6 +159,7 @@ enum class SkinSettingsCategory { Source, Geometry, Notes, LongNotes, Effects, H
         case SkinSettingsRowId::Lr2Resolution: case SkinSettingsRowId::ImportSkin:
         case SkinSettingsRowId::CreateSkin: case SkinSettingsRowId::OpenSkinFolder:
         case SkinSettingsRowId::ReloadSkin:
+        case SkinSettingsRowId::ExportPreset:
         case SkinSettingsRowId::ImportPreset: case SkinSettingsRowId::OpenSkinEditor:
         case SkinSettingsRowId::VisualLatency:
             return SkinSettingsCategory::Source;
@@ -207,6 +192,7 @@ enum class SkinSettingsCategory { Source, Geometry, Notes, LongNotes, Effects, H
         case SkinSettingsRowId::GearBoundary: case SkinSettingsRowId::KeyLabelPosition:
         case SkinSettingsRowId::TimingBar:
         case SkinSettingsRowId::TimingBarMode:
+        case SkinSettingsRowId::JudgementCounts:
         case SkinSettingsRowId::TimingMarkerStyle:
         case SkinSettingsRowId::TimingTextSize:
         case SkinSettingsRowId::TimingBarSize:
@@ -223,7 +209,6 @@ enum class SkinSettingsCategory { Source, Geometry, Notes, LongNotes, Effects, H
         case SkinSettingsRowId::UiFont:
         case SkinSettingsRowId::UiFontFile:
         case SkinSettingsRowId::GameplayCursor:
-        case SkinSettingsRowId::ExportPreset:
             return SkinSettingsCategory::Other;
         case SkinSettingsRowId::Back:
             return SkinSettingsCategory::Navigation;
@@ -231,17 +216,25 @@ enum class SkinSettingsCategory { Source, Geometry, Notes, LongNotes, Effects, H
     return SkinSettingsCategory::Other;
 }
 
+// Runtime "auto" retains the chart's original lanes; converted key modes do not
+// expose scratch placement. Keep saved placement for when Original is restored.
+inline bool skin_scratch_position_visible(std::string_view runtime_mode) {
+    return runtime_mode.empty() || runtime_mode == "auto" || runtime_mode == "none";
+}
+
 struct SkinSettingsRows {
     bool lr2_source = false;
+    bool original_key_mode = true;
 
     [[nodiscard]] constexpr int count() const {
-        return static_cast<int>(kSkinSettingsRowOrder.size()) - (lr2_source ? 0 : 1);
+        return static_cast<int>(kSkinSettingsRowOrder.size()) - (lr2_source ? 0 : 1) - (original_key_mode ? 0 : 1);
     }
 
     [[nodiscard]] constexpr int index_of(SkinSettingsRowId id) const {
         int index = 0;
         for (const auto candidate : kSkinSettingsRowOrder) {
             if (!lr2_source && candidate == SkinSettingsRowId::Lr2Resolution) continue;
+            if (!original_key_mode && candidate == SkinSettingsRowId::ScratchPosition) continue;
             if (candidate == id) return index;
             ++index;
         }

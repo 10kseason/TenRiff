@@ -18,8 +18,8 @@ enum class SkinBoundaryAction {
     OpenSkinFolder,
     ReloadSkin,
     ImportPreset,
+    ExportPreset,
     OpenSkinEditor,
-    ChooseUiFont,
 };
 
 struct SkinSettingsEffects {
@@ -35,9 +35,9 @@ struct SkinSettingsEffects {
 
 [[nodiscard]] std::optional<SkinSettingsRowId> skin_setting_id_at(
     std::size_t index,
-    bool lr2_source) noexcept;
+    bool lr2_source, bool original_key_mode = true) noexcept;
 [[nodiscard]] std::optional<std::size_t> skin_setting_index(
-    SkinSettingsRowId id, bool lr2_source) noexcept;
+    SkinSettingsRowId id, bool lr2_source, bool original_key_mode = true) noexcept;
 
 class SkinSettingsController {
 public:
@@ -55,7 +55,7 @@ public:
                                std::optional<float> height = std::nullopt) noexcept;
     [[nodiscard]] SkinSettingsEffects select(
         SkinSettingsRowId target,
-        bool lr2_source) noexcept;
+        bool lr2_source, bool original_key_mode = true) noexcept;
     [[nodiscard]] SkinSettingsEffects select_lane(int one_based_lane) noexcept;
     [[nodiscard]] SkinSettingsEffects handle(
         const MenuAction& action,
@@ -84,6 +84,7 @@ private:
     int edit_lane_ = 0;
     int edit_gap_ = 0;
     bool dirty_ = false;
+    bool original_key_mode_ = true;
     std::optional<bool> timing_default_text_, timing_default_bar_, timing_default_always_visible_;
     std::optional<bool> backdrop_default_enabled_;
     std::optional<float> backdrop_default_opacity_;

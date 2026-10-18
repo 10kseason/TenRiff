@@ -399,6 +399,11 @@ DifficultyTableLoadResult load_difficulty_table(const std::filesystem::path& pat
     result.table.by_md5_.reserve(parsed_entries.size());
     result.table.by_sha256_.reserve(parsed_entries.size());
     const auto level_lookup = build_level_order_lookup(level_order);
+    result.table.levels_ = level_order;
+    for (const auto& entry : parsed_entries) {
+        if (std::find(result.table.levels_.begin(), result.table.levels_.end(), entry.level) == result.table.levels_.end())
+            result.table.levels_.push_back(entry.level);
+    }
 
     for (std::size_t i = 0; i < parsed_entries.size(); ++i) {
         const ParsedTableEntry& parsed_entry = parsed_entries[i];

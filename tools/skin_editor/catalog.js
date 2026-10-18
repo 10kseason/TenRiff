@@ -689,8 +689,8 @@
           },
           "judgement_line_position": {
             "type": "number",
-            "minimum": 0.05,
-            "maximum": 0.98
+            "minimum": 0.01,
+            "maximum": 1.0
           },
           "full_lane_receptors": {
             "type": "boolean"
@@ -751,7 +751,7 @@
             "type": "number",
             "minimum": 0.0,
             "maximum": 1.0,
-            "default": 1.0,
+            "default": 0.5,
             "description": "Maximum backdrop height as a fraction of the field, anchored at the bottom; 0 hides it and 1 fills the lane."
           },
           "hit_burst_style": {
@@ -1267,8 +1267,8 @@
           },
           "judgement_line_position": {
             "type": "number",
-            "minimum": 0.05,
-            "maximum": 0.98
+            "minimum": 0.01,
+            "maximum": 1.0
           },
           "full_lane_receptors": {
             "type": "boolean"
@@ -1329,7 +1329,7 @@
             "type": "number",
             "minimum": 0.0,
             "maximum": 1.0,
-            "default": 1.0,
+            "default": 0.5,
             "description": "Maximum backdrop height as a fraction of the field, anchored at the bottom; 0 hides it and 1 fills the lane."
           },
           "hit_burst_style": {
@@ -7131,7 +7131,7 @@
       "5k": [
         "#F6F8FF",
         "#4F80FF",
-        "#FAE36E",
+        "#F6F8FF",
         "#4F80FF",
         "#F6F8FF"
       ],

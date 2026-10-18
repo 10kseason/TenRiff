@@ -161,6 +161,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         manifest_style ? manifest_style->timing_bar_always_visible : std::optional<bool>{});
     target.show_timing_feedback = timing_visibility.text;
     target.show_timing_bar = timing_visibility.bar;
+    target.show_judgement_counts = config_.skin.show_judgement_counts;
     target.timing_bar_always_visible = timing_visibility.always_visible;
     target.timing_marker_style = config_.skin.timing_marker_style;
     target.judgement_line_type = config_.skin.judgement_line_type;
@@ -211,7 +212,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.note_shape = manifest_style && manifest_style->note_shape.has_value()
                             ? *manifest_style->note_shape
                             : config::normalize_skin_note_shape_token(config_.skin.note_shape);
-    target.note_image_aspect = render_note_image_aspect(config_.skin.note_image_aspect);
+    target.note_image_aspect = render::NoteImageAspect::Auto;
     // A menu-only editable skin keeps the native playfield and key receptors.
     target.skin_source = gameplay_manifest && gameplay_manifest->native_gameplay_fallback
                              ? "native"
@@ -585,6 +586,9 @@ void MenuApp::update_gameplay_loading_state(int percent, std::string_view stage)
 }
 
 std::string MenuApp::current_track_label() const {
+    if (current_screen() == Screen::SongSelect && showing_table_level_folders()) {
+        return difficulty_table_display_name_.empty() ? "-" : difficulty_table_display_name_;
+    }
     if (current_screen() == Screen::SongSelect && song_select_view_ == SongSelectView::Sources &&
         selected_source_ == 0) return "ALL SONG";
     if (current_screen() == Screen::SongSelect && song_select_view_ == SongSelectView::Sources &&
@@ -733,6 +737,7 @@ void MenuApp::service_song_preview() {
     const bool song_preview_screen_active =
         current_screen() == Screen::SongSelect &&
         song_select_view_ == SongSelectView::Songs &&
+        !showing_table_level_folders() &&
         config_.audio_ui.background_sound_enabled;
     const bool preview_screen_active = song_preview_screen_active || title_chart_music;
     const bool was_preview_screen_active = song_select_screen_.active();
@@ -976,6 +981,20 @@ void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
                     true,
                     true);
 
+    append_menu_row(render.generic, ui_text("UI Font", "UI 폰트"),
+                    config_.skin.ui_font == "custom" ? ui_text("Custom", "사용자 지정")
+                        : config::skin_ui_font_label(config_.skin.ui_font),
+                    settings_cursor_ == profile_setup::kUiFontRow, render::MenuHitTargetKind::SettingsRow,
+                    profile_setup::kUiFontRow, false, true);
+    append_menu_row(render.generic, ui_text("Choose Font File", "폰트 파일 선택"),
+                    config_.skin.ui_font_path.empty() ? "TTF / OTF"
+                        : path_from_utf8(config_.skin.ui_font_path).filename().u8string(),
+                    settings_cursor_ == profile_setup::kUiFontFileRow, render::MenuHitTargetKind::SettingsRow,
+                    profile_setup::kUiFontFileRow, true, false);
+    append_menu_row(render.generic, ui_text("Gameplay Cursor", "인게임 커서"),
+                    ui_on_off(config_.ui.show_cursor_in_gameplay),
+                    settings_cursor_ == profile_setup::kGameplayCursorRow, render::MenuHitTargetKind::SettingsRow,
+                    profile_setup::kGameplayCursorRow, false, true);
     append_menu_row(render.generic,
                     ui_text("Songs Folder", "곡 폴더"),
                     config_.ui.all_song_sources ? "ALL SONG" : safe_ui_text(menu_songs::song_source_display_name(songs_path_),
@@ -1225,8 +1244,8 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
                 ui_text("END FAILED COURSE  \xE2\x9E\xA1", "실패한 코스 종료  \xE2\x9E\xA1");
         } else {
             render.result.notes.push_back(
-                ui_text("Enter continues the mix. Esc or Backspace ends it here.",
-                        "Enter로 다음 곡을 진행합니다. Esc 또는 Backspace로 여기서 종료합니다."));
+                ui_text("Enter continues the mix. Esc ends it here.",
+                        "Enter로 다음 곡을 진행합니다. Esc로 여기서 종료합니다."));
             render.result.continue_label =
                 current < total
                     ? (ui_text("NEXT ", "다음 ") + std::to_string(current + 1) + "/" +
@@ -2234,7 +2253,8 @@ int MenuApp::selected_adjustment_repeat_row(uint32_t keycode) {
 bool MenuApp::is_song_select_repeat_key(uint32_t keycode) {
     if (skin_preview_fullscreen_) return false;
     if (help_overlay_visible_ || profile_nickname_edit_active_ ||
-        online_records_url_editing_ || song_select_search_active_ ||
+        (song_select_search_active_ && current_screen() != Screen::SongSelect) ||
+        online_records_url_editing_ ||
         chat_overlay_visible_ || ranked_account_overlay_visible_ || chat_url_warning_visible_ ||
         (current_screen() == Screen::Multiplayer && multiplayer_menu_.edit_field != MultiplayerEditField::None) ||
         (current_screen() == Screen::Keymap &&
@@ -2242,6 +2262,10 @@ bool MenuApp::is_song_select_repeat_key(uint32_t keycode) {
         return false;
     }
 
+    if (current_screen() == Screen::SongSelect && (song_select_search_active_ ||
+        (song_select_focus_ == SongSelectFocus::LeftNav && song_select_nav_cursor_ == 2))) {
+        return keycode == key_backspace_ && !song_search_query_.empty();
+    }
     if (difficulty_table_url_editing_) {
         return (current_screen() == Screen::SongSelect || current_screen() == Screen::SongBrowser) &&
                keycode == key_backspace_ && !difficulty_table_url_input_.empty();
@@ -2984,8 +3008,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                     ui_text("Left / Right changes the highlighted setting. Continue opens Song Select.",
                             "좌우 키로 선택된 설정을 바꾸고, 계속을 누르면 곡 선택으로 이동합니다."),
                 };
-                target.footer = ui_text("Esc or Backspace skips to the title screen. Press F1 again to close help.",
-                                        "Esc 또는 Backspace로 타이틀 화면으로 건너뜁니다. 도움말을 닫으려면 F1을 다시 누르세요.");
+                target.footer = ui_text("Esc skips to the title screen. Press F1 again to close help.",
+                                        "Esc로 타이틀 화면으로 건너뜁니다. 도움말을 닫으려면 F1을 다시 누르세요.");
             } else {
                 target.title = ui_text("Profile Setup", "프로필 설정");
                 target.lines = {
@@ -2998,8 +3022,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                     ui_text("Use Keymap and the other Options screens for the remaining profile settings.",
                             "나머지 프로필 설정은 키 설정과 다른 옵션 화면에서 조정할 수 있습니다."),
                 };
-                target.footer = ui_text("Done, Esc, or Backspace returns to Options. Press F1 again to close help.",
-                                        "완료, Esc 또는 Backspace로 옵션에 돌아갑니다. 도움말을 닫으려면 F1을 다시 누르세요.");
+                target.footer = ui_text("Done, Esc returns to Options. Press F1 again to close help.",
+                                        "완료, Esc로 옵션에 돌아갑니다. 도움말을 닫으려면 F1을 다시 누르세요.");
             }
             return;
         case Screen::Title:
@@ -3045,8 +3069,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "탐색 메뉴에서 곡, 소스, 검색, 필터, 기록, 세션 믹스, 옵션을 엽니다."),
                 ui_text("SEARCH filters title, artist, and path. FILTER now owns sort, group, key, difficulty, and collections.",
                         "SEARCH는 제목, 아티스트, 경로를 검색하고 FILTER는 정렬, 그룹, 키, 난이도, 컬렉션을 담당합니다."),
-                ui_text("Backspace returns from Sources or Records to Songs. Esc returns to the title screen.",
-                        "Backspace는 Sources나 Records에서 Songs로 돌아가고 Esc는 타이틀 화면으로 돌아갑니다."),
+                ui_text("Esc returns from a level, Sources or Records to the parent view. Backspace only erases search text.",
+                        "Esc는 레벨·소스·기록에서 이전 목록으로 돌아갑니다. Backspace는 검색어만 지웁니다."),
                 ui_text("F2 chooses a songs folder. -/+ adjusts Rate. F5 refreshes the active source.",
                         "F2로 곡 폴더 선택, -/+로 배속 조절, F5로 활성 소스를 새로고침합니다."),
                 ui_text("C appends the selected chart to the course draft; Delete removes the last drafted stage.",
@@ -3073,8 +3097,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                 ui_text("Courses carry the LR2 grade gauge: PG/GR +0.1, GD +0.04, BAD -2, missed POOR -3, empty POOR -2; damage x0.6 below 32%, failure below 2%.",
                         "코스는 LR2 단위 게이지를 이어 씁니다: PG/GR +0.1, GD +0.04, BAD -2, 간접 POOR -3, 빈 POOR -2. 32% 미만 피해 x0.6, 2% 미만 실패."),
             };
-            target.footer = ui_text("Result Enter continues; Result Esc or Backspace ends the mix.",
-                                    "Result에서 Enter는 계속, Esc 또는 Backspace는 세션 종료입니다.");
+            target.footer = ui_text("Result Enter continues; Result Esc ends the mix.",
+                                    "Result에서 Enter는 계속, Esc는 세션 종료입니다.");
             return;
         case Screen::SongBrowser:
             target.title = ui_text("Filter Help", "필터 도움말");
@@ -3088,8 +3112,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                 ui_text("Enter toggles collection membership, creates the next collection, clears filters, or goes back.",
                         "Enter로 컬렉션 토글, 다음 컬렉션 생성, 필터 초기화, 뒤로 가기를 실행합니다."),
             };
-            target.footer = ui_text("Esc or Backspace returns to Song Select. Press F1 again to close help.",
-                                    "Esc 또는 Backspace로 Song Select로 돌아갑니다. 도움말을 닫으려면 F1을 다시 누르세요.");
+            target.footer = ui_text("Esc returns to Song Select. Press F1 again to close help.",
+                                    "Esc로 Song Select로 돌아갑니다. 도움말을 닫으려면 F1을 다시 누르세요.");
             return;
         case Screen::SettingsAudio:
             target.title = ui_text("Audio Settings", "오디오 설정");
@@ -3100,8 +3124,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "좌 / 우 키 또는 +/- 버튼으로 현재 값을 변경합니다."),
                 ui_text("Follow keeps note keysounds tied to your hits. Autoplay mixes them into background audio instead.",
                         "연동은 입력 시 키음을 재생하고, 자동재생은 키음을 배경음에 섞어 재생합니다."),
-                ui_text("Esc or Backspace saves the current values and returns.",
-                        "Esc 또는 Backspace로 현재 값을 저장하고 돌아갑니다."),
+                ui_text("Esc saves the current values and returns.",
+                        "Esc로 현재 값을 저장하고 돌아갑니다."),
             };
             target.footer = ui_text("A later return to Song Select keeps these values live.",
                                     "이 값들은 이후 Song Select로 돌아가도 그대로 유지됩니다.");
@@ -3117,8 +3141,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "언어와 메뉴 글자 크기는 프로필 설정에, 비주얼 레이턴시는 스킨 설정에 있습니다."),
                 ui_text("For Discord voice overlay, use Borderless or Windowed and pin the Voice widget at bottom-left.",
                         "Discord 음성 오버레이는 테두리 없음 또는 창 모드를 쓰고 Voice 위젯을 좌하단에 고정하세요."),
-                ui_text("Esc or Backspace saves and returns.",
-                        "Esc 또는 Backspace로 저장하고 돌아갑니다."),
+                ui_text("Esc saves and returns.",
+                        "Esc로 저장하고 돌아갑니다."),
             };
             target.footer = ui_text("Use this screen when notes feel visually early or late on your display.",
                                     "노트가 화면에서 너무 빠르거나 늦게 보일 때 이 화면에서 조정하세요.");
@@ -3139,8 +3163,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                 ui_text("The right preview scales actual gameplay uniformly, including field, note, gear and text positions.",
                         "오른쪽 미리보기는 플레이필드·노트·기어·글자 위치를 포함한 실제 인게임을 같은 비율로 축소합니다."),
             };
-            target.footer = ui_text("Esc or Backspace saves and returns.",
-                                    "Esc 또는 Backspace로 저장하고 돌아갑니다.");
+            target.footer = ui_text("Esc saves and returns.",
+                                    "Esc로 저장하고 돌아갑니다.");
             return;
         case Screen::SettingsInput:
             target.title = ui_text("Input Settings", "입력 설정");
@@ -3153,8 +3177,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "Polling Hz는 폴링 백엔드와 플레이 중 노트 키 보조 감시 주기를 정합니다."),
                 ui_text("Debounce filters switch chatter before gameplay receives duplicate presses.",
                         "디바운스는 플레이가 중복 입력을 받기 전에 스위치 채터링을 걸러냅니다."),
-                ui_text("Esc or Backspace saves and returns.",
-                        "Esc 또는 Backspace로 저장하고 돌아갑니다."),
+                ui_text("Esc saves and returns.",
+                        "Esc로 저장하고 돌아갑니다."),
             };
             target.footer = ui_text("Input changes apply after the input thread restarts when you leave the screen.",
                                     "화면을 나갈 때 입력 스레드를 다시 시작한 뒤 변경 사항이 적용됩니다.");
@@ -3194,8 +3218,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                 ui_text("Judge Window selects Normal, Hard or EX with Left/Right, Enter or the value button.",
                         "판정 범위에서 좌우 키·Enter·값 버튼으로 기본·Hard·EX를 고릅니다."),
             };
-            target.footer = ui_text("Esc or Backspace saves and refreshes the library if needed.",
-                                    "Esc 또는 Backspace로 저장하고, 필요하면 라이브러리를 새로고칩니다.");
+            target.footer = ui_text("Esc saves and refreshes the library if needed.",
+                                    "Esc로 저장하고, 필요하면 라이브러리를 새로고칩니다.");
             return;
         case Screen::ModeMods:
             target.title = ui_text("Mod Manager", "모드 관리자");
@@ -3207,8 +3231,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                 ui_text("Final score uses the lowest multiplier between the current Rate and all active mods.",
                         "최종 점수는 현재 Rate와 활성 모드 중 가장 낮은 배율을 사용합니다."),
             };
-            target.footer = ui_text("Enter, Esc, or Backspace returns to Key Mode Settings.",
-                                    "Enter, Esc, Backspace로 키 모드 설정으로 돌아갑니다.");
+            target.footer = ui_text("Enter, Esc returns to Key Mode Settings.",
+                                    "Enter, Esc로 키 모드 설정으로 돌아갑니다.");
             return;
         case Screen::Keymap:
             target.title = ui_text("Keymap Help", "키 설정 도움말");
@@ -3222,8 +3246,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                 ui_text("When you opened Keymap from Song Select, the editor defaults to the selected chart's key mode.",
                         "Song Select에서 Keymap을 열면 선택한 차트의 키 모드가 기본 편집 대상으로 잡힙니다."),
             };
-            target.footer = ui_text("An assigned key moves to its new slot. Esc or Backspace returns.",
-                                    "이미 지정한 키는 새 위치로 옮겨집니다. Esc 또는 Backspace로 돌아갑니다.");
+            target.footer = ui_text("An assigned key moves to its new slot. Esc returns.",
+                                    "이미 지정한 키는 새 위치로 옮겨집니다. Esc로 돌아갑니다.");
             return;
         case Screen::KeymapTest:
             target.title = "NKRO Test";
@@ -3233,8 +3257,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                 ui_text("Highlighted lanes show which mapped keys TenRiff is currently receiving.",
                         "강조된 레인은 TenRiff가 현재 입력으로 받고 있는 매핑 키를 보여줍니다."),
             };
-            target.footer = ui_text("Esc or Backspace returns to Keymap.",
-                                    "Esc 또는 Backspace로 키 설정 화면으로 돌아갑니다.");
+            target.footer = ui_text("Esc returns to Keymap.",
+                                    "Esc로 키 설정 화면으로 돌아갑니다.");
             return;
         case Screen::Result:
             target.title = ui_text("Result Screen", "결과 화면");
@@ -3245,8 +3269,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "Left로 현재 설정 그대로 같은 차트를 즉시 다시 시작합니다."),
                 ui_text("F1 or the Replay button starts playback from the saved replay file when one is available.",
                         "F1 또는 Replay 버튼으로 저장된 리플레이 파일이 있을 때 재생을 시작합니다."),
-                ui_text("Enter, Esc, and Backspace all return to Song Select.",
-                        "Enter, Esc, Backspace 모두 Song Select로 돌아갑니다."),
+                ui_text("Enter, and Esc all return to Song Select.",
+                        "Enter, Esc 모두 Song Select로 돌아갑니다."),
             };
             target.footer = ui_text("Back and confirm are intentionally mirrored here for faster recovery after each song.",
                                     "곡이 끝난 뒤 빠르게 복구할 수 있도록 뒤로/확인 입력을 이 화면에서는 일부러 겹치게 배치했습니다.");
@@ -3259,16 +3283,16 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                 ui_text("Keep shortcuts surfaced here: use the listed rows, F1 for help, F2 for songs folder, and F5 for reindex.",
                         "여기서는 보이는 조작만 유지합니다. 표시된 행, F1 도움말, F2 곡 폴더, F5 재인덱스를 사용하세요."),
             };
-            target.footer = ui_text("Esc or Backspace returns to the previous screen.",
-                                    "Esc 또는 Backspace로 이전 화면으로 돌아갑니다.");
+            target.footer = ui_text("Esc returns to the previous screen.",
+                                    "Esc로 이전 화면으로 돌아갑니다.");
             return;
         default:
             target.title = ui_text("Controls", "조작");
             target.lines = {
                 ui_text("Up / Down selects items. Left / Right changes adjustable values.",
                         "위 / 아래 키로 항목을 선택하고, 좌 / 우 키로 조절 가능한 값을 바꿉니다."),
-                ui_text("Enter confirms the focused action. Esc or Backspace returns.",
-                        "Enter로 선택을 확정하고, Esc 또는 Backspace로 돌아갑니다."),
+                ui_text("Enter confirms the focused action. Esc returns.",
+                        "Enter로 선택을 확정하고, Esc로 돌아갑니다."),
             };
             target.footer = ui_text("Press F1 again to close help.",
                                     "도움말을 닫으려면 F1을 다시 누르세요.");

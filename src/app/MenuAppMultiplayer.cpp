@@ -727,7 +727,7 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (keycode == key_escape_ || keycode == key_backspace_) {
+    if (keycode == key_escape_) {
         leave_multiplayer();
         return;
     }

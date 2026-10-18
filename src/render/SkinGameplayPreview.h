@@ -55,6 +55,8 @@ inline GameplayHudData make_skin_gameplay_preview(const SkinPreviewData& preview
     hud.gauge_label = "NORMAL";
     hud.show_timing_feedback = preview.show_timing_feedback;
     hud.show_timing_bar = preview.show_timing_bar;
+    hud.show_judgement_counts = preview.show_judgement_counts;
+    hud.pg = 118; hud.gr = 4; hud.gd = 1;
     hud.timing_bar_always_visible = preview.timing_bar_always_visible;
     hud.timing_marker_style = preview.timing_marker_style;
     hud.judgement_line_type = preview.judgement_line_type;
