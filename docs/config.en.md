@@ -1,3 +1,5 @@
+> **2026-10-19 · 1.9.7:** Adds Common Keys, larger mode tabs with lobby colors, colored FAST/SLOW labels, 1% adjustments, Game Mode Settings/Normal labels and a fresh seed for every solo play. The version-specific release page determines publication and downloads. Earlier dated notices are historical. [1.9.7](release-1.9.7.en.md) · [Baseline 1.9.6](baseline-1.9.6.en.md) · [Verification](release-1.9.7-gate.md).
+
 **2026-10-18 · 1.9.6:** [Fixed judgement, skin tabs/search and windowed drops](release-1.9.6.en.md) · [Verification scope](release-1.9.6-gate.md). Sites accepts only new standard Online R9/R10 submissions; old boards and records remain legacy read-only. Unsupported separate Ranked rules and Guest/custom exclusions remain.
 
 [Pinned timing table](judgement-baseline-20261018.en.md): Normal PG22/19/15/10ms and exact existing GR/GD/BAD remain. Hard uses the complete Normal NM row and EX the complete Normal VHD row for every chart RANK, without integer-ms rounding. The general source baseline remains **1.9.0**.
@@ -87,7 +89,7 @@ The 1.9.0.2 candidate adjusts all five audio UI volumes—master, BMS song, TenR
 - `gameplay_volume` (double)
   - BMS performance volume (Korean: BMS 연주 볼륨), jointly controlling background audio, keysounds and previews. 0–1, new default 0.20 (20%); explicitly saved values are retained. The field name and existing UI-effect gain are unchanged.
 - `menu_music_volume` (double)
-  - TenRiff menu/result music only. 0–1, default 1.0. The reference gain is 10% of source, 75% quieter than the 40% reference in 1.8.9.7. Independent of BMS songs; not a Windows volume-curve emulation.
+  - TenRiff menu/result music only. 0–1, default 1.0. The reference gain is 12.5% of source, 68.75% quieter than the 40% reference in 1.8.9.7. Independent of BMS songs; not a Windows volume-curve emulation.
 - `bgm_volume` (double)
   - Legacy compatibility field. 0–2, default 1.0; existing values are still loaded/saved, but have no individual UI and are ignored by play, preview and editor gain calculations.
 - `normalize_audio` (bool)
@@ -362,7 +364,7 @@ These are profile `config.json` skin settings. For a skin package's `skin.json` 
 | `timing_feedback_override` | bool; `false` | After the user edits a switch, profile visibility choices take priority over the skin manifest. |
 | `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | Independent text/bar X offsets added to the existing judgement-area layout, in 1920x1080 base pixels. |
 | `timing_text_offset_y`, `timing_bar_offset_y` | double: `-400..400`; `0` | Independent text/bar Y offsets in base pixels; positive moves down. |
-| `timing_text_scale`, `timing_bar_scale` | double: `0.50..2`; `1` | Independent FAST/SLOW text and bar scales, adjustable from 50–200% in 5% steps or with sliders. Apply to Studio, Classic, imported skins and previews without changing judgement/combo size or XY offsets. |
+| `timing_text_scale`, `timing_bar_scale` | double: `0.50..2`; `1` | Independent FAST/SLOW text and bar scales, adjustable from 50–200% in 1% steps or with sliders. Apply to Studio, Classic, imported skins and previews without changing judgement/combo size or XY offsets. |
 | `show_hold_tail`, `hold_tail_taper_enabled` | bool; `false` | LN tail-cap visibility and taper respectively. Only the Korean taper label changes to `LN 끝 줄임`; appearance and judgement rules stay unchanged. |
 | `judgement_line_glow_enabled` | bool; `true` | Judgement-line glow. |
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst brightness; zero disables it. |
@@ -376,7 +378,7 @@ These are profile `config.json` skin settings. For a skin package's `skin.json` 
 | `gameplay_field_offset_x` | double: `-720..720`; `0` | Field X offset in 1920×1080 base pixels; additionally constrained to keep the field and ↔ handle visible. |
 | `combo_position`, `judgement_position` | double: `0.10..0.78`; `0.24` | Independent combo/judgement Y anchors; missing judgement position inherits `combo_position` in older profiles. |
 | `combo_offset_x`, `judgement_offset_x` | double: `-600..600`; `0` | Independent combo/judgement X offsets in 1920×1080 base pixels. |
-| `combo_font_scale`, `judgement_font_scale` | double: `0.50..2`; `1` | Independent combo/judgement text multipliers. Skin Settings adjusts 50–200% in 5% steps or with mouse sliders; profile values also apply to imported skins. |
+| `combo_font_scale`, `judgement_font_scale` | double: `0.50..2`; `1` | Independent combo/judgement text multipliers. Skin Settings adjusts 50–200% in 1% steps or with mouse sliders; profile values also apply to imported skins. |
 | `lane_background_opacity` | double: `0..0.45`; `0.18` | Lane-background opacity. |
 | `black_playfield_enabled` | bool; `true` | Black field including lane gaps. |
 | `visual_opacity` | double: `0.20..1`; `0.96` | Shared opacity multiplier for notes, receptors and key labels. |

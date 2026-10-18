@@ -15,7 +15,7 @@
 {"Choose title-screen music: default, random BMS, last played, or none.", "选择标题画面音乐：默认、随机BMS、上次游玩的曲目或无。"},
 {"After the last judgement, listen to the remaining audio or skip it after the result delay. Notes and scoring stay unchanged.", "最后一次判定后，听完剩余音乐，或等待结果延时后跳过。音符与计分不变。"},
 {"Adjust BMS accompaniment, keysounds and previews together. Default: 20%. TenRiff menu music is independent.", "统一调节BMS伴奏、键音和试听音量，默认20%。TenRiff菜单音乐单独调节。"},
-{"Adjust TenRiff menu and result music. 100% uses a quiet 10% reference level; BMS songs are unchanged.", "调节TenRiff菜单与结果音乐。100%对应原始音量的10%基准，不影响BMS曲目。"},
+{"Adjust TenRiff menu and result music. 100% uses a quiet 12.5% reference level; BMS songs are unchanged.", "调节TenRiff菜单与结果音乐。100%对应原始音量的12.5%基准，不影响BMS曲目。"},
 {"Choose windowed, borderless, or fullscreen display.", "选择窗口、无边框或全屏显示模式。"},
 {"Use +/- for presets, or Enter to type Width and Height (320-8192). Drag a Windowed border to resize and save. The display keeps its proportions.", "用-/+选择预设，或按Enter输入宽度和高度（320–8192）。拖动窗口边框可调整并保存尺寸，画面保持原有比例。"},
 {"Set the frame-rate limit when VSync is off. Menus remain capped at 300 FPS.", "设置关闭垂直同步时的帧率上限。菜单仍以300 FPS为上限。"},

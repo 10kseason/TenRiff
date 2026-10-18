@@ -75,8 +75,9 @@ inline constexpr float kOutputSoftLimitThreshold = 0.92f;
 [[nodiscard]] inline double tenriff_music_gain(bool enabled,
                                                double master_volume,
                                                double menu_music_volume) {
-    // The 100% slider uses a quiet 10% reference level (1.8.9.7 used 40%).
-    return menu_background_gain(enabled, master_volume, menu_music_volume) * 0.1;
+    // 1.9.7 eases the scene-music attenuation from 10% to 12.5% (~+1.94 dB).
+    // Stored master/menu sliders and the separate song-preview gain stay intact.
+    return menu_background_gain(enabled, master_volume, menu_music_volume) * 0.125;
 }
 
 }  // namespace tenriff::app

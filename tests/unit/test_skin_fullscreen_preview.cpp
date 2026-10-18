@@ -21,6 +21,106 @@
 namespace tenriff::app {
 
 struct MenuAppSkinPreviewTestAccess {
+    static void check_common_keys() {
+        struct TempProfile {
+            std::filesystem::path path;
+            ~TempProfile() {
+                std::error_code ec;
+                std::filesystem::remove(path / "config.json", ec);
+                std::filesystem::remove(path, ec);
+            }
+        } profile{std::filesystem::temp_directory_path() /
+            ("tenriff_common_keys_" + std::to_string(timing::HighResClock::now_ns()))};
+        REQUIRE(std::filesystem::create_directory(profile.path));
+        auto menu = fixture();
+        menu->profile_dir_ = profile.path.u8string();
+        menu->key_tab_ = 9;
+        menu->key_delete_ = 46;
+        menu->keymap_ = menu->working_keymap_ = config::KeymapManager{}.default_keymap();
+        menu->refresh_function_keys();
+        menu->reset_screen(MenuApp::Screen::OptionsHub);
+        menu->open_keymap_screen(MenuApp::Screen::OptionsHub);
+        menu->publish_snapshot();
+        REQUIRE(menu->snapshot_.render.generic.keymap_mode_tabs.size() == 11);
+        CHECK(menu->keymap_settings_controller_.selected_row() == 1);
+        const auto modes = config::KeymapManager{}.supported_mode_tokens();
+        const auto before = menu->keymap_.mode_bindings;
+        for (int i = 1; i <= static_cast<int>(modes.size()); ++i) {
+            render::MenuClickEvent tab{};
+            tab.kind = render::MenuHitTargetKind::KeymapModeTab;
+            tab.index = i;
+            menu->handle_menu_click(tab);
+            CHECK(menu->keymap_settings_controller_.edit_mode() == modes[i - 1]);
+            CHECK(menu->snapshot_.render.generic.keymap_mode_tabs[i].selected);
+        }
+        CHECK(menu->keymap_.mode_bindings == before);
+        // Wrap from the final mode into Common Keys using the same input path.
+        tap(*menu, menu->key_right_);
+        REQUIRE(menu->keymap_common_tab_);
+        CHECK_FALSE(menu->snapshot_.render.generic.keymap_keyboard);
+        tap(*menu, menu->key_down_);
+        CHECK_FALSE(menu->keymap_mode_tabs_focused_);
+        const auto f12 = config::KeycodeMap::to_keycode("F12").value();
+        const auto original_ui = menu->config_.ui;
+        for (int row = profile_setup::kInstantRestartKeyRow; row <= profile_setup::kFunctionKeysLastRow; ++row) {
+            menu->config_.ui = original_ui;
+            menu->refresh_function_keys();
+            menu->publish_snapshot();
+            render::MenuClickEvent click{};
+            click.kind = render::MenuHitTargetKind::SettingsRow;
+            click.index = row;
+            menu->handle_menu_click(click);
+            REQUIRE(menu->profile_control_key_capture_active_);
+            const auto probes = menu->current_menu_probe_keycodes();
+            CHECK(std::find(probes.begin(), probes.end(), f12) != probes.end());
+            // Capturing owns navigation, pointer events, reserved keys and lane keys.
+            render::MenuClickEvent other_tab{};
+            other_tab.kind = render::MenuHitTargetKind::KeymapModeTab;
+            other_tab.index = 1;
+            menu->handle_menu_click(other_tab);
+            CHECK(menu->keymap_common_tab_);
+            tap(*menu, config::KeycodeMap::to_keycode("D").value());
+            CHECK(menu->profile_control_key_capture_active_);
+            tap(*menu, config::KeycodeMap::to_keycode("F10").value());
+            if (row != profile_setup::kFunctionKeysLastRow - 1)
+                CHECK(menu->profile_control_key_capture_active_);
+            // F10 is a valid no-op assignment when editing its own action.
+            if (!menu->profile_control_key_capture_active_) menu->handle_menu_click(click);
+            tap(*menu, f12);
+            REQUIRE_FALSE(menu->profile_control_key_capture_active_);
+            const int action = profile_setup::function_for_row(row);
+            const auto saved = config::ConfigLoader{}.load_profile(menu->profile_dir_);
+            REQUIRE(saved.success());
+            CHECK((action ? config::function_key(saved.config.ui, action) : saved.config.ui.instant_restart_key) == "F12");
+            render::MenuRenderData profile_rows;
+            menu->populate_common_key_rows(profile_rows);
+            const auto found = std::find_if(profile_rows.generic.rows.begin(), profile_rows.generic.rows.end(),
+                [&](const auto& item) { return item.row_index == row; });
+            REQUIRE(found != profile_rows.generic.rows.end());
+            CHECK(found->value == "F12");
+            menu->handle_menu_click(click);
+            tap(*menu, menu->key_escape_);
+            CHECK_FALSE(menu->profile_control_key_capture_active_);
+            CHECK(menu->current_screen() == MenuApp::Screen::Keymap);
+            menu->handle_menu_click(click);
+            tap(*menu, menu->key_delete_);
+            CHECK_FALSE(menu->profile_control_key_capture_active_);
+            const auto cleared = config::ConfigLoader{}.load_profile(menu->profile_dir_);
+            CHECK((action ? config::function_key(cleared.config.ui, action) : cleared.config.ui.instant_restart_key).empty());
+        }
+        CHECK(menu->keymap_.mode_bindings == before);
+        tap(*menu, menu->key_tab_);
+        tap(*menu, menu->key_right_);
+        CHECK_FALSE(menu->keymap_common_tab_);
+        CHECK(menu->keymap_settings_controller_.edit_mode() == "4k");
+        tap(*menu, menu->key_enter_);
+        CHECK_FALSE(menu->keymap_mode_tabs_focused_);
+        tap(*menu, menu->key_up_);
+        CHECK(menu->keymap_mode_tabs_focused_);
+        tap(*menu, menu->key_escape_);
+        CHECK(menu->current_screen() == MenuApp::Screen::OptionsHub);
+    }
+
     static void check_mode_tabs_and_search() {
         auto menu = fixture();
         menu->skin_settings_controller_.reset("4k");
@@ -755,6 +855,10 @@ TEST_CASE("difficulty table URL held Backspace repeats complete UTF8 characters 
 TEST_CASE("skin lane number shortcuts honor visible order bounds and modal ownership") {
     tenriff::app::MenuAppSkinPreviewTestAccess::check_lane_number_shortcuts();
 }
+TEST_CASE("common key tab owns capture saves every shared action and preserves per-mode lanes") {
+    tenriff::app::MenuAppSkinPreviewTestAccess::check_common_keys();
+}
+
 TEST_CASE("skin lane number shortcuts retain physical Shift Ctrl Alt and Win fallbacks") {
     tenriff::app::MenuAppSkinPreviewTestAccess::check_physical_lane_modifiers();
 }

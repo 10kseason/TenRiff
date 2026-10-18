@@ -10,7 +10,7 @@
         const std::size_t first_key_row = testing_keys ? 0 : 1;
         const std::size_t action_count = testing_keys ? 1 : 3;
         const int key_count = static_cast<int>(data.generic.rows.size() - first_key_row - action_count);
-        const float keymap_top = top + 74.0f;
+        const float keymap_top = top + (has_keymap_tabs ? 12.0f : 74.0f);
         const auto short_binding = [](std::string value) {
             if (value == "Unassigned" || value == "미할당" || value == "未割り当て") return std::string("—");
             const std::pair<const char*, const char*> names[] = {
@@ -55,7 +55,7 @@
             if (enabled) register_hit(rect, target, index, part);
         };
 
-        if (!testing_keys && !data.generic.rows.empty()) {
+        if (!testing_keys && !has_keymap_tabs && !data.generic.rows.empty()) {
             const auto& row = data.generic.rows.front();
             const auto mode_rect = D2D1::RectF(keymap_inner_left, keymap_top,
                                                keymap_inner_right, keymap_top + 58.0f);

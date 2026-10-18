@@ -470,7 +470,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
                                          D2D1_DRAW_TEXT_OPTIONS options = D2D1_DRAW_TEXT_OPTIONS_NONE,
                                          bool contour = true,
                                          ID2D1Brush* first_glyph_brush = nullptr,
-                                         UINT32 prefix_length = 1) {
+                                         UINT32 prefix_length = 1, ID2D1Brush* slow_brush = nullptr) {
         if (!layout || !brush) return;
         auto* outline = d2d_->text_outline_brush.Get();
         if (outline && contour) {
@@ -490,7 +490,9 @@ void MenuWindow::draw(const MenuRenderData& data) {
         // Effects apply only to the fill: outlines keep their existing contrast
         // color, and cached layouts must not leak a prefix tint to another row.
         if (first_glyph_brush) layout->SetDrawingEffect(first_glyph_brush, DWRITE_TEXT_RANGE{0, prefix_length});
+        if (slow_brush) layout->SetDrawingEffect(slow_brush, DWRITE_TEXT_RANGE{5, 4});
         ctx->DrawTextLayout(origin, layout, brush, options);
+        if (slow_brush) layout->SetDrawingEffect(nullptr, DWRITE_TEXT_RANGE{5, 4});
         if (first_glyph_brush) layout->SetDrawingEffect(nullptr, DWRITE_TEXT_RANGE{0, prefix_length});
     };
     std::size_t menu_text_slot = 0;
@@ -500,7 +502,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
                                D2D1_DRAW_TEXT_OPTIONS options = D2D1_DRAW_TEXT_OPTIONS_NONE,
                                DWRITE_MEASURING_MODE = DWRITE_MEASURING_MODE_NATURAL,
                                ID2D1Brush* first_glyph_brush = nullptr,
-                               UINT32 prefix_length = 1) {
+                               UINT32 prefix_length = 1, ID2D1Brush* slow_brush = nullptr) {
         const float width = rect.right - rect.left, height = rect.bottom - rect.top;
         if (!text || !length || !format || !brush || width <= 0 || height <= 0) return;
         D2DResources::ReadableTextLayout transient;
@@ -533,7 +535,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
             cached.line_spacing = line_spacing; cached.baseline = baseline;
         }
         draw_text_layout_readable(D2D1::Point2F(rect.left, rect.top), cached.layout.Get(), brush, options,
-                                  true, first_glyph_brush, prefix_length);
+                                  true, first_glyph_brush, prefix_length, slow_brush);
     };
 
     auto draw_text_clipped = [&](const std::wstring& text,
@@ -541,7 +543,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
                                  const D2D1_RECT_F& rect,
                                  ID2D1Brush* brush,
                                  ID2D1Brush* first_glyph_brush = nullptr,
-                                 UINT32 prefix_length = 1) {
+                                 UINT32 prefix_length = 1, ID2D1Brush* slow_brush = nullptr) {
         const float width = rect.right - rect.left;
         const float height = rect.bottom - rect.top;
         if (text.empty() || !format || !brush || width <= 0.0f || height <= 0.0f) {
@@ -556,7 +558,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
         if (text_scale >= 0.995f) {
             draw_text_exact(text.c_str(), static_cast<UINT32>(text.size()),
                           format, rect, brush, D2D1_DRAW_TEXT_OPTIONS_CLIP,
-                          DWRITE_MEASURING_MODE_NATURAL, first_glyph_brush, prefix_length);
+                          DWRITE_MEASURING_MODE_NATURAL, first_glyph_brush, prefix_length, slow_brush);
             return;
         }
 
@@ -572,7 +574,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
             rect.top + height / text_scale);
         draw_text_exact(text.c_str(), static_cast<UINT32>(text.size()),
                       format, expanded_rect, brush, D2D1_DRAW_TEXT_OPTIONS_CLIP,
-                      DWRITE_MEASURING_MODE_NATURAL, first_glyph_brush, prefix_length);
+                      DWRITE_MEASURING_MODE_NATURAL, first_glyph_brush, prefix_length, slow_brush);
         ctx->SetTransform(saved_transform);
     };
 

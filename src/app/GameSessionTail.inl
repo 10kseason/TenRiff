@@ -440,8 +440,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         one_miss_fail_enabled_ = replay_source_.mode.one_miss_fail_enabled;
         pacemaker_mode_ = "off";
     }
-    if (!replay_playback_enabled_ &&
-        random_mode_uses_fresh_session_seed(config_.mode.random)) {
+    // Every new solo play (including Retry) gets a fresh seed. Replays retain
+    // their recorded seed; peer rooms keep their shared, random-OFF contract.
+    if (!replay_playback_enabled_ && !peer_battle_mode_) {
         config_.mode.random_seed = next_random_session_seed();
     }
     if (!replay_playback_enabled_ && !options.ghost_replay_path.empty()) {
@@ -757,7 +758,21 @@ bool GameSession::initialize(const CommandLineOptions& options) {
             ghost_replay_source_.mode.random != config_.mode.random) {
             ghost_compatible = false;
         }
-        if (ghost_compatible && ghost_replay_source_.mode.random_seed.has_value() &&
+        // A new per-play seed must not disable an Original OFF/Mirror ghost:
+        // that path consumes no mode seed. Seed-dependent conversion/mods still
+        // require matching seeds because player and ghost share one chart.
+        int source_key_lanes = chart_result.chart.lane_count;
+        for (int lane = 1; lane <= chart_result.chart.lane_count; ++lane)
+            if (std::find(chart_result.chart.scratch_lanes.begin(), chart_result.chart.scratch_lanes.end(), lane) !=
+                chart_result.chart.scratch_lanes.end()) --source_key_lanes;
+        const bool seedless_conversion = mode_result.settings.key_mode == gameplay::KeyMode::Auto ||
+            (mode_result.settings.key_conversion_algorithm != gameplay::KeyModeConversionAlgorithm::NK3 &&
+             gameplay::to_string(mode_result.settings.key_mode) == std::to_string(source_key_lanes) + "K");
+        const bool seed_independent_ghost = seedless_conversion &&
+            (mode_result.settings.random == gameplay::RandomMode::Off ||
+             mode_result.settings.random == gameplay::RandomMode::Mirror) &&
+            !mode_mod_adds_notes(active_mods_) && !mode_mod_long_note_mix(active_mods_);
+        if (ghost_compatible && !seed_independent_ghost && ghost_replay_source_.mode.random_seed.has_value() &&
             ghost_replay_source_.mode.random_seed.value() != static_cast<int>(config_.mode.random_seed)) {
             ghost_compatible = false;
         }

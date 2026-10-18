@@ -1735,7 +1735,7 @@ std::vector<uint32_t> MenuApp::current_menu_probe_keycodes() const {
         current_screen() == Screen::Keymap || current_screen() == Screen::KeymapTest;
     const bool capture_all_keys =
         (current_screen() == Screen::Keymap && keymap_settings_controller_.capture_active()) ||
-        (current_screen() == Screen::QuickSetup && profile_control_key_capture_active_);
+        profile_control_key_capture_active_;
     return build_menu_probe_keycodes(fixed_menu_keys,
                                      working_keymap_,
                                      std::string(keymap_settings_controller_.edit_mode()),
@@ -2193,7 +2193,7 @@ uint32_t MenuApp::menu_key_alias(uint32_t keycode) const {
     // Capture and the key tester see actual Pad names. Ordinary menus use the
     // familiar D-pad/A/B controls without changing saved keyboard bindings.
     const bool capture = (current_screen() == Screen::Keymap && keymap_settings_controller_.capture_active()) ||
-        (current_screen() == Screen::QuickSetup && profile_control_key_capture_active_) ||
+        profile_control_key_capture_active_ ||
         current_screen() == Screen::KeymapTest;
     bool assigned = false;
     for (const auto resolved : function_keycodes_) assigned |= resolved != 0 && resolved == keycode;
@@ -2284,8 +2284,8 @@ void MenuApp::handle_input_event(const input::InputEvent& incoming_event) {
     if (duplicate_adjustment_press || duplicate_capture_press) return;
     // Key capture owns reserved keys too, so F9/F10/F11 cannot open an overlay
     // or take a screenshot instead of reporting a binding conflict.
-    if (current_screen() == Screen::QuickSetup && profile_control_key_capture_active_) {
-        if (event.state == input::InputState::Pressed) handle_quick_setup_input(event.keycode);
+    if (profile_control_key_capture_active_) {
+        if (fresh_press) handle_common_key_capture(event.keycode);
         return;
     }
     const auto printable_vk = config::KeycodeMap::polling_vk_for_keycode(event.keycode);
@@ -2475,7 +2475,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
         static_cast<MenuApp*>(owner)->discard_native_dialog_input();
     });
     if (incoming.input_time_ns > 0 && incoming.input_time_ns <= native_dialog_closed_ns_) return;
-    if (current_screen() == Screen::QuickSetup && profile_control_key_capture_active_) return;
+    if (profile_control_key_capture_active_) return;
     auto event = incoming;
     if (current_screen() == Screen::SettingsSkins && skin_search_active_ &&
         menu_window_.text_composition_active()) return;
@@ -2944,6 +2944,10 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
     }
 
     switch (event.kind) {
+        case render::MenuHitTargetKind::KeymapModeTab:
+            if (current_screen() == Screen::Keymap && event.part == render::MenuHitPart::Activate)
+                select_keymap_tab(event.index);
+            return;
         case render::MenuHitTargetKind::SkinModeTab:
             if (current_screen() == Screen::SettingsSkins && !skin_preview_fullscreen_ &&
                 event.part == render::MenuHitPart::Activate && event.index >= 0 &&
@@ -3250,6 +3254,14 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
             finish_adjustment_without_selection();
             return;
         case Screen::Keymap: {
+            keymap_mode_tabs_focused_ = false;
+            if (keymap_common_tab_) {
+                if (event.index < profile_setup::kInstantRestartKeyRow || event.index > profile_setup::kDoneRow) return;
+                settings_cursor_ = event.index;
+                if (finish_selection_only()) return;
+                handle_keymap_input(action_key);
+                return;
+            }
             if (keymap_settings_controller_.capture_active() || event.index < 0 ||
                 event.index > static_cast<int>(keymap_settings_controller_.lane_ids().size())) return;
             const bool secondary = event.index > 0 && (event.part == render::MenuHitPart::Increment ||
@@ -3717,7 +3729,7 @@ void MenuApp::handle_text_input(std::string_view text) {
         append_skin_search_text(text);
         return;
     }
-    if (current_screen() == Screen::QuickSetup && profile_control_key_capture_active_) return;
+    if (profile_control_key_capture_active_) return;
     if (ranked_account_overlay_visible_ && (account_mode_selection_ || ranked_account_sites_mode_)) return;
     if (ranked_account_overlay_visible_ &&
         ranked_account_signed_in_username_.empty() &&
@@ -3830,9 +3842,7 @@ bool MenuApp::control_modifier_pressed() const {
 #endif
 }
 
-void MenuApp::handle_quick_setup_input(uint32_t keycode) {
-    const auto setup_entry = profile_setup::entry(first_run_profile_);
-    const int item_count = profile_setup::row_count(setup_entry);
+bool MenuApp::handle_common_key_capture(uint32_t keycode) {
     if (profile_control_key_capture_active_) {
         const int function = profile_setup::function_for_row(profile_control_key_capture_row_);
         auto& binding = function ? config::function_key(config_.ui, function) : config_.ui.instant_restart_key;
@@ -3857,7 +3867,7 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
             modifier_held |= pressed_keys_.count(*modifier) != 0;
 #ifdef _WIN32
             const auto vk = config::KeycodeMap::polling_vk_for_keycode(*modifier);
-            if (vk) modifier_held |= (GetAsyncKeyState(static_cast<int>(*vk)) & 0x8000) != 0;
+            if (vk) modifier_held |= physical_modifier_pressed(static_cast<int>(*vk));
 #endif
         }
         if (keycode == key_escape_) {
@@ -3894,19 +3904,30 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
                 persist_runtime_config();
             }
         }
+        // Rejected keys leave capture and its tracked held modifiers intact.
+        // Rebuild the ordinary menu scope only when capture actually finishes.
+        if (!profile_control_key_capture_active_) refresh_menu_input_polling_scope();
         reset_song_select_repeat();
         publish_snapshot();
-        return;
+        return true;
     }
     if ((settings_cursor_ == profile_setup::kInstantRestartKeyRow ||
          profile_setup::function_for_row(settings_cursor_) != 0) && keycode == key_enter_) {
         profile_control_key_capture_row_ = settings_cursor_;
         profile_control_key_capture_active_ = true;
         profile_control_key_status_.clear();
+        refresh_menu_input_polling_scope();
         reset_song_select_repeat();
         publish_snapshot();
-        return;
+        return true;
     }
+    return false;
+}
+
+void MenuApp::handle_quick_setup_input(uint32_t keycode) {
+    const auto setup_entry = profile_setup::entry(first_run_profile_);
+    const int item_count = profile_setup::row_count(setup_entry);
+    if (handle_common_key_capture(keycode)) return;
     if (settings_cursor_ == profile_setup::kSkipStartCountdownRow &&
         (keycode == key_enter_ || keycode == key_left_ || keycode == key_right_)) {
         config_.ui.skip_start_countdown = !config_.ui.skip_start_countdown;

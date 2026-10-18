@@ -2076,172 +2076,172 @@ window.TENRIFF_NATIVE_CATALOG = {
     },
     "rects.generic.rect.005": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 28,
+      "line": 32,
       "expression": "0, 0, kBaseWidth, 126"
     },
     "rects.generic.rect.006": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 31,
+      "line": 35,
       "expression": "128, 24, 384, 94"
     },
     "rects.generic.rect.007": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 33,
+      "line": 37,
       "expression": "420, 34, 1470, 78"
     },
     "rects.generic.rect.008": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 35,
+      "line": 39,
       "expression": "422, 82, 1470, 110"
     },
     "rects.generic.rect.009": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 36,
+      "line": 40,
       "expression": "left, 984, right, 1048"
     },
     "rects.generic.rect.010": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 38,
+      "line": 42,
       "expression": "left + 24, 1004, left + 530, 1034"
     },
     "rects.generic.rect.011": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 41,
+      "line": 45,
       "expression": "left + 560, 1004, right - 24, 1034"
     },
     "rects.generic.rect.012": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 113,
+      "line": 133,
       "expression": "rect.left + 24.0f, rect.top + 18.0f, rect.right - 316.0f, rect.top + 60.0f"
     },
     "rects.generic.rect.013": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 119,
+      "line": 139,
       "expression": "rect.left + 24.0f, rect.top + 56.0f, rect.right - 24.0f, rect.top + 88.0f"
     },
     "rects.generic.rect.014": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 123,
+      "line": 143,
       "expression": "rect.left + 24.0f, rect.top + 86.0f, rect.right - 24.0f, rect.top + 118.0f"
     },
     "rects.generic.rect.025": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 193,
+      "line": 213,
       "expression": "x0 + 4.0f, swatch_top, x1 - 4.0f, swatch_top + swatch_height"
     },
     "rects.generic.rect.026": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 269,
+      "line": 289,
       "expression": "left, top, native_list_right, list_bottom_limit + 20.0f"
     },
     "rects.generic.rect.027": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 272,
+      "line": 292,
       "expression": "row_left + 6, top + 22, base_row_right, top + 48"
     },
     "rects.generic.rect.028": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 274,
+      "line": 294,
       "expression": "row_left + 6, top + 22, base_row_right, top + 48"
     },
     "rects.generic.rect.029": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 277,
+      "line": 297,
       "expression": "left, bottom - 240.0f, native_list_right, bottom"
     },
     "rects.generic.rect.030": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 278,
+      "line": 298,
       "expression": "native_list_right + 24.0f, top, right, bottom"
     },
     "rects.generic.rect.031": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 312,
+      "line": 332,
       "expression": "base_row_right + preview_gap + (modern_settings_screen ? 20.0f : 0.0f), top + (modern_settings_screen ? 0.0f : 24.0f), right - (modern_settings_screen ? 0.0f : 24.0f), bottom - (modern_settings_screen ? 0.0f : 24.0f)"
     },
     "rects.generic.rect.032": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 390,
+      "line": 410,
       "expression": "row_left, row_y, row_right, row_y + row_height"
     },
     "rects.generic.rect.033": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 408,
+      "line": 428,
       "expression": "row_left, row_y + 10, row_left + 3, row_y + row_height - 10"
     },
     "rects.generic.rect.034": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 441,
+      "line": 461,
       "expression": "row_left + 18.0f, row_y + 8.0f, std::max(row_left + 160.0f, label_right), row_y + row_height - 8.0f"
     },
     "rects.generic.rect.035": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 484,
+      "line": 509,
       "expression": "track_left, track_center_y - 4.0f, track_right, track_center_y + 4.0f"
     },
     "rects.generic.rect.036": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 502,
+      "line": 527,
       "expression": "track_rect.left, track_rect.top, knob_x, track_rect.bottom"
     },
     "rects.generic.rect.037": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 515,
+      "line": 540,
       "expression": "track_rect.left, row_y + 6.0f, track_rect.right, row_y + row_height - 6.0f"
     },
     "rects.generic.rect.038": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 519,
+      "line": 544,
       "expression": "value_left, row_y + 8.0f, row_right - 18.0f, row_y + row_height - 8.0f"
     },
     "rects.generic.rect.039": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 531,
+      "line": 556,
       "expression": "std::max(label_rect.right + 12.0f, row_left + 320.0f), row_y + 8.0f, value_right, row_y + row_height - 8.0f"
     },
     "rects.generic.rect.040": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 568,
+      "line": 593,
       "expression": "minus_left, row_y + 6.0f, minus_left + action_width, row_y + row_height - 6.0f"
     },
     "rects.generic.rect.041": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 570,
+      "line": 595,
       "expression": "plus_left, row_y + 6.0f, plus_left + action_width, row_y + row_height - 6.0f"
     },
     "rects.generic.rect.042": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 572,
+      "line": 597,
       "expression": "row_rect.left, row_rect.top, minus_rect.left - action_gap * 0.5f, row_rect.bottom"
     },
     "rects.generic.rect.043": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 583,
+      "line": 608,
       "expression": "std::max(label_rect.right + 12.0f, row_left + 320.0f), row_y + 8.0f, row_right - 18.0f, row_y + row_height - 8.0f"
     },
     "rects.generic.rect.044": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 605,
+      "line": 630,
       "expression": "row_right + scrollbar_gap, track_top, row_right + scrollbar_gap + scrollbar_width, track_bottom"
     },
     "rects.generic.rect.045": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 628,
+      "line": 653,
       "expression": "track_rect.left + 1.0f, thumb_top, track_rect.right - 1.0f, thumb_top + thumb_height"
     },
     "rects.generic.rect.046": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 651,
+      "line": 676,
       "expression": "hit_left, slot_top, hit_right, slot_bottom"
     },
     "rects.generic.rect.049": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 722,
+      "line": 747,
       "expression": "line_left, line_y, line_right, line_y + line_height"
     },
     "rects.generic.rect.050": {
       "file": "MenuWindow_draw_generic_body.inl",
-      "line": 725,
+      "line": 750,
       "expression": "line_left - 12.0f, line_y - 4.0f, line_right, line_y + line_height + 4.0f"
     },
     "rects.generic_help.rect.001": {

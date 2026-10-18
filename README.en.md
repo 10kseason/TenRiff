@@ -1,3 +1,5 @@
+> **2026-10-19 · 1.9.7:** Adds Common Keys, larger mode tabs with lobby colors, colored FAST/SLOW labels, 1% adjustments, Game Mode Settings/Normal labels and a fresh seed for every solo play. The version-specific release page determines publication and downloads. Earlier dated notices are historical. [1.9.7](docs/release-1.9.7.en.md) · [Baseline 1.9.6](docs/baseline-1.9.6.en.md) · [Verification](docs/release-1.9.7-gate.md).
+
 **2026-10-18 · 1.9.6:** [Fixed judgement, skin tabs/search and windowed drops](docs/release-1.9.6.en.md) · [Verification scope](docs/release-1.9.6-gate.md). Sites accepts only new standard Online R9/R10 submissions; old boards and records remain legacy read-only. Unsupported separate Ranked rules and Guest/custom exclusions remain.
 
 [Pinned timing table](docs/judgement-baseline-20261018.en.md): Normal PG22/19/15/10ms and exact existing GR/GD/BAD remain. Hard uses the complete Normal NM row and EX the complete Normal VHD row for every chart RANK, without integer-ms rounding. The general source baseline remains **1.9.0**.

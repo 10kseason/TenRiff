@@ -952,6 +952,50 @@ void MenuApp::sync_menu_music() {
     menu_music_.play_looping_file(music_path, gain, config_.audio);
 }
 
+void MenuApp::populate_common_key_rows(render::MenuRenderData& render) {
+    append_menu_row(render.generic, ui_text("Instant Restart Key", "즉시 재시작 키"),
+                    (profile_control_key_capture_active_ && profile_control_key_capture_row_ == profile_setup::kInstantRestartKeyRow)
+                        ? (profile_control_key_status_.empty()
+                            ? ui_text("Press a key (Esc cancels, Delete clears)", "키 입력 (Esc 취소, Delete 해제)")
+                            : profile_control_key_status_)
+                        : (config_.ui.instant_restart_key.empty() ? ui_text("Unassigned", "미지정")
+                                                                  : config_.ui.instant_restart_key),
+                    settings_cursor_ == profile_setup::kInstantRestartKeyRow, render::MenuHitTargetKind::SettingsRow,
+                    profile_setup::kInstantRestartKeyRow, true, false);
+    for (const bool decrease : {true, false}) {
+        const int row = decrease ? profile_setup::kHispeedDecreaseKeyRow : profile_setup::kHispeedIncreaseKeyRow;
+        const auto& binding = decrease ? config_.ui.hispeed_decrease_key : config_.ui.hispeed_increase_key;
+        const bool capturing = profile_control_key_capture_active_ && profile_control_key_capture_row_ == row;
+        append_menu_row(render.generic,
+            decrease ? ui_text("Note Speed x0.5 Key", "노트속도 ×0.5 키") : ui_text("Note Speed x2 Key", "노트속도 ×2 키"),
+            capturing ? (profile_control_key_status_.empty()
+                ? ui_text("Press a key (Esc cancels, Delete clears)", "키 입력 (Esc 취소, Delete 해제)")
+                : profile_control_key_status_)
+                : (binding.empty() ? ui_text("Unassigned", "미지정") : binding),
+            settings_cursor_ == row, render::MenuHitTargetKind::SettingsRow, row, true, false);
+    }
+    const std::array<std::string, 9> action_labels{
+        ui_text("Help / Judge Line -", "도움말 / 판정선 -"),
+        ui_text("Song Folder / Judge Line +", "곡 폴더 / 판정선 +"),
+        ui_text("Note Speed -0.25", "노트속도 -0.25"),
+        ui_text("Note Speed +0.25", "노트속도 +0.25"),
+        ui_text("Editor / Visual Latency -", "편집기 / 비주얼 레이턴시 -"),
+        ui_text("Visual Latency +", "비주얼 레이턴시 +"),
+        ui_text("Screenshot", "스크린샷"),
+        ui_text("Guest / Online", "게스트 / 온라인"),
+        ui_text("Chat", "채팅")};
+    for (int row = profile_setup::kFunctionKeysFirstRow; row <= profile_setup::kFunctionKeysLastRow; ++row) {
+        const int number = profile_setup::function_for_row(row);
+        const auto& binding = config::function_key(config_.ui, number);
+        const bool capturing = profile_control_key_capture_active_ && profile_control_key_capture_row_ == row;
+        append_menu_row(render.generic, action_labels[row - profile_setup::kFunctionKeysFirstRow],
+            capturing ? (profile_control_key_status_.empty()
+                ? ui_text("Press a key (Esc cancels, Delete clears)", "키 입력 (Esc 취소, Delete 해제)") : profile_control_key_status_)
+                : (binding.empty() ? ui_text("Unassigned", "미지정") : binding),
+            settings_cursor_ == row, render::MenuHitTargetKind::SettingsRow, row, true, false);
+    }
+}
+
 void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
     const auto setup_entry = profile_setup::entry(first_run_profile_);
     const bool first_run = setup_entry == profile_setup::Entry::FirstRun;
@@ -1084,47 +1128,7 @@ void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
                     config_.ui.skip_start_countdown ? ui_text("On", "켜짐") : ui_text("Off", "OFF"),
                     settings_cursor_ == profile_setup::kSkipStartCountdownRow, render::MenuHitTargetKind::SettingsRow,
                     profile_setup::kSkipStartCountdownRow, false, true);
-    append_menu_row(render.generic, ui_text("Instant Restart Key", "즉시 재시작 키"),
-                    (profile_control_key_capture_active_ && profile_control_key_capture_row_ == profile_setup::kInstantRestartKeyRow)
-                        ? (profile_control_key_status_.empty()
-                            ? ui_text("Press a key (Esc cancels, Delete clears)", "키 입력 (Esc 취소, Delete 해제)")
-                            : profile_control_key_status_)
-                        : (config_.ui.instant_restart_key.empty() ? ui_text("Unassigned", "미지정")
-                                                                  : config_.ui.instant_restart_key),
-                    settings_cursor_ == profile_setup::kInstantRestartKeyRow, render::MenuHitTargetKind::SettingsRow,
-                    profile_setup::kInstantRestartKeyRow, true, false);
-    for (const bool decrease : {true, false}) {
-        const int row = decrease ? profile_setup::kHispeedDecreaseKeyRow : profile_setup::kHispeedIncreaseKeyRow;
-        const auto& binding = decrease ? config_.ui.hispeed_decrease_key : config_.ui.hispeed_increase_key;
-        const bool capturing = profile_control_key_capture_active_ && profile_control_key_capture_row_ == row;
-        append_menu_row(render.generic,
-            decrease ? ui_text("Note Speed x0.5 Key", "노트속도 ×0.5 키") : ui_text("Note Speed x2 Key", "노트속도 ×2 키"),
-            capturing ? (profile_control_key_status_.empty()
-                ? ui_text("Press a key (Esc cancels, Delete clears)", "키 입력 (Esc 취소, Delete 해제)")
-                : profile_control_key_status_)
-                : (binding.empty() ? ui_text("Unassigned", "미지정") : binding),
-            settings_cursor_ == row, render::MenuHitTargetKind::SettingsRow, row, true, false);
-    }
-    const std::array<std::string, 9> action_labels{
-        ui_text("Help / Judge Line -", "도움말 / 판정선 -"),
-        ui_text("Song Folder / Judge Line +", "곡 폴더 / 판정선 +"),
-        ui_text("Note Speed -0.25", "노트속도 -0.25"),
-        ui_text("Note Speed +0.25", "노트속도 +0.25"),
-        ui_text("Editor / Visual Latency -", "편집기 / 비주얼 레이턴시 -"),
-        ui_text("Visual Latency +", "비주얼 레이턴시 +"),
-        ui_text("Screenshot", "스크린샷"),
-        ui_text("Guest / Online", "게스트 / 온라인"),
-        ui_text("Chat", "채팅")};
-    for (int row = profile_setup::kFunctionKeysFirstRow; row <= profile_setup::kFunctionKeysLastRow; ++row) {
-        const int number = profile_setup::function_for_row(row);
-        const auto& binding = config::function_key(config_.ui, number);
-        const bool capturing = profile_control_key_capture_active_ && profile_control_key_capture_row_ == row;
-        append_menu_row(render.generic, action_labels[row - profile_setup::kFunctionKeysFirstRow],
-            capturing ? (profile_control_key_status_.empty()
-                ? ui_text("Press a key (Esc cancels, Delete clears)", "키 입력 (Esc 취소, Delete 해제)") : profile_control_key_status_)
-                : (binding.empty() ? ui_text("Unassigned", "미지정") : binding),
-            settings_cursor_ == row, render::MenuHitTargetKind::SettingsRow, row, true, false);
-    }
+    populate_common_key_rows(render);
     append_menu_row(render.generic,
                     first_run ? ui_text("Continue to Song Select", "곡 선택으로 계속")
                               : ui_text("Done", "완료"),
@@ -1658,7 +1662,7 @@ void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render
     } else if (generic_view == menu::GenericViewKind::OptionsHub) {
         render.generic.card_grid = true;
         const auto selected_option = options_hub_controller_.cursor();
-        append_menu_row(render.generic, ui_text("KEY MODE SETTINGS", "키 모드 설정"),
+        append_menu_row(render.generic, ui_text("GAME MODE SETTINGS", "게임 모드 설정"),
                         ui_key_mode_label(config_.mode.key_mode),
                         selected_option == menu::OptionsItemId::KeyMode,
                         render::MenuHitTargetKind::OptionsItem,
@@ -1880,7 +1884,9 @@ void MenuApp::publish_snapshot() {
     }
 
     if (render.kind == render::MenuScreenKind::GenericList) {
-        menu::settings::apply_settings_help(current_screen(), render.generic, ui_language());
+        const auto help_screen = current_screen() == Screen::Keymap && keymap_common_tab_
+            ? Screen::QuickSetup : current_screen();
+        menu::settings::apply_settings_help(help_screen, render.generic, ui_language());
         render.generic.selected_help = ui::function_key_labels(render.generic.selected_help, render.function_keys);
         if (current_screen() == Screen::SettingsSkins)
             for (const auto& status : skin_status_messages_)
@@ -3209,7 +3215,7 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                                     "변경 사항은 즉시 저장되므로 다음 플레이에도 같은 보정값이 적용됩니다.");
             return;
         case Screen::ModeSelect:
-            target.title = ui_text("Key Mode Settings", "키 모드 설정");
+            target.title = ui_text("Game Mode Settings", "게임 모드 설정");
             target.lines = {
                 ui_text("Up / Down or the mouse wheel selects a row. Long lists show a clickable scrollbar on the right.",
                         "위 / 아래 키 또는 마우스 휠로 행을 선택합니다. 긴 목록은 오른쪽의 클릭 가능한 스크롤바를 표시합니다."),
@@ -3226,7 +3232,7 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                 ui_text("Enter on Mods opens the registry-backed Mod Manager for score-multiplier presets.",
                         "모드에서 Enter를 누르면 노트·배치·스크래치 설정을 엽니다."),
                 ui_text("Judge Window selects Normal, Hard or EX with Left/Right, Enter or the value button.",
-                        "판정 범위에서 좌우 키·Enter·값 버튼으로 기본·Hard·EX를 고릅니다."),
+                        "판정 범위에서 좌우 키·Enter·값 버튼으로 Normal·Hard·EX를 고릅니다."),
             };
             target.footer = ui_text("Esc saves and refreshes the library if needed.",
                                     "Esc로 저장하고, 필요하면 라이브러리를 새로고칩니다.");
@@ -3236,21 +3242,30 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
             target.lines = {
                 ui_text("Up / Down selects a mod category. Left / Right cycles Off and the registered preset for that category.",
                         "위 / 아래 키로 모드 카테고리를 선택하고, 좌 / 우 키로 OFF와 해당 카테고리의 등록 프리셋을 순환합니다."),
-                ui_text("Each pattern category keeps one active preset. Judge Window is in the parent Key Mode Settings.",
-                        "노트 구성·롱노트 규칙 등 각 항목은 하나의 설정만 적용합니다. 판정 범위는 상위 키 모드 설정에 있습니다."),
+                ui_text("Each pattern category keeps one active preset. Judge Window is in the parent Game Mode Settings.",
+                        "노트 구성·롱노트 규칙 등 각 항목은 하나의 설정만 적용합니다. 판정 범위는 상위 게임 모드 설정에 있습니다."),
                 ui_text("Final score uses the lowest multiplier between the current Rate and all active mods.",
                         "최종 점수는 현재 Rate와 활성 모드 중 가장 낮은 배율을 사용합니다."),
             };
-            target.footer = ui_text("Enter, Esc returns to Key Mode Settings.",
-                                    "Enter, Esc로 키 모드 설정으로 돌아갑니다.");
+            target.footer = ui_text("Enter, Esc returns to Game Mode Settings.",
+                                    "Enter, Esc로 게임 모드 설정으로 돌아갑니다.");
             return;
         case Screen::Keymap:
+            if (keymap_common_tab_) {
+                target.title = ui_text("Common Keys", "공용 키");
+                target.lines = {
+                    ui_text("These keys apply to every key mode and share the saved Profile bindings.",
+                            "모든 키 모드에 적용되며 프로필의 저장된 단축키와 같은 설정을 사용합니다."),
+                    ui_text("Enter captures a key. Esc cancels; Delete clears. Tab selects the mode tabs.",
+                            "Enter로 키 지정, Esc로 취소, Delete로 해제합니다. Tab으로 모드 탭을 선택합니다.")};
+                return;
+            }
             target.title = ui_text("Keymap Help", "키 설정 도움말");
             target.lines = {
                 ui_text("Up / Down selects a lane. Enter starts key capture for that lane.",
                         "위 / 아래 키로 레인을 선택하고, Enter로 해당 레인의 키 입력 대기를 시작합니다."),
-                ui_text("Left / Right on Key Mode switches among 4K-10K, 12K, 14K, and 16K layouts.",
-                        "Key Mode에서 좌 / 우 키를 누르면 4K~10K, 12K, 14K, 16K 레이아웃을 바꿉니다."),
+                ui_text("Tab selects the mode tabs. Left/Right selects Common Keys or a key layout; Enter returns to bindings.",
+                        "Tab으로 모드 탭을 선택합니다. 좌우로 공용 키·키 배치를 고르고 Enter로 키 지정으로 돌아갑니다."),
                 ui_text("Captured keys save immediately. Reset also saves immediately, and NKRO Test stays visible as a normal button.",
                         "입력한 키는 즉시 저장됩니다. 초기화도 바로 저장되고 NKRO Test는 일반 버튼으로 계속 보입니다."),
                 ui_text("When you opened Keymap from Song Select, the editor defaults to the selected chart's key mode.",

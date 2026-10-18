@@ -376,6 +376,33 @@ struct MenuAppVisualTestAccess {
         std::string error;
         report.check("keymap.fixture_restored", manager.save_profile(app.profile_dir_, original, &error), error);
         app.keymap_ = app.working_keymap_ = original;
+        const auto original_ui = app.config_.ui;
+        click(app, Kind::KeymapModeTab, 0);
+        report.check("common.native_tab", app.keymap_common_tab_ &&
+            app.snapshot_.render.generic.keymap_mode_tabs.size() == 11 &&
+            !app.snapshot_.render.generic.keymap_keyboard);
+        click(app, Kind::SettingsRow, profile_setup::kInstantRestartKeyRow);
+        key(app, "D");
+        report.check("common.native_lane_conflict", app.profile_control_key_capture_active_);
+        key(app, "F10");
+        report.check("common.native_function_conflict", app.profile_control_key_capture_active_);
+        key(app, "F12");
+        const auto common_saved = config::ConfigLoader{}.load_profile(app.profile_dir_);
+        report.check("common.native_saved_readback", !app.profile_control_key_capture_active_ &&
+            common_saved.success() && common_saved.config.ui.instant_restart_key == "F12");
+        click(app, Kind::SettingsRow, profile_setup::kInstantRestartKeyRow);
+        key(app, "Escape");
+        report.check("common.native_cancel", app.current_screen() == MenuApp::Screen::Keymap &&
+            !app.profile_control_key_capture_active_ && app.config_.ui.instant_restart_key == "F12");
+        click(app, Kind::SettingsRow, profile_setup::kInstantRestartKeyRow);
+        key(app, "Delete");
+        report.check("common.native_clear", app.config_.ui.instant_restart_key.empty());
+        app.config_.ui = original_ui;
+        app.persist_runtime_config();
+        click(app, Kind::KeymapModeTab, 1);
+        key(app, "Enter");
+        report.check("common.native_returns_to_lanes", !app.keymap_common_tab_ &&
+            app.keymap_settings_controller_.edit_mode() == "4k" && !app.keymap_mode_tabs_focused_);
         if (resume_physical_input && !app.input_thread_.start())
             throw std::runtime_error("Cannot restore menu input after keymap fixture");
         app.refresh_menu_input_polling_scope();
@@ -437,6 +464,9 @@ struct MenuAppVisualTestAccess {
         app.handle_menu_click(event);
     }
     static void isolate(MenuApp& app) {
+        // This fixture owns synthetic key edges. Desktop modifiers must not
+        // leak into them; real OS fallback behavior has separate unit probes.
+        app.physical_modifier_probe_ = [](int) { return false; };
         // ConfigLoader restores default URLs when reading empty strings. Clear
         // live URLs after initialization too; never open account/online routes.
         app.config_.ui.online_records_server_url.clear();
@@ -1166,9 +1196,14 @@ struct MenuAppVisualTestAccess {
         const int saved_key = app.song_key_filter_, saved_min = app.song_level_min_filter_, saved_max = app.song_level_max_filter_;
         const auto saved_pressed = app.pressed_keys_;
         const auto saved_owners = app.menu_key_owners_;
+        const auto saved_dialog_holds = app.native_dialog_held_keys_;
         const std::string saved_path = app.selected_song_path();
         app.pressed_keys_.clear();
         app.menu_key_owners_.clear();
+        // Earlier native picker probes sample desktop-held keys on close.
+        // Those guards must not consume this fixture's first synthetic press;
+        // the dialog fence itself is exercised separately by the picker probe.
+        app.native_dialog_held_keys_.clear();
         app.config_.ui.difficulty_table_path = "fixture-level-search.json";
         app.config_.ui.all_song_sources = true;
         app.config_.ui.song_collection_filter = "all";
@@ -1253,7 +1288,10 @@ struct MenuAppVisualTestAccess {
         type_query("blue lv:16to20");
         report.check("search.raw_text_and_level_intersect", app.song_search_query_ == "blue lv:16to20" &&
             app.song_select_search_active_ && table_levels() == std::vector<int>({20}),
-            "query=" + app.song_search_query_ + "; count=" + std::to_string(app.visible_song_count()));
+            "query=" + app.song_search_query_ + "; count=" + std::to_string(app.visible_song_count()) +
+            "; help=" + std::to_string(app.help_overlay_visible_) +
+            "; account=" + std::to_string(app.ranked_account_overlay_visible_) +
+            "; chat=" + std::to_string(app.chat_overlay_visible_));
         type_query("lv:18");
         report.check("search.table_excludes_native_only_matches", table_levels() == std::vector<int>({18}));
         app.config_.ui.difficulty_table_path.clear();
@@ -1315,6 +1353,7 @@ struct MenuAppVisualTestAccess {
         app.song_search_query_ = saved_query; app.song_select_search_active_ = saved_search_active;
         app.song_select_view_ = saved_view; app.song_select_focus_ = saved_focus; app.song_select_nav_cursor_ = saved_nav;
         app.pressed_keys_ = saved_pressed; app.menu_key_owners_ = saved_owners;
+        app.native_dialog_held_keys_ = saved_dialog_holds;
         app.rebuild_visible_song_list(&saved_path);
         app.persist_runtime_config();
         app.publish_snapshot();
@@ -1709,13 +1748,14 @@ struct MenuAppFeedbackTestAccess {
         return session.bms_timing_version_ == version && session.ghost_replay_enabled_ == ghost &&
             static_cast<bool>(session.ghost_engine_) == ghost;
     }
-    static uint32_t check_bms_session_policy(const GameSession& session, Report& report, int attempt) {
+    static uint32_t mode_seed(const GameSession& session) { return session.config_.mode.random_seed; }
+    static std::pair<uint32_t, uint32_t> check_bms_session_policy(const GameSession& session, Report& report, int attempt) {
         const auto name = "bms_branch.initialize_" + std::to_string(attempt);
-        report.check(name + ".independent_fixed_lane_seed", session.config_.mode.random_seed == 24680u);
+        report.check(name + ".independent_lane_seed", session.config_.mode.random_seed != session.bms_random_seed_);
         report.check(name + ".policies", session.bms_control_flow_version_ == 2 &&
             session.bms_gauge_version_ == 2 && session.chart_.bms_has_random &&
             session.chart_.bms_total == std::optional<double>(200.0));
-        return session.bms_random_seed_;
+        return {session.bms_random_seed_, session.config_.mode.random_seed};
     }
     static std::vector<gameplay::ReplayEvent> timing_inputs(const GameSession& session) {
         std::vector<gameplay::ReplayEvent> events;
@@ -2454,14 +2494,37 @@ void separate_timing_flow(tenriff::app::CommandLineOptions options, Report& repo
         report.check("timing.replay_initializes_original_policy_" + std::to_string(version), playable && SessionAccess::timing_state(*playback, version, false));
         playback->shutdown();
     }
+    // Isolate the new seed compatibility branch from timing-policy rejection.
+    // The ghost metadata intentionally matches everything except the mode seed.
+    for (const char* random : {"off", "mirror", "sr"}) {
+        config.mode.random = random;
+        if (!loader.save_profile(profile, app::build_persisted_runtime_config(config)))
+            throw std::runtime_error("Cannot seed ghost compatibility profile");
+        auto fixture = *replay.replay;
+        fixture.mode.random = random;
+        const auto path = std::filesystem::absolute(std::string("timing-fixture/seed-") + random + ".json").u8string();
+        report.check(std::string("seed_ghost.fixture_") + random, gameplay::save_replay_json(path, fixture).success());
+        auto ghost_options = options;
+        ghost_options.ghost_replay_path = path;
+        auto ghost = std::make_unique<app::GameSession>();
+        const bool initialized = ghost->initialize(ghost_options);
+        report.check(std::string("seed_ghost.compatibility_") + random, initialized &&
+            fixture.mode.random_seed.has_value() &&
+            SessionAccess::mode_seed(*ghost) != static_cast<uint32_t>(*fixture.mode.random_seed) &&
+            SessionAccess::timing_state(*ghost, 2, std::string(random) != "sr"));
+        ghost->shutdown();
+    }
+    config.mode.random = "off";
+    if (!loader.save_profile(profile, app::build_persisted_runtime_config(config)))
+        throw std::runtime_error("Cannot restore timing profile");
     options.chart_path = "songs/fixture/smoke.bms";
     auto unchanged = std::make_unique<app::GameSession>();
     const bool ready = unchanged->initialize(options);
     report.check("timing.unchanged_chart_keeps_v1", ready && SessionAccess::timing_state(*unchanged, 1, false));
     unchanged->shutdown();
 
-    // Exercise initialize(), not just the seed helper: fixed SR must remain
-    // fixed while authored RANDOM gets a fresh independent seed each attempt.
+    // Exercise initialize(), not just the seed helper, across every random mode
+    // and immediate restart. Authored BMS RANDOM has an independent fresh seed.
     options.chart_path = "timing-fixture/branch.bms";
     {
         std::ofstream file(options.chart_path);
@@ -2475,17 +2538,75 @@ void separate_timing_flow(tenriff::app::CommandLineOptions options, Report& repo
     config.mode.random_seed = 24680u;
     if (!loader.save_profile(profile, app::build_persisted_runtime_config(config)))
         throw std::runtime_error("Cannot seed branch profile");
-    std::optional<uint32_t> previous_branch_seed;
-    for (int attempt = 0; attempt < 3; ++attempt) {
+    std::optional<std::pair<uint32_t, uint32_t>> previous_seeds;
+    const std::array<const char*, 6> random_modes{"off", "mirror", "fr", "frns", "sr", "rr"};
+    for (int attempt = 0; attempt < 12; ++attempt) {
+        config.mode.random = random_modes[attempt / 2];
+        if (!loader.save_profile(profile, app::build_persisted_runtime_config(config)))
+            throw std::runtime_error("Cannot seed random-mode profile");
         auto branch_session = std::make_unique<app::GameSession>();
+        branch_session->set_instant_restart_start(attempt % 2 != 0);
         const bool initialized = branch_session->initialize(options);
         report.check("bms_branch.initialize_" + std::to_string(attempt), initialized);
         if (initialized) {
-            const auto seed = SessionAccess::check_bms_session_policy(*branch_session, report, attempt);
-            if (previous_branch_seed) report.check("bms_branch.fresh_seed_" + std::to_string(attempt), seed != *previous_branch_seed);
-            previous_branch_seed = seed;
+            const auto seeds = SessionAccess::check_bms_session_policy(*branch_session, report, attempt);
+            if (previous_seeds) {
+                report.check("bms_branch.fresh_seed_" + std::to_string(attempt), seeds.first != previous_seeds->first);
+                report.check("mode.fresh_seed_" + std::to_string(attempt), seeds.second != previous_seeds->second);
+            }
+            previous_seeds = seeds;
+        }
+        // One S-Random play also exercises recording and actual saved-seed
+        // verification. Other iterations cover first-start/Retry initialization.
+        std::vector<gameplay::ReplayEvent> branch_events;
+        std::size_t submitted = 0;
+        bool timed_out = false;
+        if (initialized && attempt == 8) {
+            branch_events = SessionAccess::timing_inputs(*branch_session);
+            const auto deadline = Clock::now() + std::chrono::seconds(15);
+            branch_session->set_hud_callback([&](const app::GameSession::HudSnapshot& hud) {
+                if (Clock::now() > deadline) { timed_out = true; SessionAccess::timeout(*branch_session); return; }
+                if (branch_session->did_start_gameplay())
+                    SessionAccess::submit_delta_inputs(*branch_session, branch_events, submitted, hud.current_sample);
+            });
+            SessionAccess::stop_physical_input(*branch_session);
+            branch_session->run();
         }
         branch_session->shutdown();
+        if (initialized && attempt == 8) {
+            // shutdown() finalizes the result and writes the replay.
+            const auto result = branch_session->result();
+            report.check("seed_replay.sr_play_finished", !timed_out && result.has_value &&
+                result.finished && !result.game_over && result.stats.counts.pg == 2 &&
+                submitted == branch_events.size() && branch_session->audio_error().empty(),
+                "timeout=" + std::to_string(timed_out) + " submitted=" + std::to_string(submitted) +
+                "/" + std::to_string(branch_events.size()));
+            const auto saved = gameplay::load_replay_json(result.replay_path);
+            report.check("seed_replay.sr_recorded_seeds", saved.success() && previous_seeds &&
+                saved.replay->mode.random == "sr" && saved.replay->mode.random_seed.has_value() &&
+                static_cast<uint32_t>(*saved.replay->mode.random_seed) == previous_seeds->second &&
+                saved.replay->mode.bms_random_seed == previous_seeds->first);
+            if (saved.success()) {
+                const auto verified = app::verify_replay_file(std::filesystem::u8path(result.replay_path),
+                    std::filesystem::u8path(options.chart_path), result.replay_sha256);
+                report.check("seed_replay.sr_saved_replay_verifies", verified.verified() && verified.claims_match, verified.detail);
+                auto playback_options = options;
+                playback_options.replay_path = result.replay_path;
+                auto playback = std::make_unique<app::GameSession>();
+                const bool playable = playback->initialize(playback_options);
+                report.check("seed_replay.sr_playback_initialize", playable);
+                if (playable) {
+                    const auto playback_seeds = SessionAccess::check_bms_session_policy(*playback, report, 100);
+                    report.check("seed_replay.sr_playback_seeds", playback_seeds == *previous_seeds);
+                    const auto events = SessionAccess::timing_inputs(*playback);
+                    report.check("seed_replay.sr_playback_chart", events.size() == branch_events.size() &&
+                        std::equal(events.begin(), events.end(), branch_events.begin(), [](const auto& a, const auto& b) {
+                            return a.lane == b.lane && a.sample == b.sample && a.state == b.state;
+                        }));
+                }
+                playback->shutdown();
+            }
+        }
     }
 }
 }  // namespace

@@ -2442,6 +2442,11 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<IDWriteTextFormat> title_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> option_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> body_format;
+    // Independent brushes: the general semantic brush is mutable and cannot
+    // represent FAST and SLOW drawing effects in the same text layout.
+    Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> settings_mode_brush;
+    Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> settings_fast_brush;
+    Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> settings_slow_brush;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> mono_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> logo_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> menu_button_format;

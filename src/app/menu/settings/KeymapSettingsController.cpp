@@ -236,6 +236,19 @@ KeymapSettingsEffects KeymapSettingsController::adjust_test_key_count(int direct
     return effects;
 }
 
+KeymapSettingsEffects KeymapSettingsController::select_mode(std::string_view mode) {
+    const auto modes = config::KeymapManager{}.supported_mode_tokens();
+    if (capture_active_ || std::find(modes.begin(), modes.end(), mode) == modes.end()) return {};
+    edit_mode_ = mode;
+    refresh_lanes();
+    selected_row_ = 1;
+    secondary_selected_ = false;
+    KeymapSettingsEffects effects;
+    effects.menu.render_changed = true;
+    effects.refresh_input_scope = true;
+    return effects;
+}
+
 KeymapSettingsEffects KeymapSettingsController::cycle_mode(int direction) {
     if (direction == 0) {
         return {};

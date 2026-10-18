@@ -303,6 +303,8 @@ private:
     [[nodiscard]] bool physical_modifier_pressed(int virtual_key) const;
     [[nodiscard]] bool control_modifier_pressed() const;
     void handle_quick_setup_input(uint32_t keycode);
+    bool handle_common_key_capture(uint32_t keycode);
+    void select_keymap_tab(int index);
     void handle_title_input(uint32_t keycode);
     void handle_options_hub_input(uint32_t keycode);
     void handle_multiplayer_input(uint32_t keycode);
@@ -369,6 +371,7 @@ private:
     void publish_snapshot();
     [[nodiscard]] std::string current_track_label() const;
     void populate_quick_setup_render_data(render::MenuRenderData& render);
+    void populate_common_key_rows(render::MenuRenderData& render);
     void populate_multiplayer_render_data(render::MenuRenderData& render);
     void populate_title_render_data(render::MenuRenderData& render,
                                     const std::string& current_track,
@@ -793,6 +796,8 @@ private:
     menu::settings::KeymapSettingsController keymap_settings_controller_{};
     menu::settings::ModeSettingsController mode_settings_controller_{};
     menu::settings::SkinSettingsController skin_settings_controller_{};
+    bool keymap_common_tab_ = false;
+    bool keymap_mode_tabs_focused_ = false;
     bool skin_mode_tabs_focused_ = false;
     bool skin_search_active_ = false;
     std::string skin_search_query_;

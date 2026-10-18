@@ -1,3 +1,5 @@
+> **2026-10-19 · 1.9.7:** 包含通用按键标签、加大的模式标签及大厅配色、FAST/SLOW颜色、1%调整、游戏模式设置与Normal显示，以及每局新的随机种子。 发布状态与下载以对应版本的发布页面为准。旧日期说明是当时的历史。 [1.9.7](release-1.9.7.zh-CN.md) · [Baseline 1.9.6](baseline-1.9.6.zh-CN.md) · [Verification](release-1.9.7-gate.md).
+
 **2026-10-18 · 1.9.6：** [固定判定、皮肤标签与搜索、窗口拖放](release-1.9.6.zh-CN.md) · [验证范围](release-1.9.6-gate.md)。Sites仅接受标准设置的新Online R9/R10提交，旧榜单及记录作为只读历史保留。独立Ranked的未支持规则及Guest、自定义排除保持不变。
 
 [固定判定表](judgement-baseline-20261018.zh-CN.md)：保留普通PG22/19/15/10ms及原精确GR/GD/BAD。Hard对所有文件RANK使用普通NM完整行，EX使用普通VHD完整行，不取整到整数ms。通用源码基线仍为 **1.9.0**。
@@ -87,7 +89,7 @@
 - `gameplay_volume` (double)
   - BMS演奏音量（韩文显示：BMS 연주 볼륨），共同调节伴奏、键音和试听。0–1，新默认值0.20（20%）；保留明确保存的值。字段名与UI音效的原有倍率不变。
 - `menu_music_volume` (double)
-  - 仅用于TenRiff菜单和结果音乐。0–1，默认1.0。基准为原音的10%，比1.8.9.7的40%基准再降低75%。独立于BMS曲目，不模拟Windows音量曲线。
+  - 仅用于TenRiff菜单和结果音乐。0–1，默认1.0。基准为原音的12.5%，比1.8.9.7的40%基准再降低68.75%。独立于BMS曲目，不模拟Windows音量曲线。
 - `bgm_volume` (double)
   - 兼容用旧字段。0–2，默认1.0；保留已有值的读写，但不再提供独立UI，并在游玩、试听和编辑器音量计算中忽略。
 - `normalize_audio` (bool)
@@ -364,7 +366,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `timing_feedback_override` | bool; `false` | 用户修改开关后，配置中的显示选项优先于皮肤。 |
 | `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | 文字和条的独立 X 偏移，叠加于原判定布局，以 1920x1080 像素为基准。 |
 | `timing_text_offset_y`, `timing_bar_offset_y` | double: `-400..400`; `0` | 文字和条的独立 Y 偏移；正值向下。 |
-| `timing_text_scale`, `timing_bar_scale` | double: `0.50..2`; `1` | FAST/SLOW文字与条的独立缩放，支持50–200%、5%步长或滑块。适用于Studio、Classic、导入皮肤与预览，不改变判定、连击大小或XY位置。 |
+| `timing_text_scale`, `timing_bar_scale` | double: `0.50..2`; `1` | FAST/SLOW文字与条的独立缩放，支持50–200%、1%步长或滑块。适用于Studio、Classic、导入皮肤与预览，不改变判定、连击大小或XY位置。 |
 | `show_hold_tail`, `hold_tail_taper_enabled` | bool; `false` | 分别控制LN尾端端帽与渐缩。仅将渐缩的韩文标签改为 `LN 끝 줄임`，外观和判定规则不变。 |
 | `judgement_line_glow_enabled` | bool; `true` | 判定线周围发光。 |
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst 亮度；0 为关闭。 |
@@ -378,7 +380,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `gameplay_field_offset_x` | double: `-720..720`; `0` | 以 1920×1080 为基准的面板横向偏移；另行限制以保持面板与 ↔ 手柄可见。 |
 | `combo_position`, `judgement_position` | double: `0.10..0.78`; `0.24` | 连击与判定独立的 Y 位置；旧配置缺少判定位置时继承 `combo_position`。 |
 | `combo_offset_x`, `judgement_offset_x` | double: `-600..600`; `0` | 以 1920×1080 为基准的连击与判定独立 X 偏移。 |
-| `combo_font_scale`, `judgement_font_scale` | double: `0.50..2`; `1` | 连击与判定文字的独立倍率。在皮肤设置中以5%步长或鼠标滑块调整50–200%，导入的皮肤同样使用配置倍率。 |
+| `combo_font_scale`, `judgement_font_scale` | double: `0.50..2`; `1` | 连击与判定文字的独立倍率。在皮肤设置中以1%步长或鼠标滑块调整50–200%，导入的皮肤同样使用配置倍率。 |
 | `lane_background_opacity` | double: `0..0.45`; `0.18` | 轨道背景不透明度。 |
 | `black_playfield_enabled` | bool; `true` | 将包括轨道间隙在内的整个区域设为黑色。 |
 | `visual_opacity` | double: `0.20..1`; `0.96` | 音符、接收器与按键标签的共用不透明度倍率。 |

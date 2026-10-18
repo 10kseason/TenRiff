@@ -8,6 +8,7 @@
 #include "app/TenRiffSkin.h"
 #include "app/Lr2Skin.h"
 #include "app/MenuApp.h"
+#include "app/ProfileSetupFlow.h"
 #include "config/Config.h"
 #include "config/GraphicsResolution.h"
 #include "render/SkinGameplayPreview.h"
@@ -44,6 +45,19 @@ namespace tenriff::app {
 // Seed only in-memory state, then use the production settings builders.
 // MenuApp is never initialized: no profiles, indexing, services or input start.
 struct MenuAppVisualTestAccess {
+    static void populate_keymap(render::MenuRenderData& source, int keys, bool common, int selected) {
+        auto app = std::make_unique<MenuApp>();
+        app->config_.ui.language = ui::language_token(source.ui_language);
+        app->keymap_ = app->working_keymap_ = config::KeymapManager{}.default_keymap();
+        app->keymap_settings_controller_.reset(keys, std::to_string(keys) + "k");
+        static_cast<void>(app->keymap_settings_controller_.select(1));
+        app->keymap_common_tab_ = common;
+        app->settings_cursor_ = common ? std::clamp(selected, profile_setup::kInstantRestartKeyRow,
+            profile_setup::kDoneRow) : 0;
+        source.generic = {};
+        source.generic.heading = ui::text(source.ui_language, "Keymap", "키 설정");
+        app->populate_keymap_render_data(source);
+    }
     static void populate_profile(render::MenuRenderData& source, const std::string& avatar, int selected) {
         auto app = std::make_unique<MenuApp>();
         app->config_.ui.language = ui::language_token(source.ui_language);
@@ -385,7 +399,8 @@ struct MenuWindowVisualTestAccess {
             source.generic.heading == ui::text(source.ui_language, "Skin Settings", "스킨 설정");
         const bool inner_settings_fixture = source.kind == MenuScreenKind::GenericList &&
             (source.generic.heading == ui::text(source.ui_language, "Profile Setup", "프로필 설정") ||
-             source.generic.heading == ui::text(source.ui_language, "Key Mode Settings", "키 모드 설정") ||
+             source.generic.heading == ui::text(source.ui_language, "Game Mode Settings", "게임 모드 설정") ||
+             (!source.generic.keymap_mode_tabs.empty() && !source.generic.keymap_keyboard) ||
              source.generic.heading == ui::text(source.ui_language, "Graphics Settings", "그래픽 설정") ||
              source.generic.heading == ui::text(source.ui_language, "Mod Manager", "모드 관리자") ||
              source.generic.heading == ui::text(source.ui_language, "Filter", "필터"));
@@ -407,6 +422,7 @@ struct MenuWindowVisualTestAccess {
         std::set<std::pair<int, int>> verified_targets;
         std::set<int> verified_result_targets;
         std::set<int> verified_skin_tabs;
+        std::set<int> verified_keymap_tabs;
         bool verified_skin_search = false;
         bool title_language_verified = false;
         for (std::size_t visit = 0; visit < visits; ++visit) {
@@ -425,8 +441,9 @@ struct MenuWindowVisualTestAccess {
                      region.kind == MenuHitTargetKind::SongDifficultyTable);
                 const bool preview_button = region.kind == MenuHitTargetKind::SkinPreviewButton ||
                     region.kind == MenuHitTargetKind::SkinPreviewLane;
-                const bool skin_header = skin_fixture && (region.kind == MenuHitTargetKind::SkinModeTab ||
-                    region.kind == MenuHitTargetKind::SkinSettingsSearch);
+                const bool skin_header = region.kind == MenuHitTargetKind::KeymapModeTab ||
+                    (skin_fixture && (region.kind == MenuHitTargetKind::SkinModeTab ||
+                    region.kind == MenuHitTargetKind::SkinSettingsSearch));
                 const bool pause_control = region.kind == MenuHitTargetKind::GameplayPauseAction ||
                     region.kind == MenuHitTargetKind::GameplayPauseAdjust;
                 const bool result_control = result_fixture && region.kind == MenuHitTargetKind::SettingsRow &&
@@ -472,6 +489,7 @@ struct MenuWindowVisualTestAccess {
                     if (geometry_pass) {
                         if (!skin_header) verified_targets.emplace(region.index, static_cast<int>(region.part));
                         if (region.kind == MenuHitTargetKind::SkinModeTab) verified_skin_tabs.insert(region.index);
+                        if (region.kind == MenuHitTargetKind::KeymapModeTab) verified_keymap_tabs.insert(region.index);
                         if (region.kind == MenuHitTargetKind::SkinSettingsSearch) verified_skin_search = true;
                     } else {
                         failures.emplace_back("geometry hit mismatch: id=" + std::to_string(region.index) + " part=" + std::to_string(static_cast<int>(region.part)));
@@ -587,6 +605,11 @@ struct MenuWindowVisualTestAccess {
                     failures.emplace_back("skin mode tab hit missing: id=" + std::to_string(index));
             if (!verified_skin_search) failures.emplace_back("skin search hit missing");
         }
+        if (verify) {
+            for (std::size_t index = 0; index < source.generic.keymap_mode_tabs.size(); ++index)
+                if (!verified_keymap_tabs.count(static_cast<int>(index)))
+                    failures.emplace_back("keymap tab hit missing: id=" + std::to_string(index));
+        }
         window.render(source);
         JsonValue preview_drag;
         if (verify && foreground && source.generic.skin_preview.visible)
@@ -603,6 +626,9 @@ struct MenuWindowVisualTestAccess {
         JsonArray skin_tabs;
         for (const auto& tab : source.generic.skin_mode_tabs)
             skin_tabs.emplace_back(JsonObject{{"label", JsonValue(tab.label)}, {"selected", JsonValue(tab.selected)}});
+        JsonArray keymap_tabs;
+        for (const auto& tab : source.generic.keymap_mode_tabs)
+            keymap_tabs.emplace_back(JsonObject{{"label", JsonValue(tab.label)}, {"selected", JsonValue(tab.selected)}});
         JsonArray combo_placement;
         for (std::size_t index = 0; index < window.benchmark_combo_placement_.size(); ++index) {
             const auto& metrics = window.benchmark_combo_placement_[index];
@@ -640,6 +666,9 @@ struct MenuWindowVisualTestAccess {
             {"title_language_button_verified", JsonValue(title_language_verified)},
             {"preview_drag", std::move(preview_drag)},
             {"skin_mode_tabs", JsonValue(std::move(skin_tabs))},
+            {"keymap_mode_tabs", JsonValue(std::move(keymap_tabs))},
+            {"keymap_tab_hit_kind", JsonValue(static_cast<double>(MenuHitTargetKind::KeymapModeTab))},
+            {"skin_tab_hit_kind", JsonValue(static_cast<double>(MenuHitTargetKind::SkinModeTab))},
             {"skin_search_query", JsonValue(source.generic.skin_search_query)},
             {"skin_search_active", JsonValue(source.generic.skin_search_active)},
             {"requested_combo_position", JsonValue(source.generic.skin_preview.visible ? source.generic.skin_preview.combo_position : source.gameplay.combo_position)},
@@ -818,6 +847,7 @@ int main(int argc, char** argv) {
     bool invalid_resolution = false;
     bool skin_settings = false;
     bool keymap_settings = false;
+    bool common_keys = false;
     bool keymap_test = false;
     bool keys_explicit = false;
     bool mute_inactive = false;
@@ -873,6 +903,7 @@ int main(int argc, char** argv) {
         }
         const std::string arg = argv[i];
         if (arg == "--judgement-counts") { judgement_counts = true; continue; }
+        if (arg == "--common-keys") { keymap_settings = common_keys = true; continue; }
         if (arg == "--timing-colors" && i + 1 < argc) {
             timing_color_case = argv[++i];
             if (timing_color_case != "fast" && timing_color_case != "maximum" &&
@@ -1188,7 +1219,7 @@ int main(int argc, char** argv) {
     if (settings) {
         data.kind = MenuScreenKind::GenericList;
         data.generic.heading = skin_settings ? loc("Skin Settings", "스킨 설정")
-                                             : loc("Key Mode Settings", "키 모드 설정");
+                                             : loc("Game Mode Settings", "게임 모드 설정");
         data.generic.footer_notes = {preview_backend,
             loc("VIEW ONLY", "보기 전용") + " / " + loc("OFFLINE", "오프라인")};
         auto& preview = data.generic.skin_preview;
@@ -1238,7 +1269,7 @@ int main(int argc, char** argv) {
     if (mode_settings || graphics_settings || mode_mods_settings) {
         data.generic.heading = mode_mods_settings ? loc("Mod Manager", "모드 관리자") :
                                graphics_settings ? loc("Graphics Settings", "그래픽 설정")
-                                                : loc("Key Mode Settings", "키 모드 설정");
+                                                : loc("Game Mode Settings", "게임 모드 설정");
         tenriff::app::MenuAppVisualTestAccess::populate_inner_settings(data, graphics_settings, selected_setting,
             edit_resolution, invalid_resolution, mode_mods_settings, judge_window);
     }
@@ -1286,6 +1317,8 @@ int main(int argc, char** argv) {
         }
 
     }
+    if (keymap_settings && !keymap_test)
+        tenriff::app::MenuAppVisualTestAccess::populate_keymap(data, preview_keys, common_keys, selected_row);
     if (profile_settings) {
         tenriff::app::MenuAppVisualTestAccess::populate_profile(data, avatar_path, selected_row);
     }
@@ -1531,7 +1564,7 @@ int main(int argc, char** argv) {
         data.generic.heading = loc("Options", "옵션");
         data.generic.card_grid = true;
         const std::array<std::string, 8> labels{
-            loc("KEY MODE SETTINGS", "키 모드 설정"), loc("KEYMAP", "키 설정"), loc("SKINS", "스킨"),
+            loc("GAME MODE SETTINGS", "게임 모드 설정"), loc("KEYMAP", "키 설정"), loc("SKINS", "스킨"),
             loc("GRAPHICS", "그래픽"), loc("AUDIO", "오디오"), loc("INPUT", "입력"),
             loc("CALIBRATION", "레이턴시"), loc("PROFILE", "프로필")};
         const std::array<std::string, 8> values{
@@ -1791,7 +1824,7 @@ int main(int argc, char** argv) {
         using tenriff::app::menu::Screen;
         const auto help_screen = options_grid ? Screen::OptionsHub : skin_settings ? Screen::SettingsSkins :
             mode_mods_settings ? Screen::ModeMods : mode_settings ? Screen::ModeSelect : graphics_settings ? Screen::SettingsGraphics :
-            keymap_test ? Screen::KeymapTest : keymap_settings ? Screen::Keymap : profile_settings ? Screen::QuickSetup :
+            keymap_test ? Screen::KeymapTest : common_keys ? Screen::QuickSetup : keymap_settings ? Screen::Keymap : profile_settings ? Screen::QuickSetup :
             filter_settings ? Screen::SongBrowser : Screen::SettingsAudio;
         tenriff::app::menu::settings::apply_settings_help(help_screen, data.generic, data.ui_language);
     }

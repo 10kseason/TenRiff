@@ -270,21 +270,17 @@ TEST_CASE("random mode parser accepts Mirror tokens") {
     CHECK(to_string(RandomMode::Mirror) == "MIRROR");
 }
 
-TEST_CASE("ordinary random uses a fresh per-play seed and exposes scratch-fixed aliases") {
+TEST_CASE("per-play seeds stay fresh across interleaved BMS generation and scratch-fixed aliases") {
     using tenriff::app::next_random_session_seed;
-    using tenriff::app::random_mode_uses_fresh_session_seed;
     using tenriff::gameplay::RandomMode;
     using tenriff::gameplay::parse_random_mode;
 
-    CHECK(random_mode_uses_fresh_session_seed("fr"));
-    CHECK(random_mode_uses_fresh_session_seed("FRNS"));
-    CHECK(random_mode_uses_fresh_session_seed("random_no_scratch"));
-    CHECK_FALSE(random_mode_uses_fresh_session_seed("sr"));
     REQUIRE(parse_random_mode("fr_no_scratch").has_value());
     CHECK(parse_random_mode("fr_no_scratch").value() == RandomMode::FullRandom);
 
     uint32_t previous = next_random_session_seed();
-    for (int play = 0; play < 32; ++play) {
+    for (int play = 0; play < 2048; ++play) {
+        static_cast<void>(next_random_session_seed()); // independent BMS branch seed
         const uint32_t current = next_random_session_seed();
         CHECK(current != previous);
         previous = current;

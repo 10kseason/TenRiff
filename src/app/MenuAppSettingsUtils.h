@@ -161,7 +161,7 @@ inline std::string mode_judge_window_label(const std::vector<std::string>& mods,
     const auto normalized = normalize_mode_mod_tokens(mods);
     if (std::find(normalized.begin(), normalized.end(), "judge_ex") != normalized.end()) return "EX";
     if (std::find(normalized.begin(), normalized.end(), "judge_hard") != normalized.end()) return "Hard";
-    return ui::text(language, "Normal", "기본");
+    return "Normal";  // The judgement tier uses the same name in every UI language.
 }
 
 inline std::vector<std::string> cycle_mode_judge_window(const std::vector<std::string>& mods, int direction) {
