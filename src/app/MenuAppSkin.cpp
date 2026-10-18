@@ -24,6 +24,7 @@
 #endif
 
 #include "app/Lr2Skin.h"
+#include "app/ClipboardText.h"
 #include "app/LanePresentationLayout.h"
 #include "app/MenuAppSettingsUtils.h"
 #include "app/MenuAppSkinUtils.h"
@@ -515,7 +516,82 @@ void MenuApp::choose_profile_ui_font() {
     publish_snapshot();
 }
 
+void MenuApp::append_skin_search_text(std::string_view text) {
+    if (current_screen() != Screen::SettingsSkins || !skin_search_active_ || skin_preview_fullscreen_ ||
+        help_overlay_visible_ || chat_overlay_visible_ || ranked_account_overlay_visible_ || chat_url_warning_visible_) return;
+    const std::string utf8 = util::ensure_utf8_text(text);
+    for (const unsigned char ch : utf8) {
+        if (ch >= 0x20u && ch != 0x7fu) skin_search_query_.push_back(static_cast<char>(ch));
+    }
+    // Trim whole code points after paste/IME input, never leave a partial UTF-8 suffix.
+    while (skin_search_query_.size() > 256) util::erase_last_utf8_codepoint(skin_search_query_);
+    publish_snapshot();
+}
+
 void MenuApp::handle_skins_settings_input(uint32_t keycode) {
+    // Raw keys arrive separately from IME text; the composition owns editing/navigation.
+    if (skin_search_active_ && menu_window_.text_composition_active()) return;
+    bool shift = false;
+    for (const char* name : {"LShift", "RShift"}) {
+        const auto key = config::KeycodeMap::to_keycode(name);
+        shift |= key && pressed_keys_.count(*key) != 0;
+    }
+    const bool control = control_modifier_pressed();
+    if (keycode == key_tab_) {
+        if (control) {
+            skin_search_active_ = false;
+            skin_mode_tabs_focused_ = true;
+            apply_skin_settings_effects(skin_settings_controller_.select_mode(
+                cycle_skin_edit_mode(skin_settings_controller_.edit_mode(), shift ? -1 : 1),
+                config::normalize_skin_source_token(config_.skin.source) == "tenriff"));
+        } else {
+            const int focus = skin_mode_tabs_focused_ ? 0 : skin_search_active_ ? 1 : 2;
+            const int next = (focus + (shift ? 2 : 1)) % 3;
+            skin_mode_tabs_focused_ = next == 0;
+            skin_search_active_ = next == 1;
+            publish_snapshot();
+        }
+        return;
+    }
+    if (control && keycode == config::KeycodeMap::to_keycode("F").value_or(0)) {
+        skin_search_active_ = true;
+        skin_mode_tabs_focused_ = false;
+        publish_snapshot();
+        return;
+    }
+    if (skin_search_active_) {
+        if (keycode == key_escape_) skin_search_active_ = false;
+        else if (keycode == key_backspace_) util::erase_last_utf8_codepoint(skin_search_query_);
+        else if (keycode == key_delete_) skin_search_query_.clear();
+        else if (control && keycode == config::KeycodeMap::to_keycode("V").value_or(0)) {
+            if (const auto text = clipboard_text_utf8()) append_skin_search_text(*text);
+            return;
+        }
+        // Enter/arrow keys may belong to an IME candidate; keep focus until Tab/Esc.
+        // Printable text comes only from WM_CHAR, including composed Unicode.
+        publish_snapshot();
+        return;
+    }
+    if (skin_mode_tabs_focused_) {
+        if (keycode == key_left_ || keycode == key_right_) {
+            apply_skin_settings_effects(skin_settings_controller_.select_mode(
+                cycle_skin_edit_mode(skin_settings_controller_.edit_mode(), keycode == key_left_ ? -1 : 1),
+                config::normalize_skin_source_token(config_.skin.source) == "tenriff"));
+            return;
+        }
+        if (keycode == key_up_) return;
+        if (keycode == key_down_ || keycode == key_enter_) {
+            skin_mode_tabs_focused_ = false;
+            publish_snapshot();
+            return;
+        }
+    }
+    if (keycode == key_escape_ && !skin_search_query_.empty()) {
+        skin_search_query_.clear();
+        skin_mode_tabs_focused_ = false;
+        publish_snapshot();
+        return;
+    }
 #ifdef _WIN32
     const auto vk = config::KeycodeMap::polling_vk_for_keycode(keycode);
     if (vk && ((*vk >= '0' && *vk <= '9') || (*vk >= VK_NUMPAD0 && *vk <= VK_NUMPAD9))) {
@@ -527,7 +603,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
             online_records_url_editing_ || keymap_settings_controller_.capture_active()) return;
         const auto held = [this](int key) {
             return pressed_keys_.count(static_cast<uint32_t>(key)) != 0 ||
-                   (GetAsyncKeyState(key) & 0x8000) != 0;
+                   physical_modifier_pressed(key);
         };
         if (control_modifier_pressed() || held(VK_MENU) || held(VK_LMENU) || held(VK_RMENU) ||
             held(VK_LWIN) || held(VK_RWIN)) return;
@@ -541,6 +617,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
 #endif
     menu::settings::SkinSettingsEffects effects;
     if (keycode == key_f5_) {
+        if (config::normalize_skin_source_token(config_.skin.source) != "tenriff") return;
         effects = skin_settings_controller_.request_reload();
     } else if (keycode == key_up_) {
         effects = skin_settings_controller_.handle(
@@ -740,7 +817,8 @@ void MenuApp::apply_skin_settings_effects(
         config::normalize_skin_source_token(config_.skin.source) == "lr2";
     settings_cursor_ = std::max(
         0,
-        SkinSettingsRows{lr2_source, skin_scratch_position_visible(config_.mode.key_mode)}.index_of(
+        SkinSettingsRows{lr2_source, skin_scratch_position_visible(config_.mode.key_mode),
+            config::normalize_skin_source_token(config_.skin.source) == "tenriff"}.index_of(
             skin_settings_controller_.selected_id()));
     publish_snapshot();
 }
@@ -790,7 +868,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     const bool center_gap_available = config::normalize_skin_mode_token(skin_edit_mode_) == "16k";
     const std::string active_skin_source = config::normalize_skin_source_token(config_.skin.source);
     const bool lr2_source = active_skin_source == "lr2";
-    const SkinSettingsRows stable_rows{lr2_source, skin_scratch_position_visible(config_.mode.key_mode)};
+    const SkinSettingsRows stable_rows{lr2_source, skin_scratch_position_visible(config_.mode.key_mode), active_skin_source == "tenriff"};
     const TenRiffSkinDefinition* preview_definition =
         active_skin_source == "tenriff"
             ? active_tenriff_skin_for_layout(lane_count, seven_plus_one)
@@ -846,10 +924,17 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     // Skin layouts include 7+1, which is not a runtime key-conversion mode.
     // Passing it through ui_key_mode_label would turn it into "Original".
     const std::string skin_mode_label = key_mode_label(skin_edit_mode_);
-    append_menu_row(render.generic, ui_text("Key Mode", "키 모드"), skin_mode_label,
-                    false,
-                    render::MenuHitTargetKind::SettingsRow,
-                    static_cast<int>(SkinSettingsRowId::KeyMode), false, true);
+    for (const auto mode : kSkinEditModes) {
+        render::MenuButtonData tab;
+        tab.label = key_mode_label(std::string(mode));
+        tab.selected = mode == skin_edit_mode_;
+        render.generic.skin_mode_tabs.push_back(std::move(tab));
+    }
+    render.generic.skin_mode_tabs_focused = skin_mode_tabs_focused_;
+    render.generic.skin_search_query = skin_search_query_;
+    render.generic.skin_search_active = skin_search_active_;
+    render.generic.skin_search_placeholder = ui_text("Search settings", "설정 검색");
+    render.generic.skin_search_empty = ui_text("No matching settings", "일치하는 설정이 없습니다");
     if (skin_scratch_position_visible(config_.mode.key_mode)) {
         append_menu_row(
             render.generic,
@@ -1055,6 +1140,10 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
         }
         return {};
     };
+    // One visibility contract drives rendering, mouse dispatch and keyboard navigation.
+    render.generic.rows.erase(std::remove_if(render.generic.rows.begin(), render.generic.rows.end(),
+        [&](const auto& row) { return stable_rows.index_of(static_cast<SkinSettingsRowId>(row.row_index)) < 0; }),
+        render.generic.rows.end());
     std::stable_sort(render.generic.rows.begin(), render.generic.rows.end(),
                      [&](const auto& left, const auto& right) {
                          return stable_rows.index_of(static_cast<SkinSettingsRowId>(left.row_index)) <
@@ -1065,6 +1154,20 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
         row.selected = skin_settings_controller_.selected_id() == id;
         row.category = category_label(skin_settings_category(id));
     }
+
+    if (!skin_search_query_.empty()) {
+        const auto query = lower_ascii(skin_search_query_);
+        render.generic.rows.erase(std::remove_if(render.generic.rows.begin(), render.generic.rows.end(),
+            [&](const auto& row) {
+                return lower_ascii(row.label + " " + row.value + " " + row.category).find(query) == std::string::npos;
+            }), render.generic.rows.end());
+    }
+    std::vector<SkinSettingsRowId> visible_ids;
+    for (const auto& row : render.generic.rows) visible_ids.push_back(static_cast<SkinSettingsRowId>(row.row_index));
+    skin_settings_controller_.set_visible_rows(std::move(visible_ids));
+    for (auto& row : render.generic.rows)
+        row.selected = !skin_mode_tabs_focused_ && !skin_search_active_ &&
+            skin_settings_controller_.selected_id() == static_cast<SkinSettingsRowId>(row.row_index);
 
     render.generic.skin_preview.visible = true;
     render.generic.skin_preview.hud_layout = config::normalize_skin_hud_layout_token(config_.skin.hud_layout);
@@ -1235,6 +1338,9 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                 : config::skin_color_rgb(visual_preview_lane_colors[lane_index]);
     }
 
+    render.generic.notes.push_back(ui_text(
+        "Tab moves between layout tabs, search and settings. Ctrl+Tab changes layout; Ctrl+F searches. Esc clears the filter before leaving.",
+        "Tab으로 키 모드 탭·검색·설정 사이를 이동합니다. Ctrl+Tab은 키 모드 전환, Ctrl+F는 검색입니다. Esc는 필터를 지운 뒤 화면을 나갑니다."));
     render.generic.notes.push_back(ui_text(
         "Click the numbered preview buttons or press 1-9, 0=10, Shift+1-6=11-16 to select a lane.",
         "미리보기 번호 버튼을 클릭하거나 1-9, 0=10, Shift+1-6=11-16으로 레인을 선택합니다."));

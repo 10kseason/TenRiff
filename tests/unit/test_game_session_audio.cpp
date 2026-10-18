@@ -1,6 +1,7 @@
 #include "doctest/doctest.h"
 #include "app/GameSession.h"
 #include "app/GameplayStartPolicy.h"
+#include "app/JudgeTimingPolicy.h"
 #include "app/ModeManager.h"
 #include "app/ReplayVerifier.h"
 #include "app/SitesLeaderboardClient.h"
@@ -242,11 +243,10 @@ struct GameSessionAudioTestAccess {
                 REQUIRE(recorded.size() == 2);
                 const auto& counts = session->engine_->stats().counts;
                 const auto& feedback = session->engine_->live_feedback();
-                // At -9 ms RANK0 is GREAT (PG8), while RANK1/2/3 are PG.
+                // At -9 ms every rank is PG under the pinned 10ms minimum.
                 // Every rank must nevertheless preserve the measured -9 ms.
                 const bool sample_matches = recorded[1].sample == release_ms * 48;
-                const bool grade_matches = counts.pg == (rank == 0 ? 1 : 2) &&
-                    counts.gr == (rank == 0 ? 1 : 0);
+                const bool grade_matches = counts.pg == 2 && counts.gr == 0;
                 const bool delta_matches = feedback.has_value &&
                     std::abs(feedback.delta_ms + 9.0) < 0.000001;
                 if (!sample_matches || !grade_matches || !delta_matches) ++mismatches;
@@ -295,7 +295,9 @@ struct GameSessionAudioTestAccess {
                         ms * 48, ms * 48, epoch + ms * 1'000'000LL);
                 };
                 const int head_ms = 1000 - offset_ms;
-                const int release_ms = 1991 - offset_ms;
+                // Stay just outside the pinned 10ms RANK0 PG window, so a
+                // callback crossing the LN tail cannot hide an early GREAT.
+                const int release_ms = 1989 - offset_ms;
                 REQUIRE(session->input_thread_.queue().push({32, input::InputState::Pressed, epoch + head_ms * 1'000'000LL}));
                 callback(head_ms);
                 int next = head_ms + buffer_ms;
@@ -303,10 +305,10 @@ struct GameSessionAudioTestAccess {
                 REQUIRE(session->input_thread_.queue().push({32, input::InputState::Released, epoch + release_ms * 1'000'000LL}));
                 callback(next);
                 REQUIRE(session->engine_->replay().events.size() == 2);
-                CHECK(session->engine_->replay().events[1].sample == 95568);
+                CHECK(session->engine_->replay().events[1].sample == 95472);
                 CHECK(session->engine_->stats().counts.pg == 1);
                 CHECK(session->engine_->stats().counts.gr == 1);
-                CHECK(session->engine_->live_feedback().delta_ms == doctest::Approx(-9.0));
+                CHECK(session->engine_->live_feedback().delta_ms == doctest::Approx(-11.0));
                 CHECK(session->hud_snapshot().current_sample == next * 48);
             }
         }
@@ -919,7 +921,7 @@ struct GameSessionAudioTestAccess {
         CHECK(next_song->hud_snapshot().riff_map_revision > snapshot.riff_map_revision);
     }
 
-    static void check_r4_player_and_ghost_boundaries() {
+    static void check_fixed_baseline_player_and_ghost_boundaries() {
         const auto play = [](int rank, std::string_view judge_mod, int64_t delta, std::string_view ghost_ruleset) {
             auto session = std::make_unique<GameSession>();
             session->sample_rate_ = 48000;
@@ -931,7 +933,7 @@ struct GameSessionAudioTestAccess {
             config::ModeConfig mode;
             mode.key_mode = "auto";
             mode.random = "off";
-            mode.mods = {std::string(judge_mod)};
+            if (!judge_mod.empty()) mode.mods = {std::string(judge_mod)};
             const auto managed = manage_modes(session->chart_, ChartFormat::Bms,
                 mode, config::JudgeConfig{}, 1.0, 120.0, 48000);
             gameplay::GameplayConfig live;
@@ -971,19 +973,20 @@ struct GameSessionAudioTestAccess {
             session->audio_callback(output, 1, sample, sample);
             return session;
         };
+        const double normal[][4] = {{10, 65.0 * 8 / 21, 115.0 * 8 / 21, 80},
+            {15, 65.0 * 15 / 21, 115.0 * 15 / 21, 150},
+            {19, 65.0 * 18 / 21, 115.0 * 18 / 21, 180}, {22, 65, 115, 210}};
         for (int rank = 0; rank <= 3; ++rank) {
             const double rank_scale = std::array<double, 4>{8.0, 15.0, 18.0, 21.0}[rank] / 21.0;
-            for (const std::string_view judge_mod : {"judge_easy", "judge_hard", "judge_ex"}) {
+            for (const std::string_view judge_mod : {"", "judge_easy", "judge_hard", "judge_ex"}) {
                 const bool ex = judge_mod == "judge_ex";
                 const bool hard = judge_mod == "judge_hard";
-                const std::array<double, 4> windows = ex
-                    ? std::array<double, 4>{14.0 * rank_scale, 44.57142857142857 * rank_scale,
-                                           78.85714285714286 * rank_scale, 250.0}
-                    : hard
-                    ? std::array<double, 4>{17.5 * rank_scale, 65.0 * 18.0 / 21.0 * rank_scale,
-                                           115.0 * 18.0 / 21.0 * rank_scale, 225.0}
-                    : std::array<double, 4>{21.0 * 1.35 * rank_scale, 65.0 * 1.35 * rank_scale,
-                                           115.0 * 1.35 * rank_scale, 210.0};
+                const bool easy = judge_mod == "judge_easy";
+                const double* pinned = normal[ex ? 0 : hard ? 2 : rank];
+                const std::array<double, 4> windows = easy
+                    ? std::array<double, 4>{21.0 * 1.35 * rank_scale, 65.0 * 1.35 * rank_scale,
+                                           115.0 * 1.35 * rank_scale, 210.0}
+                    : std::array<double, 4>{pinned[0], pinned[1], pinned[2], pinned[3]};
                 for (std::size_t boundary = 0; boundary < windows.size(); ++boundary) {
                     for (const int outside : {0, 1}) for (const int sign : {-1, 1}) {
                         const int64_t delta = sign * (static_cast<int64_t>(std::llround(windows[boundary] * 48.0)) + outside);
@@ -1011,11 +1014,20 @@ struct GameSessionAudioTestAccess {
                 }
             }
         }
-        // A historical R3 ghost at 18ms must stay PG while today's Hard player
+        // A historical R3 ghost at 20ms must stay PG while today's Hard player
         // gets GR; "same ghost mod" does not mean relabeling its old ruleset.
-        auto mixed = play(3, "judge_hard", 18 * 48, kRuleset3ReplayRulesetId);
+        auto mixed = play(3, "judge_hard", 20 * 48, kRuleset3ReplayRulesetId);
         CHECK(mixed->engine_->stats().counts.gr == 1);
         CHECK(mixed->ghost_engine_->stats().counts.pg == 1);
+        auto old_normal = play(0, "", 9 * 48, kRuleset7ReplayRulesetId);
+        CHECK(old_normal->engine_->stats().counts.pg == 1);
+        CHECK(old_normal->ghost_engine_->stats().counts.gr == 1);
+        auto old_hard = play(3, "judge_hard", 18 * 48, kRuleset7ReplayRulesetId);
+        CHECK(old_hard->engine_->stats().counts.pg == 1);
+        CHECK(old_hard->ghost_engine_->stats().counts.gr == 1);
+        auto old_ex = play(3, "judge_ex", 12 * 48, kRuleset8ReplayRulesetId);
+        CHECK(old_ex->engine_->stats().counts.gr == 1);
+        CHECK(old_ex->ghost_engine_->stats().counts.pg == 1);
     }
 
     static void check_long_hold_hud_scan() {
@@ -2221,6 +2233,7 @@ struct GameSessionAudioTestAccess {
         config.gauge_shift_enabled = true;
         config.gauge_policy.bms_lr2_deltas = bms_policy;
         config.gauge_policy.bms_total = session->chart_.bms_total.value_or(0.0);
+        config.judge = judge_timing_for_fixed_baseline({}, session->chart_.bms_rank, false, false, false);
         session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
         session->gauge_shift_enabled_ = true;
         if (pacemaker) {
@@ -2377,12 +2390,13 @@ struct GameSessionAudioTestAccess {
         CHECK(branch_sha256.empty() == !bms_policy);
         const bool accepted = build_sites_score_json(*replay.replay, result.replay_sha256,
                                     "Completion fixture", result.clear_status, payload, error, {}, branch_sha256);
-        const bool upload_eligible = can_upload_origin && !(auto_scratch || stale_catchup);
-        CHECK(accepted == upload_eligible);
-        CHECK(payload.empty() == !upload_eligible);
-        CHECK(error.empty() == upload_eligible);
+        const bool expected_upload = can_upload_origin && !auto_scratch && !stale_catchup;
+        CHECK(accepted == expected_upload);
+        CHECK(payload.empty() == !expected_upload);
+        CHECK(error.empty() == expected_upload);
+        if (!(auto_scratch || stale_catchup)) CHECK(replay.replay->ruleset_id == kCanonicalReplayRulesetId);
         if (stale_catchup) {
-            CHECK(replay.replay->ruleset_id == "custom-ruleset-7");
+            CHECK(replay.replay->ruleset_id == "custom-ruleset-9");
             CHECK_FALSE(is_supported_canonical_replay_ruleset(replay.replay->ruleset_id));
             CHECK_FALSE(result.pause_used);
             CHECK(std::any_of(result.export_warnings.begin(), result.export_warnings.end(),
@@ -2390,10 +2404,10 @@ struct GameSessionAudioTestAccess {
             std::ifstream saved_result(std::filesystem::u8path(result.result_path));
             REQUIRE(saved_result.is_open());
             const std::string saved((std::istreambuf_iterator<char>(saved_result)), std::istreambuf_iterator<char>());
-            CHECK(saved.find("custom-ruleset-7") != std::string::npos);
+            CHECK(saved.find("custom-ruleset-9") != std::string::npos);
         }
         if (auto_scratch) {
-            CHECK(replay.replay->ruleset_id == "custom-ruleset-7");
+            CHECK(replay.replay->ruleset_id == "custom-ruleset-9");
             CHECK(result.final_score == 0);
             CHECK(replay.replay->final_score == 0);
             CHECK(result.clear_status.find("ASSIST AUTO SCRATCH") == 0);
@@ -2761,13 +2775,19 @@ struct GameSessionAudioTestAccess {
         config.practice_no_fail_enabled = true;
         session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
         session->dispatch_lane_input(1, input::InputState::Pressed, 48000, 48000);
-        // An unpollable key provides a deterministic physical-up state without
-        // reading or synthesizing a key on the user's real keyboard.
-        session->key_to_lane_[0] = 1;
-        session->lane_binding_state_.configure(session->key_to_lane_);
-        session->polled_gameplay_keys_.push_back({0});
+        REQUIRE(session->engine_->stats().counts.pg == 1);
+        // An empty polling set deterministically reports every binding released.
+        // Keycode 0 is not unpollable: it reaches GetAsyncKeyState(0), so using it
+        // here would depend on an undefined virtual key in the desktop session.
+        session->polled_gameplay_keys_.clear();
         const auto score_before = session->engine_->stats().raw_score;
         session->rebaseline_gameplay_start_input_state(60000);
+        CHECK_FALSE(session->lane_binding_state_.pressed(1));
+        CHECK(session->lane_pressed_[0] == 0);
+        const auto& events = session->engine_->replay().events;
+        REQUIRE(events.size() == 2);
+        CHECK(events.back().state == input::InputState::Released);
+        CHECK(events.back().sample == 60000);
         CHECK(session->engine_->stats().raw_score == score_before);
         session->engine_->advance(144000);
         CHECK(session->engine_->stats().counts.bd == 1);
@@ -3024,19 +3044,19 @@ TEST_CASE("timing audit LN early release preserves rank and delta at observed sh
     tenriff::app::GameSessionAudioTestAccess::check_timing_audit_ln_release_at_observed_buffer_scale();
 }
 
-TEST_CASE("R5 calibrated live LN horizon preserves early release across positive and negative offsets") {
+TEST_CASE("fixed baseline calibrated LN horizon preserves early GREAT across positive and negative offsets") {
     tenriff::app::GameSessionAudioTestAccess::check_r5_calibrated_ln_horizon();
 }
 
-TEST_CASE("R5 input and HUD share a monotonic filtered clock through wobble rebase and pause") {
+TEST_CASE("current input and HUD share a monotonic filtered clock through wobble rebase and pause") {
     tenriff::app::GameSessionAudioTestAccess::check_r5_shared_clock_wobble_and_rebase();
 }
 
-TEST_CASE("R5 continuous clock preserves interframe monotonicity and bounded recovery from phase and rate drift") {
+TEST_CASE("current continuous clock preserves interframe monotonicity and bounded recovery from phase and rate drift") {
     tenriff::app::GameSessionAudioTestAccess::check_r5_continuous_clock_bounds();
 }
 
-TEST_CASE("R5 stale input catch-up exports an unranked custom replay without mislabeling pause") {
+TEST_CASE("current stale input catch-up exports an unranked custom replay without mislabeling pause") {
     tenriff::app::GameSessionAudioTestAccess::check_automatic_result(false, false, true, false, false, false, false, true);
 }
 
@@ -3049,7 +3069,7 @@ TEST_CASE("BMS legacy playback result does not invent an optional branch seed") 
     tenriff::app::GameSessionAudioTestAccess::check_legacy_branch_result_seed();
 }
 
-TEST_CASE("R5 scheduled replay autoplay scratch audio keeps write timing while legacy judgement stays historical") {
+TEST_CASE("current scheduled replay autoplay scratch audio keeps write timing while legacy judgement stays historical") {
     tenriff::app::GameSessionAudioTestAccess::check_r5_scheduled_audio_and_historical_frontier();
 }
 
@@ -3130,8 +3150,8 @@ TEST_CASE("Auto Scratch exports explicit assisted custom zero scores rejected by
     tenriff::app::GameSessionAudioTestAccess::check_automatic_result(false, false, true, false, false, false, true);
 }
 
-TEST_CASE("R4 live player and ghost callbacks share exact modifier edges while R3 ghosts retain old timing") {
-    tenriff::app::GameSessionAudioTestAccess::check_r4_player_and_ghost_boundaries();
+TEST_CASE("fixed baseline live player and ghost callbacks share edges while R3 R7 R8 ghosts retain old timing") {
+    tenriff::app::GameSessionAudioTestAccess::check_fixed_baseline_player_and_ghost_boundaries();
 }
 
 TEST_CASE("whole chart riff map crosses the production HUD snapshot with unique song revisions") {

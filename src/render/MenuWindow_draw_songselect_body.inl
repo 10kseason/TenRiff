@@ -647,7 +647,7 @@
         if (has_selected_song) {
             if (!data.song_select.selected_song_bms_rank.empty()) {
                 const auto rank_chip = native_rect("songselect.bms_rank", D2D1::RectF(
-                    std::max(preview.left + 12.0f, preview.right - 300.0f), preview.bottom - 48.0f,
+                    std::max(preview.left + 12.0f, preview.right - 204.0f), preview.bottom - 40.0f,
                     preview.right - 12.0f, preview.bottom - 12.0f));
                 draw_glass_panel(rank_chip, 7.0f, 0.94f, 0.62f, true, 1.0f);
                 draw_centered_text(wloc("Judgement difficulty", "판정난이도") + L" : " +

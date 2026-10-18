@@ -1,4 +1,5 @@
         auto& scene_hud_cache = is_skin_preview ? skin_preview_hud_cache_ : gameplay_hud_cache_;
+        if (benchmark_timings_enabled_) benchmark_combo_placement_ = {};
         const bool studio = gameplay_studio_deck_enabled(data.gameplay.hud_layout,
             normalize_gameplay_skin_source(data.gameplay.skin_source),
             data.gameplay.ghost_visible, data.gameplay.peer_visible);
@@ -598,12 +599,18 @@
             const float right = cx + (combo.right - cx) * scale + x;
             const float top = cy + (combo.top - cy) * scale + animation_y;
             const float bottom = cy + (combo.bottom + label_height - cy) * scale + animation_y;
-            if (right <= counts.left || left >= counts.right || bottom <= counts.top - 8 || top >= counts.bottom + 8) return 0.0f;
-            // Reserve the new row only while enabled, without changing the saved combo position.
-            const float down = counts.bottom + 8 - top;
-            if (bottom + down > field.bottom - 8 && counts.top - 8 - (bottom - top) >= field.top + 8)
-                return counts.top - 8 - bottom;
-            return down;
+            return gameplay_combo_counts_offset(field.top, field.bottom, left, top, right, bottom,
+                counts.left, counts.top, counts.right, counts.bottom);
+        };
+        auto record_combo_placement = [&](const D2D1_RECT_F& rect, float scale, float shift_y,
+                                           float label_height, bool ghost) {
+            if (!benchmark_timings_enabled_) return;
+            const float cx = (rect.left + rect.right) * .5f, cy = (rect.top + rect.bottom) * .5f;
+            const float x = static_cast<float>(data.gameplay.combo_offset_x);
+            auto& metrics = benchmark_combo_placement_[ghost ? 1 : 0];
+            metrics.combo_visible = true;
+            metrics.combo_rect = {cx + (rect.left - cx) * scale + x, cy + (rect.top - cy) * scale + shift_y,
+                cx + (rect.right - cx) * scale + x, cy + (rect.bottom + label_height - cy) * scale + shift_y};
         };
         auto draw_field_judgement_counts = [&](const GameplayFieldLayout& field,
                                                const std::array<int, 5>& values, bool ghost = false) {
@@ -615,6 +622,11 @@
                 for (std::size_t i = 0; i < values.size(); ++i) texts[i] = std::to_wstring(values[i]);
             }
             const auto bounds = field_judgement_counts_rect(field);
+            if (benchmark_timings_enabled_) {
+                auto& metrics = benchmark_combo_placement_[ghost ? 1 : 0];
+                metrics.counts_visible = true;
+                metrics.counts_rect = {bounds.left, bounds.top, bounds.right, bounds.bottom};
+            }
             const float left = bounds.left, top = bounds.top;
             const float width = bounds.right - bounds.left, height = bounds.bottom - bounds.top;
             static const std::array<std::wstring, 5> labels{L"PG", L"GR", L"G", L"BAD", L"PR"};
@@ -1393,9 +1405,9 @@
                                       float top_safe_margin,
                                       float bottom_safe_margin,
                                       float vertical_offset,
-                                      const GameplayTextPopAnimation& animation) {
+                                      const GameplayTextPopAnimation& animation, bool ghost = false) {
             if (studio) { draw_studio_combo(combo_field_layout, combo_value_text, animation,
-                top_safe_margin, bottom_safe_margin, vertical_offset); return; }
+                top_safe_margin, bottom_safe_margin, vertical_offset, ghost); return; }
             if (combo_value_text.empty() || !d2d_->accent_brush || !scene_gameplay_combo_format) {
                 return;
             }
@@ -1414,12 +1426,13 @@
             const D2D1_POINT_2F animation_center = D2D1::Point2F(
                 (combo_rect.left + combo_rect.right) * 0.5f,
                 (combo_rect.top + combo_rect.bottom) * 0.5f);
+            const float combo_scale = animation.scale * hud_font_scale(data.gameplay.combo_font_scale);
+            const float combo_shift_y = animation.offset_y + avoid_field_counts(combo_field_layout,
+                combo_rect, combo_scale, animation.offset_y, kComboLabelExtension);
+            record_combo_placement(combo_rect, combo_scale, combo_shift_y, kComboLabelExtension, ghost);
             const D2D1_MATRIX_3X2_F animation_transform =
-                D2D1::Matrix3x2F::Scale(animation.scale * hud_font_scale(data.gameplay.combo_font_scale),
-                                        animation.scale * hud_font_scale(data.gameplay.combo_font_scale), animation_center) *
-                D2D1::Matrix3x2F::Translation(static_cast<float>(data.gameplay.combo_offset_x), animation.offset_y +
-                    avoid_field_counts(combo_field_layout, combo_rect, animation.scale * hud_font_scale(data.gameplay.combo_font_scale),
-                        animation.offset_y, kComboLabelExtension)) * saved_transform;
+                D2D1::Matrix3x2F::Scale(combo_scale, combo_scale, animation_center) *
+                D2D1::Matrix3x2F::Translation(static_cast<float>(data.gameplay.combo_offset_x), combo_shift_y) * saved_transform;
             ctx->SetTransform(animation_transform);
             const auto combo_color=d2d_->accent_brush->GetColor();
             d2d_->accent_brush->SetColor(ng_color("combo",combo_color));
@@ -2707,7 +2720,7 @@
                                    combo_anchor_top_safe,
                                    combo_anchor_bottom_safe,
                                    60.0f,
-                                   ghost_combo_text_animation);
+                                   ghost_combo_text_animation, true);
             }
 
             if (key_pulse_brightness > 0.0f && d2d_->note_fill_brush && data.gameplay.ghost_lane_activity_count > 0) {

@@ -1724,7 +1724,9 @@ DWORD window_style_for_display_mode(std::string_view display_mode) {
 
 DWORD window_ex_style_for_display_mode(std::string_view display_mode) {
     static_cast<void>(display_mode);
-    return WS_EX_APPWINDOW;
+    // Mode changes and fullscreen fallback replace GWL_EXSTYLE. Keep the
+    // shell-drop flag here too, otherwise they undo DragAcceptFiles(TRUE).
+    return WS_EX_APPWINDOW | WS_EX_ACCEPTFILES;
 }
 
 SIZE window_size_for_client_area(UINT client_width, UINT client_height, DWORD style, DWORD ex_style) {
@@ -2252,6 +2254,13 @@ LRESULT CALLBACK menu_window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpa
             }
             break;
         }
+        case WM_IME_STARTCOMPOSITION:
+            if (window) window->on_text_composition(true);
+            break;
+        case WM_IME_ENDCOMPOSITION:
+        case WM_KILLFOCUS:
+            if (window) window->on_text_composition(false);
+            break;
         case WM_CHAR:
             if (window) {
                 window->on_text_input(static_cast<wchar_t>(wparam));

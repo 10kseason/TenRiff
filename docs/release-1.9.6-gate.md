@@ -1,0 +1,13 @@
+# 1.9.6 release verification scope
+
+Base: published 1.9.5.3 `78ef7fcb236d2c9dac7762e5c9aab926f1541ff4` plus the preserved judgement and skin-UI candidate. The general fixed source baseline remains 1.9.0. This document defines checks, not a claim that publication or every check is complete. Completed evidence belongs outside shipped source in the release root's `evidence/VERIFICATION.ko.md`.
+
+- Verify exact Normal PG22/19/15/10 and unchanged GR/GD/BAD; Hard must equal the entire Normal NM row and EX the entire Normal VHD row across every chart RANK. Include sample boundaries, custom calibration, LN behavior and unchanged R1–R8 replay results. Integer-ms rounding must not be introduced.
+- Verify R9/R10 creation, standard/custom separation and unchanged profile storage. Peer v7 must reject v6 explicitly without changing the packet layout.
+- Verify Sites accepts eligible fresh standard Online R9/R10 records and rejects new legacy-rule submissions. Preserve old board IDs, records, rankings and readable replay metadata; no historical recalculation or Guest/custom eligibility promotion. Verify server/client payload agreement, duplicates and rejection cases separately from the unsupported separate Ranked verifier and LN Mix v2 gates.
+- Verify all 14 skin tabs, localized search, keyboard/mouse focus, complete UTF-8 deletion, empty results and IME event ownership. Cover each source-specific control and retained hidden saved values, Original-only scratch visibility and fixed divider width.
+- Verify windowed/fullscreen transitions retain file-drop acceptance and existing file-dialog ownership. Verify combo/count placement above and below the indicator in Classic/Studio, player/ghost, multiple widths and saved Y positions; inspect actual render bounds and the smaller album badge.
+- Keep failed logs. Synthetic modifier tests use an injected all-up physical probe and explicitly test Shift/Ctrl/Alt/Win fallback; this hardens test determinism without claiming the historical intermittent failure's cause is proven.
+- Run release and independent exact-source builds, focused/full CTest, native menu/session, editor, scene and renderer checks. Record automated HWND dispatch separately from physical Explorer drag, keyboard/IME, listening, extended play and other PCs.
+- Inspect runtime/source ZIP CRC, extracted hashes and exact merged Git blobs; check clean defaults, privacy, BGA weights excluded and existing NK3 assets retained. Preserve all previous release/candidate identities.
+- Verify PR/main CI, a new immutable tag and fresh draft plus anonymous public asset readbacks. Verify the authorized Sites deployment and legacy-data readbacks without including server source, database contents, credentials or private profiles in client packages.

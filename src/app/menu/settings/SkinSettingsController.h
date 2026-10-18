@@ -35,9 +35,9 @@ struct SkinSettingsEffects {
 
 [[nodiscard]] std::optional<SkinSettingsRowId> skin_setting_id_at(
     std::size_t index,
-    bool lr2_source, bool original_key_mode = true) noexcept;
+    bool lr2_source, bool original_key_mode = true, bool tenriff_source = false) noexcept;
 [[nodiscard]] std::optional<std::size_t> skin_setting_index(
-    SkinSettingsRowId id, bool lr2_source, bool original_key_mode = true) noexcept;
+    SkinSettingsRowId id, bool lr2_source, bool original_key_mode = true, bool tenriff_source = false) noexcept;
 
 class SkinSettingsController {
 public:
@@ -55,8 +55,11 @@ public:
                                std::optional<float> height = std::nullopt) noexcept;
     [[nodiscard]] SkinSettingsEffects select(
         SkinSettingsRowId target,
-        bool lr2_source, bool original_key_mode = true) noexcept;
+        bool lr2_source, bool original_key_mode = true, bool tenriff_source = false) noexcept;
     [[nodiscard]] SkinSettingsEffects select_lane(int one_based_lane) noexcept;
+    [[nodiscard]] SkinSettingsEffects select_mode(std::string_view mode, bool tenriff_source);
+    void set_visible_rows(std::vector<SkinSettingsRowId> rows);
+    [[nodiscard]] bool row_visible(SkinSettingsRowId id) const noexcept;
     [[nodiscard]] SkinSettingsEffects handle(
         const MenuAction& action,
         config::RuntimeConfig& runtime,
@@ -79,12 +82,15 @@ private:
     [[nodiscard]] SkinSettingsEffects mark_changed() noexcept;
     void clamp_edit_targets() noexcept;
 
-    SkinSettingsRowId selected_id_ = SkinSettingsRowId::KeyMode;
+    SkinSettingsRowId selected_id_ = SkinSettingsRowId::SkinSource;
     std::string edit_mode_ = "4k";
     int edit_lane_ = 0;
     int edit_gap_ = 0;
     bool dirty_ = false;
     bool original_key_mode_ = true;
+    bool tenriff_source_ = false;
+    bool visible_rows_set_ = false;
+    std::vector<SkinSettingsRowId> visible_rows_;
     std::optional<bool> timing_default_text_, timing_default_bar_, timing_default_always_visible_;
     std::optional<bool> backdrop_default_enabled_;
     std::optional<float> backdrop_default_opacity_;

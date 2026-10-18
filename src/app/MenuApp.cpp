@@ -56,6 +56,7 @@
 #include "app/PeerBattleRuntimeRules.h"
 #include "app/MultiplayerPresentation.h"
 #include "app/RankedRecordsClient.h"
+#include "app/ReplayVerifier.h"
 #include "app/ProfileSetupFlow.h"
 #include "ui/FunctionKeyLabels.h"
 #include "app/GameplayStartPolicy.h"
@@ -2300,6 +2301,14 @@ void MenuApp::handle_input_event(const input::InputEvent& incoming_event) {
         if (chat_overlay_visible_) { (void)handle_multiplayer_chat_overlay_input(event.keycode); return; }
         if (ranked_account_overlay_visible_) { (void)handle_ranked_account_overlay_input(event.keycode); return; }
     }
+    if (current_screen() == Screen::SettingsSkins && !skin_preview_fullscreen_ &&
+        !help_overlay_visible_ && !chat_overlay_visible_ && !ranked_account_overlay_visible_ &&
+        !chat_url_warning_visible_ && (skin_search_active_ ||
+        (control_modifier_pressed() && (event.keycode == key_tab_ ||
+            event.keycode == config::KeycodeMap::to_keycode("F").value_or(0))))) {
+        if (event.state == input::InputState::Pressed) handle_skins_settings_input(event.keycode);
+        return;
+    }
     const auto preview_key = config::KeycodeMap::to_keycode("F6").value_or(0);
     if (current_screen() == Screen::SettingsSkins &&
         (skin_preview_fullscreen_ || (preview_key != 0 && event.keycode == preview_key))) {
@@ -2468,6 +2477,8 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
     if (incoming.input_time_ns > 0 && incoming.input_time_ns <= native_dialog_closed_ns_) return;
     if (current_screen() == Screen::QuickSetup && profile_control_key_capture_active_) return;
     auto event = incoming;
+    if (current_screen() == Screen::SettingsSkins && skin_search_active_ &&
+        menu_window_.text_composition_active()) return;
     // Result buttons use render.result, not the generic settings-row snapshot.
     // Validate their own activation contract in the Result branch below.
     if (event.kind == render::MenuHitTargetKind::SettingsRow &&
@@ -2933,6 +2944,25 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
     }
 
     switch (event.kind) {
+        case render::MenuHitTargetKind::SkinModeTab:
+            if (current_screen() == Screen::SettingsSkins && !skin_preview_fullscreen_ &&
+                event.part == render::MenuHitPart::Activate && event.index >= 0 &&
+                event.index < static_cast<int>(kSkinEditModes.size())) {
+                skin_search_active_ = false;
+                skin_mode_tabs_focused_ = true;
+                apply_skin_settings_effects(skin_settings_controller_.select_mode(
+                    kSkinEditModes[static_cast<std::size_t>(event.index)],
+                    config::normalize_skin_source_token(config_.skin.source) == "tenriff"));
+            }
+            return;
+        case render::MenuHitTargetKind::SkinSettingsSearch:
+            if (current_screen() == Screen::SettingsSkins && !skin_preview_fullscreen_ &&
+                event.part == render::MenuHitPart::Activate && event.index == 0) {
+                skin_search_active_ = true;
+                skin_mode_tabs_focused_ = false;
+                publish_snapshot();
+            }
+            return;
         case render::MenuHitTargetKind::SkinPreviewLane:
             if (event.part == render::MenuHitPart::Activate) select_skin_preview_lane(event.index);
             return;
@@ -3335,19 +3365,21 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
                 return;
             }
             {
-                const bool lr2_source =
-                    config::normalize_skin_source_token(config_.skin.source) == "lr2";
+                const bool lr2_source = config::normalize_skin_source_token(config_.skin.source) == "lr2";
+                const bool tenriff_source = config::normalize_skin_source_token(config_.skin.source) == "tenriff";
                 const auto target = menu::settings::settings_id_from_hit<SkinSettingsRowId>(
-                    event.index, [this, lr2_source](auto id) { return menu::settings::skin_setting_index(
-                        id, lr2_source, skin_scratch_position_visible(config_.mode.key_mode)); });
+                    event.index, [this, lr2_source, tenriff_source](auto id) { return menu::settings::skin_setting_index(
+                        id, lr2_source, skin_scratch_position_visible(config_.mode.key_mode), tenriff_source); });
                 if (!target.has_value()) {
                     return;
                 }
+                skin_search_active_ = false;
+                skin_mode_tabs_focused_ = false;
                 const auto previous = skin_settings_controller_.selected_id();
                 menu::settings::SkinSettingsEffects effects;
                 if (event.part == render::MenuHitPart::SelectOnly) {
                     effects = skin_settings_controller_.select(*target, lr2_source,
-                        skin_scratch_position_visible(config_.mode.key_mode));
+                        skin_scratch_position_visible(config_.mode.key_mode), tenriff_source);
                 } else if (event.part == render::MenuHitPart::Increment) {
                     effects = skin_settings_controller_.handle(
                         menu::MenuAction::adjust(1),
@@ -3374,11 +3406,15 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
                         available_tenriff_skin_names_,
                         *target);
                 }
+                // Clicking an already-selected row still transfers focus from tabs/search.
+                effects.menu.render_changed = true;
                 if (adjustment_without_selection) {
                     const bool next_lr2_source =
                         config::normalize_skin_source_token(config_.skin.source) == "lr2";
                     effects.merge(
-                        skin_settings_controller_.select(previous, next_lr2_source));
+                        skin_settings_controller_.select(previous, next_lr2_source,
+                            skin_scratch_position_visible(config_.mode.key_mode),
+                            config::normalize_skin_source_token(config_.skin.source) == "tenriff"));
                     settings_change_flash_screen_ = clicked_screen;
                     settings_change_flash_row_ = event.index;
                     settings_change_flash_started_ns_ = timing::HighResClock::now_ns();
@@ -3676,6 +3712,11 @@ void MenuApp::handle_title_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_text_input(std::string_view text) {
+    if (current_screen() == Screen::SettingsSkins && skin_search_active_ &&
+        !help_overlay_visible_ && !chat_overlay_visible_ && !ranked_account_overlay_visible_ && !chat_url_warning_visible_) {
+        append_skin_search_text(text);
+        return;
+    }
     if (current_screen() == Screen::QuickSetup && profile_control_key_capture_active_) return;
     if (ranked_account_overlay_visible_ && (account_mode_selection_ || ranked_account_sites_mode_)) return;
     if (ranked_account_overlay_visible_ &&
@@ -3764,6 +3805,16 @@ void MenuApp::handle_text_input(std::string_view text) {
     publish_snapshot();
 }
 
+bool MenuApp::physical_modifier_pressed(int virtual_key) const {
+    if (physical_modifier_probe_) return physical_modifier_probe_(virtual_key);
+#ifdef _WIN32
+    return (GetAsyncKeyState(virtual_key) & 0x8000) != 0;
+#else
+    static_cast<void>(virtual_key);
+    return false;
+#endif
+}
+
 bool MenuApp::control_modifier_pressed() const {
     const bool tracked =
         (key_lcontrol_ != 0 && pressed_keys_.find(key_lcontrol_) != pressed_keys_.end()) ||
@@ -3771,8 +3822,8 @@ bool MenuApp::control_modifier_pressed() const {
 #ifdef _WIN32
     // RawInput and polling can deliver the Ctrl edge just after O. Consult the
     // foreground keyboard state as a same-frame fallback for chord shortcuts.
-    const bool physical = (GetAsyncKeyState(VK_LCONTROL) & 0x8000) != 0 ||
-                          (GetAsyncKeyState(VK_RCONTROL) & 0x8000) != 0;
+    const bool physical = physical_modifier_pressed(VK_LCONTROL) ||
+                          physical_modifier_pressed(VK_RCONTROL);
     return tracked || physical;
 #else
     return tracked;

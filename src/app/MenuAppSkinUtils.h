@@ -93,8 +93,7 @@ enum class SkinSettingsRowId {
 
 // The same order drives keyboard navigation, rendered rows and mouse hit targets.
 // Keep related controls adjacent instead of deriving positions from row labels.
-inline constexpr std::array<SkinSettingsRowId, 53> kSkinSettingsRowOrder = {
-    SkinSettingsRowId::KeyMode,
+inline constexpr std::array<SkinSettingsRowId, 47> kSkinSettingsRowOrder = {
     SkinSettingsRowId::ScratchPosition,
     SkinSettingsRowId::SkinSource,
     SkinSettingsRowId::ImportedSkin,
@@ -128,23 +127,18 @@ inline constexpr std::array<SkinSettingsRowId, 53> kSkinSettingsRowOrder = {
     SkinSettingsRowId::LaneDividers,
     SkinSettingsRowId::JudgementLine,
     SkinSettingsRowId::JudgementLineType,
-    SkinSettingsRowId::GearBoundary,
     SkinSettingsRowId::TimingFeedback,
     SkinSettingsRowId::TimingBar,
     SkinSettingsRowId::TimingBarMode,
     SkinSettingsRowId::TimingMarkerStyle,
     SkinSettingsRowId::JudgementCounts,
     SkinSettingsRowId::TimingTextSize,
-    SkinSettingsRowId::TimingTextX,
     SkinSettingsRowId::TimingTextY,
     SkinSettingsRowId::TimingBarSize,
-    SkinSettingsRowId::TimingBarX,
     SkinSettingsRowId::TimingBarY,
 
     SkinSettingsRowId::JudgementY,
-    SkinSettingsRowId::JudgementX,
     SkinSettingsRowId::ComboY,
-    SkinSettingsRowId::ComboX,
     SkinSettingsRowId::ComboFontSize,
     SkinSettingsRowId::JudgementFontSize,
     SkinSettingsRowId::Back,
@@ -225,16 +219,25 @@ inline bool skin_scratch_position_visible(std::string_view runtime_mode) {
 struct SkinSettingsRows {
     bool lr2_source = false;
     bool original_key_mode = true;
+    bool tenriff_source = false;
 
-    [[nodiscard]] constexpr int count() const {
-        return static_cast<int>(kSkinSettingsRowOrder.size()) - (lr2_source ? 0 : 1) - (original_key_mode ? 0 : 1);
+    [[nodiscard]] constexpr bool visible(SkinSettingsRowId id) const {
+        if (id == SkinSettingsRowId::Lr2Resolution) return lr2_source;
+        if (id == SkinSettingsRowId::ScratchPosition) return original_key_mode;
+        if (id == SkinSettingsRowId::ImportedSkin) return lr2_source || tenriff_source;
+        if (id == SkinSettingsRowId::CreateSkin || id == SkinSettingsRowId::OpenSkinFolder ||
+            id == SkinSettingsRowId::ReloadSkin) return tenriff_source;
+        return true;
     }
-
+    [[nodiscard]] constexpr int count() const {
+        int result = 0;
+        for (const auto id : kSkinSettingsRowOrder) if (visible(id)) ++result;
+        return result;
+    }
     [[nodiscard]] constexpr int index_of(SkinSettingsRowId id) const {
         int index = 0;
         for (const auto candidate : kSkinSettingsRowOrder) {
-            if (!lr2_source && candidate == SkinSettingsRowId::Lr2Resolution) continue;
-            if (!original_key_mode && candidate == SkinSettingsRowId::ScratchPosition) continue;
+            if (!visible(candidate)) continue;
             if (candidate == id) return index;
             ++index;
         }
@@ -245,6 +248,9 @@ struct SkinSettingsRows {
 [[nodiscard]] inline constexpr int skin_settings_row_count(bool lr2_source) {
     return SkinSettingsRows{lr2_source}.count();
 }
+
+inline constexpr std::array<std::string_view, 14> kSkinEditModes{
+    "4k", "5k", "6k", "7k", "7+1", "8k", "9k", "10k", "11k", "12k", "13k", "14k", "15k", "16k"};
 
 inline std::string on_off(bool value) {
     return value ? "On" : "Off";
@@ -376,8 +382,8 @@ inline std::string normalize_skin_edit_mode(std::string value) {
 }
 
 inline std::string cycle_skin_edit_mode(std::string_view current, int direction) {
-    static constexpr const char* kSkinModes[] = {"4k", "5k", "6k", "7k", "7+1", "8k", "9k", "10k", "11k", "12k", "13k", "14k", "15k", "16k"};
-    const int option_count = static_cast<int>(sizeof(kSkinModes) / sizeof(kSkinModes[0]));
+    const auto& kSkinModes = kSkinEditModes;
+    const int option_count = static_cast<int>(kSkinModes.size());
     std::string normalized = normalize_skin_edit_mode(std::string(current));
     int index = option_count - 1;
     for (int i = 0; i < option_count; ++i) {
@@ -392,7 +398,7 @@ inline std::string cycle_skin_edit_mode(std::string_view current, int direction)
     } else if (index >= option_count) {
         index = 0;
     }
-    return kSkinModes[index];
+    return std::string(kSkinModes[index]);
 }
 
 inline int lane_count_for_skin_mode(std::string_view key_mode) {

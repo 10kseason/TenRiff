@@ -1674,11 +1674,11 @@ TEST_CASE("judge hard mod tightens charge hold tail windows without changing hol
     (void)engine.handle_input(1, InputState::Released, 2012);
     engine.advance(2500);
 
-    CHECK(mode_result.judge.pg_ms == doctest::Approx(judge.pg_ms * 17.5 / 21.0));
-    CHECK(mode_result.judge.gr_ms == doctest::Approx(judge.gr_ms * 18.0 / 21.0));
+    CHECK(mode_result.judge.pg_ms == doctest::Approx(10.0 * 19.0 / 21.0));
+    CHECK(mode_result.judge.gr_ms == doctest::Approx(20.0 * 18.0 / 21.0));
     CHECK(mode_result.judge.hold_grace_ms == doctest::Approx(judge.hold_grace_ms));
     CHECK(mode_result.judge.hold_break_ms == doctest::Approx(judge.hold_break_ms));
-    // The 12 ms release lies between Hard's 8.33 ms PG and 17.14 ms GR.
+    // The 12 ms release lies between custom Normal NM's PG and GR windows.
     CHECK(engine.stats().counts.pg == 1);
     CHECK(engine.stats().counts.gr == 1);
 }
@@ -1834,10 +1834,10 @@ TEST_CASE("hard BAD boundary and the gap before automatic miss do not swallow th
     config.sample_rate = 1000;
     config.judge = managed.judge;
     GameplayEngine boundary(chart, config);
-    CHECK(boundary.handle_input(1, InputState::Pressed, 1225).has_value());
+    CHECK(boundary.handle_input(1, InputState::Pressed, 1180).has_value());
     CHECK(boundary.stats().counts.bd == 1);
     GameplayEngine outside(chart, config);
-    CHECK_FALSE(outside.handle_input(1, InputState::Pressed, 1226).has_value());
+    CHECK_FALSE(outside.handle_input(1, InputState::Pressed, 1181).has_value());
     CHECK(outside.stats().counts.bd == 0);
     CHECK(outside.stats().counts.pr == 1);
 

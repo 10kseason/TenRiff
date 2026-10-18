@@ -4,6 +4,7 @@
 #include <array>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "app/MenuAppSettingsUtils.h"
 
@@ -81,13 +82,10 @@ void SkinSettingsEffects::merge(const SkinSettingsEffects& other) noexcept {
 
 std::optional<SkinSettingsRowId> skin_setting_id_at(
     std::size_t index,
-    bool lr2_source, bool original_key_mode) noexcept {
+    bool lr2_source, bool original_key_mode, bool tenriff_source) noexcept {
     std::size_t visible_index = 0;
     for (const auto id : kSkinSettingsRowOrder) {
-        if (!lr2_source && id == SkinSettingsRowId::Lr2Resolution) {
-            continue;
-        }
-        if (!original_key_mode && id == SkinSettingsRowId::ScratchPosition) continue;
+        if (!SkinSettingsRows{lr2_source, original_key_mode, tenriff_source}.visible(id)) continue;
         if (visible_index == index) {
             return id;
         }
@@ -96,8 +94,8 @@ std::optional<SkinSettingsRowId> skin_setting_id_at(
     return std::nullopt;
 }
 
-std::optional<std::size_t> skin_setting_index(SkinSettingsRowId id, bool lr2_source, bool original_key_mode) noexcept {
-    const int index = SkinSettingsRows{lr2_source, original_key_mode}.index_of(id);
+std::optional<std::size_t> skin_setting_index(SkinSettingsRowId id, bool lr2_source, bool original_key_mode, bool tenriff_source) noexcept {
+    const int index = SkinSettingsRows{lr2_source, original_key_mode, tenriff_source}.index_of(id);
     return index < 0 ? std::nullopt : std::optional<std::size_t>{static_cast<std::size_t>(index)};
 }
 
@@ -122,20 +120,23 @@ bool SkinSettingsController::dirty() const noexcept {
 }
 
 void SkinSettingsController::reset(std::string_view runtime_key_mode) {
-    selected_id_ = SkinSettingsRowId::KeyMode;
+    selected_id_ = SkinSettingsRowId::SkinSource;
     edit_mode_ = normalize_skin_edit_mode(std::string(runtime_key_mode));
     original_key_mode_ = skin_scratch_position_visible(runtime_key_mode);
     edit_lane_ = 0;
     edit_gap_ = 0;
     dirty_ = false;
+    visible_rows_set_ = false;
+    visible_rows_.clear();
     clamp_edit_targets();
 }
 
 SkinSettingsEffects SkinSettingsController::select(
     SkinSettingsRowId target,
-    bool lr2_source, bool original_key_mode) noexcept {
+    bool lr2_source, bool original_key_mode, bool tenriff_source) noexcept {
     original_key_mode_ = original_key_mode;
-    if (SkinSettingsRows{lr2_source, original_key_mode_}.index_of(target) < 0 || selected_id_ == target) {
+    tenriff_source_ = tenriff_source;
+    if (SkinSettingsRows{lr2_source, original_key_mode_, tenriff_source_}.index_of(target) < 0 || selected_id_ == target) {
         return {};
     }
     selected_id_ = target;
@@ -162,6 +163,28 @@ SkinSettingsEffects SkinSettingsController::select_lane(int one_based_lane) noex
     return effects;
 }
 
+SkinSettingsEffects SkinSettingsController::select_mode(std::string_view mode, bool tenriff_source) {
+    if (std::find(kSkinEditModes.begin(), kSkinEditModes.end(), mode) == kSkinEditModes.end()) return {};
+    const bool changed = edit_mode_ != mode;
+    edit_mode_ = std::string(mode);
+    clamp_edit_targets();
+    // Choosing an editor tab does not modify saved per-mode values or dirty a profile.
+    SkinSettingsEffects effects;
+    effects.menu.render_changed = true;
+    effects.refresh_tenriff_skins = tenriff_source && changed;
+    return effects;
+}
+
+void SkinSettingsController::set_visible_rows(std::vector<SkinSettingsRowId> rows) {
+    visible_rows_ = std::move(rows);
+    visible_rows_set_ = true;
+    if (!visible_rows_.empty() && !row_visible(selected_id_)) selected_id_ = visible_rows_.front();
+}
+
+bool SkinSettingsController::row_visible(SkinSettingsRowId id) const noexcept {
+    return !visible_rows_set_ || std::find(visible_rows_.begin(), visible_rows_.end(), id) != visible_rows_.end();
+}
+
 void SkinSettingsController::set_backdrop_defaults(
     std::optional<bool> enabled, std::optional<float> opacity,
     std::optional<float> brightness, std::optional<float> height) noexcept {
@@ -180,8 +203,9 @@ SkinSettingsEffects SkinSettingsController::handle(
     const bool lr2_source =
         config::normalize_skin_source_token(runtime.skin.source) == "lr2";
     original_key_mode_ = skin_scratch_position_visible(runtime.mode.key_mode);
-    if (SkinSettingsRows{lr2_source, original_key_mode_}.index_of(selected_id_) < 0) {
-        selected_id_ = SkinSettingsRowId::KeyMode;
+    tenriff_source_ = config::normalize_skin_source_token(runtime.skin.source) == "tenriff";
+    if (SkinSettingsRows{lr2_source, original_key_mode_, tenriff_source_}.index_of(selected_id_) < 0) {
+        selected_id_ = SkinSettingsRowId::SkinSource;
     }
     if (action.kind == MenuActionKind::Back) {
         return leave_screen();
@@ -191,11 +215,12 @@ SkinSettingsEffects SkinSettingsController::handle(
     }
     SkinSettingsEffects effects;
     if (target.has_value()) {
-        if (SkinSettingsRows{lr2_source, original_key_mode_}.index_of(*target) < 0) {
+        if (SkinSettingsRows{lr2_source, original_key_mode_, tenriff_source_}.index_of(*target) < 0) {
             return effects;
         }
-        effects.merge(select(*target, lr2_source, original_key_mode_));
+        effects.merge(select(*target, lr2_source, original_key_mode_, tenriff_source_));
     }
+    if (!row_visible(selected_id_)) return effects;
     effects.merge(apply_selected_action(
         action, runtime, available_lr2_skin_names, available_tenriff_skin_names));
     return effects;
@@ -218,13 +243,25 @@ SkinSettingsEffects SkinSettingsController::move_selection(
     if (direction == 0) {
         return {};
     }
-    const SkinSettingsRows rows{lr2_source, original_key_mode_};
+    if (visible_rows_set_) {
+        if (visible_rows_.empty()) return {};
+        auto it = std::find(visible_rows_.begin(), visible_rows_.end(), selected_id_);
+        const int current = it == visible_rows_.end() ? 0 : static_cast<int>(it - visible_rows_.begin());
+        const auto next = static_cast<std::size_t>(std::clamp(current + (direction < 0 ? -1 : 1),
+            0, static_cast<int>(visible_rows_.size()) - 1));
+        if (selected_id_ == visible_rows_[next]) return {};
+        selected_id_ = visible_rows_[next];
+        SkinSettingsEffects effects;
+        effects.menu.render_changed = true;
+        return effects;
+    }
+    const SkinSettingsRows rows{lr2_source, original_key_mode_, tenriff_source_};
     const int current = rows.index_of(selected_id_);
     const int next = std::clamp(
         (current < 0 ? 0 : current) + (direction < 0 ? -1 : 1),
         0,
         rows.count() - 1);
-    const auto next_id = skin_setting_id_at(static_cast<std::size_t>(next), lr2_source, original_key_mode_);
+    const auto next_id = skin_setting_id_at(static_cast<std::size_t>(next), lr2_source, original_key_mode_, tenriff_source_);
     if (!next_id.has_value() || *next_id == selected_id_) {
         return {};
     }
@@ -720,7 +757,7 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
 
 SkinSettingsEffects SkinSettingsController::leave_screen() noexcept {
     const bool was_dirty = dirty_;
-    selected_id_ = SkinSettingsRowId::KeyMode;
+    selected_id_ = SkinSettingsRowId::SkinSource;
     dirty_ = false;
     SkinSettingsEffects effects;
     effects.menu.render_changed = true;

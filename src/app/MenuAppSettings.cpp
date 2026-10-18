@@ -266,8 +266,8 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
     render.generic.notes.push_back(ui_text("Mods opens the registry-backed Mod Manager and shows the current score multiplier.",
                                            "모드는 현재 점수 배율을 보여주고 노트·배치·스크래치 설정을 엽니다."));
     render.generic.notes.push_back(ui_text(
-        "Judge Window selects Normal, Hard, or EX. Hard/EX PG, GR and GD follow the chart's BMS RANK ratio; BAD stays fixed at 225/250 ms.",
-        "판정 범위는 기본·Hard·EX 중 고릅니다. Hard·EX의 PG·GR·GD는 차트의 BMS RANK 비율을 적용하며 BAD는 각각 225·250ms로 고정됩니다."));
+        "Judge Window selects Normal, Hard, or EX. Hard uses the complete Normal NM row and EX the complete Normal VHD row, regardless of chart RANK and without rounding.",
+        "판정 범위는 기본·Hard·EX 중 고릅니다. Hard는 기본 NM 행 전체, EX는 기본 VHD 행 전체를 차트 RANK와 무관하게 반올림 없이 사용합니다."));
     for (auto& row : render.generic.rows) {
         const auto id = static_cast<menu::settings::ModeSettingId>(row.row_index);
         using Id = menu::settings::ModeSettingId;

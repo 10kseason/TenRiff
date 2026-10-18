@@ -7,6 +7,7 @@
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <functional>
 #include <future>
 #include <memory>
 #include <mutex>
@@ -298,6 +299,8 @@ private:
     void handle_input_event(const input::InputEvent& event);
     void handle_menu_click(const render::MenuClickEvent& event);
     void handle_text_input(std::string_view text);
+    void append_skin_search_text(std::string_view text);
+    [[nodiscard]] bool physical_modifier_pressed(int virtual_key) const;
     [[nodiscard]] bool control_modifier_pressed() const;
     void handle_quick_setup_input(uint32_t keycode);
     void handle_title_input(uint32_t keycode);
@@ -584,6 +587,8 @@ private:
     struct BestResultRecord {
         bool has_value = false;
         bool replay_verified = false;
+        // In-memory comparison only; recorded ruleset IDs remain authoritative.
+        int judgement_generation = 1;
         int bms_timing_version = 1;
         int bms_gauge_version = 1;
         int bms_control_flow_version = 1;
@@ -608,6 +613,7 @@ private:
     };
 
     struct LocalPlayRecord {
+        int judgement_generation = 1;
         int bms_timing_version = 1;
         int bms_gauge_version = 1;
         int bms_control_flow_version = 1;
@@ -787,6 +793,9 @@ private:
     menu::settings::KeymapSettingsController keymap_settings_controller_{};
     menu::settings::ModeSettingsController mode_settings_controller_{};
     menu::settings::SkinSettingsController skin_settings_controller_{};
+    bool skin_mode_tabs_focused_ = false;
+    bool skin_search_active_ = false;
+    std::string skin_search_query_;
     int title_cursor_ = 0;
     int selected_song_ = 0;
     int selected_source_ = 0;
@@ -927,6 +936,9 @@ private:
     render::MenuRenderData render_cache_{};
 
     std::unordered_set<uint32_t> pressed_keys_{};
+    // Tests can isolate synthetic input from keys held on the host desktop.
+    // An empty probe retains the normal platform keyboard-state fallback.
+    std::function<bool(int)> physical_modifier_probe_{};
     std::unordered_map<uint32_t, uint32_t> menu_key_owners_{};
     std::unordered_set<uint32_t> native_dialog_held_keys_{};
     int64_t native_dialog_closed_ns_ = 0;

@@ -54,6 +54,7 @@
 {"MEASURED TIMING", "实测时差"},
 {"Analysis unavailable for this record", "此记录无法进行分析"},
 {"Studio Riff Map", "Studio 密度图"},
+{"Judge Window selects Normal, Hard, or EX. Hard uses the complete Normal NM row and EX the complete Normal VHD row, regardless of chart RANK and without rounding.", "判定范围可选择Normal、Hard或EX。Hard完整采用Normal NM行，EX完整采用Normal VHD行，不受谱面RANK影响且不取整。"},
 {"Judge Easy widens PG/GR/GD by 35%. Judge Hard uses EASY PG/GR/GD 17.5/55.714/98.571 ms, scaled by BMS RANK.", "Judge Easy 将 PG/GR/GD 窗口放宽 35%。Judge Hard 的 EASY PG/GR/GD 窗口为 17.5/55.714/98.571 ms，并按 BMS RANK 缩放。"},
 {"BAD is fixed across all RANKs: Easy 210 ms / Hard 225 ms. Unplayed notes time out after 340 ms in every mode.", "所有 RANK 的 BAD 窗口固定：Easy 210 ms / Hard 225 ms。所有模式下，未击中的音符都在 340 ms 后超时。"},
 {"Title Music", "标题音乐"},
@@ -1271,3 +1272,9 @@
     {"Click the numbered preview buttons or press 1-9, 0=10, Shift+1-6=11-16 to select a lane.", "点击预览编号按钮，或按1–9、0=10、Shift+1–6=11–16选择轨道。"},
 
     {"In-field Judgement Counts", "轨道内判定计数"},
+{"Older or unsupported judgement timing stays in local records.", "旧版或不受支持的判定标准记录保留在本地。"},
+
+{"Search settings", "搜索设置"},
+{"No matching settings", "没有匹配的设置"},
+
+{"Tab moves between layout tabs, search and settings. Ctrl+Tab changes layout; Ctrl+F searches. Esc clears the filter before leaving.", "Tab在布局标签、搜索和设置间切换。Ctrl+Tab切换布局，Ctrl+F搜索。Esc先清空筛选，再退出。"},

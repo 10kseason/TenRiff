@@ -119,7 +119,8 @@ struct MenuAppVisualTestAccess {
     }
     static void populate_skin_rows(render::MenuRenderData& source,
                                    const TenRiffSkinDefinition* imported,
-                                   int selected_row, bool backdrop_override, bool scratch_right = false) {
+                                   int selected_row, bool backdrop_override, bool scratch_right = false,
+                                   const std::string& search_query = {}, bool search_active = false) {
         auto app = std::make_unique<MenuApp>();
         const auto& preview = source.generic.skin_preview;
         const std::string mode = preview.mode_label == "7+1" ? "7+1" : std::to_string(preview.lane_count) + "k";
@@ -202,10 +203,13 @@ struct MenuAppVisualTestAccess {
         config::KeymapManager keymap_manager;
         app->keymap_ = keymap_manager.default_keymap();
         app->skin_settings_controller_.reset(mode);
+        app->skin_search_query_ = search_query;
+        app->skin_search_active_ = search_active;
         if (selected_row >= 0) {
             const bool lr2_source = skin.source == "lr2";
-            if (const auto id = menu::settings::skin_setting_id_at(static_cast<std::size_t>(selected_row), lr2_source))
-                static_cast<void>(app->skin_settings_controller_.select(*id, lr2_source));
+            if (const auto id = menu::settings::skin_setting_id_at(
+                    static_cast<std::size_t>(selected_row), lr2_source, true, skin.source == "tenriff"))
+                static_cast<void>(app->skin_settings_controller_.select(*id, lr2_source, true, skin.source == "tenriff"));
         }
         render::MenuRenderData actual;
         actual.ui_language = source.ui_language;
@@ -213,6 +217,12 @@ struct MenuAppVisualTestAccess {
         source.generic.rows = std::move(actual.generic.rows);
         source.generic.skin_preview = std::move(actual.generic.skin_preview);
         source.generic.notes = std::move(actual.generic.notes);
+        source.generic.skin_mode_tabs = std::move(actual.generic.skin_mode_tabs);
+        source.generic.skin_mode_tabs_focused = actual.generic.skin_mode_tabs_focused;
+        source.generic.skin_search_query = std::move(actual.generic.skin_search_query);
+        source.generic.skin_search_placeholder = std::move(actual.generic.skin_search_placeholder);
+        source.generic.skin_search_empty = std::move(actual.generic.skin_search_empty);
+        source.generic.skin_search_active = actual.generic.skin_search_active;
         const auto tips = settings_help_tips(source.ui_language);
         source.generic.notes.insert(source.generic.notes.begin(), tips.begin(), tips.end());
     }
@@ -396,6 +406,8 @@ struct MenuWindowVisualTestAccess {
             !fixture.generic.rows.empty() ? fixture.generic.rows.size() : 1;
         std::set<std::pair<int, int>> verified_targets;
         std::set<int> verified_result_targets;
+        std::set<int> verified_skin_tabs;
+        bool verified_skin_search = false;
         bool title_language_verified = false;
         for (std::size_t visit = 0; visit < visits; ++visit) {
             if (verify) {
@@ -413,19 +425,21 @@ struct MenuWindowVisualTestAccess {
                      region.kind == MenuHitTargetKind::SongDifficultyTable);
                 const bool preview_button = region.kind == MenuHitTargetKind::SkinPreviewButton ||
                     region.kind == MenuHitTargetKind::SkinPreviewLane;
+                const bool skin_header = skin_fixture && (region.kind == MenuHitTargetKind::SkinModeTab ||
+                    region.kind == MenuHitTargetKind::SkinSettingsSearch);
                 const bool pause_control = region.kind == MenuHitTargetKind::GameplayPauseAction ||
                     region.kind == MenuHitTargetKind::GameplayPauseAdjust;
                 const bool result_control = result_fixture && region.kind == MenuHitTargetKind::SettingsRow &&
                     region.part == MenuHitPart::Activate && region.index >= 0 && region.index <= 7;
-                if (preview_button && visit != 0) continue;
-                if (!pause_control && !preview_button && !menu_card && !song_control && region.kind != MenuHitTargetKind::SettingsRow && region.kind != MenuHitTargetKind::KeymapButton)
+                if ((preview_button || skin_header) && visit != 0) continue;
+                if (!pause_control && !preview_button && !skin_header && !menu_card && !song_control && region.kind != MenuHitTargetKind::SettingsRow && region.kind != MenuHitTargetKind::KeymapButton)
                     continue;
-                const bool control = pause_control || preview_button || menu_card || song_control || result_control || region.part == MenuHitPart::Decrement ||
+                const bool control = pause_control || preview_button || skin_header || menu_card || song_control || result_control || region.part == MenuHitPart::Decrement ||
                     region.part == MenuHitPart::Increment || region.part == MenuHitPart::SetValue ||
                     ((skin_fixture || inner_settings_fixture) &&
                         (region.part == MenuHitPart::Activate || region.part == MenuHitPart::SelectOnly)) ||
                     fixture.generic.keymap_keyboard;
-                if (verify && (!control || (!preview_button && visits > 1 &&
+                if (verify && (!control || (!preview_button && !skin_header && visits > 1 &&
                     (region.kind != fixture.generic.rows[visit].target_kind ||
                      (region.index != fixture.generic.rows[visit].row_index &&
                       region.index != fixture.generic.rows[visit].secondary_row_index))))) continue;
@@ -455,8 +469,13 @@ struct MenuWindowVisualTestAccess {
                         if (region.part == MenuHitPart::SetValue && std::abs(resolved->value - 0.5) > 0.02)
                             failures.emplace_back("slider center did not produce ratio 0.5");
                     }
-                    if (geometry_pass) verified_targets.emplace(region.index, static_cast<int>(region.part));
-                    else failures.emplace_back("geometry hit mismatch: id=" + std::to_string(region.index) + " part=" + std::to_string(static_cast<int>(region.part)));
+                    if (geometry_pass) {
+                        if (!skin_header) verified_targets.emplace(region.index, static_cast<int>(region.part));
+                        if (region.kind == MenuHitTargetKind::SkinModeTab) verified_skin_tabs.insert(region.index);
+                        if (region.kind == MenuHitTargetKind::SkinSettingsSearch) verified_skin_search = true;
+                    } else {
+                        failures.emplace_back("geometry hit mismatch: id=" + std::to_string(region.index) + " part=" + std::to_string(static_cast<int>(region.part)));
+                    }
                     if (geometry_pass && result_control) verified_result_targets.insert(region.index);
                     if (geometry_pass && region.kind == MenuHitTargetKind::TitleLanguageButton)
                         title_language_verified = true;
@@ -562,6 +581,12 @@ struct MenuWindowVisualTestAccess {
                 } else if (row.activatable) require_part(MenuHitPart::Activate);
             }
         }
+        if (verify && skin_fixture) {
+            for (std::size_t index = 0; index < source.generic.skin_mode_tabs.size(); ++index)
+                if (!verified_skin_tabs.count(static_cast<int>(index)))
+                    failures.emplace_back("skin mode tab hit missing: id=" + std::to_string(index));
+            if (!verified_skin_search) failures.emplace_back("skin search hit missing");
+        }
         window.render(source);
         JsonValue preview_drag;
         if (verify && foreground && source.generic.skin_preview.visible)
@@ -575,6 +600,29 @@ struct MenuWindowVisualTestAccess {
             {"hit_eligible", JsonValue(row.activatable || row.adjustable)}, {"slider", JsonValue(row.slider)}});
         JsonArray notes;
         for (const auto& note : source.generic.notes) notes.emplace_back(note);
+        JsonArray skin_tabs;
+        for (const auto& tab : source.generic.skin_mode_tabs)
+            skin_tabs.emplace_back(JsonObject{{"label", JsonValue(tab.label)}, {"selected", JsonValue(tab.selected)}});
+        JsonArray combo_placement;
+        for (std::size_t index = 0; index < window.benchmark_combo_placement_.size(); ++index) {
+            const auto& metrics = window.benchmark_combo_placement_[index];
+            const auto rect = [](const std::array<float, 4>& values) {
+                return JsonValue(JsonArray{JsonValue(values[0]), JsonValue(values[1]), JsonValue(values[2]), JsonValue(values[3])});
+            };
+            const bool overlap = metrics.combo_visible && metrics.counts_visible &&
+                metrics.combo_rect[0] < metrics.counts_rect[2] && metrics.combo_rect[2] > metrics.counts_rect[0] &&
+                metrics.combo_rect[1] < metrics.counts_rect[3] && metrics.combo_rect[3] > metrics.counts_rect[1];
+            const bool active_field = source.gameplay.active && (index == 0 || source.gameplay.ghost_visible);
+            const int displayed_combo = index == 0 ? source.gameplay.combo : source.gameplay.ghost_combo;
+            if (verify && active_field && displayed_combo > 0 && !metrics.combo_visible)
+                failures.emplace_back("actual combo geometry was not recorded: field=" + std::to_string(index));
+            if (verify && active_field && source.gameplay.show_judgement_counts && !metrics.counts_visible)
+                failures.emplace_back("actual judgement count geometry was not recorded: field=" + std::to_string(index));
+            if (verify && overlap) failures.emplace_back("actual combo and judgement count bounds overlap: field=" + std::to_string(index));
+            combo_placement.emplace_back(JsonObject{{"field", JsonValue(index == 0 ? "player" : "ghost")},
+                {"combo_visible", JsonValue(metrics.combo_visible)}, {"counts_visible", JsonValue(metrics.counts_visible)},
+                {"combo_rect", rect(metrics.combo_rect)}, {"counts_rect", rect(metrics.counts_rect)}, {"overlap", JsonValue(overlap)}});
+        }
         // Editor notes are recorded for pixel checks, without pretending to dispatch editor input.
         JsonArray editor_note_rects;
         for (const auto& region : window.hit_regions_) {
@@ -591,6 +639,13 @@ struct MenuWindowVisualTestAccess {
             {"ui_language", JsonValue(std::string(ui::language_token(source.ui_language)))},
             {"title_language_button_verified", JsonValue(title_language_verified)},
             {"preview_drag", std::move(preview_drag)},
+            {"skin_mode_tabs", JsonValue(std::move(skin_tabs))},
+            {"skin_search_query", JsonValue(source.generic.skin_search_query)},
+            {"skin_search_active", JsonValue(source.generic.skin_search_active)},
+            {"requested_combo_position", JsonValue(source.generic.skin_preview.visible ? source.generic.skin_preview.combo_position : source.gameplay.combo_position)},
+            {"combo_placement", JsonValue(std::move(combo_placement))},
+            {"combo_placement_coordinate_space", JsonValue("Actual final draw bounds in gameplay design coordinates, including font/pop transform and count collision movement; not source-position recomputation.")},
+            {"pointer_dispatch_method", JsonValue("MenuWindow::on_mouse_click on the owned foreground window; no desktop pointer or physical click is synthesized.")},
             {"notes", JsonValue(std::move(notes))},
             {"selected_song_difficulty", JsonValue(source.song_select.selected_song_difficulty)},
             {"gameplay_note_width_scale", JsonValue(source.gameplay.note_width_scale)},
@@ -737,6 +792,7 @@ int main(int argc, char** argv) {
     double preview_note_height = 1.8;
     double preview_note_width = 1.0;
     double combo_font_scale = 1.0;
+    double fixture_combo_position = -1.0;
     double judgement_font_scale = 1.0;
     int bga_brightness_percent = 100;
     int loading_fixture = 0;
@@ -810,6 +866,11 @@ int main(int argc, char** argv) {
     MenuRenderData data;
     data.ui_language = tenriff::ui::Language::Korean;
     for (int i = 1; i < argc; ++i) {
+        if (std::string_view(argv[i]) == "--combo-position" && i + 1 < argc) {
+            fixture_combo_position = std::stod(argv[++i]);
+            if (!std::isfinite(fixture_combo_position) || fixture_combo_position < 0.10 || fixture_combo_position > 0.78) return 2;
+            continue;
+        }
         const std::string arg = argv[i];
         if (arg == "--judgement-counts") { judgement_counts = true; continue; }
         if (arg == "--timing-colors" && i + 1 < argc) {
@@ -1704,13 +1765,15 @@ int main(int argc, char** argv) {
     data.gameplay.timing_bar_scale = data.generic.skin_preview.timing_bar_scale = timing_bar_scale;
     data.gameplay.note_fade_in = data.generic.skin_preview.note_fade_in = fade_in;
     data.gameplay.note_fade_out = data.generic.skin_preview.note_fade_out = fade_out;
+    if (fixture_combo_position >= 0)
+        data.gameplay.combo_position = data.generic.skin_preview.combo_position = fixture_combo_position;
     if (!preview_note_shape.empty()) data.gameplay.note_shape = data.generic.skin_preview.note_shape = preview_note_shape;
     if (!preview_hit_burst.empty()) data.gameplay.hit_burst_style = data.generic.skin_preview.hit_burst_style = preview_hit_burst;
     if (skin_settings) {
         tenriff::app::MenuAppVisualTestAccess::populate_skin_rows(
             data, fixture_skin ? &*fixture_skin : nullptr, selected_row,
             backdrop_off || backdrop_opacity >= 0.0 || backdrop_brightness >= 0.0 || backdrop_height >= 0.0,
-            scratch_right);
+            scratch_right, search_query, search_active);
     }
     if (selected_row >= 0) {
         for (std::size_t i = 0; i < data.generic.rows.size(); ++i)
@@ -1860,7 +1923,7 @@ int main(int argc, char** argv) {
     MenuWindow window;
     window.set_config(config);
     MenuWindowVisualTestAccess::gpu_sprites(window, gpu_sprites);
-    MenuWindowVisualTestAccess::benchmark(window, benchmark_frames > 0);
+    MenuWindowVisualTestAccess::benchmark(window, benchmark_frames > 0 || !hitmap_path.empty() || verify_hits);
     if (!retention_probe_directory.empty())
         return MenuWindowVisualTestAccess::check_background_retention(window, data, retention_probe_directory) ? 0 : 5;
     if (benchmark_frames > 0) frame_limit = benchmark_warmup + benchmark_frames;

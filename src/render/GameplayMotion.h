@@ -252,6 +252,25 @@ struct GameplayProgressTrackLayout {
     float right = 0.0f;
 };
 
+// Keep the optional count row readable without turning it into a one-way wall
+// for Combo Y. Choose the nearest side that still fits the complete combo text.
+inline float gameplay_combo_counts_offset(float field_top, float field_bottom,
+    float combo_left, float combo_top, float combo_right, float combo_bottom,
+    float counts_left, float counts_top, float counts_right, float counts_bottom) {
+    constexpr float gap = 8.0f;
+    if (combo_right <= counts_left || combo_left >= counts_right ||
+        combo_bottom <= counts_top - gap || combo_top >= counts_bottom + gap) return 0.0f;
+    const float up = counts_top - gap - combo_bottom;
+    const float down = counts_bottom + gap - combo_top;
+    const bool fits_up = combo_top + up >= field_top + gap;
+    const bool fits_down = combo_bottom + down <= field_bottom - gap;
+    if (fits_up && (!fits_down || -up < down)) return up;
+    if (fits_down) return down;
+    // Oversized text may fit on neither side. Preserve the requested position
+    // rather than pushing it off-field or trapping it below the indicator.
+    return 0.0f;
+}
+
 inline GameplayProgressTrackLayout compute_gameplay_progress_track_layout(
     float content_left,
     float content_right,

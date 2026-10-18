@@ -98,6 +98,8 @@ enum class MenuHitTargetKind {
     GameplayPauseAdjust,
     TitleLanguageButton,
     SkinPreviewLane,
+    SkinModeTab,
+    SkinSettingsSearch,
 };
 
 enum class SongDifficultyTableAction {
@@ -801,6 +803,12 @@ struct GenericMenuData {
     std::vector<std::string> footer_notes;
     int footer_reserved_lines = 0;
     SkinPreviewData skin_preview;
+    std::vector<MenuButtonData> skin_mode_tabs;
+    bool skin_mode_tabs_focused = false;
+    std::string skin_search_query;
+    std::string skin_search_placeholder;
+    std::string skin_search_empty;
+    bool skin_search_active = false;
 };
 
 struct HelpOverlayData {
@@ -960,6 +968,8 @@ public:
     void on_mouse_wheel(int wheel_delta);
     void on_file_drop(std::string path);
     void on_text_input(wchar_t character);
+    void on_text_composition(bool active) { text_composition_active_.store(active, std::memory_order_release); }
+    [[nodiscard]] bool text_composition_active() const { return text_composition_active_.load(std::memory_order_acquire); }
 
     [[nodiscard]] std::optional<MenuClickEvent> poll_click_event();
     [[nodiscard]] std::optional<std::string> poll_text_input();
@@ -1044,6 +1054,7 @@ private:
     std::atomic<bool> init_success_{false};
     std::atomic<bool> fatal_error_{false};
     std::atomic<bool> screenshot_requested_{false};
+    std::atomic<bool> text_composition_active_{false};
     // Presentation-only pagination; changing help pages never changes settings.
     std::atomic<int> generic_help_page_{0};
     std::atomic<int64_t> last_present_completion_ns_{0};
@@ -1057,6 +1068,11 @@ private:
         uint32_t characters = 0, line_count = 0;
         uint64_t layout_builds = 0;
     } benchmark_song_title_;
+    struct GameplayComboPlacementMetrics {
+        bool combo_visible = false, counts_visible = false;
+        std::array<float, 4> combo_rect{}, counts_rect{};
+    };
+    std::array<GameplayComboPlacementMetrics, 2> benchmark_combo_placement_{};
     int64_t benchmark_present_started_ns_ = 0;
     int64_t benchmark_present_ended_ns_ = 0;
     bool gameplay_sprite_batch_enabled_ = true;

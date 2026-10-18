@@ -135,16 +135,20 @@ bool build_sites_score_json(const gameplay::ReplayFile& replay,
         error = "Sites upload skipped: LN Mix v2 needs a separate leaderboard condition; this score remains local.";
         return false;
     }
-    if (!is_sites_supported_replay_ruleset(replay.ruleset_id, replay.mods) ||
-        replay.replay_format_version != gameplay::kReplayFormatVersion ||
+    if (!is_sites_supported_replay_ruleset(replay.ruleset_id, replay.mods)) {
+        error = "Sites upload skipped: older or unsupported judgement timing remains local.";
+        return false;
+    }
+    if (replay.replay_format_version != gameplay::kReplayFormatVersion ||
         replay.aborted || replay.pause_used || replay.mode.autoplay_enabled ||
         replay.mode.practice_no_fail_enabled || replay.mode.one_miss_fail_enabled ||
         !replay.mode.course_gauge.empty() || mode_mod_adds_notes(replay.mods) ||
         mode_mod_auto_scratch(replay.mods)) {
         error = "Sites upload skipped: this play is not eligible for the community leaderboard."; return false;
     }
-    // Ruleset 3 makes BMS timing depend on #RANK. Never merge an unknown policy
-    // into a valid timing group or guess EASY for old evidence lacking metadata.
+    // Preserve authored timing-profile metadata as part of board identity.
+    // Hard/EX select fixed Normal rows at runtime; this field still describes
+    // the chart's RANK and must not silently merge existing board conditions.
     std::string_view timing_profile;
     if (replay.bms_rank && (*replay.bms_rank < 0 || *replay.bms_rank > 3)) {
         error = "Sites upload skipped: invalid BMS rank metadata."; return false;
@@ -290,6 +294,8 @@ void SitesLeaderboardService::worker_main() {
                     message = "Sites upload skipped: " + loaded.error;
                 } else if (loaded.replay->record_play_mode != "online") {
                     message = "Sites upload skipped: guest or historical records remain local permanently.";
+                } else if (!is_sites_supported_replay_ruleset(loaded.replay->ruleset_id, loaded.replay->mods)) {
+                    message = "Sites upload skipped: older or unsupported judgement timing remains local.";
                 } else if (!prepare_sites_bms_branch_identity(*loaded.replay, branch_sha256, error)) {
                     message = error;
                 } else if (!build_sites_score_json(*loaded.replay, pending.replay_sha256,

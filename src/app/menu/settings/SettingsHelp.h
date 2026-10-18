@@ -80,7 +80,7 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Change song speed and timing together. 1.00x is original speed; this also affects score eligibility.", "곡 재생 속도와 노트 타이밍을 함께 바꿉니다. 1.00x가 원래 속도이며 기록 조건에도 영향을 줍니다.", "曲速とノート時刻を一緒に変更します。1.00xが原速で、記録条件にも影響します。"},
         {"Change note scrolling speed without changing song speed or judgement timing.", "곡 속도와 판정 시점은 유지하고, 노트가 화면을 이동하는 속도만 바꿉니다.", "曲速と判定時刻を変えず、ノートのスクロール速度だけを変えます。"},
         {"Save mode settings and return.", "모드 설정을 저장하고 돌아갑니다.", "モード設定を保存して戻ります。"},
-        {"Choose Normal, Hard or EX. EX uses BMS RANK-scaled PG/GR/GD 14/44.5714/78.8571 ms at EASY rank, with fixed BAD 250 ms.", "기본·Hard·EX 중 판정 범위를 고릅니다. EX는 EASY RANK 기준 PG·GR·GD 14·44.5714·78.8571ms에 BMS RANK 비율을 적용하고 BAD는 250ms로 고정합니다.", "標準・Hard・EXを選びます。EXはEASY RANK基準PG/GR/GD 14/44.5714/78.8571msにBMS RANK比率を適用し、BADは250ms固定です。"},
+        {"Choose Normal, Hard or EX. Hard uses the complete Normal NM row; EX uses the complete Normal VHD row, regardless of chart RANK and without rounding. Normal VEZ uses EZ timing.", "기본·Hard·EX 중 판정 범위를 고릅니다. Hard는 기본 NM 행 전체, EX는 기본 VHD 행 전체를 차트 RANK와 무관하게 반올림 없이 사용합니다. 기본 VEZ는 EZ와 같습니다.", "標準・Hard・EXを選びます。Hardは標準NM行全体、EXは標準VHD行全体を譜面RANKに関係なく丸めずに使います。標準VEZはEZと同じです。"},
     };
     static constexpr SettingsHelpText skin[] = {
         {"Choose the key layout to edit and preview. Each layout keeps its own lane settings.", "편집하고 미리 볼 키 배치를 고릅니다. 레이아웃마다 레인 설정을 따로 유지합니다.", "編集・プレビューするキー配置です。配置ごとにレーン設定を保持します。"},

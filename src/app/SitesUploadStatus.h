@@ -43,6 +43,9 @@ inline SitesUploadStatusText sites_upload_status_text(std::string_view message) 
                 "웹 등록 제외 · 원본 BMS 채보가 없거나 변경됨 · 로컬 저장"};
     if (message.find("LN Mix v2") != std::string_view::npos)
         return {"Long LN Mix uses local records only.", "긴 LN 믹스는 로컬 기록만 저장합니다."};
+    if (message.find("older or unsupported judgement timing") != std::string_view::npos)
+        return {"Older or unsupported judgement timing stays in local records.",
+                "이전 또는 지원하지 않는 판정 기준의 기록은 로컬에 보관됩니다."};
     if (message.find("not eligible") != std::string_view::npos)
         return {"This play is excluded from web ranking; record saved locally.",
                 "웹 등록 제외 플레이 조건 · 기록은 로컬에 저장"};

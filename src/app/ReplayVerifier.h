@@ -13,10 +13,13 @@
 namespace tenriff::app {
 
 inline constexpr std::string_view kCanonicalReplayRulesetId =
-    "tenriff-native-score-v2-ruleset-7";
-// Empty POOR accuracy exclusion has an explicit identity. R1-R6 retain their
-// original accuracy, timing, score and gauge interpretation on replay.
+    "tenriff-native-score-v2-ruleset-9";
+// The fixed timing baseline has its own identity; never reinterpret R1-R8.
 inline constexpr std::string_view kExReplayRulesetId =
+    "tenriff-native-score-v2-ruleset-10";
+inline constexpr std::string_view kRuleset7ReplayRulesetId =
+    "tenriff-native-score-v2-ruleset-7";
+inline constexpr std::string_view kRuleset8ReplayRulesetId =
     "tenriff-native-score-v2-ruleset-8";
 inline constexpr std::string_view kRuleset5ReplayRulesetId =
     "tenriff-native-score-v2-ruleset-5";

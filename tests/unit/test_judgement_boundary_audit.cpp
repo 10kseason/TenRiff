@@ -13,7 +13,7 @@
 // Exercise the public engine, rather than just checking the policy helper's
 // output. A rate-adjusted chart already uses playback samples; its hit windows
 // must retain real-time milliseconds for every rate and gauge choice.
-TEST_CASE("timing audit categorical boundaries cover ranks mods rates gauges and sample rates") {
+TEST_CASE("historical R4 timing audit covers ranks mods rates gauges and sample rates") {
     using tenriff::game::GaugeType;
     using tenriff::gameplay::GameplayChart;
     using tenriff::gameplay::GameplayConfig;
@@ -85,7 +85,7 @@ TEST_CASE("timing audit categorical boundaries cover ranks mods rates gauges and
     CHECK(mismatches == 0);
 }
 
-TEST_CASE("timing audit actual R5 verifier reproduces a live batched ordinary LN release") {
+TEST_CASE("timing audit current verifier reproduces a live batched ordinary LN release") {
     using tenriff::gameplay::GameplayChart;
     using tenriff::gameplay::GameplayConfig;
     using tenriff::gameplay::GameplayEngine;

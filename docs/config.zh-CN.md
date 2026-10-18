@@ -1,3 +1,9 @@
+**2026-10-18 · 1.9.6：** [固定判定、皮肤标签与搜索、窗口拖放](release-1.9.6.zh-CN.md) · [验证范围](release-1.9.6-gate.md)。Sites仅接受标准设置的新Online R9/R10提交，旧榜单及记录作为只读历史保留。独立Ranked的未支持规则及Guest、自定义排除保持不变。
+
+[固定判定表](judgement-baseline-20261018.zh-CN.md)：保留普通PG22/19/15/10ms及原精确GR/GD/BAD。Hard对所有文件RANK使用普通NM完整行，EX使用普通VHD完整行，不取整到整数ms。通用源码基线仍为 **1.9.0**。
+
+[皮肤UI行为与快捷键](skin-ui-followup-20261018.zh-CN.md)。下方旧版本及本地候选说明均为历史记录，当前范围以1.9.6文档为准。
+
 **2026-10-18 · 1.9.5.3:** [皮肤设置整理与搜索、输入改进](release-1.9.5.3.zh-CN.md). 点击预览中的数字按钮选择编辑轨道。UI字体、字体文件和游戏内光标移至个人设置。划盘位置仅在运行键模式为Original时显示，并可在7+1布局中调整。
 
 **2026-10-17 · 1.9.5.2:** [音符与区域大小最低10%](release-1.9.5.2.zh-CN.md). 包含GOMazk的贡献(PR #102)。Note & Field Size的范围从50–140%扩展为10–140%。默认100%、已保存值和各键数模式设置保持不变；菜单、游戏、幽灵和预览使用相同下限。判定、分数、输入、音频计算以及1.9.5.1的350ms FAST/SLOW和文件选择行为保持不变。
@@ -10,7 +16,7 @@
 
 # TenRiff 配置模式（当前）
 
-**1.9.3当前契约：** 使用安全加载默认值、空POOR准确率排除R7/R8、一般ONNX及受支持Safetensors。正式Sites v19接受符合条件的新Online记录，Guest及未标注来源的历史记录永久排除。不附带BGA权重，保持OFF/空路径及1.9.0基准。[1.9.3范围](release-1.9.3.zh-CN.md)优先于下方带日期历史。
+**1.9.3当时契约（历史）：** 使用安全加载默认值、空POOR准确率排除R7/R8、一般ONNX及受支持Safetensors。正式Sites v19接受符合条件的新Online记录，Guest及未标注来源的历史记录永久排除。不附带BGA权重，保持OFF/空路径及1.9.0基准。此处保留当时历史，当前契约以上方[1.9.6范围](release-1.9.6.zh-CN.md)为准。
 
 **2026-10-15 · 1.9.1:** 用户授权的1.9.1包含此前音量、输入、尾奏修复，BMS TOTAL/RANDOM兼容、结果颜色及10形标志。主页语言按钮按EN → KO → JA → ZH循环并保存选择。新BMS血条/分支记录在服务器验证支持前仅存本地。固定基准仍为1.9.0，保留旧发行版、安装和配置。下方带日期的本地记录中不升版本、未发布等表述保留当时状态；当前以此1.9.1范围为准。 [变更与兼容性](feedback-1.9.1.zh-CN.md) · [发布验证流程](release-1.9.1-gate.md).
 
@@ -134,18 +140,19 @@
 
 [最新判定范围、RANK表与LN规则（韩语）](judgement-windows.md)
 
-- BMS `#RANK`：`3/EASY` PG21ms、`2/NORMAL` PG18ms、`1/HARD` PG15ms、`0/VERYHARD` PG8ms。EASY的GR/GD/BAD保持65/115/210ms，其他难度分别缩小至18/21、15/21、8/21倍。缺失或不支持的值使用EASY。Judge Hard/EX模组随后应用；RANK不改变 `hold_grace`/`hold_break` 设置与自动漏键时限；尾端PG/GR/GD判定会应用RANK。
+- 新普通BMS `#RANK` PG为VEZ/EZ22ms、NM19ms、HD15ms、VHD10ms。普通GR/GD/BAD保留原精确值和比例(1,18/21,15/21,8/21)。VEZ `#RANK 4`及缺失/不支持的值使用EZ判定。长按设置及自动漏键时限不变，LN尾端PG/GR/GD也使用对应表。
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - 默认 `pg / gr / gd` 分别为 `21ms / 65ms / 115ms`
+- 保存默认值 `pg=21ms` 保留为旧配置兼容的校准基准。运行时对固定表应用 `保存PG / 21`，因此普通EZ实际为22ms。不迁移保存配置或覆盖自定义值。
 - 默认 `bd` 为 `210ms`
 - `Judge Easy` (仅用于旧回放) 将RANK之后的PG/GR/GD和长按容差扩大为 `1.35x`。EASY的PG/GR/GD=`28.35/87.75/155.25ms`；BAD在所有RANK固定为 `210ms`，mask不变
-- `Judge Hard` 的EASY基准PG/GR/GD=`17.5/55.714286/98.571429ms`。RANK之后PG乘 `17.5/21`，GR/GD乘 `18/21`；BAD在所有RANK固定为 `225ms`，长按容差不变
-- `Judge EX` 的EASY基准PG/GR/GD=`14/44.571429/78.857143ms`（Hard的80%），保留RANK比例。BAD对所有RANK固定为250ms，独立的自动漏键时限仍为340ms，分数倍率与Hard相同为1.10。
+- `Judge Hard`直接复用普通NM整行(PG19/GR55.714286…/GD98.571429…/BAD180ms)，与文件RANK无关。不使用独立倍率或整数ms取整。
+- `Judge EX`直接复用普通VHD整行(PG10/GR24.761905…/GD43.809524…/BAD80ms)，与文件RANK无关。不使用独立倍率或整数ms取整；保留长按规则、自动漏键340ms及分数倍率1.10。
 - `indirect_miss` (double, ms)
   - 当前配置将此值保存并归一化为 `340ms`，自动漏键判定时限独立于BAD命中窗口
   - 默认Normal/Easy/Hard在未输入音符超过 `340ms` 后自动判漏键；Normal/Easy记BAD，Hard记断连的间接 `POOR` / OD8 `MISS`
   - BAD窗口外、自动判漏键前的迟到输入不会命中BAD，而是先将过期音符记为漏键，再检查下一音符
-- 新普通/Hard使用`tenriff-native-score-v2-ruleset-7`，EX使用`tenriff-native-score-v2-ruleset-8`。仅排除空POOR的准确率贡献，不改数值判定窗口。历史R1–R6/custom保留原规则，新custom路径使用对应7/8 ID。
+- 新普通/Hard使用`tenriff-native-score-v2-ruleset-9`，EX使用`tenriff-native-score-v2-ruleset-10`。保留空POOR准确率排除并固定数值表。历史R1–R8/custom保持原规则，新custom使用9/10 ID。Sites仅接受标准设置的新Online R9/R10提交，拒绝旧规则的新提交，旧榜单和记录只读保留。Guest、自定义、LN Mix v2及独立Ranked未支持规则仍被排除。
 - R5保持原判定时间范围，按时间顺序处理自动事件，并保留R1–R4的原处理顺序。[修正范围](release-1.8.9.5-gate.md)。
 - `hold_grace` (double, ms；默认 `80ms`)
   - 为配置兼容性及 `hold_break` 下限保留；不是当前native尾端PG/GR的判定边界
@@ -441,6 +448,6 @@ Xbox/XInput按钮使用现有按键名称字段：`PadUp`, `PadDown`, `PadLeft`,
 
 ## BMS录像与结果兼容性（1.9.1）
 
-新增三个已获用户批准的可选记录字段：`bms_gauge_version`、`bms_control_flow_version`、`bms_random_seed`，它们不是用户配置项。版本缺省为1，分支种子缺省时使用旧 `random_seed`，再缺省则为0。新的普通BMS记录血条v2；有分支的谱面还记录控制流v2及uint32分支种子。轨道RR/SR、键数转换和LN Mix使用的 `random_seed` 与谱面分支种子独立。音频设备重新加载时保留相同分支，录像按保存的种子和规则重现。组曲保留原血条并使用新分支解析器。protocol v6对战保留血条/控制流v1及分支种子0。Sites自1.9.1.1起接受符合条件的血条/分支记录，正式v19也以独立榜单接受新R7/R8。保留Guest永久排除及独立Ranked限制。新游玩使用R7/R8，旧记录保持原ID。本地BEST按规则版本组合优先，结果比较只匹配相同规则与分支种子。
+新增三个已获用户批准的可选记录字段：`bms_gauge_version`、`bms_control_flow_version`、`bms_random_seed`，它们不是用户配置项。版本缺省为1，分支种子缺省时使用旧 `random_seed`，再缺省则为0。新的普通BMS记录血条v2；有分支的谱面还记录控制流v2及uint32分支种子。轨道RR/SR、键数转换和LN Mix使用的 `random_seed` 与谱面分支种子独立。音频设备重新加载时保留相同分支，录像按保存的种子和规则重现。组曲保留原血条并使用新分支解析器。对战使用保持数据包布局的protocol v7及新普通判定，并拒绝v6对端。保留血条/控制流v1及分支种子0。Sites自1.9.1.1支持符合条件的血条/分支记录。1.9.6仅接受标准的新Online R9/R10提交，拒绝旧规则的新提交。旧榜单和记录保留原ID与排名，作为只读历史。Guest永久排除、自定义、LN Mix v2及独立Ranked未支持规则限制不变。本地BEST按规则版本组合优先，结果比较只匹配相同规则与分支种子。
 
 [公式、分支、兼容性与验证范围（英文）](bms-total-random-followup.en.md).

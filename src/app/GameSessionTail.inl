@@ -2428,7 +2428,7 @@ void GameSession::shutdown() {
                                                               course_gauge_enabled_,
                                                               "off", result_.mods);
             if (auto_scratch_enabled_ || stale_input_catchup_used_) {
-                replay.ruleset_id = mode_mod_judge_ex(result_.mods) ? "custom-ruleset-8" : "custom-ruleset-7";
+                replay.ruleset_id = mode_mod_judge_ex(result_.mods) ? "custom-ruleset-10" : "custom-ruleset-9";
             }
             if (stale_input_catchup_used_) {
                 const std::string warning = "Official scoring disabled: stale input state catch-up is not represented in the replay trace.";
