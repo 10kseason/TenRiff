@@ -320,14 +320,14 @@ TEST_CASE("song previews use 0.75 gain independently of gameplay and scene music
             CHECK(gameplay[i] == doctest::Approx(clip[i] * volume));
             CHECK(preview[i] == doctest::Approx(gameplay[i] * 0.75));
         }
-        CHECK(tenriff::app::tenriff_music_gain(true, 1.0, volume) == doctest::Approx(volume * 0.1));
-        CHECK(tenriff::app::tenriff_music_gain(true, 0.5, volume) == doctest::Approx(volume * 0.05));
+        CHECK(tenriff::app::tenriff_music_gain(true, 1.0, volume) == doctest::Approx(volume * 0.125));
+        CHECK(tenriff::app::tenriff_music_gain(true, 0.5, volume) == doctest::Approx(volume * 0.0625));
     }
     CHECK(tenriff::app::song_preview_gain(false, 1.0, 1.0) == doctest::Approx(0.0));
     CHECK(tenriff::app::song_preview_gain(true, 0.5, 2.0) == doctest::Approx(0.375));
     CHECK(tenriff::app::song_preview_gain(true, 0.0, 1.0) == doctest::Approx(0.0));
     CHECK(tenriff::app::tenriff_music_gain(false, 1.0, 1.0) == doctest::Approx(0.0));
-    CHECK(tenriff::app::tenriff_music_gain(true, 1.0, 2.0) == doctest::Approx(0.1));
+    CHECK(tenriff::app::tenriff_music_gain(true, 1.0, 2.0) == doctest::Approx(0.125));
     CHECK(tenriff::app::gameplay_volume_gain(2.0) == doctest::Approx(1.0));
 }
 

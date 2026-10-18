@@ -6,7 +6,11 @@
                                    : native_rect("generic.rect.002", D2D1::RectF(80.0f, bands.body_top, kBaseWidth - 80.0f, bands.body_bottom)));
         const float left = content_rect.left;
         const bool has_skin_tabs = !data.generic.skin_mode_tabs.empty();
-        const float top = content_rect.top + (has_skin_tabs ? 72.0f : 0.0f);
+        const bool has_keymap_tabs = !data.generic.keymap_mode_tabs.empty();
+        const bool has_mode_tabs = has_skin_tabs || has_keymap_tabs;
+        const auto& mode_tabs = has_skin_tabs ? data.generic.skin_mode_tabs : data.generic.keymap_mode_tabs;
+        const bool tabs_focused = has_skin_tabs ? data.generic.skin_mode_tabs_focused : data.generic.keymap_mode_tabs_focused;
+        const float top = content_rect.top + (has_mode_tabs ? 80.0f : 0.0f);
         const float right = content_rect.right;
         const float bottom = content_rect.bottom;
 
@@ -44,28 +48,43 @@
             draw_text_clipped(header_wide, d2d_->title_format.Get(), header_rect, d2d_->accent_brush.Get());
         }
 
-        if (has_skin_tabs) {
+        if (has_mode_tabs) {
+            if (!d2d_->settings_mode_brush)
+                ctx->CreateSolidColorBrush(D2D1::ColorF(0xECF6FF), &d2d_->settings_mode_brush);
+            if (has_skin_tabs && !d2d_->settings_fast_brush)
+                ctx->CreateSolidColorBrush(D2D1::ColorF(0x508CFF), &d2d_->settings_fast_brush);
+            if (has_skin_tabs && !d2d_->settings_slow_brush)
+                ctx->CreateSolidColorBrush(D2D1::ColorF(0xFF665C), &d2d_->settings_slow_brush);
             // All supported layouts fit on one fixed row; the trailing search never wraps.
             const float gap = 5.0f;
-            const float search_width = 340.0f;
-            const float tabs_right = right - search_width - 18.0f;
-            const float tab_width = (tabs_right - left - gap * (data.generic.skin_mode_tabs.size() - 1)) /
-                static_cast<float>(data.generic.skin_mode_tabs.size());
-            for (std::size_t i = 0; i < data.generic.skin_mode_tabs.size(); ++i) {
-                const auto& tab = data.generic.skin_mode_tabs[i];
+            const float search_width = has_skin_tabs ? 260.0f : 0.0f;
+            const float tabs_right = right - search_width - (has_skin_tabs ? 18.0f : 0.0f);
+            const float tab_width = (tabs_right - left - gap * (mode_tabs.size() - 1)) /
+                static_cast<float>(mode_tabs.size());
+            for (std::size_t i = 0; i < mode_tabs.size(); ++i) {
+                const auto& tab = mode_tabs[i];
                 const float x = left + static_cast<float>(i) * (tab_width + gap);
-                const auto rect = D2D1::RectF(x, content_rect.top, x + tab_width, content_rect.top + 52.0f);
+                const auto rect = D2D1::RectF(x, content_rect.top, x + tab_width, content_rect.top + 60.0f);
                 auto* fill = tab.selected ? d2d_->button_selected_brush.Get() : d2d_->button_brush.Get();
                 auto* border = tab.selected ? d2d_->accent_brush.Get() : d2d_->button_border_brush.Get();
                 if (fill) ctx->FillRoundedRectangle(D2D1::RoundedRect(rect, 7, 7), fill);
                 if (border) ctx->DrawRoundedRectangle(D2D1::RoundedRect(rect, 7, 7), border,
-                    tab.selected && data.generic.skin_mode_tabs_focused ? 3.0f : 1.0f);
-                draw_text_clipped_aligned(to_wide(tab.label), d2d_->body_format.Get(),
-                    D2D1::RectF(rect.left + 4, rect.top + 12, rect.right - 4, rect.bottom - 4),
-                    d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
-                register_hit(rect, MenuHitTargetKind::SkinModeTab, static_cast<int>(i), MenuHitPart::Activate);
+                    tab.selected && tabs_focused ? 3.0f : 1.0f);
+                int keys = 0;
+                for (const char ch : tab.label) {
+                    if (ch < '0' || ch > '9') break;
+                    keys = keys * 10 + ch - '0';
+                }
+                if (tab.label == "7+1") keys = 8;
+                if (d2d_->settings_mode_brush) d2d_->settings_mode_brush->SetColor(D2D1::ColorF(key_count_color(keys)));
+                draw_text_clipped_aligned(to_wide(tab.label), d2d_->song_title_format.Get(),
+                    D2D1::RectF(rect.left + 4, rect.top + 13, rect.right - 4, rect.bottom - 4),
+                    d2d_->settings_mode_brush ? d2d_->settings_mode_brush.Get() : d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+                register_hit(rect, has_skin_tabs ? MenuHitTargetKind::SkinModeTab : MenuHitTargetKind::KeymapModeTab,
+                    static_cast<int>(i), MenuHitPart::Activate);
             }
-            const auto search = D2D1::RectF(right - search_width, content_rect.top, right, content_rect.top + 52.0f);
+            if (has_skin_tabs) {
+            const auto search = D2D1::RectF(right - search_width, content_rect.top, right, content_rect.top + 60.0f);
             if (d2d_->panel_brush) ctx->FillRoundedRectangle(D2D1::RoundedRect(search, 7, 7), d2d_->panel_brush.Get());
             auto* border = data.generic.skin_search_active ? d2d_->accent_brush.Get() : d2d_->button_border_brush.Get();
             if (border) ctx->DrawRoundedRectangle(D2D1::RoundedRect(search, 7, 7), border,
@@ -76,6 +95,7 @@
                 d2d_->body_format.Get(), D2D1::RectF(search.left + 14, search.top + 12, search.right - 14, search.bottom - 4),
                 data.generic.skin_search_query.empty() ? d2d_->muted_brush.Get() : d2d_->text_brush.Get());
             register_hit(search, MenuHitTargetKind::SkinSettingsSearch, 0, MenuHitPart::Activate);
+            }
         }
 
         const bool has_skin_preview = data.generic.skin_preview.visible;
@@ -440,7 +460,12 @@
                 const D2D1_RECT_F label_rect =
                     native_rect("generic.rect.034", D2D1::RectF(row_left + 18.0f, row_y + 8.0f, std::max(row_left + 160.0f, label_right), row_y + row_height - 8.0f));
                 if (row_format && d2d_->text_brush) {
-                    draw_text_clipped(label_w, row_format, label_rect, d2d_->text_brush.Get());
+                    if (has_skin_tabs && row.label.rfind("FAST/SLOW", 0) == 0) {
+                        draw_text_clipped(label_w, row_format, label_rect, d2d_->text_brush.Get(),
+                            d2d_->settings_fast_brush.Get(), 4, d2d_->settings_slow_brush.Get());
+                    } else {
+                        draw_text_clipped(label_w, row_format, label_rect, d2d_->text_brush.Get());
+                    }
                 }
 
                 if (!row.value.empty() && row_format && d2d_->text_brush) {

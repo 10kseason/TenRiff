@@ -12,10 +12,10 @@ namespace tenriff::app::menu::settings {
 namespace {
 
 constexpr double kJudgementLinePositionStep = 0.01;
-constexpr double kComboPositionStep = 0.02;
-constexpr double kNoteSizeScaleStep = 0.05;
-constexpr double kLaneDividerScaleStep = 0.05;
-constexpr double kSkinOpacityStep = 0.05;
+constexpr double kComboPositionStep = 0.01;
+constexpr double kNoteSizeScaleStep = 0.01;
+constexpr double kLaneDividerScaleStep = 0.01;
+constexpr double kSkinOpacityStep = 0.01;
 
 std::string cycle_lr2_resolution_mode(std::string_view value, int direction) {
     static constexpr std::array<std::string_view, 4> kModes{"auto", "sd", "hd", "fhd"};
@@ -528,7 +528,7 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
         case SkinSettingsRowId::NoteFadeOut: {
             double& value = selected_id_ == SkinSettingsRowId::NoteFadeIn
                 ? runtime.skin.note_fade_in : runtime.skin.note_fade_out;
-            value = clamp_step_value(value + direction * 0.05, 0.0, 1.0, 0.05);
+            value = clamp_step_value(value + direction * kSkinOpacityStep, 0.0, 1.0, kSkinOpacityStep);
             return mark_changed();
         }
         case SkinSettingsRowId::LnBodyOpacity:

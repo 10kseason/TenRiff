@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.9.7 — 2026-10-19
+
+- Increase the reference gain for TenRiff scene music (title, menus and results) from 10% to 12.5%, reducing attenuation by about 1.94 dB. Stored master/menu sliders and song preview/gameplay gains remain unchanged.
+- Add Common Keys alongside ten key-layout tabs, sharing Profile binding storage, collision checks and immediate saves for restart and eleven function actions.
+- Enlarge fourteen skin-mode tabs, reuse Song Select mode colors, color FAST blue/SLOW red, and use 1% increments for percentage controls without migrating saved fractional values.
+- Rename Key Mode Settings to Game Mode Settings and display the default judgement range as Normal in all four languages. Timing, score and fixed grades remain unchanged.
+- Generate a fresh mode seed for every new solo play and Retry, plus an independent BMS RANDOM seed. Replays retain recorded seeds; seed-dependent shared-chart ghosts retain matching checks and Original OFF/Mirror accepts unused seed differences. Peer v7 shared rules remain unchanged.
+- Advance the explicitly selected general baseline from 1.9.0 to 1.9.6, preserving all previous releases, candidates, installations and profiles. This 1.9.7 release does not advance that baseline again. See [scope](docs/release-1.9.7.en.md) and [verification gates](docs/release-1.9.7-gate.md).
+
 ## 1.9.6 — 2026-10-18
 
 - Pin Normal PG to VEZ/EZ22, NM19, HD15 and VHD10ms while preserving exact Normal GR/GD/BAD. Hard reuses Normal NM and EX Normal VHD for all chart ranks, without integer-ms rounding. R9/R10 identify the new rules; old R1–R8 replay behavior and stored calibration remain.

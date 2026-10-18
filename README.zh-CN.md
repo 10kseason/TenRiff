@@ -1,3 +1,5 @@
+> **2026-10-19 · 1.9.7:** 包含通用按键标签、加大的模式标签及大厅配色、FAST/SLOW颜色、1%调整、游戏模式设置与Normal显示，以及每局新的随机种子。 发布状态与下载以对应版本的发布页面为准。旧日期说明是当时的历史。 [1.9.7](docs/release-1.9.7.zh-CN.md) · [Baseline 1.9.6](docs/baseline-1.9.6.zh-CN.md) · [Verification](docs/release-1.9.7-gate.md).
+
 **2026-10-18 · 1.9.6：** [固定判定、皮肤标签与搜索、窗口拖放](docs/release-1.9.6.zh-CN.md) · [验证范围](docs/release-1.9.6-gate.md)。Sites仅接受标准设置的新Online R9/R10提交，旧榜单及记录作为只读历史保留。独立Ranked的未支持规则及Guest、自定义排除保持不变。
 
 [固定判定表](docs/judgement-baseline-20261018.zh-CN.md)：保留普通PG22/19/15/10ms及原精确GR/GD/BAD。Hard对所有文件RANK使用普通NM完整行，EX使用普通VHD完整行，不取整到整数ms。通用源码基线仍为 **1.9.0**。

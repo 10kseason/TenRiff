@@ -218,12 +218,9 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
                     render::MenuHitTargetKind::SettingsRow, 11, false, true);
     append_menu_row(render.generic, ui_text("Random", "랜덤"), ui_random_label(config_.mode.random), settings_cursor_ == 12,
                     render::MenuHitTargetKind::SettingsRow, 12, false, true);
-    const std::string random_seed_value =
-        random_mode_uses_fresh_session_seed(config_.mode.random)
-            ? ui_text("Auto each play", "플레이마다 자동")
-            : std::to_string(config_.mode.random_seed);
+    const std::string random_seed_value = ui_text("Auto each play", "플레이마다 자동");
     append_menu_row(render.generic, ui_text("Random Seed", "랜덤 시드"), random_seed_value, settings_cursor_ == 13,
-                    render::MenuHitTargetKind::SettingsRow, 13, false, true);
+                    render::MenuHitTargetKind::SettingsRow, 13, false, false);
     append_menu_row(render.generic, ui_text("Judge Window", "판정 범위"),
                     mode_judge_window_label(config_.mode.mods, ui_language()), settings_cursor_ == 18,
                     render::MenuHitTargetKind::SettingsRow, 18, true, true);
@@ -267,7 +264,7 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
                                            "모드는 현재 점수 배율을 보여주고 노트·배치·스크래치 설정을 엽니다."));
     render.generic.notes.push_back(ui_text(
         "Judge Window selects Normal, Hard, or EX. Hard uses the complete Normal NM row and EX the complete Normal VHD row, regardless of chart RANK and without rounding.",
-        "판정 범위는 기본·Hard·EX 중 고릅니다. Hard는 기본 NM 행 전체, EX는 기본 VHD 행 전체를 차트 RANK와 무관하게 반올림 없이 사용합니다."));
+        "판정 범위는 Normal·Hard·EX 중 고릅니다. Hard는 Normal NM 행 전체, EX는 Normal VHD 행 전체를 차트 RANK와 무관하게 반올림 없이 사용합니다."));
     for (auto& row : render.generic.rows) {
         const auto id = static_cast<menu::settings::ModeSettingId>(row.row_index);
         using Id = menu::settings::ModeSettingId;
@@ -317,8 +314,8 @@ void MenuApp::populate_mode_mods_render_data(render::MenuRenderData& render) {
         "긴 LN 믹스: 로컬 기록에 저장하며 이전 최고 기록·온라인 순위와 분리합니다."));
     render.generic.notes.push_back(ui_text("Current: ", "현재: ") +
         mode_patterns_score_summary(config_.mode.mods, config_.speed.rate, ui_language()));
-    render.generic.notes.push_back(ui_text("Judge Window is available in Key Mode Settings.",
-        "판정 범위는 상위 키 모드 설정에서 조절합니다."));
+    render.generic.notes.push_back(ui_text("Judge Window is available in Game Mode Settings.",
+        "판정 범위는 상위 게임 모드 설정에서 조절합니다."));
     std::vector<std::string> mod_warnings;
     (void)normalize_mode_mod_tokens(config_.mode.mods, &mod_warnings);
     for (const auto& warning : mod_warnings) {

@@ -232,12 +232,10 @@ ModeSettingsEffects ModeSettingsController::apply_selected_action(
         case ModeSettingId::Random:
             runtime.mode.random = cycle_random_mode(runtime.mode.random, direction);
             return mark_changed();
-        case ModeSettingId::RandomSeed: {
-            int next = static_cast<int>(runtime.mode.random_seed) + direction;
-            runtime.mode.random_seed = static_cast<std::uint32_t>(
-                clamp_int(next, kSeedMin, kSeedMax));
-            return mark_changed();
-        }
+        case ModeSettingId::RandomSeed:
+            // Kept as a read-only row and persisted legacy field. New solo
+            // sessions choose their seed; old replays still carry exact seeds.
+            return {};
         case ModeSettingId::Rate:
             runtime.speed.rate = clamp_step_value(
                 runtime.speed.rate + direction * kRateStep,

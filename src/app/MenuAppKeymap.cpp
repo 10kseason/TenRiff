@@ -5,6 +5,7 @@
 
 #include "app/MenuAppSettingsUtils.h"
 #include "app/MenuAppSkinUtils.h"
+#include "app/ProfileSetupFlow.h"
 #include "app/menu/settings/KeymapSettingsView.h"
 #include "config/KeycodeMap.h"
 #include "timing/HighResClock.h"
@@ -25,11 +26,32 @@ void MenuApp::open_keymap_screen(Screen return_screen) {
         }
     }
     keymap_settings_controller_.reset(selected_chart_key_count, config_.mode.key_mode);
+    static_cast<void>(keymap_settings_controller_.select(1));
+    keymap_common_tab_ = false;
+    keymap_mode_tabs_focused_ = false;
     push_screen(Screen::Keymap);
     refresh_menu_input_polling_scope();
 }
 
 void MenuApp::populate_keymap_render_data(render::MenuRenderData& render) {
+    render.generic.keymap_mode_tabs.push_back({ui_text("Common Keys", "공용 키"), "", keymap_common_tab_});
+    for (const auto& mode : config::KeymapManager{}.supported_mode_tokens()) {
+        render.generic.keymap_mode_tabs.push_back({key_mode_label(mode), "",
+            !keymap_common_tab_ && mode == keymap_settings_controller_.edit_mode()});
+    }
+    render.generic.keymap_mode_tabs_focused = keymap_mode_tabs_focused_;
+    if (keymap_common_tab_) {
+        populate_common_key_rows(render);
+        append_menu_row(render.generic, ui_text("Back", "뒤로"), "",
+            settings_cursor_ == profile_setup::kDoneRow, render::MenuHitTargetKind::SettingsRow,
+            profile_setup::kDoneRow, true, false);
+        for (auto& row : render.generic.rows) row.selected &= !keymap_mode_tabs_focused_;
+        render.generic.notes.push_back(ui_text("These keys apply to every key mode and share the saved Profile bindings.",
+            "모든 키 모드에 적용되며 프로필의 저장된 단축키와 같은 설정을 사용합니다."));
+        render.generic.notes.push_back(ui_text("Enter captures a key. Esc cancels; Delete clears. Tab selects the mode tabs.",
+            "Enter로 키 지정, Esc로 취소, Delete로 해제합니다. Tab으로 모드 탭을 선택합니다."));
+        return;
+    }
     std::optional<int> selected_chart_key_count;
     if (menu_navigator_.parent().value_or(Screen::Title) == Screen::SongSelect) {
         if (const SongEntry* entry = (selected_song_ >= 0)
@@ -65,7 +87,7 @@ void MenuApp::populate_keymap_render_data(render::MenuRenderData& render) {
         append_menu_row(render.generic,
                         std::move(source.label),
                         std::move(source.value),
-                        source.selected,
+                        source.selected && !keymap_mode_tabs_focused_,
                         target_kind,
                         row_index,
                         activatable,
@@ -104,7 +126,7 @@ void MenuApp::populate_keymap_test_render_data(render::MenuRenderData& render) {
         append_menu_row(render.generic,
                         std::move(source.label),
                         std::move(source.value),
-                        source.selected,
+                        source.selected && !keymap_mode_tabs_focused_,
                         is_back ? render::MenuHitTargetKind::SettingsRow
                                 : render::MenuHitTargetKind::None,
                         0,
@@ -117,7 +139,62 @@ void MenuApp::populate_keymap_test_render_data(render::MenuRenderData& render) {
     render.generic.footer_notes = std::move(view.footer_notes);
 }
 
+void MenuApp::select_keymap_tab(int index) {
+    const auto modes = config::KeymapManager{}.supported_mode_tokens();
+    if (index < 0 || index > static_cast<int>(modes.size()) ||
+        keymap_settings_controller_.capture_active() || profile_control_key_capture_active_) return;
+    keymap_common_tab_ = index == 0;
+    keymap_mode_tabs_focused_ = true;
+    if (keymap_common_tab_) {
+        settings_cursor_ = profile_setup::kInstantRestartKeyRow;
+        refresh_menu_input_polling_scope();
+        publish_snapshot();
+    } else {
+        apply_keymap_settings_effects(keymap_settings_controller_.select_mode(modes[index - 1]));
+    }
+}
+
 void MenuApp::handle_keymap_input(uint32_t keycode) {
+    if (profile_control_key_capture_active_) {
+        handle_common_key_capture(keycode);
+        return;
+    }
+    if (keycode == key_tab_) {
+        keymap_mode_tabs_focused_ = !keymap_mode_tabs_focused_;
+        publish_snapshot();
+        return;
+    }
+    if (keymap_mode_tabs_focused_) {
+        if (keycode == key_left_ || keycode == key_right_) {
+            const auto modes = config::KeymapManager{}.supported_mode_tokens();
+            const auto found = std::find(modes.begin(), modes.end(), keymap_settings_controller_.edit_mode());
+            const int index = keymap_common_tab_ ? 0 : 1 + static_cast<int>(found - modes.begin());
+            const int count = static_cast<int>(modes.size()) + 1;
+            select_keymap_tab((index + (keycode == key_left_ ? count - 1 : 1)) % count);
+        } else if (keycode == key_down_ || keycode == key_enter_) {
+            keymap_mode_tabs_focused_ = false;
+            if (!keymap_common_tab_) static_cast<void>(keymap_settings_controller_.select(1));
+            publish_snapshot();
+        } else if (keycode == key_escape_) exit_keymap_screen();
+        return;
+    }
+    const bool first_row = keymap_common_tab_ ? settings_cursor_ == profile_setup::kInstantRestartKeyRow
+                                             : keymap_settings_controller_.selected_row() <= 1;
+    if (keycode == key_up_ && first_row) {
+        keymap_mode_tabs_focused_ = true;
+        publish_snapshot();
+        return;
+    }
+    if (keymap_common_tab_) {
+        if (keycode == key_escape_ || (keycode == key_enter_ && settings_cursor_ == profile_setup::kDoneRow)) {
+            exit_keymap_screen();
+        } else if (keycode == key_up_ || keycode == key_down_) {
+            settings_cursor_ = std::clamp(settings_cursor_ + (keycode == key_up_ ? -1 : 1),
+                profile_setup::kInstantRestartKeyRow, profile_setup::kDoneRow);
+            publish_snapshot();
+        } else if (keycode == key_enter_) handle_common_key_capture(keycode);
+        return;
+    }
     menu::settings::KeymapSettingsEffects effects;
     if (keycode == key_up_) {
         effects = keymap_settings_controller_.handle(

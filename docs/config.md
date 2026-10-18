@@ -1,3 +1,5 @@
+> **2026-10-19 · 1.9.7:** 공용 키 탭, 커진 키 모드 탭과 로비 색상, FAST/SLOW 색상, 1% 조절, 게임 모드 설정·Normal 표기와 매 판 새 시드를 포함한다. 공개 여부와 다운로드는 버전별 릴리스 페이지를 따른다. 이전 날짜의 안내는 당시 이력이다. [1.9.7](release-1.9.7.ko.md) · [Baseline 1.9.6](baseline-1.9.6.md) · [Verification](release-1.9.7-gate.md).
+
 **2026-10-18 · 1.9.6:** [고정 판정·스킨 탭과 검색·창모드 드롭](release-1.9.6.ko.md) · [검증 범위](release-1.9.6-gate.md). 정식 설정의 새 Online R9/R10만 Sites에 제출하며 이전 보드·기록은 레거시 읽기 전용으로 보존합니다. 별도 Ranked 미지원 규칙과 Guest·커스텀 제외는 유지합니다.
 
 [고정 판정표](judgement-baseline-20261018.ko.md): 기본 PG22/19/15/10ms와 기존 정확한 GR/GD/BAD를 유지합니다. Hard는 모든 파일 RANK에서 기본 NM 전체, EX는 기본 VHD 전체를 사용하며 정수 ms 반올림은 없습니다. 일반 소스 기준선은 **1.9.0**입니다.
@@ -91,7 +93,7 @@
 - `gameplay_volume` (double)
   - BMS 연주 볼륨: 반주·키음과 미리듣기를 함께 조절합니다. 0–1, 새 기본값 0.20(20%); 명시적으로 저장한 값은 유지합니다. 키 이름은 그대로이며 UI 효과음의 기존 배율은 유지합니다.
 - `menu_music_volume` (double)
-  - 텐리프 자체 메뉴·결과 음악 전용. 0–1, 기본 1.0. 기준 출력은 원음의 10%로, 1.8.9.7의 40%보다 75% 작습니다. BMS 곡과 독립적이며 Windows 볼륨 곡선을 복제하지 않습니다.
+  - 텐리프 자체 메뉴·결과 음악 전용. 0–1, 기본 1.0. 기준 출력은 원음의 12.5%로, 1.8.9.7의 40%보다 68.75% 작습니다. BMS 곡과 독립적이며 Windows 볼륨 곡선을 복제하지 않습니다.
 - `bgm_volume` (double)
   - 호환용 레거시 필드. 0–2, 기본 1.0; 기존 값의 읽기·쓰기는 유지하지만 개별 UI와 플레이·미리듣기·에디터의 음량 배율에는 사용하지 않습니다.
 - `normalize_audio` (bool)
@@ -372,7 +374,7 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `timing_feedback_override` | bool; `false` | 사용자가 표시 설정을 바꾼 후 스킨 매니페스트보다 프로필의 두 표시 값을 우선. |
 | `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | 글자/막대의 독립 X 이동. 기존 판정 주변 배치에 더하는 1920×1080 기준 픽셀. |
 | `timing_text_offset_y`, `timing_bar_offset_y` | double: `-400..400`; `0` | 글자/막대의 독립 Y 이동. 양수는 아래, 음수는 위. 기준 픽셀. |
-| `timing_text_scale`, `timing_bar_scale` | double: `0.50..2`; `1` | FAST/SLOW 글자·막대의 독립 크기 배율. 스킨 설정에서 50–200%, 5% 단위 또는 슬라이더로 조절하며 기본·Studio·Classic·가져온 스킨과 미리보기에 적용. 콤보·판정 크기 및 XY 위치는 그대로 유지. |
+| `timing_text_scale`, `timing_bar_scale` | double: `0.50..2`; `1` | FAST/SLOW 글자·막대의 독립 크기 배율. 스킨 설정에서 50–200%, 1% 단위 또는 슬라이더로 조절하며 기본·Studio·Classic·가져온 스킨과 미리보기에 적용. 콤보·판정 크기 및 XY 위치는 그대로 유지. |
 | `show_hold_tail`, `hold_tail_taper_enabled` | bool; `false` | 각각 LN 끝 표시, LN 끝 줄임. 끝 줄임은 한국어 표시명만 변경하며 모양·판정 규칙은 유지. |
 | `judgement_line_glow_enabled` | bool; `true` | 판정선 주변 빛 표시. |
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst 밝기. 0이면 끔. |
@@ -387,7 +389,7 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `gameplay_field_offset_x` | double: `-720..720`; `0` | 1920×1080 기준 기어 가로 이동. 실제 창에서 기어와 ↔ 핸들이 보이도록 추가 제한. |
 | `combo_position`, `judgement_position` | double: `0.10..0.78`; `0.24` | 콤보와 판정의 독립 Y 위치. 판정 값이 없는 기존 프로필은 combo_position을 상속. |
 | `combo_offset_x`, `judgement_offset_x` | double: `-600..600`; `0` | 1920×1080 기준 콤보와 판정의 독립 X 오프셋. |
-| `combo_font_scale`, `judgement_font_scale` | double: `0.50..2`; `1` | 콤보·판정 글자 크기 독립 배율. 스킨 설정에서 50–200%, 5% 단위 또는 마우스 슬라이더로 조절하며 가져온 스킨에도 프로필 값이 적용됨. |
+| `combo_font_scale`, `judgement_font_scale` | double: `0.50..2`; `1` | 콤보·판정 글자 크기 독립 배율. 스킨 설정에서 50–200%, 1% 단위 또는 마우스 슬라이더로 조절하며 가져온 스킨에도 프로필 값이 적용됨. |
 | `lane_background_opacity` | double: `0..0.45`; `0.18` | 레인 배경 불투명도. |
 | `black_playfield_enabled` | bool; `true` | 레인 간격을 포함한 필드 전체를 검정으로 표시. |
 | `visual_opacity` | double: `0.20..1`; `0.96` | 노트·리셉터·키 라벨의 공통 불투명도 배율. |
@@ -409,7 +411,7 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 
 모드별 배열·override 지원: `4k`부터 `16k`까지 모든 키 수와 `7+1`. 색상 토큰: `ice`, `azure`, `gold`, `mint`, `rose`, `violet`, `orange`, `teal`. 스킨 키 모드의 `7K` 다음 항목은 `7+1`이며, 바로 아래 스크래치 위치에서 좌우 표시 순서를 바꿉니다. `7+1`은 별도 키맵 모드가 아닙니다. 구버전 `expand_notes_to_dividers=true`는 여백 0으로 읽으며, 명시된 `note_divider_gap_px`가 우선합니다.
 
-모드별 크기를 처음 조절할 때는 화면에 표시된 공용 값을 기준으로 5%씩 증감한 뒤 해당 모드의 override로 저장합니다. 예를 들어 노트·필드 크기 100%에서 `+`를 누르면 105%, 노트 높이 180%에서 `-`를 누르면 175%가 됩니다. 키 모드를 바꾸어도 아직 편집하지 않은 모드의 공용 값은 유지하며, 뒤로 나갈 때 프로필에 저장해 재실행 후에도 유지합니다.
+모드별 크기를 처음 조절할 때는 화면에 표시된 공용 값을 기준으로 1%씩 증감한 뒤 해당 모드의 override로 저장합니다. 예를 들어 노트·필드 크기 100%에서 `+`를 누르면 101%, 노트 높이 180%에서 `-`를 누르면 179%가 됩니다. 키 모드를 바꾸어도 아직 편집하지 않은 모드의 공용 값은 유지하며, 뒤로 나갈 때 프로필에 저장해 재실행 후에도 유지합니다.
 
 전체 BGA 암막은 적용하지 않으며 검정 필드, 레인 배경과 기어는 기존 설정대로 유지합니다. 스킨 설정의 비주얼 레이턴시는 다섯 번째 항목입니다.
 

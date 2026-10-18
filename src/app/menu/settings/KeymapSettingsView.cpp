@@ -126,8 +126,8 @@ KeymapSettingsViewModel KeymapSettingsView::build(
         "", controller.selected_row() == static_cast<int>(controller.lane_ids().size()) + 3, KeymapActionId::Back});
     view.footer_notes.push_back(localized(
         language,
-        "Left/Right on Key Mode selects a 4K-10K, 12K, 14K, or 16K layout.",
-        "키 모드에서 좌우 키를 누르면 4K~10K, 12K, 14K 또는 16K 레이아웃을 고릅니다."));
+        "Tab selects the mode tabs. Left/Right selects Common Keys or a key layout; Enter returns to bindings.",
+        "Tab으로 모드 탭을 선택합니다. 좌우로 공용 키·키 배치를 고르고 Enter로 키 지정으로 돌아갑니다."));
     view.footer_notes.push_back(localized(
         language,
         "Click a primary or secondary key to bind. Left/Right selects its slot; Enter saves immediately.",

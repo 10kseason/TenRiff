@@ -100,6 +100,7 @@ enum class MenuHitTargetKind {
     SkinPreviewLane,
     SkinModeTab,
     SkinSettingsSearch,
+    KeymapModeTab,
 };
 
 enum class SongDifficultyTableAction {
@@ -803,6 +804,8 @@ struct GenericMenuData {
     std::vector<std::string> footer_notes;
     int footer_reserved_lines = 0;
     SkinPreviewData skin_preview;
+    std::vector<MenuButtonData> keymap_mode_tabs;
+    bool keymap_mode_tabs_focused = false;
     std::vector<MenuButtonData> skin_mode_tabs;
     bool skin_mode_tabs_focused = false;
     std::string skin_search_query;

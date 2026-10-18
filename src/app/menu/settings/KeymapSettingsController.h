@@ -64,6 +64,7 @@ public:
     void show_status(std::string message, std::int64_t now_ns);
     void clear_status() noexcept;
     [[nodiscard]] KeymapSettingsEffects adjust_test_key_count(int direction);
+    [[nodiscard]] KeymapSettingsEffects select_mode(std::string_view mode);
 
 private:
     void refresh_lanes();

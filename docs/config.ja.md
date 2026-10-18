@@ -1,3 +1,5 @@
+> **2026-10-19 · 1.9.7:** 共通キータブ、拡大したモードタブと選曲色、FAST/SLOWの色、1%調整、ゲームモード設定・Normal表示、毎回の新シードを含む。 公開状態とダウンロードは各バージョンのリリースページを参照。以前の日付の案内は当時の履歴。 [1.9.7](release-1.9.7.ja.md) · [Baseline 1.9.6](baseline-1.9.6.ja.md) · [Verification](release-1.9.7-gate.md).
+
 **2026-10-18 · 1.9.6:** [固定判定・スキンタブと検索・ウィンドウドロップ](release-1.9.6.ja.md) · [検証範囲](release-1.9.6-gate.md)。Sitesは標準設定の新規Online R9/R10のみ受け付け、旧ボード・記録はレガシー読み取り専用で保持します。別Rankedの未対応規則とGuest・カスタム除外は維持します。
 
 [固定判定表](judgement-baseline-20261018.ja.md)：通常PG22/19/15/10msと従来の正確なGR/GD/BADを維持します。HardはすべてのファイルRANKで通常NM全体、EXは通常VHD全体を使い、整数msへ丸めません。一般ソース基準は **1.9.0** です。
@@ -87,7 +89,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 - `gameplay_volume` (double)
   - BMS演奏音量（韓国語表示：BMS 연주 볼륨）。伴奏・キー音と試聴を一緒に調整します。0–1、新規既定値0.20（20%）。明示的な保存値を保持し、フィールド名とUI効果音の既存倍率は変更しません。
 - `menu_music_volume` (double)
-  - TenRiffメニュー・結果音楽専用。0–1、既定1.0。原音の10%を基準とし、1.8.9.7の40%基準より75%小さくなります。BMS曲とは独立し、Windowsの音量曲線とは異なります。
+  - TenRiffメニュー・結果音楽専用。0–1、既定1.0。原音の12.5%を基準とし、1.8.9.7の40%基準より68.75%小さくなります。BMS曲とは独立し、Windowsの音量曲線とは異なります。
 - `bgm_volume` (double)
   - 互換用の旧フィールド。0–2、既定1.0。既存値の読み書きは保持しますが、個別UIはなく、プレイ・試聴・エディターの音量計算には使用しません。
 - `normalize_audio` (bool)
@@ -364,7 +366,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | `timing_feedback_override` | bool; `false` | ユーザーが表示を変更した後はプロファイルの設定をスキンより優先。 |
 | `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | 文字とバーの独立X移動。従来の判定周辺配置に加える1920x1080基準ピクセル。 |
 | `timing_text_offset_y`, `timing_bar_offset_y` | double: `-400..400`; `0` | 文字とバーの独立Y移動。正は下、負は上。 |
-| `timing_text_scale`, `timing_bar_scale` | double: `0.50..2`; `1` | FAST/SLOW文字とバーの独立した倍率。50–200%を5%刻みまたはスライダーで調整。Studio、Classic、取り込んだスキンとプレビューに適用し、判定・コンボのサイズやXY位置は変更しない。 |
+| `timing_text_scale`, `timing_bar_scale` | double: `0.50..2`; `1` | FAST/SLOW文字とバーの独立した倍率。50–200%を1%刻みまたはスライダーで調整。Studio、Classic、取り込んだスキンとプレビューに適用し、判定・コンボのサイズやXY位置は変更しない。 |
 | `show_hold_tail`, `hold_tail_taper_enabled` | bool; `false` | LN終端キャップ表示とテーパー。テーパーの韓国語表示名だけを `LN 끝 줄임` に変更し、形状・判定規則は維持。 |
 | `judgement_line_glow_enabled` | bool; `true` | 判定線周囲の発光。 |
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst の明るさ。0 で無効。 |
@@ -378,7 +380,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | `gameplay_field_offset_x` | double: `-720..720`; `0` | 1920×1080 基準のギア横移動。ギアと ↔ ハンドルが見える範囲に追加制限。 |
 | `combo_position`, `judgement_position` | double: `0.10..0.78`; `0.24` | コンボ・判定の独立した Y 位置。旧プロファイルで判定位置がなければ `combo_position` を継承。 |
 | `combo_offset_x`, `judgement_offset_x` | double: `-600..600`; `0` | 1920×1080 基準のコンボ・判定の独立 X オフセット。 |
-| `combo_font_scale`, `judgement_font_scale` | double: `0.50..2`; `1` | コンボ・判定の独立した文字サイズ倍率。スキン設定で50–200%を5%刻みまたはマウススライダーで調整し、取り込んだスキンにもプロファイル値を適用。 |
+| `combo_font_scale`, `judgement_font_scale` | double: `0.50..2`; `1` | コンボ・判定の独立した文字サイズ倍率。スキン設定で50–200%を1%刻みまたはマウススライダーで調整し、取り込んだスキンにもプロファイル値を適用。 |
 | `lane_background_opacity` | double: `0..0.45`; `0.18` | レーン背景の不透明度。 |
 | `black_playfield_enabled` | bool; `true` | レーン間隔も含めフィールド全体を黒く表示。 |
 | `visual_opacity` | double: `0.20..1`; `0.96` | ノート・レセプター・キー名の共通不透明度倍率。 |

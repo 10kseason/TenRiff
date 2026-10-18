@@ -30,7 +30,7 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Choose title-screen music: default, random BMS, last played, or none.", "타이틀 음악을 기본 음악, 랜덤 BMS, 마지막 플레이한 곡 또는 없음으로 고릅니다.", "タイトル音楽を標準、ランダムBMS、最後に遊んだ曲、なしから選びます。"},
         {"After the last judgement, listen to the remaining audio or skip it after the result delay. Notes and scoring stay unchanged.", "마지막 판정 뒤 남은 음악을 끝까지 듣거나 결과 대기 시간 후 스킵합니다. 노트와 점수는 그대로입니다.", "最後の判定後、残りの音楽を最後まで聴くか結果待機時間後にスキップします。"},
         {"Adjust BMS accompaniment, keysounds and previews together. Default: 20%. TenRiff menu music is independent.", "BMS 반주·키음·미리듣기를 함께 조절합니다. 기본값은 20%이며 텐리프 메뉴 음악과는 별개입니다.", "BMSの伴奏・キー音・試聴をまとめて調整します。既定値は20%で、TenRiffメニュー音楽とは独立しています。"},
-        {"Adjust TenRiff menu and result music. 100% uses a quiet 10% reference level; BMS songs are unchanged.", "텐리프 메뉴·결과 음악을 조절합니다. 100%는 기본 10% 음량이며 BMS 곡에는 적용되지 않습니다.", "TenRiffのメニュー・結果音楽です。100%は原音の10%を基準とし、BMS曲には適用しません。"},
+        {"Adjust TenRiff menu and result music. 100% uses a quiet 12.5% reference level; BMS songs are unchanged.", "텐리프 메뉴·결과 음악을 조절합니다. 100%는 기본 12.5% 음량이며 BMS 곡에는 적용되지 않습니다.", "TenRiffのメニュー・結果音楽です。100%は原音の12.5%を基準とし、BMS曲には適用しません。"},
         {"Choose the output for gameplay, BMS previews, and menu/result music. F5 refreshes; Back applies. ASIO has its own driver selector.", "플레이·BMS 미리듣기·메뉴·결과 음악의 출력을 고릅니다. F5 갱신, 뒤로 가기 적용. ASIO는 별도 드라이버를 사용합니다.", "プレイ・BMS試聴・メニュー・結果音楽の出力を選択。F5更新、戻るで適用。ASIOは別途ドライバーを選択します。"},
     };
     static constexpr SettingsHelpText graphics[] = {
@@ -75,12 +75,12 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Choose the nK2 conversion preset. This setting is unavailable with Krrcream.", "nK2 변환 프리셋을 고릅니다. Krrcream을 선택하면 이 항목은 사용할 수 없습니다.", "nK2変換プリセットです。Krrcream使用時は変更できません。"},
         {"Choose the starting gauge. Gauge shifting follows the selected play mode's rules.", "시작할 게이지 종류를 고릅니다. 이후 게이지 전환은 선택한 플레이 모드의 규칙을 따릅니다.", "開始時のゲージを選びます。以降のシフトはプレイモードの規則に従います。"},
         {"Rearrange note lanes. Mirror reverses lanes; random modes change the pattern using a seed.", "노트 레인 배치를 바꿉니다. 미러는 좌우를 뒤집고, 랜덤 계열은 시드를 이용해 배치를 바꿉니다.", "ノート配置を変更します。ミラーは左右反転、ランダム系はシードで配置を変えます。"},
-        {"Set a repeatable pattern seed. Modes marked Auto choose a fresh seed each play.", "같은 배치를 재현할 시드를 정합니다. 자동으로 표시되는 모드는 플레이마다 새 시드를 사용합니다.", "配置を再現するシードです。自動と表示されるモードは毎回新しくなります。"},
+        {"Every new solo play and Retry automatically chooses a fresh seed. Replays use the recorded seed.", "새 싱글 플레이와 재시작마다 시드가 자동으로 바뀝니다. 리플레이는 기록된 시드를 사용합니다.", "新しいソロプレイとリトライではシードが自動更新されます。リプレイは記録済みシードを使います。"},
         {"Open gameplay modifiers. Their effects and score multipliers are shown in the next screen.", "플레이 모드를 엽니다. 다음 화면에서 효과와 점수 배율을 확인할 수 있습니다.", "プレイMODを開きます。次の画面で効果とスコア倍率を確認できます。"},
         {"Change song speed and timing together. 1.00x is original speed; this also affects score eligibility.", "곡 재생 속도와 노트 타이밍을 함께 바꿉니다. 1.00x가 원래 속도이며 기록 조건에도 영향을 줍니다.", "曲速とノート時刻を一緒に変更します。1.00xが原速で、記録条件にも影響します。"},
         {"Change note scrolling speed without changing song speed or judgement timing.", "곡 속도와 판정 시점은 유지하고, 노트가 화면을 이동하는 속도만 바꿉니다.", "曲速と判定時刻を変えず、ノートのスクロール速度だけを変えます。"},
         {"Save mode settings and return.", "모드 설정을 저장하고 돌아갑니다.", "モード設定を保存して戻ります。"},
-        {"Choose Normal, Hard or EX. Hard uses the complete Normal NM row; EX uses the complete Normal VHD row, regardless of chart RANK and without rounding. Normal VEZ uses EZ timing.", "기본·Hard·EX 중 판정 범위를 고릅니다. Hard는 기본 NM 행 전체, EX는 기본 VHD 행 전체를 차트 RANK와 무관하게 반올림 없이 사용합니다. 기본 VEZ는 EZ와 같습니다.", "標準・Hard・EXを選びます。Hardは標準NM行全体、EXは標準VHD行全体を譜面RANKに関係なく丸めずに使います。標準VEZはEZと同じです。"},
+        {"Choose Normal, Hard or EX. Hard uses the complete Normal NM row; EX uses the complete Normal VHD row, regardless of chart RANK and without rounding. Normal VEZ uses EZ timing.", "Normal·Hard·EX 중 판정 범위를 고릅니다. Hard는 Normal NM 행 전체, EX는 Normal VHD 행 전체를 차트 RANK와 무관하게 반올림 없이 사용합니다. Normal VEZ는 EZ와 같습니다.", "標準・Hard・EXを選びます。Hardは標準NM行全体、EXは標準VHD行全体を譜面RANKに関係なく丸めずに使います。標準VEZはEZと同じです。"},
     };
     static constexpr SettingsHelpText skin[] = {
         {"Choose the key layout to edit and preview. Each layout keeps its own lane settings.", "편집하고 미리 볼 키 배치를 고릅니다. 레이아웃마다 레인 설정을 따로 유지합니다.", "編集・プレビューするキー配置です。配置ごとにレーン設定を保持します。"},

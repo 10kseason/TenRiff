@@ -183,8 +183,8 @@ AudioSettingsViewModel AudioSettingsView::build(
         localized(language, "TenRiff Menu Music", "텐리프 메뉴 배경음 볼륨"),
         runtime.audio_ui.menu_music_volume, controller));
     view.notes.push_back(localized(language,
-        "BMS performance volume controls the whole song, keysounds, and previews together. TenRiff menu music has its own slider and a quiet 10% reference level.",
-        "BMS 연주 볼륨은 곡 전체, 키음, 미리듣기를 함께 조절합니다. 텐리프 메뉴 배경음은 별도 볼륨과 기본 10% 음량을 사용합니다."));
+        "BMS performance volume controls the whole song, keysounds, and previews together. TenRiff menu music has its own slider and a quiet 12.5% reference level.",
+        "BMS 연주 볼륨은 곡 전체, 키음, 미리듣기를 함께 조절합니다. 텐리프 메뉴 배경음은 별도 볼륨과 기본 12.5% 음량을 사용합니다."));
     view.rows.push_back(make_row(
         AudioSettingId::SoundOffset,
         SettingsRowKind::Numeric,

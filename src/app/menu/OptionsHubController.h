@@ -20,7 +20,7 @@ enum class OptionsItemId : std::uint8_t {
     Input = 5,
     Calibration = 6,
     ProfileSetup = 7,
-    Mods = 8,  // Reserved; now reached inside Key Mode Settings.
+    Mods = 8,  // Reserved; now reached inside Game Mode Settings.
     KeyTest = 9,  // Reserved; now reached inside Keymap.
 };
 
