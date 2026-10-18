@@ -477,6 +477,44 @@ std::string MenuApp::active_external_skin_name() const {
     return {};
 }
 
+void MenuApp::select_skin_preview_lane(int visual_lane) {
+    if (current_screen() != Screen::SettingsSkins || skin_preview_fullscreen_ ||
+        help_overlay_visible_ || chat_overlay_visible_ || ranked_account_overlay_visible_ ||
+        chat_url_warning_visible_ || profile_nickname_edit_active_ || difficulty_table_url_editing_ ||
+        online_records_url_editing_ || keymap_settings_controller_.capture_active()) return;
+    const int lane_count = lane_count_for_skin_mode(std::string(skin_settings_controller_.edit_mode()));
+    if (visual_lane < 1 || visual_lane > lane_count) return;
+    const bool seven_plus_one = skin_settings_controller_.edit_mode() == "7+1";
+    const int scratch_lane = 1;
+    const auto layout = resolve_lane_presentation_layout(lane_count,
+        seven_plus_one ? &scratch_lane : nullptr, seven_plus_one ? 1u : 0u,
+        config::normalize_skin_scratch_position_token(config_.skin.scratch_position));
+    apply_skin_settings_effects(skin_settings_controller_.select_lane(layout.source_lane_for_visual(visual_lane)));
+}
+
+void MenuApp::choose_profile_ui_font() {
+#ifdef _WIN32
+    if (const auto picked = pick_ui_font_dialog_utf8()) {
+        Microsoft::WRL::ComPtr<IDWriteFactory> factory;
+        render::PrivateUiFont font;
+        const bool valid = SUCCEEDED(DWriteCreateFactory(DWRITE_FACTORY_TYPE_ISOLATED,
+            __uuidof(IDWriteFactory), reinterpret_cast<IUnknown**>(factory.GetAddressOf()))) &&
+            font.load(factory.Get(), *picked);
+        if (valid) {
+            config_.skin.ui_font_path = *picked;
+            config_.skin.ui_font = "custom";
+            ++tenriff_skin_revision_;
+            persist_runtime_config();
+            profile_transfer_status_ = ui_text("Custom font applied.", "사용자 폰트를 적용했습니다.");
+        } else {
+            profile_transfer_status_ = ui_text("Could not load this font. The previous font is kept.",
+                "폰트를 불러올 수 없습니다. 기존 폰트를 유지합니다.");
+        }
+    }
+#endif
+    publish_snapshot();
+}
+
 void MenuApp::handle_skins_settings_input(uint32_t keycode) {
 #ifdef _WIN32
     const auto vk = config::KeycodeMap::polling_vk_for_keycode(keycode);
@@ -497,13 +535,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         const int digit = static_cast<int>(*vk >= VK_NUMPAD0 ? *vk - VK_NUMPAD0 : *vk - '0');
         if (shift && (digit < 1 || digit > 6)) return;
         const int visual_lane = shift ? digit + 10 : (digit == 0 ? 10 : digit);
-        const bool seven_plus_one = skin_settings_controller_.edit_mode() == "7+1";
-        const int scratch_lane = 1;
-        const auto layout = resolve_lane_presentation_layout(
-            lane_count_for_skin_mode(std::string(skin_settings_controller_.edit_mode())),
-            seven_plus_one ? &scratch_lane : nullptr, seven_plus_one ? 1u : 0u,
-            config::normalize_skin_scratch_position_token(config_.skin.scratch_position));
-        apply_skin_settings_effects(skin_settings_controller_.select_lane(layout.source_lane_for_visual(visual_lane)));
+        select_skin_preview_lane(visual_lane);
         return;
     }
 #endif
@@ -540,7 +572,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
             config_,
             available_lr2_skin_names_,
             available_tenriff_skin_names_);
-    } else if (keycode == key_escape_ || keycode == key_backspace_) {
+    } else if (keycode == key_escape_) {
         effects = skin_settings_controller_.handle(
             menu::MenuAction::back(),
             config_,
@@ -568,24 +600,16 @@ void MenuApp::apply_skin_settings_effects(
     }
 
     switch (effects.boundary_action) {
-        case menu::settings::SkinBoundaryAction::ChooseUiFont:
+        case menu::settings::SkinBoundaryAction::ExportPreset:
 #ifdef _WIN32
-            if (const auto picked = pick_ui_font_dialog_utf8()) {
-                Microsoft::WRL::ComPtr<IDWriteFactory> factory;
-                render::PrivateUiFont font;
-                const bool valid = SUCCEEDED(DWriteCreateFactory(DWRITE_FACTORY_TYPE_ISOLATED,
-                    __uuidof(IDWriteFactory), reinterpret_cast<IUnknown**>(factory.GetAddressOf()))) &&
-                    font.load(factory.Get(), *picked);
-                if (valid) {
-                    config_.skin.ui_font_path = *picked;
-                    config_.skin.ui_font = "custom";
-                    ++tenriff_skin_revision_;
-                    effects.merge(skin_settings_controller_.mark_external_change());
-                    skin_status_messages_ = {ui_text("Custom font applied.", "사용자 폰트를 적용했습니다.")};
-                } else {
-                    skin_status_messages_ = {ui_text("Could not load this font. The previous font is kept.",
-                        "폰트를 불러올 수 없습니다. 기존 폰트를 유지합니다.")};
-                }
+            {
+                const auto picked = choose_portable_file(true);
+                if (!picked.path.empty()) {
+                    const auto saved = export_skin_preset(picked.path, config_.skin, active_external_skin_root());
+                    skin_status_messages_ = {saved.success()
+                        ? ui_text("Skin preset saved: ", "스킨 프리셋 저장 완료: ") + saved.path
+                        : ui_text("Preset export failed: ", "프리셋 저장 실패: ") + saved.error};
+                } else if (!picked.cancelled) skin_status_messages_ = {picked.error};
             }
 #endif
             break;
@@ -716,7 +740,7 @@ void MenuApp::apply_skin_settings_effects(
         config::normalize_skin_source_token(config_.skin.source) == "lr2";
     settings_cursor_ = std::max(
         0,
-        SkinSettingsRows{lr2_source}.index_of(
+        SkinSettingsRows{lr2_source, skin_scratch_position_visible(config_.mode.key_mode)}.index_of(
             skin_settings_controller_.selected_id()));
     publish_snapshot();
 }
@@ -766,7 +790,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     const bool center_gap_available = config::normalize_skin_mode_token(skin_edit_mode_) == "16k";
     const std::string active_skin_source = config::normalize_skin_source_token(config_.skin.source);
     const bool lr2_source = active_skin_source == "lr2";
-    const SkinSettingsRows stable_rows{lr2_source};
+    const SkinSettingsRows stable_rows{lr2_source, skin_scratch_position_visible(config_.mode.key_mode)};
     const TenRiffSkinDefinition* preview_definition =
         active_skin_source == "tenriff"
             ? active_tenriff_skin_for_layout(lane_count, seven_plus_one)
@@ -826,19 +850,22 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     false,
                     render::MenuHitTargetKind::SettingsRow,
                     static_cast<int>(SkinSettingsRowId::KeyMode), false, true);
-    append_menu_row(
-        render.generic,
-        ui_text("Scratch Position", "스크래치 위치"),
-        seven_plus_one
-            ? (config::normalize_skin_scratch_position_token(config_.skin.scratch_position) == "right"
-                   ? ui_text("Right", "오른쪽")
-                   : ui_text("Left", "왼쪽"))
-            : ui_text("7+1 Only", "7+1 전용"),
-        false,
-        render::MenuHitTargetKind::SettingsRow,
-        static_cast<int>(SkinSettingsRowId::ScratchPosition),
-        false,
-        seven_plus_one);
+    if (skin_scratch_position_visible(config_.mode.key_mode)) {
+        append_menu_row(
+            render.generic,
+            ui_text("Scratch Position", "스크래치 위치"),
+            seven_plus_one
+                ? (config::normalize_skin_scratch_position_token(config_.skin.scratch_position) == "right"
+                       ? ui_text("Right", "오른쪽")
+                       : ui_text("Left", "왼쪽"))
+                : ui_text("7+1 Only", "7+1 전용"),
+            false,
+            render::MenuHitTargetKind::SettingsRow,
+            static_cast<int>(SkinSettingsRowId::ScratchPosition),
+            false,
+            seven_plus_one);
+
+    }
     append_menu_row(render.generic, ui_text("Skin Source", "스킨 소스"), ui_skin_source_label(active_skin_source), false,
                     render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::SkinSource), false, true);
     append_menu_row(render.generic, imported_skin_row_label, imported_skin_value, false,
@@ -869,40 +896,22 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     editable_tenriff_skin ? "F5" : ui_text("TenRiff Only", "TenRiff 전용"),
                     false, render::MenuHitTargetKind::SettingsRow,
                     static_cast<int>(SkinSettingsRowId::ReloadSkin), editable_tenriff_skin, false);
-    append_menu_row(render.generic, ui_text("Target Lane", "대상 레인"),
-                    (seven_plus_one && skin_edit_lane_ == 0
-                         ? ui_text("Scratch", "스크래치")
-                         : (seven_plus_one
-                                ? ui_text("Key ", "키 ") + std::to_string(skin_edit_lane_)
-                                : ui_text("Lane ", "레인 ") +
-                                      std::to_string(skin_edit_lane_ + 1))) +
-                        " / " + std::to_string(lane_count),
-                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TargetLane), false, true);
+
     append_menu_row(render.generic, ui_text("Note Color", "노트 색상"),
                     single_color_enabled
                         ? ui_text("Single Color Active", "단일 색상 사용 중")
                         : config::skin_color_label(preview_lane_palette[static_cast<std::size_t>(skin_edit_lane_)]),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::LaneColor),
                     false, !single_color_enabled);
-    append_menu_row(render.generic,
-                    ui_text("Single Color", "단일 색상"),
-                    config::skin_single_color_label(config_.skin.single_color),
-                    false,
-                    render::MenuHitTargetKind::SettingsRow,
-                    static_cast<int>(SkinSettingsRowId::SingleColor),
-                    false,
-                    true);
+
     append_menu_row(render.generic, ui_text("Note Fade In", "노트 페이드인 농도"), format_percent(config_.skin.note_fade_in),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::NoteFadeIn), false, true);
     append_menu_row(render.generic, ui_text("Note Fade Out", "노트 페이드아웃 농도"), format_percent(config_.skin.note_fade_out),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::NoteFadeOut), false, true);
     append_menu_row(render.generic, ui_text("Note Shape", "노트 모양"), ui_skin_note_shape_label(config_.skin.note_shape),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::NoteShape), false, true);
-    append_menu_row(render.generic, ui_text("Note Border", "노트 테두리"), ui_on_off(config_.skin.note_border_enabled),
-                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::NoteBorder), false, true);
-    append_menu_row(render.generic, ui_text("Image Aspect", "이미지 비율"),
-                    ui_skin_note_image_aspect_label(config_.skin.note_image_aspect),
-                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::ImageAspect), false, true);
+
+
     append_menu_row(render.generic, ui_text("White Dividers", "키 구분 선"), ui_on_off(config_.skin.show_lane_dividers),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::LaneDividers), false, true);
     append_menu_row(render.generic, ui_text("Judgement Line", "판정선 표시"), ui_on_off(config_.skin.show_judgement_line),
@@ -912,22 +921,9 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::JudgementLineType), false, true);
     append_menu_row(render.generic, ui_text("Gear Boundary", "기어 경계선"), ui_on_off(config_.skin.show_gear_boundary_line),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::GearBoundary), false, true);
-    append_menu_row(render.generic, ui_text("LN Tail Cap", "LN 끝 표시"), ui_on_off(config_.skin.show_hold_tail),
-                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::ShowHoldTail), false, true);
-    append_menu_row(render.generic, ui_text("LN Tail Taper", "LN 끝 줄임"), ui_on_off(config_.skin.hold_tail_taper_enabled),
-                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::LnTailTaper), false, true);
-    append_menu_row(render.generic, ui_text("Lane Tint Opacity", "레인 색상 농도"),
-                    format_percent(config_.skin.lane_background_opacity),
-                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::LaneBackgroundOpacity), false, true);
-    append_menu_row(render.generic, ui_text("Visual Opacity", "전체 투명도"),
-                    format_percent(config_.skin.visual_opacity),
-                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::VisualOpacity), false, true);
-    append_menu_row(render.generic, ui_text("Outline Alpha", "외곽선 투명도"),
-                    format_percent(config_.skin.note_outline_opacity),
-                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::NoteOutlineOpacity), false, true);
-    append_menu_row(render.generic, ui_text("LN Body Alpha", "LN 몸통 투명도"),
-                    format_percent(config_.skin.hold_body_opacity),
-                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::LnBodyOpacity), false, true);
+
+
+
     append_menu_row(render.generic, ui_text("Judge Glow", "판정선 글로우"), ui_on_off(config_.skin.judgement_line_glow_enabled),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::JudgementLineGlow), false, true);
     append_menu_row(render.generic, ui_text("Hit Burst Style", "키 키밤 모양"),
@@ -943,46 +939,20 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     append_menu_row(render.generic, ui_text("Hit Burst Brightness", "키 키밤 밝기"),
                     format_percent(config_.skin.key_pulse_brightness),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::KeyPulse), false, true);
-    append_menu_row(render.generic, ui_text("Key Labels", "키 표시 위치"),
-                    config::skin_key_label_position_label(config_.skin.key_label_position),
-                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::KeyLabelPosition), false, true);
     append_menu_row(render.generic, ui_text("Judge Line", "판정선 위치"), format_percent(config_.skin.judgement_line_position),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::JudgeLinePosition), false, true);
     append_menu_row(render.generic, ui_text("Lane Width", "레인 너비"), format_percent(preview_lane_width_scale),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::LaneWidth), false, true);
     append_menu_row(render.generic, ui_text("Note & Field Size", "노트·필드 크기"), format_percent(preview_note_width_scale),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::NoteWidth), false, true);
-    append_menu_row(render.generic, ui_text("Lane Spacing", "레인 간격"), format_percent(preview_lane_spacing_scale),
-                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::LaneSpacing), false, gap_count > 0);
-    append_menu_row(render.generic, ui_text("Divider Width", "구분선 너비"), format_percent(preview_lane_divider_width_scale),
-                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::DividerWidth), false, true);
-    append_menu_row(render.generic,
-                    ui_text("16K Center Gap", "16K 중앙 간격"),
-                    center_gap_available ? format_percent(preview_lane_center_gap_scale) : ui_text("16K Only", "16K 전용"),
-                    false,
-                    render::MenuHitTargetKind::SettingsRow,
-                    static_cast<int>(SkinSettingsRowId::CenterGap),
-                    false,
-                    center_gap_available);
-    append_menu_row(render.generic, ui_text("LN Body Width", "LN 몸통 너비"), format_percent(config_.skin.hold_body_width_scale),
-                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::LnBodyWidth), false, true);
+
+
     append_menu_row(render.generic, ui_text("Note Height", "노트 높이"), format_percent(preview_note_height_scale),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::NoteHeight), false, true);
     append_menu_row(render.generic, ui_text("Combo Y", "콤보 Y"), format_percent(config_.skin.combo_position),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::ComboY), false, true);
-    append_menu_row(render.generic, ui_text("Opaque Playfield", "기어 뒤 BGA 가림"),
-                    ui_on_off(config_.skin.black_playfield_enabled),
-                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::BlackPlayfield), false, true);
-    append_menu_row(render.generic, ui_text("UI Font", "UI 폰트"),
-                    config_.skin.ui_font == "custom" ? ui_text("Custom", "사용자 지정")
-                        : config::skin_ui_font_label(config_.skin.ui_font),
-                    false, render::MenuHitTargetKind::SettingsRow,
-                    static_cast<int>(SkinSettingsRowId::UiFont), false, true);
-    append_menu_row(render.generic, ui_text("Choose Font File", "폰트 파일 선택"),
-                    config_.skin.ui_font_path.empty() ? ui_text("TTF / OTF", "TTF / OTF")
-                        : path_from_utf8(config_.skin.ui_font_path).filename().u8string(),
-                    false, render::MenuHitTargetKind::SettingsRow,
-                    static_cast<int>(SkinSettingsRowId::UiFontFile), true, false);
+
+
     append_menu_row(render.generic, ui_text("Visual Latency", "비주얼 레이턴시"),
                     format_signed_offset_ms(config_.visual_offset_ms),
                     false, render::MenuHitTargetKind::SettingsRow,
@@ -991,10 +961,6 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     format_pixels(config_.skin.note_divider_gap_px),
                     false, render::MenuHitTargetKind::SettingsRow,
                     static_cast<int>(SkinSettingsRowId::NoteGap), false, true);
-    append_menu_row(render.generic, ui_text("Gameplay Cursor", "인게임 커서"),
-                    ui_on_off(config_.ui.show_cursor_in_gameplay),
-                    false, render::MenuHitTargetKind::SettingsRow,
-                    static_cast<int>(SkinSettingsRowId::GameplayCursor), false, true);
     append_menu_row(render.generic,
                     ui_text("FAST/SLOW Indicator", "FAST/SLOW 인디케이터"),
                     ui_on_off(timing_visibility.text),
@@ -1035,6 +1001,9 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::JudgementX), false, true);
     append_menu_row(render.generic, ui_text("Combo X", "콤보 X"), std::to_string(static_cast<int>(config_.skin.combo_offset_x)) + " px",
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::ComboX), false, true);
+    append_menu_row(render.generic, ui_text("Save Skin Preset", "스킨 프리셋 저장"), ".trskin", false,
+                    render::MenuHitTargetKind::SettingsRow,
+                    static_cast<int>(SkinSettingsRowId::ExportPreset), true, false);
     append_menu_row(render.generic, ui_text("Import Skin Preset", "스킨 프리셋 가져오기"), ".trskin", false,
                     render::MenuHitTargetKind::SettingsRow,
                     static_cast<int>(SkinSettingsRowId::ImportPreset), true, false);
@@ -1213,7 +1182,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
             ? *manifest_style->note_shape
             : config_.skin.note_shape;
     render.generic.skin_preview.note_image_aspect =
-        render_note_image_aspect(config_.skin.note_image_aspect);
+        render::NoteImageAspect::Auto;
     render.generic.skin_preview.skin_source =
         preview_definition && preview_definition->native_gameplay_fallback ? "native" : active_skin_source;
     render.generic.skin_preview.external_skin_root = active_external_skin_root();
@@ -1263,8 +1232,8 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     }
 
     render.generic.notes.push_back(ui_text(
-        "Select lanes from left to right: 1-9, 0=10, Shift+1-6=11-16. The current setting row stays selected.",
-        "왼쪽부터 레인을 선택합니다: 1-9, 0=10, Shift+1-6=11-16. 현재 설정 행은 그대로 유지됩니다."));
+        "Click the numbered preview buttons or press 1-9, 0=10, Shift+1-6=11-16 to select a lane.",
+        "미리보기 번호 버튼을 클릭하거나 1-9, 0=10, Shift+1-6=11-16으로 레인을 선택합니다."));
     render.generic.notes.push_back(ui_text(
         "Key backdrop has separate On/Off, opacity, brightness (0-200%) and maximum height (0-100%, from the field bottom). Hit-burst brightness is separate.",
         "키 빔은 켬/OFF, 농도, 밝기(0~200%), 최대 높이(필드 아래부터 0~100%)를 따로 조절합니다. 키 키밤 밝기는 별도입니다."));

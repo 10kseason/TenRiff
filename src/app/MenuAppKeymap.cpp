@@ -134,7 +134,7 @@ void MenuApp::handle_keymap_input(uint32_t keycode) {
     } else if (keycode == key_enter_) {
         effects = keymap_settings_controller_.handle(
             menu::MenuAction::activate(), timing::HighResClock::now_ns());
-    } else if (keycode == key_escape_ || keycode == key_backspace_) {
+    } else if (keycode == key_escape_) {
         effects = keymap_settings_controller_.handle(
             menu::MenuAction::back(), timing::HighResClock::now_ns());
     }
@@ -142,7 +142,7 @@ void MenuApp::handle_keymap_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_keymap_confirm_input(uint32_t keycode) {
-    if (keycode == key_enter_ || keycode == key_escape_ || keycode == key_backspace_) {
+    if (keycode == key_enter_ || keycode == key_escape_) {
         if (!pop_screen()) {
             reset_screen(Screen::Keymap);
         }
@@ -156,7 +156,7 @@ void MenuApp::handle_keymap_test_input(uint32_t keycode) {
             keycode == key_left_ ? -1 : 1));
         return;
     }
-    if (keycode == key_escape_ || keycode == key_backspace_) {
+    if (keycode == key_escape_) {
         if (!pop_screen()) {
             reset_screen(Screen::Keymap);
         }

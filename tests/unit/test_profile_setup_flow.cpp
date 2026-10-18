@@ -6,7 +6,7 @@
 using namespace tenriff::app::profile_setup;
 
 TEST_CASE("first-run profile setup keeps its original song-select and title exits") {
-    CHECK(row_count(Entry::FirstRun) == 28);
+    CHECK(row_count(Entry::FirstRun) == 31);
     CHECK(kLanguageRow == 0);
     CHECK(kMenuFontSizeRow == 1);
     CHECK(kBackendRow == kNicknameRow - 1);
@@ -25,7 +25,7 @@ TEST_CASE("first-run profile setup keeps its original song-select and title exit
 }
 
 TEST_CASE("reopened profile setup returns to the options hub") {
-    CHECK(row_count(Entry::Options) == 27);
+    CHECK(row_count(Entry::Options) == 30);
     CHECK(enter_destination(Entry::Options, kDoneRow) == Destination::OptionsHub);
     CHECK(enter_destination(Entry::Options, 2) == Destination::Stay);
     CHECK(cancel_destination(Entry::Options) == Destination::OptionsHub);
@@ -145,4 +145,18 @@ TEST_CASE("function shortcuts resolve collisions and remap authored hints withou
     CHECK(app::resolve_function_keys(ui)[0] == 0);
     CHECK(app::profile_setup::function_for_row(app::profile_setup::kHispeedDecreaseKeyRow) == 5);
     CHECK(app::profile_setup::function_for_row(app::profile_setup::kFunctionKeysLastRow) == 11);
+}
+
+
+TEST_CASE("profile gameplay cursor toggles without altering unrelated UI settings") {
+    tenriff::config::UiConfig ui;
+    const auto language = ui.language;
+    const bool before = ui.show_cursor_in_gameplay;
+    CHECK(adjust_presentation_setting(ui, kGameplayCursorRow, 1));
+    CHECK(ui.show_cursor_in_gameplay != before);
+    CHECK_FALSE(adjust_presentation_setting(ui, kGameplayCursorRow, 0));
+    CHECK(adjust_presentation_setting(ui, kGameplayCursorRow, -1));
+    CHECK(ui.show_cursor_in_gameplay == before);
+    CHECK(ui.language == language);
+    CHECK_FALSE(supports_hold_adjustment(kGameplayCursorRow));
 }

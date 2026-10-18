@@ -250,14 +250,14 @@ void MenuApp::update_bms_editor_repeat() {
 
 void MenuApp::handle_bms_editor_input(uint32_t keycode) {
     if (!bms_editor_.loaded()) {
-        if (keycode == key_escape_ || keycode == key_backspace_) {
+        if (keycode == key_escape_) {
             stop_bms_editor_preview();
             (void)pop_screen();
             publish_snapshot();
         }
         return;
     }
-    if (keycode == key_escape_ || keycode == key_backspace_) {
+    if (keycode == key_escape_) {
         stop_bms_editor_preview();
         (void)pop_screen();
         publish_snapshot();

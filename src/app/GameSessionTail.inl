@@ -3110,6 +3110,15 @@ bool GameSession::handle_control_input(const input::InputEvent& incoming_event) 
         }
         return true;
     }
+    // A deliberate Enter press can finish the audio tail after every note/LN.
+    // Lane presses and releases still reach judgement normally; they never exit.
+    if (event.state == input::InputState::Pressed && enter_keycode_ != 0 &&
+        event.keycode == enter_keycode_ && !peer_battle_mode_ && !course_gauge_enabled_ &&
+        gameplay_started_ && !paused_.load(std::memory_order_acquire) && engine_ && !engine_->is_game_over() &&
+        should_skip_post_note_audio(engine_->is_finished(), result_transition_pending_, true)) {
+        finished_.store(true, std::memory_order_release);
+        return true;
+    }
     // Course runs cannot be paused or aborted with Esc, including their opening
     // countdown. Overlay controls may still consume Esc to close their own UI.
     if (course_gauge_enabled_ && escape_keycode_ != 0 && event.keycode == escape_keycode_) {
@@ -3233,16 +3242,9 @@ bool GameSession::handle_control_input(const input::InputEvent& incoming_event) 
     }
     if (escape_keycode_ != 0 && event.state == input::InputState::Pressed &&
         event.keycode == escape_keycode_) {
-        // Once every tap and LN tail has resolved, Esc dismisses the remaining
-        // song audio without opening pause or marking the completed play aborted.
-        // Course Esc remains disabled above; synchronized peer runs retain their
-        // existing exit behavior. Autoplay/replay use this same outro control.
-        if (!peer_battle_mode_ && gameplay_started_ && config_.audio_ui.play_to_end &&
-            engine_ && engine_->is_finished() && !engine_->is_game_over() &&
-            result_transition_pending_) {
-            finished_.store(true, std::memory_order_release);
+        // Completed audio tails accept Enter only; Esc must not pause/abort a clear.
+        if (!peer_battle_mode_ && gameplay_started_ && engine_ && engine_->is_finished() && result_transition_pending_)
             return true;
-        }
         if (peer_battle_mode_ || !gameplay_started_) {
             user_aborted_.store(true, std::memory_order_release);
             stop_requested_.store(true, std::memory_order_release);
@@ -3341,15 +3343,6 @@ void GameSession::process_future_events(int64_t buffer_start_samples,
         if (auto lane = lane_from_keycode(next->event.keycode)) {
             if (auto_scratch_lane(*lane)) continue;
             if (auto_scratch_enabled_) process_autoplay_queue(buffer_start_samples, next->sample, 0);
-            if (should_skip_post_note_audio(
-                    engine_->is_finished(),
-                    result_transition_pending_,
-                    replay_playback_enabled_,
-                    autoplay_enabled_,
-                    next->event.state == input::InputState::Pressed)) {
-                finished_.store(true, std::memory_order_release);
-                return;
-            }
             const auto logical_state = lane_binding_state_.apply(next->event.keycode, next->event.state);
             if (!logical_state) continue;
             dispatch_lane_input(lane.value(),
@@ -3428,15 +3421,6 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
         }
         if (autoplay_enabled_ || auto_scratch_lane(*lane)) {
             continue;
-        }
-        if (should_skip_post_note_audio(
-                engine_->is_finished(),
-                result_transition_pending_,
-                replay_playback_enabled_,
-                autoplay_enabled_,
-                event.state == input::InputState::Pressed)) {
-            finished_.store(true, std::memory_order_release);
-            return;
         }
         const int lane_index = lane.value() - 1;
         if (lane_index < 0 || lane_index >= static_cast<int>(kGameplayHudMaxLanes)) {

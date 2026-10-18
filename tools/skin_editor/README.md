@@ -1,3 +1,13 @@
+# TenRiff Skin Editor — 1.9.5.3
+
+Opaque playfield ON, LN tail/taper OFF, LN opacity 100%, bottom key labels. These controls are hidden from the form; imported explicit values and the JSON editor remain compatible. Gameplay Cursor is a game Profile setting. This editor writes skin.json/ZIP; portable .trskin files are saved by the game.
+
+## Historical notes
+
+> Skin overhaul candidate: new Rect (Simple) default, destination-based automatic image fitting, judgement line 1–100%. UI fonts are in the game Profile screen. Legacy aspect fields roundtrip but are hidden in the form.
+
+> 2026-10-18 local candidate: 1.9.5.2 + feedback. Fresh preview field 60% (10–140%, preview only), key beam 50%, 5K white/blue/white/blue/white, FAST/SLOW 350ms and marker 700ms. `.trskin` is saved by the game; this editor exports skin.json/ZIP. Public deployment is pending approval. Older dated notes below remain historical.
+
 # TenRiff Skin Editor
 
 [한국어](#한국어) · [English](#english) · [日本語](#日本語)

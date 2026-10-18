@@ -131,14 +131,14 @@ TEST_CASE("song search lv expressions use inclusive native level boundaries and 
         CHECK(song_entry_matches_search(entry, "LV:16TO20") == (level >= 16 && level <= 20));
         CHECK(song_entry_matches_search(entry, "Lv:16") == (level == 16));
         CHECK(song_entry_matches_search(entry, "lv:19-") == (level <= 19));
-        CHECK(song_entry_matches_search(entry, "lV:18+") == (level >= 18));
+        CHECK_FALSE(song_entry_matches_search(entry, "lV:18+"));
     }
     entry.level = 16;
     CHECK(song_entry_matches_search(entry, "lv:016"));
     CHECK(song_entry_matches_search(entry, "lv:16to16"));
     entry.level = std::numeric_limits<int>::max();
     CHECK(song_entry_matches_search(entry, "lv:2147483647"));
-    CHECK(song_entry_matches_search(entry, "lv:2147483647+"));
+    CHECK_FALSE(song_entry_matches_search(entry, "lv:2147483647+"));
     CHECK(song_entry_matches_search(entry, "lv:2147483647-"));
 }
 
@@ -152,12 +152,12 @@ TEST_CASE("song search lv expressions combine with all existing text terms and b
     entry.key_count = 7;
     entry.level = 18;
 
-    CHECK(song_entry_matches_search(entry, "  BLUE\tLv:16tO20 mitsu 7k another "));
-    CHECK(song_entry_matches_search(entry, "lv:16+ lv:20-"));
+    CHECK(song_entry_matches_search(entry, "  BLUE\tLv:16tO20 mitsu "));
+    CHECK(song_entry_matches_search(entry, "lv:16to20 lv:20-"));
     CHECK_FALSE(song_entry_matches_search(entry, "lv:18+ lv:17-"));
     CHECK_FALSE(song_entry_matches_search(entry, "blue lv:19"));
     CHECK_FALSE(song_entry_matches_search(entry, "xi lv:18"));
-    CHECK(song_entry_matches_search(entry, "blue mitsu 7k another bms lv18"));
+    CHECK_FALSE(song_entry_matches_search(entry, "blue mitsu 7k another bms lv18"));
     CHECK_FALSE(song_entry_matches_search(entry, "blue mitsu 5k"));
     CHECK(song_entry_matches_search(entry, " \t "));
 
@@ -175,9 +175,9 @@ TEST_CASE("song search lv expressions use the selected table without native fall
     for (const std::string label : {"18", "018", "18+", "st18", "sl18+", u8"★18", "  LV 18  "}) {
         entry.difficulty_table_level = label;
         CHECK(song_entry_matches_search(entry, "lv:16to20", true));
-        CHECK(song_entry_matches_search(entry, "Lv:18", true));
+        CHECK(song_entry_matches_search(entry, "Lv:18", true) == (label.find('+') == std::string::npos));
         CHECK(song_entry_matches_search(entry, "lv:19-", true));
-        CHECK(song_entry_matches_search(entry, "lv:18+", true));
+        CHECK(song_entry_matches_search(entry, "lv:18+", true) == (label.find('+') != std::string::npos));
         CHECK_FALSE(song_entry_matches_search(entry, "lv:50", true));
         CHECK_FALSE(song_entry_matches_search(entry, "lv:16to20", false));
         CHECK(song_entry_matches_search(entry, "lv:50", false));
@@ -199,7 +199,7 @@ TEST_CASE("song search lv zero matches authored table zero but excludes unknown 
     entry.difficulty_table_level = "st0";
     CHECK(song_entry_matches_search(entry, "lv:0", true));
     CHECK(song_entry_matches_search(entry, "lv:0-", true));
-    CHECK(song_entry_matches_search(entry, "lv:0+", true));
+    CHECK_FALSE(song_entry_matches_search(entry, "lv:0+", true));
     CHECK(song_entry_matches_search(entry, "lv:0to1", true));
     CHECK_FALSE(song_entry_matches_search(entry, "lv:1+", true));
     CHECK_FALSE(song_entry_matches_search(entry, "lv:0", false));

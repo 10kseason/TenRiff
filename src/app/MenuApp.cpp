@@ -1721,6 +1721,7 @@ std::vector<uint32_t> MenuApp::current_menu_probe_keycodes() const {
     append_fixed_key(key_f7_);
 
     if (current_screen() == Screen::SettingsSkins) {
+        append_fixed_key(config::KeycodeMap::to_keycode("F6").value_or(0));
         for (const char* name : {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
                                  "Numpad0", "Numpad1", "Numpad2", "Numpad3", "Numpad4",
                                  "Numpad5", "Numpad6", "Numpad7", "Numpad8", "Numpad9",
@@ -2119,6 +2120,7 @@ void MenuApp::persist_runtime_config() {
 void MenuApp::refresh_song_source(bool force_reindex) {
     const DifficultyTableLoadingScope loading(*this, !config_.ui.difficulty_table_path.empty());
     difficulty_table_display_path_.clear();
+    table_levels_path_.clear();
     if (config_.ui.all_song_sources) switch_all_song_sources(force_reindex);
     else switch_song_source(songs_path_, force_reindex);
 }
@@ -2274,8 +2276,9 @@ void MenuApp::handle_input_event(const input::InputEvent& incoming_event) {
         pressed_keys_.count(event.keycode) != 0;
     const bool duplicate_adjustment_press = event.state == input::InputState::Pressed &&
         (event.keycode == key_left_ || event.keycode == key_right_ ||
-         (difficulty_table_url_editing_ && event.keycode == key_backspace_)) &&
+         (event.keycode == key_backspace_ && is_song_select_repeat_key(event.keycode))) &&
         event.keycode == song_select_repeat_key_ && pressed_keys_.count(event.keycode) != 0;
+    const bool fresh_press = event.state == input::InputState::Pressed && pressed_keys_.count(event.keycode) == 0;
     update_pressed_keys(event);
     if (duplicate_adjustment_press || duplicate_capture_press) return;
     // Key capture owns reserved keys too, so F9/F10/F11 cannot open an overlay
@@ -2297,10 +2300,10 @@ void MenuApp::handle_input_event(const input::InputEvent& incoming_event) {
         if (chat_overlay_visible_) { (void)handle_multiplayer_chat_overlay_input(event.keycode); return; }
         if (ranked_account_overlay_visible_) { (void)handle_ranked_account_overlay_input(event.keycode); return; }
     }
+    const auto preview_key = config::KeycodeMap::to_keycode("F6").value_or(0);
     if (current_screen() == Screen::SettingsSkins &&
-        (skin_preview_fullscreen_ || (key_f6_ != 0 && event.keycode == key_f6_))) {
-        if (event.state == input::InputState::Pressed &&
-            (event.keycode == key_escape_ || event.keycode == key_backspace_ || event.keycode == key_f6_))
+        (skin_preview_fullscreen_ || (preview_key != 0 && event.keycode == preview_key))) {
+        if (fresh_press && (event.keycode == key_escape_ || event.keycode == preview_key))
             toggle_skin_fullscreen_preview();
         // The preview owns input, so arrows cannot silently edit the hidden list.
         if (event.keycode != key_f9_) return;
@@ -2381,7 +2384,7 @@ void MenuApp::handle_input_event(const input::InputEvent& incoming_event) {
         return;
     }
     if (help_overlay_supported && help_overlay_visible_) {
-        if (event.keycode == key_escape_ || event.keycode == key_backspace_) {
+        if (event.keycode == key_escape_) {
             help_overlay_visible_ = false;
             publish_snapshot();
         }
@@ -2838,6 +2841,13 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
             return;
         }
         song_select_focus_ = SongSelectFocus::SongList;
+        if (showing_table_level_folders()) {
+            if (!table_levels_.empty()) {
+                selected_table_level_ = clamp_int(event.index, 0, static_cast<int>(table_levels_.size() - 1));
+                publish_snapshot();
+            }
+            return;
+        }
         if (song_select_view_ == SongSelectView::Sources) {
             selected_source_ = clamp_int(event.index, 0, static_cast<int>(config_.ui.recent_song_sources.size()));
             publish_snapshot();
@@ -2923,6 +2933,9 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
     }
 
     switch (event.kind) {
+        case render::MenuHitTargetKind::SkinPreviewLane:
+            if (event.part == render::MenuHitPart::Activate) select_skin_preview_lane(event.index);
+            return;
         case render::MenuHitTargetKind::TitleLanguageButton:
             if (current_screen() != Screen::Title || event.index != 0 ||
                 event.part != render::MenuHitPart::Activate) {
@@ -3018,6 +3031,13 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
                 }
                 return;
             }
+            if (showing_table_level_folders()) {
+                if (table_levels_.empty()) return;
+                selected_table_level_ = clamp_int(event.index, 0, static_cast<int>(table_levels_.size() - 1));
+                if (event.double_click) open_selected_table_level();
+                else publish_snapshot();
+                return;
+            }
             if (visible_song_count() == 0) {
                 if (song_select_view_ != SongSelectView::Records) {
                     return;
@@ -3089,7 +3109,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
             if (current_screen() != Screen::SongSelect) {
                 return;
             }
-            handle_song_select_input(key_backspace_);
+            handle_song_select_input(key_escape_);
             return;
         case render::MenuHitTargetKind::SongProfilePanel:
             if (current_screen() != Screen::SongSelect) {
@@ -3318,14 +3338,16 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
                 const bool lr2_source =
                     config::normalize_skin_source_token(config_.skin.source) == "lr2";
                 const auto target = menu::settings::settings_id_from_hit<SkinSettingsRowId>(
-                    event.index, [lr2_source](auto id) { return menu::settings::skin_setting_index(id, lr2_source); });
+                    event.index, [this, lr2_source](auto id) { return menu::settings::skin_setting_index(
+                        id, lr2_source, skin_scratch_position_visible(config_.mode.key_mode)); });
                 if (!target.has_value()) {
                     return;
                 }
                 const auto previous = skin_settings_controller_.selected_id();
                 menu::settings::SkinSettingsEffects effects;
                 if (event.part == render::MenuHitPart::SelectOnly) {
-                    effects = skin_settings_controller_.select(*target, lr2_source);
+                    effects = skin_settings_controller_.select(*target, lr2_source,
+                        skin_scratch_position_visible(config_.mode.key_mode));
                 } else if (event.part == render::MenuHitPart::Increment) {
                     effects = skin_settings_controller_.handle(
                         menu::MenuAction::adjust(1),
@@ -3945,6 +3967,18 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
+    if (keycode == key_enter_ && settings_cursor_ == profile_setup::kUiFontFileRow) {
+        choose_profile_ui_font();
+        return;
+    }
+    if (settings_cursor_ == profile_setup::kUiFontRow &&
+        (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
+        config_.skin.ui_font = cycle_skin_ui_font(config_.skin.ui_font, keycode == key_left_ ? -1 : 1);
+        ++tenriff_skin_revision_;
+        persist_runtime_config();
+        publish_snapshot();
+        return;
+    }
     if (keycode == key_enter_ && settings_cursor_ == profile_setup::kClearAvatarRow) {
         config_.ui.profile_avatar_path.clear();
         ++profile_avatar_revision_;
@@ -3954,7 +3988,8 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
     }
     if (keycode == key_left_ || keycode == key_right_ ||
         (keycode == key_enter_ && (settings_cursor_ == profile_setup::kLanguageRow ||
-                                  settings_cursor_ == profile_setup::kMenuFontSizeRow))) {
+                                  settings_cursor_ == profile_setup::kMenuFontSizeRow ||
+                                  settings_cursor_ == profile_setup::kGameplayCursorRow))) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         if (profile_setup::adjust_presentation_setting(config_.ui, settings_cursor_, direction)) {
             persist_runtime_config();
@@ -4040,7 +4075,7 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
         }
     }
 
-    if (keycode == key_escape_ || keycode == key_backspace_) {
+    if (keycode == key_escape_) {
         const auto destination = profile_setup::cancel_destination(setup_entry);
         first_run_profile_ = false;
         if (destination == profile_setup::Destination::OptionsHub) {
@@ -4134,7 +4169,7 @@ void MenuApp::handle_options_hub_input(uint32_t keycode) {
         return;
     }
 
-    if (keycode == key_escape_ || keycode == key_backspace_) {
+    if (keycode == key_escape_) {
         if (!pop_screen()) {
             reset_screen(Screen::Title);
         }
@@ -4212,7 +4247,7 @@ void MenuApp::handle_session_mix_input(uint32_t keycode) {
         }
         return;
     }
-    if (keycode == key_escape_ || keycode == key_backspace_) {
+    if (keycode == key_escape_) {
         if (!pop_screen()) {
             reset_screen(Screen::SongSelect);
         }
@@ -4236,6 +4271,7 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
     }
 
     auto apply_song_search_refresh = [this]() {
+        active_table_level_.clear();
         song_select_view_ = SongSelectView::Songs;
         rebuild_visible_song_list();
         rebuild_current_song_record_indices();
@@ -4278,11 +4314,8 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
         }
         if (keycode == key_backspace_) {
             if (!song_search_query_.empty()) {
-                song_search_query_.pop_back();
+                util::erase_last_utf8_codepoint(song_search_query_);
                 apply_song_search_refresh();
-            } else {
-                song_select_search_active_ = false;
-                publish_snapshot();
             }
             return;
         }
@@ -4309,7 +4342,7 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
             return;
         }
         if (keycode == key_backspace_ && !song_search_query_.empty()) {
-            song_search_query_.pop_back();
+            util::erase_last_utf8_codepoint(song_search_query_);
             apply_song_search_refresh();
             return;
         }
@@ -4325,6 +4358,17 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
             return;
         }
     }
+
+    if (keycode == key_backspace_) return;
+    if (keycode == key_escape_ && !active_table_level_.empty()) {
+        active_table_level_.clear();
+        song_select_search_active_ = false;
+        rebuild_visible_song_list();
+        publish_snapshot();
+        return;
+    }
+    if (showing_table_level_folders() && song_select_focus_ == SongSelectFocus::SongList &&
+        (keycode == key_c_ || keycode == key_i_ || keycode == key_delete_ || keycode == key_r_)) return;
 
     if (song_select_view_ == SongSelectView::Songs &&
         song_select_focus_ == SongSelectFocus::SongList &&
@@ -4419,7 +4463,7 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
             }
             return;
         }
-        if (keycode == key_backspace_) {
+        if (keycode == key_escape_) {
             song_select_focus_ = SongSelectFocus::SongList;
             publish_snapshot();
             return;
@@ -4487,6 +4531,9 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
             switch (song_select_nav_cursor_) {
                 case 0:
                     song_select_search_active_ = false;
+                    active_table_level_.clear();
+                    song_search_query_.clear();
+                    rebuild_visible_song_list();
                     song_select_view_ = SongSelectView::Songs;
                     song_select_focus_ = SongSelectFocus::SongList;
                     publish_snapshot();
@@ -4545,13 +4592,15 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
             if (!online_records_view_ && open_selected_record_result()) {
                 publish_snapshot();
             }
+        } else if (showing_table_level_folders()) {
+            open_selected_table_level();
         } else if (visible_song_count() > 0) {
             song_select_search_active_ = false;
             launch_selected_song();
         }
         return;
     }
-    if (keycode == key_backspace_) {
+    if (keycode == key_escape_) {
         song_select_search_active_ = false;
         if (song_select_view_ != SongSelectView::Songs) {
             song_select_view_ = SongSelectView::Songs;
@@ -4559,21 +4608,6 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
             publish_snapshot();
             return;
         }
-        if (multiplayer_selecting_chart_) {
-            multiplayer_selecting_chart_ = false;
-            rebuild_visible_song_list();
-            if (!pop_screen()) {
-                reset_screen(Screen::Multiplayer);
-            }
-            publish_snapshot();
-            return;
-        }
-        reset_screen(Screen::Title);
-        publish_snapshot();
-        return;
-    }
-    if (keycode == key_escape_) {
-        song_select_search_active_ = false;
         if (multiplayer_selecting_chart_) {
             multiplayer_selecting_chart_ = false;
             rebuild_visible_song_list();
@@ -5026,7 +5060,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
         return;
     }
 
-    if (keycode == key_backspace_) {
+    if (keycode == key_escape_) {
         if (!pop_screen()) {
             reset_screen(Screen::SongSelect);
         }
@@ -5036,6 +5070,12 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
 }
 
 bool MenuApp::move_song_select_selection(int delta) {
+    if (showing_table_level_folders()) {
+        if (table_levels_.empty()) return false;
+        const int previous = selected_table_level_;
+        selected_table_level_ = clamp_int(selected_table_level_ + delta, 0, static_cast<int>(table_levels_.size() - 1));
+        return previous != selected_table_level_;
+    }
     if (delta == 0) {
         return false;
     }
@@ -5092,7 +5132,7 @@ void MenuApp::handle_result_input(uint32_t keycode) {
         return;
     }
     if (last_game_was_multiplayer_) {
-        if (keycode == key_enter_ || keycode == key_escape_ || keycode == key_backspace_) {
+        if (keycode == key_enter_ || keycode == key_escape_) {
             const network::PeerSessionSnapshot peer = peer_session_.snapshot();
             const bool peer_finished =
                 peer.all_remote_finished;
@@ -5134,7 +5174,7 @@ void MenuApp::handle_result_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (result_analysis_page_ != 0 && (keycode == key_escape_ || keycode == key_backspace_)) {
+    if (result_analysis_page_ != 0 && (keycode == key_escape_)) {
         result_analysis_page_ = 0;
         publish_snapshot();
         return;
@@ -5157,7 +5197,7 @@ void MenuApp::handle_result_input(uint32_t keycode) {
             advance_session_mix_from_result();
             return;
         }
-        if (keycode == key_escape_ || keycode == key_backspace_) {
+        if (keycode == key_escape_) {
             record_current_session_mix_result();
             stop_session_mix(false);
             reset_screen(Screen::SongSelect);
@@ -5165,7 +5205,7 @@ void MenuApp::handle_result_input(uint32_t keycode) {
             return;
         }
     }
-    if (keycode == key_enter_ || keycode == key_escape_ || keycode == key_backspace_) {
+    if (keycode == key_enter_ || keycode == key_escape_) {
         if (!pop_screen()) {
             reset_screen(Screen::SongSelect);
         }

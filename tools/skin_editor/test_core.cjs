@@ -264,7 +264,7 @@ test('backdrop brightness and height roundtrip with per-mode overrides and match
   assert.equal(G.backdropColor('#4080C0',{key_backdrop_brightness:.5}),'#204060');
   assert.equal(G.backdropColor('#4080C0',{key_backdrop_brightness:2}),'#80FFFF');
   assert.equal(G.backdropColor('#4080C080',{key_backdrop_brightness:0}),'#00000080');
-  assert.equal(G.backdropTop({},2,1078),2);
+  assert.equal(G.backdropTop({},2,1078),540);
   assert.equal(G.backdropTop({key_backdrop_height:.5},2,1078),540);
   assert.equal(G.backdropTop({key_backdrop_height:0},2,1078),1078);
   assert.equal(G.backdropTop({key_backdrop_height:.25},50,1060),807.5);
@@ -273,15 +273,15 @@ test('backdrop brightness and height roundtrip with per-mode overrides and match
 
 test('native preview retains timing through the short judgement animation',()=>{
   const G=require('./gameplay.js');
-  for(const [now,animate,enabled,visible] of [[0,false,true,false],[100,true,true,false],[3100,true,true,true],[6100,true,true,true],[3499,true,true,true],[3100,true,false,false]]){
+  for(const [now,animate,enabled,bar,text] of [[0,false,true,false,false],[100,true,true,true,false],[3100,true,true,true,true],[6100,true,true,true,true],[3499,true,true,true,false],[3100,true,false,false,false]]){
     const bars=[],labels=[];
     const ctx=new Proxy({createLinearGradient(){return {addColorStop(){}};},fillRect(){if(this.fillStyle==='#123456')bars.push(true);},fillText(value){labels.push(value);}},
       {get(target,key){return key in target?target[key]:()=>{};}});
     const style=C.clone(catalog.native.gameplay);style.show_timing_feedback=enabled;
     style.native.colors.timing='#123456';
     G.paint(ctx,style,catalog.gameplayNative,'4k',now,animate,()=>false);
-    assert.equal(bars.length>0,visible,JSON.stringify({now,animate,enabled}));
-    assert.equal(labels.some(value=>/^(FAST|SLOW) /.test(value)),visible);
+    assert.equal(bars.length>0,bar,JSON.stringify({now,animate,enabled}));
+    assert.equal(labels.some(value=>/^(FAST|SLOW) /.test(value)),text);
   }
 });
 
@@ -321,9 +321,9 @@ test('native and bitmap LN bodies use linear configured alpha',()=>{
   }
 });
 
-test('always timing bar remains visible on PG and text survives only 750ms after the last non PG',()=>{
+test('always timing bar remains visible on PG and text survives only 350ms after the last non PG',()=>{
   const G=require('./gameplay.js');
-  for(const [now,always,bar,text] of [[0,true,true,false],[0,false,false,false],[15100,false,true,true],[15400,false,false,false],[15400,true,true,false]]){
+  for(const [now,always,bar,text] of [[0,true,true,false],[0,false,true,false],[15100,false,true,false],[15400,false,true,false],[15400,true,true,false]]){
     const bars=[],labels=[];
     const ctx=new Proxy({createLinearGradient(){return {addColorStop(){}};},fillRect(){if(this.fillStyle==='#123456')bars.push(true);},fillText(value){labels.push(value);}},
       {get(target,key){return key in target?target[key]:()=>{};}});
@@ -338,4 +338,28 @@ test('always timing bar remains visible on PG and text survives only 750ms after
   assert.deepEqual(C.parse(C.serialize(doc)),doc);
   assert.equal(C.gameplay(doc,'4k').timing_bar_always_visible,false);
   assert.equal(C.gameplay(doc,'10k').timing_bar_always_visible,true);
+});
+
+test('feedback preview defaults and independent feedback lifetimes match the client',()=>{
+  const G=require('./gameplay.js');
+  assert.deepEqual(catalog.gameplayNative.palettes['5k'],['#F6F8FF','#4F80FF','#F6F8FF','#4F80FF','#F6F8FF']);
+  assert.equal(G.backdropTop({},0,1080),540);
+  assert.equal(G.backdropTop({key_backdrop_height:1},0,1080),0);
+  assert.equal(G.timingFeedback(3349).textVisible,true);
+  assert.equal(G.timingFeedback(3350).textVisible,false);
+  assert.equal(G.timingFeedback(3500).textVisible,true);
+  assert.equal(G.timingFeedback(699).markers.length,2);
+  assert.equal(G.timingFeedback(700).markers.length,1);
+  assert.equal(G.timingFeedback(15100).textVisible,false);
+  assert.equal(G.timingFeedback(15100).markers[0].maximum,true);
+});
+
+test('overhaul automatic aspect uses destination geometry and line supports 1 to 100 percent',()=>{
+ const G=require('./gameplay.js');
+ assert.equal(G.autoAspect([0,0,60,60]),true);
+ assert.equal(G.autoAspect([0,0,60,32]),false);
+ assert.equal(G.autoAspect([0,0,32,60]),false);
+ assert.equal(G.autoAspect([0,0,0,0]),false);
+ for(const p of [.01,1])assert.deepEqual(errors({...basic(),gameplay:{judgement_line_position:p,modes:{'5k':{judgement_line_position:p}}}}),[]);
+ for(const p of [0,1.01])assert.ok(errors({...basic(),gameplay:{judgement_line_position:p}}).length);
 });

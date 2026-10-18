@@ -112,7 +112,7 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
         effects = graphics_settings_controller_.handle(menu::MenuAction::adjust(1), config_);
     } else if (keycode == key_enter_) {
         effects = graphics_settings_controller_.handle(menu::MenuAction::activate(), config_);
-    } else if (keycode == key_escape_ || keycode == key_backspace_) {
+    } else if (keycode == key_escape_) {
         effects = graphics_settings_controller_.handle(menu::MenuAction::back(), config_);
     }
     apply_graphics_settings_effects(effects);
@@ -171,7 +171,7 @@ void MenuApp::handle_input_settings_input(uint32_t keycode) {
     } else if (keycode == key_enter_) {
         effects = input_settings_controller_.handle(
             menu::MenuAction::activate(), config_, input_backend_fallback_policy_.polling_latched());
-    } else if (keycode == key_escape_ || keycode == key_backspace_) {
+    } else if (keycode == key_escape_) {
         effects = input_settings_controller_.handle(
             menu::MenuAction::back(), config_, input_backend_fallback_policy_.polling_latched());
     }
@@ -190,7 +190,7 @@ void MenuApp::handle_calibration_settings_input(uint32_t keycode) {
         effects = calibration_settings_controller_.handle(menu::MenuAction::adjust(1), config_);
     } else if (keycode == key_enter_) {
         effects = calibration_settings_controller_.handle(menu::MenuAction::activate(), config_);
-    } else if (keycode == key_escape_ || keycode == key_backspace_) {
+    } else if (keycode == key_escape_) {
         effects = calibration_settings_controller_.handle(menu::MenuAction::back(), config_);
     }
     apply_calibration_settings_effects(effects);
@@ -236,7 +236,7 @@ void MenuApp::handle_onnx_upscaler_confirm_input(uint32_t keycode) {
     } else if (keycode == key_enter_) {
         effects = graphics_settings_controller_.handle_confirmation(
             menu::MenuAction::activate(), config_);
-    } else if (keycode == key_escape_ || keycode == key_backspace_) {
+    } else if (keycode == key_escape_) {
         effects = graphics_settings_controller_.handle_confirmation(
             menu::MenuAction::back(), config_);
     }

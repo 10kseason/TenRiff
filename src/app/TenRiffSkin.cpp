@@ -1193,8 +1193,8 @@ TenRiffSkinDefinition load_tenriff_skin_folder(std::string_view folder_utf8,
             definition.warnings.push_back(
                 "gameplay.note_aspect must be stretch, contain, or width.");
         }
-        if (const auto judgement_line = optional_number(gameplay, "judgement_line_position", 0.05f,
-                                                        0.98f, definition, "gameplay.")) {
+        if (const auto judgement_line = optional_number(gameplay, "judgement_line_position", 0.01f,
+                                                        1.0f, definition, "gameplay.")) {
             definition.gameplay.has_hit_position = true;
             definition.gameplay.hit_position = *judgement_line * 480.0f;
         }

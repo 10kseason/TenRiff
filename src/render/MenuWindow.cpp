@@ -120,7 +120,7 @@ constexpr double kGameplayLaneDividerWidthScaleMax = 2.00;
 constexpr double kGameplayLaneDividerWidthScaleDefault = 1.00;
 constexpr double kGameplayLaneCenterGapScaleMin = 0.00;
 constexpr double kGameplayLaneCenterGapScaleMax = 2.00;
-constexpr double kGameplayLaneCenterGapScaleDefault = 0.00;
+constexpr double kGameplayLaneCenterGapScaleDefault = config::kLaneCenterGapScaleDefault;
 constexpr double kGameplayHoldBodyWidthScaleMin = 0.50;
 constexpr double kGameplayHoldBodyWidthScaleMax = 1.20;
 constexpr double kGameplayHoldBodyWidthScaleDefault = 0.60;
@@ -1186,6 +1186,11 @@ D2D1_RECT_F gameplay_note_bitmap_dest_rect(const D2D1_RECT_F& note_rect,
                                            const D2D1_RECT_F* source_rect,
                                            std::string_view note_shape,
                                            NoteImageAspect aspect) {
+    if (aspect == NoteImageAspect::Auto) {
+        aspect = gameplay_note_auto_preserves_aspect(note_rect.right - note_rect.left,
+                                                    note_rect.bottom - note_rect.top)
+            ? NoteImageAspect::Contain : NoteImageAspect::Stretch;
+    }
     if (aspect == NoteImageAspect::Stretch || !bitmap) {
         return note_rect;
     }
@@ -4221,7 +4226,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
             // and note translation use the same effective (including skin) height.
             const auto placement = gameplay_judgement_field(field_layout, hit_line_y,
                 desired.note_height_scale, 2, *d2d_, gameplay_note_sprite_cache_, data.note_shape,
-                use_imported_metrics && gameplay_note_sprite_cache_.has_imported_note_aspect
+                data.note_image_aspect != NoteImageAspect::Auto && use_imported_metrics && gameplay_note_sprite_cache_.has_imported_note_aspect
                     ? gameplay_note_sprite_cache_.imported_note_aspect : data.note_image_aspect).band;
             const auto band = D2D1::RectF(field_layout.left + 2.0f, placement.top,
                                          field_layout.right - 2.0f, placement.bottom);

@@ -18,11 +18,8 @@ namespace tenriff::app {
 [[nodiscard]] inline constexpr bool should_skip_post_note_audio(
     bool notes_finished,
     bool result_transition_pending,
-    bool replay_playback,
-    bool autoplay,
-    bool lane_pressed) {
-    return notes_finished && result_transition_pending && !replay_playback && !autoplay &&
-           lane_pressed;
+    bool enter_pressed) {
+    return notes_finished && result_transition_pending && enter_pressed;
 }
 
 }  // namespace tenriff::app

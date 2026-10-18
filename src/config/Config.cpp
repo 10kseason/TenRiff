@@ -74,7 +74,7 @@ const std::unordered_map<std::string, std::vector<std::string>>& default_skin_la
                   "teal", "ice", "azure", "ice", "azure", "ice"}},
         {"14k", {"ice", "azure", "ice", "azure", "ice", "teal", "gold",
                   "gold", "teal", "ice", "azure", "ice", "azure", "ice"}},
-        {"5k", {"ice", "azure", "gold", "azure", "ice"}},
+        {"5k", {"ice", "azure", "ice", "azure", "ice"}},
         {"6k", {"ice", "azure", "ice", "ice", "azure", "ice"}},
         {"7k", {"ice", "azure", "ice", "gold", "ice", "azure", "ice"}},
         {"7+1", {"ice", "ice", "azure", "ice", "gold", "ice", "azure", "ice"}},
@@ -1979,12 +1979,9 @@ double resolved_skin_note_height_scale(const SkinConfig& skin, std::string_view 
     return std::clamp(it->second, kNoteHeightScaleMin, kNoteHeightScaleMax);
 }
 
-double resolved_skin_lane_divider_width_scale(const SkinConfig& skin, std::string_view key_mode) {
-    static_cast<void>(key_mode);
-    return std::clamp(
-        skin.lane_divider_width_scale,
-        kLaneDividerWidthScaleMin,
-        kLaneDividerWidthScaleMax);
+double resolved_skin_lane_divider_width_scale(const SkinConfig&, std::string_view) {
+    // Retain legacy fields when loading presets, but use one fixed divider width.
+    return kLaneDividerWidthScaleDefault;
 }
 
 double resolved_skin_lane_center_gap_scale(const SkinConfig& skin, std::string_view key_mode) {

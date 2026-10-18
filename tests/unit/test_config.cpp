@@ -227,7 +227,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.mode.key_conversion_nk2_preset == "native");
     CHECK(config.graphics.resolution == "native");
     CHECK(config.graphics.display_mode == "borderless");
-    CHECK(tenriff::config::kJudgementLinePositionMin == doctest::Approx(0.0));
+    CHECK(tenriff::config::kJudgementLinePositionMin == doctest::Approx(0.01));
     CHECK(tenriff::config::kJudgementLinePositionMax == doctest::Approx(1.0));
     CHECK_FALSE(config.graphics.vsync);
     CHECK(config.graphics.refresh_hz == -1);
@@ -267,7 +267,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.judge.indirect_miss_ms == doctest::Approx(340.0));
     CHECK(config.judge.hold_grace_ms == doctest::Approx(80.0));
     CHECK(config.judge.hold_break_ms == doctest::Approx(200.0));
-    CHECK(config.skin.note_shape == "rect");
+    CHECK(config.skin.note_shape == "simple_rect");
     CHECK(config.skin.source == "native");
     CHECK(config.skin.tenriff_skin_name.empty());
     CHECK(config.skin.lr2_skin_name.empty());
@@ -1402,8 +1402,8 @@ TEST_CASE("config save and load use shared lane divider width scaling") {
     const auto result = loader.load_profile("profiles/test");
     REQUIRE(result.success());
     CHECK(result.config.skin.lane_divider_width_scale == doctest::Approx(0.75));
-    CHECK(tenriff::config::resolved_skin_lane_divider_width_scale(result.config.skin, "10k") == doctest::Approx(0.75));
-    CHECK(tenriff::config::resolved_skin_lane_divider_width_scale(result.config.skin, "7k") == doctest::Approx(0.75));
+    CHECK(tenriff::config::resolved_skin_lane_divider_width_scale(result.config.skin, "10k") == doctest::Approx(1.0));
+    CHECK(tenriff::config::resolved_skin_lane_divider_width_scale(result.config.skin, "7k") == doctest::Approx(1.0));
 }
 
 TEST_CASE("config clamps refresh_hz and normalizes invalid resolution preset") {
@@ -1581,7 +1581,7 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
     CHECK(result.config.skin.show_gear_boundary_line);
     CHECK_FALSE(result.config.skin.show_hold_tail);
     CHECK(result.config.skin.hold_tail_taper_enabled);
-    CHECK(result.config.skin.judgement_line_position == doctest::Approx(0.0));
+    CHECK(result.config.skin.judgement_line_position == doctest::Approx(0.01));
     CHECK(result.config.skin.gameplay_field_offset_x == doctest::Approx(-275.0));
     CHECK(result.config.skin.combo_position == doctest::Approx(0.52));
     CHECK(result.config.skin.single_color == "violet");
@@ -2581,7 +2581,7 @@ TEST_CASE("backdrop brightness and height preserve old profiles and portable set
     tenriff::config::SkinConfig skin;
     REQUIRE(tenriff::config::deserialize_skin_config(R"({"key_backdrop_opacity":0.4})", skin));
     CHECK(skin.key_backdrop_brightness == doctest::Approx(1.0));
-    CHECK(skin.key_backdrop_height == doctest::Approx(1.0));
+    CHECK(skin.key_backdrop_height == doctest::Approx(0.5));
     REQUIRE(tenriff::config::deserialize_skin_config(
         R"({"key_backdrop_brightness":8,"key_backdrop_height":-2})", skin));
     CHECK(skin.key_backdrop_brightness == doctest::Approx(2.0));
@@ -2590,7 +2590,7 @@ TEST_CASE("backdrop brightness and height preserve old profiles and portable set
     skin.key_backdrop_height = std::numeric_limits<double>::infinity();
     REQUIRE(tenriff::config::deserialize_skin_config(tenriff::config::serialize_skin_config(skin), skin));
     CHECK(skin.key_backdrop_brightness == doctest::Approx(1.0));
-    CHECK(skin.key_backdrop_height == doctest::Approx(1.0));
+    CHECK(skin.key_backdrop_height == doctest::Approx(0.5));
     TempDirGuard temp{make_temp_dir()};
     CurrentPathGuard cwd;
     std::filesystem::current_path(temp.path);
@@ -2777,4 +2777,61 @@ TEST_CASE("judgement line type preserves legacy profiles and rejects unsupported
     write_file("profiles/player/config.json", R"({"skin":{"show_judgement_line":false}})");
     CHECK(loader.load_profile("profiles/player").config.skin.judgement_line_type == 2);
 
+}
+
+TEST_CASE("feedback fresh defaults preserve explicit legacy profile values") {
+    tenriff::config::RuntimeConfig runtime;
+    CHECK(runtime.skin.note_width_scale == doctest::Approx(0.6));
+    CHECK(runtime.skin.key_backdrop_height == doctest::Approx(0.5));
+    CHECK((runtime.ui.function_keys == std::array<std::string, 11>{"F3","F4","F2","F1","F5","F6","F7","F8","F9","F10","F11"}));
+    CHECK((tenriff::config::default_skin_lane_colors("5k") == std::vector<std::string>{"ice","azure","ice","azure","ice"}));
+    REQUIRE(tenriff::config::deserialize_skin_config(R"({"note_width_scale":1.0,"key_backdrop_height":1.0,"note_width_scales":{"5k":0.8}})", runtime.skin));
+    CHECK(runtime.skin.note_width_scale == doctest::Approx(1.0));
+    CHECK(runtime.skin.key_backdrop_height == doctest::Approx(1.0));
+    CHECK(tenriff::config::resolved_skin_note_width_scale(runtime.skin, "5k") == doctest::Approx(0.8));
+}
+
+TEST_CASE("skin overhaul defaults and hidden legacy values survive preset roundtrip") {
+    using namespace tenriff::config;
+    SkinConfig skin;
+    CHECK(skin.note_shape == "simple_rect");
+    CHECK(resolved_skin_lane_center_gap_scale(skin, "16k") == 1.0);
+    REQUIRE(deserialize_skin_config(R"({"note_shape":"circle","single_color":"azure","note_border_enabled":false,"visual_opacity":0.65,"note_outline_opacity":0.35,"lane_background_opacity":0.25,"lane_center_gap_scale":0.4,"lane_divider_width_scale":0.2,"judgement_line_position":0})", skin));
+    CHECK(resolved_skin_lane_divider_width_scale(skin, "16k") == 1.0);
+    CHECK(skin.judgement_line_position == 0.01);
+    SkinConfig restored;
+    REQUIRE(deserialize_skin_config(serialize_skin_config(skin), restored));
+    CHECK(restored.note_shape == "circle");
+    CHECK(restored.single_color == "azure");
+    CHECK_FALSE(restored.note_border_enabled);
+    CHECK(restored.visual_opacity == doctest::Approx(0.65));
+    CHECK(restored.note_outline_opacity == doctest::Approx(0.35));
+    CHECK(restored.lane_background_opacity == doctest::Approx(0.25));
+    CHECK(resolved_skin_lane_center_gap_scale(restored, "16k") == doctest::Approx(0.4));
+    CHECK(resolved_skin_lane_divider_width_scale(restored, "16k") == 1.0);
+    REQUIRE(deserialize_skin_config(R"({"judgement_line_position":1.1})", restored));
+    CHECK(restored.judgement_line_position == 1.0);
+}
+
+
+TEST_CASE("skin cleanup defaults preserve saved legacy values through serialization") {
+    using namespace tenriff::config;
+    SkinConfig skin;
+    CHECK(skin.black_playfield_enabled);
+    CHECK_FALSE(skin.show_hold_tail);
+    CHECK_FALSE(skin.hold_tail_taper_enabled);
+    CHECK(skin.hold_body_width_scale == 1.0);
+    CHECK(skin.hold_body_opacity == 1.0);
+    CHECK(skin.key_label_position == "bottom");
+    for (auto gap : resolved_skin_lane_spacing_scales(skin, "5k")) CHECK(gap == 0.0);
+    REQUIRE(deserialize_skin_config(R"({"black_playfield_enabled":false,"show_hold_tail":true,"hold_tail_taper_enabled":true,"hold_body_width_scale":0.7,"hold_body_opacity":0.35,"key_label_position":"top","lane_spacing_scales":{"5k":[0.2,0.2,0.2,0.2]}})", skin));
+    SkinConfig restored;
+    REQUIRE(deserialize_skin_config(serialize_skin_config(skin), restored));
+    CHECK_FALSE(restored.black_playfield_enabled);
+    CHECK(restored.show_hold_tail);
+    CHECK(restored.hold_tail_taper_enabled);
+    CHECK(restored.hold_body_width_scale == doctest::Approx(0.7));
+    CHECK(restored.hold_body_opacity == doctest::Approx(0.35));
+    CHECK(restored.key_label_position == "top");
+    for (auto gap : resolved_skin_lane_spacing_scales(restored, "5k")) CHECK(gap == doctest::Approx(0.2));
 }

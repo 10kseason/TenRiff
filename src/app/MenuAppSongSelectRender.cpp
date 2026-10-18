@@ -119,6 +119,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
     render.song_select.track = current_track;
     render.song_select.song_count = static_cast<int>(visible_song_count());
     render.song_select.source_count = static_cast<int>(config_.ui.recent_song_sources.size());
+    render.song_select.showing_level_folders = showing_table_level_folders();
     render.song_select.showing_sources = (song_select_view_ == SongSelectView::Sources);
     render.song_select.showing_records = (song_select_view_ == SongSelectView::Records);
     render.song_select.online_records =
@@ -236,7 +237,9 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         : safe_ui_text_or_placeholder(songs_path_, "<invalid path>");
     render.song_select.index_profile_label = ui_song_index_profile_label(config_.mode.song_index_profile);
     render.song_select.background_upscale_prefer_npu = config_.graphics.background_upscale_prefer_npu;
-    render.song_select.group_summary = song_group_detail_label(song_group_mode_, language);
+    render.song_select.group_summary = active_table_level_.empty()
+        ? song_group_detail_label(song_group_mode_, language)
+        : ui_text("Level ", "레벨 ") + safe_ui_text(active_table_level_);
     render.song_select.browser_summary = browser_summary();
     render.song_select.search_query = safe_ui_text(song_search_query_);
     render.song_select.search_active = song_select_search_active_;
@@ -541,6 +544,28 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                     "\n웹 기록은 F10 > 웹 리더보드 > 웹사이트 열기에서 확인하세요.");
             }
         }
+    } else if (showing_table_level_folders()) {
+        const int total = static_cast<int>(table_levels_.size());
+        const int start = std::clamp(selected_table_level_ - kSongSelectVisibleCardCount / 2,
+            0, std::max(0, total - kSongSelectVisibleCardCount));
+        const int end = std::min(total, start + kSongSelectVisibleCardCount);
+        render.song_select.list_total_count = total;
+        render.song_select.list_visible_count = end - start;
+        render.song_select.list_window_start = start;
+        render.song_select.list_selected_index = selected_table_level_;
+        for (int i = start; i < end; ++i) {
+            render::SongCardData card;
+            card.title = ui_text("Level ", "레벨 ") + safe_ui_text(table_levels_[i]);
+            card.artist = difficulty_table_display_name();
+            const int count = i < static_cast<int>(table_level_counts_.size()) ? table_level_counts_[i] : 0;
+            card.detail = std::to_string(count) + ui_text(" charts", "곡");
+            card.level_label = safe_ui_text(table_levels_[i]);
+            card.song_index = i;
+            card.selected = i == selected_table_level_;
+            render.song_select.songs.push_back(std::move(card));
+        }
+        render.song_select.primary_hint = ui_text("Enter / Double-click: Open level", "Enter / 두 번 클릭: 레벨 열기");
+        render.song_select.empty_title = ui_text("NO TABLE LEVELS", "난이도표 레벨 없음");
     } else {
         const int total = static_cast<int>(visible_song_count());
         if (total > 0) {
@@ -617,7 +642,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         }
     }
 
-    if (!render.song_select.showing_sources) {
+    if (!render.song_select.showing_sources && !showing_table_level_folders()) {
         if (const SongEntry* entry = (selected_song_ >= 0)
                                          ? visible_song_entry(static_cast<std::size_t>(selected_song_))
                                          : nullptr) {

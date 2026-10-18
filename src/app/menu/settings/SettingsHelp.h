@@ -161,6 +161,9 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
     static constexpr SettingsHelpText profile[] = {
         {"Choose the interface language. The change is applied and saved immediately.", "화면 언어를 선택합니다. 변경 즉시 적용하고 저장합니다.", "表示言語を選びます。すぐに適用・保存されます。"},
         {"Increase menu text size if labels are difficult to read.", "글자가 작으면 메뉴 글자 크기를 키우세요.", "文字が小さい場合はメニュー文字を大きくします。"},
+        {"Choose the font used by the skin UI.", "스킨 UI에 사용할 글꼴을 고릅니다.", "スキンUIで使うフォントを選びます。"},
+        {"Choose a local TTF/OTF font. Missing files use the default font.", "로컬 TTF·OTF 폰트를 선택합니다. 파일이 없어지면 기본 폰트를 사용합니다.", "ローカルのTTF・OTFフォントを選びます。ファイルがなければ標準フォントを使います。"},
+        {"Show or hide the mouse cursor during gameplay.", "플레이 중 마우스 커서를 표시하거나 숨깁니다.", "プレイ中のマウスカーソルを表示・非表示にします。"},
         {"Press Enter or F2 to choose a songs folder. You can also drop a folder onto the window.", "Enter 또는 F2로 곡 폴더를 선택합니다. 창에 폴더를 끌어 놓아도 됩니다.", "EnterかF2で曲フォルダーを選びます。ウィンドウへのドロップも使えます。"},
         mode[11], mode[15], calibration[2], audio[1], input[0],
         {"Press Enter to edit the name shown in records and multiplayer.", "Enter를 눌러 기록과 멀티플레이에 표시할 닉네임을 입력합니다.", "Enterで記録やマルチプレイに表示する名前を編集します。"},

@@ -14,6 +14,7 @@
   let tab = 'layout', screen = 'title', mode = 'common', previewMode = '7k', slot = 'buttons';
   let nativeGroup = 'metrics', nativeSearch = '', rawText = '', rawDirty = false, drag = null, imageTarget = null;
   let instrumentGroup = 'motion', spriteSlot = 'key_idle', spriteLayer = 0, pressedPreviewLane = -1;
+  let fieldScale = .6;
   let raf = 0, busy = false, documentGeneration = 0;
   let selectedOption = 4;
   const files = new Map(), images = new Map();
@@ -21,7 +22,7 @@
   const history = C.createHistory(catalog.native || fallbackNative);
   const defaults = {
     theme: {accent:'#6EE7F2',text:'#F4F7FF',muted:'#9AA3AD',card:'#1F2130E8',panel:'#14141CB8',footer:'#0B101DF2',button:'#242638',button_selected:'#6EE7F238',border:'#31344A',judgement_line:'#FF4D6D',lane_divider:'#F6F8FF',scene_primary:'#61D6FA',scene_secondary:'#8F9EFA',scene_background:'#04081A'},
-    gameplay: {background_opacity:.66,note_width_ratio:1,note_height_ratio:1,judgement_line_position:.82,full_lane_receptors:false,note_aspect:'stretch',show_lane_dividers:true,show_judgement_line:true,show_timing_feedback:true,show_gear_boundary_line:true,show_hold_tail:true,hold_tail_taper:true,judgement_line_glow:true,key_pulse:true,key_pulse_brightness:.7,key_backdrop:true,key_backdrop_opacity:.25,key_backdrop_brightness:1,key_backdrop_height:1,hit_burst_style:'prism',key_label_position:'bottom',note_border:true,note_shape:'rect',lane_background_opacity:.08,black_playfield:true,visual_opacity:1,note_outline_opacity:1,hold_body_opacity:.28}
+    gameplay: {background_opacity:.66,note_width_ratio:1,note_height_ratio:1,judgement_line_position:.82,full_lane_receptors:false,note_aspect:'stretch',show_lane_dividers:true,show_judgement_line:true,show_timing_feedback:true,show_gear_boundary_line:true,show_hold_tail:false,hold_tail_taper:false,judgement_line_glow:true,key_pulse:true,key_pulse_brightness:.7,key_backdrop:true,key_backdrop_opacity:.25,key_backdrop_brightness:1,key_backdrop_height:.5,hit_burst_style:'prism',key_label_position:'bottom',note_border:true,note_shape:'simple_rect',lane_background_opacity:.08,black_playfield:true,visual_opacity:1,note_outline_opacity:1,hold_body_opacity:1}
   };
   const layouts = {
     title: {spectrum:[696,66,1224,150],logo:[670,184,1250,300],buttons:[470,360,1450,940],guide:[1492,386,1834,924],footer:[80,972,1840,1056]},
@@ -154,8 +155,9 @@
       const select=element('select',{class:'wide','aria-label':t('mode'),on:{change:e=>{if(!canChange()){e.target.value=mode;return;}mode=e.target.value;if(mode!=='common'){previewMode=mode;$('preview-mode').value=mode;}renderInspector();draw();}}},body);
       option(select,'common',t('common'));modes.forEach(m=>option(select,m,m.toUpperCase()));select.value=mode;
       const base=mode==='common'?['gameplay']:['gameplay','modes',mode];
+      element('p',{class:'hint',text:t('autoAspectHint')},body);
       const props=mode==='common'?schema.properties.gameplay.properties:schema.$defs.gameplayMode.properties;
-      Object.entries(props).filter(([key])=>!['modes','native'].includes(key)).forEach(([key,rule])=>field(body,[...base,key],rule));
+      Object.entries(props).filter(([key])=>!['modes','native','note_aspect','black_playfield','show_hold_tail','hold_tail_taper','hold_body_opacity','key_label_position','column_spacings'].includes(key)).forEach(([key,rule])=>field(body,[...base,key],rule));
     } else if(tab === 'instrument') {
       renderInstrument(body);
     } else if(tab === 'layout') {
@@ -468,10 +470,10 @@
   function drawGameplay(now=0){
     const p=palette(),style={...defaults.gameplay,...C.gameplay(doc(),previewMode)},count=previewMode==='7+1'?8:parseInt(previewMode,10);
     if(style.renderer==='native' || (doc().lobby?.renderer==='native'&&!doc().gameplay)) {
-      G.paint(ctx,style,gameplayCatalog,previewMode,now||performance.now(),$('animate').checked,art,pressedPreviewLane);return;
+      G.paint(ctx,style,gameplayCatalog,previewMode,now||performance.now(),$('animate').checked,art,pressedPreviewLane,fieldScale);return;
     }
     art(style.background||'gameplay/background.png',[0,0,1920,1080],style.background_opacity);
-    const width=Math.min(1200,count*95),left=(1920-width)/2,line=1080*style.judgement_line_position,laneWidth=width/count;
+    const width=Math.min(1200,count*95)*fieldScale,left=(1920-width)/2,line=1080*style.judgement_line_position,laneWidth=width/count;
     box([left,50,left+width,1060],style.black_playfield?'#000000ee':p.panel,p.border,0);
     for(let i=0;i<count;i++){
       const x=left+i*laneWidth,color=style.lane_colors?.[i%style.lane_colors.length]||(i%2?p.accent:p.text);
@@ -484,7 +486,7 @@
       for(let j=0;j<3;j++){
         const y=120+((i*97+j*235)%Math.max(100,line-220)),w=laneWidth*.86*style.note_width_ratio,h=18*style.note_height_ratio,rect=[x+(laneWidth-w)/2,y,x+(laneWidth+w)/2,y+h];
         ctx.globalAlpha=style.visual_opacity;
-        if(!art(C.laneAsset(style.note,i,style.lane_map),rect,style.visual_opacity,style.note_aspect==='contain')){
+        if(!art(C.laneAsset(style.note,i,style.lane_map),rect,style.visual_opacity,G.autoAspect(rect))){
           G.drawNoteShape(ctx,rect,color,style,style.visual_opacity);
         }ctx.globalAlpha=1;
       }
@@ -514,7 +516,7 @@
   function animation(){if(raf)cancelAnimationFrame(raf);raf=0;if($('animate').checked&&!document.hidden)raf=requestAnimationFrame(tick);else draw();}
   function point(event){const r=$('preview').getBoundingClientRect();return[(event.clientX-r.left)*1920/r.width,(event.clientY-r.top)*1080/r.height];}
   $('preview').addEventListener('pointerdown',event=>{
-    if(['gameplay','instrument'].includes(tab)&&event.button===0){const [x]=point(event),count=previewMode==='7+1'?8:parseInt(previewMode,10);pressedPreviewLane=x>=470&&x<1450?Math.floor((x-470)/980*count):-1;$('preview').setPointerCapture(event.pointerId);draw();return;}
+    if(['gameplay','instrument'].includes(tab)&&event.button===0){const [x]=point(event),count=previewMode==='7+1'?8:parseInt(previewMode,10);const style=C.gameplay(doc(),previewMode),native=style.renderer==='native'||(doc().lobby?.renderer==='native'&&!doc().gameplay),width=(native?980:Math.min(1200,count*95))*fieldScale,left=(1920-width)/2;pressedPreviewLane=x>=left&&x<left+width?Math.floor((x-left)/width*count):-1;$('preview').setPointerCapture(event.pointerId);draw();return;}
     if(screen==='options'&&doc().lobby?.renderer==='native'&&tab!=='layout'&&event.button===0){
       const [x,y]=point(event),index=optionRoles.findIndex((_,i)=>{const r=optionRect(i);return x>=r[0]&&x<=r[2]&&y>=r[1]&&y<=r[3];});
       if(index>=0){selectedOption=index;draw();}return;
@@ -570,7 +572,7 @@
     }catch(error){notice(t(error.message),'error');}
   }
   function download(blob,name){const url=URL.createObjectURL(blob),a=element('a',{href:url,download:name},document.body);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);}
-  function readyToSave(){if(rawDirty&&!applyRaw())return false;if(issues().some(item=>item.severity==='error')){notice(t('invalidSave'),'error');return false;}return true;}
+  function readyToSave(){const active=document.activeElement;if(active&&$('inspector-body').contains(active)&&active.matches('input,textarea'))active.blur();if(rawDirty&&!applyRaw())return false;if(issues().some(item=>item.severity==='error')){notice(t('invalidSave'),'error');return false;}return true;}
   function save(){if(!readyToSave())return;download(new Blob([C.serialize(doc())],{type:'application/json;charset=utf-8'}),'skin.json');history.markSaved();notice(t('saved'));renderHeader();}
   async function exportZIP(){
     if(busy||!readyToSave())return;
@@ -589,6 +591,7 @@
   }
   $('language').addEventListener('change',e=>{language=e.target.value;try{localStorage.setItem('tenriff-skin-editor-language',language);}catch(_){}notice('');render();});
   $('screen').addEventListener('change',e=>{screen=e.target.value;slot=Object.keys(layouts[screen]||layouts.generic)[0];renderInspector();draw();});
+  $('field-scale').addEventListener('input',e=>{fieldScale=Math.max(.1,Math.min(1.4,Number(e.target.value)/100));$('field-scale-value').textContent=Math.round(fieldScale*100)+'%';draw();});
   $('preview-mode').addEventListener('change',e=>{previewMode=e.target.value;draw();});
   ['outlines','grid','snap'].forEach(id=>$(id).addEventListener('change',()=>draw()));$('animate').addEventListener('change',animation);document.addEventListener('visibilitychange',animation);
   $('new').addEventListener('click',()=>newSkin());$('open').addEventListener('click',()=>$('file-input').click());$('folder').addEventListener('click',()=>$('folder-input').click());

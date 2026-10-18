@@ -669,7 +669,7 @@ struct MenuAppVisualTestAccess {
         click(app, Kind::SettingsRow, profile_setup::kFunctionKeysFirstRow);
         key(app, "F10");
         report.check("profile.function_conflict_rejected", app.profile_control_key_capture_active_ &&
-            config::function_key(app.config_.ui, 1) == "F1");
+            config::function_key(app.config_.ui, 1) == "F3");
         key(app, "F12");
         report.check("profile.function_assigned", !app.profile_control_key_capture_active_ && app.key_f1_ ==
             config::KeycodeMap::to_keycode("F12").value());
@@ -677,14 +677,14 @@ struct MenuAppVisualTestAccess {
         report.check("profile.function_persisted", saved_function.success() &&
             config::function_key(saved_function.config.ui, 1) == "F12");
         report.check("profile.function_hint", app.ui_text("F1 / F10", "F1 / F10") == "F12 / F10");
-        key(app, "F1");
+        key(app, "F3");
         report.check("profile.old_function_inactive", !app.help_overlay_visible_);
         key(app, "F12");
         report.check("profile.new_function_dispatch", app.help_overlay_visible_);
         key(app, "F12");
         click(app, Kind::SettingsRow, profile_setup::kFunctionKeysFirstRow);
-        key(app, "F1");
-        report.check("profile.function_restored", app.key_f1_ == config::KeycodeMap::to_keycode("F1").value());
+        key(app, "F3");
+        report.check("profile.function_restored", app.key_f1_ == config::KeycodeMap::to_keycode("F3").value());
         // Synthetic stale Enter edges model input collected inside a modal
         // picker. The real picker smoke below checks native ownership too.
         app.input_thread_.queue().push({app.key_enter_, input::InputState::Pressed, 1});
@@ -1128,9 +1128,11 @@ struct MenuAppVisualTestAccess {
         type_query("lv:16to20");
         report.check("search.raw_range_inclusive_preserves_sort", app.song_search_query_ == "lv:16to20" &&
             app.song_select_search_active_ && table_levels() == std::vector<int>({20, 19, 18, 16}) &&
-            app.song_sort_mode_ == MenuApp::SongSortMode::DifficultyDesc);
+            app.song_sort_mode_ == MenuApp::SongSortMode::DifficultyDesc,
+            "query=" + app.song_search_query_ + "; count=" + std::to_string(app.visible_song_count()));
         app.handle_text_input("lv:16to20");
-        report.check("search.wm_char_does_not_duplicate_raw_keys", app.song_search_query_ == "lv:16to20");
+        report.check("search.wm_char_does_not_duplicate_raw_keys", app.song_search_query_ == "lv:16to20",
+            "query=" + app.song_search_query_);
         type_query("lv:16", "RShift");
         report.check("search.raw_exact_right_shift", app.song_search_query_ == "lv:16" &&
             app.song_select_search_active_ && table_levels() == std::vector<int>({16}));
@@ -1140,11 +1142,12 @@ struct MenuAppVisualTestAccess {
             "query=" + app.song_search_query_ + "; minus=" +
             config::KeycodeMap::to_name(config::KeycodeMap::to_keycode("Minus").value()));
         type_query("lv:18+", "RShift");
-        report.check("search.raw_lower_inclusive", app.song_search_query_ == "lv:18+" &&
-            app.song_select_search_active_ && table_levels() == std::vector<int>({21, 20, 19, 18}));
+        report.check("search.raw_plus_exact", app.song_search_query_ == "lv:18+" &&
+            app.song_select_search_active_ && table_levels().empty());
         type_query("blue lv:16to20");
         report.check("search.raw_text_and_level_intersect", app.song_search_query_ == "blue lv:16to20" &&
-            app.song_select_search_active_ && table_levels() == std::vector<int>({20}));
+            app.song_select_search_active_ && table_levels() == std::vector<int>({20}),
+            "query=" + app.song_search_query_ + "; count=" + std::to_string(app.visible_song_count()));
         type_query("lv:18");
         report.check("search.table_excludes_native_only_matches", table_levels() == std::vector<int>({18}));
         app.config_.ui.difficulty_table_path.clear();
@@ -1168,6 +1171,35 @@ struct MenuAppVisualTestAccess {
             app.config_.speed.hi_speed == saved_speed.hi_speed);
         key(app, "Esc");
         report.check("search.escape_finishes_editing", !app.song_select_search_active_ && screen(app) == Screen::SongSelect);
+
+        // Owned native fixture: declared empty tiers must remain navigable even
+        // when the chart list is much shorter than the folder list.
+        std::ofstream("folder-header.json") << R"({"name":"Level folders","symbol":"st","level_order":["st21","st1","st2","st16+","st16"],"data_url":"folder-data.json"})";
+        std::ofstream("folder-data.json") << "[]";
+        app.config_.ui.difficulty_table_path = "folder-header.json";
+        app.song_search_query_.clear();
+        app.song_select_focus_ = MenuApp::SongSelectFocus::SongList;
+        app.rebuild_visible_song_list();
+        app.publish_snapshot();
+        report.check("folders.sorted_declared_empty", app.table_levels_ ==
+            std::vector<std::string>({"st1","st2","st16","st16+","st21"}));
+        std::string folder_detail;
+        report.check("folders.native_present", present(app, folder_detail), folder_detail);
+        // Request only after the new snapshot has reached the renderer. An
+        // immediate request can capture the previous search frame instead.
+        app.menu_window_.request_screenshot();
+        report.check("folders.capture_present", present(app, folder_detail), folder_detail);
+        click(app, Kind::SongScrollbar, 2);
+        click(app, Kind::SongStartButton, 0);
+        report.check("folders.exact_selected_level", app.active_table_level_ == "st16" &&
+            app.visible_song_count() == 1 && app.visible_song_entry(0)->difficulty_table_level == "st16");
+        key(app, "Esc");
+        click(app, Kind::SongScrollbar, 3);
+        click(app, Kind::SongStartButton, 0);
+        report.check("folders.empty_plus_kept", app.active_table_level_ == "st16+" && app.visible_song_count() == 0);
+        key(app, "Esc");
+        key(app, "Backspace");
+        report.check("folders.backspace_no_navigation", app.showing_table_level_folders() && screen(app) == Screen::SongSelect);
 
         app.indexed_songs_ = saved_songs;
         app.config_.ui = saved_ui;
@@ -1209,16 +1241,21 @@ struct MenuAppVisualTestAccess {
         render::MenuRenderData skin_view;
         app.populate_skin_settings_render_data(skin_view);
         bool removed = true;
-        bool adjacent = false;
+        bool color_visible = false;
         for (std::size_t i = 0; i < skin_view.generic.rows.size(); ++i) {
             const auto id = static_cast<SkinSettingsRowId>(skin_view.generic.rows[i].row_index);
             removed = removed && id != SkinSettingsRowId::TargetGap && id != SkinSettingsRowId::VisualPreset &&
-                id != SkinSettingsRowId::IndicatorBackground && id != SkinSettingsRowId::ExportPreset;
-            if (id == SkinSettingsRowId::TargetLane && i + 1 < skin_view.generic.rows.size())
-                adjacent = skin_view.generic.rows[i + 1].row_index == static_cast<int>(SkinSettingsRowId::LaneColor);
+                id != SkinSettingsRowId::IndicatorBackground;
+            removed = removed && id != SkinSettingsRowId::TargetLane && id != SkinSettingsRowId::UiFont &&
+                id != SkinSettingsRowId::UiFontFile && id != SkinSettingsRowId::DividerWidth &&
+                id != SkinSettingsRowId::CenterGap && id != SkinSettingsRowId::SingleColor &&
+                id != SkinSettingsRowId::NoteBorder && id != SkinSettingsRowId::ImageAspect &&
+                id != SkinSettingsRowId::VisualOpacity && id != SkinSettingsRowId::NoteOutlineOpacity &&
+                id != SkinSettingsRowId::LaneBackgroundOpacity;
+            if (id == SkinSettingsRowId::LaneColor) color_visible = true;
         }
         report.check("skin.retired_rows_absent", removed);
-        report.check("skin.target_lane_above_note_color", adjacent);
+        report.check("skin.note_color_visible_without_target_row", color_visible);
         app.skin_settings_controller_.reset("16k");
         (void)app.skin_settings_controller_.select(SkinSettingsRowId::LaneWidth, false);
         key(app, "0");
@@ -1712,7 +1749,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
     report.check("judge.menu_launch_result_retains_hard", Access::last_result_hard_judge(app));
     Access::key(app, "Space");
     report.check("result.analysis_available", Access::analysis_available(app));
-    Access::key(app, "F2");
+    Access::key(app, "F4");
     report.check("result.analysis_keyboard_lanes", Access::analysis_page(app) == 1);
     Access::click(app, Kind::SettingsRow, 5);
     report.check("result.analysis_mouse_types", Access::analysis_page(app) == 2);

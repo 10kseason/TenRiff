@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.9.5.3 — 2026-10-18
+
+- Select the edit lane with numbered preview buttons. UI font, font file and Gameplay Cursor live in Profile. Scratch Position appears only in Original runtime key mode and is adjustable for a 7+1 layout.
+- Fresh defaults: note/field 60%, maximum key beam height 50%, 5K white/blue/white/blue/white, simple rectangle. F1 speed +0.25 / F2 -0.25; F3 judgement line up 1% / F4 down 1%. F5/F6 x0.5/x2 remain.
+- Keep fresh defaults of opaque playfield ON, LN tail OFF, LN body width/opacity 100%, lane spacing 0%, key labels bottom; hide these controls and LN tail taper from Skin Settings. Explicit saved values remain intact.
+- Also remove target-lane, single-color, note-border, overall/outline alpha, lane-background density, 16K center-gap and divider-width rows. New 16K center gap is 100%; effective divider width is fixed at 100%. Judgement line accepts 1–100%.
+- Automatic image fit uses the configured destination note width/height: contain for 1:1, stretch otherwise. Fix F6 fullscreen skin preview and portable .trskin preset file saving.
+- Holding Backspace repeatedly deletes complete UTF-8 characters and never navigates back. Free-text search uses title/artist only. Lv:16 and Lv:16+ each match only that exact level.
+- Show every declared difficulty-table level folder in numeric order, including empty levels; entering a folder shows only its level. Only Enter skips the post-note/LN outro.
+- Reuse serialized settings/preset formats and input action slots to preserve saved values. Judgement, score, gauge, audio and replay rules are unchanged. Retain fixed baseline 1.9.0, Guest exclusion, fixed grades, client_submitted and no bundled BGA weights.
+
 ## [1.9.5] - 2026-10-17
 
 - Route menu/result music through the selected WASAPI endpoint or ASIO driver using asynchronous decoding and existing AudioThread; preserve scene gain, focus mute and exclusive ownership at transitions.

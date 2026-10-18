@@ -1,3 +1,7 @@
+> 2026-10-18 local update: [automatic aspect, fixed dividers and preserved legacy fields](skin-overhaul-20261018.en.md). Judgement line: 1–100%.
+
+> 2026-10-18 로컬 후보의 변경은 [UI·검색 후속 안내](feedback-20261018.ko.md)가 우선합니다. 아래 날짜별 내용은 해당 버전의 이력입니다.
+
 # TenRiff 스킨 포맷 v1
 
 1.8.8 스킨 설정의 숫자 레인 단축키와 화면상 왼쪽부터 선택하는 규칙은 [레인 선택 안내](release-feedback-1.8.8.ko.md#스킨의-숫자-레인-선택)를 참고하세요. 편집 대상 선택 기능이며 스킨 포맷 v1은 유지합니다.

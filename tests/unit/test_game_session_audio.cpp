@@ -1,5 +1,6 @@
 #include "doctest/doctest.h"
 #include "app/GameSession.h"
+#include "app/GameplayStartPolicy.h"
 #include "app/ModeManager.h"
 #include "app/ReplayVerifier.h"
 #include "app/SitesLeaderboardClient.h"
@@ -37,6 +38,35 @@ struct CompletionTestDirectory {
 // Exercise the production input-to-voice-to-mixer path without starting a device,
 // input thread, decoder, profile or record writer.
 struct GameSessionAudioTestAccess {
+    static void check_default_tuning_directions() {
+        for (bool paused : {false, true}) {
+            auto session = pause_fixture();
+            const auto bindings = resolve_function_keys(session->config_.ui, session->key_to_lane_);
+            session->f1_keycode_ = bindings[0]; session->f2_keycode_ = bindings[1];
+            session->f3_keycode_ = bindings[2]; session->f4_keycode_ = bindings[3];
+            session->config_.speed.hi_speed = 4.0;
+            session->config_.skin.judgement_line_position = 0.82;
+            if (paused) control(*session, 27);
+            const auto press = [&](uint32_t key) {
+                control(*session, key);
+                input::InputEvent release{};
+                release.keycode = key; release.state = input::InputState::Released;
+                REQUIRE(session->handle_control_input(release));
+            };
+            // Physical Windows F1-F4 codes, passed only to the production handler.
+            press(112); CHECK(session->config_.speed.hi_speed == doctest::Approx(4.25));
+            CHECK(session->config_.skin.judgement_line_position == doctest::Approx(0.82));
+            press(113); CHECK(session->config_.speed.hi_speed == doctest::Approx(4.0));
+            press(114); CHECK(session->config_.skin.judgement_line_position == doctest::Approx(0.81));
+            press(115); CHECK(session->config_.skin.judgement_line_position == doctest::Approx(0.82));
+            session->config_.skin.judgement_line_position = 0.01;
+            press(114); CHECK(session->config_.skin.judgement_line_position == doctest::Approx(0.01));
+            session->config_.skin.judgement_line_position = 1.0;
+            press(115); CHECK(session->config_.skin.judgement_line_position == doctest::Approx(1.0));
+            CHECK(session->engine_->replay().events.empty());
+            CHECK(session->engine_->stats().raw_score == 0);
+        }
+    }
     static void check_pcm_retention_until_stop() {
         GameSession session;
         session.sample_rate_ = 1000;
@@ -1358,6 +1388,7 @@ struct GameSessionAudioTestAccess {
     static void check_concurrent_hud_timing_publication() {
         auto session = std::make_unique<GameSession>();
         session->sample_rate_ = 48000;
+        session->enter_keycode_ = 13;
         session->chart_.lane_count = 4;
         session->chart_.duration_samples = 2'000'000'000;
         session->chart_.notes.push_back(gameplay::NoteEvent{1, 1'000'000'000, std::nullopt});
@@ -2165,12 +2196,13 @@ struct GameSessionAudioTestAccess {
     static void check_automatic_result(bool delayed_bgm, bool manual_skip, bool silent,
                                        bool failed_audio = false, bool skip_outro = false, bool pacemaker = false,
                                        bool auto_scratch = false, bool stale_catchup = false,
-                                       uint32_t skip_key = 32, bool future_skip = false, bool bms_policy = false,
+                                       uint32_t skip_key = 13, bool future_skip = false, bool bms_policy = false,
                                        bool online_origin = true, bool revoke_online = false) {
         auto session = std::make_unique<GameSession>();
         session->options_.online_recording_enabled = online_origin;
         session->options_.online_recording_permission = std::make_shared<std::atomic_bool>(online_origin);
         session->sample_rate_ = 48000;
+        session->enter_keycode_ = 13;
         session->chart_.lane_count = 4;
         session->chart_.bms_rank = 3; // BMS loader resolves absent #RANK to EASY.
         if (bms_policy) {
@@ -2248,6 +2280,15 @@ struct GameSessionAudioTestAccess {
         int64_t last_buffer_sample = 0;
         for (int64_t sample = 12000; sample <= expected_end + 960; sample += 480) {
             last_buffer_sample = sample;
+            // Exercise both queue paths: lane taps and Esc must not finish the
+            // pending tail, while the later deliberate Enter still can.
+            if (sample == 12960 || sample == 13440) {
+                input::InputEvent ignored{};
+                ignored.keycode = sample == 12960 ? 32 : 27;
+                ignored.state = input::InputState::Pressed;
+                if (future_skip) REQUIRE(session->future_events_.push({ignored, sample}));
+                else REQUIRE(session->input_thread_.queue().push(ignored));
+            }
             if (manual_skip && sample == 14400) {
                 input::InputEvent skip{};
                 skip.keycode = skip_key;
@@ -2434,12 +2475,12 @@ struct GameSessionAudioTestAccess {
             session->replay_playback_enabled_ = mode == 8;
             const auto recorded_events = session->engine_->replay().events.size();
             queue_physical_edge(*session, 27, input::InputState::Pressed, 48480, future_queue);
-            const bool skip = mode == 0 || mode == 7 || mode == 8;
+            const bool skip = false; // Esc never confirms a completed outro.
             const bool abort_peer = mode == 6;
             CHECK(session->finished_.load() == (skip || abort_peer));
             CHECK(session->user_aborted_.load() == abort_peer);
-            CHECK(session->paused_.load() == (mode >= 1 && mode <= 4));
-            CHECK(session->pause_used_.load() == (mode >= 1 && mode <= 4));
+            CHECK(session->paused_.load() == (mode == 1 || mode == 2 || mode == 4));
+            CHECK(session->pause_used_.load() == (mode == 1 || mode == 2 || mode == 4));
             CHECK(session->engine_->replay().events.size() == recorded_events);
         }
     }
@@ -2882,6 +2923,12 @@ TEST_CASE("Shift bindings share secondary LN state without premature release") {
     tenriff::app::GameSessionAudioTestAccess::check_secondary_binding_input_queue(161, 160);
 }
 
+#ifdef _WIN32
+TEST_CASE("fresh default F1 raises speed F2 lowers speed F3 raises line F4 lowers line") {
+    tenriff::app::GameSessionAudioTestAccess::check_default_tuning_directions();
+}
+#endif
+
 TEST_CASE("F5 F6 and F8 tuning work with or without a held Shift lane during play and pause") {
     for (const uint32_t key : {160u, 161u})
         for (const bool held : {false, true})
@@ -2940,11 +2987,11 @@ TEST_CASE("post-note skip still exports without adding an input or aborting the 
     tenriff::app::GameSessionAudioTestAccess::check_automatic_result(false, true, false);
 }
 
-TEST_CASE("Esc skips a completed listen-to-end outro without pause and preserves eligible replay export") {
+TEST_CASE("Enter skips a completed listen-to-end outro without pause and preserves eligible replay export") {
     for (const bool future_queue : {false, true}) {
         for (const bool future_bgm : {false, true})
             tenriff::app::GameSessionAudioTestAccess::check_automatic_result(
-                future_bgm, true, false, false, false, false, false, false, 27, future_queue);
+                future_bgm, true, false, false, false, false, false, false, 13, future_queue);
         tenriff::app::GameSessionAudioTestAccess::check_outro_escape_guards(future_queue);
     }
 }

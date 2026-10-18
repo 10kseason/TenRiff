@@ -1,3 +1,5 @@
+**2026-10-18 · 1.9.5.3:** [Skin settings cleanup and search/input fixes](docs/release-1.9.5.3.en.md). Select the edit lane with numbered preview buttons. UI font, font file and Gameplay Cursor live in Profile. Scratch Position appears only in Original runtime key mode and is adjustable for a 7+1 layout.
+
 **2026-10-17 · 1.9.5.2:** [Note and field size down to10%](docs/release-1.9.5.2.en.md). Includes GOMazk’s contribution (PR #102). Note & Field Size expands from50–140% to10–140%. The100% default, saved values and per-key-mode settings are preserved; menus, gameplay, ghost and preview use the same lower limit. Judgement, score, input and audio calculations and the1.9.5.1 350ms FAST/SLOW/file-picker behavior remain unchanged.
 
 **2026-10-17 · 1.9.5.1:** [Judgement line, FAST/SLOW and file pickers](docs/release-1.9.5.1.en.md). FAST/SLOW remains for 0.35 seconds from the last hit outside the maximum window. A maximum judgement neither clears it immediately nor extends its lifetime. Another outside-window hit replaces it immediately. The Always scale and 0.7-second dot/barcode lifetime remain separate.

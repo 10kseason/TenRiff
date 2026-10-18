@@ -208,7 +208,7 @@
         // A skin that declares note_aspect knows its own art, so it wins over the
         // player's Image Aspect setting; otherwise that setting decides.
         const NoteImageAspect note_image_aspect =
-            use_imported_metrics && gameplay_note_sprite_cache_.has_imported_note_aspect
+            data.gameplay.note_image_aspect != NoteImageAspect::Auto && use_imported_metrics && gameplay_note_sprite_cache_.has_imported_note_aspect
                 ? gameplay_note_sprite_cache_.imported_note_aspect
                 : data.gameplay.note_image_aspect;
         // Hit-burst brightness, 0% turns the explosion off entirely.
@@ -1129,8 +1129,8 @@
 
             if (scene_body_format && d2d_->muted_brush) {
                 const std::wstring hispeed_hint_w =
-                    wloc("HI-SPEED  F3/F4  +/-0.25   F5 x0.5 / F6 x2",
-                         "노트속도  F3/F4  +/-0.25   F5 ×0.5 / F6 ×2");
+                    wloc("HI-SPEED  F4 +0.25 / F3 -0.25   F5 x0.5 / F6 x2",
+                         "노트속도  F4 +0.25 / F3 -0.25   F5 ×0.5 / F6 ×2");
                 draw_readable_text_aligned(
                     hispeed_hint_w,
                     scene_body_format.Get(),
@@ -1139,8 +1139,8 @@
                     d2d_->muted_brush.Get(),
                     DWRITE_TEXT_ALIGNMENT_CENTER);
                 const std::wstring tuning_hint_w =
-                    wloc("JUDGE LINE  F1/F2  +/-1%   VISUAL LATENCY  F7/F8  -/+1ms",
-                         "판정선 위치  F1/F2  +/-1%   비주얼 레이턴시  F7/F8  -/+1ms");
+                    wloc("JUDGE LINE  F1 UP 1% / F2 DOWN 1%   LATENCY  F7/F8 -/+1ms",
+                         "판정선  F1 위 1% / F2 아래 1%   레이턴시  F7/F8 -/+1ms");
                 draw_readable_text_aligned(
                     tuning_hint_w,
                     scene_body_format.Get(),

@@ -130,7 +130,7 @@
     "lr2_resolution_mode": "auto",
     "scratch_position": "left",
     "visual_preset": "tenriff",
-    "note_shape": "rect",
+    "note_shape": "simple_rect",
     "note_border_enabled": true,
     "show_lane_dividers": true,
     "show_judgement_line": true,
@@ -166,7 +166,7 @@
     "visual_opacity": 0.96,
     "note_outline_opacity": 0.78,
     "hold_body_opacity": 0.55,
-    "note_width_scale": 1.0,
+    "note_width_scale": 0.6,
     "hold_body_width_scale": 0.6,
     "note_height_scale": 1.8,
     "lane_divider_width_scale": 1.0,
@@ -181,7 +181,7 @@
       "5k": [
         "ice",
         "azure",
-        "gold",
+        "ice",
         "azure",
         "ice"
       ],
@@ -268,9 +268,11 @@
     "key_backdrop_enabled": true,
     "key_backdrop_opacity": 0.25,
     "key_backdrop_brightness": 1.0,
-    "key_backdrop_height": 1.0,
+    "key_backdrop_height": 0.5,
     "note_fade_in": 0.0,
-    "note_fade_out": 0.0
+    "note_fade_out": 0.0,
+    "lane_center_gap_scale": 1.0,
+    "lane_center_gap_scales": {}
   },
   "offsets": {
     "input": 0.0,

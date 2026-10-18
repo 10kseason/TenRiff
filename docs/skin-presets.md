@@ -1,3 +1,7 @@
+> 2026-10-18 local update: [automatic aspect, fixed dividers and preserved legacy fields](skin-overhaul-20261018.en.md). Judgement line: 1–100%.
+
+> 2026-10-18 로컬 후보의 변경은 [UI·검색 후속 안내](feedback-20261018.ko.md)가 우선합니다. 아래 날짜별 내용은 해당 버전의 이력입니다.
+
 # Portable skin presets
 
 For 1.8.8 target-lane number shortcuts and their visual left-to-right order, see [skin lane controls (Korean)](release-feedback-1.8.8.ko.md#스킨의-숫자-레인-선택). These shortcuts select an editing target; the `.trskin` format is unchanged.

@@ -38,7 +38,8 @@ namespace tenriff::render {
 //   Contain — shrink the image inside the rect, keeping its aspect.
 //   Width   — keep the rect's width and derive height from the image aspect,
 //             so square arrow art stays square however short the note rect is.
-enum class NoteImageAspect { Stretch, Contain, Width };
+// Auto follows the configured destination dimensions, never the source image.
+enum class NoteImageAspect { Stretch, Contain, Width, Auto };
 
 struct MenuWindowConfig {
     std::string title = "TenRiff";
@@ -96,6 +97,7 @@ enum class MenuHitTargetKind {
     GameplayPauseAction,
     GameplayPauseAdjust,
     TitleLanguageButton,
+    SkinPreviewLane,
 };
 
 enum class SongDifficultyTableAction {
@@ -179,6 +181,7 @@ struct SongSelectData {
     int source_count = 0;
     int record_count = 0;
     bool showing_sources = false;
+    bool showing_level_folders = false;
     bool showing_records = false;
     bool online_records = false;
     bool sites_records = false;
@@ -548,7 +551,7 @@ struct GameplayHudData {
     bool indicator_background_visible = false;
     std::string key_label_position = "bottom";
     bool note_border_enabled = true;
-    std::string note_shape = "rect";
+    std::string note_shape = "simple_rect";
     NoteImageAspect note_image_aspect = NoteImageAspect::Stretch;
     std::string skin_source = "native";
     std::string external_skin_root;
@@ -761,7 +764,7 @@ struct SkinPreviewData {
     bool indicator_background_visible = false;
     std::string key_label_position = "bottom";
     bool note_border_enabled = true;
-    std::string note_shape = "rect";
+    std::string note_shape = "simple_rect";
     NoteImageAspect note_image_aspect = NoteImageAspect::Stretch;
     std::string skin_source = "native";
     std::string external_skin_root;
@@ -1233,7 +1236,7 @@ private:
         std::size_t lane_color_count = 0;
         int lane_count = 0;
         bool note_border_enabled = true;
-        std::string note_shape = "rect";
+        std::string note_shape = "simple_rect";
         NoteImageAspect note_image_aspect = NoteImageAspect::Stretch;
         std::string skin_source = "native";
         std::string external_skin_root;

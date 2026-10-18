@@ -63,8 +63,7 @@ TEST_CASE("skin direct lane selection preserves the active editor row and config
     CHECK(controller.select_lane(5).empty());
     CHECK(controller.select_lane(10).empty());
     CHECK(controller.edit_lane() == 0);
-    static_cast<void>(controller.select(SkinSettingsRowId::TargetLane, false));
-    static_cast<void>(controller.handle(MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames));
+    static_cast<void>(controller.select_lane(4));
     CHECK(controller.edit_lane() == 3);
     CHECK_FALSE(controller.dirty());
 }
@@ -120,7 +119,12 @@ TEST_CASE("retired skin controls cannot mutate old presets through stale mouse t
         controller.reset("10k");
         const auto saved = tenriff::config::serialize_skin_config(runtime.skin);
         for (const auto id : {SkinSettingsRowId::TargetGap, SkinSettingsRowId::VisualPreset,
-                              SkinSettingsRowId::IndicatorBackground, SkinSettingsRowId::ExportPreset}) {
+                              SkinSettingsRowId::IndicatorBackground, SkinSettingsRowId::TargetLane,
+                              SkinSettingsRowId::SingleColor, SkinSettingsRowId::NoteBorder,
+                              SkinSettingsRowId::ImageAspect, SkinSettingsRowId::VisualOpacity,
+                              SkinSettingsRowId::NoteOutlineOpacity, SkinSettingsRowId::LaneBackgroundOpacity,
+                              SkinSettingsRowId::UiFont, SkinSettingsRowId::UiFontFile,
+                              SkinSettingsRowId::CenterGap, SkinSettingsRowId::DividerWidth}) {
             const auto changed = controller.handle(MenuAction::activate(), runtime, kLr2Names, kTenRiffNames, id);
             CHECK(changed.empty());
             CHECK(controller.selected_id() == SkinSettingsRowId::KeyMode);
@@ -144,14 +148,14 @@ TEST_CASE("skin preset actions use the same keyboard and mouse controller path")
     CHECK_FALSE(imported.menu.persist_config);
     const auto font = controller.handle(MenuAction::activate(), runtime, kLr2Names, kTenRiffNames,
                                          SkinSettingsRowId::UiFontFile);
-    CHECK(font.boundary_action == SkinBoundaryAction::ChooseUiFont);
+    CHECK(font.empty());
     CHECK_FALSE(font.menu.persist_config);
     CHECK_FALSE(controller.dirty());
     CHECK(controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames,
                              SkinSettingsRowId::UiFontFile).empty());
 }
 
-TEST_CASE("skin keyboard navigation skips retired export and still opens preset import") {
+TEST_CASE("skin keyboard navigation opens preset export and import") {
     using tenriff::app::menu::settings::skin_setting_id_at;
     using tenriff::app::menu::settings::skin_setting_index;
     for (const auto source : {"native", "lr2", "tenriff"}) {
@@ -163,8 +167,13 @@ TEST_CASE("skin keyboard navigation skips retired export and still opens preset 
         static_cast<void>(controller.select(SkinSettingsRowId::ReloadSkin, lr2));
         const auto reload_index = skin_setting_index(SkinSettingsRowId::ReloadSkin, lr2);
         REQUIRE(reload_index.has_value());
-        CHECK(skin_setting_id_at(*reload_index + 1, lr2) == SkinSettingsRowId::ImportPreset);
-        CHECK_FALSE(skin_setting_index(SkinSettingsRowId::ExportPreset, lr2).has_value());
+        CHECK(skin_setting_id_at(*reload_index + 1, lr2) == SkinSettingsRowId::ExportPreset);
+        REQUIRE(skin_setting_index(SkinSettingsRowId::ExportPreset, lr2).has_value());
+        static_cast<void>(controller.handle(MenuAction::move(1), runtime, kLr2Names, kTenRiffNames));
+        CHECK(controller.selected_id() == SkinSettingsRowId::ExportPreset);
+        const auto exported = controller.handle(MenuAction::activate(), runtime, kLr2Names, kTenRiffNames);
+        CHECK(exported.boundary_action == SkinBoundaryAction::ExportPreset);
+        CHECK_FALSE(exported.menu.persist_config);
 
         static_cast<void>(controller.handle(MenuAction::move(1), runtime, kLr2Names, kTenRiffNames));
         CHECK(controller.selected_id() == SkinSettingsRowId::ImportPreset);
@@ -174,6 +183,8 @@ TEST_CASE("skin keyboard navigation skips retired export and still opens preset 
         CHECK(controller.selected_id() == SkinSettingsRowId::OpenSkinEditor);
         static_cast<void>(controller.handle(MenuAction::move(-1), runtime, kLr2Names, kTenRiffNames));
         CHECK(controller.selected_id() == SkinSettingsRowId::ImportPreset);
+        static_cast<void>(controller.handle(MenuAction::move(-1), runtime, kLr2Names, kTenRiffNames));
+        CHECK(controller.selected_id() == SkinSettingsRowId::ExportPreset);
         static_cast<void>(controller.handle(MenuAction::move(-1), runtime, kLr2Names, kTenRiffNames));
         CHECK(controller.selected_id() == SkinSettingsRowId::ReloadSkin);
         CHECK_FALSE(controller.dirty());
@@ -194,9 +205,7 @@ TEST_CASE("skin controller owns edit mode lane and gap selection") {
     CHECK(effects.menu.render_changed);
     CHECK(controller.dirty());
 
-    effects = controller.handle(
-        MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames,
-        SkinSettingsRowId::TargetLane);
+    effects = controller.select_lane(8);
     CHECK(controller.edit_lane() == 7);
     CHECK_FALSE(effects.menu.persist_config);
     CHECK(controller.edit_gap() == 6);
@@ -207,8 +216,7 @@ TEST_CASE("skin controller owns edit mode lane and gap selection") {
                                        SkinSettingsRowId::LaneSpacing));
     const auto adjusted = tenriff::config::resolved_skin_lane_spacing_scales(runtime.skin, "7+1");
     for (std::size_t i = 0; i < original.size(); ++i) {
-        if (i == 2) CHECK(adjusted[i] > original[i]);
-        else CHECK(adjusted[i] == original[i]);
+        CHECK(adjusted[i] == original[i]);
     }
 }
 
@@ -253,13 +261,13 @@ TEST_CASE("skin appearance rows mutate through one typed action path") {
     static_cast<void>(controller.handle(
         MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames,
         SkinSettingsRowId::NoteBorder));
-    CHECK(runtime.skin.note_border_enabled != old_border);
+    CHECK(runtime.skin.note_border_enabled == old_border);
 
     const double old_opacity = runtime.skin.visual_opacity;
     static_cast<void>(controller.handle(
         MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames,
         SkinSettingsRowId::VisualOpacity));
-    CHECK(runtime.skin.visual_opacity < old_opacity);
+    CHECK(runtime.skin.visual_opacity == old_opacity);
 
     const double old_offset = runtime.visual_offset_ms;
     static_cast<void>(controller.handle(
@@ -394,11 +402,11 @@ TEST_CASE("skin geometry first adjustment preserves lane defaults and explicit p
     CHECK(widths[1] == doctest::Approx(tenriff::config::kLaneWidthScaleDefault));
     const auto gaps = tenriff::config::resolved_skin_lane_spacing_scales(runtime.skin, "16k");
     REQUIRE(gaps.size() == 15u);
-    CHECK(gaps[0] == doctest::Approx(tenriff::config::kLaneSpacingScaleDefault + 0.05));
+    CHECK(gaps[0] == doctest::Approx(tenriff::config::kLaneSpacingScaleDefault));
     CHECK(gaps[1] == doctest::Approx(tenriff::config::kLaneSpacingScaleDefault));
     CHECK(tenriff::config::resolved_skin_lane_divider_width_scale(runtime.skin, "16k") ==
-          doctest::Approx(tenriff::config::kLaneDividerWidthScaleDefault + 0.05));
-    CHECK(tenriff::config::resolved_skin_lane_center_gap_scale(runtime.skin, "16k") == doctest::Approx(0.85));
+          doctest::Approx(tenriff::config::kLaneDividerWidthScaleDefault));
+    CHECK(tenriff::config::resolved_skin_lane_center_gap_scale(runtime.skin, "16k") == doctest::Approx(0.8));
     CHECK(tenriff::config::resolved_skin_note_width_scale(runtime.skin, "16k") == doctest::Approx(1.25));
     CHECK(tenriff::config::resolved_skin_note_height_scale(runtime.skin, "16k") == doctest::Approx(2.05));
 }
@@ -471,7 +479,7 @@ TEST_CASE("skin unavailable adjustments are no-ops") {
     effects = controller.handle(
         MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames,
         SkinSettingsRowId::CenterGap);
-    CHECK(effects.menu.render_changed);
+    CHECK(effects.empty());
     CHECK_FALSE(controller.dirty());
 }
 
@@ -505,7 +513,7 @@ TEST_CASE("skin back persists once only after config mutation") {
 
     static_cast<void>(controller.handle(
         MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames,
-        SkinSettingsRowId::GameplayCursor));
+        SkinSettingsRowId::JudgementLine));
     effects = controller.handle(
         MenuAction::back(), runtime, kLr2Names, kTenRiffNames);
     CHECK(effects.menu.navigate_back);
@@ -584,6 +592,8 @@ TEST_CASE("timing indicator size controls preserve judgement combo positions and
 
 TEST_CASE("simple rectangle is a distinct selectable note shape and retains rectangle compatibility") {
     tenriff::config::RuntimeConfig runtime;
+    CHECK(runtime.skin.note_shape == "simple_rect");
+    runtime.skin.note_shape = "rect";
     SkinSettingsController controller;
     controller.reset("4k");
     (void)controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames,
@@ -820,4 +830,43 @@ TEST_CASE("judgement line type cycles by keyboard and pointer and saves independ
     CHECK(runtime.skin.judgement_line_type == 2);
     CHECK_FALSE(runtime.skin.show_judgement_line);
     CHECK(controller.handle(MenuAction::back(), runtime, kLr2Names, kTenRiffNames).menu.persist_config);
+}
+
+
+TEST_CASE("skin cleanup hides legacy controls and rejects stale pointer targets") {
+    using namespace tenriff::app;
+    tenriff::config::RuntimeConfig runtime;
+    runtime.skin.show_hold_tail = true;
+    runtime.skin.hold_body_opacity = 0.35;
+    runtime.skin.hold_body_width_scale = 0.7;
+    SkinSettingsController controller;
+    controller.reset("auto");
+    const auto saved = tenriff::config::serialize_skin_config(runtime.skin);
+    for (auto id : {SkinSettingsRowId::ShowHoldTail, SkinSettingsRowId::LnTailTaper,
+                   SkinSettingsRowId::LnBodyWidth, SkinSettingsRowId::LnBodyOpacity,
+                   SkinSettingsRowId::BlackPlayfield, SkinSettingsRowId::LaneSpacing,
+                   SkinSettingsRowId::KeyLabelPosition, SkinSettingsRowId::GameplayCursor}) {
+        CHECK(SkinSettingsRows{}.index_of(id) < 0);
+        CHECK(controller.handle(MenuAction::activate(), runtime, kLr2Names, kTenRiffNames, id).empty());
+    }
+    CHECK(tenriff::config::serialize_skin_config(runtime.skin) == saved);
+    for (bool lr2 : {false, true}) for (bool original : {false, true}) {
+        const SkinSettingsRows rows{lr2, original};
+        CHECK((rows.index_of(SkinSettingsRowId::ScratchPosition) >= 0) == original);
+        for (int i = 0; i < rows.count(); ++i) {
+            auto id = menu::settings::skin_setting_id_at(i, lr2, original);
+            REQUIRE(id.has_value());
+            CHECK(rows.index_of(*id) == i);
+        }
+    }
+    controller.reset("7+1");
+    runtime.mode.key_mode = "auto";
+    CHECK(controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames,
+                            SkinSettingsRowId::ScratchPosition).menu.persist_config == false);
+    CHECK(runtime.skin.scratch_position == "right");
+    runtime.mode.key_mode = "8k";
+    CHECK(controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames,
+                            SkinSettingsRowId::ScratchPosition).empty());
+    CHECK(runtime.skin.scratch_position == "right");
+    CHECK(controller.selected_id() == SkinSettingsRowId::KeyMode);
 }

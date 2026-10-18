@@ -134,10 +134,10 @@ TEST_CASE("completed notes wait for chart audio unless the player skips") {
 
     CHECK(gameplay_result_transition_sample(10'000, 50'000, 22'050) == 50'000);
     CHECK(gameplay_result_transition_sample(40'000, 50'000, 22'050) == 62'050);
-    CHECK(should_skip_post_note_audio(true, true, false, false, true));
-    CHECK_FALSE(should_skip_post_note_audio(true, true, true, false, true));
-    CHECK_FALSE(should_skip_post_note_audio(true, true, false, true, true));
-    CHECK_FALSE(should_skip_post_note_audio(true, true, false, false, false));
+    CHECK(should_skip_post_note_audio(true, true, true));
+    CHECK_FALSE(should_skip_post_note_audio(false, true, true));
+    CHECK_FALSE(should_skip_post_note_audio(true, false, true));
+    CHECK_FALSE(should_skip_post_note_audio(true, true, false));
 }
 
 TEST_CASE("gameplay visual travel horizon follows speed changes without normalizing them") {

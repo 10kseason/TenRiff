@@ -37,7 +37,7 @@ void MenuApp::handle_audio_settings_input(uint32_t keycode) {
         effects = audio_settings_controller_.handle(menu::MenuAction::adjust(1), config_);
     } else if (keycode == key_enter_) {
         effects = audio_settings_controller_.handle(menu::MenuAction::activate(), config_);
-    } else if (keycode == key_escape_ || keycode == key_backspace_) {
+    } else if (keycode == key_escape_) {
         effects = audio_settings_controller_.handle(menu::MenuAction::back(), config_);
     }
     apply_audio_settings_effects(effects);
@@ -73,7 +73,7 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
         effects = mode_settings_controller_.handle(menu::MenuAction::adjust(1), config_);
     } else if (keycode == key_enter_) {
         effects = mode_settings_controller_.handle(menu::MenuAction::activate(), config_);
-    } else if (keycode == key_escape_ || keycode == key_backspace_) {
+    } else if (keycode == key_escape_) {
         effects = mode_settings_controller_.handle(menu::MenuAction::back(), config_);
     }
     play_speed_adjustment_if_changed(previous_speed);
@@ -97,7 +97,7 @@ void MenuApp::handle_mode_mods_input(uint32_t keycode) {
     } else if (keycode == key_enter_) {
         effects = mode_settings_controller_.handle_mod_manager(
             menu::MenuAction::activate(), config_);
-    } else if (keycode == key_escape_ || keycode == key_backspace_) {
+    } else if (keycode == key_escape_) {
         effects = mode_settings_controller_.handle_mod_manager(
             menu::MenuAction::back(), config_);
     }

@@ -56,7 +56,7 @@
     return points.map(([x,y])=>[(x-(minX+maxX)/2)/(maxX-minX),(y-(minY+maxY)/2)/(maxX-minX)]);
   }
   function drawNoteShape(ctx, rect, color, style, opacity=1) {
-    const shape=style.note_shape||'rect',points=noteShapeVertices(shape),width=Math.max(2,rect[2]-rect[0]);
+    const shape=style.note_shape||'simple_rect',points=noteShapeVertices(shape),width=Math.max(2,rect[2]-rect[0]);
     const cx=(rect[0]+rect[2])/2,cy=(rect[1]+rect[3])/2;
     ctx.save();ctx.globalAlpha=clamp(opacity,0,1);ctx.fillStyle=color;ctx.beginPath();
     if(points){points.forEach(([x,y],i)=>i?ctx.lineTo(cx+x*width,cy+y*width):ctx.moveTo(cx+x*width,cy+y*width));ctx.closePath();}
@@ -88,12 +88,14 @@
     ctx.strokeStyle=luminance<.35?'#EAF3FD':'#061118';ctx.lineWidth=stroke;ctx.lineJoin='round';ctx.strokeText(content,rect[0],center,rect[2]-rect[0]);
     ctx.fillText(content,rect[0],center,rect[2]-rect[0]);ctx.restore();
   }
+  // Match the client's destination-based fitting, independent of source image size.
+  function autoAspect(rect){const w=rect[2]-rect[0],h=rect[3]-rect[1];return Number.isFinite(w)&&Number.isFinite(h)&&w>0&&h>0&&Math.abs(w-h)<=Math.max(w,h)*.0001;}
   const state={travel:[],last:0,mode:''};
-  function paint(ctx, style, catalog, mode, now, animate, art, pressedLane=-1) {
+  function paint(ctx, style, catalog, mode, now, animate, art, pressedLane=-1, fieldScale=.6) {
     const native=settings(style,catalog),m=native.metrics,c=native.colors,motion=native.motion;
-    const count=mode==='7+1'?8:parseInt(mode,10),left=470,right=1450,bottom=1080,width=(right-left)/count;
+    const count=mode==='7+1'?8:parseInt(mode,10),scale=Number.isFinite(fieldScale)?clamp(fieldScale,.1,1.4):.6,left=960-490*scale,right=960+490*scale,bottom=1080,width=(right-left)/count;
     const colors=style.lane_colors?.length?style.lane_colors:(catalog.palettes?.[mode]||['#F6F8FF','#4F80FF']);
-    const line=clamp(style.judgement_line_position??.82,0,1)*bottom;
+    const line=clamp(style.judgement_line_position??.82,.01,1)*bottom;
     const opacity=clamp(style.visual_opacity??1,.2,1),tick=now/1000,beat=animate?Math.floor(tick*2):0;
     const phase=animate?(tick*2)%1:0,hit=pressedLane>=0?pressedLane:beat%count;
     const dt=state.mode===mode?(now-state.last)/1000:1;state.mode=mode;state.last=now;
@@ -107,8 +109,8 @@
     };
     const sprite=(slot,lane,rect,alpha=opacity)=>{
       const path=Array.isArray(style[slot])?style[slot][lane]:style[slot];
-      if(path&&art(path.replace(/\{index:02\}/g,String(lane+1).padStart(2,'0')).replace(/\{index\}/g,String(lane+1)).replace(/\{lane\}/g,style.lane_map?.[lane]||String(lane+1)),rect,alpha))return;
-      if(['note','hold_head','hold_tail'].includes(slot)&&(style.note_shape||'rect')!=='rect'&&!style.native?.sprites?.[slot]){
+      if(path&&art(path.replace(/\{index:02\}/g,String(lane+1).padStart(2,'0')).replace(/\{index\}/g,String(lane+1)).replace(/\{lane\}/g,style.lane_map?.[lane]||String(lane+1)),rect,alpha,['note','hold_head','hold_tail'].includes(slot)&&autoAspect(rect)))return;
+      if(['note','hold_head','hold_tail'].includes(slot)&&(style.note_shape||'simple_rect')!=='rect'&&!style.native?.sprites?.[slot]){
         drawNoteShape(ctx,rect,colors[lane%colors.length],style,alpha);return;
       }
       const meta=catalog.sprites[slot];
@@ -146,7 +148,7 @@
             [[0,blend(color,c.hold_edge,m.hold_edge_mix)],[.17,blend(color,c.hold_shadow,.72)],[.5,blend(color,c.hold_core,m.hold_core_mix)],[.83,blend(color,c.hold_shadow,.72)],[1,blend(color,c.hold_edge,m.hold_edge_mix)]].forEach(([stop,value])=>gradient.addColorStop(stop,value));
             box(rail,gradient,bodyOpacity);
           }
-          sprite('hold_head',lane,rect);if(style.show_hold_tail!==false)sprite('hold_tail',lane,[rect[0],tail,rect[2],tail+nh*.65]);
+          sprite('hold_head',lane,rect);if(style.show_hold_tail===true)sprite('hold_tail',lane,[rect[0],tail,rect[2],tail+nh*.65]);
         }else sprite('note',lane,rect);
       }
       if(style.key_label_position!=='off')label('key_label',String(lane+1),[x+6,style.key_label_position==='top'?20:bottom-28,x+width-4,style.key_label_position==='top'?44:bottom-4]);
@@ -172,28 +174,34 @@
     const grades=['pg','gr','gd','bd','pr'],grade=animate?Math.floor(tick/3)%grades.length:0;
     const judgementAlpha=animate?clamp(1-phase*500/motion.judgement_duration_ms,0,1):1;
     label('judgement',['P GREAT','GREAT','GOOD','BAD','POOR'][grade],[858,192,1150,260],'judgement',c['judgement_'+grades[grade]],judgementAlpha);
-    const life=animate?Math.max(0,1-phase*500/motion.combo_duration_ms):0,scale=1+(motion.combo_scale-1)*life;
-    ctx.save();ctx.translate(960,324);ctx.scale(scale,scale);ctx.translate(-960,-324);
+    const life=animate?Math.max(0,1-phase*500/motion.combo_duration_ms):0,comboScale=1+(motion.combo_scale-1)*life;
+    ctx.save();ctx.translate(960,324);ctx.scale(comboScale,comboScale);ctx.translate(-960,-324);
     label('combo','147',[920,290+motion.combo_lift*life,1080,348+motion.combo_lift*life]);ctx.restore();
-    // Half-second sample hits use the same 0.75s guidance lifetime as the client.
-    // The last non-PG survives the first PG at the next grade transition.
-    const hitTime=animate?Math.floor(tick*2)/2:0;
-    const currentNonPg=grade!==0;
-    const lastNonPgTime=currentNonPg?hitTime:Math.floor(tick/15)*15-.5;
-    const timingVisible=animate&&lastNonPgTime>=0&&tick-lastNonPgTime<=.75;
-    const timingGrade=currentNonPg?grade:4;
-    const errorMs=timingGrade%2?-28:24;
-    if(timingVisible&&style.show_timing_feedback!==false)
-      label('timing_label',(errorMs<0?'FAST ':'SLOW ')+Math.abs(errorMs)+' ms',[858,242,1150,268],'body',errorMs<0?c.timing_fast:c.timing_slow,1);
-    if((style.show_timing_bar??style.show_timing_feedback)!==false&&(style.timing_bar_always_visible===true||timingVisible)){
+    // Sample hits are half a second apart. Text retains the last non-maximum
+    // hit for 350ms; each indicator sample lives independently for 700ms.
+    const feedback=timingFeedback(now,animate);
+    if(feedback.textVisible&&style.show_timing_feedback!==false)
+      label('timing_label',(feedback.errorMs<0?'FAST ':'SLOW ')+Math.abs(feedback.errorMs)+' ms',[858,242,1150,268],'body',feedback.errorMs<0?c.timing_fast:c.timing_slow,1);
+    if((style.show_timing_bar??style.show_timing_feedback)!==false&&(style.timing_bar_always_visible===true||feedback.markers.length)){
       const timing=adjusted([960-m.timing_half_width,275,960+m.timing_half_width,275+m.timing_height],native.rects.timing);
       const center=(timing[0]+timing[2])/2,half=(timing[2]-timing[0])/2;
       box(timing,c.timing,.25);box([center-1,timing[1]-4,center+1,timing[3]+4],c.timing);
-      if(timingVisible)for(const ms of [-27,-12,8,errorMs]){const x=center+clamp(ms/m.timing_range_ms,-1,1)*half;
-        box([x-1,timing[1]-2,x+1,timing[3]+2],ms<0?c.timing_fast:c.timing_slow,.8);
+      for(const marker of feedback.markers){const x=center+clamp(marker.ms/m.timing_range_ms,-1,1)*half;
+        box([x-1,timing[1]-2,x+1,timing[3]+2],marker.maximum?'#45D983':marker.ms<0?c.timing_fast:c.timing_slow,.8);
       }
     }
     if(style.gear)art(style.gear,[left,0,right,bottom],opacity);
+  }
+  function timingFeedback(now,animate=true) {
+    if(!animate)return {textVisible:false,errorMs:0,markers:[]};
+    const tick=Math.max(0,now/1000),hit=Math.floor(tick*2)/2;
+    const grade=Math.floor(hit/3)%5;
+    const lastOutside=grade?hit:Math.floor(tick/15)*15-.5;
+    const errorMs=(grade||4)%2?-28:24,markers=[];
+    for(let at=hit;at>=0&&tick-at<.7;at-=.5){
+      const g=Math.floor(at/3)%5;markers.push({ms:g?(g%2?-28:24):0,maximum:g===0});
+    }
+    return {textVisible:lastOutside>=0&&tick-lastOutside<.35,errorMs,markers};
   }
   function judgementLineWidth(width, ratio=1) {
     return width*(Number.isFinite(ratio)?clamp(ratio,.5/1.8,4/1.8):1);
@@ -210,8 +218,8 @@
     return '#'+bytes.join('').toUpperCase()+(match[2]||'');
   }
   function backdropTop(style, top, bottom) {
-    const height=style.key_backdrop_height??1,ratio=Number.isFinite(height)?clamp(height,0,1):1;
+    const height=style.key_backdrop_height??.5,ratio=Number.isFinite(height)?clamp(height,0,1):.5;
     return bottom-Math.max(0,bottom-top)*ratio;
   }
-  return {groups,settings,blend,advance,adjusted,drawSprite,noteShapeVertices,drawNoteShape,paint,paintText,judgementLineWidth,backdropOpacity,backdropColor,backdropTop};
+  return {autoAspect,groups,settings,blend,advance,adjusted,drawSprite,noteShapeVertices,drawNoteShape,paint,paintText,judgementLineWidth,backdropOpacity,backdropColor,backdropTop,timingFeedback};
 });

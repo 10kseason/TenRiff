@@ -283,8 +283,8 @@ OnnxUpscalerConfirmViewModel GraphicsSettingsView::build_onnx_confirmation(
         "A high-spec GPU/accelerator is recommended. Slow models can reduce menu or gameplay smoothness.",
         "고사양 GPU/가속기를 권장합니다. 느린 모델은 메뉴나 플레이 화면을 끊기게 할 수 있습니다."));
     view.notes.push_back(localized(language,
-        "Yes applies now. No, Esc, or Backspace leaves the upscaler OFF.",
-        "예를 누르면 바로 적용합니다. 아니오, Esc, Backspace는 업스케일러를 끈 상태로 둡니다."));
+        "Yes applies now. No, Esc leaves the upscaler OFF.",
+        "예를 누르면 바로 적용합니다. 아니오, Esc는 업스케일러를 끈 상태로 둡니다."));
     return view;
 }
 
