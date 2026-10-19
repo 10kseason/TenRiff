@@ -88,6 +88,7 @@ inline GameplayHudData make_skin_gameplay_preview(const SkinPreviewData& preview
     hud.lane_center_gap_scale = preview.lane_center_gap_scale;
     hud.hold_body_width_scale = preview.hold_body_width_scale;
     hud.show_lane_dividers = preview.show_lane_dividers;
+    hud.lane_divider_brightness = preview.lane_divider_brightness;
     hud.note_divider_gap_px = preview.note_divider_gap_px;
     hud.show_judgement_line = preview.show_judgement_line;
     hud.show_gear_boundary_line = preview.show_gear_boundary_line;

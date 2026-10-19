@@ -365,6 +365,7 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `note_image_aspect` | `stretch`, `contain`, `width`; `stretch` | 늘이기 / 비율 유지해 안에 맞추기 / 폭을 고정하고 높이를 비율로 계산. |
 | `preserve_note_image_aspect_ratio` | bool; `false` | 구버전 호환 필드. 명시된 `note_image_aspect`가 우선하며 저장 시 stretch 이외는 true. |
 | `note_border_enabled`, `show_lane_dividers`, `show_judgement_line` | bool; `true` | 각각 노트 테두리, 레인 구분선, 판정선 표시. |
+| `lane_divider_brightness` | double: `0..1`; `1` | 키 구분선 RGB 명도. 100%는 기존 색상, 0%는 검정. UI는 1% 단위이며 표시 여부·알파·너비·마디선은 그대로 유지. 기존 프로필에 키가 없으면 100%. |
 | `note_divider_gap_px` | double: `0..40`; `12` px | 노트 한쪽 가장자리와 구분선 사이 여백. 0이면 구분선까지 확장. |
 | `show_gear_boundary_line` | bool; `false` | 기어 경계선 표시. |
 | `show_timing_feedback` | bool; `true` | FAST/SLOW 글자 표시. 타이밍 막대는 별도 설정. |

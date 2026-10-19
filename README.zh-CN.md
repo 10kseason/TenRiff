@@ -1,3 +1,7 @@
+> **2026-10-19 · 1.9.8:** 基于1.9.7，在判定、连击、FAST/SLOW指示器及其条形显示的每项Y设置前显示X设置，并以1%步长调整0～100%的键位分隔线亮度。 包含1.9.7的通用按键、加大的彩色标签、每局新种子及场景音乐基准增益，通用固定基线仍为1.9.6。 [1.9.8](docs/release-1.9.8.zh-CN.md) · [X/Y](docs/skin-xy-20261019.zh-CN.md) · [Baseline 1.9.6](docs/baseline-1.9.6.zh-CN.md) · [Verification](docs/release-1.9.8-gate.md).
+
+下方旧版本与日期的说明保留当时历史。当前范围以1.9.8文档为准，发布状态和下载以对应版本的发布页面为准。
+
 > **2026-10-19 · 1.9.7:** 包含通用按键标签、加大的模式标签及大厅配色、FAST/SLOW颜色、1%调整、游戏模式设置与Normal显示，以及每局新的随机种子。 发布状态与下载以对应版本的发布页面为准。旧日期说明是当时的历史。 [1.9.7](docs/release-1.9.7.zh-CN.md) · [Baseline 1.9.6](docs/baseline-1.9.6.zh-CN.md) · [Verification](docs/release-1.9.7-gate.md).
 
 **2026-10-18 · 1.9.6：** [固定判定、皮肤标签与搜索、窗口拖放](docs/release-1.9.6.zh-CN.md) · [验证范围](docs/release-1.9.6-gate.md)。Sites仅接受标准设置的新Online R9/R10提交，旧榜单及记录作为只读历史保留。独立Ranked的未支持规则及Guest、自定义排除保持不变。

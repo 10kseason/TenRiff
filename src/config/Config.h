@@ -213,6 +213,8 @@ struct SkinConfig {
     // Retained so builds older than the three-way option keep reading a sane value.
     bool preserve_note_image_aspect_ratio = false;
     bool show_lane_dividers = true;
+    // RGB brightness multiplier; 1 preserves existing skin colors and opacity.
+    double lane_divider_brightness = 1.0;
     // Clearance in pixels between each note edge and the lane divider line. Zero
     // makes notes meet the dividers; the default reproduces the historic inset.
     double note_divider_gap_px = kNoteDividerGapPxDefault;

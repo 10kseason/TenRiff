@@ -3939,6 +3939,8 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
     desired.lane_divider_width_scale = data.lane_divider_width_scale;
     desired.lane_center_gap_scale = data.lane_center_gap_scale;
     desired.show_lane_dividers = data.show_lane_dividers;
+    desired.lane_divider_brightness = std::isfinite(data.lane_divider_brightness)
+        ? std::clamp(data.lane_divider_brightness, 0.0, 1.0) : 1.0;
     desired.show_judgement_line = data.show_judgement_line;
     desired.judgement_line_type = data.judgement_line_type;
     desired.note_divider_gap_px = data.note_divider_gap_px;
@@ -3986,6 +3988,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
         gameplay_static_cache_.lane_divider_width_scale == desired.lane_divider_width_scale &&
         gameplay_static_cache_.lane_center_gap_scale == desired.lane_center_gap_scale &&
         gameplay_static_cache_.show_lane_dividers == desired.show_lane_dividers &&
+        gameplay_static_cache_.lane_divider_brightness == desired.lane_divider_brightness &&
         gameplay_static_cache_.show_judgement_line == desired.show_judgement_line &&
         gameplay_static_cache_.judgement_line_type == desired.judgement_line_type &&
         gameplay_static_cache_.note_divider_gap_px == desired.note_divider_gap_px &&
@@ -4111,6 +4114,13 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
 
         if (desired.show_lane_dividers && d2d_->lane_divider_brush) {
             const float divider_opacity = d2d_->lane_divider_brush->GetOpacity();
+            const auto divider_color = d2d_->lane_divider_brush->GetColor();
+            const float brightness = static_cast<float>(desired.lane_divider_brightness);
+            // Dim only vertical lane separators, retaining authored hue/alpha and
+            // restoring the shared brush before measure lines or other screens.
+            d2d_->lane_divider_brush->SetColor(D2D1::ColorF(
+                divider_color.r * brightness, divider_color.g * brightness,
+                divider_color.b * brightness, divider_color.a));
             if (desired.native_instrument) d2d_->lane_divider_brush->SetOpacity(desired.studio ? 0.05f : divider_opacity * native_gameplay_number(native_style,"lane_divider_opacity"));
             for (std::size_t divider = 0; divider < desired.lane_divider_width_count; ++divider) {
                 if (desired.hidden_scratch_mask & (uint32_t{1} << divider)) continue;
@@ -4128,6 +4138,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
                                             stroke);
             }
             d2d_->lane_divider_brush->SetOpacity(divider_opacity);
+            d2d_->lane_divider_brush->SetColor(divider_color);
         }
 
         const float hit_line_y =

@@ -133,6 +133,7 @@
     "note_shape": "simple_rect",
     "note_border_enabled": true,
     "show_lane_dividers": true,
+    "lane_divider_brightness": 1.0,
     "show_judgement_line": true,
     "judgement_line_type": 1,
     "show_timing_feedback": true,

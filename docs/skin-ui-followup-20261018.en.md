@@ -5,7 +5,7 @@ The 2026-10-18 follow-up is included in 1.9.6. Earlier local candidates, publish
 - Retain file-drop acceptance when switching to windowed mode. Existing BMS file/folder handling and owned file-dialog lifetimes are unchanged.
 - Show supported key modes as one horizontal tab row above Skin Settings, with a search box at the end. Search filters settings visible for the current source. Per-mode persistence is unchanged.
 - Click a tab or use Ctrl+Tab / Ctrl+Shift+Tab to change modes. Ctrl+F focuses search; Tab / Shift+Tab cycles between tabs, search and the settings list. Search matches labels, values and categories in the current language.
-- Hide Gear Boundary, Judgement X, Combo X, FAST/SLOW X and indicator X controls without clearing stored values.
+- Hide Gear Boundary, Judgement X, Combo X, FAST/SLOW X and indicator X controls without clearing stored values. [Follow-up: supersedes hiding the four X controls](skin-xy-20261019.en.md).
 - Show Create Skin, Open Skin Folder and Reload only for TenRiff; show Imported Skin selection only for TenRiff or LR2.
 - Preserve Original-mode scratch-position visibility and the hidden 100% divider-width policy.
 - Reduce the default album-art judgement badge from 288×36 to 192×28 design pixels. Explicit skin-authored rectangles still take precedence.

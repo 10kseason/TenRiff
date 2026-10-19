@@ -145,6 +145,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.show_lane_dividers = style_bool(
         manifest_style ? manifest_style->show_lane_dividers : std::optional<bool>{},
         config_.skin.show_lane_dividers);
+    target.lane_divider_brightness = config_.skin.lane_divider_brightness;
     target.note_divider_gap_px = std::clamp(
         config_.skin.note_divider_gap_px,
         config::kNoteDividerGapPxMin,

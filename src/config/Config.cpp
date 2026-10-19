@@ -138,6 +138,7 @@ void sanitize_skin_config(SkinConfig& skin) {
         skin.judgement_line_position, kJudgementLinePositionMin, kJudgementLinePositionMax);
     skin.note_divider_gap_px =
         std::clamp(skin.note_divider_gap_px, kNoteDividerGapPxMin, kNoteDividerGapPxMax);
+    skin.lane_divider_brightness = clamp_finite(skin.lane_divider_brightness, 0.0, 1.0, 1.0);
     skin.gameplay_field_offset_x = clamp_finite(
         skin.gameplay_field_offset_x,
         kGameplayFieldOffsetXMin,
@@ -837,6 +838,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_string(*skin, "note_image_aspect", config.skin.note_image_aspect));
         config.skin.show_lane_dividers =
             get_bool(*skin, "show_lane_dividers", config.skin.show_lane_dividers);
+        config.skin.lane_divider_brightness = clamp_finite(
+            get_number(*skin, "lane_divider_brightness", config.skin.lane_divider_brightness), 0.0, 1.0, 1.0);
         // Configs written while this was a plain on/off carry the boolean form.
         if (get_bool(*skin, "expand_notes_to_dividers", false)) {
             config.skin.note_divider_gap_px = 0.0;
@@ -1338,6 +1341,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     // Older builds read only the boolean, so keep it in step with the token.
     skin.emplace("preserve_note_image_aspect_ratio", JsonValue{note_image_aspect != "stretch"});
     skin.emplace("show_lane_dividers", JsonValue{config.skin.show_lane_dividers});
+    skin.emplace("lane_divider_brightness", JsonValue{config.skin.lane_divider_brightness});
     skin.emplace("note_divider_gap_px", JsonValue{config.skin.note_divider_gap_px});
     skin.emplace("show_judgement_line", JsonValue{config.skin.show_judgement_line});
     skin.emplace("judgement_line_type", JsonValue{static_cast<double>(config.skin.judgement_line_type)});

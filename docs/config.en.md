@@ -355,6 +355,7 @@ These are profile `config.json` skin settings. For a skin package's `skin.json` 
 | `note_image_aspect` | `stretch`, `contain`, `width`; `stretch` | Fill the rectangle / fit inside with aspect preserved / keep width and derive height from aspect. |
 | `preserve_note_image_aspect_ratio` | bool; `false` | Legacy field; explicit `note_image_aspect` wins. Saved true for non-stretch modes. |
 | `note_border_enabled`, `show_lane_dividers`, `show_judgement_line` | bool; `true` | Show note borders, lane dividers, and the judgement line respectively. |
+| `lane_divider_brightness` | double: `0..1`; `1` | Lane-divider RGB brightness: 100% preserves the existing color and 0% is black. UI steps are 1%; visibility, alpha, width and measure lines are unchanged. Older profiles without this key default to 100%. |
 | `note_divider_gap_px` | double: `0..40`; `12` px | Gap from each note edge to the divider; zero expands notes to the dividers. |
 | `show_gear_boundary_line` | bool; `false` | Show the gear boundary line. |
 | `show_timing_feedback` | bool; `true` | Show FAST/SLOW text independently of the bar. |

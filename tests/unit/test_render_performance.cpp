@@ -165,6 +165,7 @@ TEST_CASE("skin preview preserves gameplay positions and imported geometry with 
     preview.judgement_offset_x = -120;
     preview.combo_position = 0.5;
     preview.combo_offset_x = 120;
+    preview.lane_divider_brightness = 0.37;
     preview.note_width_scale = 0.10;
     preview.note_height_scale = 4;
     preview.lane_center_gap_scale = 1.5;
@@ -183,6 +184,7 @@ TEST_CASE("skin preview preserves gameplay positions and imported geometry with 
     CHECK(hud.gameplay_field_offset_x == -260);
     CHECK(hud.judgement_offset_x == -120);
     CHECK(hud.combo_offset_x == 120);
+    CHECK(hud.lane_divider_brightness == doctest::Approx(0.37));
     CHECK(hud.judgement_position == 0.4);
     CHECK(hud.combo_position == 0.5);
     CHECK(hud.note_width_scale == doctest::Approx(0.10));

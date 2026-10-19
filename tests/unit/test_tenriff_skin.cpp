@@ -619,7 +619,7 @@ TEST_CASE("Skin settings retain stable IDs while grouping lane selection with no
     using namespace tenriff::app;
     for (const bool lr2 : {false, true}) {
         const SkinSettingsRows rows{lr2};
-        CHECK(rows.count() == (lr2 ? 44 : 42));
+        CHECK(rows.count() == (lr2 ? 49 : 47));
         CHECK(rows.index_of(SkinSettingsRowId::Lr2Resolution) == (lr2 ? 4 : -1));
         CHECK(rows.index_of(SkinSettingsRowId::TargetGap) == -1);
         CHECK(rows.index_of(SkinSettingsRowId::VisualPreset) == -1);
@@ -629,8 +629,12 @@ TEST_CASE("Skin settings retain stable IDs while grouping lane selection with no
         CHECK(rows.index_of(SkinSettingsRowId::LaneColor) >= 0);
         CHECK(rows.index_of(SkinSettingsRowId::UiFont) == -1);
         CHECK(rows.index_of(SkinSettingsRowId::UiFontFile) == -1);
-        CHECK(rows.index_of(SkinSettingsRowId::TimingTextSize) + 1 == rows.index_of(SkinSettingsRowId::TimingTextY));
-        CHECK(rows.index_of(SkinSettingsRowId::TimingBarSize) + 1 == rows.index_of(SkinSettingsRowId::TimingBarY));
+        CHECK(rows.index_of(SkinSettingsRowId::TimingTextSize) + 1 == rows.index_of(SkinSettingsRowId::TimingTextX));
+        CHECK(rows.index_of(SkinSettingsRowId::TimingTextX) + 1 == rows.index_of(SkinSettingsRowId::TimingTextY));
+        CHECK(rows.index_of(SkinSettingsRowId::TimingBarSize) + 1 == rows.index_of(SkinSettingsRowId::TimingBarX));
+        CHECK(rows.index_of(SkinSettingsRowId::TimingBarX) + 1 == rows.index_of(SkinSettingsRowId::TimingBarY));
+        CHECK(rows.index_of(SkinSettingsRowId::JudgementX) + 1 == rows.index_of(SkinSettingsRowId::JudgementY));
+        CHECK(rows.index_of(SkinSettingsRowId::ComboX) + 1 == rows.index_of(SkinSettingsRowId::ComboY));
         CHECK(skin_settings_category(SkinSettingsRowId::TargetLane) == SkinSettingsCategory::Notes);
         CHECK(rows.index_of(SkinSettingsRowId::Back) == rows.count() - 1);
         for (const auto id : kSkinSettingsRowOrder) {

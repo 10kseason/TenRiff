@@ -1472,13 +1472,15 @@ struct MenuAppVisualTestAccess {
         // Use the normal app text consumer, without claiming physical typing/IME.
         app.handle_text_input("cOmBo");
         data = view();
-        report.check("skin.search_case_insensitive_rows", data.rows.size() == 2 &&
-            has(data, SkinSettingsRowId::ComboY) && has(data, SkinSettingsRowId::ComboFontSize));
+        report.check("skin.search_case_insensitive_rows", data.rows.size() == 3 &&
+            has(data, SkinSettingsRowId::ComboX) && has(data, SkinSettingsRowId::ComboY) &&
+            has(data, SkinSettingsRowId::ComboFontSize));
         key(app, "Tab");
         key(app, "Down");
         const auto selected = app.skin_settings_controller_.selected_id();
         report.check("skin.search_keyboard_stays_in_filtered_rows", !app.skin_search_active_ &&
-            (selected == SkinSettingsRowId::ComboY || selected == SkinSettingsRowId::ComboFontSize));
+            (selected == SkinSettingsRowId::ComboX || selected == SkinSettingsRowId::ComboY ||
+             selected == SkinSettingsRowId::ComboFontSize));
         click(app, Kind::SkinSettingsSearch, 0);
         key(app, "Delete");
         app.handle_text_input("zz_no_matching_setting_zz");
@@ -1489,7 +1491,8 @@ struct MenuAppVisualTestAccess {
         app.config_.ui.language = "ko";
         app.handle_text_input(u8"콤보");
         data = view();
-        report.check("skin.search_localized_utf8", data.rows.size() == 2 && has(data, SkinSettingsRowId::ComboY));
+        report.check("skin.search_localized_utf8", data.rows.size() == 3 &&
+            has(data, SkinSettingsRowId::ComboX) && has(data, SkinSettingsRowId::ComboY));
         key(app, "Backspace");
         report.check("skin.search_backspace_whole_codepoint", app.skin_search_query_ == u8"콤");
         key(app, "Esc");
@@ -1507,12 +1510,41 @@ struct MenuAppVisualTestAccess {
                 has(data, SkinSettingsRowId::OpenSkinFolder) == (source == "tenriff") &&
                 has(data, SkinSettingsRowId::ReloadSkin) == (source == "tenriff"));
             bool removed = true;
-            for (const auto id : {SkinSettingsRowId::KeyMode, SkinSettingsRowId::GearBoundary,
-                SkinSettingsRowId::JudgementX, SkinSettingsRowId::ComboX,
-                SkinSettingsRowId::TimingTextX, SkinSettingsRowId::TimingBarX}) removed &= !has(data, id);
+            for (const auto id : {SkinSettingsRowId::KeyMode, SkinSettingsRowId::GearBoundary}) removed &= !has(data, id);
             report.check("skin.source." + source + ".retired_rows_hidden", removed);
+            bool xy_visible = true;
+            for (const auto id : {SkinSettingsRowId::JudgementX, SkinSettingsRowId::JudgementY,
+                SkinSettingsRowId::ComboX, SkinSettingsRowId::ComboY,
+                SkinSettingsRowId::TimingTextX, SkinSettingsRowId::TimingTextY,
+                SkinSettingsRowId::TimingBarX, SkinSettingsRowId::TimingBarY}) xy_visible &= has(data, id);
+            report.check("skin.source." + source + ".xy_rows_visible", xy_visible);
+            const auto before_xy = config::serialize_skin_config(app.config_.skin);
+            for (const auto id : {SkinSettingsRowId::JudgementX, SkinSettingsRowId::ComboX,
+                SkinSettingsRowId::TimingTextX, SkinSettingsRowId::TimingBarX}) {
+                click(app, Kind::SettingsRow, static_cast<int>(id), Part::Increment);
+            }
+            const auto preview = view().skin_preview;
+            report.check("skin.source." + source + ".x_pointer_updates_preview",
+                app.config_.skin.judgement_offset_x == 27 && preview.judgement_offset_x == 27 &&
+                app.config_.skin.combo_offset_x == -13 && preview.combo_offset_x == -13 &&
+                app.config_.skin.timing_text_offset_x == 39 && preview.timing_text_offset_x == 39 &&
+                app.config_.skin.timing_bar_offset_x == -21 && preview.timing_bar_offset_x == -21);
+            for (const auto id : {SkinSettingsRowId::JudgementX, SkinSettingsRowId::ComboX,
+                SkinSettingsRowId::TimingTextX, SkinSettingsRowId::TimingBarX}) {
+                click(app, Kind::SettingsRow, static_cast<int>(id), Part::SelectOnly);
+                key(app, "Left");
+            }
+            report.check("skin.source." + source + ".x_keyboard_restores_without_y_changes",
+                config::serialize_skin_config(app.config_.skin) == before_xy);
+            click(app, Kind::SettingsRow, static_cast<int>(SkinSettingsRowId::LaneDividerBrightness), Part::Decrement);
+            report.check("skin.source." + source + ".divider_brightness_preview",
+                has(view(), SkinSettingsRowId::LaneDividerBrightness) &&
+                std::abs(view().skin_preview.lane_divider_brightness - 0.99) < 0.00001);
+            click(app, Kind::SettingsRow, static_cast<int>(SkinSettingsRowId::LaneDividerBrightness), Part::Increment);
+            report.check("skin.source." + source + ".divider_brightness_preserves_other_values",
+                config::serialize_skin_config(app.config_.skin) == before_xy);
         }
-        report.check("skin.hidden_values_preserved", app.config_.skin.show_gear_boundary_line &&
+        report.check("skin.existing_values_preserved", app.config_.skin.show_gear_boundary_line &&
             app.config_.skin.judgement_offset_x == 17 && app.config_.skin.combo_offset_x == -23 &&
             app.config_.skin.timing_text_offset_x == 29 && app.config_.skin.timing_bar_offset_x == -31);
         app.config_ = saved_config;

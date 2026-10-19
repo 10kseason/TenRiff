@@ -357,6 +357,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `note_image_aspect` | `stretch`, `contain`, `width`; `stretch` | 拉伸填充 / 保持比例完整容纳 / 固定宽度并按比例计算高度。 |
 | `preserve_note_image_aspect_ratio` | bool; `false` | 旧版兼容字段；显式 `note_image_aspect` 优先，非 stretch 模式保存为 true。 |
 | `note_border_enabled`, `show_lane_dividers`, `show_judgement_line` | bool; `true` | 分别显示音符边框、轨道分隔线与判定线。 |
+| `lane_divider_brightness` | double: `0..1`; `1` | 键位分隔线RGB亮度：100%保持原色，0%为黑色。UI步长1%，显示开关、透明度、宽度及小节线保持不变。缺少此字段的旧配置默认为100%。 |
 | `note_divider_gap_px` | double: `0..40`; `12` px | 音符每侧边缘与分隔线的间距；0 表示扩展至分隔线。 |
 | `show_gear_boundary_line` | bool; `false` | 显示轨道面板边界线。 |
 | `show_timing_feedback` | bool; `true` | 独立显示 FAST/SLOW 文字。 |

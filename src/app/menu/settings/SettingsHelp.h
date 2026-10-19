@@ -158,6 +158,7 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Choose round dots or straight vertical barcode markers. Each judgement marker disappears after 0.7 seconds.", "둥근 점 또는 곧은 세로줄 바코드를 고릅니다. 판정 마커는 각각 0.7초 뒤 사라집니다.", "丸い点か縦線バーコードを選びます。各判定マーカーは0.7秒で消えます。"},
         {"Type 1 keeps the existing line. Type 2 aligns notes inside a note-height band. Judgement timing and scoring stay unchanged.", "타입 1은 기존 판정선입니다. 타입 2는 노트 높이의 영역 안에 노트를 맞춥니다. 판정 시간과 점수 계산은 같습니다.", "タイプ1は従来の判定線です。タイプ2はノートの高さの領域内にノートを揃えます。判定時刻と得点計算は変わりません。"},
         {"Show PG / GR / G / BAD / PR counts below the timing indicator inside the field. Counts remain visible between hits. Default: Off.", "노트 필드의 인디케이터 바로 아래에 PG / GR / G / BAD / PR 개수를 표시합니다. 입력 사이에도 유지됩니다. 기본값: OFF.", "フィールド内のインジケーター直下にPG / GR / G / BAD / PRの累計を表示します。入力間も表示。既定値：オフ。"},
+        {"Adjust lane divider brightness from 0% (black) to 100% (original color) in 1% steps. Width, opacity and visibility stay unchanged.", "키 구분선 명도를 0%(검정)부터 100%(기존 색상)까지 1% 단위로 조절합니다. 두께·불투명도·표시 여부는 유지합니다.", "キー区切り線の明るさを0%（黒）～100%（元の色）で1%ずつ調整します。幅・不透明度・表示設定は維持します。"},
     };
     static constexpr SettingsHelpText profile[] = {
         {"Choose the interface language. The change is applied and saved immediately.", "화면 언어를 선택합니다. 변경 즉시 적용하고 저장합니다.", "表示言語を選びます。すぐに適用・保存されます。"},

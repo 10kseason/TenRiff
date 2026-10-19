@@ -357,6 +357,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | `note_image_aspect` | `stretch`, `contain`, `width`; `stretch` | 引き伸ばし / 比率を保って内側に収める / 幅を固定して比率から高さを計算。 |
 | `preserve_note_image_aspect_ratio` | bool; `false` | 旧版互換。明示的な `note_image_aspect` が優先。stretch 以外は true で保存。 |
 | `note_border_enabled`, `show_lane_dividers`, `show_judgement_line` | bool; `true` | ノート枠、レーン区切り線、判定線をそれぞれ表示。 |
+| `lane_divider_brightness` | double: `0..1`; `1` | キー区切り線のRGB明度。100%は既存の色、0%は黒。UIは1%刻みで、表示設定・アルファ・幅・小節線を維持。項目のない旧プロファイルは100%が既定。 |
 | `note_divider_gap_px` | double: `0..40`; `12` px | ノート片側と区切り線の間隔。0 なら区切り線まで拡張。 |
 | `show_gear_boundary_line` | bool; `false` | ギア境界線を表示。 |
 | `show_timing_feedback` | bool; `true` | バーとは別にFAST/SLOW文字を表示。 |

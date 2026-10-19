@@ -203,9 +203,11 @@ struct MenuAppSkinPreviewTestAccess {
             CHECK(has(SkinSettingsRowId::ImportedSkin) == (std::string(source) != "native"));
             for (auto id : {SkinSettingsRowId::CreateSkin, SkinSettingsRowId::ReloadSkin, SkinSettingsRowId::OpenSkinFolder})
                 CHECK(has(id) == (std::string(source) == "tenriff"));
-            for (auto id : {SkinSettingsRowId::KeyMode, SkinSettingsRowId::GearBoundary, SkinSettingsRowId::JudgementX,
-                           SkinSettingsRowId::ComboX, SkinSettingsRowId::TimingTextX, SkinSettingsRowId::TimingBarX})
+            for (auto id : {SkinSettingsRowId::KeyMode, SkinSettingsRowId::GearBoundary})
                 CHECK_FALSE(has(id));
+            for (auto id : {SkinSettingsRowId::JudgementX, SkinSettingsRowId::ComboX,
+                           SkinSettingsRowId::TimingTextX, SkinSettingsRowId::TimingBarX})
+                CHECK(has(id));
         }
     }
 

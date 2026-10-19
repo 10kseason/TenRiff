@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.8 — 2026-10-19
+
+- Restore X controls immediately before Y for Judgement, Combo, the FAST/SLOW indicator and bar in Skin Settings. Reuse existing −600..600px offsets and 10px steps, preserving saved X/Y, zero defaults, localized search and Native/TenRiff/LR2 keyboard/pointer controls.
+- Add Lane Divider Brightness from 0–100% in 1% steps, default 100%. The optional `skin.lane_divider_brightness` changes separator RGB only; 0% is black. Visibility, alpha, width and measure lines remain unchanged, with immediate preview/Classic/Studio/ghost cache refresh and profile/portable-skin persistence.
+- Build on published 1.9.7, preserving Common Keys, colored tabs, fresh play/Retry seeds, recorded replay seeds and scene-music reference gain. Fixed judgement, grades, replay/input/audio contracts and the general 1.9.6 baseline remain unchanged. See [scope](docs/release-1.9.8.en.md) and [verification gates](docs/release-1.9.8-gate.md).
+
 ## 1.9.7 — 2026-10-19
 
 - Increase the reference gain for TenRiff scene music (title, menus and results) from 10% to 12.5%, reducing attenuation by about 1.94 dB. Stored master/menu sliders and song preview/gameplay gains remain unchanged.
