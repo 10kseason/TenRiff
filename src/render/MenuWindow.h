@@ -522,6 +522,7 @@ struct GameplayHudData {
     double lane_center_gap_scale = 0.0;
     double hold_body_width_scale = 1.00;
     bool show_lane_dividers = true;
+    double lane_divider_brightness = 1.0;
     double note_divider_gap_px = kGameplayNoteDividerGapPxDefault;
     bool show_judgement_line = true;
     int judgement_line_type = 1;
@@ -750,6 +751,7 @@ struct SkinPreviewData {
     double lane_center_gap_scale = 0.0;
     double hold_body_width_scale = 1.00;
     bool show_lane_dividers = true;
+    double lane_divider_brightness = 1.0;
     double note_divider_gap_px = kGameplayNoteDividerGapPxDefault;
     bool show_judgement_line = true;
     int judgement_line_type = 1;
@@ -1239,6 +1241,7 @@ private:
         double lane_divider_width_scale = 1.0;
         double lane_center_gap_scale = 0.0;
         bool show_lane_dividers = true;
+        double lane_divider_brightness = 1.0;
         double note_divider_gap_px = kGameplayNoteDividerGapPxDefault;
         bool show_judgement_line = true;
         int judgement_line_type = 1;

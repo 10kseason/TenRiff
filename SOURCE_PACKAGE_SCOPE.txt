@@ -1,9 +1,9 @@
-TenRiff 1.9.7 source scope
+TenRiff 1.9.8 source scope
 
-Release scope: Common Keys, larger colored skin/key tabs, FAST/SLOW colors, 1% controls, Game Mode Settings/Normal labels and fresh per-play seeds. Preserve fixed judgement, old replay policies and saved profiles. Only the release page determines publication. See docs/release-1.9.7.en.md and docs/release-1.9.7-gate.md.
+Release scope: restore X alongside Y for Judgement, Combo, the FAST/SLOW indicator and bar; add 0–100% lane-divider brightness in 1% steps. Based on published 1.9.7, preserving Common Keys, larger colored skin/key tabs, FAST/SLOW colors, Game Mode Settings/Normal labels, fresh per-play seeds and 12.5% scene-music reference gain. Preserve fixed judgement, old replay policies and saved profiles. Only the release page determines publication. See docs/release-1.9.8.en.md and docs/release-1.9.8-gate.md.
 
-The fixed public baseline is 1.9.6, explicitly selected on 2026-10-19. Preserve all prior tags, assets, candidates and installations; 1.9.7 does not automatically advance that baseline.
-This source preserves prior audio/input and BMS timing/gauge/branch compatibility. New Normal/Hard uses R9 and EX uses R10; R1-R8 replays keep their original behavior. Sites accepts only new standard Online R9/R10 submissions. New legacy-rule submissions are blocked, while old boards and records remain read-only. Guest, unmarked historical and custom records remain ineligible; the client_submitted trust boundary and unsupported separate Ranked verifier gate remain. See docs/judgement-baseline-20261018.en.md, docs/release-1.9.7-gate.md and docs/baseline-1.9.6.en.md.
+The fixed public baseline is 1.9.6, explicitly selected on 2026-10-19. Preserve all prior tags, assets, candidates and installations; 1.9.8 does not automatically advance that baseline.
+This source preserves prior audio/input and BMS timing/gauge/branch compatibility. New Normal/Hard uses R9 and EX uses R10; R1-R8 replays keep their original behavior. Sites accepts only new standard Online R9/R10 submissions. New legacy-rule submissions are blocked, while old boards and records remain read-only. Guest, unmarked historical and custom records remain ineligible; the client_submitted trust boundary and unsupported separate Ranked verifier gate remain. See docs/judgement-baseline-20261018.en.md, docs/release-1.9.8-gate.md and docs/baseline-1.9.6.en.md.
 Plugin runtime/API/SDK and major GameSession extraction are not implemented in this release. Long LN Mix v2 remains local-history/replay only, excluded from legacy BEST and Sites uploads.
 Xbox/XInput uses optional Windows system DLLs only. No driver, XInput DLL, analog-stick axis or rumble component is bundled.
 
@@ -91,7 +91,7 @@ Notes:
 - Local LLM/tooling checkouts such as `external/llama.cpp/` are intentionally excluded from the public source package.
 - The repository license is MIT and should be shipped with both source and binary distributions.
 - The generic external ONNX/Safetensors upscaler source, converter and compatibility tools are included, but BGA upscaler models, checkpoints, training data, and model-specific verification metadata are excluded. Bundled ONNX files are limited to the project-owned NK3 P64 graph and fixed-target generalized pattern MLP inference exports; raw charts, training caches, and checkpoints remain excluded.
-- Standalone BMS key-converter source is retained for development regression only. Official 1.9.7 binary archives do not contain its CLI or GUI executables, and the top-level build option defaults off.
+- Standalone BMS key-converter source is retained for development regression only. Official 1.9.8 binary archives do not contain its CLI or GUI executables, and the top-level build option defaults off.
 
 Web-ranking privacy boundary:
 - Client-side ranking protocol, eligibility rules, payload validation, and verifier tests may remain public for reproducibility.

@@ -999,6 +999,9 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
 
     append_menu_row(render.generic, ui_text("White Dividers", "키 구분 선"), ui_on_off(config_.skin.show_lane_dividers),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::LaneDividers), false, true);
+    append_slider_menu_row(render.generic, ui_text("Lane Divider Brightness", "키 구분선 명도"),
+                    format_percent(config_.skin.lane_divider_brightness), config_.skin.lane_divider_brightness,
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::LaneDividerBrightness));
     append_menu_row(render.generic, ui_text("Judgement Line", "판정선 표시"), ui_on_off(config_.skin.show_judgement_line),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::JudgementLine), false, true);
     append_menu_row(render.generic, ui_text("Judgement Line Type", "판정선 타입"),
@@ -1247,6 +1250,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
         manifest_style ? manifest_style->show_lane_dividers : std::optional<bool>{},
         config_.skin.show_lane_dividers);
     render.generic.skin_preview.note_divider_gap_px = config_.skin.note_divider_gap_px;
+    render.generic.skin_preview.lane_divider_brightness = config_.skin.lane_divider_brightness;
     render.generic.skin_preview.show_judgement_line = style_bool(
         manifest_style ? manifest_style->show_judgement_line : std::optional<bool>{},
         config_.skin.show_judgement_line);

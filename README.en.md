@@ -1,3 +1,7 @@
+> **2026-10-19 · 1.9.8:** Based on 1.9.7, exposes X immediately before Y for Judgement, Combo, the FAST/SLOW indicator and its bar, and adds lane-divider brightness from 0–100% in 1% steps. Includes 1.9.7 Common Keys, larger colored tabs, fresh per-play seeds and scene-music reference gain; the fixed general baseline remains 1.9.6. [1.9.8](docs/release-1.9.8.en.md) · [X/Y](docs/skin-xy-20261019.en.md) · [Baseline 1.9.6](docs/baseline-1.9.6.en.md) · [Verification](docs/release-1.9.8-gate.md).
+
+Earlier versioned and dated notices below retain their historical context. The 1.9.8 documents define the current scope; publication and downloads follow the version-specific release page.
+
 > **2026-10-19 · 1.9.7:** Adds Common Keys, larger mode tabs with lobby colors, colored FAST/SLOW labels, 1% adjustments, Game Mode Settings/Normal labels and a fresh seed for every solo play. The version-specific release page determines publication and downloads. Earlier dated notices are historical. [1.9.7](docs/release-1.9.7.en.md) · [Baseline 1.9.6](docs/baseline-1.9.6.en.md) · [Verification](docs/release-1.9.7-gate.md).
 
 **2026-10-18 · 1.9.6:** [Fixed judgement, skin tabs/search and windowed drops](docs/release-1.9.6.en.md) · [Verification scope](docs/release-1.9.6-gate.md). Sites accepts only new standard Online R9/R10 submissions; old boards and records remain legacy read-only. Unsupported separate Ranked rules and Guest/custom exclusions remain.

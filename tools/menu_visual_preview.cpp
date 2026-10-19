@@ -174,6 +174,7 @@ struct MenuAppVisualTestAccess {
         skin.timing_text_scale = preview.timing_text_scale;
         skin.timing_bar_scale = preview.timing_bar_scale;
         skin.show_lane_dividers = preview.show_lane_dividers;
+        skin.lane_divider_brightness = preview.lane_divider_brightness;
         skin.note_divider_gap_px = preview.note_divider_gap_px;
         skin.show_judgement_line = preview.show_judgement_line;
         skin.show_gear_boundary_line = preview.show_gear_boundary_line;
@@ -612,6 +613,11 @@ struct MenuWindowVisualTestAccess {
         }
         window.render(source);
         JsonValue preview_drag;
+        const double requested_divider_brightness = source.generic.skin_preview.visible
+            ? source.generic.skin_preview.lane_divider_brightness : source.gameplay.lane_divider_brightness;
+        if (verify && (source.generic.skin_preview.visible || source.kind == MenuScreenKind::GameplayHud) &&
+            std::abs(window.gameplay_static_cache_.lane_divider_brightness - requested_divider_brightness) > 0.00001)
+            failures.emplace_back("lane divider brightness did not reach the rendered static cache");
         if (verify && foreground && source.generic.skin_preview.visible)
             preview_drag = verify_preview_drag(window, source, failures);
         JsonArray rows;
@@ -672,6 +678,7 @@ struct MenuWindowVisualTestAccess {
             {"skin_search_query", JsonValue(source.generic.skin_search_query)},
             {"skin_search_active", JsonValue(source.generic.skin_search_active)},
             {"requested_combo_position", JsonValue(source.generic.skin_preview.visible ? source.generic.skin_preview.combo_position : source.gameplay.combo_position)},
+            {"lane_divider_brightness", JsonValue(window.gameplay_static_cache_.lane_divider_brightness)},
             {"combo_placement", JsonValue(std::move(combo_placement))},
             {"combo_placement_coordinate_space", JsonValue("Actual final draw bounds in gameplay design coordinates, including font/pop transform and count collision movement; not source-position recomputation.")},
             {"pointer_dispatch_method", JsonValue("MenuWindow::on_mouse_click on the owned foreground window; no desktop pointer or physical click is synthesized.")},
@@ -795,6 +802,8 @@ int main(int argc, char** argv) {
     double field_offset = 0;
     std::string song_title_file;
     std::optional<std::array<double, 2>> next_field_layout;
+    double divider_brightness = 1.0;
+    std::optional<double> next_divider_brightness;
     int players = 0;
     int preview_fps = 144;
     int benchmark_frames = 0;
@@ -902,6 +911,13 @@ int main(int argc, char** argv) {
             continue;
         }
         const std::string arg = argv[i];
+        if ((arg == "--divider-brightness" || arg == "--next-divider-brightness") && i + 1 < argc) {
+            const double value = std::stod(argv[++i]);
+            if (!std::isfinite(value) || value < 0.0 || value > 1.0) return 2;
+            if (arg == "--divider-brightness") divider_brightness = value;
+            else next_divider_brightness = value;
+            continue;
+        }
         if (arg == "--judgement-counts") { judgement_counts = true; continue; }
         if (arg == "--common-keys") { keymap_settings = common_keys = true; continue; }
         if (arg == "--timing-colors" && i + 1 < argc) {
@@ -1791,6 +1807,7 @@ int main(int argc, char** argv) {
         data.function_keys[8] = "E";
     }
     data.gameplay.timing_text_offset_x = data.generic.skin_preview.timing_text_offset_x = timing_text_x;
+    data.gameplay.lane_divider_brightness = data.generic.skin_preview.lane_divider_brightness = divider_brightness;
     data.gameplay.timing_text_offset_y = data.generic.skin_preview.timing_text_offset_y = timing_text_y;
     data.gameplay.timing_bar_offset_x = data.generic.skin_preview.timing_bar_offset_x = timing_bar_x;
     data.gameplay.timing_bar_offset_y = data.generic.skin_preview.timing_bar_offset_y = timing_bar_y;
@@ -2138,6 +2155,9 @@ int main(int argc, char** argv) {
             data.gameplay.gameplay_field_offset_x = (*next_field_layout)[0];
             data.gameplay.note_width_scale = (*next_field_layout)[1];
         }
+        if (rendered_frames == 35 && next_divider_brightness) {
+            data.gameplay.lane_divider_brightness = data.generic.skin_preview.lane_divider_brightness = *next_divider_brightness;
+        }
         if (avatar_refresh_frame > 0 && rendered_frames == avatar_refresh_frame) ++data.profile_avatar_revision;
         if (cycle_selection) {
             const int selection = (rendered_frames / 45);
@@ -2225,6 +2245,7 @@ int main(int argc, char** argv) {
         // Still emit an explicit unverified report after 60 frames if focus fails.
         if (!menu_roundtrip && !hitmap_written && rendered_frames >= 5 &&
             (!next_field_layout || rendered_frames >= 40) &&
+            (!next_divider_brightness || rendered_frames >= 40) &&
             (MenuWindowVisualTestAccess::owns_foreground(window) || rendered_frames >= 60) &&
             (verify_hits || !hitmap_path.empty())) {
             if (!MenuWindowVisualTestAccess::verify_and_write(window, data, hitmap_path, verify_hits)) {

@@ -83,6 +83,30 @@ TEST_CASE("skin stable identifiers map across the optional LR2 row") {
     CHECK_FALSE(tenriff::app::menu::settings::skin_setting_index(SkinSettingsRowId::Lr2Resolution, false).has_value());
 }
 
+TEST_CASE("skin divider brightness uses one percent steps without changing visibility or geometry") {
+    tenriff::config::RuntimeConfig runtime;
+    SkinSettingsController controller;
+    controller.reset("10k");
+    runtime.skin.show_lane_dividers = false;
+    runtime.skin.lane_divider_width_scale = 1.25;
+    CHECK(runtime.skin.lane_divider_brightness == 1.0);
+    (void)controller.handle(MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames,
+                            SkinSettingsRowId::LaneDividerBrightness);
+    CHECK(runtime.skin.lane_divider_brightness == doctest::Approx(0.99));
+    (void)controller.handle(MenuAction::set_ratio(0.374), runtime, kLr2Names, kTenRiffNames,
+                            SkinSettingsRowId::LaneDividerBrightness);
+    CHECK(runtime.skin.lane_divider_brightness == doctest::Approx(0.37));
+    (void)controller.handle(MenuAction::set_ratio(-1), runtime, kLr2Names, kTenRiffNames,
+                            SkinSettingsRowId::LaneDividerBrightness);
+    CHECK(runtime.skin.lane_divider_brightness == 0.0);
+    (void)controller.handle(MenuAction::set_ratio(2), runtime, kLr2Names, kTenRiffNames,
+                            SkinSettingsRowId::LaneDividerBrightness);
+    CHECK(runtime.skin.lane_divider_brightness == 1.0);
+    CHECK_FALSE(runtime.skin.show_lane_dividers);
+    CHECK(runtime.skin.lane_divider_width_scale == 1.25);
+    CHECK(controller.handle(MenuAction::back(), runtime, kLr2Names, kTenRiffNames).menu.persist_config);
+}
+
 TEST_CASE("skin direct lane selection preserves the active editor row and config while rejecting absent lanes") {
     tenriff::config::RuntimeConfig runtime;
     SkinSettingsController controller;
@@ -170,9 +194,7 @@ TEST_CASE("retired skin controls cannot mutate old presets through stale mouse t
                               SkinSettingsRowId::NoteOutlineOpacity, SkinSettingsRowId::LaneBackgroundOpacity,
                               SkinSettingsRowId::UiFont, SkinSettingsRowId::UiFontFile,
                               SkinSettingsRowId::CenterGap, SkinSettingsRowId::DividerWidth,
-                              SkinSettingsRowId::KeyMode, SkinSettingsRowId::GearBoundary,
-                              SkinSettingsRowId::JudgementX, SkinSettingsRowId::ComboX,
-                              SkinSettingsRowId::TimingTextX, SkinSettingsRowId::TimingBarX}) {
+                              SkinSettingsRowId::KeyMode, SkinSettingsRowId::GearBoundary}) {
             const auto changed = controller.handle(MenuAction::activate(), runtime, kLr2Names, kTenRiffNames, id);
             CHECK(changed.empty());
             CHECK(controller.selected_id() == SkinSettingsRowId::SkinSource);
@@ -582,7 +604,7 @@ TEST_CASE("judgement and combo offsets change independently and clamp to visible
     (void)controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::JudgementX);
     CHECK(runtime.skin.judgement_offset_x == 600);
     (void)controller.handle(MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::ComboX);
-    CHECK(runtime.skin.combo_offset_x == 0);
+    CHECK(runtime.skin.combo_offset_x == -10);
     CHECK(runtime.skin.judgement_offset_x == 600);
 }
 
@@ -797,9 +819,9 @@ TEST_CASE("timing controls adopt manifest switches independently and persist on 
     change(SkinSettingsRowId::TimingTextY, -1);
     change(SkinSettingsRowId::TimingBarX, -1);
     change(SkinSettingsRowId::TimingBarY);
-    CHECK(runtime.skin.timing_text_offset_x == 0);
+    CHECK(runtime.skin.timing_text_offset_x == 10);
     CHECK(runtime.skin.timing_text_offset_y == -10);
-    CHECK(runtime.skin.timing_bar_offset_x == 0);
+    CHECK(runtime.skin.timing_bar_offset_x == -10);
     CHECK(runtime.skin.timing_bar_offset_y == 10);
     CHECK(runtime.skin.judgement_offset_x == 0);
     runtime.skin.timing_bar_offset_y = 400;

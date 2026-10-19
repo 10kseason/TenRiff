@@ -1117,6 +1117,7 @@
 {"Web upload incomplete. See the result message.", "Webアップロードが完了していません。結果メッセージを確認してください。"},
 {"When you opened Keymap from Song Select, the editor defaults to the selected chart's key mode.", "選曲からキー設定を開くと、選択中の譜面のキー数で編集を開始します。"},
 {"White Dividers", "白い区切り線"},
+{"Lane Divider Brightness", "キー区切り線の明るさ"},
 {"Width", "幅"},
 {"Windowed", "ウィンドウ"},
 {"Windows could not open the selected link.", "Windowsで選択したリンクを開けませんでした。"},

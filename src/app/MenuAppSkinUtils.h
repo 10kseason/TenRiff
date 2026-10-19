@@ -89,11 +89,12 @@ enum class SkinSettingsRowId {
     TimingMarkerStyle,
     JudgementLineType,
     JudgementCounts,
+    LaneDividerBrightness,
 };
 
 // The same order drives keyboard navigation, rendered rows and mouse hit targets.
 // Keep related controls adjacent instead of deriving positions from row labels.
-inline constexpr std::array<SkinSettingsRowId, 47> kSkinSettingsRowOrder = {
+inline constexpr std::array<SkinSettingsRowId, 52> kSkinSettingsRowOrder = {
     SkinSettingsRowId::ScratchPosition,
     SkinSettingsRowId::SkinSource,
     SkinSettingsRowId::ImportedSkin,
@@ -125,6 +126,7 @@ inline constexpr std::array<SkinSettingsRowId, 47> kSkinSettingsRowOrder = {
     SkinSettingsRowId::HudLayout,
     SkinSettingsRowId::HudRiffMapVisible,
     SkinSettingsRowId::LaneDividers,
+    SkinSettingsRowId::LaneDividerBrightness,
     SkinSettingsRowId::JudgementLine,
     SkinSettingsRowId::JudgementLineType,
     SkinSettingsRowId::TimingFeedback,
@@ -133,11 +135,15 @@ inline constexpr std::array<SkinSettingsRowId, 47> kSkinSettingsRowOrder = {
     SkinSettingsRowId::TimingMarkerStyle,
     SkinSettingsRowId::JudgementCounts,
     SkinSettingsRowId::TimingTextSize,
+    SkinSettingsRowId::TimingTextX,
     SkinSettingsRowId::TimingTextY,
     SkinSettingsRowId::TimingBarSize,
+    SkinSettingsRowId::TimingBarX,
     SkinSettingsRowId::TimingBarY,
 
+    SkinSettingsRowId::JudgementX,
     SkinSettingsRowId::JudgementY,
+    SkinSettingsRowId::ComboX,
     SkinSettingsRowId::ComboY,
     SkinSettingsRowId::ComboFontSize,
     SkinSettingsRowId::JudgementFontSize,
@@ -183,6 +189,7 @@ enum class SkinSettingsCategory { Source, Geometry, Notes, LongNotes, Effects, H
         case SkinSettingsRowId::HudRiffMapVisible:
         case SkinSettingsRowId::JudgementLineType:
         case SkinSettingsRowId::LaneDividers: case SkinSettingsRowId::JudgementLine:
+        case SkinSettingsRowId::LaneDividerBrightness:
         case SkinSettingsRowId::GearBoundary: case SkinSettingsRowId::KeyLabelPosition:
         case SkinSettingsRowId::TimingBar:
         case SkinSettingsRowId::TimingBarMode:

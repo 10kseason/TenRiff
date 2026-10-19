@@ -1116,6 +1116,8 @@
 {"Web upload incomplete. See the result message.", "网页上传未完成。请查看结果消息。"},
 {"When you opened Keymap from Song Select, the editor defaults to the selected chart's key mode.", "从选曲页面打开键位时，编辑器默认使用所选谱面的键数模式。"},
 {"White Dividers", "白色分隔线"},
+{"Lane Divider Brightness", "键位分隔线亮度"},
+{"Adjust lane divider brightness from 0% (black) to 100% (original color) in 1% steps. Width, opacity and visibility stay unchanged.", "以1%步长调整键位分隔线亮度，0%为黑色，100%为原色。宽度、透明度和显示开关保持不变。"},
 {"Width", "宽度"},
 {"Windowed", "窗口模式"},
 {"Windows could not open the selected link.", "Windows 无法打开所选链接。"},

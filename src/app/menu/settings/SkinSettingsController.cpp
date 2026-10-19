@@ -299,6 +299,10 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
         runtime.skin.key_backdrop_height = backdrop_default_height_.value_or(static_cast<float>(runtime.skin.key_backdrop_height));
         runtime.skin.key_backdrop_override = true;
     }
+    if (action.kind == MenuActionKind::SetRatio && selected_id_ == SkinSettingsRowId::LaneDividerBrightness) {
+        runtime.skin.lane_divider_brightness = clamp_step_value(action.ratio, 0.0, 1.0, 0.01);
+        return mark_changed();
+    }
     if (action.kind == MenuActionKind::SetRatio && backdrop_slider) {
         auto& value = selected_id_ == SkinSettingsRowId::KeyBackdropBrightness ? runtime.skin.key_backdrop_brightness
             : selected_id_ == SkinSettingsRowId::KeyBackdropHeight ? runtime.skin.key_backdrop_height : runtime.skin.key_backdrop_opacity;
@@ -482,6 +486,10 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
             return mark_changed();
         case SkinSettingsRowId::LaneDividers:
             runtime.skin.show_lane_dividers = !runtime.skin.show_lane_dividers;
+            return mark_changed();
+        case SkinSettingsRowId::LaneDividerBrightness:
+            runtime.skin.lane_divider_brightness = clamp_step_value(
+                runtime.skin.lane_divider_brightness + direction * 0.01, 0.0, 1.0, 0.01);
             return mark_changed();
         case SkinSettingsRowId::JudgementLineType:
             runtime.skin.judgement_line_type = runtime.skin.judgement_line_type == 2 ? 1 : 2;
