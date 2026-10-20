@@ -716,8 +716,11 @@ LayoutDefinition resolve_layout_definition(int lane_count) {
     case 6:
         return LayoutDefinition{6, {"11", "12", "13", "14", "15", "16"}, std::string("1"), std::nullopt, std::string("5K")};
     case 8:
+        // An explicit eight-key export must survive an unused sixth slot.
+        // #7K would describe seven keys plus scratch, which native loading now
+        // correctly collapses when channel 16 contains no playable objects.
         return LayoutDefinition{8, {"11", "12", "13", "14", "15", "16", "18", "19"},
-                                std::string("1"), std::nullopt, std::string("7K")};
+                                std::string("1"), std::nullopt, std::string("8K")};
     case 9:
         return LayoutDefinition{9, {"11", "12", "13", "14", "15", "22", "23", "24", "25"},
                                 std::nullopt, std::make_pair(std::string("PLAYMODE"), std::string("9K")), std::nullopt};

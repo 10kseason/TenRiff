@@ -252,6 +252,10 @@ void MenuApp::update_keymap_capture_timeout() {
 }
 
 void MenuApp::apply_keymap_capture(uint32_t keycode) {
+    if (keycode == 0x1Bu || (key_escape_ != 0 && keycode == key_escape_)) {
+        apply_keymap_settings_effects(keymap_settings_controller_.cancel_capture());
+        return;
+    }
 #ifdef _WIN32
     // Polling reports VK_SHIFT before LShift/RShift. Keep capture open for the
     // following side-specific event instead of saving an ambiguous VK_10.

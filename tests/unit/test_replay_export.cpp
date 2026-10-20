@@ -681,13 +681,102 @@ TEST_CASE("replay v3 strict validation rejects ambiguous or unbounded traces") {
     decreasing_sample.trace.events[1].sample = 99;
     CHECK_FALSE(tenriff::gameplay::validate_replay_evidence(decreasing_sample).success());
 
-    ReplayFile repeated_state = replay;
-    repeated_state.trace.events[1].state = InputState::Pressed;
-    CHECK_FALSE(tenriff::gameplay::validate_replay_evidence(repeated_state).success());
+    ReplayFile repeated_press = replay;
+    repeated_press.trace.events[1].state = InputState::Pressed;
+    CHECK(tenriff::gameplay::validate_replay_evidence(repeated_press).success());
+
+    ReplayFile repeated_release = replay;
+    repeated_release.trace.events.push_back(ReplayEvent{1, InputState::Released, 300});
+    CHECK_FALSE(tenriff::gameplay::validate_replay_evidence(repeated_release).success());
+    repeated_release = replay;
+    repeated_release.trace.events.front().state = InputState::Released;
+    CHECK_FALSE(tenriff::gameplay::validate_replay_evidence(repeated_release).success());
 
     ReplayFile non_finite = replay;
     non_finite.score_multiplier = std::numeric_limits<double>::infinity();
     CHECK_FALSE(tenriff::gameplay::validate_replay_evidence(non_finite).success());
+}
+
+TEST_CASE("secondary strikes round trip and verify as current replay taps and continuous charge holds") {
+    const auto directory = std::filesystem::temp_directory_path() /
+        ("tenriff-secondary-replay-" +
+         std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(std::filesystem::create_directory(directory));
+    struct Cleanup {
+        std::filesystem::path path;
+        ~Cleanup() { std::error_code error; std::filesystem::remove_all(path, error); }
+    } cleanup{directory};
+    for (const bool hold : {false, true}) {
+        for (const bool ex : {false, true}) {
+            tenriff::gameplay::GameplayChart source;
+            source.lane_count = 4;
+            source.duration_samples = 24000;
+            source.bms_rank = 2;
+            tenriff::gameplay::NoteEvent first{1, 8000,
+                hold ? std::optional<int64_t>{16000} : std::nullopt};
+            first.release_required = hold;
+            source.notes.push_back(first);
+            if (!hold) {
+                source.notes.push_back({1, 10000, std::nullopt});
+                source.notes.push_back({1, 16000, std::nullopt});
+            }
+            ReplayFile replay;
+            replay.chart_format = "bms";
+            replay.bms_rank = source.bms_rank;
+            replay.chart_sha256 = std::string(64, 'b');
+            replay.ruleset_id = std::string(ex ? tenriff::app::kExReplayRulesetId
+                                               : tenriff::app::kCanonicalReplayRulesetId);
+            replay.sample_rate = 8000;
+            replay.mode.key_mode = "auto";
+            replay.mode.random = "off";
+            replay.mode.gauge = "normal";
+            if (ex) replay.mods = {"judge_ex"};
+            replay.score_multiplier = tenriff::app::final_score_multiplier(replay.mods, 1.0);
+            auto chart = source;
+            tenriff::gameplay::offset_gameplay_chart_samples(chart, 24000);
+            tenriff::gameplay::GameplayConfig config;
+            config.sample_rate = replay.sample_rate;
+            config.judge = tenriff::app::replay_judge_config_for_playback(
+                replay, tenriff::config::JudgeConfig{}, source.bms_rank);
+            config.gauge_shift_enabled = true;
+            tenriff::gameplay::GameplayEngine engine(chart, config);
+            const std::vector<ReplayEvent> strikes{
+                {1, InputState::Pressed, 32000},
+                {1, InputState::Pressed, 34000},
+                {1, InputState::Released, hold ? 40000 : 36000}};
+            for (const auto& event : strikes) {
+                static_cast<void>(engine.handle_input(event.lane, event.state, event.sample));
+                engine.advance(event.sample);
+            }
+            if (!hold) {
+                static_cast<void>(engine.handle_input(1, InputState::Pressed, 40000));
+                engine.advance(40000);
+            }
+            engine.advance(48000);
+            REQUIRE(engine.stats().counts.pg == (hold ? 2 : 3));
+            REQUIRE(engine.stats().counts.bd == 0);
+            replay.trace = engine.replay();
+            replay.stats = engine.stats();
+            replay.final_score = tenriff::gameplay::scale_native_score(
+                replay.stats.raw_score, replay.score_multiplier);
+            const auto path = directory / "takeover.json";
+            REQUIRE(save_replay_json(path.u8string(), replay).success());
+            const auto loaded = load_replay_json(path.u8string());
+            REQUIRE(loaded.success());
+            REQUIRE(loaded.replay->trace.events.size() == replay.trace.events.size());
+            for (std::size_t i = 0; i < replay.trace.events.size(); ++i) {
+                CHECK(loaded.replay->trace.events[i].state == replay.trace.events[i].state);
+                CHECK(loaded.replay->trace.events[i].sample == replay.trace.events[i].sample);
+            }
+            const auto verified = tenriff::app::verify_replay_against_chart(
+                *loaded.replay, source, tenriff::app::ChartFormat::Bms, 120.0);
+            REQUIRE(verified.verified());
+            CHECK(verified.claims_match);
+            CHECK(verified.stats.counts.pg == (hold ? 2 : 3));
+            CHECK(verified.stats.counts.bd == 0);
+            CHECK(verified.final_gauge_value == doctest::Approx(engine.gauge_state().value));
+        }
+    }
 }
 
 TEST_CASE("deterministic replay verification ignores edited score claims") {
@@ -2226,4 +2315,82 @@ TEST_CASE("fixed timing baseline live and replay boundaries agree at 44k 48k and
         }
     }
     CHECK(probes == 1080);
+}
+
+TEST_CASE("scratch-free BMS new native7 historical native7 native8 and explicit conversion replays verify without new fields") {
+    const auto directory = std::filesystem::temp_directory_path() /
+        ("tenriff-scratch-free-replays-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(std::filesystem::create_directory(directory));
+    const auto path = directory / "seven.bms";
+    for (const bool already_seven : {false, true}) {
+    write_file(path, already_seven
+        ? "#TITLE Historical sparse seven\n#BPM 120\n#7K\n#00111:01\n#00214:01\n"
+        : "#TITLE Scratch-free replay fixture\n#BPM 120\n#7K\n"
+          "#00111:01\n#00214:01\n#00319:01\n#00418:01\n#00116:0000\n");
+    const auto hash = tenriff::app::hash_chart_file(path);
+    REQUIRE(hash.valid());
+    for (const bool legacy_source : {false, true}) {
+        for (const std::string key_mode : {"auto", "7k", "8k"}) {
+            // Explicit conversion keeps the old source in both new and old runs.
+            if (!legacy_source && key_mode != "auto") continue;
+            for (const std::string random : {"off", "mirror", "rr", "sr"}) {
+                const auto source = tenriff::app::ChartLoader{}.load(
+                    path.u8string(), 48000, 1.0, "ignore", 0, 1, 1, legacy_source);
+                REQUIRE(source.success());
+                if (already_seven) {
+                    REQUIRE(source.chart.notes.size() == 2);
+                    CHECK(source.chart.notes[1].lane == 2);
+                }
+                tenriff::config::ModeConfig mode;
+                mode.key_mode = key_mode;
+                mode.random = random;
+                mode.random_seed = 42;
+                mode.gauge = "normal";
+                const auto managed = tenriff::app::manage_modes(source.chart, source.format, mode, {},
+                    1.0, source.base_bpm, 48000, tenriff::app::LongNoteMixVersion::LegacyShort, 3);
+                auto played = managed.chart;
+                tenriff::gameplay::offset_gameplay_chart_samples(played, 144000);
+                tenriff::gameplay::GameplayConfig config;
+                config.sample_rate = 48000;
+                config.judge = managed.judge;
+                config.gauge_shift_enabled = true;
+                tenriff::gameplay::GameplayEngine engine(played, config);
+                for (const auto& note : played.notes) {
+                    engine.advance(note.start_sample - 1);
+                    (void)engine.handle_input(note.lane, InputState::Pressed, note.start_sample);
+                    (void)engine.handle_input(note.lane, InputState::Released, note.start_sample + 1);
+                }
+                engine.advance(played.duration_samples + 240000);
+                ReplayFile replay;
+                replay.chart_path = path.u8string();
+                replay.chart_format = "bms";
+                replay.chart_sha256 = hash.sha256;
+                replay.ruleset_id = tenriff::app::kCanonicalReplayRulesetId;
+                replay.sample_rate = 48000;
+                replay.mods = managed.active_mods;
+                replay.mode.key_mode = key_mode;
+                replay.mode.random = random;
+                replay.mode.random_seed = 42;
+                replay.mode.gauge = "normal";
+                replay.mode.key_conversion_version = 3;
+                replay.mode.key_conversion_algorithm = mode.key_conversion_algorithm;
+                replay.mode.key_conversion_nk2_preset = mode.key_conversion_nk2_preset;
+                replay.trace = engine.replay();
+                replay.stats = engine.stats();
+                replay.rate_multiplier = managed.rate_multiplier;
+                replay.score_multiplier = managed.final_multiplier;
+                replay.final_score = tenriff::gameplay::scale_native_score(replay.stats.raw_score, replay.score_multiplier);
+                if (key_mode == "auto") CHECK(replay.trace.lane_count == (legacy_source && !already_seven ? 8 : 7));
+                const auto replay_path = directory / "replay.json";
+                REQUIRE(save_replay_json(replay_path.u8string(), replay).success());
+                const auto verified = tenriff::app::verify_replay_file(replay_path, path);
+                CHECK(verified.verified());
+                CHECK(verified.claims_match);
+                CHECK(verified.stats.counts.pg == static_cast<int>(played.notes.size()));
+                CHECK(read_file(replay_path).find("bms_layout_version") == std::string::npos);
+            }
+        }
+    }
+    }
+    std::filesystem::remove_all(directory);
 }

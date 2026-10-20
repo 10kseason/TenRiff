@@ -1,4 +1,5 @@
 #include "render/BgaImageLoader.h"
+#include "render/BgaTransparency.h"
 
 #include <condition_variable>
 #include <limits>
@@ -35,7 +36,7 @@ struct ThreadComInit {
 
 std::shared_ptr<BgaImageFrame> decode_image(IWICImagingFactory* factory,
                                             const std::string& path,
-                                            std::uint64_t request_id) {
+                                            std::uint64_t request_id, bool black_key) {
     auto result = std::make_shared<BgaImageFrame>();
     result->source_path = path;
     result->request_id = request_id;
@@ -55,7 +56,7 @@ std::shared_ptr<BgaImageFrame> decode_image(IWICImagingFactory* factory,
     Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
     if (FAILED(decoder->GetFrame(0, &frame)) || !frame ||
         FAILED(factory->CreateFormatConverter(&converter)) || !converter ||
-        FAILED(converter->Initialize(frame.Get(), GUID_WICPixelFormat32bppPBGRA,
+        FAILED(converter->Initialize(frame.Get(), black_key ? GUID_WICPixelFormat32bppBGRA : GUID_WICPixelFormat32bppPBGRA,
                                      WICBitmapDitherTypeNone, nullptr, 0.0f,
                                      WICBitmapPaletteTypeCustom))) {
         return result;
@@ -82,6 +83,14 @@ std::shared_ptr<BgaImageFrame> decode_image(IWICImagingFactory* factory,
     }
     result->width = width;
     result->height = height;
+    if (black_key) {
+        apply_bga_black_key(result->bgra);
+        for (std::size_t i = 0; i < result->bgra.size(); i += 4) {
+            const auto alpha = result->bgra[i + 3];
+            for (int c = 0; c < 3; ++c)
+                result->bgra[i + c] = static_cast<std::uint8_t>((result->bgra[i + c] * alpha + 127) / 255);
+        }
+    }
     return result;
 }
 #endif
@@ -97,9 +106,10 @@ struct BgaImageLoader::Impl {
     std::string requested_path;
     std::string pending_path;
     std::shared_ptr<const BgaImageFrame> ready;
+    const bool black_key;
     std::thread worker;
 
-    Impl() : worker([this]() { run(); }) {}
+    explicit Impl(bool key) : black_key(key), worker([this]() { run(); }) {}
 
     ~Impl() {
         {
@@ -140,7 +150,7 @@ struct BgaImageLoader::Impl {
 
 #ifdef _WIN32
             std::shared_ptr<const BgaImageFrame> decoded =
-                decode_image(factory.Get(), path, id);
+                decode_image(factory.Get(), path, id, black_key);
 #else
             auto unsupported = std::make_shared<BgaImageFrame>();
             unsupported->source_path = path;
@@ -155,7 +165,7 @@ struct BgaImageLoader::Impl {
     }
 };
 
-BgaImageLoader::BgaImageLoader() : impl_(std::make_unique<Impl>()) {}
+BgaImageLoader::BgaImageLoader(bool black_key) : impl_(std::make_unique<Impl>(black_key)) {}
 BgaImageLoader::~BgaImageLoader() = default;
 
 void BgaImageLoader::request(std::string path) {

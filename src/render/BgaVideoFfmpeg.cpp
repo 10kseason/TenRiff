@@ -149,6 +149,9 @@ bool read_bmp_frame(HANDLE pipe,
 struct BgaVideoFfmpegReader::Impl {
     std::string path;
     std::int64_t next_frame_index = 0;
+    std::shared_ptr<BgaVideoFrame> last_frame;
+    std::int64_t requested_frame_index = -1;
+    bool ended = false;
 
 #ifdef _WIN32
     HANDLE process = nullptr;
@@ -157,6 +160,8 @@ struct BgaVideoFfmpegReader::Impl {
 
     bool start(std::int64_t first_frame_index) {
         stop();
+        last_frame.reset();
+        ended = false;
         if (path.empty()) {
             return false;
         }
@@ -273,7 +278,15 @@ std::shared_ptr<BgaVideoFrame> BgaVideoFfmpegReader::read_at(std::int64_t target
         static_cast<double>(std::max<std::int64_t>(0, target_100ns)) *
         static_cast<double>(kFallbackFramesPerSecond) /
         static_cast<double>(kHundredNsPerSecond)));
-    if (target_frame < impl_->next_frame_index ||
+    const bool backwards = impl_->requested_frame_index >= 0 && target_frame < impl_->requested_frame_index;
+    impl_->requested_frame_index = target_frame;
+    if (impl_->ended && !backwards) return impl_->last_frame;
+    // next_frame_index points past the frame already delivered. Repeating that
+    // frame's time (including a paused clock) must not restart the subprocess.
+    if (impl_->last_frame && target_frame == impl_->next_frame_index - 1) {
+        return impl_->last_frame;
+    }
+    if (backwards || target_frame < impl_->next_frame_index - 1 ||
         target_frame - impl_->next_frame_index > kMaximumSequentialFrames) {
         if (!impl_->start(target_frame)) {
             return {};
@@ -286,7 +299,8 @@ std::shared_ptr<BgaVideoFrame> BgaVideoFfmpegReader::read_at(std::int64_t target
         std::uint32_t height = 0;
         std::vector<std::uint8_t> bgra;
         if (!read_bmp_frame(impl_->output, width, height, bgra)) {
-            return result;
+            impl_->ended = true;
+            return impl_->last_frame;
         }
         auto frame = std::make_shared<BgaVideoFrame>();
         frame->source_path = impl_->path;
@@ -297,6 +311,7 @@ std::shared_ptr<BgaVideoFrame> BgaVideoFfmpegReader::read_at(std::int64_t target
         frame->bgra = std::move(bgra);
         ++impl_->next_frame_index;
         result = std::move(frame);
+        impl_->last_frame = result;
     }
     return result;
 #else
@@ -312,6 +327,9 @@ void BgaVideoFfmpegReader::close() {
     impl_->stop();
     impl_->path.clear();
     impl_->next_frame_index = 0;
+    impl_->last_frame.reset();
+    impl_->requested_frame_index = -1;
+    impl_->ended = false;
 }
 
 const std::string& BgaVideoFfmpegReader::path() const {

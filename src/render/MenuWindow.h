@@ -1012,6 +1012,17 @@ private:
     [[nodiscard]] bool ensure_gameplay_note_sprites(const GameplayHudData& data);
     void invalidate_gameplay_background_cache();
     [[nodiscard]] std::array<std::size_t, 2> gameplay_background_retention_stats() const;
+    // Readback is invoked only by the standalone developer preview friend.
+    // Normal rendering never allocates a staging bitmap or reads GPU pixels.
+    struct GameplayBackgroundProbe {
+        const void* bitmap_identity = nullptr;
+        uint32_t width = 0, height = 0;
+        bool readable = false;
+        std::array<uint8_t, 4> first_bgra{};
+        uint8_t min_alpha = 255, max_alpha = 0;
+        uint64_t pixel_hash = 0;
+    };
+    [[nodiscard]] GameplayBackgroundProbe gameplay_background_probe(bool overlay) const;
     void set_background_upscale_model_path(std::string model_path, bool prefer_npu, std::string output_mode);
     [[nodiscard]] bool ensure_gameplay_background_bitmap(const GameplayHudData& data);
     void invalidate_song_select_preview_cache();

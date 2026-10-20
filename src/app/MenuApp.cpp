@@ -5142,50 +5142,38 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
 }
 
 bool MenuApp::move_song_select_selection(int delta) {
-    if (showing_table_level_folders()) {
-        if (table_levels_.empty()) return false;
-        const int previous = selected_table_level_;
-        selected_table_level_ = clamp_int(selected_table_level_ + delta, 0, static_cast<int>(table_levels_.size() - 1));
-        return previous != selected_table_level_;
-    }
     if (delta == 0) {
         return false;
     }
+    // Keyboard repeat, Page Up/Down and wheel input share this path. Widen
+    // before adding so even a large wheel/page delta cannot overflow an index.
+    const auto move_cyclic = [delta](int& selection, std::size_t count) {
+        if (count == 0) return false;
+        const int previous = selection;
+        const auto size = static_cast<int64_t>(count);
+        auto next = (static_cast<int64_t>(selection) + delta) % size;
+        if (next < 0) next += size;
+        selection = static_cast<int>(next);
+        return previous != selection;
+    };
+    if (showing_table_level_folders()) {
+        return move_cyclic(selected_table_level_, table_levels_.size());
+    }
 
     if (song_select_view_ == SongSelectView::Sources) {
-        const int previous = selected_source_;
-        selected_source_ = clamp_int(selected_source_ + delta, 0,
-                                     static_cast<int>(config_.ui.recent_song_sources.size()));
-        return selected_source_ != previous;
+        return move_cyclic(selected_source_, config_.ui.recent_song_sources.size() + 1);
     }
 
     if (song_select_view_ == SongSelectView::Records) {
         if (online_records_view_) {
             const auto online = online_records_service_.snapshot();
-            if (online.records.empty()) return false;
-            const int previous = selected_online_record_;
-            selected_online_record_ = clamp_int(
-                selected_online_record_ + delta, 0,
-                static_cast<int>(online.records.size() - 1));
-            return selected_online_record_ != previous;
+            return move_cyclic(selected_online_record_, online.records.size());
         }
         rebuild_current_song_record_indices();
-        if (current_song_record_indices_.empty()) {
-            return false;
-        }
-        const int previous = selected_record_;
-        selected_record_ = clamp_int(selected_record_ + delta, 0,
-                                     static_cast<int>(current_song_record_indices_.size() - 1));
-        return selected_record_ != previous;
+        return move_cyclic(selected_record_, current_song_record_indices_.size());
     }
 
-    if (visible_song_count() == 0) {
-        return false;
-    }
-
-    const int previous = selected_song_;
-    selected_song_ = clamp_int(selected_song_ + delta, 0, static_cast<int>(visible_song_count() - 1));
-    return selected_song_ != previous;
+    return move_cyclic(selected_song_, visible_song_count());
 }
 
 bool MenuApp::result_presentation_ready() const {

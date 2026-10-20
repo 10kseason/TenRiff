@@ -338,7 +338,7 @@
         if (d2d_->title_format && d2d_->text_brush) {
             const std::wstring library_title =
                 data.song_select.showing_sources
-                    ? wloc("SONG SOURCES", "곡 소스")
+                    ? wloc("LIBRARIES", "곡 라이브러리")
                     : (data.song_select.showing_records
                            ? (data.song_select.online_records
                                   ? (data.song_select.sites_records ? wloc("WEB RECORDS", "웹 기록") : wloc("LEGACY SERVER RECORDS", "기존 서버 기록"))
@@ -401,6 +401,7 @@
             std::max(0.0f, (card_bottom - card_top - card_height * 7.0f) / 6.0f));
         for (std::size_t i = 0; i < data.song_select.songs.size(); ++i) {
             const auto& song = data.song_select.songs[i];
+            const auto lamp = song_select_lamp_presentation(song.lamp);
             const float y0 = card_top + static_cast<float>(i) * (card_height + card_gap);
             const float entry_x = native_motion_screen ? -14.0f * (1.0f - native_menu_motion_.entrance(
                 static_cast<float>(i) * 0.025f)) : 0.0f;
@@ -416,6 +417,12 @@
             if (modern_library_screen && song.selected && d2d_->button_selected_brush) {
                 ctx->FillRoundedRectangle(D2D1::RoundedRect(card, 9.0f, 9.0f),
                                           d2d_->button_selected_brush.Get());
+            }
+            if (lamp.tint_card) {
+                // A low-opacity wash keeps the existing selection frame and
+                // artwork readable while exposing the saved clear gauge.
+                ctx->FillRoundedRectangle(D2D1::RoundedRect(card, 9.0f, 9.0f),
+                    semantic_color(*lamp.color, song.selected ? 0.085f : 0.055f));
             }
             if (song.selected && d2d_->accent_brush) {
                 const float saved = d2d_->accent_brush->GetOpacity();
@@ -491,11 +498,12 @@
                                    native_rect("songselect.rect.030", D2D1::RectF(value_left, card.top + 54.0f,
                                                card.right - 12.0f, card.bottom - 8.0f)),
                                    d2d_->accent_brush.Get());
-            } else if (!song.lamp.empty() && d2d_->hud_format && d2d_->muted_brush) {
-                draw_trailing_text(to_wide(song.lamp), d2d_->hud_format.Get(),
-                                   native_rect("songselect.rect.031", D2D1::RectF(value_left, card.top + 54.0f,
-                                               card.right - 12.0f, card.bottom - 8.0f)),
-                                   d2d_->muted_brush.Get());
+            } else if (!lamp.label.empty() && d2d_->stats_value_format && d2d_->muted_brush) {
+                draw_trailing_text(to_wide(lamp.label), d2d_->stats_value_format.Get(),
+                                   native_rect("songselect.rect.031", D2D1::RectF(value_left, card.top + 52.0f,
+                                               card.right - 12.0f, card.bottom - 7.0f)),
+                                   lamp.color ? semantic_color(*lamp.color)
+                                              : static_cast<ID2D1Brush*>(d2d_->muted_brush.Get()));
             }
         }
 
@@ -891,8 +899,8 @@
         if (d2d_->song_artist_format && d2d_->accent_brush) {
             const std::string subtitle =
                 data.song_select.showing_sources
-                    ? (data.song_select.selected_source_all ? loc("ALL REGISTERED SOURCES", "등록된 모든 소스")
-                                                            : loc("LOCAL SONG SOURCE", "로컬 곡 소스"))
+                    ? (data.song_select.selected_source_all ? loc("ALL REGISTERED LIBRARIES", "등록된 모든 라이브러리")
+                                                            : loc("LOCAL LIBRARY", "로컬 곡 라이브러리"))
                     : (data.song_select.showing_records
                            ? data.song_select.selected_record_created_utc
                            : data.song_select.selected_song_artist);
@@ -1144,7 +1152,7 @@
                 std::string status =
                     loc("LAMP ", "램프 ") +
                     (data.song_select.selected_song_lamp.empty()
-                         ? "--" : data.song_select.selected_song_lamp);
+                         ? "--" : song_select_lamp_presentation(data.song_select.selected_song_lamp).label);
                 status += data.song_select.selected_song_favorite
                               ? "  /  FAVORITE" : "  /  NOT FAVORITE";
                 if (!data.song_select.selected_song_ghost_status.empty()) {
@@ -1181,7 +1189,7 @@
                                : "--", true);
             draw_meta_pair(native_rect("songselect.rect.083", D2D1::RectF(right_left + 220.0f, right_panel.top + 162.0f,
                                        right_left + 390.0f, right_panel.top + 238.0f)),
-                           loc("ROOTS", "소스"),
+                           loc("LIBRARIES", "라이브러리"),
                            format_int_with_commas(data.song_select.source_count));
             if (d2d_->body_format && d2d_->muted_brush) {
                 draw_text_clipped(to_wide(data.song_select.selected_source_path),
@@ -1271,7 +1279,7 @@
             }
             const std::wstring action_label =
                 data.song_select.showing_sources
-                    ? wloc("OPEN SOURCE", "소스 열기")
+                    ? wloc("OPEN LIBRARY", "라이브러리 열기")
                     : (data.song_select.showing_records
                            ? (data.song_select.online_records
                                   ? wloc("VIEW ONLY", "조회 전용")

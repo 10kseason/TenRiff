@@ -748,7 +748,8 @@ bool contains_any_channel(const std::vector<std::string>& lane_channels,
     return false;
 }
 
-DeclaredLayout detect_declared_layout(const BmsChart& chart, std::string_view source_extension = {}) {
+DeclaredLayout detect_declared_layout(const BmsChart& chart, std::string_view source_extension = {},
+                                      bool preserve_empty_sp_scratch = false) {
     static constexpr std::array<std::string_view, 6> kSpFiveTemplate = {"11", "12", "13", "14", "15", "16"};
     static constexpr std::array<std::string_view, 8> kSpSevenTemplate = {"11", "12", "13", "14", "15", "16", "18", "19"};
     static constexpr std::array<std::string_view, 10> kDpTenTemplate = {"11", "12", "13", "14", "15",
@@ -796,6 +797,18 @@ DeclaredLayout detect_declared_layout(const BmsChart& chart, std::string_view so
                                       matches_only_allowed_channels(lane_channels, kDpTenTemplate);
     const bool fits_standard_dp_fourteen_plus_two = has_two_player_channels &&
                                                     matches_only_allowed_channels(lane_channels, kDpFourteenPlusTwoTemplate);
+
+    // Standard SP channels 18/19 describe the sixth/seventh keyboard lanes;
+    // they do not imply that a scratch exists. Keep explicit non-7K layouts,
+    // PMS and DP unchanged, and retain every keyboard position when collapsing
+    // a former 7+1 chart. Already-7K sparse layouts without 18/19 keep their
+    // historical compact mapping: their old 7-lane replays have no discriminator.
+    if (!preserve_empty_sp_scratch && !is_pms_source && !has_two_player_channels &&
+        (explicit_key_count == 0 || explicit_key_count == 7) &&
+        fits_standard_sp_seven && !chart.has_sp_scratch_objects &&
+        contains_any_channel(lane_channels, {"18", "19"})) {
+        return DeclaredLayout{7, {}, {"11", "12", "13", "14", "15", "18", "19"}};
+    }
 
     if (!has_two_player_channels) {
         if (explicit_key_count == 5 && uses_sp5_channels) {
@@ -1021,6 +1034,22 @@ BmsParseResult BmsParser::parse(std::string_view content, const BmsParserOptions
                 continue;
             }
 
+            measure_tail.remove_prefix(1);
+            std::string data = trim(measure_tail);
+            // Remove all spaces and tabs from data to ensure even-length token parsing.
+            data.erase(std::remove_if(data.begin(), data.end(), [](unsigned char ch) {
+                          return ch == ' ' || ch == '\t';
+                      }),
+                      data.end());
+            if (channel_token == "16" || channel_token == "56" || channel_token == "D6") {
+                for (std::size_t offset = 0; offset + 1 < data.size(); offset += 2) {
+                    if (data.compare(offset, 2, "00") != 0) {
+                        result.chart.has_sp_scratch_objects = true;
+                        break;
+                    }
+                }
+            }
+
             if (options.metadata_only) {
                 if (is_note_lane_channel(channel_token)) {
                     const std::string canonical = canonical_lane_channel(channel_token);
@@ -1030,14 +1059,6 @@ BmsParseResult BmsParser::parse(std::string_view content, const BmsParserOptions
                 }
                 continue;
             }
-
-            measure_tail.remove_prefix(1);
-            std::string data = trim(measure_tail);
-            // Remove all spaces and tabs from data to ensure even-length token parsing.
-            data.erase(std::remove_if(data.begin(), data.end(), [](unsigned char ch) {
-                          return ch == ' ' || ch == '\t';
-                      }),
-                      data.end());
 
             if (channel_token != "02" && !validate_measure_token_length(data)) {
                 auto severity = options.tolerant ? BmsParseSeverity::Warning : BmsParseSeverity::Error;
@@ -1155,7 +1176,7 @@ BmsParseResult BmsParser::parse(std::string_view content, const BmsParserOptions
         }
     }
 
-    const DeclaredLayout declared_layout = detect_declared_layout(result.chart);
+    const DeclaredLayout declared_layout = detect_declared_layout(result.chart, {}, options.preserve_empty_sp_scratch);
     result.chart.declared_key_count = declared_layout.key_count;
     result.chart.layout_label = declared_layout.layout_label;
     if (result.chart.declared_key_count > 0) {
@@ -1186,7 +1207,7 @@ BmsParseResult BmsParser::parseFile(const std::string& path, const BmsParserOpti
     buffer << file.rdbuf();
     BmsParseResult result = parse(buffer.str(), options);
     const std::string extension = lower_extension(std::filesystem::path(std::filesystem::u8path(path)).extension().u8string());
-    const DeclaredLayout declared_layout = detect_declared_layout(result.chart, extension);
+    const DeclaredLayout declared_layout = detect_declared_layout(result.chart, extension, options.preserve_empty_sp_scratch);
     result.chart.declared_key_count = declared_layout.key_count;
     result.chart.layout_label = declared_layout.layout_label;
     if (result.chart.declared_key_count > 0) {

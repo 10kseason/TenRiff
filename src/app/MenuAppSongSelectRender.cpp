@@ -11,6 +11,7 @@
 #include "app/MenuAppSongSelectUtils.h"
 #include "app/MenuRecordUtils.h"
 #include "app/MenuSongUtils.h"
+#include "render/GameplayGaugePalette.h"
 #include "timing/HighResClock.h"
 
 namespace tenriff::app {
@@ -262,8 +263,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             ? ui_text("UP/DOWN or wheel  MOVE     ENTER / dbl-click  SELECT FOR LOBBY",
                       "위/아래 또는 휠  이동     ENTER / 더블클릭  로비 곡 선택")
             : (render.song_select.showing_sources
-            ? ui_text("UP/DOWN or wheel  MOVE     ENTER / dbl-click  OPEN SOURCE     PGUP/PGDN  PAGE",
-                      "위/아래 또는 휠  이동     ENTER / 더블클릭  소스 열기     PGUP/PGDN  페이지")
+            ? ui_text("UP/DOWN or wheel  MOVE     ENTER / dbl-click  OPEN LIBRARY     PGUP/PGDN  PAGE",
+                      "위/아래 또는 휠  이동     ENTER / 더블클릭  라이브러리 열기     PGUP/PGDN  페이지")
             : (render.song_select.showing_records
                    ? (render.song_select.online_records
                           ? ui_text("UP/DOWN or wheel  MOVE     TAB  LOCAL RECORDS     F5  REFRESH",
@@ -301,7 +302,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
 
     const std::string source_detail =
         std::to_string(render.song_select.source_count) + " " +
-        ui_text(render.song_select.source_count == 1 ? "ROOT" : "ROOTS", "소스");
+        ui_text(render.song_select.source_count == 1 ? "LIBRARY" : "LIBRARIES", "라이브러리");
     const std::string group_detail = render.song_select.group_summary;
     const std::string browser_detail = render.song_select.browser_summary;
     const std::string records_detail =
@@ -360,7 +361,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                                render.song_select.showing_sources || render.song_select.showing_records
                                    ? (std::to_string(render.song_select.song_count) + " " + ui_text("CHARTS", "차트"))
                                    : ui_text("ACTIVE", "활성")},
-        render::MenuButtonData{ui_text("SOURCES", "소스"), u8"▣", song_select_nav_cursor_ == 1,
+        render::MenuButtonData{ui_text("LIBRARY", "라이브러리"), u8"▣", song_select_nav_cursor_ == 1,
                                config_.ui.recent_song_sources.empty()
                                    ? ui_text("ADD FOLDER", "폴더 추가")
                                    : (render.song_select.showing_sources ? ui_text("ACTIVE", "활성") : source_detail)},
@@ -406,7 +407,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 if (i == 0) {
                     card.title = "ALL SONG";
                     card.artist = ui_text("All registered song folders", "등록한 모든 곡 폴더");
-                    card.detail = config_.ui.all_song_sources ? ui_text("CURRENT SOURCE", "현재 소스")
+                    card.detail = config_.ui.all_song_sources ? ui_text("CURRENT LIBRARY", "현재 라이브러리")
                         : ui_text("Combined library · duplicates removed", "통합 라이브러리 · 중복 제외");
                     card.level = std::max(0, all_source_song_count_);
                     render.song_select.songs.push_back(std::move(card));
@@ -420,8 +421,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 card.level = (count_it != source_song_counts_.end()) ? count_it->second : 0;
                 card.detail = safe_ui_text((!config_.ui.all_song_sources && menu_songs::normalize_path_key(path_from_utf8(source_path)) ==
                                             menu_songs::normalize_path_key(path_from_utf8(songs_path_)))
-                                               ? ui_text("CURRENT SOURCE", "현재 소스")
-                                               : ui_text("RECENT SOURCE", "최근 소스"));
+                                               ? ui_text("CURRENT LIBRARY", "현재 라이브러리")
+                                               : ui_text("RECENT LIBRARY", "최근 라이브러리"));
                 render.song_select.songs.push_back(std::move(card));
             }
 
@@ -449,10 +450,10 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             }
         }
         if (total_sources == 1) {
-            render.song_select.empty_title = ui_text("NO SONG SOURCES", "불러온 곡 소스 없음");
+            render.song_select.empty_title = ui_text("NO LIBRARIES", "불러온 곡 라이브러리 없음");
             render.song_select.empty_message =
-                ui_text("Use SOURCES > Add Songs Folder, press F2, or drop a folder onto the window.",
-                        "SOURCES > 폴더 추가를 사용하거나 F2를 누르거나, 폴더를 창에 드래그 앤 드롭하세요.");
+                ui_text("Use LIBRARY > Add Songs Folder, press F2, or drop a folder onto the window.",
+                        "라이브러리 > 폴더 추가를 사용하거나 F2를 누르거나, 폴더를 창에 드래그 앤 드롭하세요.");
         }
     } else if (render.song_select.showing_records) {
         const int total = render.song_select.record_count;
@@ -478,7 +479,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                     render::SongCardData card;
                     card.title = "#" + std::to_string(record.rank) + "  " +
                                  safe_ui_text(record.player_name, "PLAYER");
-                    card.artist = record.clear_status + "  " +
+                    card.artist = render::song_select_lamp_presentation(record.clear_status).label + "  " +
                                   ui_text("SCORE ", "점수 ") +
                                   format_int_with_commas(record.score) + "  " +
                                   format_decimal(record.accuracy) + "%";
@@ -495,7 +496,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                     local_play_records_[current_song_record_indices_[static_cast<std::size_t>(i)]];
                 render::SongCardData card;
                 card.title = menu_records::compact_timestamp_label(record.created_utc);
-                card.artist = record.player_name + "  " + record.clear_status + "  " +
+                card.artist = record.player_name + "  " + render::song_select_lamp_presentation(record.clear_status).label + "  " +
                               record.rank + "  " + ui_text("SCORE ", "점수 ") +
                               format_int_with_commas(record.score);
                 card.detail = record.replay_path.empty()
@@ -620,24 +621,24 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             if (multiplayer_selecting_chart_) {
                 render.song_select.empty_title = ui_text("NO SHARED CHARTS", "공통 보유 차트 없음");
                 render.song_select.empty_message =
-                    ui_text("Only byte-identical BMS charts owned by every connected player are shown. Change song sources or reindex to refresh the shared list.",
-                            "현재 접속자 전원이 가진 바이트 단위 동일 BMS만 표시합니다. 곡 소스를 바꾸거나 재인덱스해 공통 목록을 갱신하세요.");
+                    ui_text("Only byte-identical BMS charts owned by every connected player are shown. Change libraries or reindex to refresh the shared list.",
+                            "현재 접속자 전원이 가진 바이트 단위 동일 BMS만 표시합니다. 곡 라이브러리를 바꾸거나 재인덱스해 공통 목록을 갱신하세요.");
             } else if (!song_search_query_.empty() || song_key_filter_ > 0 || song_level_min_filter_ > 0 ||
                 song_level_max_filter_ > 0) {
                 render.song_select.empty_title = ui_text("NO CHARTS MATCH", "일치하는 차트 없음");
                 render.song_select.empty_message =
-                    ui_text("Clear the current search/filter or switch the active source to see more charts.",
-                            "현재 검색/필터를 지우거나 활성 소스를 바꿔 더 많은 차트를 보세요.");
+                    ui_text("Clear the current search/filter or switch the active library to see more charts.",
+                            "현재 검색/필터를 지우거나 활성 라이브러리를 바꿔 더 많은 차트를 보세요.");
             } else if (render.song_select.indexing) {
                 render.song_select.empty_title = ui_text("BUILDING LIBRARY", "라이브러리 생성 중");
                 render.song_select.empty_message =
-                    ui_text("The current source is still indexing. You can keep browsing while scan progress updates above.",
-                            "현재 소스를 아직 인덱싱 중입니다. 위 진행 상황이 갱신되는 동안 계속 둘러볼 수 있습니다.");
+                    ui_text("The current library is still indexing. You can keep browsing while scan progress updates above.",
+                            "현재 라이브러리를 아직 인덱싱 중입니다. 위 진행 상황이 갱신되는 동안 계속 둘러볼 수 있습니다.");
             } else {
                 render.song_select.empty_title = ui_text("NO CHARTS INDEXED", "인덱싱된 차트 없음");
                 render.song_select.empty_message =
-                    ui_text("Use SOURCES > Add Songs Folder, press F2, or drop a songs folder. Then use F5 to reindex.",
-                            "SOURCES > 폴더 추가를 사용하거나 F2를 누르거나 곡 폴더를 드래그 앤 드롭한 뒤 F5로 재인덱스하세요.");
+                    ui_text("Use LIBRARY > Add Songs Folder, press F2, or drop a songs folder. Then use F5 to reindex.",
+                            "라이브러리 > 폴더 추가를 사용하거나 F2를 누르거나 곡 폴더를 드래그 앤 드롭한 뒤 F5로 재인덱스하세요.");
             }
         }
     }
@@ -709,7 +710,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                     selected_online_record->verified_at_utc);
             render.song_select.selected_record_status =
                 selected_online_record->player_name + " / " +
-                selected_online_record->clear_status + (sites_records_view_ ? " / WEB" : " / ONLINE VERIFIED");
+                render::song_select_lamp_presentation(selected_online_record->clear_status).label +
+                (sites_records_view_ ? " / WEB" : " / ONLINE VERIFIED");
             render.song_select.selected_record_replay_detail =
                 sites_records_view_ ? render.song_select.sites_board_label :
                 ui_text("Ruleset ", "룰셋 ") + selected_online_record->ruleset_id;
@@ -731,7 +733,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             render.song_select.selected_record_created_utc =
                 menu_records::compact_timestamp_label(selected_record->created_utc);
             render.song_select.selected_record_status =
-                selected_record->player_name + " / " + selected_record->clear_status + " / " +
+                selected_record->player_name + " / " +
+                render::song_select_lamp_presentation(selected_record->clear_status).label + " / " +
                 selected_record->verification_status;
             render.song_select.selected_record_replay_file = filename_only(selected_record->replay_path);
             if (const ReplaySummary* replay = replay_summary_for_path(selected_record->replay_path)) {
@@ -890,8 +893,8 @@ void MenuApp::populate_song_browser_render_data(render::MenuRenderData& render) 
 
     render.generic.notes.push_back(ui_text("Search lives on Song Select. Use the SEARCH item there for title, artist, and path matches.",
                                            "검색은 Song Select에 있습니다. 제목, 아티스트, 경로 검색은 SEARCH 항목을 사용하세요."));
-    render.generic.notes.push_back(ui_text("Sort and Group moved here so the left rail only separates Songs, Sources, Search, Filter, Records, and Options.",
-                                           "왼쪽 레일이 곡/소스/검색/필터/기록/옵션만 남도록 정렬과 그룹을 이 화면으로 옮겼습니다."));
+    render.generic.notes.push_back(ui_text("Sort and Group moved here so the left rail only separates Songs, Library, Search, Filter, Records, and Options.",
+                                           "왼쪽 레일이 곡/라이브러리/검색/필터/기록/옵션만 남도록 정렬과 그룹을 이 화면으로 옮겼습니다."));
     render.generic.notes.push_back(ui_text(
         "Sort: Enter or click the value to cycle; -/+ changes direction. With Group enabled, sorting applies inside each group.",
         "정렬: Enter 또는 값을 클릭해 순환하고 -/+로 앞뒤 선택합니다. 그룹을 켜면 각 그룹 안에서 정렬됩니다."));

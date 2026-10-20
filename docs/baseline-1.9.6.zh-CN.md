@@ -1,3 +1,5 @@
+> **2026-10-21 · 1.9.8.5 发布范围：** 在用户指定的1.9.8上增加BGA播放与黑色透明、选曲循环、曲库与通关显示、小数时间、无划盘7K及第二按键控制权修正。通用固定基线仍为 **1.9.6**。下方旧说明保留当时历史；行为和兼容边界见[1.9.8.5](release-1.9.8.5.zh-CN.md)，验证见[发布检查](release-1.9.8.5-gate.md)，发布状态与下载以[发布页面](https://github.com/10kseason/TenRiff/releases/tag/1.9.8.5)为准。
+
 # TenRiff 1.9.6 固定基线
 
 [한국어](baseline-1.9.6.md) | [English](baseline-1.9.6.en.md) | [日本語](baseline-1.9.6.ja.md) | [简体中文](baseline-1.9.6.zh-CN.md)

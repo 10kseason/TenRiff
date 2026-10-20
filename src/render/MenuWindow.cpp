@@ -2611,9 +2611,9 @@ MenuWindow::MenuWindow()
       gameplay_base_video_decoder_(std::make_unique<BgaVideoDecoder>()),
       gameplay_overlay_video_decoder_(std::make_unique<BgaVideoDecoder>()),
       gameplay_base_image_loader_(std::make_unique<BgaImageLoader>()),
-      gameplay_overlay_image_loader_(std::make_unique<BgaImageLoader>()),
+      gameplay_overlay_image_loader_(std::make_unique<BgaImageLoader>(true)),
       gameplay_background_upscaler_(std::make_unique<OnnxBackgroundUpscaler>()),
-      gameplay_overlay_background_upscaler_(std::make_unique<OnnxBackgroundUpscaler>()),
+      gameplay_overlay_background_upscaler_(std::make_unique<OnnxBackgroundUpscaler>("", false, "auto", true)),
       song_select_background_upscaler_(std::make_unique<OnnxBackgroundUpscaler>()) {}
 
 MenuWindow::~MenuWindow() {
@@ -3312,6 +3312,43 @@ std::array<std::size_t, 2> MenuWindow::gameplay_background_retention_stats() con
                 : std::array<std::size_t, 2>{};
 }
 
+MenuWindow::GameplayBackgroundProbe MenuWindow::gameplay_background_probe(bool overlay) const {
+    GameplayBackgroundProbe result;
+    if (!d2d_ || !d2d_->d2d_context) return result;
+    ID2D1Bitmap* source = overlay ? d2d_->gameplay_background_overlay_bitmap.Get()
+                                : d2d_->gameplay_background_base_bitmap.Get();
+    result.bitmap_identity = source;
+    if (!source) return result;
+    const auto size = source->GetPixelSize();
+    result.width = size.width;
+    result.height = size.height;
+    if (size.width == 0 || size.height == 0) return result;
+    const auto properties = D2D1::BitmapProperties1(
+        static_cast<D2D1_BITMAP_OPTIONS>(D2D1_BITMAP_OPTIONS_CPU_READ | D2D1_BITMAP_OPTIONS_CANNOT_DRAW),
+        source->GetPixelFormat());
+    Microsoft::WRL::ComPtr<ID2D1Bitmap1> staging;
+    if (FAILED(d2d_->d2d_context->CreateBitmap(size, nullptr, 0, &properties, staging.GetAddressOf())) ||
+        FAILED(staging->CopyFromBitmap(nullptr, source, nullptr))) return result;
+    D2D1_MAPPED_RECT mapped{};
+    if (FAILED(staging->Map(D2D1_MAP_OPTIONS_READ, &mapped))) return result;
+    result.pixel_hash = 14695981039346656037ull;
+    std::copy_n(mapped.bits, 4, result.first_bgra.begin());
+    for (uint32_t y = 0; y < size.height; ++y) {
+        const auto* row = mapped.bits + static_cast<std::size_t>(y) * mapped.pitch;
+        for (uint32_t x = 0; x < size.width; ++x) {
+            const auto* pixel = row + static_cast<std::size_t>(x) * 4;
+            result.min_alpha = std::min(result.min_alpha, pixel[3]);
+            result.max_alpha = std::max(result.max_alpha, pixel[3]);
+            for (unsigned channel = 0; channel < 4; ++channel) {
+                result.pixel_hash ^= pixel[channel];
+                result.pixel_hash *= 1099511628211ull;
+            }
+        }
+    }
+    result.readable = SUCCEEDED(staging->Unmap());
+    return result;
+}
+
 void MenuWindow::set_background_upscale_model_path(std::string model_path, bool prefer_npu, std::string output_mode) {
     if (active_background_upscale_model_path_ == model_path &&
         active_background_upscale_prefer_npu_ == prefer_npu &&
@@ -3325,7 +3362,7 @@ void MenuWindow::set_background_upscale_model_path(std::string model_path, bool 
     gameplay_background_upscaler_ =
         std::make_unique<OnnxBackgroundUpscaler>(active_background_upscale_model_path_, prefer_npu, active_background_upscale_output_mode_);
     gameplay_overlay_background_upscaler_ =
-        std::make_unique<OnnxBackgroundUpscaler>(active_background_upscale_model_path_, prefer_npu, active_background_upscale_output_mode_);
+        std::make_unique<OnnxBackgroundUpscaler>(active_background_upscale_model_path_, prefer_npu, active_background_upscale_output_mode_, true);
     song_select_background_upscaler_ =
         std::make_unique<OnnxBackgroundUpscaler>(active_background_upscale_model_path_, prefer_npu, active_background_upscale_output_mode_);
     gameplay_background_cache_ = GameplayBackgroundCache{};
@@ -3352,55 +3389,58 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
         data.background_upscale_mode == "onnx" ? "onnx" : "off";
     d2d_->gameplay_background_used = true;
     const auto use_cached_background_bitmap =
-        [&](const std::string& path, Microsoft::WRL::ComPtr<ID2D1Bitmap>& destination) {
-            const auto found = d2d_->gameplay_background_bitmaps.find(path);
+        [&](const std::string& path, bool overlay, Microsoft::WRL::ComPtr<ID2D1Bitmap>& destination) {
+            const auto found = d2d_->gameplay_background_bitmaps.find(path + (overlay ? "|overlay" : "|base"));
             if (found == d2d_->gameplay_background_bitmaps.end() || !found->second.bitmap) {
                 return false;
             }
             destination = found->second.bitmap;
             return true;
         };
-    const bool paths_changed =
-        gameplay_background_cache_.base_path != data.background_base_path ||
-        gameplay_background_cache_.overlay_path != data.background_overlay_path ||
-        gameplay_background_cache_.base_start_sample != data.background_base_start_sample ||
-        gameplay_background_cache_.overlay_start_sample != data.background_overlay_start_sample;
     const bool mode_changed = gameplay_background_cache_.upscale_mode != upscale_mode;
-    if (paths_changed || mode_changed) {
-        gameplay_base_video_decoder_->clear();
-        gameplay_overlay_video_decoder_->clear();
-        gameplay_base_image_loader_->clear();
-        gameplay_overlay_image_loader_->clear();
-        gameplay_background_upscaler_->clear();
-        gameplay_overlay_background_upscaler_->clear();
-        gameplay_background_cache_ = GameplayBackgroundCache{};
-        gameplay_background_cache_.base_path = data.background_base_path;
-        gameplay_background_cache_.overlay_path = data.background_overlay_path;
-        gameplay_background_cache_.base_start_sample = data.background_base_start_sample;
-        gameplay_background_cache_.overlay_start_sample = data.background_overlay_start_sample;
-        gameplay_background_cache_.upscale_mode = upscale_mode;
-
-        const auto prepare_static_layer =
-            [&](const std::string& path,
-                BgaImageLoader* loader,
-                Microsoft::WRL::ComPtr<ID2D1Bitmap>& destination) {
-                if (path.empty() || BgaVideoDecoder::is_supported_video_path(path)) {
-                    destination.Reset();
-                    return;
-                }
-                if (!use_cached_background_bitmap(path, destination)) {
-                    // Keep the previous frame visible while the new image is
-                    // decoded. The render thread never performs file I/O here.
-                    loader->request(path);
-                }
-            };
-        prepare_static_layer(data.background_base_path,
-                             gameplay_base_image_loader_.get(),
-                             d2d_->gameplay_background_base_bitmap);
-        prepare_static_layer(data.background_overlay_path,
-                             gameplay_overlay_image_loader_.get(),
-                             d2d_->gameplay_background_overlay_bitmap);
-    }
+    // Each authored layer owns its decoder and clock. Changing an overlay must
+    // never blank or reopen the unrelated base video (and vice versa).
+    const auto prepare_layer = [&](const std::string& path, int64_t start, bool overlay,
+                                   std::string& previous_path, int64_t& previous_start,
+                                   BgaVideoDecoder* decoder, BgaImageLoader* loader,
+                                   OnnxBackgroundUpscaler* upscaler,
+                                   Microsoft::WRL::ComPtr<ID2D1Bitmap>& bitmap,
+                                   std::string& requested_key, std::string& upscaled_key,
+                                   bool& is_upscaled) {
+        if (path == previous_path && start == previous_start && !mode_changed) return;
+        const bool content_changed = path != previous_path || start != previous_start;
+        if (content_changed) {
+            decoder->clear();
+            loader->clear();
+        }
+        upscaler->clear();
+        requested_key.clear();
+        upscaled_key.clear();
+        is_upscaled = false;
+        previous_path = path;
+        previous_start = start;
+        if (path.empty()) {
+            bitmap.Reset();
+        } else if (!BgaVideoDecoder::is_supported_video_path(path) &&
+                   !use_cached_background_bitmap(path, overlay, bitmap)) {
+            loader->request(path);
+        }
+        // Keep the last completed bitmap until the replacement is ready,
+        // including video starts/restarts. Explicit empty cues still clear it.
+    };
+    prepare_layer(data.background_base_path, data.background_base_start_sample, false,
+                  gameplay_background_cache_.base_path, gameplay_background_cache_.base_start_sample,
+                  gameplay_base_video_decoder_.get(), gameplay_base_image_loader_.get(),
+                  gameplay_background_upscaler_.get(), d2d_->gameplay_background_base_bitmap,
+                  gameplay_background_cache_.base_requested_key, gameplay_background_cache_.base_upscaled_key,
+                  gameplay_background_cache_.base_is_upscaled);
+    prepare_layer(data.background_overlay_path, data.background_overlay_start_sample, true,
+                  gameplay_background_cache_.overlay_path, gameplay_background_cache_.overlay_start_sample,
+                  gameplay_overlay_video_decoder_.get(), gameplay_overlay_image_loader_.get(),
+                  gameplay_overlay_background_upscaler_.get(), d2d_->gameplay_background_overlay_bitmap,
+                  gameplay_background_cache_.overlay_requested_key, gameplay_background_cache_.overlay_upscaled_key,
+                  gameplay_background_cache_.overlay_is_upscaled);
+    gameplay_background_cache_.upscale_mode = upscale_mode;
 
     const auto upload_bgra = [&](std::uint32_t width,
                                  std::uint32_t height,
@@ -3429,7 +3469,7 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
 
     const auto cache_ready_image =
         [&](BgaImageLoader* loader,
-            const std::string& active_path,
+            const std::string& active_path, bool overlay,
             Microsoft::WRL::ComPtr<ID2D1Bitmap>& destination) {
             const auto frame = loader ? loader->take_ready() : nullptr;
             if (!frame) {
@@ -3446,14 +3486,15 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
             if (!upload_bgra(frame->width, frame->height, frame->bgra, bitmap)) {
                 return;
             }
-            auto existing = d2d_->gameplay_background_bitmaps.find(frame->source_path);
+            const std::string cache_key = frame->source_path + (overlay ? "|overlay" : "|base");
+            auto existing = d2d_->gameplay_background_bitmaps.find(cache_key);
             if (existing != d2d_->gameplay_background_bitmaps.end()) {
                 d2d_->gameplay_background_bitmap_bytes -= existing->second.decoded_bytes;
                 existing->second = D2DResources::GameplayBackgroundBitmapEntry{
                     frame->bgra.size(), bitmap};
             } else {
                 d2d_->gameplay_background_bitmaps.emplace(
-                    frame->source_path,
+                    cache_key,
                     D2DResources::GameplayBackgroundBitmapEntry{frame->bgra.size(), bitmap});
             }
             d2d_->gameplay_background_bitmap_bytes += frame->bgra.size();
@@ -3466,10 +3507,10 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
         };
 
     cache_ready_image(gameplay_base_image_loader_.get(),
-                      gameplay_background_cache_.base_path,
+                      gameplay_background_cache_.base_path, false,
                       d2d_->gameplay_background_base_bitmap);
     cache_ready_image(gameplay_overlay_image_loader_.get(),
-                      gameplay_background_cache_.overlay_path,
+                      gameplay_background_cache_.overlay_path, true,
                       d2d_->gameplay_background_overlay_bitmap);
 
     const auto process_video_layer = [&](const std::string& path,

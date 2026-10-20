@@ -819,17 +819,75 @@ TEST_CASE("parser infers sparse standard SP charts without falling back to 10K")
     auto result = parser.parse(data);
 
     CHECK(result.success());
-    CHECK_EQ(result.chart.declared_key_count, 8);
-    CHECK_EQ(result.chart.layout_label, "7+1 SP");
+    CHECK_EQ(result.chart.declared_key_count, 7);
+    CHECK(result.chart.layout_label.empty());
     auto lane11 = result.chart.lane_mapping.laneForChannel("11");
     auto lane14 = result.chart.lane_mapping.laneForChannel("14");
     auto lane19 = result.chart.lane_mapping.laneForChannel("19");
     REQUIRE(lane11.has_value());
     REQUIRE(lane14.has_value());
     REQUIRE(lane19.has_value());
-    CHECK_EQ(lane11.value(), 2);
-    CHECK_EQ(lane14.value(), 5);
-    CHECK_EQ(lane19.value(), 8);
+    CHECK_EQ(lane11.value(), 1);
+    CHECK_EQ(lane14.value(), 4);
+    CHECK_EQ(lane19.value(), 7);
+}
+
+TEST_CASE("parser recognizes scratch-free SP while preserving authored sparse layouts and legacy mapping") {
+    BmsParser parser;
+    for (const std::string header : {"", "#7K\n"}) {
+        for (const std::string empty_scratch : {"", "#00116:0000\n", "#00156:00 00\n"}) {
+            const auto data = header + "#BPM 120\n#00111:01\n#00114:01\n#00119:01\n" + empty_scratch;
+            for (const bool metadata_only : {false, true}) {
+                BmsParserOptions options;
+                options.metadata_only = metadata_only;
+                const auto current = parser.parse(data, options);
+                REQUIRE(current.success());
+                CHECK(current.chart.declared_key_count == 7);
+                CHECK(current.chart.layout_label.empty());
+                CHECK(current.chart.lane_mapping.laneForChannel("11") == 1u);
+                CHECK(current.chart.lane_mapping.laneForChannel("14") == 4u);
+                CHECK(current.chart.lane_mapping.laneForChannel("19") == 7u);
+                CHECK_FALSE(current.chart.lane_mapping.laneForChannel("16").has_value());
+                options.preserve_empty_sp_scratch = true;
+                const auto legacy = parser.parse(data, options);
+                REQUIRE(legacy.success());
+                CHECK(legacy.chart.declared_key_count == 8);
+                CHECK(legacy.chart.layout_label == "7+1 SP");
+                CHECK(legacy.chart.lane_mapping.laneForChannel("11") == 2u);
+                CHECK(legacy.chart.lane_mapping.laneForChannel("19") == 8u);
+            }
+        }
+    }
+    const auto explicit_seven = parser.parse("#7K\n#00111:01\n#00114:01\n");
+    CHECK(explicit_seven.chart.declared_key_count == 7);
+    // This was already 7K before scratch-free 7+1 detection. Its historical
+    // 7-lane replays cannot identify a changed mapping, so retain compact slots.
+    CHECK(explicit_seven.chart.lane_mapping.laneForChannel("14") == 2u);
+    // Explicit 8K is a generic authored layout, not an implied 7+1 chart.
+    const auto explicit_eight = parser.parse("#8K\n#00111:01\n#00116:00\n#00119:01\n");
+    CHECK(explicit_eight.chart.declared_key_count == 8);
+    CHECK(explicit_eight.chart.lane_mapping.laneForChannel("16").has_value());
+}
+
+TEST_CASE("parser keeps real scratch taps holds and mines in seven plus one SP") {
+    BmsParser parser;
+    for (const std::string scratch : {"#00216:01\n", "#00256:0101\n",
+                                      "#LNOBJ ZZ\n#00216:01ZZ\n", "#002D6:01\n"}) {
+        for (const bool metadata_only : {false, true}) {
+            BmsParserOptions options;
+            options.metadata_only = metadata_only;
+            const auto parsed = parser.parse("#7K\n#BPM 120\n#00111:01\n#00119:01\n" + scratch, options);
+            REQUIRE(parsed.success());
+            CHECK(parsed.chart.declared_key_count == 8);
+            CHECK(parsed.chart.layout_label == "7+1 SP");
+            CHECK(parsed.chart.lane_mapping.laneForChannel("16") == 1u);
+        }
+    }
+    // Only the selected branch determines whether a playable scratch exists.
+    const auto inactive = parser.parse("#7K\n#SETRANDOM 1\n#IF 2\n#00216:01\n#ENDIF\n"
+                                       "#ENDRANDOM\n#00111:01\n#00119:01\n");
+    REQUIRE(inactive.success());
+    CHECK(inactive.chart.declared_key_count == 7);
 }
 
 TEST_CASE("parser ignores empty 14 plus 2 template channels when detecting 10K2S") {

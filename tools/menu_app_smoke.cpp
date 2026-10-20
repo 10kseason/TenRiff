@@ -20,6 +20,7 @@
 #include "config/KeycodeMap.h"
 #include "audio/WasapiBackend.h"
 #include "config/SimpleJson.h"
+#include "render/GameplayGaugePalette.h"
 #include "timing/HighResClock.h"
 #include "../tests/unit/bms_timing_fixture.h"
 
@@ -32,6 +33,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -317,6 +319,140 @@ struct MenuAppVisualTestAccess {
         app.config_.skin = saved_skin;
         app.keymap_settings_controller_ = saved_controller;
     }
+    static void check_lobby_feedback(MenuApp& app, Report& report) {
+        const bool resume_physical_input = app.input_thread_.is_running();
+        app.input_thread_.stop();
+        while (app.input_thread_.queue().pop()) {}
+        app.pressed_keys_.clear();
+        app.menu_key_owners_.clear();
+        app.reset_song_select_repeat();
+        const auto saved_ui = app.config_.ui;
+        const auto saved_songs = app.indexed_songs_;
+        const auto saved_visible = app.visible_song_indices_;
+        const auto saved_best = app.chart_best_results_;
+        const auto saved_records = app.local_play_records_;
+        const auto saved_record_indices = app.chart_play_record_indices_;
+        const auto saved_view = app.song_select_view_;
+        const auto saved_focus = app.song_select_focus_;
+        const bool saved_online_records = app.online_records_view_;
+        const auto saved_search = app.song_search_query_;
+        const bool saved_search_active = app.song_select_search_active_;
+        const int saved_song = app.selected_song_, saved_source = app.selected_source_;
+        const int saved_record = app.selected_record_;
+        app.config_.ui.difficulty_table_path.clear();
+        app.song_search_query_.clear();
+        app.song_select_search_active_ = false;
+        app.song_select_view_ = MenuApp::SongSelectView::Songs;
+        app.song_select_focus_ = MenuApp::SongSelectFocus::SongList;
+        app.online_records_view_ = false;
+        app.indexed_songs_.clear();
+        app.visible_song_indices_.clear();
+        for (std::size_t i = 0; i < 10; ++i) {
+            auto entry = saved_songs.front();
+            entry.title = "Cyclic fixture " + std::to_string(i);
+            entry.path = "cyclic-fixture-" + std::to_string(i) + ".bms";
+            app.indexed_songs_.push_back(std::move(entry));
+            app.visible_song_indices_.push_back(i);
+        }
+        app.selected_song_ = 0;
+        app.publish_snapshot();
+        key(app, "Up");
+        report.check("lobby.wrap_up_first_to_last", app.selected_song_ == 9 &&
+            app.snapshot_.render.song_select.list_selected_index == 9);
+        key(app, "Down");
+        report.check("lobby.wrap_down_last_to_first", app.selected_song_ == 0 &&
+            app.snapshot_.render.song_select.list_selected_index == 0);
+        key(app, "PageDown");
+        key(app, "PageDown");
+        report.check("lobby.wrap_page_preserves_distance", app.selected_song_ == 4);
+        render::MenuClickEvent wheel;
+        wheel.kind = Kind::MouseWheel;
+        wheel.wheel_steps = 5;
+        app.handle_menu_click(wheel);
+        report.check("lobby.wrap_wheel_preserves_distance", app.selected_song_ == 9);
+        app.visible_song_indices_ = {0};
+        app.selected_song_ = 0;
+        app.publish_snapshot();
+        key(app, "Up"); key(app, "Down");
+        report.check("lobby.wrap_single_stays_selected", app.selected_song_ == 0 &&
+            app.snapshot_.render.song_select.list_total_count == 1);
+        app.visible_song_indices_.clear();
+        app.publish_snapshot();
+        key(app, "Up"); key(app, "Down");
+        report.check("lobby.wrap_empty_stays_empty", app.snapshot_.render.song_select.songs.empty() &&
+            app.snapshot_.render.song_select.list_total_count == 0);
+
+        app.song_select_view_ = MenuApp::SongSelectView::Sources;
+        app.config_.ui.recent_song_sources = {"fixture-first", "fixture-second"};
+        app.selected_source_ = 0;
+        app.publish_snapshot();
+        key(app, "Up");
+        report.check("lobby.wrap_library_first_to_last", app.selected_source_ == 2);
+        key(app, "Down");
+        report.check("lobby.wrap_library_last_to_first", app.selected_source_ == 0);
+        for (const auto& language : std::array<std::pair<const char*, const char*>, 4>{{
+                 {"en", "LIBRARY"}, {"ko", u8"라이브러리"},
+                 {"ja", u8"ライブラリ"}, {"zh-CN", u8"曲库"}}}) {
+            app.config_.ui.language = language.first;
+            app.publish_snapshot();
+            const auto& view = app.snapshot_.render.song_select;
+            report.check(std::string("lobby.library_label_") + language.first,
+                view.left_nav.size() > 1 && view.left_nav[1].label == language.second &&
+                view.showing_sources && app.screen_title() == app.ui_text("Library", "라이브러리"));
+        }
+
+        app.config_.ui.language = "en";
+        app.song_select_view_ = MenuApp::SongSelectView::Songs;
+        app.visible_song_indices_ = {0};
+        app.selected_song_ = 0;
+        MenuApp::BestResultRecord best;
+        best.has_value = true;
+        best.game_over = false;
+        best.clear_status = "GAUGE SHIFT NORMAL CLEAR";
+        for (const auto& path : menu_songs::build_chart_path_keys(app.indexed_songs_.front().path, app.songs_path_)) {
+            app.chart_best_results_[path] = best;
+        }
+        app.publish_snapshot();
+        const auto& cards = app.snapshot_.render.song_select.songs;
+        const auto lamp = render::song_select_lamp_presentation(cards.empty() ? "" : cards.front().lamp);
+        report.check("lobby.lamp_snapshot_retains_status_and_formats_copy", cards.size() == 1 &&
+            cards.front().lamp == "GAUGE SHIFT NORMAL CLEAR" && lamp.label == "NORMAL CLEAR" &&
+            lamp.tint_card && lamp.color == render::song_select_gauge_text_color("normal"));
+        app.local_play_records_ = {MenuApp::LocalPlayRecord{}};
+        app.local_play_records_.front().clear_status = "GAUGE SHIFT HARD CLEAR";
+        app.local_play_records_.front().player_name = "Fixture";
+        app.selected_record_ = 0;
+        for (const auto& path : menu_songs::build_chart_path_keys(app.indexed_songs_.front().path, app.songs_path_)) {
+            app.chart_play_record_indices_[path] = {0};
+        }
+        app.song_select_view_ = MenuApp::SongSelectView::Records;
+        app.publish_snapshot();
+        const auto& record_view = app.snapshot_.render.song_select;
+        report.check("lobby.record_snapshot_uses_compact_clear_copy", !record_view.songs.empty() &&
+            record_view.songs.front().artist.find("HARD CLEAR") != std::string::npos &&
+            record_view.songs.front().artist.find("GAUGE SHIFT") == std::string::npos &&
+            app.local_play_records_.front().clear_status == "GAUGE SHIFT HARD CLEAR");
+
+        app.config_.ui = saved_ui;
+        app.indexed_songs_ = saved_songs;
+        app.visible_song_indices_ = saved_visible;
+        app.chart_best_results_ = saved_best;
+        app.local_play_records_ = saved_records;
+        app.chart_play_record_indices_ = saved_record_indices;
+        app.song_select_view_ = saved_view;
+        app.song_select_focus_ = saved_focus;
+        app.online_records_view_ = saved_online_records;
+        app.song_search_query_ = saved_search;
+        app.song_select_search_active_ = saved_search_active;
+        app.selected_song_ = saved_song;
+        app.selected_source_ = saved_source;
+        app.selected_record_ = saved_record;
+        app.rebuild_current_song_record_indices();
+        if (resume_physical_input && !app.input_thread_.start())
+            throw std::runtime_error("Cannot restore menu input after lobby fixture");
+        app.refresh_menu_input_polling_scope();
+        app.publish_snapshot();
+    }
     static void check_sequential_keymap(MenuApp& app, Report& report) {
         check_keymap_palette(app, report);
         // This fixture owns synthetic down/up edges. A physical held-key
@@ -347,6 +483,34 @@ struct MenuAppVisualTestAccess {
         report.check("keymap.sequential_profile_readback", saved.success() &&
             bindings.at("lane1") == "Q" && bindings.at("lane2") == "W" &&
             bindings.at("lane3") == "E" && bindings.at("lane4") == "R");
+        const auto keymap_bytes = [&]() {
+            std::ifstream in(std::filesystem::u8path(app.profile_dir_) / "keymap.json", std::ios::binary);
+            if (!in) throw std::runtime_error("Cannot read fixture keymap");
+            return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+        };
+        for (const bool secondary : {false, true}) {
+            const auto before = app.working_keymap_;
+            const auto before_bytes = keymap_bytes();
+            click(app, Kind::SettingsRow, 1, secondary ? Part::Increment : Part::Activate);
+            const bool started = app.keymap_settings_controller_.capture_active() &&
+                app.keymap_settings_controller_.secondary_selected() == secondary;
+            key(app, "Escape");
+            const auto after = manager.load_profile(app.profile_dir_);
+            const auto primary = manager.bindings_for_mode(after.keymap, "4k");
+            const auto alternate = manager.secondary_bindings_for_mode(after.keymap, "4k");
+            const auto no_escape = [](const auto& keys) {
+                return std::none_of(keys.begin(), keys.end(), [](const auto& item) {
+                    return config::KeycodeMap::to_keycode(item.second) == 0x1Bu;
+                });
+            };
+            report.check(std::string("keymap.escape_cancels_") + (secondary ? "secondary" : "primary"),
+                started && app.current_screen() == Screen::Keymap &&
+                !app.keymap_settings_controller_.capture_active() &&
+                app.working_keymap_.mode_bindings == before.mode_bindings &&
+                app.working_keymap_.secondary_mode_bindings == before.secondary_mode_bindings &&
+                after.success() && no_escape(primary) && no_escape(alternate) &&
+                keymap_bytes() == before_bytes);
+        }
         click(app, Kind::SettingsRow, 1, Part::Increment);
         key(app, "T");
         report.check("keymap.secondary_advances_in_same_slot", app.keymap_settings_controller_.selected_row() == 2 &&
@@ -1998,6 +2162,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
     Access::check_table_input_and_filter(app, report);
     Access::check_level_search_input(app, report);
     Access::check_browser_sort_and_range(app, report);
+    Access::check_lobby_feedback(app, report);
     Access::check_loading_pacing(app, report);
     Access::check_hud_feedback_followup(app, report);
     tenriff::app::MenuAppFeedbackTestAccess::check_maximum_text_sequence(report);

@@ -474,7 +474,9 @@ ReplayVerificationResult verify_replay_file(
                                                      "ignore",
                                                      bms_random_seed,
                                                      replay.mode.bms_timing_version,
-                                                     replay.mode.bms_control_flow_version);
+                                                     replay.mode.bms_control_flow_version,
+                                                     preserve_legacy_empty_sp_scratch(
+                                                         replay.mode.key_mode, replay.trace.lane_count));
     if (!loaded_chart.success()) {
         return invalid_result(loaded_chart.error.empty()
                                   ? "Bound chart could not be reconstructed."

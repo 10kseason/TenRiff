@@ -1,6 +1,8 @@
+> **2026-10-21 · 1.9.8.5 release scope:** Adds BGA playback and black-key transparency fixes, wrapping song selection, Library/clear labels, decimal timing, scratch-free 7K and secondary-key ownership to the user-selected 1.9.8. The fixed general baseline remains **1.9.6**. Earlier notices retain their historical scope; see [1.9.8.5](release-1.9.8.5.en.md) for behavior and compatibility and [release gates](release-1.9.8.5-gate.md) for verification. Publication and downloads follow the [release page](https://github.com/10kseason/TenRiff/releases/tag/1.9.8.5).
+
 > **2026-10-19 · 1.9.8:** Based on 1.9.7, exposes X immediately before Y for Judgement, Combo, the FAST/SLOW indicator and its bar, and adds lane-divider brightness from 0–100% in 1% steps. Includes 1.9.7 Common Keys, larger colored tabs, fresh per-play seeds and scene-music reference gain; the fixed general baseline remains 1.9.6. [1.9.8](release-1.9.8.en.md) · [X/Y](skin-xy-20261019.en.md) · [Baseline 1.9.6](baseline-1.9.6.en.md) · [Verification](release-1.9.8-gate.md).
 
-Earlier versioned and dated notices below retain their historical context. The 1.9.8 documents define the current scope; publication and downloads follow the version-specific release page.
+Earlier versioned and dated notices below retain their historical context. The 1.9.8.5 documents define the current scope; publication and downloads follow the version-specific release page.
 
 > **2026-10-19 · 1.9.7:** Adds Common Keys, larger mode tabs with lobby colors, colored FAST/SLOW labels, 1% adjustments, Game Mode Settings/Normal labels and a fresh seed for every solo play. The version-specific release page determines publication and downloads. Earlier dated notices are historical. [1.9.7](release-1.9.7.en.md) · [Baseline 1.9.6](baseline-1.9.6.en.md) · [Verification](release-1.9.7-gate.md).
 

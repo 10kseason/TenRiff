@@ -10,6 +10,7 @@
 
 #include <iostream>
 #include <mutex>
+#include <optional>
 #include <thread>
 #include <utility>
 
@@ -32,6 +33,7 @@ namespace {
 
 constexpr std::int64_t kHundredNsPerSecond = 10'000'000;
 constexpr std::int64_t kRequestQuantum100ns = kHundredNsPerSecond / 30;
+constexpr std::int64_t kCeilRequestQuantum100ns = (kHundredNsPerSecond + 29) / 30;
 
 std::string lower_ascii(std::string_view value) {
     std::string result(value);
@@ -112,6 +114,11 @@ public:
         height_ = 0;
         stride_ = 0;
         last_timestamp_ = -1;
+        requested_timestamp_ = -1;
+        timestamp_origin_.reset();
+        last_frame_.reset();
+        future_frame_.reset();
+        ended_ = false;
     }
 
     bool open(std::string_view path) {
@@ -180,6 +187,9 @@ public:
         PropVariantClear(&position);
         if (SUCCEEDED(hr)) {
             last_timestamp_ = -1;
+            last_frame_.reset();
+            future_frame_.reset();
+            ended_ = false;
         }
         return SUCCEEDED(hr);
     }
@@ -188,13 +198,32 @@ public:
         if (!reader_) {
             return {};
         }
-        if (last_timestamp_ >= 0 && target_100ns + kRequestQuantum100ns < last_timestamp_ &&
-            !seek(target_100ns)) {
-            return {};
+        const bool initial_request = !timestamp_origin_.has_value();
+        // Some MF sources expose container PTS (MPG), while others already
+        // normalize it (MP4). Read the beginning before any late initial seek;
+        // metadata or a post-seek first frame cannot establish this origin.
+        if (initial_request && target_100ns > 0 && !read_at(0)) return {};
+        bool check_seek_position = false;
+        // A 24/25 fps frame may be ahead of a 30 Hz request. Only the requested
+        // clock moving backwards is a seek; decoded timestamps must not rewind it.
+        if (requested_timestamp_ >= 0 && target_100ns < requested_timestamp_) {
+            if (!seek(std::max<std::int64_t>(0, target_100ns - kHundredNsPerSecond))) return {};
+            check_seek_position = true;
         }
-        if (last_timestamp_ < 0 && target_100ns > kHundredNsPerSecond / 2 &&
-            !seek(target_100ns)) {
-            return {};
+        requested_timestamp_ = target_100ns;
+        if (future_frame_) {
+            if (target_100ns < future_frame_->timestamp_100ns) return last_frame_;
+            last_frame_ = std::move(future_frame_);
+            last_timestamp_ = last_frame_->timestamp_100ns;
+        }
+        if (last_frame_ && (ended_ || target_100ns <= last_timestamp_)) {
+            return last_frame_;
+        }
+        if (initial_request && target_100ns > 3 * kHundredNsPerSecond) {
+            // MF seeking is approximate. A one-second source-time preroll
+            // avoids damaged/overshot MPG starts seen with exact PTS seeking.
+            if (!seek(target_100ns - kHundredNsPerSecond)) return {};
+            check_seek_position = true;
         }
 
         std::shared_ptr<BgaVideoFrame> latest;
@@ -213,7 +242,8 @@ public:
                 return latest;
             }
             if ((flags & MF_SOURCE_READERF_ENDOFSTREAM) != 0) {
-                return latest;
+                ended_ = true;
+                return last_frame_;
             }
             if ((flags & MF_SOURCE_READERF_CURRENTMEDIATYPECHANGED) != 0) {
                 Microsoft::WRL::ComPtr<IMFMediaType> current_type;
@@ -236,21 +266,51 @@ public:
                 continue;
             }
 
+            if (!timestamp_origin_) timestamp_origin_ = timestamp;
+            const auto relative_timestamp =
+                std::max<std::int64_t>(0, timestamp - *timestamp_origin_);
+            if (check_seek_position && relative_timestamp > target_100ns) {
+                // A demuxer may still seek past the desired frame. Reopen and
+                // decode from the beginning within the same bounded read loop.
+                // A very distant target can need subsequent playback requests.
+                const std::string reopen_path = path_;
+                if (!open(reopen_path)) return {};
+                requested_timestamp_ = target_100ns;
+                check_seek_position = false;
+                continue;
+            }
+            check_seek_position = false;
+            // Some MPEG sources return an older sample after a newer PTS.
+            // Never let that sample replace the retained presentation frame.
+            // Explicit seeks/reopens reset last_timestamp_ and allow rewinds.
+            if (relative_timestamp < last_timestamp_) continue;
             auto frame = std::make_shared<BgaVideoFrame>();
             frame->source_path = path_;
-            frame->timestamp_100ns = timestamp;
+            frame->timestamp_100ns = relative_timestamp;
             frame->width = width_;
             frame->height = height_;
             if (!copy_rgb32_sample(sample.Get(), width_, height_, stride_, frame->bgra)) {
                 return latest;
             }
-            last_timestamp_ = timestamp;
+            // Sparse AVI streams can jump from 0 to 1.6 seconds. Keep the
+            // previous image through that authored gap instead of presenting
+            // its next image early. Require a real gap so ordinary 24/25 fps
+            // cadence and 100 ns/request-quantization rounding stay unchanged.
+            if (last_frame_ &&
+                relative_timestamp - last_timestamp_ > 2 * kCeilRequestQuantum100ns &&
+                relative_timestamp - target_100ns > kCeilRequestQuantum100ns) {
+                future_frame_ = std::move(frame);
+                return last_frame_;
+            }
+            last_timestamp_ = relative_timestamp;
             latest = std::move(frame);
-            if (timestamp >= target_100ns) {
+            last_frame_ = latest;
+            if (relative_timestamp >= target_100ns) {
                 return latest;
             }
         }
-        return latest;
+        // Exhausting the bounded loop on old samples must keep the last image.
+        return last_frame_;
     }
 
     [[nodiscard]] const std::string& path() const { return path_; }
@@ -262,6 +322,11 @@ private:
     std::uint32_t height_ = 0;
     LONG stride_ = 0;
     std::int64_t last_timestamp_ = -1;
+    std::int64_t requested_timestamp_ = -1;
+    std::optional<std::int64_t> timestamp_origin_;
+    std::shared_ptr<BgaVideoFrame> last_frame_;
+    std::shared_ptr<BgaVideoFrame> future_frame_;
+    bool ended_ = false;
 };
 #endif
 
@@ -270,7 +335,6 @@ private:
 struct BgaVideoDecoder::Impl {
     std::mutex mutex;
     std::condition_variable wake;
-    std::thread worker;
     bool stop = false;
     bool has_pending = false;
     std::string requested_path;
@@ -279,7 +343,11 @@ struct BgaVideoDecoder::Impl {
     std::int64_t pending_timestamp_100ns = 0;
     std::uint64_t request_id = 0;
     std::uint64_t pending_id = 0;
+    std::uint64_t generation = 0;
+    std::uint64_t pending_generation = 0;
     std::shared_ptr<const BgaVideoFrame> ready;
+    // Start only after every field read by run() has been initialized.
+    std::thread worker;
 
     Impl() : worker([this]() { run(); }) {}
 
@@ -309,11 +377,13 @@ struct BgaVideoDecoder::Impl {
         MfVideoReader reader;
         BgaVideoFfmpegReader ffmpeg_reader;
         std::string failed_path;
+        std::uint64_t reader_generation = 0;
         auto failed_retry_after = std::chrono::steady_clock::time_point::min();
         while (true) {
             std::string path;
             std::int64_t timestamp_100ns = 0;
             std::uint64_t id = 0;
+            std::uint64_t active_generation = 0;
             {
                 std::unique_lock<std::mutex> lock(mutex);
                 wake.wait(lock, [this]() { return stop || has_pending; });
@@ -323,9 +393,16 @@ struct BgaVideoDecoder::Impl {
                 path = pending_path;
                 timestamp_100ns = pending_timestamp_100ns;
                 id = pending_id;
+                active_generation = pending_generation;
                 has_pending = false;
             }
 
+            if (reader_generation != active_generation) {
+                reader.close();
+                ffmpeg_reader.close();
+                failed_path.clear();
+                reader_generation = active_generation;
+            }
             if (reader.path() != path && ffmpeg_reader.path() != path) {
                 if (failed_path == path &&
                     std::chrono::steady_clock::now() < failed_retry_after) {
@@ -361,7 +438,9 @@ struct BgaVideoDecoder::Impl {
             if (!frame || frame->bgra.empty()) {
                 continue;
             }
-            frame->request_id = id;
+            // Cached frames may already be held by the renderer as const data.
+            // Assign identity once, before first publication, never mutate them.
+            if (frame->request_id == 0) frame->request_id = id;
             {
                 std::lock_guard<std::mutex> lock(mutex);
                 // Rendering requests arrive faster than decoding. Requiring the
@@ -369,7 +448,7 @@ struct BgaVideoDecoder::Impl {
                 // forever on a decoder that cannot sustain the render frame rate.
                 // A same-path frame is safe to present while the latest position
                 // remains queued; path changes and clear() still reject stale BGA.
-                if (path == requested_path) {
+                if (path == requested_path && active_generation == generation) {
                     ready = std::move(frame);
                 }
             }
@@ -394,11 +473,16 @@ void BgaVideoDecoder::request(std::string path, double position_seconds) {
     if (path == impl_->requested_path && timestamp_100ns == impl_->requested_timestamp_100ns) {
         return;
     }
+    if (path != impl_->requested_path || timestamp_100ns < impl_->requested_timestamp_100ns) {
+        ++impl_->generation;
+        impl_->ready.reset();
+    }
     impl_->requested_path = std::move(path);
     impl_->requested_timestamp_100ns = timestamp_100ns;
     impl_->pending_path = impl_->requested_path;
     impl_->pending_timestamp_100ns = timestamp_100ns;
     impl_->pending_id = ++impl_->request_id;
+    impl_->pending_generation = impl_->generation;
     impl_->has_pending = true;
     impl_->wake.notify_one();
 }
@@ -422,6 +506,7 @@ void BgaVideoDecoder::clear() {
     impl_->has_pending = false;
     impl_->ready.reset();
     ++impl_->request_id;
+    ++impl_->generation;
 }
 
 bool BgaVideoDecoder::is_supported_video_path(std::string_view path) {

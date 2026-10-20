@@ -1,4 +1,5 @@
 #include "render/OnnxBackgroundUpscaler.h"
+#include "render/BgaTransparency.h"
 #include "render/OnnxUpscaleImage.h"
 #include "render/FfmpegImageFilter.h"
 
@@ -138,7 +139,6 @@ struct OnnxBackgroundUpscaler::Impl {
     bool prefer_npu = true;
     std::mutex mutex;
     std::condition_variable wake;
-    std::thread worker;
     bool stop = false;
     std::string requested_path;
     std::string pending_path;
@@ -152,12 +152,15 @@ struct OnnxBackgroundUpscaler::Impl {
     std::shared_ptr<const OnnxUpscaleFrame> ready;
     std::unordered_map<std::string, std::shared_ptr<const OnnxUpscaleFrame>> cache;
     std::deque<std::string> cache_lru;
+    const bool black_key;
+    std::thread worker;
 
     explicit Impl(std::string configured_model_path, bool configured_prefer_npu,
-                  std::string output_mode)
+                  std::string output_mode, bool key)
         : model_path(std::move(configured_model_path)),
           configured_output_mode(std::move(output_mode)),
           prefer_npu(configured_prefer_npu),
+          black_key(key),
           worker([this]() { run(); }) {}
 
     ~Impl() {
@@ -366,6 +369,13 @@ struct OnnxBackgroundUpscaler::Impl {
                     finish_bgra_request();
                     continue;
                 }
+                std::vector<std::uint8_t> source_alpha;
+                if (black_key) {
+                    apply_bga_black_key(source_bgra);
+                    source_alpha.reserve(std::size_t(source_width) * source_height);
+                    for (std::size_t i = 3; i < source_bgra.size(); i += 4)
+                        source_alpha.push_back(source_bgra[i]);
+                }
                 const auto deblocked = deblock_bgra_ffmpeg(source_width, source_height, source_bgra, [&]() {
                     std::lock_guard<std::mutex> lock(mutex);
                     return stop || id != request_id;
@@ -453,6 +463,8 @@ struct OnnxBackgroundUpscaler::Impl {
                     }
                 }
                 if (!completed) { finish_bgra_request(); continue; }
+                if (black_key)
+                    restore_bga_alpha(output, source_alpha, source_width, source_height, frame_scale);
 
                 auto frame = std::make_shared<OnnxUpscaleFrame>();
                 frame->source_path = path;
@@ -490,8 +502,8 @@ struct OnnxBackgroundUpscaler::Impl {
 };
 
 OnnxBackgroundUpscaler::OnnxBackgroundUpscaler(std::string model_path, bool prefer_npu,
-                                             std::string output_mode)
-    : impl_(std::make_unique<Impl>(std::move(model_path), prefer_npu, std::move(output_mode))) {}
+                                             std::string output_mode, bool black_key)
+    : impl_(std::make_unique<Impl>(std::move(model_path), prefer_npu, std::move(output_mode), black_key)) {}
 
 OnnxBackgroundUpscaler::~OnnxBackgroundUpscaler() = default;
 

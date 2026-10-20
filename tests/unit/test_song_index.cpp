@@ -559,8 +559,8 @@ TEST_CASE("song scan infers sparse standard SP BMS layouts instead of defaulting
 
     REQUIRE(index.entries.size() == 1u);
     CHECK(warnings.empty());
-    CHECK(index.entries.front().key_count == 8);
-    CHECK(index.entries.front().layout_label == "7+1 SP");
+    CHECK(index.entries.front().key_count == 7);
+    CHECK(index.entries.front().layout_label.empty());
 }
 
 TEST_CASE("song scan supports UTF-8 song roots") {
@@ -779,7 +779,7 @@ TEST_CASE("cached song index load drops non-BMS menu entries") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 20,\n"
+               "  \"version\": 21,\n"
                "  \"entries\": [\n"
                "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"chart_name\":\"MX\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
                "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"chart_name\":\"Another\",\"format\":\"bms\",\"layout_label\":\"5+1 SP\",\"key_count\":6,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1},\n"
@@ -814,7 +814,7 @@ TEST_CASE("cached song index filters non-BMS entries") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 20,\n"
+               "  \"version\": 21,\n"
                "  \"entries\": [\n"
                 "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"chart_name\":\"MX\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
                 "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"format\":\"bms\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
@@ -836,7 +836,7 @@ TEST_CASE("streaming song index loader parses compact single-line current caches
 
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
-               "{\"version\":20,\"entries\":["
+               "{\"version\":21,\"entries\":["
                "{\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"Composer\",\"chart_name\":\"Hyper\",\"format\":\"bms\",\"layout_label\":\"7+1 SP\",\"key_count\":8,\"level\":12,\"rating\":7.5,\"bpm\":150,\"mtime\":1},"
                "{\"path\":\"ignored.osu\",\"title\":\"Ignored\",\"artist\":\"Mapper\",\"format\":\"osu\",\"key_count\":10,\"level\":13,\"rating\":8.5,\"bpm\":180,\"mtime\":2}"
                "]}");
@@ -988,7 +988,7 @@ TEST_CASE("cached song index sanitizes control heavy metadata on load") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 20,\n"
+               "  \"version\": 21,\n"
                "  \"entries\": [\n"
                 "    {\"path\":\"legacy.bms\",\"title\":\"Bad\\nTitle\",\"artist\":\"Artist\\tName\",\"chart_name\":\"Hyper\\r\",\"format\":\"bms\\r\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
                "  ]\n"
@@ -1238,6 +1238,41 @@ TEST_CASE("missing song index reports not loaded from file") {
     CHECK_FALSE(result.loaded_from_file);
     CHECK(result.index.entries.empty());
     CHECK_FALSE(result.warnings.empty());
+}
+
+TEST_CASE("song index v20 scratch cache rebuilds once and all scan modes recognize scratch-free seven keys") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE_FALSE(temp.path.empty());
+    const auto chart = temp.path / "seven.bms";
+    write_file(chart, "#TITLE Seven Keys\n#BPM 120\n#7K\n#00111:01\n#00119:01\n#00156:0000\n");
+    const auto mtime = std::filesystem::last_write_time(chart);
+    std::vector<std::string> warnings;
+    SongIndexOptions fast;
+    fast.profile = tenriff::app::SongIndexProfile::Fast;
+    for (const auto options : {SongIndexOptions{}, difficulty_scan_options(), fast}) {
+        const auto current = scan_songs(temp.path.u8string(), nullptr, warnings, {}, options);
+        REQUIRE(current.entries.size() == 1);
+        CHECK(current.entries.front().key_count == 7);
+        CHECK(current.entries.front().layout_label.empty());
+    }
+    const auto path = temp.path / "index.json";
+    write_file(path, "{\"version\":20,\"entries\":[{\"path\":\"seven.bms\","
+                    "\"format\":\"bms\",\"key_count\":8,\"layout_label\":\"7+1 SP\"}]}");
+    const auto stale = load_song_index(path.u8string());
+    REQUIRE(stale.success());
+    CHECK_FALSE(stale.loaded_from_file);
+    CHECK(stale.index.entries.empty());
+    const auto rebuilt = scan_songs(temp.path.u8string(), &stale.index, warnings);
+    REQUIRE(rebuilt.entries.size() == 1);
+    CHECK(rebuilt.entries.front().key_count == 7);
+    std::string error;
+    REQUIRE(save_song_index(path.u8string(), rebuilt, {}, &error));
+    const auto reloaded = load_song_index(path.u8string());
+    REQUIRE(reloaded.success());
+    CHECK(reloaded.loaded_from_file);
+    REQUIRE(reloaded.index.entries.size() == 1);
+    CHECK(reloaded.index.entries.front().key_count == 7);
+    CHECK(std::filesystem::last_write_time(chart) == mtime);
 }
 
 TEST_CASE("song index and chart loader agree on duration-based reference BPM") {

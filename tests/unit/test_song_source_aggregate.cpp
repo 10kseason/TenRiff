@@ -4,6 +4,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -23,6 +24,76 @@
 
 namespace tenriff::app {
 struct MenuAppSongSourceTestAccess {
+    static void check_cyclic_lobby_navigation() {
+        auto menu = std::make_unique<MenuApp>();
+        menu->song_select_view_ = MenuApp::SongSelectView::Songs;
+        menu->config_.ui.difficulty_table_path.clear();
+        menu->song_select_search_active_ = false;
+        CHECK_FALSE(menu->move_song_select_selection(-1));
+        CHECK(menu->selected_song_ == 0);
+        menu->indexed_songs_.resize(10);
+        for (std::size_t i = 0; i < 10; ++i) {
+            menu->indexed_songs_[i].path = "chart-" + std::to_string(i) + ".bms";
+            menu->visible_song_indices_.push_back(i);
+        }
+        CHECK(menu->move_song_select_selection(-1));
+        CHECK(menu->selected_song_ == 9);
+        CHECK(menu->move_song_select_selection(1));
+        CHECK(menu->selected_song_ == 0);
+        CHECK(menu->move_song_select_selection(7));
+        CHECK(menu->selected_song_ == 7);
+        CHECK(menu->move_song_select_selection(7));
+        CHECK(menu->selected_song_ == 4);
+        CHECK(menu->move_song_select_selection(-14));
+        CHECK(menu->selected_song_ == 0);
+        CHECK_FALSE(menu->move_song_select_selection(0));
+        CHECK_FALSE(menu->move_song_select_selection(10));
+        CHECK(menu->move_song_select_selection(std::numeric_limits<int>::max()));
+        CHECK(menu->selected_song_ == 7);
+        CHECK(menu->move_song_select_selection(-std::numeric_limits<int>::max()));
+        CHECK(menu->selected_song_ == 0);
+        CHECK(menu->move_song_select_selection(std::numeric_limits<int>::min()));
+        CHECK(menu->selected_song_ == 2);
+        menu->visible_song_indices_ = {0};
+        menu->selected_song_ = 0;
+        CHECK_FALSE(menu->move_song_select_selection(1));
+        CHECK_FALSE(menu->move_song_select_selection(-1));
+
+        menu->config_.ui.difficulty_table_path = "navigation-fixture.json";
+        menu->table_levels_ = {"1", "2", "3"};
+        REQUIRE(menu->showing_table_level_folders());
+        CHECK(menu->move_song_select_selection(-1));
+        CHECK(menu->selected_table_level_ == 2);
+        CHECK(menu->move_song_select_selection(1));
+        CHECK(menu->selected_table_level_ == 0);
+        menu->table_levels_.clear();
+        CHECK_FALSE(menu->move_song_select_selection(1));
+        menu->config_.ui.difficulty_table_path.clear();
+
+        menu->song_select_view_ = MenuApp::SongSelectView::Sources;
+        menu->config_.ui.recent_song_sources = {"first", "second"};
+        CHECK(menu->move_song_select_selection(-1));
+        CHECK(menu->selected_source_ == 2);  // ALL SONG is the first library entry.
+        CHECK(menu->move_song_select_selection(1));
+        CHECK(menu->selected_source_ == 0);
+        menu->config_.ui.recent_song_sources.clear();
+        CHECK_FALSE(menu->move_song_select_selection(-1));
+
+        menu->song_select_view_ = MenuApp::SongSelectView::Records;
+        menu->local_play_records_.resize(3);
+        for (const auto& key : menu_songs::build_chart_path_keys("chart-0.bms", menu->songs_path_)) {
+            menu->chart_play_record_indices_[key] = {0, 1, 2};
+        }
+        CHECK(menu->move_song_select_selection(-1));
+        CHECK(menu->selected_record_ == 2);
+        CHECK(menu->move_song_select_selection(1));
+        CHECK(menu->selected_record_ == 0);
+        menu->local_play_records_.clear();
+        CHECK_FALSE(menu->move_song_select_selection(-1));
+        menu->online_records_view_ = true;
+        CHECK_FALSE(menu->move_song_select_selection(1));
+    }
+
     static void check_fixed_timing_best_and_ghost(const std::string& root) {
         auto menu = std::make_unique<MenuApp>();
         menu->songs_path_ = root;
@@ -546,6 +617,10 @@ TEST_CASE("ALL SONG skips deleted folders inside a valid cache and continues wit
 }
 
 #ifdef _WIN32
+TEST_CASE("lobby selection wraps songs folders libraries and records without overflow") {
+    MenuAppSongSourceTestAccess::check_cyclic_lobby_navigation();
+}
+
 TEST_CASE("fixed timing BEST and automatic ghost separate historical scores while preserving history") {
     AggregateFixture f;
     MenuAppSongSourceTestAccess::check_fixed_timing_best_and_ghost(f.base.u8string());

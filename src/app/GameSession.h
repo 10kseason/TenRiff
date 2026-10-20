@@ -648,6 +648,9 @@ private:
     InputBackendRuntimeState forced_polling_input_state_{};
     InputBackendRuntimeState input_backend_state_{};
     std::vector<PolledGameplayKey> polled_gameplay_keys_;
+    // Private deterministic resume probe; empty in ordinary execution so the
+    // actual keyboard/gamepad state remains authoritative.
+    std::function<bool(uint32_t)> physical_key_state_probe_{};
     std::vector<ToneVoice> tone_voices_;
     std::vector<ChartAudioAsset> chart_audio_assets_;
     std::vector<ChartAudioEvent> chart_audio_events_;
