@@ -13,12 +13,15 @@
 #include "config/GraphicsResolution.h"
 #include "render/SkinGameplayPreview.h"
 #include "render/ResultPresentation.h"
+#include "render/GameplayFeedbackText.h"
+#include "render/GameplayGaugePalette.h"
 #include "app/menu/settings/AudioSettingsView.h"
 #include "app/menu/settings/KeymapSettingsView.h"
 #include "config/KeycodeMap.h"
 #include "config/SimpleJson.h"
 #include "app/SettingsHelpTips.h"
 #include "app/menu/settings/SettingsHelp.h"
+#include "util/Utf8Compat.h"
 
 #include <windows.h>
 #include <shellapi.h>
@@ -361,6 +364,207 @@ struct MenuWindowVisualTestAccess {
         return passed;
     }
 
+    static bool check_background_layers(MenuWindow& window, MenuRenderData source,
+                                         const std::string& directory) {
+        using namespace config;
+        using Clock = std::chrono::steady_clock;
+        constexpr int phase_timeout_ms = 8000, total_timeout_ms = 45000;
+        const auto began = Clock::now();
+        const auto total_deadline = began + std::chrono::milliseconds(total_timeout_ms);
+        const auto video = source.gameplay.background_base_path;
+        const auto root = std::filesystem::u8path(directory);
+        const auto black = (root / "black.bmp").u8string();
+        const auto red = (root / "red.bmp").u8string();
+        const auto nearblack = (root / "nearblack.bmp").u8string();
+        JsonArray checks;
+        unsigned failed = 0, frames = 0, pending_video_holds = 0;
+        MenuWindow::GameplayBackgroundProbe base, overlay;
+        app::GameplayMemoryDeferral playing;
+        playing.begin();
+        const auto pixels = [](const auto& layer) {
+            JsonArray first;
+            for (auto channel : layer.first_bgra) first.emplace_back(static_cast<double>(channel));
+            std::ostringstream hash;
+            hash << std::hex << layer.pixel_hash;
+            return JsonValue(JsonObject{{"present", JsonValue(layer.bitmap_identity != nullptr)},
+                {"readable", JsonValue(layer.readable)}, {"width", JsonValue(static_cast<double>(layer.width))},
+                {"height", JsonValue(static_cast<double>(layer.height))}, {"first_bgra", JsonValue(std::move(first))},
+                {"min_alpha", JsonValue(static_cast<double>(layer.min_alpha))},
+                {"max_alpha", JsonValue(static_cast<double>(layer.max_alpha))},
+                {"pixel_hash", JsonValue(hash.str())}});
+        };
+        const auto check = [&](const char* name, bool passed) {
+            failed += !passed;
+            checks.emplace_back(JsonObject{{"name", JsonValue(name)}, {"passed", JsonValue(passed)},
+                {"base", pixels(base)}, {"overlay", pixels(overlay)}});
+        };
+        const auto finish = [&] {
+            playing.end();
+            const bool passed = failed == 0 && !window.had_fatal_error();
+            std::cout << json_stringify(JsonValue(JsonObject{{"passed", JsonValue(passed)},
+                {"phase_timeout_ms", JsonValue(static_cast<double>(phase_timeout_ms))},
+                {"total_timeout_ms", JsonValue(static_cast<double>(total_timeout_ms))},
+                {"elapsed_ms", JsonValue(std::chrono::duration<double, std::milli>(Clock::now() - began).count())},
+                {"rendered_frames", JsonValue(static_cast<double>(frames))},
+                {"observed_pending_video_holds", JsonValue(static_cast<double>(pending_video_holds))},
+                {"checks", JsonValue(std::move(checks))}}), 2) << '\n';
+            return passed;
+        };
+        std::error_code ec;
+        bool fixtures_ready = BgaVideoDecoder::is_supported_video_path(video);
+        for (const auto& path : {black, red, nearblack, video}) {
+            fixtures_ready = std::filesystem::is_regular_file(std::filesystem::u8path(path), ec) &&
+                !ec && fixtures_ready;
+            ec.clear();
+        }
+        check("fixtures.required_bmps_and_video_exist", fixtures_ready);
+        if (!fixtures_ready) return finish();
+        source.kind = MenuScreenKind::GameplayHud;
+        source.generic.skin_preview.visible = false;
+        source.gameplay.active = true;
+        source.gameplay.paused = true;
+        source.gameplay.sample_rate = 48000;
+        source.gameplay.current_sample = 48000;
+        source.gameplay.rate = 1.0;
+        source.gameplay.background_upscale_mode = "off";
+        source.gameplay.background_base_start_sample = 0;
+        source.gameplay.background_overlay_start_sample = 0;
+        const auto render = [&] {
+            window.render(source);
+            ++frames;
+            base = window.gameplay_background_probe(false);
+            overlay = window.gameplay_background_probe(true);
+        };
+        const auto wait_ready = [&](const char* name, const auto& ready) {
+            const auto deadline = std::min(total_deadline,
+                Clock::now() + std::chrono::milliseconds(phase_timeout_ms));
+            bool complete = false;
+            do {
+                render();
+                if ((complete = ready()) || window.had_fatal_error() || window.should_close()) break;
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            } while (Clock::now() < deadline);
+            check(name, complete && !window.had_fatal_error());
+            return complete && !window.had_fatal_error();
+        };
+        const auto pixel_is = [](const auto& layer, std::array<uint8_t, 4> pixel) {
+            return layer.readable && layer.first_bgra == pixel &&
+                layer.min_alpha == pixel[3] && layer.max_alpha == pixel[3];
+        };
+        const auto same = [](const auto& lhs, const auto& rhs) {
+            return lhs.readable && rhs.readable && lhs.bitmap_identity == rhs.bitmap_identity &&
+                lhs.width == rhs.width && lhs.height == rhs.height && lhs.pixel_hash == rhs.pixel_hash;
+        };
+        source.gameplay.background_base_path = black;
+        source.gameplay.background_overlay_path = black;
+        if (!wait_ready("bmp.same_black_file_base_opaque_overlay_transparent", [&] {
+                return pixel_is(base, {0, 0, 0, 255}) && pixel_is(overlay, {0, 0, 0, 0});
+            })) return finish();
+        const auto cached_black_base = base, cached_black_overlay = overlay;
+        source.gameplay.background_base_path = red;
+        if (!wait_ready("bmp.red_base_black_overlay", [&] {
+                return pixel_is(base, {0, 0, 255, 255}) && pixel_is(overlay, {0, 0, 0, 0});
+            })) return finish();
+        check("bmp.base_change_preserves_overlay_bitmap", same(overlay, cached_black_overlay));
+        source.gameplay.background_base_path = black;
+        source.gameplay.background_overlay_path = red;
+        if (!wait_ready("bmp.swapped_layers_keep_distinct_cache_entries", [&] {
+                return pixel_is(base, {0, 0, 0, 255}) && pixel_is(overlay, {0, 0, 255, 255});
+            })) return finish();
+        check("bmp.cached_black_base_stays_opaque", same(base, cached_black_base));
+        const auto cached_red_overlay = overlay;
+        source.gameplay.background_base_path = nearblack;
+        source.gameplay.background_overlay_path = nearblack;
+        if (!wait_ready("bmp.nearblack_is_opaque_on_both_layers", [&] {
+                return pixel_is(base, {1, 1, 1, 255}) && pixel_is(overlay, {1, 1, 1, 255});
+            })) return finish();
+        source.gameplay.background_base_path = black;
+        source.gameplay.background_overlay_path = black;
+        render();
+        check("bmp.cache_roundtrip_does_not_cross_contaminate_alpha",
+            same(base, cached_black_base) && same(overlay, cached_black_overlay));
+
+        source.gameplay.background_base_path = video;
+        render();
+        check("video.start_keeps_completed_bitmap_until_ready", base.readable);
+        if (!wait_ready("video.base_first_frame_ready", [&] {
+                return base.readable && base.bitmap_identity != cached_black_base.bitmap_identity;
+            })) return finish();
+        const auto fixed_base_video = base;
+        source.gameplay.background_overlay_path = red;
+        source.gameplay.background_overlay_start_sample = 123;
+        render();
+        check("video.overlay_path_and_start_change_preserves_frozen_base",
+            same(base, fixed_base_video) && same(overlay, cached_red_overlay));
+        source.gameplay.background_overlay_path = video;
+        source.gameplay.background_overlay_start_sample = 0;
+        bool base_preserved = true;
+        if (!wait_ready("video.overlay_first_frame_ready", [&] {
+                base_preserved = base_preserved && same(base, fixed_base_video);
+                return overlay.readable && overlay.bitmap_identity != cached_red_overlay.bitmap_identity;
+            })) return finish();
+        check("video.overlay_decode_never_clears_frozen_base", base_preserved);
+        const auto before_overlay_restart = overlay;
+        source.gameplay.background_overlay_start_sample = 48000;
+        render();
+        pending_video_holds += same(overlay, before_overlay_restart);
+        bool overlay_never_blank = overlay.readable;
+        base_preserved = same(base, fixed_base_video);
+        if (!wait_ready("video.overlay_restart_gets_new_frame", [&] {
+                overlay_never_blank = overlay_never_blank && overlay.readable;
+                base_preserved = base_preserved && same(base, fixed_base_video);
+                pending_video_holds += same(overlay, before_overlay_restart);
+                return overlay.readable && overlay.bitmap_identity != before_overlay_restart.bitmap_identity;
+            })) return finish();
+        check("video.overlay_restart_holds_last_frame_and_preserves_base", overlay_never_blank && base_preserved);
+        const auto fixed_overlay_video = overlay;
+        source.gameplay.background_base_path = red;
+        render();
+        check("video.base_change_preserves_frozen_overlay",
+            pixel_is(base, {0, 0, 255, 255}) && same(overlay, fixed_overlay_video));
+        source.gameplay.background_base_path.clear();
+        render();
+        check("video.base_clear_only_clears_base", !base.bitmap_identity && same(overlay, fixed_overlay_video));
+        source.gameplay.background_base_path = video;
+        bool overlay_preserved = true;
+        if (!wait_ready("video.base_restart_with_paused_overlay", [&] {
+                overlay_preserved = overlay_preserved && same(overlay, fixed_overlay_video);
+                return base.readable;
+            })) return finish();
+        check("video.base_restart_preserves_paused_overlay", overlay_preserved);
+        const auto before_base_restart = base;
+        source.gameplay.background_base_start_sample = 48000;
+        render();
+        pending_video_holds += same(base, before_base_restart);
+        bool base_never_blank = base.readable;
+        if (!wait_ready("video.base_new_start_gets_new_frame", [&] {
+                base_never_blank = base_never_blank && base.readable;
+                overlay_preserved = overlay_preserved && same(overlay, fixed_overlay_video);
+                pending_video_holds += same(base, before_base_restart);
+                return base.readable && base.bitmap_identity != before_base_restart.bitmap_identity;
+            })) return finish();
+        check("video.base_restart_holds_last_frame_and_preserves_overlay", base_never_blank && overlay_preserved);
+        const auto after_base_restart = base;
+        source.gameplay.background_overlay_path.clear();
+        bool overlay_stays_clear = true;
+        for (int i = 0; i < 5; ++i) {
+            render();
+            overlay_stays_clear = overlay_stays_clear && !overlay.bitmap_identity && same(base, after_base_restart);
+        }
+        check("video.overlay_clear_has_no_stale_frame_and_preserves_base", overlay_stays_clear);
+        source.gameplay.background_base_path.clear();
+        render();
+        check("video.both_clear_remove_all_visible_bitmaps", !base.bitmap_identity && !overlay.bitmap_identity);
+        window.invalidate_gameplay_background_cache();
+        render();
+        check("video.session_reset_cannot_restore_stale_bitmaps", !base.bitmap_identity && !overlay.bitmap_identity);
+        source.gameplay.background_base_path = video;
+        if (!wait_ready("video.playback_recovers_after_explicit_reset", [&] { return base.readable; }))
+            return finish();
+        check("video.valid_restarts_observed_pending_last_frame", pending_video_holds > 0);
+        return finish();
+    }
+
     static std::array<uint64_t, 6> gpu_sprite_stats(const MenuWindow& window) {
         const auto& stats = window.benchmark_gpu_sprite_stats_;
         return {stats[0], stats[1], stats[2], stats[3], stats[4], window.benchmark_gpu_sprite_submissions_};
@@ -667,6 +871,20 @@ struct MenuWindowVisualTestAccess {
                     JsonValue(static_cast<double>(window.offset_x_ + region.right * window.scale_)),
                     JsonValue(static_cast<double>(window.offset_y_ + region.bottom * window.scale_))})}});
         }
+        JsonArray lamp_labels, lobby_nav;
+        for (const auto& card : source.song_select.songs) {
+            const auto lamp = song_select_lamp_presentation(card.lamp);
+            JsonArray rgb;
+            if (lamp.color) {
+                for (unsigned shift : {16u, 8u, 0u})
+                    rgb.emplace_back(static_cast<double>((*lamp.color >> shift) & 0xFFu));
+            }
+            lamp_labels.emplace_back(JsonObject{{"stored_status", JsonValue(card.lamp)},
+                {"display_label", JsonValue(lamp.label)}, {"tint_card", JsonValue(lamp.tint_card)},
+                {"color_rgb", lamp.color ? JsonValue(std::move(rgb)) : JsonValue()}});
+        }
+        for (const auto& item : source.song_select.left_nav) lobby_nav.emplace_back(item.label);
+        const auto timing_text = gameplay_timing_feedback_text(source.gameplay.timing_feedback_delta_ms);
         JsonObject report{
             {"ui_language", JsonValue(std::string(ui::language_token(source.ui_language)))},
             {"title_language_button_verified", JsonValue(title_language_verified)},
@@ -684,6 +902,10 @@ struct MenuWindowVisualTestAccess {
             {"pointer_dispatch_method", JsonValue("MenuWindow::on_mouse_click on the owned foreground window; no desktop pointer or physical click is synthesized.")},
             {"notes", JsonValue(std::move(notes))},
             {"selected_song_difficulty", JsonValue(source.song_select.selected_song_difficulty)},
+            {"lobby_lamp_formatter", JsonValue(std::move(lamp_labels))},
+            {"lobby_nav_labels", JsonValue(std::move(lobby_nav))},
+            {"timing_feedback_delta_ms", JsonValue(source.gameplay.timing_feedback_delta_ms)},
+            {"timing_formatter_text", JsonValue(util::utf8_from_wide_lossy(timing_text))},
             {"gameplay_note_width_scale", JsonValue(source.gameplay.note_width_scale)},
             {"editor_note_width_scale", JsonValue(source.bms_editor.note_width_scale)},
             {"editor_lane_count", JsonValue(static_cast<double>(source.bms_editor.lane_count))},
@@ -781,6 +1003,7 @@ int main(int argc, char** argv) {
     bool timing_bar_always = false;
     std::string timing_marker_style = "dot";
     std::string timing_color_case;
+    std::optional<double> timing_delta_fixture;
     double timing_maximum_ms = 21.0;
     bool remapped_functions = false;
     bool measure_lines_fixture = false;
@@ -867,6 +1090,7 @@ int main(int argc, char** argv) {
     bool native_level_table = false;
     int table_prefix_keys = 0;
     bool mixed_table_prefixes = false;
+    bool lamp_fixture = false;
     bool backdrop_off = false;
     double backdrop_opacity = -1.0;
     double backdrop_brightness = -1.0;
@@ -878,6 +1102,7 @@ int main(int argc, char** argv) {
     bool hitmap_written = false;
     std::string hitmap_path;
     std::string retention_probe_directory;
+    std::string layer_probe_directory;
     bool profile_settings = false;
     bool title = false;
     bool focus_options = false;
@@ -919,6 +1144,14 @@ int main(int argc, char** argv) {
             continue;
         }
         if (arg == "--judgement-counts") { judgement_counts = true; continue; }
+        if (arg == "--lamp-fixture") { lamp_fixture = true; continue; }
+        if (arg == "--timing-delta-ms" && i + 1 < argc) {
+            const double value = std::stod(argv[++i]);
+            if (!std::isfinite(value) || value == 0 || std::abs(value) > 180.0) return 2;
+            timing_delta_fixture = value;
+            gameplay = true;
+            continue;
+        }
         if (arg == "--common-keys") { keymap_settings = common_keys = true; continue; }
         if (arg == "--timing-colors" && i + 1 < argc) {
             timing_color_case = argv[++i];
@@ -936,6 +1169,10 @@ int main(int argc, char** argv) {
         // Keep new independent flags outside the legacy nested else-if chain (MSVC limit).
         if (arg == "--bga-retention-probe" && i + 1 < argc) {
             retention_probe_directory = argv[++i];
+            continue;
+        }
+        if (arg == "--bga-layer-probe" && i + 1 < argc) {
+            layer_probe_directory = argv[++i];
             continue;
         }
         if (arg == "--timing-marker" && i + 1 < argc) {
@@ -1433,8 +1670,8 @@ int main(int argc, char** argv) {
     songs.secondary_hint = loc("LEFT/RIGHT NAV     BACKSPACE BACK     F2 FOLDER     -/+ RATE     F5 REINDEX     F1 HELP",
                                "좌우 이동 / BACKSPACE 뒤로 / F2 폴더 / -/+ 배속 / F5 재검색 / F1 도움말");
     songs.empty_title = loc("NO CHARTS MATCH", "일치하는 차트 없음");
-    songs.empty_message = loc("Clear the current search/filter or switch the active source to see more charts.",
-                              "검색·필터를 지우거나 활성 소스를 바꿔 더 많은 차트를 확인하세요.");
+    songs.empty_message = loc("Clear the current search/filter or switch the active library to see more charts.",
+                              "검색·필터를 지우거나 활성 라이브러리를 바꿔 더 많은 차트를 확인하세요.");
     songs.result_available = !empty;
     songs.search_active = search_active;
     songs.search_query = search_query;
@@ -1450,7 +1687,7 @@ int main(int argc, char** argv) {
     songs.selected_source_name = loc("SONG LIBRARY", "곡 라이브러리");
     songs.selected_source_path = "songs / preview";
     const std::array<std::string, 7> navigation{
-        loc("SONGS", "곡 목록"), loc("SOURCES", "소스"), loc("SEARCH", "검색"),
+        loc("SONGS", "곡 목록"), loc("LIBRARY", "라이브러리"), loc("SEARCH", "검색"),
         loc("FILTER", "필터"), loc("RECORDS", "기록"), loc("SESSION MIX", "세션 믹스"),
         loc("OPTIONS", "옵션")};
     for (const auto& label : navigation) {
@@ -1484,11 +1721,19 @@ int main(int argc, char** argv) {
             card.selected = i == 0;
             card.favorite = i == 1;
             card.lamp = "CLEAR";
+            if (lamp_fixture) {
+                constexpr std::array<const char*, 7> statuses{
+                    "GAUGE SHIFT NORMAL CLEAR", "GAUGE SHIFT HARD CLEAR", "GAUGE SHIFT EX CLEAR",
+                    "GAUGE SHIFT EASY CLEAR", "FAILED", "", "ASSIST PRACTICE GAUGE SHIFT NORMAL CLEAR"};
+                card.lamp = statuses[static_cast<std::size_t>(i)];
+                card.favorite = false;
+            }
             songs.songs.push_back(card);
         }
         songs.song_count = songs.list_total_count = 42;
         songs.record_count = songs.source_count = 42;
         songs.list_visible_count = 7;
+        if (lamp_fixture) songs.selected_song_lamp = songs.songs.front().lamp;
     }
     if (songs.showing_sources && !empty) {
         songs.selected_source_all = true;
@@ -1976,6 +2221,8 @@ int main(int argc, char** argv) {
     MenuWindowVisualTestAccess::benchmark(window, benchmark_frames > 0 || !hitmap_path.empty() || verify_hits);
     if (!retention_probe_directory.empty())
         return MenuWindowVisualTestAccess::check_background_retention(window, data, retention_probe_directory) ? 0 : 5;
+    if (!layer_probe_directory.empty())
+        return MenuWindowVisualTestAccess::check_background_layers(window, data, layer_probe_directory) ? 0 : 5;
     if (benchmark_frames > 0) frame_limit = benchmark_warmup + benchmark_frames;
     const auto start = std::chrono::steady_clock::now();
     while (!window.should_close()) {
@@ -2028,6 +2275,18 @@ int main(int argc, char** argv) {
                 hud.timing_feedback_delta_ms = timing_sequence && rendered_frames < 30 ? -50.0 : last;
                 hud.has_timing_feedback = hud.has_retained_timing_feedback = timing_sequence
                     ? (rendered_frames < 21 || (rendered_frames >= 30 && rendered_frames < 51)) : outside;
+                hud.timing_bar_always_visible = true;
+            }
+            if (timing_delta_fixture) {
+                hud.feedback = "GR";
+                hud.feedback_delta_ms = *timing_delta_fixture;
+                hud.has_feedback = hud.has_non_pg_feedback = true;
+                hud.has_timing_feedback = hud.has_retained_timing_feedback = true;
+                hud.timing_feedback_delta_ms = *timing_delta_fixture;
+                hud.timing_history_count = 1;
+                hud.timing_history_delta_ms[0] = *timing_delta_fixture;
+                hud.timing_history_maximums[0] = false;
+                hud.timing_maximum_window_ms = 22.0;
                 hud.timing_bar_always_visible = true;
             }
 
@@ -2126,6 +2385,7 @@ int main(int argc, char** argv) {
                 hud.ghost_feedback_delta_ms = hud.feedback_delta_ms;
                 hud.ghost_has_non_pg_feedback = hud.has_non_pg_feedback;
                 hud.ghost_has_timing_feedback = hud.has_timing_feedback;
+                hud.ghost_has_retained_timing_feedback = hud.has_retained_timing_feedback;
                 hud.ghost_timing_feedback_delta_ms = hud.timing_feedback_delta_ms;
                 hud.ghost_timing_history_count = hud.timing_history_count;
                 hud.ghost_timing_history_delta_ms = hud.timing_history_delta_ms;

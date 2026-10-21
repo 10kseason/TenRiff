@@ -72,6 +72,16 @@ std::string format_binding_value_for_log(std::string_view value) {
     return std::string(value);
 }
 
+bool is_escape_key(std::uint32_t keycode) {
+    // Reject both ordinary VK aliases and an explicitly authored scan-code
+    // alias; Escape must remain available for pause/back/capture cancellation.
+#ifdef _WIN32
+    return KeycodeMap::polling_vk_for_keycode(keycode) == 0x1Bu;
+#else
+    return keycode == 0x1Bu;
+#endif
+}
+
 void canonicalize_mode_bindings(const KeymapManager& manager,
                                 Keymap& keymap,
                                 std::string_view key_mode,
@@ -97,7 +107,7 @@ void canonicalize_mode_bindings(const KeymapManager& manager,
         }();
 
         const auto keycode = KeycodeMap::to_keycode(original);
-        if (!keycode.has_value()) {
+        if (!keycode.has_value() || is_escape_key(*keycode)) {
             const std::string fallback = defaults[lane];
             if (original != fallback) {
                 ++result.repaired_binding_count;
@@ -213,7 +223,7 @@ bool KeymapManager::assign_binding(Keymap& keymap, std::string_view key_mode, st
     const std::string normalized = normalize_mode_token(key_mode);
     const auto lanes = lane_ids_for_mode(normalized);
     const auto code = KeycodeMap::to_keycode(key_name);
-    if (!code || std::find(lanes.begin(), lanes.end(), lane) == lanes.end()) {
+    if (!code || is_escape_key(*code) || std::find(lanes.begin(), lanes.end(), lane) == lanes.end()) {
         return false;
     }
 
@@ -302,7 +312,7 @@ KeymapLoadResult KeymapManager::load_profile(std::string_view profile_dir) const
                 if (!key.is_string() || std::find(lanes.begin(), lanes.end(), lane) == lanes.end()) continue;
                 const auto original = key.as_string();
                 if (original.empty()) continue;
-                if (const auto code = KeycodeMap::to_keycode(original)) {
+                if (const auto code = KeycodeMap::to_keycode(original); code && !is_escape_key(*code)) {
                     const auto canonical = KeycodeMap::to_name(*code);
                     if (canonical != original) ++result.normalized_binding_count;
                     result.keymap.secondary_mode_bindings[normalized_mode][lane] = canonical;
@@ -337,6 +347,19 @@ KeymapLoadResult KeymapManager::load_profile(std::string_view profile_dir) const
 }
 
 bool KeymapManager::save_profile(std::string_view profile_dir, const Keymap& keymap, std::string* error) const {
+    // Validate before opening/truncating an existing profile. Callers that
+    // construct a Keymap directly must obey the same rule as capture/assign.
+    for (const auto& mode : supported_mode_tokens()) {
+        for (const auto& bindings : {bindings_for_mode(keymap, mode),
+                                     secondary_bindings_for_mode(keymap, mode)}) {
+            for (const auto& [lane, key] : bindings) {
+                if (const auto code = KeycodeMap::to_keycode(key); code && is_escape_key(*code)) {
+                    if (error) *error = "Escape cannot be assigned to a lane.";
+                    return false;
+                }
+            }
+        }
+    }
     auto path = std::filesystem::u8path(profile_dir);
     std::filesystem::create_directories(path);
     path /= "keymap.json";

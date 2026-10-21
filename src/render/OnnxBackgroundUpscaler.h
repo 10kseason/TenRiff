@@ -26,7 +26,7 @@ struct OnnxUpscaleFrame {
 class OnnxBackgroundUpscaler {
 public:
     explicit OnnxBackgroundUpscaler(std::string model_path = {}, bool prefer_npu = false,
-                                    std::string output_mode = "auto");
+                                    std::string output_mode = "auto", bool black_key = false);
     ~OnnxBackgroundUpscaler();
 
     OnnxBackgroundUpscaler(const OnnxBackgroundUpscaler&) = delete;

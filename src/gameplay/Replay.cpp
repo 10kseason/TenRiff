@@ -851,8 +851,11 @@ ReplayValidationResult validate_replay_evidence(const ReplayFile& replay) {
             return result;
         }
         auto& lane_state = lane_states[static_cast<std::size_t>(event.lane - 1)];
-        if (lane_state == event.state) {
-            result.error = "Replay v3 contains a repeated per-lane input state.";
+        // A fresh secondary binding can strike an already held lane without a
+        // synthetic key-up (which would break a hold). The engine records each
+        // strike; duplicate releases still have no valid ownership transition.
+        if (lane_state == event.state && event.state == input::InputState::Released) {
+            result.error = "Replay v3 contains a repeated per-lane release.";
             return result;
         }
         lane_state = event.state;

@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.9.8.5 — 2026-10-21
+
+- Fix BGA layer interference by keeping base/overlay playback and caches independent. Normalize MF presentation timestamps, retain sparse/EOF frames, reject stale asynchronous results and old forward-play PTS, and avoid decoder rewinds caused by ordinary frame cadence.
+- Make exact-black image overlays transparent while preserving base-image black and authored alpha, including external ONNX image processing. Keep video AI disabled and ship no BGA weights.
+- Wrap song navigation at both ends of the filtered list, rename Source to Library, and replace the GAUGE SHIFT prefix with larger bold gauge-colored clear labels and subtle card tinting.
+- Display FAST/SLOW with outward one-decimal precision so ±22.020833ms reads ±22.1ms. Preserve fixed Normal 22/19/15/10ms, Hard/EX shared timing rows, grades and current/historical rulesets.
+- Reject Esc as a lane binding. Let a fresh same-lane secondary press take ownership and score; releasing it does not revive an older held key. Preserve ownership through pause/resume. Down/down/up replays use existing fields but require the updated validator.
+- Recognize scratch-free former 7+1 SP as native7 while preserving actual scratch objects, explicit layouts, historical native8 replay reconstruction and old already7 sparse mapping. Keep legacy source mapping for explicit runtime conversion/peer v7, declare #8K in eight-key exports, and rebuild derived index cache21.
+- Continue published 1.9.8 without promoting the fixed general baseline from 1.9.6. Keep all prior releases, candidates, installations and profiles. Candidate validation does not certify new release assets; see [scope](docs/release-1.9.8.5.en.md) and [verification gates](docs/release-1.9.8.5-gate.md). No website, database or public Skin Editor deployment is included.
+
 ## 1.9.8 — 2026-10-19
 
 - Restore X controls immediately before Y for Judgement, Combo, the FAST/SLOW indicator and bar in Skin Settings. Reuse existing −600..600px offsets and 10px steps, preserving saved X/Y, zero defaults, localized search and Native/TenRiff/LR2 keyboard/pointer controls.

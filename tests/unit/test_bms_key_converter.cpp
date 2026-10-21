@@ -9,6 +9,7 @@
 
 #include "app/BmsKeyConverter.h"
 #include "app/ChartLoader.h"
+#include "chart/BmsParser.h"
 
 namespace {
 
@@ -286,6 +287,15 @@ TEST_CASE("bms key converter writes every target lane count from 1K through 18K"
                                        std::to_string(load_result.chart.lane_count) + "K");
         }
         CHECK_FALSE(load_result.chart.notes.empty());
+        if (target == 8) {
+            const auto parsed = tenriff::chart::BmsParser{}.parseFile(output_path.u8string());
+            REQUIRE(parsed.success());
+            CHECK(parsed.chart.headers.count("8K") == 1u);
+            CHECK(parsed.chart.headers.count("7K") == 0u);
+            CHECK(parsed.chart.lane_mapping.laneForChannel("16") == 6u);
+            CHECK(parsed.chart.lane_mapping.laneForChannel("19") == 8u);
+            CHECK(load_result.chart.scratch_lanes.empty());
+        }
     }
 }
 
@@ -298,6 +308,28 @@ TEST_CASE("bms key converter rejects targets outside the 1K through 18K contract
     const auto result = tenriff::app::convert_bms_chart_file(options);
     CHECK_FALSE(result.success);
     CHECK(result.error.find("Unsupported target lane count") != std::string::npos);
+}
+
+TEST_CASE("bms key converter reads scratch-free source as native seven keys") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE_FALSE(temp.path.empty());
+    const auto input = temp.path / "seven.bms";
+    {
+        std::ofstream file(input);
+        file << "#TITLE Seven without scratch\n#BPM 120\n#7K\n"
+                "#00111:01\n#00214:01\n#00319:01\n#00116:0000\n";
+    }
+    tenriff::app::BmsKeyConverterOptions options;
+    options.input_path = input.u8string();
+    options.output_path = (temp.path / "four.bms").u8string();
+    options.target_lane_count = 4;
+    const auto converted = tenriff::app::convert_bms_chart_file(options);
+    REQUIRE(converted.success);
+    CHECK(converted.source_lane_count == 7);
+    const auto reloaded = tenriff::app::ChartLoader{}.load(options.output_path, 48000, 1.0);
+    REQUIRE(reloaded.success());
+    CHECK(reloaded.chart.lane_count == 4);
+    CHECK_FALSE(reloaded.chart.notes.empty());
 }
 
 TEST_CASE("bms key converter auto-detects sample rate from BMS keysounds") {

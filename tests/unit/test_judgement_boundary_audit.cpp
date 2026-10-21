@@ -9,6 +9,42 @@
 #include "app/ModeManager.h"
 #include "app/ReplayVerifier.h"
 #include "gameplay/GameplayEngine.h"
+#include "render/GameplayFeedbackText.h"
+
+TEST_CASE("fixed PG sample boundaries distinguish exact 22 ms from the first GREAT sample") {
+    for (const int sample_rate : {44100, 48000, 88200, 96000, 192000}) {
+        for (const int rank : {0, 1, 2, 3, 4}) {
+            for (const int difficulty : {0, 1, 2}) {
+                constexpr double normal[]{10.0, 15.0, 19.0, 22.0, 22.0};
+                const double expected = difficulty == 2 ? 10.0 : difficulty == 1 ? 19.0 : normal[rank];
+                tenriff::gameplay::GameplayConfig config;
+                config.sample_rate = sample_rate;
+                config.judge = tenriff::app::judge_timing_for_fixed_baseline(
+                    {}, rank, false, difficulty == 1, difficulty == 2);
+                CHECK(config.judge.pg_ms == expected);
+                const auto edge = std::llround(expected * sample_rate / 1000.0);
+                const int64_t note_sample = sample_rate * 2;
+                for (const int sign : {-1, 1}) for (const int extra : {-1, 0, 1}) {
+                    tenriff::gameplay::GameplayChart chart;
+                    chart.lane_count = 1;
+                    chart.duration_samples = sample_rate * 4;
+                    chart.notes.push_back({1, note_sample, std::nullopt});
+                    tenriff::gameplay::GameplayEngine engine(chart, config);
+                    const auto offset = sign * (edge + extra);
+                    (void)engine.handle_input(1, tenriff::input::InputState::Pressed, note_sample + offset);
+                    CHECK(engine.stats().counts.pg == (extra <= 0 ? 1 : 0));
+                    CHECK(engine.stats().counts.gr == (extra > 0 ? 1 : 0));
+                    if (extra > 0) {
+                        const auto text = tenriff::render::gameplay_timing_feedback_text(
+                            offset * 1000.0 / sample_rate);
+                        const auto magnitude = std::to_wstring(static_cast<int>(expected)) + L".1 ms";
+                        CHECK(text == (sign < 0 ? L"FAST -" : L"SLOW +") + magnitude);
+                    }
+                }
+            }
+        }
+    }
+}
 
 // Exercise the public engine, rather than just checking the policy helper's
 // output. A rate-adjusted chart already uses playback samples; its hit windows

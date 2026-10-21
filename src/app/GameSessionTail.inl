@@ -511,7 +511,10 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         ChartLoader loader;
         out_result = loader.load(chart_path_, sample_rate_, config_.speed.rate,
                                   config_.audio_ui.bms_keysound_policy,
-                                  bms_random_seed_, bms_timing_version_, bms_control_flow_version_);
+                                  bms_random_seed_, bms_timing_version_, bms_control_flow_version_,
+                                  preserve_legacy_empty_sp_scratch(config_.mode.key_mode,
+                                      replay_playback_enabled_ ? replay_source_.trace.lane_count : 0,
+                                      peer_battle_mode_));
         for (const auto& message : out_result.messages) {
             std::cerr << "[warn] " << message << std::endl;
         }
@@ -3014,14 +3017,18 @@ void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
     while (future_events_.pop().has_value()) {
     }
     pending_input_events_.clear();
+    const auto physical_key_pressed = [this](uint32_t keycode) {
+        if (physical_key_state_probe_) return physical_key_state_probe_(keycode);
+        if (const auto vk = config::KeycodeMap::polling_vk_for_keycode(keycode))
+            return (GetAsyncKeyState(static_cast<int>(*vk)) & 0x8000) != 0;
+        return input_thread_.gamepad_key_pressed(keycode);
+    };
 
     // A key held through restart/loading/resume must be released before it can
     // start another attempt. It never becomes a lane press or replay event.
     instant_restart_key_armed_ = true;
     if (instant_restart_keycode_ != 0) {
-        const auto vk = config::KeycodeMap::polling_vk_for_keycode(instant_restart_keycode_);
-        if (vk) instant_restart_key_armed_ = (GetAsyncKeyState(static_cast<int>(*vk)) & 0x8000) == 0;
-        else instant_restart_key_armed_ = !input_thread_.gamepad_key_pressed(instant_restart_keycode_);
+        instant_restart_key_armed_ = !physical_key_pressed(instant_restart_keycode_);
     }
 
     hispeed_decrease_held_ = false;
@@ -3032,21 +3039,13 @@ void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
     std::fill(lane_pressed_.begin(), lane_pressed_.end(), 0);
     hispeed_coarse_decrease_held_ = false;
     hispeed_coarse_increase_held_ = false;
-    lane_binding_state_.reset();
+    std::vector<uint32_t> held_lane_keys;
+    held_lane_keys.reserve(polled_gameplay_keys_.size());
     const int64_t baseline_time_ns = timing::HighResClock::now_ns();
     for (auto& tracked : polled_gameplay_keys_) {
-        bool pressed = input_thread_.gamepad_key_pressed(tracked.keycode);
-        if (const auto poll_vk = config::KeycodeMap::polling_vk_for_keycode(tracked.keycode); poll_vk.has_value()) {
-            pressed = (GetAsyncKeyState(static_cast<int>(*poll_vk)) & 0x8000) != 0;
-        }
-        if (!pressed) {
+        if (!physical_key_pressed(tracked.keycode)) {
             continue;
         }
-
-        input::InputEvent baseline_event{};
-        baseline_event.keycode = tracked.keycode;
-        baseline_event.state = input::InputState::Pressed;
-        baseline_event.input_time_ns = baseline_time_ns;
 
         if (tracked.keycode == f5_keycode_) hispeed_coarse_decrease_held_ = true;
         if (tracked.keycode == f6_keycode_) hispeed_coarse_increase_held_ = true;
@@ -3061,12 +3060,13 @@ void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
         if (autoplay_enabled_ || replay_playback_enabled_) {
             continue;
         }
-        static_cast<void>(lane_binding_state_.apply(baseline_event.keycode, baseline_event.state));
+        held_lane_keys.push_back(tracked.keycode);
     }
 
-    // Poll every binding before syncing any lane: an unheld secondary must not
-    // release an LN whose primary is still down when play resumes.
+    // Snapshot all physical keys first. Resume retains the actual owner rather
+    // than selecting whichever held binding happens to occur last in the list.
     if (!autoplay_enabled_ && !replay_playback_enabled_) {
+        lane_binding_state_.rebaseline(held_lane_keys, gameplay_started_.load(std::memory_order_acquire));
         for (int lane = 1; lane <= chart_.lane_count; ++lane) {
             if (auto_scratch_lane(lane)) continue;
             catch_up_lane_input(lane, lane_binding_state_.pressed(lane)

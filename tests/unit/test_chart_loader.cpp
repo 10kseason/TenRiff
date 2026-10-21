@@ -921,6 +921,44 @@ TEST_CASE("chart loader maps 7+1 SP scratch to the first gameplay lane") {
     CHECK(result.chart.notes[2].lane == 8);
 }
 
+TEST_CASE("chart loader recognizes scratch-free native seven keys and preserves replay conversion peer source layouts") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE_FALSE(temp.path.empty());
+    const auto path = temp.path / "scratch_free.bms";
+    {
+        std::ofstream file(path);
+        file << "#BPM 120\n#7K\n#00111:01\n#00114:01\n#00119:01\n#00116:0000\n";
+    }
+    const auto native = ChartLoader{}.load(path.u8string(), 48000, 1.0);
+    REQUIRE(native.success());
+    REQUIRE(native.chart.notes.size() == 3);
+    CHECK(native.chart.lane_count == 7);
+    CHECK(native.chart.scratch_lanes.empty());
+    CHECK(native.chart.notes[0].lane == 1);
+    CHECK(native.chart.notes[1].lane == 4);
+    CHECK(native.chart.notes[2].lane == 7);
+    const auto legacy = ChartLoader{}.load(path.u8string(), 48000, 1.0, "ignore", 0, 2, 2, true);
+    REQUIRE(legacy.success());
+    REQUIRE(legacy.chart.notes.size() == 3);
+    CHECK(legacy.chart.lane_count == 8);
+    CHECK(legacy.chart.scratch_lanes == std::vector<int>{1});
+    CHECK(legacy.chart.notes[0].lane == 2);
+    CHECK(legacy.chart.notes[1].lane == 5);
+    CHECK(legacy.chart.notes[2].lane == 8);
+    using tenriff::app::preserve_legacy_empty_sp_scratch;
+    for (const auto mode : {"auto", "AUTO", "native", "none", ""}) {
+        CHECK_FALSE(preserve_legacy_empty_sp_scratch(mode));
+        CHECK_FALSE(preserve_legacy_empty_sp_scratch(mode, 7));
+        CHECK(preserve_legacy_empty_sp_scratch(mode, 8));
+        CHECK(preserve_legacy_empty_sp_scratch(mode, 0, true));
+    }
+    for (const auto mode : {"4k", "7k", "8k", "10k", "16k"}) {
+        CHECK(preserve_legacy_empty_sp_scratch(mode));
+        CHECK(preserve_legacy_empty_sp_scratch(mode, 7));
+        CHECK(preserve_legacy_empty_sp_scratch(mode, 8));
+    }
+}
+
 TEST_CASE("chart loader maps pms extension charts to 9 lanes") {
     TempDirGuard temp;
     temp.path = make_temp_dir();

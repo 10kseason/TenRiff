@@ -1455,7 +1455,9 @@ struct GameSessionAudioTestAccess {
         CHECK(published_snapshots > 0);
     }
 
-    static void check_secondary_binding_input_queue(uint32_t primary_key = 32, uint32_t secondary_key = 33) {
+    static void check_secondary_binding_input_queue(uint32_t primary_key = 32, uint32_t secondary_key = 33,
+                                                   bool future_queue = false, bool older_key_held = false,
+                                                   bool early_release = false) {
         auto session = std::make_unique<GameSession>();
         session->sample_rate_ = 48000;
         session->chart_.lane_count = 1;
@@ -1473,30 +1475,46 @@ struct GameSessionAudioTestAccess {
         session->key_to_lane_ = {{primary_key, 1}, {secondary_key, 1}};
         session->lane_binding_state_.configure(session->key_to_lane_);
         const auto physical_event = [&](uint32_t key, input::InputState state, int64_t sample) {
-            const int64_t time_ns = 1'000'000'000LL + (sample - 48000) * 1'000'000'000LL / 48000;
-            session->startup_input_timing_anchor_ = {sample, time_ns, true};
-            session->current_playback_sample_ = sample;
-            input::InputEvent event{};
-            event.keycode = key; event.state = state; event.input_time_ns = time_ns;
-            REQUIRE(session->input_thread_.queue().push(event));
-            session->process_input_queue(sample, sample + 480, 0);
-            session->engine_->advance(sample);
+            queue_physical_edge(*session, key, state, sample, future_queue);
         };
         physical_event(primary_key, input::InputState::Pressed, 48000);
         physical_event(secondary_key, input::InputState::Pressed, 60000);
-        physical_event(primary_key, input::InputState::Released, 72000);
+        if (!older_key_held) physical_event(primary_key, input::InputState::Released, 72000);
         CHECK(session->lane_pressed_[0] == 1);
         CHECK(session->lane_binding_state_.pressed(1));
         CHECK(session->engine_->stats().counts.bd == 0);
         CHECK(session->engine_->stats().counts.pr == 0);
-        physical_event(secondary_key, input::InputState::Released, 96000);
+        physical_event(secondary_key, input::InputState::Released, early_release ? 72000 : 96000);
+        if (older_key_held) {
+            physical_event(primary_key, input::InputState::Pressed, 98400);
+            CHECK_FALSE(session->lane_binding_state_.pressed(1));
+            physical_event(primary_key, input::InputState::Released, 98400);
+        }
         session->engine_->advance(100800);
         CHECK(session->lane_pressed_[0] == 0);
         CHECK_FALSE(session->lane_binding_state_.pressed(1));
-        CHECK(session->engine_->stats().counts.pg == 2);
-        CHECK(session->engine_->stats().counts.bd == 0);
+        CHECK(session->engine_->stats().counts.pg == (early_release ? 1 : 2));
+        CHECK(session->engine_->stats().counts.bd == (early_release ? 1 : 0));
         CHECK(session->engine_->stats().counts.pr == 0);
-        CHECK(session->engine_->replay().events.size() == 2);
+        const auto& replay = session->engine_->replay().events;
+        REQUIRE(replay.size() == 3);
+        CHECK(replay[0].state == input::InputState::Pressed);
+        CHECK(replay[0].sample == 48000);
+        CHECK(replay[1].state == input::InputState::Pressed);
+        CHECK(replay[1].sample == 60000);
+        CHECK(replay[2].state == input::InputState::Released);
+        CHECK(replay[2].sample == (early_release ? 72000 : 96000));
+        gameplay::GameplayEngine playback(session->chart_, config);
+        for (const auto& event : replay) {
+            static_cast<void>(playback.handle_input(event.lane, event.state, event.sample));
+            playback.advance(event.sample);
+        }
+        playback.advance(100800);
+        CHECK(playback.stats().counts.pg == session->engine_->stats().counts.pg);
+        CHECK(playback.stats().counts.bd == session->engine_->stats().counts.bd);
+        CHECK(playback.stats().counts.pr == session->engine_->stats().counts.pr);
+        CHECK(playback.stats().raw_score == session->engine_->stats().raw_score);
+        CHECK(playback.gauge_state().value == doctest::Approx(session->engine_->gauge_state().value));
     }
 
     static std::unique_ptr<GameSession> shift_lane_fixture(uint32_t key, bool hold = true) {
@@ -1541,6 +1559,59 @@ struct GameSessionAudioTestAccess {
             session.process_input_queue(sample, sample + 480, 0);
         }
         session.engine_->advance(sample);
+    }
+
+    static void check_secondary_binding_tap_queue(bool future_queue, bool extra_empty_press) {
+        auto session = shift_lane_fixture(32, false);
+        if (!extra_empty_press) session->chart_.notes.push_back({1, 60000, std::nullopt});
+        session->chart_.notes.push_back({1, 96000, std::nullopt});
+        session->chart_.notes.push_back({1, 120000, std::nullopt});
+        gameplay::GameplayConfig config;
+        config.sample_rate = 48000;
+        config.practice_no_fail_enabled = true;
+        session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+        session->key_to_lane_ = {{32, 1}, {33, 1}};
+        session->lane_binding_state_.configure(session->key_to_lane_);
+        const auto physical_event = [&](uint32_t key, input::InputState state, int64_t sample) {
+            queue_physical_edge(*session, key, state, sample, future_queue);
+        };
+        physical_event(32, input::InputState::Pressed, 48000);
+        physical_event(33, input::InputState::Pressed, 60000);
+        CHECK(session->engine_->stats().counts.pg == (extra_empty_press ? 1 : 2));
+        // A real extra strike retains the engine's ordinary Empty Poor rule;
+        // binding ownership must not suppress it or create synthetic strikes.
+        CHECK(session->engine_->stats().counts.pr == (extra_empty_press ? 1 : 0));
+        physical_event(33, input::InputState::Released, 72000);
+        CHECK(session->lane_pressed_[0] == 0);
+        CHECK_FALSE(session->lane_binding_state_.pressed(1));
+        physical_event(32, input::InputState::Pressed, 80000);
+        CHECK(session->lane_pressed_[0] == 0);
+        CHECK_FALSE(session->lane_binding_state_.pressed(1));
+        physical_event(32, input::InputState::Released, 84000);
+        physical_event(32, input::InputState::Pressed, 96000);
+        CHECK(session->lane_pressed_[0] == 1);
+        physical_event(33, input::InputState::Pressed, 120000);
+        CHECK(session->engine_->stats().counts.pg == (extra_empty_press ? 3 : 4));
+        CHECK(session->engine_->stats().counts.bd == 0);
+        CHECK(session->engine_->stats().counts.pr == (extra_empty_press ? 1 : 0));
+        const auto& replay = session->engine_->replay().events;
+        REQUIRE(replay.size() == 5);
+        CHECK(replay[0].sample == 48000);
+        CHECK(replay[1].sample == 60000);
+        CHECK(replay[2].sample == 72000);
+        CHECK(replay[3].sample == 96000);
+        CHECK(replay[4].sample == 120000);
+        gameplay::GameplayEngine playback(session->chart_, config);
+        for (const auto& event : replay) {
+            static_cast<void>(playback.handle_input(event.lane, event.state, event.sample));
+            playback.advance(event.sample);
+        }
+        CHECK(playback.is_finished());
+        CHECK(playback.stats().counts.pg == session->engine_->stats().counts.pg);
+        CHECK(playback.stats().counts.bd == session->engine_->stats().counts.bd);
+        CHECK(playback.stats().counts.pr == session->engine_->stats().counts.pr);
+        CHECK(playback.stats().raw_score == session->engine_->stats().raw_score);
+        CHECK(playback.gauge_state().value == doctest::Approx(session->engine_->gauge_state().value));
     }
 
     static void check_shift_lane_edges(uint32_t key, bool hold, bool future_queue) {
@@ -1612,7 +1683,7 @@ struct GameSessionAudioTestAccess {
         CHECK(session->engine_->stats().raw_score == score_before);
         CHECK(session->engine_->replay().events.size() == 1);
         // No physical keys are polled in this deterministic fixture. The real
-        // resume path still resets every configured binding before syncing lanes.
+        // resume path reconciles every configured binding before syncing lanes.
         session->polled_gameplay_keys_.clear();
         session->rebaseline_gameplay_start_input_state(60000);
         CHECK_FALSE(session->lane_binding_state_.pressed(1));
@@ -2768,6 +2839,52 @@ struct GameSessionAudioTestAccess {
         }
     }
 
+    static void check_secondary_owner_rebaseline() {
+        for (const int scenario : {0, 1, 2, 3}) {
+            auto session = shift_lane_fixture(32, true);
+            session->gameplay_started_ = true;
+            session->key_to_lane_[33] = 1;
+            session->lane_binding_state_.configure(session->key_to_lane_);
+            session->rebuild_polled_gameplay_keys();
+            // Reverse enumeration intentionally: current ownership must not be
+            // selected by the order of a physical-key snapshot.
+            std::reverse(session->polled_gameplay_keys_.begin(), session->polled_gameplay_keys_.end());
+            queue_physical_edge(*session, 32, input::InputState::Pressed, 48000);
+            if (scenario != 1) queue_physical_edge(*session, 33, input::InputState::Pressed, 49000);
+            if (scenario == 0) queue_physical_edge(*session, 33, input::InputState::Released, 50000);
+            const auto score_before = session->engine_->stats().raw_score;
+            const auto events_before = session->engine_->replay().events.size();
+            session->physical_key_state_probe_ = [scenario](uint32_t key) {
+                return key == 32 || (scenario == 3 && key == 33);
+            };
+            session->rebaseline_gameplay_start_input_state(50000);
+            CHECK(session->engine_->stats().raw_score == score_before);
+            const bool held = scenario == 1 || scenario == 3;
+            CHECK(session->lane_binding_state_.pressed(1) == held);
+            CHECK(session->lane_pressed_[0] == (held ? 1 : 0));
+            CHECK(session->engine_->replay().events.size() == events_before + (scenario == 2 ? 1 : 0));
+            if (scenario == 2) {
+                CHECK(session->engine_->replay().events.back().state == input::InputState::Released);
+                CHECK(session->engine_->replay().events.back().sample == 50000);
+            }
+            if (scenario == 3) {
+                // The older held key is not the owner, regardless of polling order.
+                queue_physical_edge(*session, 32, input::InputState::Released, 70000);
+                CHECK(session->lane_binding_state_.pressed(1));
+            }
+            if (held) {
+                queue_physical_edge(*session, scenario == 1 ? 32 : 33, input::InputState::Released, 96000);
+                CHECK(session->engine_->stats().counts.pg == 2);
+                CHECK(session->engine_->stats().counts.bd == 0);
+            } else {
+                // A repeated raw/polled down from the surrendered key cannot revive it.
+                queue_physical_edge(*session, 32, input::InputState::Pressed, 50000);
+                CHECK_FALSE(session->lane_binding_state_.pressed(1));
+                CHECK(session->engine_->stats().raw_score == score_before);
+            }
+        }
+    }
+
     static void check_released_hold_rebaseline() {
         auto session = pause_fixture();
         session->chart_.notes = {gameplay::NoteEvent{1, 48000, 144000}};
@@ -2925,6 +3042,21 @@ TEST_CASE("normalization OFF only clips true post master overflow and rejects no
 
 TEST_CASE("production input queue preserves a charge hold through primary to secondary key handoff") {
     tenriff::app::GameSessionAudioTestAccess::check_secondary_binding_input_queue();
+}
+
+TEST_CASE("secondary owner release ends the LN even while the original key remains held in both queues and replay") {
+    for (const bool future_queue : {false, true})
+        for (const bool older_key_held : {false, true})
+            for (const bool early_release : {false, true})
+                tenriff::app::GameSessionAudioTestAccess::check_secondary_binding_input_queue(
+                    32, 33, future_queue, older_key_held, early_release);
+}
+
+TEST_CASE("fresh secondary strikes score taps and preserve Empty Poor with no held-key revival in both queues and replay") {
+    for (const bool future_queue : {false, true})
+        for (const bool extra_empty_press : {false, true})
+            tenriff::app::GameSessionAudioTestAccess::check_secondary_binding_tap_queue(
+                future_queue, extra_empty_press);
 }
 
 TEST_CASE("mapped left and right Shift score note heads and LN releases through both gameplay queues") {
@@ -3114,6 +3246,10 @@ TEST_CASE("session mix ignores Esc during gameplay and its starting countdown") 
 
 TEST_CASE("resume synchronizes a released hold without scoring the paused input") {
     tenriff::app::GameSessionAudioTestAccess::check_released_hold_rebaseline();
+}
+
+TEST_CASE("resume keeps secondary ownership and surrendered held keys without fresh score events") {
+    tenriff::app::GameSessionAudioTestAccess::check_secondary_owner_rebaseline();
 }
 
 TEST_CASE("audio driver failure on the last finished buffer does not export a score or replay") {

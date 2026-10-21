@@ -38,9 +38,9 @@ namespace tenriff::app {
 
 namespace {
 
-// v19 lacks authored judgement metadata; older caches also predate corrected
-// RANDOM control flow. Rebuild these derived caches once, preserving records.
-constexpr int kSongIndexVersion = 20;
+// v20 reserves a scratch lane on scratch-free SP charts. Rebuild these derived
+// caches once so library key counts agree with new native play; retain records.
+constexpr int kSongIndexVersion = 21;
 constexpr std::uintmax_t kMaxMetadataChartFileBytes = 8u * 1024u * 1024u;
 
 bool cancel_requested(const SongIndexCancelCallback& cancel) {

@@ -19,7 +19,7 @@ struct BgaImageFrame {
 // latest-only so dense BMP animations skip stale work instead of stalling play.
 class BgaImageLoader {
 public:
-    BgaImageLoader();
+    explicit BgaImageLoader(bool black_key = false);
     ~BgaImageLoader();
 
     BgaImageLoader(const BgaImageLoader&) = delete;

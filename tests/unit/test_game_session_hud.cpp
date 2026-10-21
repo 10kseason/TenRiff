@@ -1,6 +1,7 @@
 #include "doctest/doctest.h"
 
 #include <optional>
+#include <limits>
 
 #include "app/GameSessionInputTiming.h"
 #include "app/JudgementLoopTiming.h"
@@ -284,9 +285,31 @@ TEST_CASE("gameplay hud revisions bump text caches for score and feedback change
 }
 
 TEST_CASE("gameplay timing feedback formats early and late hits with signed milliseconds") {
-    CHECK(tenriff::render::gameplay_timing_feedback_text(-12.4) == L"FAST -12 ms");
-    CHECK(tenriff::render::gameplay_timing_feedback_text(18.6) == L"SLOW +19 ms");
-    CHECK(tenriff::render::gameplay_timing_feedback_text(0.49).empty());
+    CHECK(tenriff::render::gameplay_timing_feedback_text(-12.4) == L"FAST -12.4 ms");
+    CHECK(tenriff::render::gameplay_timing_feedback_text(18.6) == L"SLOW +18.6 ms");
+    CHECK(tenriff::render::gameplay_timing_feedback_text(0.49) == L"SLOW +0.5 ms");
+}
+
+TEST_CASE("gameplay timing feedback keeps fractional boundary misses distinct from exact PG edges") {
+    using tenriff::render::gameplay_timing_feedback_text;
+    for (const double edge : {10.0, 15.0, 19.0, 22.0}) {
+        const auto whole = std::to_wstring(static_cast<int>(edge));
+        CHECK(gameplay_timing_feedback_text(edge) == L"SLOW +" + whole + L".0 ms");
+        CHECK(gameplay_timing_feedback_text(-edge) == L"FAST -" + whole + L".0 ms");
+        for (const int sample_rate : {44100, 48000, 88200, 96000, 192000}) {
+            const auto boundary = std::llround(edge * sample_rate / 1000.0);
+            const double outside = (boundary + 1) * 1000.0 / sample_rate;
+            CHECK(gameplay_timing_feedback_text(outside) == L"SLOW +" + whole + L".1 ms");
+            CHECK(gameplay_timing_feedback_text(-outside) == L"FAST -" + whole + L".1 ms");
+        }
+    }
+    CHECK(gameplay_timing_feedback_text(0.0).empty());
+    CHECK(gameplay_timing_feedback_text(-0.0).empty());
+    CHECK(gameplay_timing_feedback_text(0.00001) == L"SLOW +0.1 ms");
+    CHECK(gameplay_timing_feedback_text(-0.00001) == L"FAST -0.1 ms");
+    CHECK(gameplay_timing_feedback_text(std::numeric_limits<double>::infinity()).empty());
+    CHECK(gameplay_timing_feedback_text(std::numeric_limits<double>::quiet_NaN()).empty());
+    CHECK(gameplay_timing_feedback_text(std::numeric_limits<double>::max()).empty());
 }
 
 TEST_CASE("gameplay hud revisions refresh timing text for repeated judgement grades") {

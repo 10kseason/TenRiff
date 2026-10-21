@@ -21,6 +21,15 @@ TEST_CASE("UI language normalization accepts Japanese without changing legacy to
     CHECK(language_token(Language::Japanese) == "ja");
 }
 
+TEST_CASE("song lobby names the source browser Library in all supported languages") {
+    CHECK(text(Language::English, "LIBRARY", "라이브러리") == "LIBRARY");
+    CHECK(text(Language::Korean, "LIBRARY", "라이브러리") == "라이브러리");
+    CHECK(text(Language::Japanese, "LIBRARY", "라이브러리") == "ライブラリ");
+    CHECK(text(Language::Chinese, "LIBRARY", "라이브러리") == "曲库");
+    CHECK(text(Language::Japanese, "OPEN LIBRARY", "라이브러리 열기") == "ライブラリを開く");
+    CHECK(text(Language::Chinese, "CURRENT LIBRARY", "현재 라이브러리") == "当前曲库");
+}
+
 TEST_CASE("UI language accepts Chinese aliases and preserves its canonical profile token") {
     for (const auto alias : {"zh", "ZH-CN", "zh_CN", "Chinese", "cn"})
         CHECK(language_from_token(alias) == Language::Chinese);

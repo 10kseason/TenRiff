@@ -980,6 +980,42 @@ TEST_CASE("EX-HARD gauge uses its own near-black gray palette") {
     CHECK(tenriff::render::song_select_gauge_text_color("easy") == 0x5EE59Au);
 }
 
+TEST_CASE("lobby clear lamps remove Gauge Shift copy while preserving gauge and assist identity") {
+    using tenriff::render::song_select_gauge_text_color;
+    using tenriff::render::song_select_lamp_presentation;
+    const std::string persisted = "GAUGE SHIFT NORMAL CLEAR";
+    const auto normal = song_select_lamp_presentation(persisted);
+    CHECK(persisted == "GAUGE SHIFT NORMAL CLEAR");
+    CHECK(normal.label == "NORMAL CLEAR");
+    REQUIRE(normal.color.has_value());
+    CHECK(*normal.color == song_select_gauge_text_color("normal"));
+    CHECK(normal.tint_card);
+    for (const auto& fixture : {
+             std::pair{"GAUGE SHIFT EX CLEAR", "ex_hard"},
+             std::pair{"EX-HARD CLEAR", "ex_hard"},
+             std::pair{"GAUGE SHIFT HARD CLEAR", "hard"},
+             std::pair{"HARD CLEAR", "hard"},
+             std::pair{"GAUGE SHIFT EASY CLEAR", "easy"},
+             std::pair{"EASY CLEAR", "easy"},
+             std::pair{"CLEAR", "normal"}}) {
+        const auto lamp = song_select_lamp_presentation(fixture.first);
+        CHECK(lamp.label.find("GAUGE SHIFT") == std::string::npos);
+        REQUIRE(lamp.color.has_value());
+        CHECK(*lamp.color == song_select_gauge_text_color(fixture.second));
+        CHECK(lamp.tint_card);
+    }
+    for (const auto* status : {"", "FAILED", "ABORTED", "AUTOPLAY", "NO PLAY", "--",
+                               "ASSIST PRACTICE CLEAR", "UNKNOWN CLEAR"}) {
+        const auto lamp = song_select_lamp_presentation(status);
+        CHECK(lamp.label == status);
+        CHECK_FALSE(lamp.color.has_value());
+        CHECK_FALSE(lamp.tint_card);
+    }
+    const auto assisted = song_select_lamp_presentation("ASSIST PRACTICE GAUGE SHIFT HARD CLEAR");
+    CHECK(assisted.label == "ASSIST PRACTICE HARD CLEAR");
+    CHECK_FALSE(assisted.tint_card);
+}
+
 TEST_CASE("native digital keys separate held depth from hit glitch") {
     const auto idle = tenriff::render::resolve_native_digital_key_visual(false, 0.0f, 80.0f);
     CHECK(idle.press_offset == doctest::Approx(0.0f));
@@ -1107,8 +1143,8 @@ TEST_CASE("only P GREAT animates and GOOD uses solid gray") {
     CHECK(gameplay_judgement_rgb("PG") == 0xFFE18A);
     CHECK(gameplay_judgement_rgb("GR") == 0x6EE7F2);
     CHECK(gameplay_judgement_rgb("G") == 0xAEB5BF);
-    CHECK(gameplay_timing_feedback_text(-28, "GR") == L"FAST -28 ms");
-    CHECK(gameplay_timing_feedback_text(28, "GR") == L"SLOW +28 ms");
+    CHECK(gameplay_timing_feedback_text(-28, "GR") == L"FAST -28.0 ms");
+    CHECK(gameplay_timing_feedback_text(28, "GR") == L"SLOW +28.0 ms");
 }
 
 TEST_CASE("Native gameplay edited key geometry and response remain bounded") {

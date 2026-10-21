@@ -1197,7 +1197,7 @@ void MenuApp::populate_title_render_data(render::MenuRenderData& render,
             ? ui_text("PLAY becomes Add Songs Folder until a library is indexed",
                       "라이브러리가 생기기 전까지 PLAY가 곡 폴더 추가로 바뀝니다")
             : ui_text("F2 selects a songs folder; -/+ adjusts Rate", "F2로 곡 폴더 선택, -/+로 배속 조절"),
-        ui_text("F5 refreshes the current song source", "F5로 현재 곡 소스를 새로고침"),
+        ui_text("F5 refreshes the current library", "F5로 현재 라이브러리를 새로고침"),
         ui_text("F1 opens the control help overlay", "F1로 조작 도움말 열기"),
         ui_text("ESC exits from the title menu", "ESC로 타이틀 메뉴 종료"),
     };
@@ -1630,7 +1630,7 @@ void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render
                     "반복 스테이지를 포함해 LR2의 차트 MD5 순서를 그대로 유지합니다."));
             } else {
                 render.generic.notes.push_back(
-                    ui_text("Missing charts in active source: ", "현재 곡 소스의 누락 채보: ") +
+                    ui_text("Missing charts in active library: ", "현재 라이브러리의 누락 채보: ") +
                     std::to_string(course_match.missing_md5.size()) + "/" +
                     std::to_string(course->chart_md5.size()));
             }
@@ -2992,7 +2992,7 @@ std::string MenuApp::screen_title() const {
     }
     if (current_screen() == Screen::SongSelect) {
         if (song_select_view_ == SongSelectView::Sources) {
-            return ui_text("Song Sources", "곡 소스");
+            return ui_text("Library", "라이브러리");
         }
         if (song_select_view_ == SongSelectView::Records) {
             return ui_text("Local Records", "로컬 기록");
@@ -3052,8 +3052,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "Enter 또는 더블클릭으로 선택한 버튼을 엽니다."),
                 ui_text("If no songs are indexed yet, PLAY becomes Add Songs Folder so recovery stays visible on the first screen.",
                         "아직 인덱싱된 곡이 없으면 PLAY가 곡 폴더 추가로 바뀌어 첫 화면에서 바로 복구할 수 있습니다."),
-                ui_text("F2 opens the songs-folder picker, -/+ adjusts Rate, and F5 refreshes the source.",
-                        "F2는 곡 폴더 선택, -/+는 배속 조절, F5는 소스 새로고침입니다."),
+                ui_text("F2 opens the songs-folder picker, -/+ adjusts Rate, and F5 refreshes the library.",
+                        "F2는 곡 폴더 선택, -/+는 배속 조절, F5는 라이브러리 새로고침입니다."),
             };
             target.footer = ui_text("Esc exits TenRiff. Press F1 again to close help.",
                                     "Esc로 TenRiff를 종료합니다. 도움말을 닫으려면 F1을 다시 누르세요.");
@@ -3076,27 +3076,27 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
         case Screen::SongSelect:
             target.title = ui_text("Song Select Controls", "곡 선택 조작");
             target.lines = {
-                ui_text("Up / Down or the mouse wheel moves through the current list. PgUp / PgDn jumps by a page.",
-                        "위 / 아래 키 또는 마우스 휠로 현재 목록을 이동합니다. PgUp / PgDn은 페이지 단위로 이동합니다."),
+                ui_text("Up / Down or the mouse wheel wraps around the current list. PgUp / PgDn jumps by a page.",
+                        "위 / 아래 키 또는 마우스 휠로 목록의 양 끝을 순환합니다. PgUp / PgDn은 페이지 단위로 이동합니다."),
                 ui_text("Left / Right switches focus between the left navigation rail and the song list.",
                         "좌 / 우 키로 왼쪽 내비게이션과 곡 목록 사이의 포커스를 전환합니다."),
                 ui_text("Enter selects the focused item. Double-click on a song launches it immediately.",
                         "Enter는 선택된 항목을 열고, 곡을 더블클릭하면 즉시 시작합니다."),
-                ui_text("The navigation exposes Songs, Sources, Search, Filter, Records, Session Mix, and Options.",
-                        "탐색 메뉴에서 곡, 소스, 검색, 필터, 기록, 세션 믹스, 옵션을 엽니다."),
+                ui_text("The navigation exposes Songs, Library, Search, Filter, Records, Session Mix, and Options.",
+                        "탐색 메뉴에서 곡, 라이브러리, 검색, 필터, 기록, 세션 믹스, 옵션을 엽니다."),
                 ui_text("SEARCH filters title, artist, and path. FILTER now owns sort, group, key, difficulty, and collections.",
                         "SEARCH는 제목, 아티스트, 경로를 검색하고 FILTER는 정렬, 그룹, 키, 난이도, 컬렉션을 담당합니다."),
-                ui_text("Esc returns from a level, Sources or Records to the parent view. Backspace only erases search text.",
-                        "Esc는 레벨·소스·기록에서 이전 목록으로 돌아갑니다. Backspace는 검색어만 지웁니다."),
-                ui_text("F2 chooses a songs folder. -/+ adjusts Rate. F5 refreshes the active source.",
-                        "F2로 곡 폴더 선택, -/+로 배속 조절, F5로 활성 소스를 새로고침합니다."),
+                ui_text("Esc returns from a level, Library or Records to the parent view. Backspace only erases search text.",
+                        "Esc는 레벨·라이브러리·기록에서 이전 목록으로 돌아갑니다. Backspace는 검색어만 지웁니다."),
+                ui_text("F2 chooses a songs folder. -/+ adjusts Rate. F5 refreshes the active library.",
+                        "F2로 곡 폴더 선택, -/+로 배속 조절, F5로 활성 라이브러리를 새로고침합니다."),
                 ui_text("C appends the selected chart to the course draft; Delete removes the last drafted stage.",
                         "C로 선택한 채보를 코스 초안에 추가하고 Delete로 마지막 스테이지를 제거합니다."),
                 ui_text("Safe indexing lowers RAM use for very large libraries. Fast rescans quicker on high-memory PCs.",
                         "안전 인덱싱은 매우 큰 라이브러리에서 RAM 사용량을 줄이고, 빠름은 메모리가 많은 PC에서 재스캔 속도를 높입니다."),
             };
-            target.footer = ui_text("Current source, group, filter, sort, and indexing profile stay visible on the Song Select screen.",
-                                    "현재 소스, 그룹, 필터, 정렬, 인덱싱 프로필은 Song Select 화면에 계속 표시됩니다.");
+            target.footer = ui_text("Current library, group, filter, sort, and indexing profile stay visible on the Song Select screen.",
+                                    "현재 라이브러리, 그룹, 필터, 정렬, 인덱싱 프로필은 Song Select 화면에 계속 표시됩니다.");
             return;
         case Screen::SessionMix:
             target.title = ui_text("Session Mix", "세션 믹스");

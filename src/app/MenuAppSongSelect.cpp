@@ -445,8 +445,8 @@ void MenuApp::start_session_mix() {
                 ui_text("LR2 course unavailable: ", "LR2 코스 실행 불가: ") +
                 std::to_string(match.missing_md5.size()) + "/" +
                 std::to_string(course->chart_md5.size()) +
-                ui_text(" charts are missing from the active song source.",
-                        "개 채보가 현재 곡 소스에 없습니다.");
+                ui_text(" charts are missing from the active library.",
+                        "개 채보가 현재 라이브러리에 없습니다.");
             publish_snapshot();
             return;
         }

@@ -1,3 +1,5 @@
+> **2026-10-21 · 1.9.8.5 release scope:** Adds BGA playback and black-key transparency fixes, wrapping song selection, Library/clear labels, decimal timing, scratch-free 7K and secondary-key ownership to the user-selected 1.9.8. The fixed general baseline remains **1.9.6**. Earlier notices retain their historical scope; see [1.9.8.5](release-1.9.8.5.en.md) for behavior and compatibility and [release gates](release-1.9.8.5-gate.md) for verification. Publication and downloads follow the [release page](https://github.com/10kseason/TenRiff/releases/tag/1.9.8.5).
+
 # TenRiff 1.9.6 Fixed Baseline
 
 [한국어](baseline-1.9.6.md) | [English](baseline-1.9.6.en.md) | [日本語](baseline-1.9.6.ja.md) | [简体中文](baseline-1.9.6.zh-CN.md)

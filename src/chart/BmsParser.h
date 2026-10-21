@@ -30,6 +30,9 @@ struct BmsParserOptions {
     // Upload-only branch identity. Ordinary gameplay does not retain another
     // chart-text copy. Captures active directives after control expansion.
     bool capture_active_text = false;
+    // Older native replays and explicit conversions reserve the empty SP
+    // scratch lane. New native play recognizes scratch-free seven-key charts.
+    bool preserve_empty_sp_scratch = false;
 };
 
 enum class BmsParseSeverity {
@@ -63,6 +66,9 @@ struct BmsChart {
     // Includes directives in inactive branches; session setup uses this to keep
     // authored branch randomness independent of the lane-randomization seed.
     bool has_random_directives = false;
+    // Includes visible/LN scratch objects and scratch mines, but not 00 rows.
+    // Retained separately because metadata-only parsing discards payloads.
+    bool has_sp_scratch_objects = false;
     int declared_key_count = 0;
     std::string layout_label;
     std::vector<BmsMeasureCommand> commands;

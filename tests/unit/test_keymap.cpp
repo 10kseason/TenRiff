@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <optional>
 #include <random>
 #include <string>
@@ -490,12 +491,100 @@ TEST_CASE("unique binding validation rejects same-slot aliases but keeps left an
     CHECK(manager.validate_unique_bindings(keymap).empty());
 }
 
-TEST_CASE("alternate physical key releases preserve a held logical key and long note") {
+#ifdef _WIN32
+TEST_CASE("Escape aliases cannot be assigned to primary or secondary lane bindings") {
+    tenriff::config::KeymapManager manager;
+    for (const auto& mode : manager.supported_mode_tokens()) {
+        for (const bool secondary : {false, true}) {
+            for (const char* name : {"Esc", "Escape", "VK_1B", "SC_01"}) {
+                auto keymap = manager.default_keymap();
+                const auto before = keymap;
+                CHECK_FALSE(manager.assign_binding(keymap, mode, "lane1", name, secondary));
+                CHECK(keymap.bindings == before.bindings);
+                CHECK(keymap.mode_bindings == before.mode_bindings);
+                CHECK(keymap.secondary_mode_bindings == before.secondary_mode_bindings);
+            }
+        }
+    }
+}
+
+TEST_CASE("saved Escape lane aliases are repaired on load without changing the input file") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    const std::string original =
+        R"({"modes":{"4k":{"lane1":"Esc","lane2":"Escape","lane3":"VK_1B","lane4":"SC_01"}},)"
+        R"("secondary_modes":{"5k":{"lane1":"Esc","lane2":"Escape","lane3":"VK_1B","lane4":"SC_01","lane5":"A"}},)"
+        R"("bindings":{"lane1":"Escape"}})";
+    write_file(temp.path / "keymap.json", original);
+    tenriff::config::KeymapManager manager;
+    const auto loaded = manager.load_profile(temp.path.u8string());
+    REQUIRE(loaded.success());
+    CHECK(loaded.repaired_binding_count == 9);
+    CHECK(manager.bindings_for_mode(loaded.keymap, "4k") ==
+          manager.bindings_for_mode(manager.default_keymap(), "4k"));
+    CHECK(loaded.keymap.bindings.at("lane1") == "Q");
+    CHECK(loaded.keymap.mode_bindings.at("10k").at("lane1") == "Q");
+    const auto secondary = manager.secondary_bindings_for_mode(loaded.keymap, "5k");
+    REQUIRE(secondary.size() == 1);
+    CHECK(secondary.at("lane5") == "A");
+    std::ifstream file(temp.path / "keymap.json", std::ios::binary);
+    const std::string unchanged{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+    CHECK(unchanged == original);
+}
+
+TEST_CASE("saving a directly constructed Escape lane binding leaves the existing profile untouched") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    const std::string original = R"({"preserve":"original profile"})";
+    write_file(temp.path / "keymap.json", original);
+    tenriff::config::KeymapManager manager;
+    for (const bool secondary : {false, true}) {
+        auto keymap = manager.default_keymap();
+        (secondary ? keymap.secondary_mode_bindings : keymap.mode_bindings)["4k"]["lane1"] = "VK_1B";
+        std::string error;
+        CHECK_FALSE(manager.save_profile(temp.path.u8string(), keymap, &error));
+        CHECK(error == "Escape cannot be assigned to a lane.");
+        std::ifstream file(temp.path / "keymap.json", std::ios::binary);
+        const std::string unchanged{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+        CHECK(unchanged == original);
+    }
+}
+#endif
+
+TEST_CASE("latest physical press owns the lane without an older held key reviving") {
+    using tenriff::input::InputState;
+    for (const std::uint32_t first : {10u, 20u}) {
+        const std::uint32_t second = first == 10u ? 20u : 10u;
+        tenriff::input::LaneBindingState state;
+        state.configure({{10, 1}, {20, 1}, {30, 2}});
+        CHECK(state.apply(first, InputState::Pressed) == InputState::Pressed);
+        CHECK(state.apply(second, InputState::Pressed) == InputState::Pressed);
+        CHECK_FALSE(state.apply(first, InputState::Pressed).has_value());
+        CHECK_FALSE(state.apply(second, InputState::Pressed).has_value());
+        CHECK(state.apply(30, InputState::Pressed) == InputState::Pressed);
+        CHECK(state.apply(second, InputState::Released) == InputState::Released);
+        CHECK_FALSE(state.pressed(1));
+        CHECK(state.pressed(2));
+        // OS repeat from the still-held old key cannot restore the lane.
+        CHECK_FALSE(state.apply(first, InputState::Pressed).has_value());
+        CHECK_FALSE(state.pressed(1));
+        CHECK_FALSE(state.apply(first, InputState::Released).has_value());
+        CHECK(state.apply(first, InputState::Pressed) == InputState::Pressed);
+        CHECK(state.pressed(1));
+        CHECK(state.apply(first, InputState::Released) == InputState::Released);
+        CHECK_FALSE(state.pressed(0));
+        CHECK_FALSE(state.pressed(3));
+    }
+}
+
+TEST_CASE("releasing the older physical key leaves the latest owner and other lanes held") {
     using tenriff::input::InputState;
     tenriff::input::LaneBindingState state;
     state.configure({{10, 1}, {20, 1}, {30, 2}});
     CHECK(state.apply(10, InputState::Pressed) == InputState::Pressed);
-    CHECK_FALSE(state.apply(20, InputState::Pressed).has_value());
+    CHECK(state.apply(20, InputState::Pressed) == InputState::Pressed);
     CHECK_FALSE(state.apply(10, InputState::Released).has_value());
     CHECK(state.pressed(1));
     CHECK(state.apply(30, InputState::Pressed) == InputState::Pressed);
@@ -549,4 +638,28 @@ TEST_CASE("secondary key handoff keeps a real charge long note intact until its 
     CHECK(engine.stats().counts.pg == 2);
     CHECK(engine.stats().counts.bd == 0);
     CHECK(engine.stats().counts.pr == 0);
+}
+
+TEST_CASE("resume physical reconciliation preserves owners and never revives surrendered held bindings") {
+    using tenriff::input::InputState;
+    for (const bool reverse : {false, true}) {
+        tenriff::input::LaneBindingState state;
+        state.configure({{10, 1}, {20, 1}});
+        REQUIRE(state.apply(10, InputState::Pressed) == InputState::Pressed);
+        REQUIRE(state.apply(20, InputState::Pressed) == InputState::Pressed);
+        state.rebaseline(reverse ? std::vector<uint32_t>{20, 10} : std::vector<uint32_t>{10, 20}, true);
+        CHECK(state.pressed(1));
+        CHECK(state.apply(20, InputState::Released) == InputState::Released);
+        state.rebaseline({10}, true);
+        CHECK_FALSE(state.pressed(1));
+        CHECK_FALSE(state.apply(10, InputState::Pressed).has_value());
+        CHECK_FALSE(state.apply(10, InputState::Released).has_value());
+        CHECK(state.apply(10, InputState::Pressed) == InputState::Pressed);
+        state.rebaseline({}, true);
+        CHECK_FALSE(state.pressed(1));
+        state.rebaseline({20}, true);
+        CHECK_FALSE(state.pressed(1));
+        CHECK_FALSE(state.apply(20, InputState::Released).has_value());
+        CHECK(state.apply(20, InputState::Pressed) == InputState::Pressed);
+    }
 }

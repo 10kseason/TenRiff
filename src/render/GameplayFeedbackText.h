@@ -1,7 +1,9 @@
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <string_view>
 
@@ -21,15 +23,21 @@ inline std::wstring gameplay_timing_feedback_text(double delta_ms) {
         return {};
     }
 
-    const auto rounded_ms = static_cast<std::int64_t>(std::llround(delta_ms));
-    if (rounded_ms == 0) {
+    if (delta_ms == 0.0) {
         return {};
     }
 
-    if (rounded_ms < 0) {
-        return L"FAST " + std::to_wstring(rounded_ms) + L" ms";
+    // Round magnitude outward: the first sample outside a 22 ms PG window
+    // must read 22.1, never 22.0. Ignore one multiplication-rounding ULP.
+    const double tenths = std::ceil(std::nextafter(std::abs(delta_ms) * 10.0, 0.0));
+    if (!std::isfinite(tenths) ||
+        tenths >= static_cast<double>((std::numeric_limits<std::int64_t>::max)())) {
+        return {};
     }
-    return L"SLOW +" + std::to_wstring(rounded_ms) + L" ms";
+    const auto magnitude = (std::max)(std::int64_t{1}, static_cast<std::int64_t>(tenths));
+    const std::wstring value = std::to_wstring(magnitude / 10) + L"." +
+                              std::to_wstring(magnitude % 10) + L" ms";
+    return (delta_ms < 0.0 ? L"FAST -" : L"SLOW +") + value;
 }
 
 // The session selects the retained error independently of the current grade.

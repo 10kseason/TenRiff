@@ -12,6 +12,7 @@
 #include "app/MenuSongUtils.h"
 #include "chart/BmsChartNorm.h"
 #include "chart/BmsParser.h"
+#include "gameplay/ModeSettings.h"
 #include "chart/BmsTimeline.h"
 namespace tenriff::app {
 
@@ -379,13 +380,20 @@ std::optional<std::string> resolve_bms_visual_path(
 
 }  // namespace
 
+bool preserve_legacy_empty_sp_scratch(std::string_view key_mode, int replay_lane_count,
+                                      bool peer_battle) {
+    const auto mode = gameplay::parse_key_mode(key_mode).value_or(gameplay::KeyMode::Auto);
+    return peer_battle || mode != gameplay::KeyMode::Auto || replay_lane_count == 8;
+}
+
 ChartLoadResult ChartLoader::load(const std::string& path,
                                   int sample_rate,
                                   double rate,
                                   std::string_view bms_keysound_policy,
                                   uint32_t bms_random_seed,
                                   int bms_timing_version,
-                                  int bms_control_flow_version) const {
+                                  int bms_control_flow_version,
+                                  bool preserve_empty_sp_scratch) const {
     ChartLoadResult result;
     AssetLookupIndex asset_lookup;
 
@@ -404,6 +412,7 @@ ChartLoadResult ChartLoader::load(const std::string& path,
     chart::BmsParserOptions parser_options;
     parser_options.random_seed = bms_random_seed;
     parser_options.control_flow_version = bms_control_flow_version;
+    parser_options.preserve_empty_sp_scratch = preserve_empty_sp_scratch;
     auto parse_result = parser.parseFile(file_path.u8string(), parser_options);
     append_bms_messages(result.messages, parse_result.messages);
     if (!parse_result.success()) {
