@@ -175,3 +175,5 @@
 {"Choose round dots or straight vertical barcode markers. Each judgement marker disappears after 0.7 seconds.", "选择圆点或竖直条形。每个判定标记在0.7秒后消失。"},
 
     {"Show PG / GR / G / BAD / PR counts below the timing indicator inside the field. Counts remain visible between hits. Default: Off.", "在轨道内指示器正下方显示PG / GR / G / BAD / PR累计数量，击打间隔仍显示。默认关闭。"},
+
+{"NK2 E adds LNs only inside source LN intervals. Reducing keys uses placement only.", "NK2 E只在原谱长按区间内添加长按。减少键数时仅重新分配音符。"},

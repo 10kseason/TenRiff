@@ -2138,7 +2138,7 @@ RuntimeConfig ConfigLoader::defaults() const {
 
     config.mode.key_mode = "none";
     config.mode.key_conversion_algorithm = "krrcream";
-    config.mode.key_conversion_nk2_preset = "native";
+    config.mode.key_conversion_nk2_preset = "source_ln_e_v1";
     config.mode.gauge = "ex_hard";
     config.mode.random = "off";
     config.mode.random_seed = 0;

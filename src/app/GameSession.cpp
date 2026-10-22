@@ -123,6 +123,7 @@ std::string normalize_nk2_preset_local(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
         return static_cast<char>(std::tolower(ch));
     });
+    if (value == "e" || value == "source_ln_e_v1") return "source_ln_e_v1";
     if (value == "transform" || value == "transform35") {
         return "transform";
     }

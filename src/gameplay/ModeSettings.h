@@ -18,6 +18,7 @@ enum class Nk2Preset {
     Transform,
     // 65% support budget aimed at keeping the source placement readable.
     Remaster,
+    SourceLnE,  // KeyWeaver 1.3.0 E, isolated from historical presets.
 };
 
 enum class KeyMode {

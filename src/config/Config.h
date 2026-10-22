@@ -306,7 +306,7 @@ struct InputConfig {
 struct ModeConfig {
     std::string key_mode = "auto";
     std::string key_conversion_algorithm = "krrcream";
-    std::string key_conversion_nk2_preset = "native";
+    std::string key_conversion_nk2_preset = "source_ln_e_v1";
     std::string gauge = "ex_hard";
     std::string random = "off";
     uint32_t random_seed = 0;

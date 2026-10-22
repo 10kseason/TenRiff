@@ -94,7 +94,7 @@
   "mode": {
     "key_mode": "none",
     "key_conversion_algorithm": "krrcream",
-    "key_conversion_nk2_preset": "native",
+    "key_conversion_nk2_preset": "source_ln_e_v1",
     "gauge": "ex_hard",
     "random": "off",
     "random_seed": 0,

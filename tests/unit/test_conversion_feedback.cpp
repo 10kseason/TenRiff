@@ -191,6 +191,7 @@ static void check_feedback_replay(const std::vector<const char*>& algorithms) {
         for (int version : {1, 2, 3}) {
             tenriff::config::ModeConfig mode;
             mode.key_mode = "4k"; mode.key_conversion_algorithm = algorithm; mode.random_seed = 42;
+            mode.key_conversion_nk2_preset = "native"; // Historical replay omits the preset field.
             mode.gauge = "normal";
             const auto managed = tenriff::app::manage_modes(source, tenriff::app::ChartFormat::Bms,
                 mode, {}, 1, 120, 44100, tenriff::app::LongNoteMixVersion::Musical, version);

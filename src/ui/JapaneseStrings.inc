@@ -1309,3 +1309,6 @@
 {"Missing charts in active library: ", "現在のライブラリにない譜面: "},
 {"Up / Down or the mouse wheel wraps around the current list. PgUp / PgDn jumps by a page.", "上下キー・ホイールで一覧の先頭と末尾を循環します。PgUp/PgDnでページ移動します。"},
 {" charts are missing from the active library.", " 譜面が現在のライブラリにありません。"},
+
+{"Krrcream remaps source notes only. nK2 E uses phrase search and adds LNs only inside source LN intervals; NK3 always uses strict P64 plus the host beam solver, and adds the NPU/GPU/CPU MLP only for non-10K sources converted to 10K.", "Krrcreamは元ノートを再配置します。nK2 Eはフレーズ探索を使い、原本LN区間内にだけLNを追加します。NK3は厳格なP64とホスト側ビーム探索を使用し、10K以外から10Kへの変換時だけNPU/GPU/CPUのMLPを追加します。"},
+{"NK2 only", "NK2専用"},

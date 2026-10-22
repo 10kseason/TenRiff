@@ -607,6 +607,11 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         return false;
     }
 
+    if (config_.mode.key_conversion_algorithm != "nk2" &&
+        normalize_nk2_preset_local(config_.mode.key_conversion_nk2_preset) == "source_ln_e_v1") {
+        // E is NK2-only; do not split unchanged Krrcream/NK3 records or ghosts.
+        config_.mode.key_conversion_nk2_preset = "native";
+    }
     key_conversion_version_ = replay_playback_enabled_ ? replay_source_.mode.key_conversion_version : 3;
     long_note_mix_version_ = replay_playback_enabled_ ? replay_source_.mode.long_note_mix_version : 2;
     ModeManagerResult mode_result =
@@ -761,14 +766,16 @@ bool GameSession::initialize(const CommandLineOptions& options) {
             ghost_replay_source_.mode.random != config_.mode.random) {
             ghost_compatible = false;
         }
-        // A new per-play seed must not disable an Original OFF/Mirror ghost:
-        // that path consumes no mode seed. Seed-dependent conversion/mods still
-        // require matching seeds because player and ghost share one chart.
+        // Original and NK2 E consume no mode seed. A new per-play seed must
+        // not disable their OFF/Mirror ghosts. Seed-dependent conversion/mods
+        // still require matching seeds because both fields share one chart.
         int source_key_lanes = chart_result.chart.lane_count;
         for (int lane = 1; lane <= chart_result.chart.lane_count; ++lane)
             if (std::find(chart_result.chart.scratch_lanes.begin(), chart_result.chart.scratch_lanes.end(), lane) !=
                 chart_result.chart.scratch_lanes.end()) --source_key_lanes;
         const bool seedless_conversion = mode_result.settings.key_mode == gameplay::KeyMode::Auto ||
+            (mode_result.settings.key_conversion_algorithm == gameplay::KeyModeConversionAlgorithm::NK2 &&
+             mode_result.settings.key_conversion_nk2_preset == gameplay::Nk2Preset::SourceLnE) ||
             (mode_result.settings.key_conversion_algorithm != gameplay::KeyModeConversionAlgorithm::NK3 &&
              gameplay::to_string(mode_result.settings.key_mode) == std::to_string(source_key_lanes) + "K");
         const bool seed_independent_ghost = seedless_conversion &&

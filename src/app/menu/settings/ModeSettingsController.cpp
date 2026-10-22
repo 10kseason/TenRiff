@@ -221,8 +221,8 @@ ModeSettingsEffects ModeSettingsController::apply_selected_action(
                 runtime.mode.key_conversion_algorithm);
             return mark_changed();
         case ModeSettingId::Nk2Preset:
-            if (normalize_key_conversion_algorithm(runtime.mode.key_conversion_algorithm) ==
-                "krrcream") return {};
+            if (normalize_key_conversion_algorithm(runtime.mode.key_conversion_algorithm) !=
+                "nk2") return {};
             runtime.mode.key_conversion_nk2_preset = cycle_key_conversion_nk2_preset(
                 runtime.mode.key_conversion_nk2_preset);
             return mark_changed();

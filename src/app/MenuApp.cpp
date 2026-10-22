@@ -913,6 +913,7 @@ std::string MenuApp::ui_key_conversion_algorithm_label(std::string_view token) c
 
 std::string MenuApp::ui_key_conversion_nk2_preset_label(std::string_view token) const {
     const std::string normalized = normalize_key_conversion_nk2_preset(std::string(token));
+    if (normalized == "source_ln_e_v1") return "E - Source LN";
     if (normalized == "transform") {
         return "Transform (35%)";
     }
