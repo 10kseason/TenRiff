@@ -72,7 +72,7 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Set the target for the selected Pacemaker mode. Enable Pacemaker first.", "선택한 페이스메이커 방식의 목표 정확도 또는 점수를 정합니다. 먼저 페이스메이커를 켜세요.", "ペースメーカーの目標精度・スコアです。先にペースメーカーを有効にします。"},
         {"Original keeps the chart's lanes. A numbered mode converts the pattern to that key count.", "원본은 차트의 키 수와 배치를 유지합니다. 숫자 키 모드는 패턴을 해당 키 수로 변환합니다.", "原本は譜面のキー数を保持します。数値を選ぶとそのキー数へ変換します。"},
         {"Choose the pattern conversion method. Compare the preview and pick the layout that feels comfortable.", "키 수를 바꿀 때 패턴을 배치하는 방식을 고릅니다. 변환 결과를 확인해 편한 방식을 선택하세요.", "キー数変換時の配置方式を選びます。変換結果を確認して選択してください。"},
-        {"Choose the nK2 conversion preset. This setting is unavailable with Krrcream.", "nK2 변환 프리셋을 고릅니다. Krrcream을 선택하면 이 항목은 사용할 수 없습니다.", "nK2変換プリセットです。Krrcream使用時は変更できません。"},
+        {"NK2 E adds LNs only inside source LN intervals. Reducing keys uses placement only.", "NK2 E는 원본 LN 구간 안에만 LN을 추가합니다. 키 수를 줄일 때는 배치만 바꿉니다.", "NK2 Eは原本LN区間内にだけLNを追加します。キー数を減らす場合は配置のみ変更します。"},
         {"Choose the starting gauge. Gauge shifting follows the selected play mode's rules.", "시작할 게이지 종류를 고릅니다. 이후 게이지 전환은 선택한 플레이 모드의 규칙을 따릅니다.", "開始時のゲージを選びます。以降のシフトはプレイモードの規則に従います。"},
         {"Rearrange note lanes. Mirror reverses lanes; random modes change the pattern using a seed.", "노트 레인 배치를 바꿉니다. 미러는 좌우를 뒤집고, 랜덤 계열은 시드를 이용해 배치를 바꿉니다.", "ノート配置を変更します。ミラーは左右反転、ランダム系はシードで配置を変えます。"},
         {"Every new solo play and Retry automatically chooses a fresh seed. Replays use the recorded seed.", "새 싱글 플레이와 재시작마다 시드가 자동으로 바뀝니다. 리플레이는 기록된 시드를 사용합니다.", "新しいソロプレイとリトライではシードが自動更新されます。リプレイは記録済みシードを使います。"},

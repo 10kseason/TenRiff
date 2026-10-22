@@ -224,7 +224,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.audio_ui.menu_music_volume == doctest::Approx(1.0));
     CHECK_FALSE(config.mode.calculate_song_index_difficulty);
     CHECK(config.mode.key_conversion_algorithm == "krrcream");
-    CHECK(config.mode.key_conversion_nk2_preset == "native");
+    CHECK(config.mode.key_conversion_nk2_preset == "source_ln_e_v1");
     CHECK(config.graphics.resolution == "native");
     CHECK(config.graphics.display_mode == "borderless");
     CHECK(tenriff::config::kJudgementLinePositionMin == doctest::Approx(0.01));

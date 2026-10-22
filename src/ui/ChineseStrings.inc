@@ -1310,3 +1310,6 @@
 {"Missing charts in active library: ", "当前曲库中缺失的谱面： "},
 {"Up / Down or the mouse wheel wraps around the current list. PgUp / PgDn jumps by a page.", "上/下或鼠标滚轮在当前列表两端循环移动。PgUp / PgDn 按页跳转。"},
 {" charts are missing from the active library.", " 张谱面不在当前曲库中。"},
+
+{"Krrcream remaps source notes only. nK2 E uses phrase search and adds LNs only inside source LN intervals; NK3 always uses strict P64 plus the host beam solver, and adds the NPU/GPU/CPU MLP only for non-10K sources converted to 10K.", "Krrcream仅重新分配原谱音符。nK2 E使用乐句搜索，只在原谱长按区间内添加长按。NK3始终使用严格P64和主机束搜索求解器，仅在非10K谱面转为10K时加入NPU/GPU/CPU MLP。"},
+{"NK2 only", "仅限NK2"},

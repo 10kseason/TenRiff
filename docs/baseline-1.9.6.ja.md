@@ -1,3 +1,5 @@
+> **2026-10-22 · 1.9.9 · NK2 E / 16K送信:** [1.9.9](release-1.9.9.ja.md) · [Verification](release-1.9.9-gate.md). Baseline **1.9.6**. 4/5/6/7/8/9/10/12/14/16K. Earlier dated entries below are historical.
+
 > **2026-10-21 · 1.9.8.5 リリース範囲:** ユーザー指定の1.9.8にBGA再生・黒の透過、選曲循環・ライブラリ・クリア表示、小数のタイミング、スクラッチなし7Kと第2キー所有権の修正を追加します。一般固定基準は **1.9.6** のままです。以下の旧案内は当時の履歴です。動作と互換性は[1.9.8.5](release-1.9.8.5.ja.md)、検証は[リリースゲート](release-1.9.8.5-gate.md)、公開状態とダウンロードは[リリースページ](https://github.com/10kseason/TenRiff/releases/tag/1.9.8.5)を参照してください。
 
 # TenRiff 1.9.6 固定基準

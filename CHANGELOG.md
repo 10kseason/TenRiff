@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.9.9 — 2026-10-22
+
+- Integrate KeyWeaver 1.3.0 NK2 preset E (`source_ln_e_v1`) for existing 4/5/6/7/8/9/10/12/14/16K menu targets. Fresh NK2 presets default to E; saved historical presets retain their original engine and Krrcream remains the default algorithm. Expansion adds source-covered holds; reduction only places/drops notes. Preserve exact source samples and keysounds and reject unsafe output.
+- Accept 16K scores in both client and web contracts and expose the web filter. Preserve old web 4–14K support, board identities, records, schema, current Online R9/R10 eligibility and the client_submitted boundary.
+- Allow deterministic E OFF/Mirror ghosts to survive unused per-play seed differences while keeping random/mod/BMS guards. E replays require the 1.9.9 verifier; replay format, timing, grades and peer v7 remain unchanged.
+- Continue 1.9.8.5 without moving the fixed general 1.9.6 baseline. Keep prior releases/installations/profiles and public Skin Editor v11. See [scope](docs/release-1.9.9.en.md) and [verification gates](docs/release-1.9.9-gate.md).
+
 ## 1.9.8.5 — 2026-10-21
 
 - Fix BGA layer interference by keeping base/overlay playback and caches independent. Normalize MF presentation timestamps, retain sparse/EOF frames, reject stale asynchronous results and old forward-play PTS, and avoid decoder rewinds caused by ordinary frame cadence.

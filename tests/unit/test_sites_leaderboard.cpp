@@ -985,3 +985,21 @@ TEST_CASE("Sites rejects Auto Scratch even if canonical ruleset metadata is forg
     CHECK_FALSE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
     CHECK(payload.empty());
 }
+
+TEST_CASE("Sites accepts existing 16K while retaining the previous 4K through 14K range") {
+    for (int lanes : {4,5,6,7,8,9,10,11,12,13,14,16}) {
+        auto replay = score_fixture();
+        replay.trace.lane_count = lanes;
+        replay.mode.key_conversion_algorithm = "nk2";
+        replay.mode.key_conversion_nk2_preset = "source_ln_e_v1";
+        std::string payload, error;
+        REQUIRE(app::build_sites_score_json(replay, std::string(64, 'c'), "NK2 E", "CLEAR", payload, error));
+        CHECK(payload.find("\"key_mode\":\"" + std::to_string(lanes) + "K\"") != std::string::npos);
+    }
+    for (int lanes : {0,3,15,17,18}) {
+        auto replay = score_fixture(); replay.trace.lane_count = lanes;
+        std::string payload, error;
+        CHECK_FALSE(app::build_sites_score_json(replay, std::string(64, 'c'), "Invalid", "CLEAR", payload, error));
+        CHECK(payload.empty());
+    }
+}

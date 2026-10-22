@@ -244,3 +244,11 @@ responsibility, not on behalf of any other Contributor, and only if You agree
 to indemnify, defend, and hold each Contributor harmless for any liability
 incurred by, or claims asserted against, such Contributor by reason of your
 accepting any such warranty or additional liability.
+
+KeyWeaver E integration (`nk2e/`)
+
+- Upstream: https://github.com/10kseason/key-weaver
+- Pinned commit: `4bbf7cbece9657c41bd1fd2cc479155b575056d6`
+- Copyright (c) 2026 KeyWeaver contributors
+- License: MIT; full text in `nk2e/LICENSE` (source) and `third_party/keyweaver-e/LICENSE` (runtime package).
+- The original historical `nk2/` implementation remains separate.

@@ -1,3 +1,5 @@
+> **2026-10-22 · 1.9.9 · NK2 E / 16K提交:** [1.9.9](release-1.9.9.zh-CN.md) · [Verification](release-1.9.9-gate.md). Baseline **1.9.6**. 4/5/6/7/8/9/10/12/14/16K. Earlier dated entries below are historical.
+
 > **2026-10-21 · 1.9.8.5 发布范围：** 在用户指定的1.9.8上增加BGA播放与黑色透明、选曲循环、曲库与通关显示、小数时间、无划盘7K及第二按键控制权修正。通用固定基线仍为 **1.9.6**。下方旧说明保留当时历史；行为和兼容边界见[1.9.8.5](release-1.9.8.5.zh-CN.md)，验证见[发布检查](release-1.9.8.5-gate.md)，发布状态与下载以[发布页面](https://github.com/10kseason/TenRiff/releases/tag/1.9.8.5)为准。
 
 > **2026-10-19 · 1.9.8:** 基于1.9.7，在判定、连击、FAST/SLOW指示器及其条形显示的每项Y设置前显示X设置，并以1%步长调整0～100%的键位分隔线亮度。 包含1.9.7的通用按键、加大的彩色标签、每局新种子及场景音乐基准增益，通用固定基线仍为1.9.6。 [1.9.8](release-1.9.8.zh-CN.md) · [X/Y](skin-xy-20261019.zh-CN.md) · [Baseline 1.9.6](baseline-1.9.6.zh-CN.md) · [Verification](release-1.9.8-gate.md).

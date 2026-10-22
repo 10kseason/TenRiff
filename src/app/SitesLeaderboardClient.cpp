@@ -181,7 +181,7 @@ bool build_sites_score_json(const gameplay::ReplayFile& replay,
     const auto lanes = replay.trace.lane_count;
     const double accuracy = replay.stats.accuracy_percent();
     const double detailed_accuracy = replay.stats.detailed_accuracy_percent();
-    if (!is_hash(replay.chart_sha256) || !is_hash(replay_sha256) || lanes < 4 || lanes > 14 ||
+    if (!is_hash(replay.chart_sha256) || !is_hash(replay_sha256) || lanes < 4 || (lanes > 14 && lanes != 16) ||
         !std::isfinite(replay.rate) || replay.rate < 0.5 || replay.rate > 2.0 ||
         replay.final_score < 0 || replay.final_score > 1'000'000'000 ||
         !std::isfinite(accuracy) || accuracy < 0 || accuracy > 100 ||

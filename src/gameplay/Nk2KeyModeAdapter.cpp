@@ -174,6 +174,7 @@ convert_key_mode_chart_nk2(const GameplayChart &chart,
     nk2_options.nativeWeight = 0.8;
     nk2_options.remixWeight = 0.2;
     break;
+  case Nk2Preset::SourceLnE: // Routed to the separate E adapter by KeyModeConverter.
   case Nk2Preset::Native:
     nk2_options.mode = keyconv::nk2::Mode::Native;
     break;

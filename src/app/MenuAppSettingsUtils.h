@@ -390,6 +390,7 @@ inline std::string cycle_key_conversion_algorithm(std::string_view current) {
 
 inline std::string normalize_key_conversion_nk2_preset(std::string value) {
     value = to_lower_ascii(std::move(value));
+    if (value == "e" || value == "source_ln_e_v1") return "source_ln_e_v1";
     if (value == "transform" || value == "transform35") {
         return "transform";
     }
@@ -401,6 +402,8 @@ inline std::string normalize_key_conversion_nk2_preset(std::string value) {
 
 inline std::string cycle_key_conversion_nk2_preset(std::string_view current) {
     const std::string normalized = normalize_key_conversion_nk2_preset(std::string(current));
+    if (normalized == "source_ln_e_v1") return "native";
+    if (normalized == "remaster") return "source_ln_e_v1";
     if (normalized == "native") {
         return "transform";
     }

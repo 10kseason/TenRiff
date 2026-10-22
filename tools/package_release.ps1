@@ -3,7 +3,7 @@ param(
     [string]$BuildReleaseDirectory,
     [Parameter(Mandatory = $true)]
     [string]$OutputDirectory,
-    [string]$Version = "1.9.8.5",
+    [string]$Version = "1.9.9",
     [switch]$BinaryOnly
 )
 
@@ -109,6 +109,9 @@ foreach ($relative in @(
         Remove-Item -LiteralPath $packagedTool
     }
 }
+$keyweaverNoticeDirectory = Join-Path $binaryRoot "third_party\keyweaver-e"
+New-Item -ItemType Directory -Path $keyweaverNoticeDirectory -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $repoRoot "nk2e\LICENSE") -Destination $keyweaverNoticeDirectory
 $ncnnNoticeDirectory = Join-Path $binaryRoot "third_party\ncnn-20260526"
 New-Item -ItemType Directory -Path $ncnnNoticeDirectory -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repoRoot "third_party\ncnn-20260526\LICENSE.txt") `

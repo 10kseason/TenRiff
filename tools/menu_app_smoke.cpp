@@ -1945,6 +1945,7 @@ struct MenuAppFeedbackTestAccess {
             static_cast<bool>(session.ghost_engine_) == ghost;
     }
     static uint32_t mode_seed(const GameSession& session) { return session.config_.mode.random_seed; }
+    static int chart_lanes(const GameSession& session) { return session.chart_.lane_count; }
     static std::pair<uint32_t, uint32_t> check_bms_session_policy(const GameSession& session, Report& report, int attempt) {
         const auto name = "bms_branch.initialize_" + std::to_string(attempt);
         report.check(name + ".independent_lane_seed", session.config_.mode.random_seed != session.bms_random_seed_);
@@ -2711,6 +2712,35 @@ void separate_timing_flow(tenriff::app::CommandLineOptions options, Report& repo
             SessionAccess::timing_state(*ghost, 2, std::string(random) != "sr"));
         ghost->shutdown();
     }
+    const auto original_mode = config.mode;
+    config.mode.key_mode = "16K";
+    config.mode.key_conversion_algorithm = "nk2";
+    config.mode.key_conversion_nk2_preset = "source_ln_e_v1";
+    for (const char* random : {"off", "mirror", "sr"}) {
+        config.mode.random = random;
+        if (!loader.save_profile(profile, app::build_persisted_runtime_config(config)))
+            throw std::runtime_error("Cannot seed NK2 E ghost profile");
+        auto fixture = *replay.replay;
+        fixture.mode.key_mode = "16K";
+        fixture.mode.key_conversion_algorithm = "nk2";
+        fixture.mode.key_conversion_nk2_preset = "source_ln_e_v1";
+        // This fixture isolates initialize() compatibility, not ghost scoring.
+        fixture.trace.lane_count = 16;
+        fixture.mode.random = random;
+        const auto path = std::filesystem::absolute(std::string("timing-fixture/seed-e-") + random + ".json").u8string();
+        report.check(std::string("seed_ghost.e_fixture_") + random, gameplay::save_replay_json(path, fixture).success());
+        auto ghost_options = options;
+        ghost_options.ghost_replay_path = path;
+        auto ghost = std::make_unique<app::GameSession>();
+        const bool initialized = ghost->initialize(ghost_options);
+        report.check(std::string("seed_ghost.e_compatibility_") + random, initialized &&
+            SessionAccess::chart_lanes(*ghost) == 16 &&
+            fixture.mode.random_seed.has_value() &&
+            SessionAccess::mode_seed(*ghost) != static_cast<uint32_t>(*fixture.mode.random_seed) &&
+            SessionAccess::timing_state(*ghost, 2, std::string(random) != "sr"));
+        ghost->shutdown();
+    }
+    config.mode = original_mode;
     config.mode.random = "off";
     if (!loader.save_profile(profile, app::build_persisted_runtime_config(config)))
         throw std::runtime_error("Cannot restore timing profile");

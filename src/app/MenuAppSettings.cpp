@@ -206,12 +206,12 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
                     ui_key_conversion_algorithm_label(config_.mode.key_conversion_algorithm),
                     settings_cursor_ == 9, render::MenuHitTargetKind::SettingsRow, 9, false, true);
     const bool nk2_selected =
-        normalize_key_conversion_algorithm(config_.mode.key_conversion_algorithm) !=
-        "krrcream";
+        normalize_key_conversion_algorithm(config_.mode.key_conversion_algorithm) ==
+        "nk2";
     append_menu_row(render.generic, "nK2 Preset",
                     nk2_selected
                         ? ui_key_conversion_nk2_preset_label(config_.mode.key_conversion_nk2_preset)
-                        : ui_text("Locked (Krrcream)", "잠김 (Krrcream)"),
+                        : ui_text("NK2 only", "NK2 전용"),
                     settings_cursor_ == 10, render::MenuHitTargetKind::SettingsRow, 10,
                     false, nk2_selected);
     append_menu_row(render.generic, ui_text("Gauge Shift Start", "게이지 시프트 시작"), ui_gauge_label(config_.mode.gauge), settings_cursor_ == 11,
@@ -255,8 +255,8 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
     render.generic.notes.push_back(ui_text("None keeps the chart's original key count and pattern layout instead of forcing a conversion.",
                                            "원본은 강제 변환 없이 차트의 원래 키 수와 패턴 배치를 유지합니다."));
     render.generic.notes.push_back(ui_text(
-        "Krrcream remaps source notes only. nK2 keeps the legacy engine; NK3 always uses strict P64 plus the host beam solver, and adds the NPU/GPU/CPU MLP only for non-10K sources converted to 10K.",
-        "Krrcream은 원본 노트만 재배치합니다. nK2는 기존 엔진을 유지합니다. NK3는 항상 strict P64와 호스트 빔 솔버를 사용하며, 10K가 아닌 원본을 10K로 변환할 때만 NPU/GPU/CPU MLP를 추가합니다."));
+        "Krrcream remaps source notes only. nK2 E uses phrase search and adds LNs only inside source LN intervals; NK3 always uses strict P64 plus the host beam solver, and adds the NPU/GPU/CPU MLP only for non-10K sources converted to 10K.",
+        "Krrcream은 원본 노트만 재배치합니다. nK2 E는 구간 탐색을 사용하고 원본 LN 구간 안에만 LN을 추가합니다. NK3는 항상 strict P64와 호스트 빔 솔버를 사용하며, 10K가 아닌 원본을 10K로 변환할 때만 NPU/GPU/CPU MLP를 추가합니다."));
     render.generic.notes.push_back(ui_text(
         "Mirror itself is seedless. Key Mode conversion runs first and may still use Random Seed.",
         "미러 자체는 시드를 쓰지 않지만, 먼저 실행되는 키 모드 변환은 랜덤 시드를 사용할 수 있습니다."));
