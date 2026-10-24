@@ -24,6 +24,7 @@ struct GameplayHudRevisionNote {
     double visual_position = 0.0;
     double tail_visual_position = 0.0;
     bool pending = false;
+    bool released = false;
 };
 
 struct GameplayHudRevisionInput {
@@ -140,6 +141,7 @@ inline bool gameplay_hud_notes_equal(const GameplayHudRevisionInput& lhs, const 
                                  left.hold == right.hold &&
                                  left.head_visible == right.head_visible &&
                                  left.pending == right.pending &&
+                                 left.released == right.released &&
                                  left.mine == right.mine &&
                                  left.visual_position == right.visual_position &&
                                  left.tail_visual_position == right.tail_visual_position;
@@ -192,6 +194,7 @@ inline bool gameplay_hud_ghost_notes_equal(const GameplayHudRevisionInput& lhs,
                                  left.hold == right.hold &&
                                  left.head_visible == right.head_visible &&
                                  left.pending == right.pending &&
+                                 left.released == right.released &&
                                  left.mine == right.mine &&
                                  left.visual_position == right.visual_position &&
                                  left.tail_visual_position == right.tail_visual_position;

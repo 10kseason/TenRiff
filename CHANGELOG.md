@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.9.9.1 — 2026-10-24
+
+- Extend full-screen backgrounds, BGA and dimming across 21:9 while keeping UI, note proportions and pointer mapping centered and uniformly scaled; add the 5120×2160 preset and preserve explicit inset skin rectangles.
+- Keep a released long note's remaining body until its original tail passes, without restoring its judged head or active glow. Delay automatic results for the last visible failed hold tail, including negative visual offsets; retain explicit skip, abort and game-over behavior.
+- Add LN Mix v3 with at least 50ms clearance around same-lane mines. Preserve source holds/keysounds/mines, historical v1/v2 reconstruction and no-mine v2 parity; reject mismatched ghosts. Use the existing version field: new v3 replays require the 1.9.9.1 verifier and are rejected by 1.9.9.
+- Sync bundled offline skin-editor catalog source references after the background helper change, preserving editable IDs/values. No public editor, website or DB deployment is included.
+- Keep fixed baseline 1.9.6, timing/grades, R1–R10, peer v7, NK2 E and LN Mix v2/v3 local-only BEST/Sites exclusions. Preserve earlier releases/installations/profiles/candidate evidence. See [scope](docs/release-1.9.9.1.en.md) and [release gates](docs/release-1.9.9.1-gate.md); publication follows the [release page](https://github.com/10kseason/TenRiff/releases/tag/1.9.9.1).
+
+## Historical unpublished local candidate — 2026-10-24 (superseded by 1.9.9.1 scope)
+
+The following records development status before the versioned release work; it does not describe the current publication state. The original candidate directory and evidence are preserved.
+
+- Extend full-screen backgrounds and overlays for 21:9 while retaining centered UI and note proportions; add the 5120x2160 preset.
+- Keep a released long note body visible until its original tail passes, without changing judgement or restoring active highlights.
+- Generate LN Mix v3 with 50 ms same-lane mine clearance; preserve historical v1/v2 replay generation and reject mismatched ghosts. New v3 replay verification requires this candidate.
+- See [behavior and compatibility](docs/ultrawide-ln-20261024.md). No publication or baseline promotion.
+
 ## 1.9.9 — 2026-10-22
 
 - Integrate KeyWeaver 1.3.0 NK2 preset E (`source_ln_e_v1`) for existing 4/5/6/7/8/9/10/12/14/16K menu targets. Fresh NK2 presets default to E; saved historical presets retain their original engine and Krrcream remains the default algorithm. Expansion adds source-covered holds; reduction only places/drops notes. Preserve exact source samples and keysounds and reject unsafe output.

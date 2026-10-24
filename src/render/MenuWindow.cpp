@@ -2,6 +2,7 @@
 #include "render/SettingsListLayout.h"
 #include "render/DifficultyLabel.h"
 #include "render/MenuWindow.h"
+#include "render/MenuViewport.h"
 #include "ui/FunctionKeyLabels.h"
 #include "render/GameplaySpriteBatch.h"
 #include "config/BuiltinDifficultyTables.h"

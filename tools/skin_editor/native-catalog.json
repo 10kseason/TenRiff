@@ -96,12 +96,6 @@
     "palette.ecf6ff": "#F2F2F2FF"
   },
   "rects": {
-    "account.rect.001": [
-      0,
-      0,
-      0,
-      0
-    ],
     "account.rect.002": [
       0,
       0,
@@ -228,6 +222,12 @@
       0,
       0
     ],
+    "account.rect.001": [
+      0,
+      0,
+      0,
+      0
+    ],
     "chat.rect.001": [
       0,
       0,
@@ -265,12 +265,6 @@
       0
     ],
     "chat.rect.007": [
-      0,
-      0,
-      0,
-      0
-    ],
-    "difficulty_table_editor.rect.001": [
       0,
       0,
       0,
@@ -325,6 +319,12 @@
       0
     ],
     "difficulty_table_editor.rect.010": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "difficulty_table_editor.rect.001": [
       0,
       0,
       0,
@@ -570,12 +570,6 @@
       0,
       0
     ],
-    "help.rect.001": [
-      0,
-      0,
-      0,
-      0
-    ],
     "help.rect.002": [
       0,
       0,
@@ -601,6 +595,12 @@
       0
     ],
     "help.rect.006": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "help.rect.001": [
       0,
       0,
       0,
@@ -697,12 +697,6 @@
       0
     ],
     "result_multiplayer.rect.007": [
-      0,
-      0,
-      0,
-      0
-    ],
-    "result_single.rect.001": [
       0,
       0,
       0,
@@ -937,6 +931,12 @@
       0
     ],
     "result_single.rect.047": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "result_single.rect.001": [
       0,
       0,
       0,
@@ -1770,12 +1770,6 @@
       0,
       0
     ],
-    "url_warning.rect.001": [
-      0,
-      0,
-      0,
-      0
-    ],
     "url_warning.rect.002": [
       0,
       0,
@@ -1813,6 +1807,12 @@
       0
     ],
     "url_warning.rect.008": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "url_warning.rect.001": [
       0,
       0,
       0,
@@ -1874,11 +1874,6 @@
     "stats_value": "Segoe UI"
   },
   "references": {
-    "rects.account.rect.001": {
-      "file": "MenuWindow_draw_account_body.inl",
-      "line": 17,
-      "expression": "0.0f, 0.0f, kBaseWidth, kBaseHeight"
-    },
     "rects.account.rect.002": {
       "file": "MenuWindow_draw_account_body.inl",
       "line": 28,
@@ -1984,6 +1979,11 @@
       "line": 260,
       "expression": "modal.left + 40.0f, modal.bottom - 38.0f, modal.right - 40.0f, modal.bottom - 12.0f"
     },
+    "rects.account.rect.001": {
+      "file": "MenuWindow_draw_account_body.inl",
+      "line": 17,
+      "expression": "0, 0, kBaseWidth, kBaseHeight"
+    },
     "rects.chat.rect.001": {
       "file": "MenuWindow_draw_chat_body.inl",
       "line": 24,
@@ -2018,11 +2018,6 @@
       "file": "MenuWindow_draw_chat_body.inl",
       "line": 113,
       "expression": "input_rect.left + 930.0f, input_rect.top + 8.0f, input_rect.right - 14.0f, input_rect.bottom - 5.0f"
-    },
-    "rects.difficulty_table_editor.rect.001": {
-      "file": "MenuWindow_draw_difficulty_table_editor.inl",
-      "line": 5,
-      "expression": "0, 0, kBaseWidth, kBaseHeight"
     },
     "rects.difficulty_table_editor.rect.002": {
       "file": "MenuWindow_draw_difficulty_table_editor.inl",
@@ -2068,6 +2063,11 @@
       "file": "MenuWindow_draw_difficulty_table_editor.inl",
       "line": 57,
       "expression": "1190, 763, 1420, 815"
+    },
+    "rects.difficulty_table_editor.rect.001": {
+      "file": "MenuWindow_draw_difficulty_table_editor.inl",
+      "line": 5,
+      "expression": "0, 0, kBaseWidth, kBaseHeight"
     },
     "rects.generic.rect.001": {
       "file": "MenuWindow_draw_generic_body.inl",
@@ -2269,11 +2269,6 @@
       "line": 79,
       "expression": "rect.right - 82, rect.bottom - 56, rect.right - 26, rect.bottom - 16"
     },
-    "rects.help.rect.001": {
-      "file": "MenuWindow_draw_help_body.inl",
-      "line": 8,
-      "expression": "0.0f, 0.0f, kBaseWidth, kBaseHeight"
-    },
     "rects.help.rect.002": {
       "file": "MenuWindow_draw_help_body.inl",
       "line": 12,
@@ -2298,6 +2293,11 @@
       "file": "MenuWindow_draw_help_body.inl",
       "line": 55,
       "expression": "panel_rect.left + 40.0f, panel_rect.bottom - 88.0f, panel_rect.right - 40.0f, panel_rect.bottom - 34.0f"
+    },
+    "rects.help.rect.001": {
+      "file": "MenuWindow_draw_help_body.inl",
+      "line": 8,
+      "expression": "0, 0, kBaseWidth, kBaseHeight"
     },
     "rects.native_motion.rect.001": {
       "file": "MenuWindow_draw_native_motion.inl",
@@ -2378,11 +2378,6 @@
       "file": "MenuWindow_draw_result_multiplayer.inl",
       "line": 53,
       "expression": "1160.0f, 960.0f, 1856.0f, 1040.0f"
-    },
-    "rects.result_single.rect.001": {
-      "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 226,
-      "expression": "0.0f, 0.0f, kBaseWidth, kBaseHeight"
     },
     "rects.result_single.rect.002": {
       "file": "MenuWindow_draw_result_single_body.inl",
@@ -2578,6 +2573,11 @@
       "file": "MenuWindow_draw_result_single_body.inl",
       "line": 1005,
       "expression": "620.0f, 1022.0f, 1300.0f, 1050.0f"
+    },
+    "rects.result_single.rect.001": {
+      "file": "MenuWindow_draw_result_single_body.inl",
+      "line": 226,
+      "expression": "0, 0, kBaseWidth, kBaseHeight"
     },
     "rects.result_summary.rect.002": {
       "file": "MenuWindow_draw_result_summary.inl",
@@ -3269,11 +3269,6 @@
       "line": 154,
       "expression": "footer.right - 246, footer.top + 18, footer.right - 24, footer.top + 56"
     },
-    "rects.url_warning.rect.001": {
-      "file": "MenuWindow_draw_url_warning_body.inl",
-      "line": 17,
-      "expression": "0.0f, 0.0f, kBaseWidth, kBaseHeight"
-    },
     "rects.url_warning.rect.002": {
       "file": "MenuWindow_draw_url_warning_body.inl",
       "line": 24,
@@ -3308,6 +3303,11 @@
       "file": "MenuWindow_draw_url_warning_body.inl",
       "line": 64,
       "expression": "modal.right - 342.0f, button_top, modal.right - 40.0f, button_top + 56.0f"
+    },
+    "rects.url_warning.rect.001": {
+      "file": "MenuWindow_draw_url_warning_body.inl",
+      "line": 17,
+      "expression": "0, 0, kBaseWidth, kBaseHeight"
     }
   }
 }

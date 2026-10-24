@@ -9,6 +9,7 @@
 #include "config/SimpleJson.h"
 #include "gameplay/ModeApplier.h"
 #include "timing/HighResClock.h"
+#include "render/GameplayMotion.h"
 #include "../support/MockAsioDriver.h"
 
 #include <algorithm>
@@ -1251,6 +1252,109 @@ struct GameSessionAudioTestAccess {
             CHECK(std::count_if(notes.begin(), notes.begin() + count, [](const auto& note) {
                 return note.hold && !note.head_visible && note.start_sample == 70000 && note.tail_sample == 100000;
             }) == 1);
+        }
+    }
+
+    static void check_early_released_hold_hud(bool release_required) {
+        auto session = pause_hud_fixture();
+        session->chronological_judgement_ = false;
+        session->audio_timing_diagnostics_logged_ = true;
+        session->chart_.notes[1].release_required = release_required;
+        gameplay::GameplayConfig config;
+        config.practice_no_fail_enabled = true;
+        session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+        session->ghost_engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+        session->dispatch_lane_input(1, input::InputState::Pressed, 37500, 37500);
+        session->dispatch_ghost_lane_input(1, input::InputState::Pressed, 37500);
+        session->dispatch_lane_input(1, input::InputState::Released, 37501, 37501);
+        session->dispatch_ghost_lane_input(1, input::InputState::Released, 37501);
+        session->dispatch_lane_input(1, input::InputState::Pressed, 42000, 42000);
+        session->dispatch_ghost_lane_input(1, input::InputState::Pressed, 42000);
+        session->dispatch_lane_input(1, input::InputState::Released, 70000, 70000);
+        session->dispatch_ghost_lane_input(1, input::InputState::Released, 70000);
+        std::vector<gameplay::ActiveHoldView> active;
+        session->engine_->collect_active_holds(active);
+        CHECK(active.empty());
+        session->ghost_engine_->collect_active_holds(active);
+        CHECK(active.empty());
+        const auto bad = session->engine_->stats().counts.bd;
+        const auto ghost_bad = session->ghost_engine_->stats().counts.bd;
+        CHECK(bad > 0);
+        CHECK(ghost_bad > 0);
+        std::vector<float> audio(960);
+        for (const int64_t sample : {70000, 85000, 100000, 100001, 120000}) {
+            session->audio_callback(audio.data(), 480, sample, sample);
+            const auto hud = session->hud_snapshot();
+            for (const bool ghost : {false, true}) {
+                const auto& notes = ghost ? hud.ghost_notes : hud.notes;
+                const auto count = ghost ? hud.ghost_note_count : hud.note_count;
+                int rendered_bodies = 0;
+                for (std::size_t i = 0; i < count; ++i) {
+                    const auto& note = notes[i];
+                    if (!note.hold || note.tail_sample != 100000) continue;
+                    CHECK(note.released);
+                    CHECK_FALSE(note.pending);
+                    CHECK(note.head_visible); // unanchored; released suppresses the scored head
+                    CHECK_FALSE(render::should_render_gameplay_note_head(
+                        note.start_sample, note.head_visible, sample, note.released));
+                    if (render::should_render_gameplay_note(note.start_sample, note.tail_sample,
+                            note.hold, note.head_visible, note.pending, sample, sample, 32, note.released))
+                        ++rendered_bodies;
+                }
+                CHECK(rendered_bodies == (sample <= 100000 ? 1 : 0));
+            }
+            // Display retention never postpones or scores the released tail again.
+            CHECK(session->engine_->stats().counts.bd == bad);
+            CHECK(session->ghost_engine_->stats().counts.bd == ghost_bad);
+        }
+    }
+
+    static void check_final_released_hold_completion(bool play_to_end, bool manual_skip, double visual_offset_ms) {
+        auto session = std::make_unique<GameSession>();
+        session->sample_rate_ = 48000;
+        session->chronological_judgement_ = false;
+        session->audio_timing_diagnostics_logged_ = true;
+        session->synthetic_tones_enabled_ = false;
+        session->gameplay_started_ = true;
+        session->enter_keycode_ = 13;
+        session->config_.ui.result_tail_ms = 100;
+        session->config_.audio_ui.play_to_end = play_to_end;
+        session->config_.audio_ui.mute_when_inactive = false;
+        session->config_.visual_offset_ms = visual_offset_ms;
+        session->chart_.lane_count = 1;
+        session->chart_.duration_samples = 240000;
+        session->chart_.notes = {{1, 48000, 144000}};
+        session->hidden_hit_note_ids_.assign(1, 0);
+        session->lane_activity_.assign(1, 0);
+        session->lane_pressed_.assign(1, 0);
+        gameplay::GameplayConfig config;
+        config.practice_no_fail_enabled = true;
+        session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+        session->dispatch_lane_input(1, input::InputState::Pressed, 48000, 48000);
+        session->dispatch_lane_input(1, input::InputState::Released, 60000, 60000);
+        std::vector<float> audio(960);
+        session->audio_callback(audio.data(), 480, 60000, 60000);
+        REQUIRE(session->engine_->is_finished());
+        REQUIRE(session->result_transition_pending_);
+        CHECK_FALSE(session->finished_.load());
+        const int64_t visible_end = 144000 + static_cast<int64_t>(-visual_offset_ms * 48);
+        CHECK(session->result_transition_sample_ == visible_end);
+        const auto bad = session->engine_->stats().counts.bd;
+        const auto events = session->engine_->replay().events.size();
+        if (manual_skip) {
+            input::InputEvent skip{};
+            skip.keycode = 13;
+            skip.state = input::InputState::Pressed;
+            CHECK(session->handle_control_input(skip));
+            CHECK(session->finished_.load());
+            CHECK_FALSE(session->user_aborted_.load());
+            return;
+        }
+        for (const int64_t sample : {int64_t{90000}, visible_end - 1, visible_end}) {
+            session->audio_callback(audio.data(), 480, sample, sample);
+            CHECK(session->finished_.load() == (sample >= visible_end));
+            CHECK(session->engine_->stats().counts.bd == bad);
+            CHECK(session->engine_->replay().events.size() == events);
         }
     }
 
@@ -3271,6 +3375,17 @@ TEST_CASE("long missed hold cannot pin player and ghost HUD to expired note hist
 }
 TEST_CASE("HUD old LN survivors preserve missed and active bodies across rewind and offset changes") {
     tenriff::app::GameSessionAudioTestAccess::check_hud_hold_survivor_lifecycle();
+}
+TEST_CASE("early released player and ghost holds keep their body while judgement completes immediately") {
+    for (const bool release_required : {false, true})
+        tenriff::app::GameSessionAudioTestAccess::check_early_released_hold_hud(release_required);
+}
+TEST_CASE("final released hold delays automatic results until its visible tail but preserves explicit skip") {
+    for (const bool play_to_end : {false, true})
+        for (const bool manual_skip : {false, true})
+            for (const double offset : {0.0, -100.0})
+                tenriff::app::GameSessionAudioTestAccess::check_final_released_hold_completion(
+                    play_to_end, manual_skip, offset);
 }
 TEST_CASE("ghost replay backlog preserves player callback order samples keysound and feedback") {
     tenriff::app::GameSessionAudioTestAccess::check_ghost_backlog_player_callback();

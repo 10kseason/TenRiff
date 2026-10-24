@@ -14,7 +14,7 @@
         if (d2d_->footer_brush) {
             const float saved = d2d_->footer_brush->GetOpacity();
             d2d_->footer_brush->SetOpacity(0.72f * eased);
-            ctx->FillRectangle(native_rect("url_warning.rect.001", D2D1::RectF(0.0f, 0.0f, kBaseWidth, kBaseHeight)),
+            ctx->FillRectangle(native_background_rect("url_warning.rect.001"),
                                d2d_->footer_brush.Get());
             d2d_->footer_brush->SetOpacity(saved);
         }

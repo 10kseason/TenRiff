@@ -625,6 +625,96 @@ TEST_CASE("mode manager musical LN lengths follow BPM sample rate and playback r
     }
 }
 
+TEST_CASE("mode manager mine-safe LN mix leaves fifty milliseconds on both sides of same-lane mines") {
+    for (int sample_rate : {1000, 44100, 48000}) {
+        const int64_t head = sample_rate;
+        const int64_t clearance = std::llround(sample_rate * 0.05);
+        const int64_t half_beat = std::llround(sample_rate * 0.25);
+        for (int64_t mine_sample : {head - clearance, head - clearance + 1, head,
+                                   head + half_beat + clearance - 1,
+                                   head + half_beat + clearance,
+                                   head + sample_rate, head + 3 * sample_rate}) {
+            tenriff::gameplay::GameplayChart chart;
+            chart.lane_count = 1;
+            append_note(chart, 1, head);
+            chart.duration_samples = 10 * sample_rate;
+            chart.mines.push_back({1, mine_sample, 15.0, false, 7, 9});
+            tenriff::config::ModeConfig mode;
+            mode.mods = {"ln_mix_90"};
+            const auto mixed = tenriff::app::manage_modes(chart, tenriff::app::ChartFormat::Bms,
+                mode, make_judge_config(), 1.0, 120.0, sample_rate);
+            REQUIRE(mixed.chart.notes.size() == 1);
+            REQUIRE(mixed.chart.mines.size() == 1);
+            CHECK(mixed.chart.mines[0].sample == mine_sample);
+            CHECK(mixed.chart.mines[0].mine_id == 9);
+            CHECK(mixed.chart.mines[0].damage_percent == 15.0);
+            const auto& note = mixed.chart.notes[0];
+            const bool eligible = mine_sample <= head - clearance ||
+                                  mine_sample >= head + half_beat + clearance;
+            CHECK(note.end_sample.has_value() == eligible);
+            if (note.end_sample) {
+                CHECK((mine_sample <= note.start_sample - clearance ||
+                       mine_sample >= *note.end_sample + clearance));
+            }
+        }
+    }
+}
+
+TEST_CASE("mode manager mine-safe LN mix preserves authored holds and other-lane candidates") {
+    tenriff::gameplay::GameplayChart chart;
+    chart.lane_count = 2;
+    append_note(chart, 1, 1000);
+    append_note(chart, 2, 1000, 3000, true);
+    chart.duration_samples = 10000;
+    // Unsorted and invalid-lane mines must not alter the safe lane's selection.
+    chart.mines = {{2, 2500}, {0, 1000}, {3, 1000}, {2, 1000}, {2, 1500}};
+    tenriff::config::ModeConfig mode;
+    mode.mods = {"ln_mix_90"};
+    const auto mixed = tenriff::app::manage_modes(chart, tenriff::app::ChartFormat::Bms,
+        mode, make_judge_config(), 1.0, 120.0, 1000);
+    REQUIRE(mixed.chart.notes.size() == 2);
+    CHECK(mixed.chart.notes[0].end_sample.has_value());
+    CHECK(mixed.chart.notes[1].end_sample == chart.notes[1].end_sample);
+    CHECK(mixed.chart.notes[1].release_required);
+}
+
+TEST_CASE("mode manager mine-safe LN mix preserves historical v1 v2 and mine-free generation") {
+    using tenriff::app::LongNoteMixVersion;
+    tenriff::gameplay::GameplayChart chart;
+    chart.lane_count = 1;
+    for (int i = 0; i < 20; ++i) append_note(chart, 1, 1000 + i * 2500);
+    chart.duration_samples = 52000;
+    auto with_mines = chart;
+    for (auto it = chart.notes.rbegin(); it != chart.notes.rend(); ++it) {
+        with_mines.mines.push_back({1, it->start_sample + 100});
+    }
+    for (uint32_t seed : {1u, 24680u, 987654u}) for (double rate : {0.5, 1.0, 2.0}) {
+        tenriff::config::ModeConfig mode;
+        mode.mods = {"ln_mix_90"};
+        mode.random_seed = seed;
+        for (auto version : {LongNoteMixVersion::LegacyShort, LongNoteMixVersion::Musical}) {
+            const auto old_clear = tenriff::app::manage_modes(chart, tenriff::app::ChartFormat::Bms,
+                mode, make_judge_config(), rate, 120.0, 1000, version);
+            const auto old_mines = tenriff::app::manage_modes(with_mines, tenriff::app::ChartFormat::Bms,
+                mode, make_judge_config(), rate, 120.0, 1000, version);
+            const auto safe_clear = tenriff::app::manage_modes(chart, tenriff::app::ChartFormat::Bms,
+                mode, make_judge_config(), rate, 120.0, 1000);
+            const auto safe_mines = tenriff::app::manage_modes(with_mines, tenriff::app::ChartFormat::Bms,
+                mode, make_judge_config(), rate, 120.0, 1000);
+            int old_holds = 0;
+            for (std::size_t i = 0; i < chart.notes.size(); ++i) {
+                CHECK(old_clear.chart.notes[i].end_sample == old_mines.chart.notes[i].end_sample);
+                old_holds += old_clear.chart.notes[i].end_sample.has_value();
+                CHECK_FALSE(safe_mines.chart.notes[i].end_sample.has_value());
+                if (version == LongNoteMixVersion::Musical) {
+                    CHECK(old_clear.chart.notes[i].end_sample == safe_clear.chart.notes[i].end_sample);
+                }
+            }
+            CHECK(old_holds == 18);
+        }
+    }
+}
+
 TEST_CASE("no-ln-release disables charge-tail release judgement at a neutral score multiplier") {
     tenriff::gameplay::GameplayChart chart;
     chart.lane_count = 1;

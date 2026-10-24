@@ -14,12 +14,38 @@
 #include "render/OnnxBackgroundUpscaler.h"
 #include "render/OnnxUpscaleImage.h"
 #include "render/MenuWindow.h"
+#include "render/MenuViewport.h"
 #include "render/SkinGameplayPreview.h"
 #include "timing/HighResClock.h"
 #include <cstdlib>
 #include <iostream>
 #include <numeric>
 #include <limits>
+
+TEST_CASE("ultrawide background spans the client while authored UI keeps uniform scale") {
+    using tenriff::render::menu_viewport;
+    for (const auto [width, height] : {std::pair{2560, 1080}, std::pair{3440, 1440},
+                                      std::pair{5120, 2160}}) {
+        const auto viewport = menu_viewport(width, height);
+        CHECK(viewport.scale == doctest::Approx(height / 1080.0f));
+        CHECK(viewport.offset_y == doctest::Approx(0));
+        CHECK(viewport.background_left < 0);
+        CHECK(viewport.background_right > 1920);
+        CHECK(viewport.background_left * viewport.scale + viewport.offset_x == doctest::Approx(0));
+        CHECK(viewport.background_right * viewport.scale + viewport.offset_x == doctest::Approx(width));
+        CHECK(960 * viewport.scale + viewport.offset_x == doctest::Approx(width * 0.5f));
+        CHECK(1080 * viewport.scale + viewport.offset_y == doctest::Approx(height));
+    }
+    for (const auto [width, height] : {std::pair{1920, 1080}, std::pair{1280, 720},
+                                      std::pair{2560, 1440}, std::pair{1024, 768},
+                                      std::pair{900, 1600}}) {
+        const auto viewport = menu_viewport(width, height);
+        CHECK(viewport.background_left == 0);
+        CHECK(viewport.background_right == 1920);
+        CHECK(viewport.scale == doctest::Approx(std::min(width / 1920.0f, height / 1080.0f)));
+    }
+    CHECK(menu_viewport(0, 0).scale == 1);
+}
 
 TEST_CASE("feedback regression indicator backing visibility reaches fullscreen skin preview") {
     tenriff::render::SkinPreviewData preview;
@@ -83,7 +109,8 @@ TEST_CASE("render layout and pointer mapping preserve aspect at uncommon resolut
     using Access = tenriff::render::MenuWindowResolutionTestAccess;
     tenriff::render::MenuWindow window;
     for (const auto [width, height] : {std::pair{1600, 900}, std::pair{1366, 768}, std::pair{1280, 800},
-                                      std::pair{1024, 768}, std::pair{3440, 1440}, std::pair{900, 1600}}) {
+                                      std::pair{1024, 768}, std::pair{2560, 1080}, std::pair{3440, 1440},
+                                      std::pair{5120, 2160}, std::pair{1920, 1080}, std::pair{900, 1600}}) {
         Access::resize(window, width, height);
         const float scale = Access::scale(window);
         CHECK(scale == doctest::Approx(std::min(width / 1920.0f, height / 1080.0f)));

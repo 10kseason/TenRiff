@@ -12,7 +12,7 @@
 namespace tenriff::app {
 
 // Chart conversion evolves independently from the R1-R4 judgement rules.
-enum class LongNoteMixVersion { LegacyShort = 1, Musical = 2 };
+enum class LongNoteMixVersion { LegacyShort = 1, Musical = 2, MineSafeMusical = 3 };
 
 struct ModeModDescriptor {
     std::string_view token;
@@ -68,7 +68,7 @@ struct ModeManagerResult {
                                              double rate,
                                              double base_bpm = 0.0,
                                              int sample_rate = 0,
-                                             LongNoteMixVersion long_note_mix_version = LongNoteMixVersion::Musical,
+                                             LongNoteMixVersion long_note_mix_version = LongNoteMixVersion::MineSafeMusical,
                                              int key_conversion_version = 3);
 
 }  // namespace tenriff::app

@@ -155,6 +155,7 @@ private:
         bool mine = false;
         double visual_position = 0.0;
         double tail_visual_position = 0.0;
+        bool released = false;
         };
 
         bool active = false;

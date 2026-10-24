@@ -1013,7 +1013,8 @@ TEST_CASE("config save and load preserve explicit uncommon resolutions") {
     std::filesystem::current_path(temp.path);
     ConfigLoader loader;
     auto config = loader.defaults();
-    for (const auto size : {"1600x900", "1366x768", "1280x800", "3440x1440", "900x1600"}) {
+    for (const auto size : {"1600x900", "1366x768", "1280x800", "2560x1080", "3440x1440",
+                           "5120x2160", "900x1600"}) {
         config.graphics.resolution = size;
         std::string error;
         REQUIRE(loader.save_profile("profiles/test", config, &error));

@@ -41,7 +41,7 @@ inline SitesUploadStatusText sites_upload_status_text(std::string_view message) 
     if (message.find("BMS branch chart evidence") != std::string_view::npos)
         return {"Web upload skipped: original BMS chart unavailable or changed; record saved locally.",
                 "웹 등록 제외 · 원본 BMS 채보가 없거나 변경됨 · 로컬 저장"};
-    if (message.find("LN Mix v2") != std::string_view::npos)
+    if (message.find("LN Mix v") != std::string_view::npos)
         return {"Long LN Mix uses local records only.", "긴 LN 믹스는 로컬 기록만 저장합니다."};
     if (message.find("older or unsupported judgement timing") != std::string_view::npos)
         return {"Older or unsupported judgement timing stays in local records.",

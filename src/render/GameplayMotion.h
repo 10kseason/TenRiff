@@ -482,11 +482,17 @@ inline bool should_render_gameplay_note(int64_t start_sample,
                                         bool pending,
                                         int64_t snapshot_sample,
                                         int64_t display_sample,
-                                        int64_t handoff_grace_samples) {
+                                        int64_t handoff_grace_samples,
+                                        bool released = false) {
     if (!hold) {
         return head_visible && start_sample >= display_sample;
     }
     if (!head_visible) {
+        return tail_sample >= display_sample;
+    }
+    // A completed early release is display-only: its remaining body scrolls
+    // away with the chart instead of vanishing with the engine's active hold.
+    if (released) {
         return tail_sample >= display_sample;
     }
     if (start_sample >= display_sample) {
@@ -506,8 +512,9 @@ inline bool should_render_gameplay_note(int64_t start_sample,
 
 inline bool should_render_gameplay_note_head(int64_t start_sample,
                                              bool head_visible,
-                                             int64_t display_sample) {
-    return head_visible && start_sample >= display_sample;
+                                             int64_t display_sample,
+                                             bool released = false) {
+    return head_visible && !released && start_sample >= display_sample;
 }
 
 inline bool gameplay_note_anchors_to_judgement_line(bool hold, bool head_visible) {

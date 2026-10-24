@@ -132,7 +132,8 @@ bool build_sites_score_json(const gameplay::ReplayFile& replay,
     if (mode_mod_long_note_mix(replay.mods) && replay.mode.long_note_mix_version != 1) {
         // Existing boards do not distinguish conversion versions. Keep a new
         // multi-beat chart out of the legacy chart-condition leaderboard.
-        error = "Sites upload skipped: LN Mix v2 needs a separate leaderboard condition; this score remains local.";
+        error = "Sites upload skipped: LN Mix v" + std::to_string(replay.mode.long_note_mix_version) +
+            " needs a separate leaderboard condition; this score remains local.";
         return false;
     }
     if (!is_sites_supported_replay_ruleset(replay.ruleset_id, replay.mods)) {

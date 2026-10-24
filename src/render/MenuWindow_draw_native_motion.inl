@@ -191,7 +191,7 @@
     auto draw_native_background = [&]() {
         if (!native_motion_screen || !d2d_->native_menu_brush) return;
         if (d2d_->native_menu_background) ctx->FillRectangle(
-            native_rect("native_motion.rect.003", D2D1::RectF(0, 0, kBaseWidth, kBaseHeight)), d2d_->native_menu_background.Get());
+            native_background_rect("native_motion.rect.003"), d2d_->native_menu_background.Get());
         // A quiet background leaves the rhythm and category symbols in front.
         // Avoid moving particles and diagonal grids behind small menu text.
         const float reveal = native_menu_motion_.entrance(0, 0.65f);

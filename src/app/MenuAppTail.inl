@@ -446,6 +446,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         out_note.hold = note.hold;
         out_note.head_visible = note.head_visible;
         out_note.pending = note.pending;
+        out_note.released = note.released;
         out_note.mine = note.mine;
         out_note.visual_position = note.visual_position;
         out_note.tail_visual_position = note.tail_visual_position;
@@ -554,6 +555,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         out_note.hold = note.hold;
         out_note.head_visible = note.head_visible;
         out_note.pending = note.pending;
+        out_note.released = note.released;
         out_note.mine = note.mine;
         out_note.visual_position = note.visual_position;
         out_note.tail_visual_position = note.tail_visual_position;
@@ -1226,7 +1228,9 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     if (mode_mod_long_note_mix(last_result_mods_)) {
         render.result.analysis_mods += last_result_long_note_mix_version_ == 1
             ? ui_text(" / Legacy LN Mix", " / 이전 LN 믹스")
-            : ui_text(" / Long LN Mix", " / 긴 LN 믹스");
+            : last_result_long_note_mix_version_ == 3
+                ? ui_text(" / Mine-safe LN Mix", " / 지뢰 회피 LN 믹스")
+                : ui_text(" / Long LN Mix", " / 긴 LN 믹스");
     }
     render.result.profile =
         last_result_player_name_.empty() ? profile_display_name() : last_result_player_name_;
@@ -2532,6 +2536,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
             out.tail_sample = hud.notes[i].tail_sample;
             out.hold = hud.notes[i].hold;
             out.head_visible = hud.notes[i].head_visible;
+            out.released = hud.notes[i].released;
             out.pending = hud.notes[i].pending;
             out.mine = hud.notes[i].mine;
             out.visual_position = hud.notes[i].visual_position;
@@ -2583,6 +2588,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
             out.tail_sample = hud.ghost_notes[i].tail_sample;
             out.hold = hud.ghost_notes[i].hold;
             out.head_visible = hud.ghost_notes[i].head_visible;
+            out.released = hud.ghost_notes[i].released;
             out.pending = hud.ghost_notes[i].pending;
             out.mine = hud.ghost_notes[i].mine;
             out.visual_position = hud.ghost_notes[i].visual_position;

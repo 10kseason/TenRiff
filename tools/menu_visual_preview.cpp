@@ -1032,6 +1032,7 @@ int main(int argc, char** argv) {
     int benchmark_frames = 0;
     int dense_notes = 0;
     bool dense_holds = false;
+    int hold_release_fixture = 0; // 1 = active reference, 2 = released body
     bool tapered_holds = false;
     int benchmark_successful_presents = 0;
     int benchmark_fullscreen_presents = 0;
@@ -1136,6 +1137,12 @@ int main(int argc, char** argv) {
             continue;
         }
         const std::string arg = argv[i];
+        if (arg == "--released-hold" || arg == "--held-hold-reference") {
+            hold_release_fixture = arg == "--released-hold" ? 2 : 1;
+            gameplay = ghost = fixture_idle = no_feedback = true;
+            if (fixture_seconds < 0.0) fixture_seconds = 2.0;
+            continue;
+        }
         if ((arg == "--divider-brightness" || arg == "--next-divider-brightness") && i + 1 < argc) {
             const double value = std::stod(argv[++i]);
             if (!std::isfinite(value) || value < 0.0 || value > 1.0) return 2;
@@ -2369,6 +2376,24 @@ int main(int argc, char** argv) {
                     note.tail_visual_position = note.tail_sample / 48000.0;
                 }
             }
+            if (hold_release_fixture != 0) {
+                // The production HUD's released body keeps its original head
+                // coordinate but has no scored head, active anchor or key glow.
+                hud.note_count = 1;
+                hud.notes[0] = {};
+                auto& note = hud.notes[0];
+                note.lane = 2;
+                note.hold = true;
+                note.released = hold_release_fixture == 2;
+                note.head_visible = note.released;
+                note.start_sample = hud.current_sample - 24000;
+                note.tail_sample = hud.current_sample + 18000;
+                note.visual_position = note.start_sample / 48000.0;
+                note.tail_visual_position = note.tail_sample / 48000.0;
+                hud.lane_activity.fill(0.0f);
+                hud.lane_pressed.fill(0);
+                if (!note.released) hud.lane_pressed[1] = 1;
+            }
             if (ghost) {
                 // Identical note/key activity makes visual parity measurable;
                 // independent score labels still exercise the split info cards.
@@ -2613,6 +2638,7 @@ int main(int argc, char** argv) {
             {"song_title", MenuWindowVisualTestAccess::song_title_stats(window)},
             {"dense_notes", JsonValue(static_cast<double>(dense_notes))},
             {"dense_holds", JsonValue(dense_holds)}, {"tapered_holds", JsonValue(tapered_holds)},
+            {"hold_release_fixture", JsonValue(static_cast<double>(hold_release_fixture))},
             {"player_note_count", JsonValue(static_cast<double>(data.gameplay.note_count))},
             {"ghost_note_count", JsonValue(static_cast<double>(data.gameplay.ghost_note_count))},
             {"wall_ms", JsonValue((tenriff::timing::HighResClock::now_ns() - benchmark_wall_start) / 1e6)},

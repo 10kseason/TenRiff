@@ -52,6 +52,7 @@ public:
         double visual_position = 0.0;
         double tail_visual_position = 0.0;
         bool pending = false;
+        bool released = false;
     };
 
     struct HudSnapshot {
@@ -502,7 +503,7 @@ private:
     double chart_base_bpm_ = 0.0;
     std::vector<std::string> active_mods_{};
     std::vector<std::string> session_mode_mods_{};
-    int long_note_mix_version_ = 2;
+    int long_note_mix_version_ = 3;
     int key_conversion_version_ = 3;
     int bms_timing_version_ = 2;
     int bms_gauge_version_ = 1;
