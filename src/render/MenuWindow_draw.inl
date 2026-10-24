@@ -39,6 +39,9 @@ void MenuWindow::draw(const MenuRenderData& data) {
     }
 
     auto* ctx = d2d_->d2d_context.Get();
+    const auto viewport = menu_viewport(static_cast<int>(width_), static_cast<int>(height_));
+    const D2D1_RECT_F full_screen_rect = D2D1::RectF(
+        viewport.background_left, 0.0f, viewport.background_right, kBaseHeight);
     const int64_t render_now_ns = timing::HighResClock::now_ns();
     const auto& native_style = data.lobby_skin.native_menu;
     const bool native_overrides = data.kind != MenuScreenKind::GameplayHud &&
@@ -48,6 +51,13 @@ void MenuWindow::draw(const MenuRenderData& data) {
         const auto rect = native_skin_rect(native_style, key,
             {fallback.left, fallback.top, fallback.right, fallback.bottom});
         return D2D1::RectF(rect[0], rect[1], rect[2], rect[3]);
+    };
+    auto native_background_rect = [&](const char* key) {
+        const auto rect = native_rect(key, D2D1::RectF(0.0f, 0.0f, kBaseWidth, kBaseHeight));
+        // Native skin exports commonly spell out the default full-canvas rect.
+        // Expand that default too; intentionally inset/custom panels keep their bounds.
+        return rect.left == 0.0f && rect.top == 0.0f &&
+               rect.right == kBaseWidth && rect.bottom == kBaseHeight ? full_screen_rect : rect;
     };
     auto native_metric = [&](const char* key, float fallback) {
         return native_overrides ? native_skin_number(native_style.metrics, key, fallback,
@@ -330,8 +340,6 @@ void MenuWindow::draw(const MenuRenderData& data) {
 
     draw_native_background();
 
-    const D2D1_RECT_F full_screen_rect =
-        D2D1::RectF(0.0f, 0.0f, kBaseWidth, kBaseHeight);
     if (title_background) {
         const auto source = centered_bitmap_source_rect(title_background->GetSize(), full_screen_rect);
         // The Studio artwork is already authored against the menu's contrast
@@ -372,8 +380,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
                             D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
                             &source_rect);
         }
-        const D2D1_RECT_F background_rect =
-            D2D1::RectF(0.0f, 0.0f, kBaseWidth, kBaseHeight);
+        const D2D1_RECT_F background_rect = full_screen_rect;
         if (d2d_->gameplay_background_base_bitmap) {
             // The restored bitmap keeps the original aspect at x2. Cover-fit
             // and any viewport crop are applied here, after AI composition.
@@ -419,7 +426,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
         if (has_menu_scene) {
             d2d_->glow_brush->SetOpacity(data.kind == MenuScreenKind::TitleMenu ? 0.26f : 0.14f);
         }
-        ctx->FillRectangle(D2D1::RectF(0.0f, 0.0f, kBaseWidth, kBaseHeight), d2d_->glow_brush.Get());
+        ctx->FillRectangle(full_screen_rect, d2d_->glow_brush.Get());
         d2d_->glow_brush->SetOpacity(saved_opacity);
     }
 

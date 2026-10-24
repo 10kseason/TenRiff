@@ -1175,7 +1175,7 @@ TEST_CASE("LN Mix conversion version round-trips with absent legacy default and 
     result.chart_path = "fixture.bms";
     result.mods = replay.mods;
     result.stats.total_notes = 10;
-    for (int version : {1, 2}) {
+    for (int version : {1, 2, 3}) {
         replay.mode.long_note_mix_version = version;
         result.long_note_mix_version = version;
         REQUIRE(save_replay_json(replay_path.string(), replay).success());
@@ -1196,7 +1196,7 @@ TEST_CASE("LN Mix conversion version round-trips with absent legacy default and 
         }
     }
     const std::vector<tenriff::config::JsonValue> invalid = {
-        tenriff::config::JsonValue{0.0}, tenriff::config::JsonValue{3.0},
+        tenriff::config::JsonValue{0.0}, tenriff::config::JsonValue{4.0},
         tenriff::config::JsonValue{1.5}, tenriff::config::JsonValue{"2"},
         tenriff::config::JsonValue{true}, tenriff::config::JsonValue{},
     };
@@ -1291,17 +1291,20 @@ TEST_CASE("feedback regression key conversion version round-trips with absent le
     std::filesystem::remove(result_path);
 }
 
-TEST_CASE("replay verifier reconstructs both LN Mix conversions without changing R1 through R4 judgement rules") {
+TEST_CASE("replay verifier reconstructs all LN Mix conversions without changing judgement rules") {
     tenriff::gameplay::GameplayChart source;
     source.lane_count = 1;
     source.duration_samples = 51'000 * 48;
     for (int i = 0; i < 20; ++i) source.notes.push_back({1, (1000 + i * 2500) * 48, std::nullopt});
+    // A mine within a potential long hold makes v3 reconstruction materially
+    // different from v2 while all historical versions retain their own chart.
+    source.mines.push_back({1, 1800 * 48, 10.0});
     tenriff::config::ModeConfig mode;
     mode.mods = {"ln_mix_50"};
     mode.random_seed = 24680;
     for (const auto ruleset : {tenriff::app::kLegacyReplayRulesetId, tenriff::app::kPreviousReplayRulesetId,
                                tenriff::app::kRuleset3ReplayRulesetId, tenriff::app::kRuleset4ReplayRulesetId, tenriff::app::kCanonicalReplayRulesetId}) {
-        for (int version : {1, 2}) {
+        for (int version : {1, 2, 3}) {
             const auto managed = tenriff::app::manage_modes(source, tenriff::app::ChartFormat::Bms,
                 mode, tenriff::config::JudgeConfig{}, 1.0, 120.0, 48000,
                 static_cast<tenriff::app::LongNoteMixVersion>(version));
@@ -1345,17 +1348,92 @@ TEST_CASE("replay verifier reconstructs both LN Mix conversions without changing
             CHECK(verified.stats.max_combo == replay.stats.max_combo);
             CHECK(verified.stats.raw_score == replay.stats.raw_score);
             CHECK(verified.stats.accuracy_percent() == replay.stats.accuracy_percent());
+            const std::filesystem::path saved_path = "ln_mix_saved_verifier_test.json";
+            REQUIRE(save_replay_json(saved_path.string(), replay).success());
+            const auto loaded = load_replay_json(saved_path.string());
+            REQUIRE(loaded.success());
+            CHECK(loaded.replay->mode.long_note_mix_version == version);
+            CHECK(tenriff::app::verify_replay_against_chart(*loaded.replay, source,
+                tenriff::app::ChartFormat::Bms, 120.0).claims_match);
+            std::filesystem::remove(saved_path);
             if (version == 1) {
                 replay.mode.long_note_mix_version = 2;
                 const auto wrong = tenriff::app::verify_replay_against_chart(replay, source,
                     tenriff::app::ChartFormat::Bms, 120.0);
                 CHECK_FALSE(wrong.claims_match);
             }
-            replay.mode.long_note_mix_version = 3;
+            replay.mode.long_note_mix_version = 4;
             CHECK_FALSE(tenriff::app::verify_replay_against_chart(replay, source,
                 tenriff::app::ChartFormat::Bms, 120.0).verified());
         }
     }
+}
+
+TEST_CASE("mine-safe LN Mix verifies saved BMS mine replay without promoting local records") {
+    const std::filesystem::path chart_path = "mine_safe_ln_mix_verifier.bms";
+    const std::filesystem::path replay_path = "mine_safe_ln_mix_verifier.json";
+    std::string bms = "#PLAYER 1\n#TITLE Mine-safe LN Mix\n#BPM 120\n#RANK 2\n";
+    for (int measure = 1; measure <= 12; ++measure) {
+        const auto index = (measure < 10 ? "00" : "0") + std::to_string(measure);
+        bms += "#" + index + "11:01\n";
+        if (measure % 2 == 0) bms += "#" + index + "D1:0001\n";
+    }
+    write_file(chart_path, bms);
+    tenriff::app::ChartLoader loader;
+    const auto loaded = loader.load(chart_path.u8string(), 48000, 1.0);
+    REQUIRE(loaded.success());
+    REQUIRE(loaded.chart.mines.size() == 6);
+    const auto hash = tenriff::app::hash_chart_file(chart_path);
+    REQUIRE(hash.valid());
+    tenriff::config::ModeConfig mode;
+    mode.mods = {"ln_mix_50"};
+    mode.random_seed = 24680;
+    for (int version : {1, 2, 3}) {
+        const auto managed = tenriff::app::manage_modes(loaded.chart, loaded.format, mode,
+            tenriff::config::JudgeConfig{}, 1.0, loaded.base_bpm, 48000,
+            static_cast<tenriff::app::LongNoteMixVersion>(version));
+        auto chart = managed.chart;
+        tenriff::gameplay::offset_gameplay_chart_samples(chart, 144000);
+        ReplayFile replay;
+        replay.chart_path = chart_path.u8string();
+        replay.chart_format = "bms";
+        replay.chart_sha256 = hash.sha256;
+        replay.bms_rank = loaded.chart.bms_rank;
+        replay.ruleset_id = std::string(tenriff::app::kCanonicalReplayRulesetId);
+        replay.sample_rate = 48000;
+        replay.mods = mode.mods;
+        replay.mode.random_seed = 24680;
+        replay.mode.gauge = "normal";
+        replay.mode.long_note_mix_version = version;
+        replay.mode.bms_timing_version = 2;
+        replay.mode.bms_control_flow_version = 2;
+        replay.mode.bms_random_seed = 0;
+        tenriff::gameplay::GameplayConfig config;
+        config.sample_rate = 48000;
+        config.gauge_shift_enabled = true;
+        config.judge = tenriff::app::replay_judge_config_for_playback(replay, {}, replay.bms_rank);
+        tenriff::gameplay::GameplayEngine engine(chart, config);
+        for (const auto& note : chart.notes) {
+            engine.advance(note.start_sample - 1);
+            (void)engine.handle_input(note.lane, InputState::Pressed, note.start_sample);
+            const auto release = note.end_sample.value_or(note.start_sample) + 1;
+            engine.advance(release - 1);
+            (void)engine.handle_input(note.lane, InputState::Released, release);
+        }
+        engine.advance(chart.duration_samples + 240000);
+        replay.trace = engine.replay();
+        replay.stats = engine.stats();
+        replay.rate_multiplier = managed.rate_multiplier;
+        replay.score_multiplier = managed.final_multiplier;
+        replay.final_score = tenriff::gameplay::scale_native_score(replay.stats.raw_score, replay.score_multiplier);
+        REQUIRE(save_replay_json(replay_path.u8string(), replay).success());
+        const auto verified = tenriff::app::verify_replay_file(replay_path, chart_path);
+        CHECK(verified.verified());
+        CHECK(verified.claims_match);
+        CHECK(verified.official_eligible == (version == 1));
+    }
+    std::filesystem::remove(replay_path);
+    std::filesystem::remove(chart_path);
 }
 
 TEST_CASE("file replay verification binds the replay and exact chart SHA-256") {

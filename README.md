@@ -1,3 +1,5 @@
+> **2026-10-24 · 1.9.9.1 릴리스 범위:** 21:9 화면·롱노트 해제 표시와 마지막 꼬리 대기·같은 레인 지뢰 앞뒤 50ms를 비우는 LN Mix v3. [변경과 호환성](docs/release-1.9.9.1.ko.md) · [검증 게이트](docs/release-1.9.9.1-gate.md). 일반 고정 기준선은 **1.9.6**입니다. v1/v2 리플레이는 유지하며 v3는 1.9.9.1 검증기가 필요합니다. 아래 이전 안내는 당시 이력입니다. 공개 여부와 다운로드는 [1.9.9.1 릴리스](https://github.com/10kseason/TenRiff/releases/tag/1.9.9.1)가 기준입니다.
+
 > **2026-10-22 · 1.9.9 · NK2 E / 16K 제출:** [1.9.9](docs/release-1.9.9.ko.md) · [Verification](docs/release-1.9.9-gate.md). Baseline **1.9.6**. 4/5/6/7/8/9/10/12/14/16K. Earlier dated entries below are historical.
 
 > **2026-10-21 · 1.9.8.5 릴리스 범위:** 사용자 지정 1.9.8에 BGA 재생·검정 투명색, 선곡 순환·라이브러리·클리어 표시, 소수점 타이밍, 스크래치 없는 7K와 보조키 소유권 수정을 더합니다. 일반 고정 기준선은 **1.9.6**입니다. 아래 이전 안내는 당시 이력이며, 현재 범위와 호환 경계는 [1.9.8.5](docs/release-1.9.8.5.ko.md), 실제 검증은 [릴리스 게이트](docs/release-1.9.8.5-gate.md)를 따릅니다. 공개 여부·다운로드는 [릴리스 페이지](https://github.com/10kseason/TenRiff/releases/tag/1.9.8.5)가 기준입니다.

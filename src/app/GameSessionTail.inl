@@ -613,7 +613,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         config_.mode.key_conversion_nk2_preset = "native";
     }
     key_conversion_version_ = replay_playback_enabled_ ? replay_source_.mode.key_conversion_version : 3;
-    long_note_mix_version_ = replay_playback_enabled_ ? replay_source_.mode.long_note_mix_version : 2;
+    long_note_mix_version_ = replay_playback_enabled_ ? replay_source_.mode.long_note_mix_version : 3;
     ModeManagerResult mode_result =
         manage_modes(chart_result.chart,
                      chart_result.format,
@@ -789,6 +789,13 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         if (ghost_compatible &&
             !equivalent_mode_mod_tokens(ghost_replay_source_.mods, active_mods_)) {
             ghost_compatible = false;
+        }
+        if (ghost_compatible && mode_mod_long_note_mix(active_mods_) &&
+            ghost_replay_source_.mode.long_note_mix_version != long_note_mix_version_) {
+            // Both fields share one chart. Historical replays remain playable
+            // alone, but a ghost must not undo the new run's mine avoidance.
+            ghost_compatible = false;
+            std::cerr << "[warn] Ghost disabled: LN Mix conversion differs from this play." << std::endl;
         }
         if (ghost_compatible && chart_result.has_bpm_stop_timing_difference &&
             ghost_replay_source_.mode.bms_timing_version != bms_timing_version_) {
@@ -1513,7 +1520,15 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
     }
 
     const auto append_player_chart_note = [&](const gameplay::NoteEvent& note) {
-        if (note.note_id < hidden_hit_note_ids_.size() && hidden_hit_note_ids_[note.note_id] != 0) {
+        const bool hit = note.note_id < hidden_hit_note_ids_.size() && hidden_hit_note_ids_[note.note_id] != 0;
+        // A judged release removes the engine hold immediately. Keep only its
+        // visual body until the original tail passes, without restoring a head,
+        // pending judgement, or the active-hold highlight.
+        const bool released = hit && note.end_sample.has_value() &&
+            std::none_of(active_holds_buffer_.begin(), active_holds_buffer_.end(), [&](const auto& hold) {
+                return hold.lane == note.lane && hold.end_sample == *note.end_sample;
+            });
+        if (hit && !released) {
             return;
         }
         if (note.lane <= 0 || note.lane > snapshot.lane_count) {
@@ -1529,6 +1544,7 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         hud_note.tail_visual_position = chart_.visual_position_at(hud_note.tail_sample);
         hud_note.head_visible = true;
         hud_note.pending = engine_->is_note_pending(note.lane, note.note_id);
+        hud_note.released = released;
         snapshot.notes[snapshot.note_count++] = hud_note;
     };
     for (const auto index : hud_past_hold_indices_) {
@@ -1594,7 +1610,12 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         }
 
         const auto append_ghost_chart_note = [&](const gameplay::NoteEvent& note) {
-            if (note.note_id < ghost_hidden_hit_note_ids_.size() && ghost_hidden_hit_note_ids_[note.note_id] != 0) {
+            const bool hit = note.note_id < ghost_hidden_hit_note_ids_.size() && ghost_hidden_hit_note_ids_[note.note_id] != 0;
+            const bool released = hit && note.end_sample.has_value() &&
+                std::none_of(ghost_active_holds_buffer_.begin(), ghost_active_holds_buffer_.end(), [&](const auto& hold) {
+                    return hold.lane == note.lane && hold.end_sample == *note.end_sample;
+                });
+            if (hit && !released) {
                 return;
             }
             if (note.lane <= 0 || note.lane > snapshot.lane_count) {
@@ -1610,6 +1631,7 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             hud_note.tail_visual_position = chart_.visual_position_at(hud_note.tail_sample);
             hud_note.head_visible = true;
             hud_note.pending = ghost_engine_->is_note_pending(note.lane, note.note_id);
+            hud_note.released = released;
             snapshot.ghost_notes[snapshot.ghost_note_count++] = hud_note;
         };
         for (const auto index : ghost_hud_past_hold_indices_) {
@@ -2876,8 +2898,23 @@ void GameSession::audio_callback(float* output,
                     if (!result_transition_pending_) {
                         const int64_t tail_samples =
                             ms_to_samples(std::max(0.0, config_.ui.result_tail_ms), sample_rate_);
+                        // Releasing the final LN completes judgement before its
+                        // original tail. Let that display-only body leave the
+                        // field before automatic results, even with outro audio
+                        // disabled. Explicit skip/abort/game-over paths stay above.
+                        int64_t visible_hold_end = 0;
+                        for (const auto& note : chart_.notes) {
+                            if (note.end_sample && note.note_id < hidden_hit_note_ids_.size() &&
+                                hidden_hit_note_ids_[note.note_id] != 0) {
+                                visible_hold_end = std::max(visible_hold_end, *note.end_sample);
+                            }
+                        }
+                        if (visible_hold_end > 0) {
+                            visible_hold_end += ms_to_samples(
+                                std::max(0.0, -config_.visual_offset_ms), sample_rate_);
+                        }
                         result_transition_sample_ = gameplay_result_transition_sample(
-                            buffer_end_samples, 0, tail_samples);
+                            buffer_end_samples, visible_hold_end, tail_samples);
                         result_transition_pending_ = true;
                     }
                 } else {

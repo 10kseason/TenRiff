@@ -2,7 +2,7 @@
             hit_regions_.clear();
             const auto saved_footer_color = d2d_->footer_brush->GetColor();
             d2d_->footer_brush->SetColor(native_palette("palette.05090f", D2D1::ColorF(0x05090F, 0.82f)));
-            ctx->FillRectangle(native_rect("difficulty_table_editor.rect.001", D2D1::RectF(0, 0, kBaseWidth, kBaseHeight)), d2d_->footer_brush.Get());
+            ctx->FillRectangle(native_background_rect("difficulty_table_editor.rect.001"), d2d_->footer_brush.Get());
             d2d_->footer_brush->SetColor(saved_footer_color);
             const D2D1_RECT_F editor = native_rect("difficulty_table_editor.rect.002", D2D1::RectF(470, 180, 1450, 850));
             draw_glass_panel(editor, 18, 1.0f, 0, false, 0);

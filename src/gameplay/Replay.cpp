@@ -351,7 +351,7 @@ ExportResult save_replay_json(const std::string& path, const ReplayFile& replay,
         result.error = "Unsupported key conversion version.";
         return result;
     }
-    if (replay.mode.long_note_mix_version != 1 && replay.mode.long_note_mix_version != 2) {
+    if (replay.mode.long_note_mix_version != 1 && replay.mode.long_note_mix_version != 2 && replay.mode.long_note_mix_version != 3) {
         ExportResult result;
         result.error = "Unsupported LN Mix conversion version.";
         return result;
@@ -407,7 +407,7 @@ ExportResult save_result_json(const std::string& path, const ResultFile& result_
         result.error = "Unsupported key conversion version.";
         return result;
     }
-    if (result_file.long_note_mix_version != 1 && result_file.long_note_mix_version != 2) {
+    if (result_file.long_note_mix_version != 1 && result_file.long_note_mix_version != 2 && result_file.long_note_mix_version != 3) {
         ExportResult result;
         result.error = "Unsupported LN Mix conversion version.";
         return result;
@@ -567,7 +567,7 @@ ReplayLoadResult load_replay_json(const std::string& path) {
             replay.mode.key_conversion_version = static_cast<int>(version->as_number());
         }
         if (const auto* version = find_json_value(*mode, "long_note_mix_version")) {
-            if (!version->is_number() || (version->as_number() != 1.0 && version->as_number() != 2.0)) {
+            if (!version->is_number() || (version->as_number() != 1.0 && version->as_number() != 2.0 && version->as_number() != 3.0)) {
                 result.error = "Unsupported LN Mix conversion version.";
                 return result;
             }
@@ -765,7 +765,7 @@ ReplayValidationResult validate_replay_evidence(const ReplayFile& replay) {
     if (replay.mode.key_conversion_version != 1 && replay.mode.key_conversion_version != 2 && replay.mode.key_conversion_version != 3)
         return {"Unsupported key conversion version."};
     ReplayValidationResult result;
-    if (replay.mode.long_note_mix_version != 1 && replay.mode.long_note_mix_version != 2) {
+    if (replay.mode.long_note_mix_version != 1 && replay.mode.long_note_mix_version != 2 && replay.mode.long_note_mix_version != 3) {
         result.error = "Unsupported LN Mix conversion version.";
         return result;
     }

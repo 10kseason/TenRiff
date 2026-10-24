@@ -223,7 +223,7 @@
 
         ID2D1Bitmap* result_art =
             find_song_card_preview_bitmap(data.result.background_path);
-        const D2D1_RECT_F full_result_rect = native_rect("result_single.rect.001", D2D1::RectF(0.0f, 0.0f, kBaseWidth, kBaseHeight));
+        const D2D1_RECT_F full_result_rect = native_background_rect("result_single.rect.001");
         if (result_art && presentation.background > 0.0f) {
             const D2D1_RECT_F source =
                 centered_bitmap_source_rect(result_art->GetSize(), full_result_rect);

@@ -5,7 +5,7 @@
         if (d2d_->panel_brush) {
             const float saved_opacity = d2d_->panel_brush->GetOpacity();
             d2d_->panel_brush->SetOpacity(0.88f);
-            ctx->FillRectangle(native_rect("help.rect.001", D2D1::RectF(0.0f, 0.0f, kBaseWidth, kBaseHeight)), d2d_->panel_brush.Get());
+            ctx->FillRectangle(native_background_rect("help.rect.001"), d2d_->panel_brush.Get());
             d2d_->panel_brush->SetOpacity(saved_opacity);
         }
 

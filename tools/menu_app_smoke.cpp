@@ -1167,7 +1167,21 @@ struct MenuAppVisualTestAccess {
         app.current_song_record_indices_ = {0};
         report.check("records.auto_ghost_skips_legacy_mix", app.best_replay_path_for_selected_song().empty());
         app.current_song_record_indices_ = {0, 1};
-        report.check("records.auto_ghost_uses_current_mix", app.best_replay_path_for_selected_song() == "fixture-v2-replay");
+        report.check("records.auto_ghost_skips_pre_mine_safe_mix", app.best_replay_path_for_selected_song().empty());
+        record.long_note_mix_version = 3;
+        verified.final_score = 250;
+        app.append_chart_result_record(record, "fixture-v3-result", "fixture-v3-replay", verified);
+        best_unchanged = app.chart_best_results_.size() == legacy_best.size();
+        for (const auto& [key, best] : legacy_best) {
+            const auto found = app.chart_best_results_.find(key);
+            best_unchanged = best_unchanged && found != app.chart_best_results_.end() &&
+                found->second.best_score == best.best_score;
+        }
+        report.check("records.mine_safe_ln_history_without_legacy_best_overwrite",
+            best_unchanged && app.local_play_records_.size() == 3 &&
+            app.local_play_records_.back().long_note_mix_version == 3);
+        app.current_song_record_indices_ = {0, 1, 2};
+        report.check("records.auto_ghost_uses_current_mix", app.best_replay_path_for_selected_song() == "fixture-v3-replay");
         record.mods.clear();
         record.bms_timing_version = 2;
         verified.final_score = 50;
@@ -1183,7 +1197,7 @@ struct MenuAppVisualTestAccess {
             corrected_best &= best.bms_timing_version == 2 && best.best_score == 50;
         report.check("records.legacy_timing_cannot_replace_corrected_best", corrected_best);
         app.config_.mode.mods.clear();
-        app.current_song_record_indices_ = {3, 2}; // Higher legacy score first.
+        app.current_song_record_indices_ = {4, 3}; // Higher legacy score first.
         report.check("records.ghost_prefers_corrected_timing", app.best_replay_path_for_selected_song() == "timing-v2-replay");
         SongEntry alias_entry;
         alias_entry.path = "alias-fixture/chart.bms";

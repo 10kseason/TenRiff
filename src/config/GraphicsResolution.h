@@ -91,11 +91,11 @@ inline std::string normalize_graphics_resolution(std::string_view value) {
 
 inline std::vector<std::string> graphics_resolution_choices(
     const std::vector<std::pair<int, int>>& display_modes = {}) {
-    static constexpr std::array<std::string_view, 22> common{
+    static constexpr std::array<std::string_view, 23> common{
         "640x480", "800x600", "1024x768", "1152x864", "720p", "1280x800",
         "1280x1024", "1360x768", "1366x768", "1440x900", "1600x900",
         "1600x1200", "1680x1050", "1080p", "1920x1200", "2560x1080",
-        "qhd", "2560x1600", "3440x1440", "3840x1080", "3840x1600", "3840x2160"};
+        "qhd", "2560x1600", "3440x1440", "3840x1080", "3840x1600", "3840x2160", "5120x2160"};
     std::vector<std::string> choices;
     for (const auto value : common) choices.emplace_back(value);
     for (const auto [width, height] : display_modes) {

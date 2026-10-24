@@ -436,7 +436,7 @@ TEST_CASE("Sites payload preserves active judge modifiers without relabeling nor
     }
 }
 
-TEST_CASE("Sites keeps musical LN Mix v2 out of unversioned legacy boards") {
+TEST_CASE("Sites keeps musical LN Mix versions out of unversioned legacy boards") {
     auto replay = score_fixture();
     replay.mods = {"ln_mix_30"};
     std::string payload, error;
@@ -446,6 +446,8 @@ TEST_CASE("Sites keeps musical LN Mix v2 out of unversioned legacy boards") {
         CHECK_FALSE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
         CHECK(payload.empty());
         CHECK(error.find("separate leaderboard condition") != std::string::npos);
+        CHECK(error.find("LN Mix v" + std::to_string(version)) != std::string::npos);
+        CHECK(app::sites_upload_status_text(error).english == "Long LN Mix uses local records only.");
     }
     replay.mods.clear();
     replay.mode.long_note_mix_version = 2;

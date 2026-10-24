@@ -122,6 +122,14 @@ def catalog():
             expression = ' '.join(source[match.end():end-1].split())
             line = source[:match.start()].count('\n') + 1
             data['references']['rects.' + match[1]] = {'file': path.name, 'line': line, 'expression': expression}
+        # Full-canvas slots now expand at render time on ultrawide displays.
+        # Keep their authored skin IDs editable instead of dropping them when
+        # the renderer uses its dedicated one-argument background helper.
+        for match in re.finditer(r'native_background_rect\("([^"\n]+)"\)', source):
+            data['rects'][match[1]] = [0, 0, 0, 0]
+            data['references']['rects.' + match[1]] = {
+                'file': path.name, 'line': source[:match.start()].count('\n') + 1,
+                'expression': '0, 0, kBaseWidth, kBaseHeight'}
         for match in re.finditer(r'native_metric\("([^"\n]+)",\s*(-?\d+(?:\.\d+)?)[f]?\)', source):
             # Declared before the modern/legacy split, used only by the old prism.
             if match[1] == 'result_single.prism_bottom': continue

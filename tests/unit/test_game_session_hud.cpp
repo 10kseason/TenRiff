@@ -14,6 +14,7 @@
 #include "gameplay/GameplayEngine.h"
 #include "gameplay/GameplayChart.h"
 #include "render/GameplayFeedbackText.h"
+#include "render/GameplayMotion.h"
 
 namespace {
 
@@ -100,6 +101,33 @@ TEST_CASE("display offset expands HUD lookahead so notes do not spawn late") {
 
     CHECK(window.past_samples == 204);
     CHECK(window.lookahead_samples == 2344);
+}
+
+TEST_CASE("released hold body remains until its tail without restoring its head or active anchor") {
+    using namespace tenriff::render;
+    for (const int64_t sample : {1200, 1500, 1999, 2000}) {
+        CHECK(should_render_gameplay_note(1000, 2000, true, true, false, sample, sample, 32, true));
+        CHECK_FALSE(should_render_gameplay_note_head(1000, true, sample, true));
+        CHECK(gameplay_note_render_sample(1000, true, true, sample) == 1000);
+    }
+    CHECK_FALSE(should_render_gameplay_note(1000, 2000, true, true, false, 2001, 2001, 32, true));
+    // A negative visual offset must not resurrect a head already scored.
+    CHECK_FALSE(should_render_gameplay_note_head(1000, true, 900, true));
+    // Unhit misses retain the existing render policy.
+    CHECK_FALSE(should_render_gameplay_note(1000, 2000, true, true, false, 1500, 1500, 32));
+}
+
+TEST_CASE("released player and ghost holds invalidate the HUD motion cache") {
+    tenriff::app::GameplayHudRevisionInput previous;
+    previous.note_count = previous.ghost_note_count = 1;
+    previous.ghost_visible = true;
+    for (const bool ghost : {false, true}) {
+        auto next = previous;
+        (ghost ? next.ghost_notes[0] : next.notes[0]).released = true;
+        const auto diff = tenriff::app::diff_gameplay_hud_revisions(previous, next);
+        CHECK(diff.motion_changed);
+        CHECK_FALSE(diff.text_changed);
+    }
 }
 
 TEST_CASE("negative display offset keeps past notes alive longer in the HUD") {

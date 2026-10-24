@@ -1,3 +1,5 @@
+> **2026-10-24 · 1.9.9.1 リリース範囲:** 21:9画面・LN途中解除表示と最後の末尾待機・同レーン地雷の前後50msを空けるLN Mix v3。[変更と互換性](docs/release-1.9.9.1.ja.md) · [検証ゲート](docs/release-1.9.9.1-gate.md)。一般固定基準は **1.9.6**。旧v1/v2リプレイを維持し、v3には1.9.9.1検証器が必要。以下の旧案内は当時の履歴であり、公開状態とダウンロードは[1.9.9.1リリース](https://github.com/10kseason/TenRiff/releases/tag/1.9.9.1)を基準とする。
+
 > **2026-10-22 · 1.9.9 · NK2 E / 16K送信:** [1.9.9](docs/release-1.9.9.ja.md) · [Verification](docs/release-1.9.9-gate.md). Baseline **1.9.6**. 4/5/6/7/8/9/10/12/14/16K. Earlier dated entries below are historical.
 
 > **2026-10-21 · 1.9.8.5 リリース範囲:** ユーザー指定の1.9.8にBGA再生・黒の透過、選曲循環・ライブラリ・クリア表示、小数のタイミング、スクラッチなし7Kと第2キー所有権の修正を追加します。一般固定基準は **1.9.6** のままです。以下の旧案内は当時の履歴です。動作と互換性は[1.9.8.5](docs/release-1.9.8.5.ja.md)、検証は[リリースゲート](docs/release-1.9.8.5-gate.md)、公開状態とダウンロードは[リリースページ](https://github.com/10kseason/TenRiff/releases/tag/1.9.8.5)を参照してください。

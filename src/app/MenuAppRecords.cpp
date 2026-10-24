@@ -724,7 +724,7 @@ std::string MenuApp::best_replay_path_for_selected_song() const {
         if (!record.replay_path.empty() &&
             equivalent_mode_mod_tokens(record.mods, config_.mode.mods) &&
             (!mode_mod_long_note_mix(record.mods) ||
-             record.long_note_mix_version == static_cast<int>(LongNoteMixVersion::Musical)) &&
+             record.long_note_mix_version == static_cast<int>(LongNoteMixVersion::MineSafeMusical)) &&
             menu_records::default_ghost_replay_allowed(record.autoplay_enabled,
                                                        record.practice_no_fail_enabled,
                                                        record.clear_status)) {

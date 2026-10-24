@@ -149,16 +149,10 @@ void MenuWindow::apply_pending_config() {
 }
 
 void MenuWindow::update_layout() {
-    const float width = static_cast<float>(width_);
-    const float height = static_cast<float>(height_);
-    const float scale_x = width / kBaseWidth;
-    const float scale_y = height / kBaseHeight;
-    scale_ = std::min(scale_x, scale_y);
-    if (scale_ <= 0.0f) {
-        scale_ = 1.0f;
-    }
-    offset_x_ = (width - kBaseWidth * scale_) * 0.5f;
-    offset_y_ = (height - kBaseHeight * scale_) * 0.5f;
+    const auto viewport = menu_viewport(static_cast<int>(width_), static_cast<int>(height_));
+    scale_ = viewport.scale;
+    offset_x_ = viewport.offset_x;
+    offset_y_ = viewport.offset_y;
 }
 
 void MenuWindow::update_brushes() {

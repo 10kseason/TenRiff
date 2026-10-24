@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cmath>
 #include <limits>
+#include <iterator>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -346,6 +347,19 @@ void apply_mixed_long_notes(gameplay::GameplayChart& chart,
     const int effective_sample_rate = sample_rate > 0 ? sample_rate : kFallbackSampleRate;
     const int64_t same_lane_clearance_samples =
         std::max<int64_t>(1, static_cast<int64_t>(std::llround(effective_sample_rate * 0.05)));
+    // Only the new generation version uses mines as lane occupancy. Rebuilding
+    // historical v1/v2 replays must retain their original selection and tails.
+    std::vector<std::vector<int64_t>> lane_mines(static_cast<std::size_t>(lane_count) + 1u);
+    if (version == LongNoteMixVersion::MineSafeMusical) {
+        for (const auto& mine : chart.mines) {
+            if (mine.lane > 0 && mine.lane <= lane_count) {
+                lane_mines[static_cast<std::size_t>(mine.lane)].push_back(mine.sample);
+            }
+        }
+        for (auto& samples : lane_mines) {
+            std::sort(samples.begin(), samples.end());
+        }
+    }
     const int64_t eighth_samples = long_note_subdivision_samples(sample_rate, base_bpm, 8);
     const int64_t sixteenth_samples = long_note_subdivision_samples(sample_rate, base_bpm, 16);
     const int64_t twenty_fourth_samples = long_note_subdivision_samples(sample_rate, base_bpm, 24);
@@ -396,6 +410,23 @@ void apply_mixed_long_notes(gameplay::GameplayChart& chart,
                 // holds and the next note while preserving taps on other lanes.
                 end_sample =
                     chart.notes[indices[position + 1]].start_sample - same_lane_clearance_samples;
+            }
+            const auto& mines = lane_mines[static_cast<std::size_t>(lane)];
+            if (!mines.empty()) {
+                const auto next_mine = std::lower_bound(mines.begin(), mines.end(), note.start_sample);
+                const auto clearance_before = [&](int64_t sample) {
+                    return std::max(sample, (std::numeric_limits<int64_t>::min)() +
+                                               same_lane_clearance_samples) - same_lane_clearance_samples;
+                };
+                // Leave room both to press after a mine and to release before
+                // the next one. Never move or delete authored notes/mines.
+                if (next_mine != mines.begin() &&
+                    *std::prev(next_mine) > clearance_before(note.start_sample)) {
+                    continue;
+                }
+                if (next_mine != mines.end()) {
+                    end_sample = std::min(end_sample, clearance_before(*next_mine));
+                }
             }
             // V1 requires its longest (half-beat) duration. V2 keeps the same
             // half-beat eligibility at the effective rate; longer tails are
@@ -453,7 +484,7 @@ void apply_mixed_long_notes(gameplay::GameplayChart& chart,
                                    ? twenty_fourth_samples
                                    : thirty_second_samples;
         }
-        if (version == LongNoteMixVersion::Musical) {
+        if (version != LongNoteMixVersion::LegacyShort) {
             std::size_t length_index = 2; // Medium 20%: one beat.
             if (i >= duration_counts.sixteenth &&
                 i < duration_counts.sixteenth + duration_counts.eighth) {

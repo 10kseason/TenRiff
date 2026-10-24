@@ -45,17 +45,24 @@ TEST_CASE("graphics resolution choices include 900p monitor modes and preserve c
     GraphicsSettingsController controller;
     controller.set_display_resolutions({{1600, 900}, {1600, 900}, {1536, 864}, {0, 0}, {7680, 4320}});
     bool found_900p = false, found_monitor_mode = false, found_8k = false;
+    bool found_uw1080 = false, found_uw1440 = false, found_uw2160 = false;
     for (int i = 0; i < 40; ++i) {
         const auto effects = controller.handle(MenuAction::adjust(1), runtime, GraphicsSettingId::Resolution);
         CHECK(effects.apply_runtime_graphics);
         found_900p |= runtime.graphics.resolution == "1600x900";
         found_monitor_mode |= runtime.graphics.resolution == "1536x864";
         found_8k |= runtime.graphics.resolution == "7680x4320";
+        found_uw1080 |= runtime.graphics.resolution == "2560x1080";
+        found_uw1440 |= runtime.graphics.resolution == "3440x1440";
+        found_uw2160 |= runtime.graphics.resolution == "5120x2160";
         if (runtime.graphics.resolution == "native") break;
     }
     CHECK(found_900p);
     CHECK(found_monitor_mode);
     CHECK(found_8k);
+    CHECK(found_uw1080);
+    CHECK(found_uw1440);
+    CHECK(found_uw2160);
     runtime.graphics.resolution = "1500x1000";
     static_cast<void>(controller.handle(MenuAction::adjust(1), runtime, GraphicsSettingId::Resolution));
     static_cast<void>(controller.handle(MenuAction::adjust(-1), runtime, GraphicsSettingId::Resolution));
@@ -79,7 +86,7 @@ TEST_CASE("graphics live rows cycle and request immediate runtime apply") {
 
     effects = controller.handle(
         MenuAction::adjust(-1), runtime, GraphicsSettingId::Resolution);
-    CHECK(runtime.graphics.resolution == "3840x2160");
+    CHECK(runtime.graphics.resolution == "5120x2160");
     CHECK(effects.apply_runtime_graphics);
 
     runtime.graphics.refresh_hz = -1;

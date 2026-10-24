@@ -1063,6 +1063,8 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
             state.notes[i].pending,
         };
         input.notes[i].mine = state.notes[i].mine;
+        input.notes[i].pending = state.notes[i].pending;
+        input.notes[i].released = state.notes[i].released;
         input.notes[i].visual_position = state.notes[i].visual_position;
         input.notes[i].tail_visual_position = state.notes[i].tail_visual_position;
     }
@@ -1107,6 +1109,8 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
             state.ghost_notes[i].pending,
         };
         input.ghost_notes[i].mine = state.ghost_notes[i].mine;
+        input.ghost_notes[i].pending = state.ghost_notes[i].pending;
+        input.ghost_notes[i].released = state.ghost_notes[i].released;
         input.ghost_notes[i].visual_position = state.ghost_notes[i].visual_position;
         input.ghost_notes[i].tail_visual_position = state.ghost_notes[i].tail_visual_position;
     }

@@ -1838,11 +1838,11 @@
                     note.pending,
                     data.gameplay.current_sample,
                     display_sample,
-                    hold_handoff_grace_samples)) {
+                    hold_handoff_grace_samples, note.released)) {
                 continue;
             }
             const bool render_head =
-                should_render_gameplay_note_head(note.start_sample, note.head_visible, display_sample);
+                should_render_gameplay_note_head(note.start_sample, note.head_visible, display_sample, note.released);
             const int lane = std::clamp(note.lane, 1, lane_count);
             if (lane_hidden(static_cast<std::size_t>(lane - 1))) continue;
             const std::size_t lane_index = static_cast<std::size_t>(lane - 1);
@@ -2514,11 +2514,11 @@
                         note.pending,
                         data.gameplay.current_sample,
                         display_sample,
-                        hold_handoff_grace_samples)) {
+                        hold_handoff_grace_samples, note.released)) {
                     continue;
                 }
                 const bool render_head =
-                    should_render_gameplay_note_head(note.start_sample, note.head_visible, display_sample);
+                    should_render_gameplay_note_head(note.start_sample, note.head_visible, display_sample, note.released);
                 const int lane = std::clamp(note.lane, 1, lane_count);
                 if (lane_hidden(static_cast<std::size_t>(lane - 1))) continue;
                 const std::size_t lane_index = static_cast<std::size_t>(lane - 1);
@@ -2910,7 +2910,8 @@
         }
         if (data.gameplay.paused && !data.gameplay.countdown_active && d2d_->panel_brush && d2d_->card_brush &&
             d2d_->text_brush && scene_header_format && scene_body_format) {
-            const D2D1_RECT_F screen_overlay = D2D1::RectF(0.0f, 0.0f, kBaseWidth, kBaseHeight);
+            const D2D1_RECT_F screen_overlay = data.kind == MenuScreenKind::GameplayHud
+                ? full_screen_rect : D2D1::RectF(0.0f, 0.0f, kBaseWidth, kBaseHeight);
             // Tall enough to seat the three menu rows and the live tuning readout.
             const D2D1_RECT_F pause_panel = D2D1::RectF(650.0f, 210.0f, 1270.0f, 960.0f);
             const float saved_panel_opacity = d2d_->panel_brush->GetOpacity();
