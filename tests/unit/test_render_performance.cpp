@@ -994,17 +994,17 @@ TEST_CASE("imported pressed art is a transient hit pulse instead of an LN hold s
     CHECK(tenriff::render::should_use_imported_pressed_key(1.5f));
 }
 
-TEST_CASE("EX-HARD gauge uses its own near-black gray palette") {
-    CHECK(tenriff::render::gameplay_gauge_color("EX-HARD") == 0x292C31u);
-    CHECK(tenriff::render::gameplay_gauge_color("HARD") == 0xFF4D6Du);
-    CHECK(tenriff::render::gameplay_gauge_color("EASY") == 0x89D185u);
-    CHECK(tenriff::render::gameplay_gauge_color("NORMAL") == 0xFFB703u);
+TEST_CASE("gameplay gauge fallback colors match the clear card palette") {
+    CHECK(tenriff::render::gameplay_gauge_color("EX-HARD") == 0xFF44EFu);
+    CHECK(tenriff::render::gameplay_gauge_color("HARD") == 0xFF3838u);
+    CHECK(tenriff::render::gameplay_gauge_color("EASY") == 0x00ED57u);
+    CHECK(tenriff::render::gameplay_gauge_color("NORMAL") == 0xFFF000u);
     CHECK(tenriff::render::gameplay_gauge_color("EX-HARD") !=
           tenriff::render::gameplay_gauge_color("HARD"));
-    CHECK(tenriff::render::song_select_gauge_text_color("ex_hard") == 0xFF4D6Du);
-    CHECK(tenriff::render::song_select_gauge_text_color("hard") == 0xFF9F43u);
-    CHECK(tenriff::render::song_select_gauge_text_color("normal") == 0xFFE45Eu);
-    CHECK(tenriff::render::song_select_gauge_text_color("easy") == 0x5EE59Au);
+    CHECK(tenriff::render::song_select_gauge_text_color("ex_hard") == 0xFF44EFu);
+    CHECK(tenriff::render::song_select_gauge_text_color("hard") == 0xFF3838u);
+    CHECK(tenriff::render::song_select_gauge_text_color("normal") == 0xFFF000u);
+    CHECK(tenriff::render::song_select_gauge_text_color("easy") == 0x00ED57u);
 }
 
 TEST_CASE("lobby clear lamps remove Gauge Shift copy while preserving gauge and assist identity") {
@@ -1017,6 +1017,9 @@ TEST_CASE("lobby clear lamps remove Gauge Shift copy while preserving gauge and 
     REQUIRE(normal.color.has_value());
     CHECK(*normal.color == song_select_gauge_text_color("normal"));
     CHECK(normal.tint_card);
+    CHECK(normal.badge_label == "NM CLEAR");
+    CHECK(normal.badge_rgb == 0xFFF000);
+    CHECK_FALSE(normal.rainbow_badge);
     for (const auto& fixture : {
              std::pair{"GAUGE SHIFT EX CLEAR", "ex_hard"},
              std::pair{"EX-HARD CLEAR", "ex_hard"},
@@ -1030,6 +1033,12 @@ TEST_CASE("lobby clear lamps remove Gauge Shift copy while preserving gauge and 
         REQUIRE(lamp.color.has_value());
         CHECK(*lamp.color == song_select_gauge_text_color(fixture.second));
         CHECK(lamp.tint_card);
+        const std::string_view tier(fixture.second);
+        CHECK(lamp.badge_label == (tier == "ex_hard" ? "EX CLEAR" :
+            tier == "hard" ? "HD CLEAR" : tier == "easy" ? "EZ CLEAR" : "NM CLEAR"));
+        CHECK(lamp.badge_rgb == (tier == "ex_hard" ? 0xFF44EF :
+            tier == "hard" ? 0xFF3838 : tier == "easy" ? 0x00ED57 : 0xFFF000));
+        CHECK(lamp.rainbow_badge == (tier == "ex_hard"));
     }
     for (const auto* status : {"", "FAILED", "ABORTED", "AUTOPLAY", "NO PLAY", "--",
                                "ASSIST PRACTICE CLEAR", "UNKNOWN CLEAR"}) {
@@ -1037,10 +1046,13 @@ TEST_CASE("lobby clear lamps remove Gauge Shift copy while preserving gauge and 
         CHECK(lamp.label == status);
         CHECK_FALSE(lamp.color.has_value());
         CHECK_FALSE(lamp.tint_card);
+        CHECK(lamp.badge_label.empty());
+        CHECK_FALSE(lamp.rainbow_badge);
     }
     const auto assisted = song_select_lamp_presentation("ASSIST PRACTICE GAUGE SHIFT HARD CLEAR");
     CHECK(assisted.label == "ASSIST PRACTICE HARD CLEAR");
     CHECK_FALSE(assisted.tint_card);
+    CHECK(assisted.badge_label.empty());
 }
 
 TEST_CASE("native digital keys separate held depth from hit glitch") {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -33,6 +34,8 @@ struct Lr2CourseSaveResult {
 struct Lr2CourseMatch {
     std::vector<std::size_t> song_indices;
     std::vector<std::string> missing_md5;
+    // One slot per authored stage, including missing and repeated hashes.
+    std::vector<std::optional<std::size_t>> stage_song_indices;
 
     [[nodiscard]] bool playable() const {
         return !song_indices.empty() && missing_md5.empty();
@@ -46,5 +49,8 @@ struct Lr2CourseMatch {
                                                        const Lr2CourseDefinition& course);
 [[nodiscard]] Lr2CourseMatch match_lr2_course(const Lr2CourseDefinition& course,
                                               const std::vector<SongEntry>& songs);
+
+[[nodiscard]] std::vector<Lr2CourseMatch> match_lr2_courses(
+    const std::vector<Lr2CourseDefinition>& courses, const std::vector<SongEntry>& songs);
 
 }  // namespace tenriff::app

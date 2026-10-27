@@ -168,9 +168,9 @@
         }
         if (!lobby_logo_bitmap && d2d_->song_logo_format && d2d_->text_brush) {
             if (modern_library_screen) draw_native_asset(native_menu_assets::kMark,
-                D2D1::RectF(logo_slot.left, logo_slot.top + 6, logo_slot.left + 48, logo_slot.top + 64));
+                D2D1::RectF(logo_slot.left, logo_slot.top - 2, logo_slot.left + 64, logo_slot.top + 66));
             draw_native_wordmark(modern_library_screen ? d2d_->header_format.Get() : d2d_->song_logo_format.Get(),
-                native_rect("songselect.rect.005", D2D1::RectF(logo_slot.left + (modern_library_screen ? 64.0f : 2.0f),
+                native_rect("songselect.rect.005", D2D1::RectF(logo_slot.left + (modern_library_screen ? 82.0f : 2.0f),
                     logo_slot.top - 2, logo_slot.right - 4, logo_slot.bottom - 10)));
         }
         if (!lobby_logo_bitmap && d2d_->hud_format && d2d_->muted_brush) {
@@ -399,9 +399,37 @@
             std::max(1.0f, (card_bottom - card_top) / 7.0f));
         const float card_gap = std::min(native_metric("songselect.card_gap", 8.0f),
             std::max(0.0f, (card_bottom - card_top - card_height * 7.0f) / 6.0f));
+        // One device-owned gradient serves the frame, badge and compiled logo.
+        // It is static: EX stays readable even when menu motion is disabled.
+        auto clear_badge_brush = [&](const SongSelectLampPresentation& lamp,
+                                     const D2D1_RECT_F& rect) -> ID2D1Brush* {
+            if (lamp.rainbow_badge) {
+                if (!d2d_->song_clear_gradient) {
+                    D2D1_GRADIENT_STOP stops[7];
+                    for (std::size_t s = 0; s < 7; ++s)
+                        stops[s] = {kClearRainbowStops[s], D2D1::ColorF(kClearRainbowRgb[s])};
+                    Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> collection;
+                    if (SUCCEEDED(ctx->CreateGradientStopCollection(stops, 7, &collection))) {
+                        ctx->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(
+                            D2D1::Point2F(0, 0), D2D1::Point2F(1, 0)),
+                            collection.Get(), &d2d_->song_clear_gradient);
+                    }
+                }
+                if (d2d_->song_clear_gradient) {
+                    d2d_->song_clear_gradient->SetStartPoint(D2D1::Point2F(rect.left, rect.top));
+                    d2d_->song_clear_gradient->SetEndPoint(D2D1::Point2F(rect.right, rect.top));
+                    return d2d_->song_clear_gradient.Get();
+                }
+            }
+            return semantic_color(lamp.badge_rgb);
+        };
+        // EX's existing face, weight and size are shared by every clear badge.
+        // Only the paint varies; native font overrides remain effective.
+        auto* clear_badge_format = d2d_->stats_value_format.Get();
         for (std::size_t i = 0; i < data.song_select.songs.size(); ++i) {
             const auto& song = data.song_select.songs[i];
             const auto lamp = song_select_lamp_presentation(song.lamp);
+            const bool clear_card = !lamp.badge_label.empty();
             const float y0 = card_top + static_cast<float>(i) * (card_height + card_gap);
             const float entry_x = native_motion_screen ? -14.0f * (1.0f - native_menu_motion_.entrance(
                 static_cast<float>(i) * 0.025f)) : 0.0f;
@@ -410,21 +438,26 @@
                 break;
             }
             register_hit(card, MenuHitTargetKind::SongCard, song.song_index);
-            draw_glass_panel(card, 9.0f,
+            if (clear_card) {
+                ctx->FillRoundedRectangle(D2D1::RoundedRect(card, 10.0f, 10.0f),
+                                          semantic_color(0x030503, song.selected ? 0.98f : 0.92f));
+            } else {
+                draw_glass_panel(card, 9.0f,
                              song.selected ? 0.90f : 0.56f,
                              song.selected ? 0.60f : 0.06f,
                              song.selected, song.selected ? 3.0f : 1.0f);
-            if (modern_library_screen && song.selected && d2d_->button_selected_brush) {
+            }
+            if (!clear_card && modern_library_screen && song.selected && d2d_->button_selected_brush) {
                 ctx->FillRoundedRectangle(D2D1::RoundedRect(card, 9.0f, 9.0f),
                                           d2d_->button_selected_brush.Get());
             }
-            if (lamp.tint_card) {
+            if (!clear_card && lamp.tint_card) {
                 // A low-opacity wash keeps the existing selection frame and
                 // artwork readable while exposing the saved clear gauge.
                 ctx->FillRoundedRectangle(D2D1::RoundedRect(card, 9.0f, 9.0f),
                     semantic_color(*lamp.color, song.selected ? 0.085f : 0.055f));
             }
-            if (song.selected && d2d_->accent_brush) {
+            if (!clear_card && song.selected && d2d_->accent_brush) {
                 const float saved = d2d_->accent_brush->GetOpacity();
                 d2d_->accent_brush->SetOpacity(0.94f);
                 ctx->FillRoundedRectangle(
@@ -434,11 +467,12 @@
                     d2d_->accent_brush.Get());
                 d2d_->accent_brush->SetOpacity(saved);
             }
-            draw_native_focus(card, 9, 16 + i, song.song_index, song.selected);
+            if (!clear_card) draw_native_focus(card, 9, 16 + i, song.song_index, song.selected);
 
             const D2D1_RECT_F jacket =
                 native_rect("songselect.rect.025", D2D1::RectF(card.left + 10.0f, card.top + 9.0f,
-                            card.left + 80.0f, card.bottom - 9.0f));
+                            card.left + (modern_library_screen ? 134.0f : 80.0f),
+                            card.bottom - 9.0f));
             ID2D1Bitmap* jacket_bitmap = find_song_card_preview_bitmap(song.background_path);
             if (jacket_bitmap) {
                 const D2D1_RECT_F source =
@@ -493,17 +527,44 @@
                                    DWRITE_TEXT_ALIGNMENT_TRAILING,
                                    data.song_select.difficulty_table_active ? song.difficulty_prefix_key_count : 0);
             }
+            const auto lamp_rect = native_rect("songselect.rect.031", D2D1::RectF(
+                clear_card ? card.left + 6.0f : value_left,
+                card.top + (clear_card ? 4.0f : 52.0f),
+                clear_card ? std::min(card.left + 140.0f, text_left - 4.0f) : card.right - 12.0f,
+                clear_card ? std::min(card.top + 32.0f, card.bottom - 4.0f) : card.bottom - 7.0f));
             if (song.favorite && d2d_->hud_format && d2d_->accent_brush) {
                 draw_trailing_text(L"FAV", d2d_->hud_format.Get(),
                                    native_rect("songselect.rect.030", D2D1::RectF(value_left, card.top + 54.0f,
                                                card.right - 12.0f, card.bottom - 8.0f)),
                                    d2d_->accent_brush.Get());
-            } else if (!lamp.label.empty() && d2d_->stats_value_format && d2d_->muted_brush) {
+            } else if (!clear_card && !lamp.label.empty() && d2d_->stats_value_format && d2d_->muted_brush) {
                 draw_trailing_text(to_wide(lamp.label), d2d_->stats_value_format.Get(),
-                                   native_rect("songselect.rect.031", D2D1::RectF(value_left, card.top + 52.0f,
-                                               card.right - 12.0f, card.bottom - 7.0f)),
+                                   lamp_rect,
                                    lamp.color ? semantic_color(*lamp.color)
                                               : static_cast<ID2D1Brush*>(d2d_->muted_brush.Get()));
+            }
+            if (clear_card) {
+                // Favoriting no longer hides a clear. Existing authored lamp
+                // rectangles still win; only the built-in fallback moves to the jacket.
+                const auto badge = lamp_rect;
+                ctx->FillRoundedRectangle(D2D1::RoundedRect(badge, 14.0f, 14.0f), semantic_color(0x030503));
+                ctx->DrawRoundedRectangle(D2D1::RoundedRect(badge, 14.0f, 14.0f),
+                                          clear_badge_brush(lamp, badge), 1.8f);
+                const float icon_size = std::min({40.0f, (badge.bottom - badge.top) * 1.43f,
+                                                  (badge.right - badge.left) * 0.30f});
+                const float icon_top = (badge.top + badge.bottom - icon_size) * 0.5f;
+                const auto icon = D2D1::RectF(badge.left + 3.0f, icon_top,
+                                              badge.left + 3.0f + icon_size, icon_top + icon_size);
+                const auto logo_color = D2D1::ColorF(lamp.badge_rgb);
+                auto* logo_brush = clear_badge_brush(lamp, D2D1::RectF(8, 23, 94, 77));
+                draw_native_asset(native_menu_assets::kMark, icon, 1.0f, 0.0f, &logo_color, logo_brush);
+                draw_centered_text(to_wide(lamp.badge_label), clear_badge_format,
+                    D2D1::RectF(icon.right + 1.0f, badge.top, badge.right - 7.0f, badge.bottom),
+                    clear_badge_brush(lamp, badge), true);
+                // A heavier selected outline keeps keyboard focus visible
+                // without replacing the clear's semantic color with white.
+                ctx->DrawRoundedRectangle(D2D1::RoundedRect(card, 10.0f, 10.0f),
+                                          clear_badge_brush(lamp, card), song.selected ? 3.0f : 1.8f);
             }
         }
 
@@ -1131,13 +1192,41 @@
                                                        value_rect.right + 2.0f,
                                                        value_rect.bottom + 2.0f)),
                                            d2d_->text_brush.Get());
-                        d2d_->text_brush->SetColor(D2D1::ColorF(
-                            song_select_gauge_text_color(
-                                data.song_select.current_gauge_tier)));
-                        d2d_->text_brush->SetOpacity(1.0f);
-                        draw_trailing_text(to_wide(mode_values[i].second),
-                                           d2d_->song_title_format.Get(), value_rect,
-                                           d2d_->text_brush.Get());
+                        const auto text = to_wide(mode_values[i].second);
+                        SongSelectLampPresentation start_lamp;
+                        start_lamp.badge_rgb = song_select_gauge_text_color(data.song_select.current_gauge_tier);
+                        start_lamp.rainbow_badge = data.song_select.current_gauge_tier == "ex_hard";
+                        auto paint_rect = value_rect;
+                        if (start_lamp.rainbow_badge) {
+                            // Measure only when text/font/slot changes, so the full
+                            // EX rainbow spans the right-aligned localized glyphs.
+                            auto& measure = d2d_->shift_start_measure;
+                            auto* format = d2d_->song_title_format.Get();
+                            const float width = value_rect.right - value_rect.left;
+                            const float height = value_rect.bottom - value_rect.top;
+                            const float fit = format->GetWordWrapping() == DWRITE_WORD_WRAPPING_NO_WRAP
+                                ? estimate_single_line_text_scale(text, format->GetFontSize(), width, height) : 1.0f;
+                            if (!measure.layout || measure.text != text || measure.format.Get() != format ||
+                                measure.width != width / fit || measure.height != height / fit) {
+                                measure = {};
+                                measure.text = text; measure.format = format;
+                                measure.width = width / fit; measure.height = height / fit;
+                                d2d_->dwrite_factory->CreateTextLayout(text.c_str(), static_cast<UINT32>(text.size()),
+                                    format, measure.width, measure.height, &measure.layout);
+                                if (measure.layout) {
+                                    measure.layout->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+                                    measure.layout->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
+                                }
+                            }
+                            if (measure.layout) {
+                                DWRITE_TEXT_METRICS metrics{};
+                                measure.layout->GetMetrics(&metrics);
+                                paint_rect.left = value_rect.left + metrics.left;
+                                paint_rect.right = paint_rect.left + std::max(1.0f, metrics.width);
+                            }
+                        }
+                        draw_trailing_text(text, d2d_->song_title_format.Get(), value_rect,
+                                           clear_badge_brush(start_lamp, paint_rect));
                         d2d_->text_brush->SetColor(saved_color);
                         d2d_->text_brush->SetOpacity(saved_opacity);
                     } else {

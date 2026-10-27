@@ -20,7 +20,7 @@
             d2d_->native_wordmark_format = format;
         }
         const auto& metrics = d2d_->native_wordmark_metrics;
-        const float scale = std::min({1.0f, (rect.right - rect.left - 4.0f) / std::max(1.0f, metrics.width),
+        const float scale = std::min({1.18f, (rect.right - rect.left - 4.0f) / std::max(1.0f, metrics.width),
             (rect.bottom - rect.top - 4.0f) / std::max(1.0f, metrics.height)});
         if (scale <= 0.0f) return;
         const auto motion = native_wordmark_motion(native_seconds, native_menu_motion_.moving());

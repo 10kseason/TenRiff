@@ -4227,17 +4227,16 @@
           "judgement": "#E8ECF1",
           "timing": "#F7FAFD",
           "key_label": "#F7FAFD",
-          "gauge_hard": "#FF4D6D",
-          "gauge_normal": "#FFB703",
-          "gauge_easy": "#89D185",
+          "gauge_hard": "#FF3838",
+          "gauge_normal": "#FFF000",
+          "gauge_easy": "#00ED57",
           "judgement_pg": "#FFE18A",
           "judgement_gr": "#6EE7F2",
           "judgement_gd": "#AEB5BF",
           "judgement_bd": "#FF9F43",
           "judgement_pr": "#FF6B6B",
           "timing_fast": "#5DA9FF",
-          "timing_slow": "#FF5A6B",
-          "gauge_ex_hard": "#292C31"
+          "timing_slow": "#FF5A6B"
         },
         "motion": {
           "press_response": 100,
@@ -5747,15 +5746,15 @@
       },
       "gauge_hard": {
         "label": "Gauge Hard",
-        "default": "#FF4D6D"
+        "default": "#FF3838"
       },
       "gauge_normal": {
         "label": "Gauge Normal",
-        "default": "#FFB703"
+        "default": "#FFF000"
       },
       "gauge_easy": {
         "label": "Gauge Easy",
-        "default": "#89D185"
+        "default": "#00ED57"
       },
       "judgement_pg": {
         "label": "Judgement Pg",
@@ -5787,7 +5786,7 @@
       },
       "gauge_ex_hard": {
         "label": "Gauge Ex Hard",
-        "default": "#292C31"
+        "default": "#FF44EF"
       }
     },
     "rects": {

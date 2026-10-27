@@ -1,3 +1,47 @@
+# 1.9.9.3 — 2026-10-27
+
+- Default F1/F2 speed decrease/increase and accelerated held speed/visual-latency controls, preserving saved bindings.
+- LR2CRS course selection with authored order/missing-stage checks; cached, smoother Auto Mix routes.
+- Optional 4/5/7/8/10K key/hold/KPS overlay with a separate bounded worker and large fixed whole-BMS difficulty; saved Skin Settings toggle/X/Y, default OFF.
+- Clear-card borders/logo badges, common EX typography, matching Shift Start and larger default TenRiff logos.
+- Grade palette: S+–S+++ rainbow, S red, A+/A yellow, B/C/D green, E/F lavender. EX gameplay gauges override saved solid EX colors; imported alpha logos and legacy lobby badges use semantic colors.
+- Preserve accuracy thresholds, judgement/score/replay/peer contracts, prior releases and general baseline1.9.6. No website/DB/public-editor deployment. See [scope](docs/release-1.9.9.3.en.md) and [verification gates](docs/release-1.9.9.3-gate.md).
+
+## Local follow-up — rank colors and EX rainbow (2026-10-27)
+
+- S+/S++/S+++ EX rainbow; S HD red; A+/A NM yellow; B/C/D EZ green; E/F lavender. Grade thresholds unchanged.
+- Clear badges share EX typography; Shift Start uses clear colors. EX gauges override saved solid EX colors; imported badge logos use their alpha with clear paint; legacy lobby also displays badges.
+- [Behavior](docs/rank-colors-20261027.en.md). Local candidate; prior artifacts preserved.
+
+## Local follow-up — BMS overlay (2026-10-27)
+
+- Fixed full-BMS peak difficulty replaces live input difficulty; enlarged display, separate low-priority KPS worker and bounded nonblocking input/HUD paths.
+- Default in-game EZ/NM/HD/EX gauge colors match clear cards; authored skin colors and grade/scoring rules remain.
+- [Behavior and limits](docs/bms-overlay-20261027.en.md). Local only; no version/baseline promotion.
+
+## Local follow-up · 2026-10-27 · Clear cards (unreleased)
+
+- Match the reference with rounded green EZ, yellow NM, red HD and static rainbow EX outlines, plus a TenRiff logo/clear badge at the upper-left of the jacket. Favorites retain their clear badge. Selection uses a heavier border.
+- Preserve saved clear records, assisted-play exclusions, seven visible rows and explicit skin rectangles. Inherit the local controls, Session Mix and key overlay changes; no version or baseline change. [Behavior](docs/clear-cards-20261027.en.md).
+
+## Local follow-up · 2026-10-27 · Key Overlay (unreleased)
+
+- Optional built-in key-note-overlay plugin for runtime 4/5/7/8/10K: key trails/holds, 1-second NPS and upstream v2.13 input-pattern difficulty estimates. Default OFF; Skin HUD controls persist enablement and X/Y position.
+- Bounded event handoff keeps difficulty analysis off the audio/judgement thread. Pause/focus loss clears history; autoplay/replays/ghosts excluded. Larger default native TenRiff marks/wordmarks.
+- Continues the local controls and Session Mix candidate; no version bump, upload, timing/scoring or replay changes. [Behavior](docs/key-overlay-20261027.en.md).
+
+## Local follow-up · 2026-10-27 · Session Mix (unreleased)
+
+- Course browser with ordered stages, missing-chart status, keyboard/mouse selection and explicit entry. LR2CRS authored order/repeats remain; missing stages block entry. Completion/failure returns to the browser.
+- Cache the displayed auto plan through entry, deduplicate music variants, and use a gradual difficulty route with conservative no-record fallback. Target minutes remain approximate.
+- Includes prior local tuning controls; no release version, replay, judgement, gauge or file-format changes. [Behavior](docs/session-mix-20261027.en.md).
+
+## Unreleased local controls follow-up (2026-10-27)
+
+- Fresh F1/F2 defaults decrease/increase note speed; preserve saved bindings.
+- Accelerate held lobby speed/visual-latency/Rate controls and gameplay/pause tuning after 0.6s/1.5s; retain precise step sizes and clear repeat state at input boundaries.
+- [Behavior and compatibility](docs/controls-20261027.en.md).
+
 # Changelog
 
 ## 1.9.9.1 — 2026-10-24

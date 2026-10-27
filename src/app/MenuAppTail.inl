@@ -203,6 +203,10 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
                                  : config::normalize_skin_hit_burst_style_token(config_.skin.hit_burst_style);
     target.hud_layout = config::normalize_skin_hud_layout_token(config_.skin.hud_layout);
     target.hud_riff_map_visible = config_.skin.hud_riff_map_visible;
+    target.key_overlay_enabled = config_.skin.key_overlay_enabled;
+    target.key_overlay_x = config_.skin.key_overlay_x;
+    target.key_overlay_y = config_.skin.key_overlay_y;
+
     target.indicator_background_visible = config_.skin.indicator_background_visible;
     target.key_label_position = manifest_style && manifest_style->key_label_position.has_value()
                                     ? *manifest_style->key_label_position
@@ -385,6 +389,14 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         }
     }
 
+    target.key_overlay = gameplay_hud_.key_overlay;
+    target.key_overlay.held.fill(false);
+    for (int lane = 0; lane < target.lane_count && lane < 10; ++lane) {
+        const int visual = lane_layout.visual_lane_for_source(lane + 1) - 1;
+        if (visual >= 0 && visual < 10) target.key_overlay.held[visual] = gameplay_hud_.key_overlay.held[lane];
+    }
+    for (std::size_t i = 0; i < target.key_overlay.note_count; ++i)
+        target.key_overlay.notes[i].lane = lane_layout.visual_lane_for_source(target.key_overlay.notes[i].lane + 1) - 1;
     target.lane_pressed_count = gameplay_hud_.lane_pressed_count;
     target.lane_pressed.fill(0);
     for (std::size_t source = 0; source < gameplay_hud_.lane_pressed_count; ++source) {
@@ -421,7 +433,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
 
     target.key_label_count = 0;
     target.key_labels.fill(std::string{});
-    if (target.key_label_position != "off") {
+    if (target.key_label_position != "off" || target.key_overlay_enabled) {
         config::KeymapManager keymap_manager;
         const std::string keymap_mode = std::to_string(target.lane_count) + "k";
         const auto bindings = keymap_manager.bindings_for_mode(keymap_, keymap_mode);
@@ -1542,128 +1554,7 @@ void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render
     const auto generic_view = menu::screen_descriptor(current_screen()).generic_view;
 
     if (generic_view == menu::GenericViewKind::SessionMix) {
-        const Lr2CourseDefinition* course = selected_session_mix_lr2_course();
-        const bool lr2_course_selected = course != nullptr;
-        const bool draft_selected = session_mix_source_index_ == 1;
-        const Lr2CourseMatch course_match =
-            lr2_course_selected ? match_lr2_course(*course, indexed_songs_) : Lr2CourseMatch{};
-        const SessionMixPhaseCounts counts =
-            session_mix_phase_counts(session_mix_minutes_, visible_song_count());
-        append_menu_row(render.generic,
-                        ui_text("Mix Source", "믹스 소스"),
-                        draft_selected
-                            ? (ui_text("DRAFT COURSE  ", "초안 코스  ") +
-                               std::to_string(session_mix_draft_.size()))
-                            : (lr2_course_selected
-                                   ? ("LR2  " + safe_ui_text(course->title, "<invalid course>"))
-                                   : ui_text("AUTO MIX", "자동 믹스")),
-                        settings_cursor_ == 0,
-                        render::MenuHitTargetKind::SettingsRow,
-                        0,
-                        true,
-                        true);
-        append_menu_row(render.generic,
-                        ui_text("Session Length", "세션 길이"),
-                        draft_selected
-                            ? (std::to_string(session_mix_draft_.size()) + ui_text(" STAGES / ", " 스테이지 / ") +
-                               (session_mix_draft_.empty()
-                                    ? "-"
-                                    : std::to_string(session_mix_draft_.front().key_count) + "K"))
-                            : (lr2_course_selected
-                                   ? (std::to_string(course->chart_md5.size()) + ui_text(" STAGES / ", " 스테이지 / ") +
-                                      std::to_string(course->key_count) + "K")
-                                   : (std::to_string(session_mix_minutes_) + ui_text(" MIN", "분"))),
-                        settings_cursor_ == 1,
-                        render::MenuHitTargetKind::SettingsRow,
-                        1,
-                        !lr2_course_selected && !draft_selected,
-                        !lr2_course_selected && !draft_selected);
-        append_menu_row(render.generic,
-                        ui_text("Save Draft as LR2 Course", "초안을 LR2 코스로 저장"),
-                        std::to_string(session_mix_draft_.size()) + ui_text(" STAGES", " 스테이지"),
-                        settings_cursor_ == 2,
-                        render::MenuHitTargetKind::SettingsRow,
-                        2,
-                        !session_mix_draft_.empty(),
-                        false);
-        append_menu_row(render.generic,
-                        ui_text("Load LR2 Course File", "LR2 코스 파일 불러오기"),
-                        session_mix_lr2_courses_.empty()
-                            ? ui_text("BROWSE OR DROP .LR2CRS", "찾기 또는 .LR2CRS 드롭")
-                            : (std::to_string(session_mix_lr2_courses_.size()) + ui_text(" COURSES", "개 코스")),
-                        settings_cursor_ == 3,
-                        render::MenuHitTargetKind::SettingsRow,
-                        3,
-                        true,
-                        false);
-        const bool can_start = draft_selected
-                                   ? !session_mix_draft_.empty()
-                                   : (lr2_course_selected ? course_match.playable()
-                                                          : visible_song_count() > 0);
-        append_menu_row(render.generic,
-                        ui_text("Start Session Mix", "세션 믹스 시작"),
-                        draft_selected
-                            ? (std::to_string(session_mix_draft_.size()) + ui_text(" DRAFT STAGES", "개 초안 스테이지"))
-                            : (lr2_course_selected
-                                   ? (std::to_string(course_match.song_indices.size()) + ui_text(" COURSE STAGES", "개 코스 스테이지"))
-                                   : (std::to_string(counts.total()) + ui_text(" UNIQUE CHARTS", "개 고유 차트"))),
-                        settings_cursor_ == 4,
-                        render::MenuHitTargetKind::SettingsRow,
-                        4,
-                        can_start,
-                        false);
-        append_menu_row(render.generic,
-                        ui_text("Back to Song Select", "곡 선택으로 돌아가기"),
-                        "",
-                        settings_cursor_ == 5,
-                        render::MenuHitTargetKind::SettingsRow,
-                        5,
-                        true,
-                        false);
-        if (draft_selected) {
-            render.generic.notes.push_back(ui_text(
-                "Song Select C appends stages in order; Delete removes the last stage.",
-                "곡 선택에서 C로 순서대로 추가하고 Delete로 마지막 스테이지를 제거합니다."));
-            render.generic.notes.push_back(ui_text(
-                "Draft order and repeated charts are preserved when played or saved.",
-                "실행하거나 저장할 때 초안 순서와 반복 곡을 그대로 유지합니다."));
-        } else if (lr2_course_selected) {
-            if (course_match.missing_md5.empty()) {
-                render.generic.notes.push_back(ui_text(
-                    "LR2 chart MD5 order is preserved exactly, including repeated stages.",
-                    "반복 스테이지를 포함해 LR2의 차트 MD5 순서를 그대로 유지합니다."));
-            } else {
-                render.generic.notes.push_back(
-                    ui_text("Missing charts in active library: ", "현재 라이브러리의 누락 채보: ") +
-                    std::to_string(course_match.missing_md5.size()) + "/" +
-                    std::to_string(course->chart_md5.size()));
-            }
-        } else {
-            render.generic.notes.push_back(
-                ui_text("Candidate pool: ", "후보 풀: ") + std::to_string(visible_song_count()) +
-                ui_text(" charts from the current search and filters.",
-                        "개 차트 — 현재 검색과 필터 결과를 사용합니다."));
-            render.generic.notes.push_back(
-                session_mix_phase_label(SessionMixPhase::Warmup) + " " + std::to_string(counts.warmup) +
-                "  /  " + session_mix_phase_label(SessionMixPhase::Challenge) + " " +
-                std::to_string(counts.challenge) + "  /  " +
-                session_mix_phase_label(SessionMixPhase::Cooldown) + " " +
-                std::to_string(counts.cooldown));
-            render.generic.notes.push_back(
-                ui_text("Local best results estimate your level; unplayed and uncleared charts feed the challenge phase.",
-                        "로컬 최고 기록으로 수준을 추정하고, 미플레이·미클리어 곡을 도전 구간에 배치합니다."));
-            render.generic.notes.push_back(
-                ui_text("Length is an estimate based on roughly three minutes per chart.",
-                        "길이는 차트당 약 3분을 기준으로 한 목표치입니다."));
-        }
-        if (!session_mix_status_message_.empty()) {
-            render.generic.notes.push_back(session_mix_status_message_);
-        }
-        render.generic.footer_notes = {
-            ui_text("LEFT / RIGHT changes source or auto length", "LEFT / RIGHT로 소스 또는 자동 길이 변경"),
-            ui_text("C adds on Song Select  |  Drop .lr2crs to load  |  ENTER activates",
-                    "곡 선택 C로 추가  |  .lr2crs 드롭으로 로드  |  ENTER 실행"),
-        };
+        populate_session_mix_render_data(render);
     } else if (generic_view == menu::GenericViewKind::OptionsHub) {
         render.generic.card_grid = true;
         const auto selected_option = options_hub_controller_.cursor();
@@ -2117,8 +2008,8 @@ void MenuApp::update_pressed_keys(const input::InputEvent& event) {
             song_select_repeat_key_ = event.keycode;
             song_select_repeat_screen_ = current_screen();
             song_select_repeat_row_ = selected_adjustment_repeat_row(event.keycode);
-            song_select_repeat_next_ns_ =
-                timing::HighResClock::now_ns() + kSongSelectRepeatInitialDelayNs;
+            song_select_repeat_started_ns_ = timing::HighResClock::now_ns();
+            song_select_repeat_next_ns_ = song_select_repeat_started_ns_ + kSongSelectRepeatInitialDelayNs;
         }
     } else {
         pressed_keys_.erase(event.keycode);
@@ -2215,12 +2106,21 @@ void MenuApp::service_song_select_repeat(int64_t now_ns, bool foreground) {
             reset_song_select_repeat();
             return;
     }
-    song_select_repeat_next_ns_ = now_ns + kSongSelectRepeatIntervalNs;
+    if (song_select_repeat_key_ == 0) return; // The action may have reset its owner.
+    // Only numeric lobby adjustments accelerate; gauge/random, navigation and
+    // text deletion keep their established repeat cadence.
+    const bool numeric_tuning = current_screen() == Screen::SongSelect &&
+        ((song_select_repeat_row_ >= 0 && song_select_repeat_row_ <= 1) ||
+         song_select_repeat_key_ == key_minus_ || song_select_repeat_key_ == key_plus_);
+    song_select_repeat_next_ns_ = now_ns + (numeric_tuning
+        ? tuning_repeat_interval_ns(now_ns - song_select_repeat_started_ns_)
+        : kSongSelectRepeatIntervalNs);
 }
 
 void MenuApp::reset_song_select_repeat() {
     song_select_repeat_key_ = 0;
     song_select_repeat_next_ns_ = 0;
+    song_select_repeat_started_ns_ = 0;
     song_select_repeat_row_ = -1;
 }
 
@@ -2283,7 +2183,12 @@ bool MenuApp::is_song_select_repeat_key(uint32_t keycode) {
                keycode == key_backspace_ && !difficulty_table_url_input_.empty();
     }
 
+    if (current_screen() == Screen::SongSelect && (keycode == key_minus_ || keycode == key_plus_)) {
+        return true;
+    }
+
     if (keycode == key_page_up_ || keycode == key_page_down_) {
+        if (current_screen() == Screen::SessionMix) return session_mix_focus_ != 1;
         return current_screen() == Screen::SongSelect &&
                song_select_focus_ == SongSelectFocus::SongList;
     }
@@ -2313,6 +2218,7 @@ bool MenuApp::is_song_select_repeat_key(uint32_t keycode) {
     if (keycode != key_left_ && keycode != key_right_) {
         return false;
     }
+    if (current_screen() == Screen::SessionMix) return false;
     return current_screen() == Screen::OptionsHub || selected_adjustment_repeat_row(keycode) >= 0;
 }
 
@@ -2524,6 +2430,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.lane_activity.fill(0.0f);
         std::copy_n(hud.lane_activity.begin(), hud.lane_activity_count, gameplay_hud_.lane_activity.begin());
 
+        gameplay_hud_.key_overlay = hud.key_overlay;
         gameplay_hud_.lane_pressed_count = hud.lane_pressed_count;
         gameplay_hud_.lane_pressed.fill(0);
         std::copy_n(hud.lane_pressed.begin(), hud.lane_pressed_count, gameplay_hud_.lane_pressed.begin());

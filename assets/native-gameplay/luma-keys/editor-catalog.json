@@ -301,15 +301,15 @@
     },
     "gauge_hard": {
       "label": "Gauge Hard",
-      "default": "#FF4D6D"
+      "default": "#FF3838"
     },
     "gauge_normal": {
       "label": "Gauge Normal",
-      "default": "#FFB703"
+      "default": "#FFF000"
     },
     "gauge_easy": {
       "label": "Gauge Easy",
-      "default": "#89D185"
+      "default": "#00ED57"
     },
     "judgement_pg": {
       "label": "Judgement Pg",
@@ -341,7 +341,7 @@
     },
     "gauge_ex_hard": {
       "label": "Gauge Ex Hard",
-      "default": "#292C31"
+      "default": "#FF44EF"
     }
   },
   "rects": {

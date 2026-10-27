@@ -48,6 +48,27 @@ namespace tenriff::app {
 // Seed only in-memory state, then use the production settings builders.
 // MenuApp is never initialized: no profiles, indexing, services or input start.
 struct MenuAppVisualTestAccess {
+    static void populate_session_mix(render::MenuRenderData& source, bool missing, int selected, int stage_offset) {
+        auto app=std::make_unique<MenuApp>();
+        app->config_.ui.language=ui::language_token(source.ui_language);
+        app->config_.ui.session_mix_lr2_course_path="TenRiff course preview.lr2crs";
+        for (int i=0;i<12;++i) {
+            SongEntry song; song.title=i==1 ? "별빛 속으로 / 星の向こうへ / Beyond the Starlight" : "Stage " + std::to_string(i+1);
+            song.path="preview/"+std::to_string(i)+".bms"; song.key_count=7; song.level=5+i%5;
+            song.md5=std::string(32, 'a'+i); app->indexed_songs_.push_back(song); app->visible_song_indices_.push_back(i);
+            app->session_mix_draft_.push_back({song.path,song.md5,song.title,7,song.level});
+        }
+        for (int i=0;i<9;++i) {
+            Lr2CourseDefinition course; course.title="COURSE " + std::to_string(i+1) + " · SESSION"; course.key_count=7;
+            for (int stage=0;stage<12;++stage) course.chart_md5.push_back(std::string(32,'a'+stage));
+            course.chart_md5[3]=course.chart_md5[0]; // Authored repeat stays visible.
+            if (missing) course.chart_md5[1]=std::string(32,'f'+10);
+            app->session_mix_lr2_courses_.push_back(course);
+        }
+        app->select_session_mix_course(selected<0 ? 2 : selected);
+        app->session_mix_stage_offset_=stage_offset;
+        app->populate_session_mix_render_data(source);
+    }
     static void populate_keymap(render::MenuRenderData& source, int keys, bool common, int selected) {
         auto app = std::make_unique<MenuApp>();
         app->config_.ui.language = ui::language_token(source.ui_language);
@@ -144,6 +165,9 @@ struct MenuAppVisualTestAccess {
         app->config_.ui.language = ui::language_token(source.ui_language);
         auto& skin = app->config_.skin;
         skin.scratch_position = scratch_right ? "right" : "left";
+        skin.key_overlay_enabled = preview.key_overlay_enabled;
+        skin.key_overlay_x = preview.key_overlay_x;
+        skin.key_overlay_y = preview.key_overlay_y;
         // Keep the deterministic scene's values reflected in its actual rows.
         skin.note_height_scale = preview.note_height_scale;
         skin.note_height_scales[mode] = preview.note_height_scale;
@@ -609,7 +633,8 @@ struct MenuWindowVisualTestAccess {
              source.generic.heading == ui::text(source.ui_language, "Graphics Settings", "그래픽 설정") ||
              source.generic.heading == ui::text(source.ui_language, "Mod Manager", "모드 관리자") ||
              source.generic.heading == ui::text(source.ui_language, "Filter", "필터"));
-        const bool song_fixture = source.kind == MenuScreenKind::SongSelect;
+        const bool mix_fixture = source.session_mix.active;
+        const bool song_fixture = source.kind == MenuScreenKind::SongSelect && !mix_fixture;
         const bool result_fixture = source.kind == MenuScreenKind::ResultScreen;
         // Sample before the verification render: crossing the reveal boundary
         // during that draw must not falsely require buttons from an earlier frame.
@@ -634,14 +659,22 @@ struct MenuWindowVisualTestAccess {
             if (verify) {
                 for (std::size_t row = 0; row < fixture.generic.rows.size(); ++row)
                     fixture.generic.rows[row].selected = row == visit;
+                if (mix_fixture) {
+                    // Model entry from a normal library with a live scrollbar.
+                    window.song_scrollbar_state_.visible = true;
+                    window.song_scrollbar_state_.total_count = 100;
+                }
                 window.render(fixture);
+                if (mix_fixture && window.song_scrollbar_state_.visible)
+                    failures.emplace_back("session mix retained the previous song scrollbar");
             }
             const auto regions = window.hit_regions_;
             for (const auto& region : regions) {
                 const bool menu_card = region.kind == MenuHitTargetKind::OptionsItem ||
                     region.kind == MenuHitTargetKind::TitleButton ||
                     region.kind == MenuHitTargetKind::TitleLanguageButton;
-                const bool song_control = song_fixture &&
+                const bool song_control = (mix_fixture && (region.kind == MenuHitTargetKind::SongCard ||
+                    region.kind == MenuHitTargetKind::SessionMixStagePage || region.kind == MenuHitTargetKind::SettingsRow)) || song_fixture &&
                     (region.kind == MenuHitTargetKind::SongCard || region.kind == MenuHitTargetKind::SongNavButton ||
                      region.kind == MenuHitTargetKind::SongDifficultyTable);
                 const bool preview_button = region.kind == MenuHitTargetKind::SkinPreviewButton ||
@@ -733,6 +766,18 @@ struct MenuWindowVisualTestAccess {
         }
         // The table editor deliberately replaces background song hits with its
         // modal controls; those controls were verified in the region loop above.
+        if (verify && mix_fixture) {
+            int cards=0; bool enter=false;
+            for (const auto& hit:window.hit_regions_) {
+                if (hit.kind==MenuHitTargetKind::SongCard) ++cards;
+                if (hit.kind==MenuHitTargetKind::SettingsRow && hit.index==4) enter=true;
+                if (hit.left<0 || hit.top<0 || hit.right>1920 || hit.bottom>1080)
+                    failures.emplace_back("session mix control outside design canvas");
+            }
+            if (cards!=std::min(7,static_cast<int>(source.session_mix.courses.size())))
+                failures.emplace_back("session mix course viewport lost a card");
+            if (enter!=source.session_mix.can_start) failures.emplace_back("session mix entry availability mismatch");
+        }
         if (verify && song_fixture && !source.song_select.difficulty_table_editing) {
             const auto search = std::find_if(window.hit_regions_.begin(), window.hit_regions_.end(), [](const auto& hit) {
                 return hit.kind == MenuHitTargetKind::SongNavButton && hit.index == 2;
@@ -1049,6 +1094,8 @@ int main(int argc, char** argv) {
     };
     double benchmark_cpu_start = 0;
     int64_t benchmark_wall_start = 0;
+    bool key_overlay_fixture = false;
+    double key_overlay_x = 0.0, key_overlay_y = 0.25;
     int preview_keys = 10;
     int menu_keys = 7;
     double preview_note_height = 1.8;
@@ -1092,12 +1139,15 @@ int main(int argc, char** argv) {
     int table_prefix_keys = 0;
     bool mixed_table_prefixes = false;
     bool lamp_fixture = false;
+    bool clear_card_fixture = false;
     bool backdrop_off = false;
     double backdrop_opacity = -1.0;
     double backdrop_brightness = -1.0;
     double backdrop_height = -1.0;
     int pressed_lane = 1;
     int selected_row = -1;
+    bool session_mix=false, session_mix_missing=false;
+    int session_mix_stage_offset=0;
     int selected_setting = -1;
     bool verify_hits = false;
     bool hitmap_written = false;
@@ -1152,6 +1202,7 @@ int main(int argc, char** argv) {
         }
         if (arg == "--judgement-counts") { judgement_counts = true; continue; }
         if (arg == "--lamp-fixture") { lamp_fixture = true; continue; }
+        if (arg == "--clear-card-fixture") { clear_card_fixture = true; continue; }
         if (arg == "--timing-delta-ms" && i + 1 < argc) {
             const double value = std::stod(argv[++i]);
             if (!std::isfinite(value) || value == 0 || std::abs(value) > 180.0) return 2;
@@ -1203,6 +1254,12 @@ int main(int argc, char** argv) {
         }
         if (arg == "--bms-rank" && i + 1 < argc) { bms_rank_fixture = argv[++i]; continue; }
         if (arg == "--artist-text" && i + 1 < argc) { artist_fixture = argv[++i]; continue; }
+        if (arg == "--key-overlay") { key_overlay_fixture = true; continue; }
+        if (arg == "--key-overlay-x" && i + 1 < argc) { key_overlay_x = std::stod(argv[++i]); continue; }
+        if (arg == "--key-overlay-y" && i + 1 < argc) { key_overlay_y = std::stod(argv[++i]); continue; }
+        if (arg=="--session-mix") { session_mix=true; continue; }
+        if (arg=="--session-mix-missing") { session_mix=session_mix_missing=true; continue; }
+        if (arg=="--session-mix-stage-offset" && i+1<argc) { session_mix_stage_offset=std::max(0,std::stoi(argv[++i])); continue; }
         if (arg == "--language" && i + 1 < argc) { data.ui_language = tenriff::ui::language_from_token(argv[++i]); continue; }
         if (arg == "--bga-brightness" && i + 1 < argc) { bga_brightness_percent = std::clamp(std::stoi(argv[++i]), 0, 100); continue; }
         if (arg == "--play-mode") { mode_selection = true; sites_account = true; continue; }
@@ -1654,7 +1711,11 @@ int main(int argc, char** argv) {
     songs.selected_song_nps_median = 10;
     songs.selected_song_nps_max = 24;
     songs.selected_song_chart_name = "ANOTHER";
-    songs.current_gauge = loc("Normal", "노말");
+    songs.current_gauge_tier = fixture_gauge == "EX-HARD" ? "ex_hard" :
+        fixture_gauge == "HARD" ? "hard" : fixture_gauge == "EASY" ? "easy" : "normal";
+    songs.current_gauge = fixture_gauge == "EX-HARD" ? "EX-HARD" :
+        fixture_gauge == "HARD" ? loc("Hard", "하드") :
+        fixture_gauge == "EASY" ? loc("Easy", "이지") : loc("Normal", "노말");
     songs.current_hi_speed = "3.50";
     songs.current_visual_latency = "+0 ms";
     songs.current_random = loc("Off", "OFF");
@@ -1734,6 +1795,19 @@ int main(int argc, char** argv) {
                     "GAUGE SHIFT EASY CLEAR", "FAILED", "", "ASSIST PRACTICE GAUGE SHIFT NORMAL CLEAR"};
                 card.lamp = statuses[static_cast<std::size_t>(i)];
                 card.favorite = false;
+            }
+            if (clear_card_fixture) {
+                constexpr std::array<const char*, 7> statuses{
+                    "EASY CLEAR", "NORMAL CLEAR", "HARD CLEAR", "EX CLEAR",
+                    "FAILED", "", "ASSIST PRACTICE GAUGE SHIFT NORMAL CLEAR"};
+                card.lamp = statuses[static_cast<std::size_t>(i)];
+                card.title = "feeling(bms edit)[Hierarchie]";
+                card.artist = u8"天使真央 / obj.森さん";
+                card.detail = "7K SP BMS / Insane / Satellite sl11";
+                card.level_label = "sl11";
+                card.difficulty_is_aery_five_key = false;
+                card.difficulty_prefix_key_count = 0;
+                card.background_path = bga_path;
             }
             songs.songs.push_back(card);
         }
@@ -2071,12 +2145,17 @@ int main(int argc, char** argv) {
         data.gameplay.combo_position = data.generic.skin_preview.combo_position = fixture_combo_position;
     if (!preview_note_shape.empty()) data.gameplay.note_shape = data.generic.skin_preview.note_shape = preview_note_shape;
     if (!preview_hit_burst.empty()) data.gameplay.hit_burst_style = data.generic.skin_preview.hit_burst_style = preview_hit_burst;
+    data.gameplay.key_overlay_enabled = data.generic.skin_preview.key_overlay_enabled = key_overlay_fixture;
+    data.gameplay.key_overlay_x = data.generic.skin_preview.key_overlay_x = key_overlay_x;
+    data.gameplay.key_overlay_y = data.generic.skin_preview.key_overlay_y = key_overlay_y;
     if (skin_settings) {
         tenriff::app::MenuAppVisualTestAccess::populate_skin_rows(
             data, fixture_skin ? &*fixture_skin : nullptr, selected_row,
             backdrop_off || backdrop_opacity >= 0.0 || backdrop_brightness >= 0.0 || backdrop_height >= 0.0,
             scratch_right, search_query, search_active);
     }
+    if (session_mix) tenriff::app::MenuAppVisualTestAccess::populate_session_mix(
+        data, session_mix_missing, selected_row, session_mix_stage_offset);
     if (selected_row >= 0) {
         for (std::size_t i = 0; i < data.generic.rows.size(); ++i)
             data.generic.rows[i].selected = static_cast<int>(i) == selected_row;
@@ -2232,6 +2311,19 @@ int main(int argc, char** argv) {
         return MenuWindowVisualTestAccess::check_background_layers(window, data, layer_probe_directory) ? 0 : 5;
     if (benchmark_frames > 0) frame_limit = benchmark_warmup + benchmark_frames;
     const auto start = std::chrono::steady_clock::now();
+    tenriff::app::BmsOverlayEstimate fixture_overlay_estimate;
+    if (key_overlay_fixture && tenriff::app::key_overlay_supports(preview_keys)) {
+        tenriff::gameplay::GameplayChart fixture_chart;
+        fixture_chart.lane_count = preview_keys;
+        for (int i = 0; i < 240; ++i) {
+            tenriff::gameplay::NoteEvent note;
+            note.lane = i % preview_keys + 1;
+            note.start_sample = i * 60;
+            if (i % 9 == 0) note.end_sample = note.start_sample + 150;
+            fixture_chart.notes.push_back(note);
+        }
+        fixture_overlay_estimate = tenriff::app::estimate_bms_overlay_difficulty(fixture_chart, 1000);
+    }
     while (!window.should_close()) {
         MSG message;
         while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
@@ -2428,7 +2520,7 @@ int main(int argc, char** argv) {
         ++rendered_frames;
         const int roundtrip_phase = menu_roundtrip ? (rendered_frames - 1) / 60 : 0;
         const bool roundtrip_phase_end = menu_roundtrip && rendered_frames % 60 == 0;
-        const auto& render_data = menu_roundtrip && roundtrip_phase != 1 ? *roundtrip_menu : data;
+        auto& render_data = menu_roundtrip && roundtrip_phase != 1 ? *roundtrip_menu : data;
         if (cycle_font_scale && rendered_frames == 40) data.ui_text_scale = 1.4f;
         if (rendered_frames == 35 && !bga_next_path.empty())
             data.gameplay.background_base_path = bga_next_path;
@@ -2473,6 +2565,22 @@ int main(int argc, char** argv) {
             window.request_screenshot();
         }
         const int64_t render_start_ns = benchmark_frames > 0 || menu_roundtrip ? tenriff::timing::HighResClock::now_ns() : 0;
+        if (key_overlay_fixture && render_data.kind == MenuScreenKind::GameplayHud && !render_data.generic.skin_preview.fullscreen) {
+            tenriff::app::KeyNoteOverlay fixture_overlay;
+            fixture_overlay.configure(true, render_data.gameplay.lane_count);
+            for (int i = 0; i < 96; ++i) {
+                const int lane = i % render_data.gameplay.lane_count;
+                fixture_overlay.record(lane, true, (100 + i * 60) * 1'000'000LL);
+                fixture_overlay.record(lane, false, (130 + i * 60) * 1'000'000LL);
+            }
+            fixture_overlay.record(1, true, 5'950'000'000LL);
+            render_data.gameplay.key_overlay = fixture_overlay.update(6'200'000'000LL, true);
+            render_data.gameplay.key_overlay.bms_chart = fixture_overlay_estimate.bms_chart;
+            render_data.gameplay.key_overlay.difficulty = fixture_overlay_estimate.difficulty;
+            render_data.gameplay.key_overlay_enabled = true;
+            render_data.gameplay.key_overlay_x = key_overlay_x;
+            render_data.gameplay.key_overlay_y = key_overlay_y;
+        }
         window.render(render_data);
         if (menu_roundtrip) {
             auto& phase = roundtrip_phases[roundtrip_phase];

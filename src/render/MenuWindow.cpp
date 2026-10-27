@@ -1,4 +1,5 @@
 #include "app/MemoryReclamation.h"
+#include "key_note_overlay/dan_rating.h"
 #include "render/SettingsListLayout.h"
 #include "render/DifficultyLabel.h"
 #include "render/MenuWindow.h"
@@ -2490,6 +2491,7 @@ struct MenuWindow::D2DResources {
         uint64_t builds = 0;
     } gameplay_song_title, preview_song_title;
     std::array<ReadableTextLayout, 384> menu_readable_text{};
+    ReadableTextLayout shift_start_measure;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_logo_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_nav_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_record_label_format;
@@ -2514,6 +2516,7 @@ struct MenuWindow::D2DResources {
         Microsoft::WRL::ComPtr<IDWriteTextFormat> format;
         Microsoft::WRL::ComPtr<IDWriteTextLayout> layout;
         Microsoft::WRL::ComPtr<ID2D1Bitmap1> bitmap;
+        Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> fallback_gradient;
         D2D1_COLOR_F color{};
         float width = 0, height = 0;
         bool attempted = false;
@@ -2531,6 +2534,8 @@ struct MenuWindow::D2DResources {
     std::array<Microsoft::WRL::ComPtr<ID2D1PathGeometry>, 2> result_action_icons{};
     std::array<bool, 2> result_action_icons_attempted{};
     Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> result_gauge_gradient;
+    Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> song_clear_gradient;
+    Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> gameplay_gauge_gradient;
     Microsoft::WRL::ComPtr<IDWriteTextLayout> generic_help_layout;
     std::wstring generic_help_text;
     float generic_help_width = 0.0f;

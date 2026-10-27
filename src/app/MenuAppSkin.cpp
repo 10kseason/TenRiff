@@ -1021,6 +1021,13 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     config::normalize_skin_hud_layout_token(config_.skin.hud_layout) == "classic"
                         ? ui_text("Classic", "클래식") : ui_text("Studio Deck", "스튜디오 덱"),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::HudLayout), false, true);
+    append_menu_row(render.generic, ui_text("Key Overlay Plugin (4/5/7/8/10K)", "키 오버레이 플러그인 (4/5/7/8/10K)"),
+                    ui_on_off(config_.skin.key_overlay_enabled), false, render::MenuHitTargetKind::SettingsRow,
+                    static_cast<int>(SkinSettingsRowId::KeyOverlayEnabled), false, true);
+    append_menu_row(render.generic, ui_text("Key Overlay X", "키 오버레이 X"), format_percent(config_.skin.key_overlay_x),
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::KeyOverlayX), false, true);
+    append_menu_row(render.generic, ui_text("Key Overlay Y", "키 오버레이 Y"), format_percent(config_.skin.key_overlay_y),
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::KeyOverlayY), false, true);
     append_menu_row(render.generic, ui_text("Studio Riff Map", "그래프 맵"),
                     ui_on_off(config_.skin.hud_riff_map_visible),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::HudRiffMapVisible), false, true);
@@ -1175,6 +1182,10 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.skin_preview.visible = true;
     render.generic.skin_preview.hud_layout = config::normalize_skin_hud_layout_token(config_.skin.hud_layout);
     render.generic.skin_preview.hud_riff_map_visible = config_.skin.hud_riff_map_visible;
+    render.generic.skin_preview.key_overlay_enabled = config_.skin.key_overlay_enabled;
+    render.generic.skin_preview.key_overlay_x = config_.skin.key_overlay_x;
+    render.generic.skin_preview.key_overlay_y = config_.skin.key_overlay_y;
+
     render.generic.skin_preview.indicator_background_visible = config_.skin.indicator_background_visible;
     render.generic.skin_preview.mode_label = skin_mode_label;
     render.generic.skin_preview.selected_color_label =

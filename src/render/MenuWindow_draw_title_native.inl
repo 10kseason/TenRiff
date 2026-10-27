@@ -5,10 +5,10 @@
         if (d2d_->panel_brush) {
             ctx->FillRectangle(native_rect("title_native.rect.001", D2D1::RectF(0, 0, kBaseWidth, 126)), d2d_->panel_brush.Get());
         }
-        const auto logo = skin_layout_rect(data, "title.logo", D2D1::RectF(56, 24, 418, 94));
-        draw_native_asset(native_menu_assets::kMark, native_rect("title_native.rect.002", D2D1::RectF(logo.left, logo.top + 2, logo.left + 64, logo.bottom)));
+        const auto logo = skin_layout_rect(data, "title.logo", D2D1::RectF(56, 14, 440, 112));
+        draw_native_asset(native_menu_assets::kMark, native_rect("title_native.rect.002", D2D1::RectF(logo.left, logo.top + 2, logo.left + 84, logo.bottom)));
         draw_native_wordmark(d2d_->header_format.Get(),
-                             native_rect("title_native.rect.003", D2D1::RectF(logo.left + 82, logo.top, logo.right, logo.bottom)));
+                             native_rect("title_native.rect.003", D2D1::RectF(logo.left + 102, logo.top + 10, logo.right, logo.bottom)));
         draw_text_clipped(wloc("HOME", "홈"), d2d_->song_title_format.Get(),
                           native_rect("title_native.rect.004", D2D1::RectF(466, 44, 850, 88)), d2d_->muted_brush.Get());
         const D2D1_RECT_F profile = data.performance.visible

@@ -3,6 +3,7 @@
 #include <array>
 #include <algorithm>
 #include <cstdint>
+#include <filesystem>
 #include <chrono>
 #include <limits>
 #include <memory>
@@ -304,6 +305,94 @@ struct MenuAppRepeatTestAccess {
         release(*menu, menu->key_left_);
     }
 
+    static void check_accelerated_lobby_tuning() {
+        struct TempProfile {
+            std::filesystem::path path;
+            ~TempProfile() {
+                std::error_code ec;
+                std::filesystem::remove(path / "config.json", ec);
+                std::filesystem::remove(path, ec);
+            }
+        } profile{std::filesystem::temp_directory_path() /
+            ("tenriff_lobby_repeat_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()))};
+        REQUIRE(std::filesystem::create_directory(profile.path));
+        for (int row : {0, 1, 4}) {
+            for (int direction : {-1, 1}) {
+                auto menu = fixture();
+                menu->profile_dir_ = profile.path.u8string();
+                menu->key_minus_ = 189; menu->key_plus_ = 187;
+                menu->reset_screen(MenuApp::Screen::SongSelect);
+                menu->song_select_focus_ = MenuApp::SongSelectFocus::QuickSettings;
+                menu->song_quick_setting_cursor_ = row == 4 ? 0 : row;
+                menu->config_.speed.hi_speed = 10.0;
+                menu->config_.speed.rate = 1.0;
+                menu->config_.visual_offset_ms = 0.0;
+                const uint32_t key = row == 4 ? (direction < 0 ? 189 : 187) : (direction < 0 ? 37 : 39);
+                const auto value = [&] { return row == 0 ? menu->config_.visual_offset_ms
+                    : row == 1 ? menu->config_.speed.hi_speed : menu->config_.speed.rate; };
+                const double initial = value();
+                press(*menu, key);
+                const double step = value() - initial;
+                CHECK(step * direction > 0);
+                const auto start = menu->song_select_repeat_started_ns_;
+                REQUIRE(start > 0);
+                press(*menu, key); // A platform repeat cannot add a second step.
+                CHECK(value() == doctest::Approx(initial + step));
+                menu->service_song_select_repeat(start + 249'000'000LL, true);
+                CHECK(value() == doctest::Approx(initial + step));
+                menu->service_song_select_repeat(start + 250'000'000LL, true);
+                menu->service_song_select_repeat(start + 294'000'000LL, true);
+                CHECK(value() == doctest::Approx(initial + 2 * step));
+                menu->service_song_select_repeat(start + 295'000'000LL, true);
+                CHECK(value() == doctest::Approx(initial + 3 * step));
+                menu->service_song_select_repeat(start + 600'000'000LL, true);
+                menu->service_song_select_repeat(start + 624'000'000LL, true);
+                CHECK(value() == doctest::Approx(initial + 4 * step));
+                menu->service_song_select_repeat(start + 625'000'000LL, true);
+                CHECK(value() == doctest::Approx(initial + 5 * step));
+                menu->service_song_select_repeat(start + 1'500'000'000LL, true);
+                menu->service_song_select_repeat(start + 1'514'000'000LL, true);
+                CHECK(value() == doctest::Approx(initial + 6 * step));
+                menu->service_song_select_repeat(start + 1'515'000'000LL, true);
+                CHECK(value() == doctest::Approx(initial + 7 * step));
+                release(*menu, key);
+                menu->service_song_select_repeat(start + 10'000'000'000LL, true);
+                CHECK(value() == doctest::Approx(initial + 7 * step));
+                press(*menu, key);
+                CHECK(menu->song_select_repeat_next_ns_ - menu->song_select_repeat_started_ns_ == 250'000'000LL);
+                const auto before_cancel = value();
+                menu->service_song_select_repeat(menu->song_select_repeat_next_ns_, false);
+                menu->service_song_select_repeat(start + 20'000'000'000LL, true);
+                CHECK(value() == before_cancel);
+                CHECK(menu->song_select_repeat_started_ns_ == 0);
+                // Search owns +/- as text, not Rate adjustment.
+                menu->song_select_search_active_ = true;
+                CHECK_FALSE(menu->is_song_select_repeat_key(189));
+                CHECK_FALSE(menu->is_song_select_repeat_key(187));
+            }
+        }
+        auto menu = fixture();
+        menu->profile_dir_ = profile.path.u8string();
+        menu->reset_screen(MenuApp::Screen::SongSelect);
+        menu->song_select_focus_ = MenuApp::SongSelectFocus::QuickSettings;
+        for (int row : {2, 3}) {
+            menu->song_quick_setting_cursor_ = row;
+            press(*menu, 39);
+            const auto late = menu->song_select_repeat_started_ns_ + 2'000'000'000LL;
+            menu->service_song_select_repeat(late, true);
+            CHECK(menu->song_select_repeat_next_ns_ - late == 45'000'000LL);
+            release(*menu, 39);
+        }
+        menu->song_quick_setting_cursor_ = 1;
+        press(*menu, 39);
+        const auto speed = menu->config_.speed.hi_speed;
+        menu->song_quick_setting_cursor_ = 0;
+        menu->service_song_select_repeat(menu->song_select_repeat_next_ns_, true);
+        CHECK(menu->config_.speed.hi_speed == speed);
+        CHECK(menu->config_.visual_offset_ms == 0);
+        CHECK(menu->song_select_repeat_key_ == 0);
+    }
+
     static void check_cancellation_boundaries() {
         auto menu = fixture();
         press(*menu, menu->key_right_);
@@ -389,6 +478,9 @@ TEST_CASE("rendered audio row hit indices decode to the same settings as keyboar
         REQUIRE(click_target.has_value());
         CHECK(*click_target == kAudioSettingOrder[index]);
     }
+}
+TEST_CASE("accelerated lobby tuning preserves steps search and nonnumeric row cadence") {
+    tenriff::app::MenuAppRepeatTestAccess::check_accelerated_lobby_tuning();
 }
 #endif
 

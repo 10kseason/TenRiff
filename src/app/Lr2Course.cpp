@@ -225,27 +225,33 @@ Lr2CourseSaveResult save_lr2_course_file(std::string_view path,
     return result;
 }
 
-Lr2CourseMatch match_lr2_course(const Lr2CourseDefinition& course,
-                                const std::vector<SongEntry>& songs) {
+std::vector<Lr2CourseMatch> match_lr2_courses(
+    const std::vector<Lr2CourseDefinition>& courses, const std::vector<SongEntry>& songs) {
     std::unordered_map<std::string, std::size_t> by_md5;
     by_md5.reserve(songs.size());
-    for (std::size_t i = 0; i < songs.size(); ++i) {
-        if (songs[i].md5.size() == 32u) {
-            by_md5.try_emplace(lower_ascii(songs[i].md5), i);
+    for (std::size_t i = 0; i < songs.size(); ++i)
+        if (songs[i].md5.size() == 32u) by_md5.try_emplace(lower_ascii(songs[i].md5), i);
+    std::vector<Lr2CourseMatch> matches;
+    matches.reserve(courses.size());
+    for (const auto& course : courses) {
+        Lr2CourseMatch match;
+        for (const auto& md5 : course.chart_md5) {
+            const auto found = by_md5.find(lower_ascii(md5));
+            if (found == by_md5.end()) {
+                match.missing_md5.push_back(md5);
+                match.stage_song_indices.push_back(std::nullopt);
+            } else {
+                match.song_indices.push_back(found->second);
+                match.stage_song_indices.push_back(found->second);
+            }
         }
+        matches.push_back(std::move(match));
     }
+    return matches;
+}
 
-    Lr2CourseMatch match;
-    match.song_indices.reserve(course.chart_md5.size());
-    for (const auto& md5 : course.chart_md5) {
-        const auto found = by_md5.find(lower_ascii(md5));
-        if (found == by_md5.end()) {
-            match.missing_md5.push_back(md5);
-        } else {
-            match.song_indices.push_back(found->second);
-        }
-    }
-    return match;
+Lr2CourseMatch match_lr2_course(const Lr2CourseDefinition& course, const std::vector<SongEntry>& songs) {
+    return match_lr2_courses({course}, songs).front();
 }
 
 }  // namespace tenriff::app

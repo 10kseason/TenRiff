@@ -1,5 +1,7 @@
 #pragma once
 
+#include "app/KeyNoteOverlay.h"
+
 #include "audio/MixNormalizer.h"
 #include "audio/SettingsAdjustmentClick.h"
 
@@ -131,6 +133,7 @@ public:
 
         std::size_t lane_activity_count = 0;
         std::array<float, kGameplayHudMaxLanes> lane_activity{};
+        app::KeyOverlaySnapshot key_overlay;
         std::size_t lane_pressed_count = 0;
         std::array<uint8_t, kGameplayHudMaxLanes> lane_pressed{};
         std::size_t note_count = 0;
@@ -447,6 +450,8 @@ private:
     void adjust_hispeed(double delta);
     void update_hispeed_repeat_state(uint32_t keycode, input::InputState state, int64_t event_time_ns);
     void service_hispeed_repeat(int64_t now_ns);
+    void service_control_repeats(int64_t now_ns, bool foreground);
+    void reset_control_repeats();
     void adjust_judgement_line_position(double delta);
     void adjust_visual_offset(double delta);
     // Returns true when the key belongs to one of the in-play tuning bindings.
@@ -607,6 +612,7 @@ private:
     struct TuningRepeat {
         bool held = false;
         int64_t next_repeat_ns = 0;
+        int64_t started_ns = 0;
     };
     TuningRepeat judgement_line_decrease_repeat_{};
     TuningRepeat judgement_line_increase_repeat_{};
@@ -638,6 +644,8 @@ private:
     int64_t countdown_started_ns_ = 0;
     int64_t hispeed_decrease_next_repeat_ns_ = 0;
     int64_t hispeed_increase_next_repeat_ns_ = 0;
+    int64_t hispeed_decrease_started_ns_ = 0;
+    int64_t hispeed_increase_started_ns_ = 0;
     int64_t result_transition_sample_ = 0;
     std::atomic<bool> gameplay_started_{false};
     bool result_transition_pending_ = false;
@@ -681,6 +689,8 @@ private:
     bool audio_timing_diagnostics_logged_ = false;
     std::vector<float> lane_activity_;
     std::vector<float> ghost_lane_activity_;
+    KeyNoteOverlay key_overlay_;
+    BmsOverlayEstimate key_overlay_chart_;
     std::vector<uint8_t> lane_pressed_;
     std::vector<uint8_t> ghost_lane_pressed_;
     HudCallback hud_callback_;

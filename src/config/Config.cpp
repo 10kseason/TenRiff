@@ -138,6 +138,8 @@ void sanitize_skin_config(SkinConfig& skin) {
         skin.judgement_line_position, kJudgementLinePositionMin, kJudgementLinePositionMax);
     skin.note_divider_gap_px =
         std::clamp(skin.note_divider_gap_px, kNoteDividerGapPxMin, kNoteDividerGapPxMax);
+    skin.key_overlay_x = clamp_finite(skin.key_overlay_x, 0.0, 1.0, 0.0);
+    skin.key_overlay_y = clamp_finite(skin.key_overlay_y, 0.0, 1.0, 0.25);
     skin.lane_divider_brightness = clamp_finite(skin.lane_divider_brightness, 0.0, 1.0, 1.0);
     skin.gameplay_field_offset_x = clamp_finite(
         skin.gameplay_field_offset_x,
@@ -900,6 +902,9 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.skin.hud_layout = normalize_skin_hud_layout_token(
             get_string(*skin, "hud_layout", config.skin.hud_layout));
         config.skin.indicator_background_visible = get_bool(*skin, "indicator_background_visible", false);
+        config.skin.key_overlay_enabled = get_bool(*skin, "key_overlay_enabled", config.skin.key_overlay_enabled);
+        config.skin.key_overlay_x = get_number(*skin, "key_overlay_x", config.skin.key_overlay_x);
+        config.skin.key_overlay_y = get_number(*skin, "key_overlay_y", config.skin.key_overlay_y);
         config.skin.hud_riff_map_visible =
             get_bool(*skin, "hud_riff_map_visible", config.skin.hud_riff_map_visible);
         config.skin.ui_font = normalize_skin_ui_font_token(
@@ -1378,6 +1383,9 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("hit_burst_style",
                  JsonValue{normalize_skin_hit_burst_style_token(config.skin.hit_burst_style)});
     skin.emplace("hud_layout", JsonValue{normalize_skin_hud_layout_token(config.skin.hud_layout)});
+    skin.emplace("key_overlay_enabled", JsonValue{config.skin.key_overlay_enabled});
+    skin.emplace("key_overlay_x", JsonValue{config.skin.key_overlay_x});
+    skin.emplace("key_overlay_y", JsonValue{config.skin.key_overlay_y});
     skin.emplace("hud_riff_map_visible", JsonValue{config.skin.hud_riff_map_visible});
     skin.emplace("indicator_background_visible", JsonValue{config.skin.indicator_background_visible});
     skin.emplace("key_label_position",

@@ -81,6 +81,9 @@ TEST_CASE("skin preset native settings round trip only appearance in Unicode pat
     skin.lane_colors["5k"] = {"rose", "azure", "ice", "azure", "rose"};
     skin.judgement_position = 0.6;
     skin.hud_riff_map_visible = false;
+    skin.key_overlay_enabled = true;
+    skin.key_overlay_x = 0.35;
+    skin.key_overlay_y = 0.9;
     skin.judgement_offset_x = 42;
     skin.show_timing_feedback = false;
     skin.show_timing_bar = true;
@@ -117,6 +120,9 @@ TEST_CASE("skin preset native settings round trip only appearance in Unicode pat
     CHECK(imported.skin.ui_font_path.empty());
     CHECK(imported.skin.judgement_position == doctest::Approx(0.6));
     CHECK_FALSE(imported.skin.hud_riff_map_visible);
+    CHECK(imported.skin.key_overlay_enabled);
+    CHECK(imported.skin.key_overlay_x == doctest::Approx(0.35));
+    CHECK(imported.skin.key_overlay_y == doctest::Approx(0.9));
     CHECK(imported.skin.judgement_offset_x == 42);
     CHECK_FALSE(imported.skin.show_timing_feedback);
     CHECK(imported.skin.show_timing_bar);

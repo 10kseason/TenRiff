@@ -437,7 +437,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
         bms_editor_hover_bgm_index_ = -1;
         bms_editor_note_drag_state_ = MenuWindow::BmsEditorNoteDragState{};
     }
-    if (data.kind != MenuScreenKind::SongSelect) {
+    if (data.kind != MenuScreenKind::SongSelect || data.session_mix.active) {
         clear_song_scrollbar_state();
     }
     if (drag_context == FieldDragContext::None && !gameplay_field_drag_state_.active) {
@@ -1348,7 +1348,11 @@ void MenuWindow::draw(const MenuRenderData& data) {
         d2d_->body_format->SetParagraphAlignment(saved_alignment);
     };
 
+    auto draw_session_mix = [&]() {
+#include "MenuWindow_draw_session_mix.inl"
+    };
     auto draw_song_select = [&]() {
+        if (data.session_mix.active) { draw_session_mix(); return; }
 #include "MenuWindow_draw_songselect_body.inl"
     };
 

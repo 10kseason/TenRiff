@@ -1312,3 +1312,43 @@
 
 {"Krrcream remaps source notes only. nK2 E uses phrase search and adds LNs only inside source LN intervals; NK3 always uses strict P64 plus the host beam solver, and adds the NPU/GPU/CPU MLP only for non-10K sources converted to 10K.", "Krrcreamは元ノートを再配置します。nK2 Eはフレーズ探索を使い、原本LN区間内にだけLNを追加します。NK3は厳格なP64とホスト側ビーム探索を使用し、10K以外から10Kへの変換時だけNPU/GPU/CPUのMLPを追加します。"},
 {"NK2 only", "NK2専用"},
+
+{"DRAFT COURSE", "下書きコース"},
+{"MISSING", "譜面不足"},
+{"Missing chart", "不足している譜面"},
+{"Original course order · continuous gauge", "原コース順 · ゲージ引き継ぎ"},
+{"Draft order and repeated stages are preserved.", "下書きの順番と繰り返しを保持します。"},
+{"Warm-up → challenge → cooldown · about 3 min per stage", "ウォームアップ → 挑戦 → クールダウン · 1曲約3分換算"},
+{"Select a course, then enter.", "コースを選んで開始します。"},
+{"All stages are required to enter.", "全ステージの譜面が必要です。"},
+{"Auto length", "自動ミックスの長さ"},
+{"Remix", "ミックス再生成"},
+{"Save draft", "下書きを保存"},
+{"Import courses", "コースを読み込む"},
+{"Enter course", "コース開始"},
+{"Chart file unavailable: ", "譜面ファイルがありません: "},
+{"Choose a course · review its stages · enter", "コース選択 · ステージ確認 · 開始"},
+{"COURSE OPTIONS", "コースメニュー"},
+{"COURSES", "コース一覧"},
+{"STAGE ORDER", "ステージ順"},
+{"No stages yet", "ステージがありません"},
+{"Previous stages", "前のステージ"},
+{"Next stages", "次のステージ"},
+{"↑↓ / WHEEL SELECT   ENTER / DOUBLE CLICK ENTER   TAB PANEL   ESC BACK", "↑↓ / ホイール 選択   ENTER / ダブルクリック 開始   TAB 領域移動   ESC 戻る"},
+
+// Optional integrated key-note-overlay plugin.
+{"Key Overlay Plugin (4/5/7/8/10K)", "キーオーバーレイ プラグイン (4/5/7/8/10K)"},
+{"Key Overlay X", "キーオーバーレイ X"},
+{"Key Overlay Y", "キーオーバーレイ Y"},
+{"Input estimate", "入力推定"},
+{"Collecting again", "再収集中"},
+{"Live input only", "実入力待ち"},
+{"Collecting input", "入力収集中"},
+
+{"BMS chart estimate", "BMS譜面推定"},
+
+{"BMS only", "BMS専用"},
+
+{"Not rated", "推定不可"},
+
+{"Chart peak", "譜面ピーク"},

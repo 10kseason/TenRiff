@@ -83,6 +83,7 @@ void MenuApp::sync_song_select_state() {
 }
 
 void MenuApp::rebuild_visible_song_list(const std::string* selected_path) {
+    session_mix_auto_dirty_ = true;
     using namespace menu_song_select;
 
     std::string preserved_path;

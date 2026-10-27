@@ -1,42 +1,69 @@
 #pragma once
 
 #include <cstdint>
+#include <array>
 #include <optional>
 #include <string>
 #include <string_view>
 
 namespace tenriff::render {
 
+inline constexpr std::uint32_t kClearEasyRgb = 0x00ED57;
+inline constexpr std::uint32_t kClearNormalRgb = 0xFFF000;
+inline constexpr std::uint32_t kClearHardRgb = 0xFF3838;
+inline constexpr std::uint32_t kClearExRgb = 0xFF44EF; // Fallback when a gradient cannot be allocated.
+inline constexpr std::uint32_t kGradeLowRgb = 0xC2A0FF;
+inline constexpr std::array<std::uint32_t, 7> kClearRainbowRgb{
+    0xFF32ED, 0xFF4848, 0xFFF000, 0x00ED57, 0x00E9FF, 0x7755FF, 0xFF32ED};
+inline constexpr std::array<float, 7> kClearRainbowStops{0.0f, 0.18f, 0.36f, 0.54f, 0.72f, 0.88f, 1.0f};
+
+inline bool grade_uses_clear_rainbow(std::wstring_view grade) {
+    return grade == L"S+" || grade == L"S++" || grade == L"S+++" ||
+           grade == L"SS" || grade == L"SSS" || grade == L"AA" || grade == L"AAA";
+}
+
+inline std::uint32_t grade_display_color(std::wstring_view grade) {
+    if (grade_uses_clear_rainbow(grade)) return kClearExRgb;
+    if (grade == L"S") return kClearHardRgb;
+    if (grade == L"A+" || grade == L"A") return kClearNormalRgb;
+    if (grade == L"B+" || grade == L"B" || grade == L"C+" || grade == L"C" || grade == L"D") return kClearEasyRgb;
+    if (grade == L"E" || grade == L"F") return kGradeLowRgb;
+    return 0xB6C0D0; // AUTO / no record / abort retain their neutral label.
+}
+
 inline std::uint32_t gameplay_gauge_color(std::string_view gauge_token) {
     if (gauge_token == "EX-HARD") {
-        return 0x292C31;
+        return kClearExRgb;
     }
     if (gauge_token == "HARD") {
-        return 0xFF4D6D;
+        return kClearHardRgb;
     }
     if (gauge_token == "EASY") {
-        return 0x89D185;
+        return kClearEasyRgb;
     }
-    return 0xFFB703;
+    return kClearNormalRgb;
 }
 
 inline std::uint32_t song_select_gauge_text_color(std::string_view gauge_tier) {
     if (gauge_tier == "ex_hard") {
-        return 0xFF4D6D;
+        return kClearExRgb;
     }
     if (gauge_tier == "hard") {
-        return 0xFF9F43;
+        return kClearHardRgb;
     }
     if (gauge_tier == "easy") {
-        return 0x5EE59A;
+        return kClearEasyRgb;
     }
-    return 0xFFE45E;
+    return kClearNormalRgb;
 }
 
 struct SongSelectLampPresentation {
     std::string label;
     std::optional<std::uint32_t> color;
     bool tint_card = false;
+    std::string badge_label;
+    std::uint32_t badge_rgb = 0;
+    bool rainbow_badge = false;
 };
 
 inline SongSelectLampPresentation song_select_lamp_presentation(std::string_view status) {
@@ -52,12 +79,21 @@ inline SongSelectLampPresentation song_select_lamp_presentation(std::string_view
     const std::string_view label(result.label);
     if (label == "EX CLEAR" || label == "EX-HARD CLEAR") {
         result.color = song_select_gauge_text_color("ex_hard");
+        result.badge_label = "EX CLEAR";
+        result.badge_rgb = kClearExRgb;
+        result.rainbow_badge = true;
     } else if (label == "HARD CLEAR") {
         result.color = song_select_gauge_text_color("hard");
+        result.badge_label = "HD CLEAR";
+        result.badge_rgb = kClearHardRgb;
     } else if (label == "EASY CLEAR") {
         result.color = song_select_gauge_text_color("easy");
+        result.badge_label = "EZ CLEAR";
+        result.badge_rgb = kClearEasyRgb;
     } else if (label == "CLEAR" || label == "NORMAL CLEAR") {
         result.color = song_select_gauge_text_color("normal");
+        result.badge_label = "NM CLEAR";
+        result.badge_rgb = kClearNormalRgb;
     }
     result.tint_card = result.color.has_value();
     return result;

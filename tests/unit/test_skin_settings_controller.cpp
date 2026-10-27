@@ -25,6 +25,8 @@ const std::vector<std::string> kTenRiffNames{"Native A", "Native B"};
 TEST_CASE("skin percentage controls change by one percent and sliders retain the percent grid") {
     using Skin = tenriff::config::SkinConfig;
     const std::pair<SkinSettingsRowId, double Skin::*> scalars[] = {
+        {SkinSettingsRowId::KeyOverlayX, &Skin::key_overlay_x},
+        {SkinSettingsRowId::KeyOverlayY, &Skin::key_overlay_y},
         {SkinSettingsRowId::NoteFadeIn, &Skin::note_fade_in},
         {SkinSettingsRowId::NoteFadeOut, &Skin::note_fade_out},
         {SkinSettingsRowId::KeyPulse, &Skin::key_pulse_brightness},
@@ -998,4 +1000,21 @@ TEST_CASE("skin mode tabs retain per-mode edits and filtered navigation cannot e
     controller.set_visible_rows({});
     CHECK(controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames).empty());
     CHECK(tenriff::config::serialize_skin_config(runtime.skin) == original);
+}
+
+TEST_CASE("key overlay plugin toggle and position bounds use real skin settings actions") {
+    tenriff::config::RuntimeConfig runtime;
+    SkinSettingsController controller;
+    controller.reset("6k"); // Unsupported play mode must still retain user settings.
+    CHECK_FALSE(runtime.skin.key_overlay_enabled);
+    static_cast<void>(controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::KeyOverlayEnabled));
+    CHECK(runtime.skin.key_overlay_enabled);
+    runtime.skin.key_overlay_x = 1.0;
+    static_cast<void>(controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::KeyOverlayX));
+    CHECK(runtime.skin.key_overlay_x == 1.0);
+    runtime.skin.key_overlay_y = 0;
+    static_cast<void>(controller.handle(MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::KeyOverlayY));
+    CHECK(runtime.skin.key_overlay_y == 0.0);
+    static_cast<void>(controller.handle(MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::KeyOverlayEnabled));
+    CHECK_FALSE(runtime.skin.key_overlay_enabled);
 }

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "app/KeyNoteOverlay.h"
+
 #include "app/MultiplayerMenuState.h"
 #include "network/LanDiscovery.h"
 #include "network/PeerSession.h"
@@ -10,6 +12,7 @@
 #include <functional>
 #include <future>
 #include <memory>
+#include <limits>
 #include <mutex>
 #include <string>
 #include <string_view>
@@ -82,6 +85,7 @@ class MenuApp {
     friend struct MenuAppSongSourceTestAccess;
     friend struct MenuAppVisualTestAccess;
     friend struct MenuAppRepeatTestAccess;
+    friend struct MenuAppSessionMixTestAccess;
     friend struct MenuAppSkinPreviewTestAccess;
     friend struct MenuAppFeedbackTestAccess;
 public:
@@ -239,6 +243,7 @@ private:
 
         std::size_t lane_activity_count = 0;
         std::array<float, kGameplayHudMaxLanes> lane_activity{};
+        app::KeyOverlaySnapshot key_overlay;
         std::size_t lane_pressed_count = 0;
         std::array<uint8_t, kGameplayHudMaxLanes> lane_pressed{};
         std::size_t note_count = 0;
@@ -430,6 +435,12 @@ private:
     void service_bms_editor_preview();
     void stop_bms_editor_preview();
     void start_session_mix();
+    void populate_session_mix_render_data(render::MenuRenderData& render);
+    void refresh_session_mix_auto_plan();
+    void refresh_session_mix_course_matches();
+    bool prepare_session_mix_start();
+    void select_session_mix_course(int index);
+    bool handle_session_mix_click(const render::MenuClickEvent& event);
     bool add_selected_song_to_session_mix_draft();
     void remove_last_session_mix_draft_song();
     bool save_session_mix_draft(std::string_view path);
@@ -773,6 +784,13 @@ private:
     int indexed_favorite_count_ = 0;
 
     int session_mix_minutes_ = 30;
+    int session_mix_focus_ = 0; // 0 courses, 1 actions, 2 stage list
+    int session_mix_stage_offset_ = 0;
+    bool session_mix_auto_dirty_ = true;
+    SessionMixPlan session_mix_auto_plan_{};
+    std::vector<Lr2CourseMatch> session_mix_course_matches_;
+    std::unordered_map<std::string, std::size_t> session_mix_song_paths_;
+    uint64_t session_mix_match_revision_ = (std::numeric_limits<uint64_t>::max)();
     int session_mix_source_index_ = 0;
     std::vector<SessionMixDraftEntry> session_mix_draft_{};
     std::vector<Lr2CourseDefinition> session_mix_lr2_courses_{};
@@ -978,6 +996,7 @@ private:
     int song_level_max_filter_ = 0;
     uint32_t song_select_repeat_key_ = 0;
     int64_t song_select_repeat_next_ns_ = 0;
+    int64_t song_select_repeat_started_ns_ = 0;
     Screen song_select_repeat_screen_ = Screen::Title;
     int song_select_repeat_row_ = -1;
 

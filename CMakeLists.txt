@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.9.9.1 LANGUAGES C CXX)
+project(TenRiff VERSION 1.9.9.3 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -194,6 +194,10 @@ add_library(tenriff_core
     src/app/SkinPreset.cpp
     src/app/GraphicsTiming.cpp
     src/app/ImportedGameplaySkin.cpp
+    src/app/KeyNoteOverlay.cpp
+    third_party/key_note_overlay/pattern_difficulty.cpp
+    third_party/key_note_overlay/mania_strain.cpp
+    third_party/key_note_overlay/dan_rating.cpp
     src/app/Lr2Course.cpp
     src/app/Lr2Skin.cpp
     src/app/TenRiffSkin.cpp
@@ -219,6 +223,7 @@ add_library(tenriff_core
 target_include_directories(tenriff_core
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party
 )
 
 target_compile_features(tenriff_core PUBLIC cxx_std_17)
@@ -349,6 +354,7 @@ if(WIN32)
         src/app/MenuAppDeviceSettings.cpp
         src/app/MenuAppKeymap.cpp
         src/app/MenuAppRecords.cpp
+        src/app/MenuAppSessionMix.cpp
         src/app/MenuAppSongSelect.cpp
         src/app/MenuAppSongSelectRender.cpp
         src/app/MenuAppSongSelectState.cpp
@@ -441,6 +447,15 @@ set_target_properties(tenriff_replay_verifier PROPERTIES
 target_link_libraries(tenriff_replay_verifier PRIVATE tenriff_core)
 
 set_target_properties(tenriff PROPERTIES OUTPUT_NAME "TenRiff")
+
+add_custom_command(TARGET tenriff POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:tenriff>/third_party/key_note_overlay"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/third_party/key_note_overlay/LICENSE"
+        "${CMAKE_CURRENT_SOURCE_DIR}/third_party/key_note_overlay/README.md"
+        "${CMAKE_CURRENT_SOURCE_DIR}/third_party/key_note_overlay/provenance.json"
+        "$<TARGET_FILE_DIR:tenriff>/third_party/key_note_overlay"
+    COMMENT "Copying integrated key overlay license and provenance")
 
 # The small raw-image filter helper is separate from general BGA video decoding.
 # BGA model weights are deliberately never copied: users select their own ONNX.
@@ -828,6 +843,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_song_index.cpp
         tests/unit/test_song_select_state.cpp
         tests/unit/test_song_select_screen.cpp
+        tests/unit/test_key_note_overlay.cpp
         tests/unit/test_session_mix.cpp
         tests/unit/test_lr2_course.cpp
         tests/unit/test_menu_settings_utils.cpp

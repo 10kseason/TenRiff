@@ -1,0 +1,62 @@
+{
+  "upstream": "https://github.com/10kseason/key-note-overlay-cpp",
+  "retrieved": "2026-10-27",
+  "readme_version": "2.13",
+  "files": [
+    {
+      "file": "pattern_difficulty.h",
+      "git_blob_sha1": "11c1efad0eb96a0cf8484ee6133ec5cf6f97a90f",
+      "sha256": "f4539f9a08604a19f84a6755c3f7ce3bd73ae0fa9fe3869b1e7e2c1425aacc73"
+    },
+    {
+      "file": "pattern_difficulty.cpp",
+      "git_blob_sha1": "7418d975c62b35adc5126c81c4a352cd44b8dcfe",
+      "sha256": "71382d41ae55bcb11d693865ac978bc9a9584d6b15cd7bd0af1788762ed958cd"
+    },
+    {
+      "file": "mania_strain.h",
+      "git_blob_sha1": "59fb4a093093788a5463c040e4cc440ae638d350",
+      "sha256": "cc613a511b9d482e6d58d8069cd550614e34ffbd0277d27a2acb4270c89f0138"
+    },
+    {
+      "file": "mania_strain.cpp",
+      "git_blob_sha1": "d5f40065f570f6465aec96ff023662cb33504e52",
+      "sha256": "bdb53fb535f76978024de8bdb900b694df28d2747647a0ea7036f099dbdbf909"
+    },
+    {
+      "file": "dan_rating.h",
+      "git_blob_sha1": "0de49ee4258aad3ee9ad031c2a1a4f3dc8fe51f4",
+      "sha256": "5ff91fc315ff8cd86e9a2bdeb18bd19b9d63f483ce9ca6a833b7a390c3084818"
+    },
+    {
+      "file": "dan_rating.cpp",
+      "git_blob_sha1": "6593ffd00ce3591769c3f1e7a77521b03d9fcb2f",
+      "sha256": "1c6547229f6600589df2f2119e7f1bc9c851bfed19de90b2b5408589235e3508"
+    },
+    {
+      "file": "calibration_tables.h",
+      "git_blob_sha1": "9fb87186ce76f6c9fd4089713ac59102791e92cd",
+      "sha256": "1b11861b677623cabcc324d7a642f3f6020fcd8f8259be9edc39722c72f3aa2b"
+    },
+    {
+      "file": "dan_reference.h",
+      "git_blob_sha1": "10ec1697569f4cea27df45fb2a087dfd3b80d872",
+      "sha256": "d85d2a1e8473029380dc15b29cffd990e02c1461e8d00b10c2de86cb61342342"
+    },
+    {
+      "file": "revive10_reference.h",
+      "git_blob_sha1": "078cf3c8c0eea3a1fdfd9d4bc4ed0239b099b865",
+      "sha256": "451afc76d19135e6eadc068cfb5c7ff552473e6d0f1765dda26dba8e9595d21e"
+    },
+    {
+      "file": "aery_auxiliary_reference.h",
+      "git_blob_sha1": "10bcaa671511b25966108da0efc1e54087eb4a6f",
+      "sha256": "3e665b9bb49e66cf7159beacfc8cc7bd0a4799c989cf4c3a1e81c2e2de62dc29"
+    },
+    {
+      "file": "LICENSE",
+      "git_blob_sha1": "3369ec21a3938f98091e5cb106a1c03c40d26b58",
+      "sha256": "806e4bcd09c6c9b91b91fa12b4726e86cd498e6fb92537725ada19e6897544a6"
+    }
+  ]
+}

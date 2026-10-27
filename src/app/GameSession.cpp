@@ -1,3 +1,4 @@
+#include "app/TuningRepeatTiming.h"
 #include "app/GameSession.h"
 #include "app/AudioFileDecoder.h"
 #include "app/AudioMixPolicy.h"
@@ -80,7 +81,6 @@ constexpr double kHispeedMin = 0.50;
 constexpr double kHispeedMax = 50.00;
 constexpr double kHispeedStep = 0.25;
 constexpr int64_t kHispeedRepeatInitialDelayMs = 180;
-constexpr int64_t kHispeedRepeatIntervalMs = 45;
 // In-play tuning steps. The judgement line moves in 1% of the playfield height and
 // the visual offset in 1 ms, both finer than the menu steps because the player is
 // watching the chart scroll while they nudge it.

@@ -1,3 +1,17 @@
+> **2026-10-27 · 1.9.9.3:** 包含长按调节、LR2CRS课程、BMS/KPS叠加、通关卡片、等级配色和EX彩虹修复。通用固定基线仍为 **1.9.6**。下方旧版本与本地候选描述属于历史记录，以本版范围为准。 [1.9.9.3](docs/release-1.9.9.3.zh-CN.md) · [Verification](docs/release-1.9.9.3-gate.md).
+
+**2026-10-27 · Local:** [评级、起始血条颜色与EX彩虹修正](docs/rank-colors-20261027.zh-CN.md).
+
+**2026-10-27 · Local:** [BMS固定估计、KPS线程和血条颜色](docs/bms-overlay-20261027.zh-CN.md).
+
+**2026-10-27 · Local:** [选曲通关卡片](docs/clear-cards-20261027.zh-CN.md).
+
+**2026-10-27 · Local:** [按键叠加与标志放大](docs/key-overlay-20261027.zh-CN.md).
+
+**2026-10-27 · Local:** [Session Mix课程列表与自动选曲](docs/session-mix-20261027.zh-CN.md).
+
+**2026-10-27 · Local:** [长按调节与默认速度键](docs/controls-20261027.zh-CN.md).
+
 > **2026-10-24 · 1.9.9.1 发布范围：** 21:9显示、LN松开显示与最后尾部等待、在同轨地雷前后留出50ms的LN Mix v3。[变化与兼容性](docs/release-1.9.9.1.zh-CN.md) · [发布检查](docs/release-1.9.9.1-gate.md)。通用固定基线仍为 **1.9.6**。保留旧v1/v2回放，v3需要1.9.9.1验证器。下方旧说明保留当时历史，发布状态与下载以[1.9.9.1发布](https://github.com/10kseason/TenRiff/releases/tag/1.9.9.1)为准。
 
 > **2026-10-22 · 1.9.9 · NK2 E / 16K提交:** [1.9.9](docs/release-1.9.9.zh-CN.md) · [Verification](docs/release-1.9.9-gate.md). Baseline **1.9.6**. 4/5/6/7/8/9/10/12/14/16K. Earlier dated entries below are historical.

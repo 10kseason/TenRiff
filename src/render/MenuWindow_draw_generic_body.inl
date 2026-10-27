@@ -30,9 +30,9 @@
         D2D1_RECT_F header_rect = native_rect("generic.rect.004", D2D1::RectF(left, 48.0f, right, 120.0f));
         if (modern_settings_screen) {
             if (d2d_->panel_brush) ctx->FillRectangle(native_rect("generic.rect.005", D2D1::RectF(0, 0, kBaseWidth, 126)), d2d_->panel_brush.Get());
-            draw_native_asset(native_menu_assets::kMark, D2D1::RectF(64, 30, 112, 88));
+            draw_native_asset(native_menu_assets::kMark, D2D1::RectF(54, 20, 118, 98));
             draw_native_wordmark(d2d_->header_format.Get(),
-                                native_rect("generic.rect.006", D2D1::RectF(128, 24, 384, 94)));
+                                native_rect("generic.rect.006", D2D1::RectF(136, 24, 398, 100)));
             draw_text_clipped(to_wide(data.generic.heading.empty() ? data.screen_title : data.generic.heading),
                               d2d_->title_format.Get(), native_rect("generic.rect.007", D2D1::RectF(420, 34, 1470, 78)), d2d_->text_brush.Get());
             draw_text_clipped(wloc("SETTINGS & TOOLS", "설정 및 도구"), d2d_->hud_format.Get(),

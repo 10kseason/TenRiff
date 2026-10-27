@@ -1,3 +1,17 @@
+> **2026-10-27 · 1.9.9.3:** 長押し調整・LR2CRSコース・BMS/KPSオーバーレイ・クリアカード・ランク色・EX虹色修正を含みます。一般固定基準は **1.9.6**。下記の旧版・ローカル候補説明は当時の履歴で、現在の範囲はこの文書を優先します。 [1.9.9.3](docs/release-1.9.9.3.ja.md) · [Verification](docs/release-1.9.9.3-gate.md).
+
+**2026-10-27 · Local:** [ランク・開始ゲージ色とEX虹色の修正](docs/rank-colors-20261027.ja.md).
+
+**2026-10-27 · Local:** [BMS固定推定・KPSワーカー・ゲージ色](docs/bms-overlay-20261027.ja.md).
+
+**2026-10-27 · Local:** [選曲クリアカード](docs/clear-cards-20261027.ja.md).
+
+**2026-10-27 · Local:** [キーオーバーレイとロゴ拡大](docs/key-overlay-20261027.ja.md).
+
+**2026-10-27 · Local:** [セッションミックスのコース選択と自動選曲](docs/session-mix-20261027.ja.md).
+
+**2026-10-27 · Local:** [長押し調整と既定の速度キー](docs/controls-20261027.ja.md).
+
 > **2026-10-24 · 1.9.9.1 リリース範囲:** 21:9画面・LN途中解除表示と最後の末尾待機・同レーン地雷の前後50msを空けるLN Mix v3。[変更と互換性](docs/release-1.9.9.1.ja.md) · [検証ゲート](docs/release-1.9.9.1-gate.md)。一般固定基準は **1.9.6**。旧v1/v2リプレイを維持し、v3には1.9.9.1検証器が必要。以下の旧案内は当時の履歴であり、公開状態とダウンロードは[1.9.9.1リリース](https://github.com/10kseason/TenRiff/releases/tag/1.9.9.1)を基準とする。
 
 > **2026-10-22 · 1.9.9 · NK2 E / 16K送信:** [1.9.9](docs/release-1.9.9.ja.md) · [Verification](docs/release-1.9.9-gate.md). Baseline **1.9.6**. 4/5/6/7/8/9/10/12/14/16K. Earlier dated entries below are historical.

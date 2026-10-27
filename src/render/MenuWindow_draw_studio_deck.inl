@@ -154,17 +154,24 @@
             const auto& token = data.gameplay.gauge_label;
             const char* slot = token == "EX-HARD" ? "gauge_ex_hard" : token == "HARD" ? "gauge_hard" : token == "EASY" ? "gauge_easy" : "gauge_normal";
             auto rgb = ng_rgb(slot, gameplay_gauge_color(token));
-            // Only the shipped dark EX-HARD default is lifted; authored colors win.
-            if (token == "EX-HARD" && rgb == 0x292C31) rgb = 0xC9CED6;
+            const bool rainbow = token == "EX-HARD";
             const auto color = color_from_rgb(rgb, 1);
             auto* fill = d2d_->note_fill_brush.Get(); const auto saved = fill->GetColor(); fill->SetColor(color);
             if (ratio > 0) for (float x : {field.left - 12, field.right + 2})
-                ctx->FillRectangle(D2D1::RectF(x, hit * (1 - ratio), x + 10, hit), fill);
+                ctx->FillRectangle(D2D1::RectF(x, hit * (1 - ratio), x + 10, hit),
+                    rainbow ? gauge_rainbow_brush(D2D1::RectF(x, 0, x + 10, hit), true, 1)
+                            : static_cast<ID2D1Brush*>(fill));
             const float x = studio_deck.gauge_marker_x, y = gameplay_studio_gauge_marker_y(hit, ratio);
-            ctx->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(x, y, x + 96, y + 40), 7, 7), fill);
+            const auto marker = D2D1::RectF(x, y, x + 96, y + 40);
+            ctx->FillRoundedRectangle(D2D1::RoundedRect(marker, 7, 7),
+                rainbow ? gauge_rainbow_brush(marker, false, 1) : static_cast<ID2D1Brush*>(fill));
             fill->SetColor(saved);
             studio_text(scene_hud_cache.gauge_value_text, studio_fonts.studio_numbers[4].Get(), D2D1::RectF(x + 4, y + 4, x + 92, y + 36), D2D1::ColorF(0x0A0C10), DWRITE_TEXT_ALIGNMENT_CENTER);
-            studio_text(scene_hud_cache.studio_gauge_name, studio_fonts.studio_numbers[0].Get(), D2D1::RectF(x, y + 43, x + 96, y + 65), color, DWRITE_TEXT_ALIGNMENT_LEADING, 2);
+            const auto label = D2D1::RectF(x, y + 43, x + 96, y + 65);
+            if (rainbow) draw_readable_text_aligned(scene_hud_cache.studio_gauge_name,
+                studio_fonts.studio_numbers[0].Get(), label, gauge_rainbow_brush(label, false, 1),
+                DWRITE_TEXT_ALIGNMENT_LEADING, true, 2);
+            else studio_text(scene_hud_cache.studio_gauge_name, studio_fonts.studio_numbers[0].Get(), label, color, DWRITE_TEXT_ALIGNMENT_LEADING, 2);
         };
         auto draw_studio_combo = [&](const GameplayFieldLayout& field, const std::wstring& value,
                                      const GameplayTextPopAnimation& animation, float top, float bottom, float offset, bool ghost) {
