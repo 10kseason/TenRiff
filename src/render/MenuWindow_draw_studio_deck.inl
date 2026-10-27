@@ -152,9 +152,9 @@
             const float hit = gameplay_field_y(field.top, field.height, judgement_line_position);
             const float ratio = static_cast<float>(std::clamp(data.gameplay.gauge / 100.0, 0.0, 1.0));
             const auto& token = data.gameplay.gauge_label;
-            const char* slot = token == "EX-HARD" ? "gauge_ex_hard" : token == "HARD" ? "gauge_hard" : token == "EASY" ? "gauge_easy" : "gauge_normal";
+            const char* slot = gameplay_gauge_is_ex(token) ? "gauge_ex_hard" : token == "HARD" ? "gauge_hard" : token == "EASY" ? "gauge_easy" : "gauge_normal";
             auto rgb = ng_rgb(slot, gameplay_gauge_color(token));
-            const bool rainbow = token == "EX-HARD";
+            const bool rainbow = gameplay_gauge_is_ex(token);
             const auto color = color_from_rgb(rgb, 1);
             auto* fill = d2d_->note_fill_brush.Get(); const auto saved = fill->GetColor(); fill->SetColor(color);
             if (ratio > 0) for (float x : {field.left - 12, field.right + 2})

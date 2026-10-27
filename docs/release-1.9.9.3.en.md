@@ -1,5 +1,7 @@
 # TenRiff 1.9.9.3
 
+Live HUD label `EX` and legacy preview label `EX-HARD` both select the EX palette. This fixes live EX falling back to NM yellow; previews now use the real `EX` label.
+
 This release integrates the 2026-10-27 local follow-ups into published 1.9.9.1. The general fixed baseline remains **1.9.6**. The [release page](https://github.com/10kseason/TenRiff/releases/tag/1.9.9.3) determines publication and downloads.
 
 ## Changes

@@ -932,6 +932,8 @@ struct MenuWindowVisualTestAccess {
         const auto timing_text = gameplay_timing_feedback_text(source.gameplay.timing_feedback_delta_ms);
         JsonObject report{
             {"ui_language", JsonValue(std::string(ui::language_token(source.ui_language)))},
+            {"gameplay_gauge_label", JsonValue(source.gameplay.gauge_label)},
+            {"ghost_gauge_label", JsonValue(source.gameplay.ghost_gauge_label)},
             {"title_language_button_verified", JsonValue(title_language_verified)},
             {"preview_drag", std::move(preview_drag)},
             {"skin_mode_tabs", JsonValue(std::move(skin_tabs))},
@@ -1343,7 +1345,9 @@ int main(int argc, char** argv) {
             std::transform(fixture_gauge.begin(), fixture_gauge.end(), fixture_gauge.begin(),
                 [](unsigned char ch) { return static_cast<char>(std::toupper(ch)); });
             if (fixture_gauge != "NORMAL" && fixture_gauge != "HARD" &&
-                fixture_gauge != "EASY" && fixture_gauge != "EX-HARD") return 2;
+                fixture_gauge != "EASY" && fixture_gauge != "EX-HARD" && fixture_gauge != "EX") return 2;
+            // MenuApp emits the short display label; fixtures must exercise that path.
+            if (fixture_gauge == "EX-HARD") fixture_gauge = "EX";
         }
         else if (arg == "--gauge-value" && i + 1 < argc)
             fixture_gauge_value = std::clamp(std::stod(argv[++i]), 0.0, 100.0);
@@ -1711,9 +1715,9 @@ int main(int argc, char** argv) {
     songs.selected_song_nps_median = 10;
     songs.selected_song_nps_max = 24;
     songs.selected_song_chart_name = "ANOTHER";
-    songs.current_gauge_tier = fixture_gauge == "EX-HARD" ? "ex_hard" :
+    songs.current_gauge_tier = fixture_gauge == "EX" ? "ex_hard" :
         fixture_gauge == "HARD" ? "hard" : fixture_gauge == "EASY" ? "easy" : "normal";
-    songs.current_gauge = fixture_gauge == "EX-HARD" ? "EX-HARD" :
+    songs.current_gauge = fixture_gauge == "EX" ? "EX" :
         fixture_gauge == "HARD" ? loc("Hard", "하드") :
         fixture_gauge == "EASY" ? loc("Easy", "이지") : loc("Normal", "노말");
     songs.current_hi_speed = "3.50";

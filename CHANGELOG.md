@@ -1,5 +1,7 @@
 # 1.9.9.3 — 2026-10-27
 
+- Fix real gameplay `EX` labels falling back to NM yellow; share EX/EX-HARD recognition across Classic/Studio/player/ghost and make visual fixtures use the live label.
+
 - Default F1/F2 speed decrease/increase and accelerated held speed/visual-latency controls, preserving saved bindings.
 - LR2CRS course selection with authored order/missing-stage checks; cached, smoother Auto Mix routes.
 - Optional 4/5/7/8/10K key/hold/KPS overlay with a separate bounded worker and large fixed whole-BMS difficulty; saved Skin Settings toggle/X/Y, default OFF.

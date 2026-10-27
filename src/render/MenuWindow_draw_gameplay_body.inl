@@ -1329,11 +1329,11 @@
                 static_cast<float>(std::clamp(gauge_value / 100.0, 0.0, 1.0));
             const float fill_top =
                 gauge_bottom - (gauge_bottom - gauge_top) * gauge_ratio;
-            const char* gauge_color_slot=gauge_token=="EX-HARD"?"gauge_ex_hard":gauge_token=="HARD"?"gauge_hard":gauge_token=="EASY"?"gauge_easy":"gauge_normal";
+            const char* gauge_color_slot=gameplay_gauge_is_ex(gauge_token)?"gauge_ex_hard":gauge_token=="HARD"?"gauge_hard":gauge_token=="EASY"?"gauge_easy":"gauge_normal";
             const uint32_t gauge_rgb = ng_rgb(gauge_color_slot,gameplay_gauge_color(gauge_token));
             const float gauge_alpha=ng_alpha(gauge_color_slot);
             // EX is a semantic rainbow even when an older skin saved a solid EX color.
-            const bool rainbow = gauge_token == "EX-HARD";
+            const bool rainbow = gameplay_gauge_is_ex(gauge_token);
 
             if (d2d_->accent_brush && gauge_ratio > 0.0f) {
                 const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();

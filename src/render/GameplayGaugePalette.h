@@ -31,8 +31,13 @@ inline std::uint32_t grade_display_color(std::wstring_view grade) {
     return 0xB6C0D0; // AUTO / no record / abort retain their neutral label.
 }
 
+inline bool gameplay_gauge_is_ex(std::string_view gauge_token) {
+    // Live MenuApp HUDs use EX; keep the older preview label compatible.
+    return gauge_token == "EX" || gauge_token == "EX-HARD";
+}
+
 inline std::uint32_t gameplay_gauge_color(std::string_view gauge_token) {
-    if (gauge_token == "EX-HARD") {
+    if (gameplay_gauge_is_ex(gauge_token)) {
         return kClearExRgb;
     }
     if (gauge_token == "HARD") {

@@ -1786,6 +1786,26 @@ struct MenuAppVisualTestAccess {
         app.config_.skin.timing_bar_always_visible = true;
         app.populate_gameplay_render_data(hud);
         report.check("hud.always_never_fabricates_initial_fast", !hud.has_timing_feedback && !hud.ghost_has_timing_feedback);
+        for (const auto type : {game::GaugeType::ExHard, game::GaugeType::Hard,
+                                game::GaugeType::Normal, game::GaugeType::Easy}) {
+            {
+                std::lock_guard<std::mutex> lock(app.gameplay_hud_mutex_);
+                app.gameplay_hud_.gauge_type = type;
+                app.gameplay_hud_.ghost_gauge_type = type;
+            }
+            // Cross the real enum-to-display-label boundary used by live play.
+            app.populate_gameplay_render_data(hud);
+            const bool expected_rainbow = type == game::GaugeType::ExHard;
+            const auto expected_color = expected_rainbow ? render::kClearExRgb :
+                type == game::GaugeType::Hard ? render::kClearHardRgb :
+                type == game::GaugeType::Easy ? render::kClearEasyRgb : render::kClearNormalRgb;
+            report.check("hud.player_gauge_palette_" + hud.gauge_label,
+                render::gameplay_gauge_is_ex(hud.gauge_label) == expected_rainbow &&
+                render::gameplay_gauge_color(hud.gauge_label) == expected_color);
+            report.check("hud.ghost_gauge_palette_" + hud.ghost_gauge_label,
+                render::gameplay_gauge_is_ex(hud.ghost_gauge_label) == expected_rainbow &&
+                render::gameplay_gauge_color(hud.ghost_gauge_label) == expected_color);
+        }
         app.config_.skin = saved_skin;
         {
             std::lock_guard<std::mutex> lock(app.gameplay_hud_mutex_);

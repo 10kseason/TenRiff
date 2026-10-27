@@ -995,6 +995,8 @@ TEST_CASE("imported pressed art is a transient hit pulse instead of an LN hold s
 }
 
 TEST_CASE("gameplay gauge fallback colors match the clear card palette") {
+    // Real MenuApp HUDs emit EX; EX-HARD is a legacy preview label.
+    CHECK(tenriff::render::gameplay_gauge_color("EX") == 0xFF44EFu);
     CHECK(tenriff::render::gameplay_gauge_color("EX-HARD") == 0xFF44EFu);
     CHECK(tenriff::render::gameplay_gauge_color("HARD") == 0xFF3838u);
     CHECK(tenriff::render::gameplay_gauge_color("EASY") == 0x00ED57u);

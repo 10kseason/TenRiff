@@ -1,5 +1,6 @@
 #include "doctest/doctest.h"
 
+#include <array>
 #include <set>
 #include <vector>
 
@@ -186,7 +187,9 @@ struct MenuAppSessionMixTestAccess {
             app->reset_screen(menu::Screen::SessionMix);
             for (int i=0; i<3; ++i) {
                 SongEntry song;
-                song.path = (root / (std::to_string(i) + ".bms")).u8string();
+                // Exercise a path alias: loading canonicalizes paths, including
+                // the short TEMP names used by Windows CI runners.
+                song.path = (root / "." / (std::to_string(i) + ".bms")).u8string();
                 song.title = "Stage " + std::to_string(i); song.md5 = std::string(32, 'a'+i);
                 song.key_count = 7; song.level = 5+i;
                 std::ofstream(song.path) << "#TITLE Test\n#BPM 120\n";
@@ -215,9 +218,13 @@ struct MenuAppSessionMixTestAccess {
         CHECK(view.session_mix.stages[2].title=="Stage 1");
         REQUIRE(app.prepare_session_mix_start());
         REQUIRE(app.session_mix_plan_.entries.size()==3);
-        CHECK(app.session_mix_plan_.entries[0].chart_id==app.indexed_songs_[1].path);
-        CHECK(app.session_mix_plan_.entries[1].chart_id==app.indexed_songs_[0].path);
-        CHECK(app.session_mix_plan_.entries[2].chart_id==app.indexed_songs_[1].path);
+        CHECK(app.indexed_songs_[1].path != app.song_absolute_path(app.indexed_songs_[1]));
+        const std::array<std::size_t, 3> expected_indices{1, 0, 1};
+        for (std::size_t i = 0; i < expected_indices.size(); ++i) {
+            CHECK(std::filesystem::equivalent(
+                std::filesystem::u8path(app.session_mix_plan_.entries[i].chart_id),
+                std::filesystem::u8path(app.indexed_songs_[expected_indices[i]].path)));
+        }
         app.select_session_mix_course(3);
         app.populate_session_mix_render_data(view);
         CHECK_FALSE(view.session_mix.can_start);
