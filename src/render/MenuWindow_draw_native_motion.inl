@@ -20,7 +20,7 @@
                               native_motion_value("entry_seconds", 0.42f, 0.05f, 2));
     const double native_seconds = native_menu_motion_.seconds();
     const float native_intensity = native_motion_value("intensity", 1, 0, 2);
-    if (native_motion_screen && !d2d_->native_menu_brush) {
+    if ((native_motion_screen || data.kind == MenuScreenKind::SongSelect) && !d2d_->native_menu_brush) {
         ctx->CreateSolidColorBrush(native_palette("palette.63e9f2", D2D1::ColorF(0x63E9F2)), &d2d_->native_menu_brush);
         const D2D1_GRADIENT_STOP stops[] = {
             {0.0f, native_palette("palette.101d32", D2D1::ColorF(0x101D32))}, {0.56f, native_palette("palette.101421", D2D1::ColorF(0x101421))},
@@ -93,8 +93,9 @@
     };
     auto draw_native_asset = [&](native_menu_assets::Asset asset, const D2D1_RECT_F& rect,
                                  float alpha = 1.0f, float rotation = 0.0f,
-                                 const D2D1_COLOR_F* vector_color = nullptr) {
-        if (!native_motion_screen || !d2d_->native_menu_brush || alpha <= 0) return;
+                                 const D2D1_COLOR_F* vector_color = nullptr,
+                                 ID2D1Brush* vector_brush = nullptr) {
+        if ((!native_motion_screen && !vector_color) || !d2d_->native_menu_brush || alpha <= 0) return;
         if (native_overrides && !native_style.assets.empty()) {
             const std::array<std::pair<native_menu_assets::Asset, const char*>, 18> names = {{
                 {native_menu_assets::kMark, "mark"}, {native_menu_assets::kPrism, "prism"},
@@ -113,6 +114,26 @@
                     if (ID2D1Bitmap* bitmap = find_song_card_preview_bitmap(it->second)) {
                         D2D1_MATRIX_3X2_F saved;
                         ctx->GetTransform(&saved);
+                        if (vector_color && vector_brush && asset.first == native_menu_assets::kMark.first) {
+                            // A clear badge owns its semantic paint. Reuse the
+                            // imported mark's alpha/shape without editing its file.
+                            const float size = std::min(rect.right - rect.left, rect.bottom - rect.top);
+                            const float x = (rect.left + rect.right - size) * 0.5f;
+                            const float y = (rect.top + rect.bottom - size) * 0.5f;
+                            ctx->SetTransform(D2D1::Matrix3x2F::Rotation(rotation, D2D1::Point2F(50, 50)) *
+                                D2D1::Matrix3x2F::Scale(size / 100, size / 100) *
+                                D2D1::Matrix3x2F::Translation(x, y) * saved);
+                            const auto aa = ctx->GetAntialiasMode();
+                            const float opacity = vector_brush->GetOpacity();
+                            ctx->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
+                            vector_brush->SetOpacity(alpha);
+                            const auto target = fit_rect_preserve_aspect(D2D1::RectF(0, 0, 100, 100), bitmap->GetSize());
+                            ctx->FillOpacityMask(bitmap, vector_brush, &target, nullptr);
+                            vector_brush->SetOpacity(opacity);
+                            ctx->SetAntialiasMode(aa);
+                            ctx->SetTransform(saved);
+                            return;
+                        }
                         ctx->SetTransform(D2D1::Matrix3x2F::Rotation(rotation,
                             D2D1::Point2F((rect.left + rect.right) * 0.5f, (rect.top + rect.bottom) * 0.5f)) * saved);
                         ctx->DrawBitmap(bitmap, fit_rect_preserve_aspect(rect, bitmap->GetSize()),
@@ -136,11 +157,11 @@
             auto* geometry = d2d_->native_menu_geometry[i].Get();
             if (!geometry) continue;
             auto* brush = native_color(native_menu_assets::paths[i].color, alpha);
-            // Only compiled vectors use the role color. Imported PNGs above
-            // retain their authored pixels, including multicolor custom icons.
+            // Clear badges request semantic paint; other icons retain their skin colors.
             if (vector_color) brush->SetColor(*vector_color);
-            if (native_menu_assets::paths[i].filled) ctx->FillGeometry(geometry, brush);
-            else ctx->DrawGeometry(geometry, brush, std::clamp(native_metric("icon.stroke_width", 2.16f), 0.5f, 8.0f));
+            auto* paint = vector_brush ? vector_brush : static_cast<ID2D1Brush*>(brush);
+            if (native_menu_assets::paths[i].filled) ctx->FillGeometry(geometry, paint);
+            else ctx->DrawGeometry(geometry, paint, std::clamp(native_metric("icon.stroke_width", 2.16f), 0.5f, 8.0f));
         }
         ctx->SetTransform(saved);
     };

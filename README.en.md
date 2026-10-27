@@ -1,3 +1,17 @@
+> **2026-10-27 · 1.9.9.3:** Includes accelerated controls, LR2CRS courses, BMS/KPS overlay, clear cards, grade colors and EX rainbow fixes. General fixed baseline: **1.9.6**. Older release and local-candidate entries below are historical; this scope supersedes them. [1.9.9.3](docs/release-1.9.9.3.en.md) · [Verification](docs/release-1.9.9.3-gate.md).
+
+**2026-10-27 · Local:** [Rank/shift colors and EX rainbow correction](docs/rank-colors-20261027.en.md).
+
+**2026-10-27 · Local:** [Fixed BMS estimate, KPS worker and gauge colors](docs/bms-overlay-20261027.en.md).
+
+**2026-10-27 · Local:** [Song-select clear cards](docs/clear-cards-20261027.en.md).
+
+**2026-10-27 · Local:** [Key overlay and larger logo](docs/key-overlay-20261027.en.md).
+
+**2026-10-27 · Local:** [Session Mix course browser and automatic selection](docs/session-mix-20261027.en.md).
+
+**2026-10-27 · Local:** [Held adjustments and default speed keys](docs/controls-20261027.en.md).
+
 > **2026-10-24 · 1.9.9.1 release scope:** 21:9 displays, released-hold visibility and final-tail waiting, and LN Mix v3 with 50ms clearance around same-lane mines. [Changes and compatibility](docs/release-1.9.9.1.en.md) · [Verification gates](docs/release-1.9.9.1-gate.md). The general fixed baseline stays **1.9.6**. Historical v1/v2 replays remain; v3 needs the 1.9.9.1 verifier. Earlier notices below are historical. Publication and downloads follow the [1.9.9.1 release](https://github.com/10kseason/TenRiff/releases/tag/1.9.9.1).
 
 > **2026-10-22 · 1.9.9 · NK2 E / 16K submissions:** [1.9.9](docs/release-1.9.9.en.md) · [Verification](docs/release-1.9.9-gate.md). Baseline **1.9.6**. 4/5/6/7/8/9/10/12/14/16K. Earlier dated entries below are historical.

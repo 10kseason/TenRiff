@@ -96,3 +96,20 @@ TEST_CASE("LR2 course serializer round trips title order repeats and key count")
     CHECK(parsed.courses[0].key_count == 7);
     CHECK(parsed.courses[0].chart_md5 == course.chart_md5);
 }
+
+TEST_CASE("LR2 course batch matching retains missing slots and repeated stages") {
+    SongEntry a; a.md5=std::string(32,'a');
+    SongEntry b; b.md5=std::string(32,'b');
+    Lr2CourseDefinition course;
+    course.chart_md5={std::string(32,'B'),std::string(32,'c'),std::string(32,'a'),std::string(32,'B')};
+    const auto matches=tenriff::app::match_lr2_courses({course,course},{a,b});
+    REQUIRE(matches.size()==2);
+    for (const auto& match:matches) {
+        REQUIRE(match.stage_song_indices.size()==4);
+        CHECK(match.stage_song_indices[0]==1u);
+        CHECK_FALSE(match.stage_song_indices[1].has_value());
+        CHECK(match.stage_song_indices[2]==0u);
+        CHECK(match.stage_song_indices[3]==1u);
+        CHECK_FALSE(match.playable());
+    }
+}

@@ -252,3 +252,11 @@ KeyWeaver E integration (`nk2e/`)
 - Copyright (c) 2026 KeyWeaver contributors
 - License: MIT; full text in `nk2e/LICENSE` (source) and `third_party/keyweaver-e/LICENSE` (runtime package).
 - The original historical `nk2/` implementation remains separate.
+
+Key Note Overlay integration (`third_party/key_note_overlay/`)
+
+- Upstream: https://github.com/10kseason/key-note-overlay-cpp
+- Snapshot: v2.13 main source retrieved 2026-10-27; exact per-file Git blob IDs in `third_party/key_note_overlay/provenance.json`.
+- Copyright (c) 2026 something-ai
+- License: MIT; full text in `third_party/key_note_overlay/LICENSE`.
+- Only the platform-independent difficulty/strain/rank core and calibration tables are included. TenRiff owns the input adapter and rendering. No global hook, tray, process-memory reader or external application is bundled.

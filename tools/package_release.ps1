@@ -3,7 +3,7 @@ param(
     [string]$BuildReleaseDirectory,
     [Parameter(Mandatory = $true)]
     [string]$OutputDirectory,
-    [string]$Version = "1.9.9.1",
+    [string]$Version = "1.9.9.3",
     [switch]$BinaryOnly
 )
 
@@ -112,6 +112,12 @@ foreach ($relative in @(
 $keyweaverNoticeDirectory = Join-Path $binaryRoot "third_party\keyweaver-e"
 New-Item -ItemType Directory -Path $keyweaverNoticeDirectory -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repoRoot "nk2e\LICENSE") -Destination $keyweaverNoticeDirectory
+$keyOverlayNoticeDirectory = Join-Path $binaryRoot "third_party\key_note_overlay"
+New-Item -ItemType Directory -Path $keyOverlayNoticeDirectory -Force | Out-Null
+foreach ($notice in @("LICENSE", "README.md", "provenance.json")) {
+    Copy-Item -LiteralPath (Join-Path $repoRoot "third_party\key_note_overlay\$notice") `
+        -Destination (Join-Path $keyOverlayNoticeDirectory $notice)
+}
 $ncnnNoticeDirectory = Join-Path $binaryRoot "third_party\ncnn-20260526"
 New-Item -ItemType Directory -Path $ncnnNoticeDirectory -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repoRoot "third_party\ncnn-20260526\LICENSE.txt") `

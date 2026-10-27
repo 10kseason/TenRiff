@@ -1,3 +1,17 @@
+> **2026-10-27 · 1.9.9.3:** Includes accelerated controls, LR2CRS courses, BMS/KPS overlay, clear cards, grade colors and EX rainbow fixes. General fixed baseline: **1.9.6**. Older release and local-candidate entries below are historical; this scope supersedes them. [1.9.9.3](release-1.9.9.3.en.md) · [Verification](release-1.9.9.3-gate.md).
+
+**2026-10-27 · Local:** [Rank/shift colors and EX rainbow correction](rank-colors-20261027.en.md).
+
+**2026-10-27 · Local:** [Fixed BMS estimate, KPS worker and gauge colors](bms-overlay-20261027.en.md).
+
+**2026-10-27 · Local:** [Song-select clear cards](clear-cards-20261027.en.md).
+
+**2026-10-27 · Local:** [Key overlay and larger logo](key-overlay-20261027.en.md).
+
+**2026-10-27 · Local:** [Session Mix course browser and automatic selection](session-mix-20261027.en.md).
+
+**2026-10-27 · Local:** [Held adjustments and default speed keys](controls-20261027.en.md).
+
 **2026-10-17 · 1.9.5:** Menu/result music follows the selected sound output. Indicator ranges and markers use blue FAST / green maximum judgement / red LATE. FAST/SLOW updates on maximum hits too. Lobby order is OFF → Mirror → Random → S-Random → Random (Scratch Fixed) → OFF. [Scene audio routing and timing indicators](release-1.9.5.en.md).
 
 **2026-10-17 · 1.9.3 local:** [Indicators, output devices and profile shortcuts](input-feedback-20261017.en.md).

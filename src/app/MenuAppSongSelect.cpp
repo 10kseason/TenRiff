@@ -319,6 +319,9 @@ bool MenuApp::load_session_mix_lr2_course_file(std::string_view path, bool remem
     }
 
     session_mix_lr2_courses_ = result.courses;
+    session_mix_course_matches_.clear();
+    session_mix_stage_offset_ = 0;
+    session_mix_focus_ = 0;
     session_mix_source_index_ = session_mix_lr2_courses_.empty() ? 0 : 2;
 
     fs::path stored_path = menu_song_select::path_from_utf8(path);
@@ -435,78 +438,7 @@ bool MenuApp::save_session_mix_draft(std::string_view path) {
 }
 
 void MenuApp::start_session_mix() {
-    if (session_mix_source_index_ == 1) {
-        session_mix_plan_ = build_session_mix_draft_plan(session_mix_draft_);
-        session_mix_active_course_title_ = "TenRiff Custom Course";
-    } else if (const Lr2CourseDefinition* course = selected_session_mix_lr2_course()) {
-        const Lr2CourseMatch match = match_lr2_course(*course, indexed_songs_);
-        if (!match.missing_md5.empty()) {
-            session_mix_status_message_ =
-                ui_text("LR2 course unavailable: ", "LR2 코스 실행 불가: ") +
-                std::to_string(match.missing_md5.size()) + "/" +
-                std::to_string(course->chart_md5.size()) +
-                ui_text(" charts are missing from the active library.",
-                        "개 채보가 현재 라이브러리에 없습니다.");
-            publish_snapshot();
-            return;
-        }
-        if (match.song_indices.empty()) {
-            session_mix_status_message_ = ui_text(
-                "The selected LR2 course has no playable charts.",
-                "선택한 LR2 코스에 플레이 가능한 채보가 없습니다.");
-            publish_snapshot();
-            return;
-        }
-
-        session_mix_plan_ = {};
-        session_mix_plan_.target_minutes = static_cast<int>(match.song_indices.size()) * 3;
-        session_mix_plan_.entries.reserve(match.song_indices.size());
-        for (const std::size_t song_index : match.song_indices) {
-            const SongEntry& entry = indexed_songs_[song_index];
-            int difficulty = entry.level > 0 ? entry.level : entry.native_level;
-            if (difficulty <= 0 && entry.rating > 0.0) {
-                difficulty = static_cast<int>(std::llround(entry.rating));
-            }
-            session_mix_plan_.entries.push_back(SessionMixEntry{
-                song_absolute_path(entry), SessionMixPhase::Challenge, difficulty});
-        }
-        session_mix_active_course_title_ = course->title;
-    } else {
-        session_mix_active_course_title_.clear();
-        std::vector<SessionMixCandidate> candidates;
-        candidates.reserve(visible_song_count());
-        for (std::size_t i = 0; i < visible_song_count(); ++i) {
-            const SongEntry* entry = visible_song_entry(i);
-            if (!entry) {
-                continue;
-            }
-            const std::string chart_path = song_absolute_path(*entry);
-            if (chart_path.empty()) {
-                continue;
-            }
-            const BestResultRecord best = best_result_for_song_entry(*entry);
-            int difficulty = entry->level > 0 ? entry->level : entry->native_level;
-            if (difficulty <= 0 && entry->rating > 0.0) {
-                difficulty = static_cast<int>(std::llround(entry->rating));
-            }
-            candidates.push_back(SessionMixCandidate{
-                chart_path,
-                difficulty,
-                best.has_value,
-                best.has_value && !best.game_over,
-                best.accuracy,
-            });
-        }
-
-        const std::uint32_t seed = static_cast<std::uint32_t>(
-            timing::HighResClock::now_ns() ^ static_cast<int64_t>(candidates.size()));
-        session_mix_plan_ = build_session_mix_plan(
-            std::move(candidates), session_mix_minutes_, seed);
-    }
-    if (session_mix_plan_.entries.empty()) {
-        session_mix_status_message_ = ui_text(
-            "No playable charts match the current filter.",
-            "현재 필터에 맞는 플레이 가능한 차트가 없습니다.");
+    if (!prepare_session_mix_start()) {
         publish_snapshot();
         return;
     }
@@ -527,7 +459,7 @@ void MenuApp::launch_current_session_mix_song() {
 
     if (!session_mix_active_ || session_mix_cursor_ >= session_mix_plan_.entries.size()) {
         stop_session_mix(true);
-        reset_screen(Screen::SongSelect);
+        reset_screen(Screen::SessionMix);
         publish_snapshot();
         return;
     }
@@ -551,6 +483,7 @@ void MenuApp::launch_current_session_mix_song() {
     launch_gameplay(chart_path);
     if (session_mix_active_ && current_screen() == Screen::SongSelect) {
         stop_session_mix(false);
+        reset_screen(Screen::SessionMix);
         publish_snapshot();
     }
 }
@@ -579,13 +512,13 @@ void MenuApp::advance_session_mix_from_result() {
         session_mix_status_message_ =
             ui_text("COURSE FAILED", "코스 실패") + "  " +
             std::to_string(failed_stage) + "/" + std::to_string(total_stages);
-        reset_screen(Screen::SongSelect);
+        reset_screen(Screen::SessionMix);
         publish_snapshot();
         return;
     }
     if (session_mix_cursor_ + 1 >= session_mix_plan_.entries.size()) {
         stop_session_mix(true);
-        reset_screen(Screen::SongSelect);
+        reset_screen(Screen::SessionMix);
         publish_snapshot();
         return;
     }

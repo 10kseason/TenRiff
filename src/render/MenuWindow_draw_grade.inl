@@ -1,15 +1,6 @@
     // Grades are semantic colors, independent of the monochrome menu palette.
     // Rasterize two Gaussian bloom layers and the crisp glyph once per slot;
     // steady frames (including gameplay) never run a blur or rebuild a layout.
-    auto grade_color = [](std::wstring_view grade) {
-        if (grade == L"S+++" || grade == L"S++" || grade == L"S+" || grade == L"SS" || grade == L"SSS" || grade == L"AA" || grade == L"AAA") return D2D1::ColorF(0xFFD66B);
-        if (grade == L"S") return D2D1::ColorF(0x70ECFF);
-        if (grade == L"A+" || grade == L"A") return D2D1::ColorF(0x9DB3FF);
-        if (grade == L"B+" || grade == L"B") return D2D1::ColorF(0x78E3A9);
-        if (grade == L"C+" || grade == L"C") return D2D1::ColorF(0xFFAD70);
-        if (grade == L"D" || grade == L"F") return D2D1::ColorF(0xFF7386);
-        return D2D1::ColorF(0xB6C0D0);
-    };
     auto draw_grade = [&](std::size_t slot, const std::wstring& text, IDWriteTextFormat* format,
                           const D2D1_RECT_F& rect, float alpha,
                           DWRITE_TEXT_ALIGNMENT alignment = DWRITE_TEXT_ALIGNMENT_LEADING,
@@ -17,7 +8,8 @@
         const float width = std::ceil(rect.right - rect.left), height = std::ceil(rect.bottom - rect.top);
         if (!format || text.empty() || alpha <= 0 || width <= 0 || height <= 0) return;
         auto& cache = d2d_->grade_bitmaps[slot];
-        const auto color = grade_color(text);
+        const auto color = D2D1::ColorF(grade_display_color(text));
+        const bool rainbow = grade_uses_clear_rainbow(text);
         constexpr float pad = 28.0f;
         if (!cache.attempted || cache.text != text || cache.format.Get() != format ||
             cache.width != width || cache.height != height || cache.alignment != alignment || cache.text_scale != text_scale) {
@@ -43,6 +35,25 @@
                 cache.layout->SetMaxWidth(width / cache.fit);
                 cache.layout->SetMaxHeight(height / cache.fit);
             }
+            // Anchor all seven clear colors to the actual glyph bounds, not the
+            // often much wider rank slot. Build once with the existing glyph cache.
+            auto make_rainbow = [&](ID2D1RenderTarget* target) {
+                Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> gradient;
+                if (!rainbow || !cache.layout) return gradient;
+                DWRITE_TEXT_METRICS metrics{};
+                cache.layout->GetMetrics(&metrics);
+                D2D1_GRADIENT_STOP stops[7];
+                for (std::size_t s = 0; s < 7; ++s)
+                    stops[s] = {kClearRainbowStops[s], D2D1::ColorF(kClearRainbowRgb[s])};
+                Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> collection;
+                if (SUCCEEDED(target->CreateGradientStopCollection(stops, 7, &collection)))
+                    target->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(
+                        D2D1::Point2F(metrics.left, 0),
+                        D2D1::Point2F(metrics.left + std::max(1.0f, metrics.width), 0)),
+                        collection.Get(), &gradient);
+                return gradient;
+            };
+            cache.fallback_gradient = make_rainbow(ctx);
             // A separate device context avoids interrupting the window's BeginDraw.
             Microsoft::WRL::ComPtr<ID2D1Device> device;
             Microsoft::WRL::ComPtr<ID2D1DeviceContext> off;
@@ -65,7 +76,9 @@
                 off->BeginDraw();
                 off->Clear(D2D1::ColorF(0, 0));
                 off->SetTransform(D2D1::Matrix3x2F::Scale(cache.fit, cache.fit) * D2D1::Matrix3x2F::Translation(pad, pad));
-                off->DrawTextLayout(D2D1::Point2F(0, 0), cache.layout.Get(), brush.Get());
+                const auto gradient = make_rainbow(off.Get());
+                off->DrawTextLayout(D2D1::Point2F(0, 0), cache.layout.Get(),
+                    gradient ? static_cast<ID2D1Brush*>(gradient.Get()) : brush.Get());
                 const HRESULT glyph_hr = off->EndDraw();
                 off->SetTransform(D2D1::Matrix3x2F::Identity());
                 off->SetTarget(bloom.Get());
@@ -98,7 +111,10 @@
             if (cache.layout) {
                 ctx->SetTransform(D2D1::Matrix3x2F::Scale(cache.fit, cache.fit) *
                     D2D1::Matrix3x2F::Translation(rect.left, rect.top) * saved_transform);
-                ctx->DrawTextLayout(D2D1::Point2F(0, 0), cache.layout.Get(), d2d_->accent_brush.Get(),
+                if (cache.fallback_gradient) cache.fallback_gradient->SetOpacity(std::clamp(alpha, 0.0f, 1.0f));
+                ctx->DrawTextLayout(D2D1::Point2F(0, 0), cache.layout.Get(),
+                                    cache.fallback_gradient ? static_cast<ID2D1Brush*>(cache.fallback_gradient.Get())
+                                                            : d2d_->accent_brush.Get(),
                                     D2D1_DRAW_TEXT_OPTIONS_CLIP);
             } else {
                 const auto fallback_rect = text_scale == 1.0f ? rect : D2D1::RectF(rect.left, rect.top,

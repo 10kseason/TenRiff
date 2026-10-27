@@ -348,6 +348,8 @@ TEST_CASE("profile start controls retain legacy defaults and roundtrip without c
     CHECK(legacy.config.ui.instant_restart_key.empty());
     CHECK(legacy.config.ui.hispeed_decrease_key == "F5");
     CHECK(legacy.config.ui.hispeed_increase_key == "F6");
+    CHECK(legacy.config.ui.function_keys[2] == "F1");
+    CHECK(legacy.config.ui.function_keys[3] == "F2");
     auto edited = legacy.config;
     edited.ui.skip_start_countdown = true;
     edited.ui.instant_restart_key = "F12";
@@ -355,6 +357,11 @@ TEST_CASE("profile start controls retain legacy defaults and roundtrip without c
     edited.ui.hispeed_increase_key.clear();
     edited.ui.function_keys[0] = "F2";
     edited.ui.function_keys[1] = "F1";
+    edited.ui.function_keys[2] = "F2"; // Explicit old defaults remain user choices.
+    edited.ui.function_keys[3] = "F1";
+    edited.skin.key_overlay_enabled = true;
+    edited.skin.key_overlay_x = 0.17;
+    edited.skin.key_overlay_y = 0.72;
     edited.skin.timing_marker_style = "barcode";
     edited.skin.judgement_line_type = 2;
     edited.audio.device_id = "synthetic-endpoint";
@@ -369,6 +376,11 @@ TEST_CASE("profile start controls retain legacy defaults and roundtrip without c
     CHECK(loaded.config.ui.hispeed_increase_key.empty());
     CHECK(loaded.config.ui.function_keys[0] == "F2");
     CHECK(loaded.config.ui.function_keys[1] == "F1");
+    CHECK(loaded.config.ui.function_keys[2] == "F2");
+    CHECK(loaded.config.ui.function_keys[3] == "F1");
+    CHECK(loaded.config.skin.key_overlay_enabled);
+    CHECK(loaded.config.skin.key_overlay_x == doctest::Approx(0.17));
+    CHECK(loaded.config.skin.key_overlay_y == doctest::Approx(0.72));
     CHECK(loaded.config.skin.timing_marker_style == "barcode");
     CHECK(loaded.config.skin.judgement_line_type == 2);
     CHECK(loaded.config.audio.device_id == "synthetic-endpoint");
@@ -2786,7 +2798,7 @@ TEST_CASE("feedback fresh defaults preserve explicit legacy profile values") {
     tenriff::config::RuntimeConfig runtime;
     CHECK(runtime.skin.note_width_scale == doctest::Approx(0.6));
     CHECK(runtime.skin.key_backdrop_height == doctest::Approx(0.5));
-    CHECK((runtime.ui.function_keys == std::array<std::string, 11>{"F3","F4","F2","F1","F5","F6","F7","F8","F9","F10","F11"}));
+    CHECK((runtime.ui.function_keys == std::array<std::string, 11>{"F3","F4","F1","F2","F5","F6","F7","F8","F9","F10","F11"}));
     CHECK((tenriff::config::default_skin_lane_colors("5k") == std::vector<std::string>{"ice","azure","ice","azure","ice"}));
     REQUIRE(tenriff::config::deserialize_skin_config(R"({"note_width_scale":1.0,"key_backdrop_height":1.0,"note_width_scales":{"5k":0.8}})", runtime.skin));
     CHECK(runtime.skin.note_width_scale == doctest::Approx(1.0));

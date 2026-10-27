@@ -269,9 +269,9 @@
         }
 
         const D2D1_RECT_F header_line = native_rect("result_single.rect.002", D2D1::RectF(54.0f, 38.0f, 1866.0f, 122.0f));
-        draw_native_asset(native_menu_assets::kMark, D2D1::RectF(64, 38, 112, 96), presentation.background);
+        draw_native_asset(native_menu_assets::kMark, D2D1::RectF(54, 28, 118, 106), presentation.background);
         draw_native_wordmark(d2d_->header_format.Get(),
-                             native_rect("result_single.rect.003", D2D1::RectF(128, 36, 384, 100)), presentation.background);
+                             native_rect("result_single.rect.003", D2D1::RectF(136, 32, 398, 108)), presentation.background);
         draw_result_text(result_loc("RESULT", "결과"),
                          d2d_->title_format.Get(),
                          native_rect("result_single.rect.004", D2D1::RectF(410.0f, 44.0f, 600.0f, 84.0f)),

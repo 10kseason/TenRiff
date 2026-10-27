@@ -183,6 +183,29 @@
         auto ng_rgb=[&](const char* key,uint32_t fallback){return native_gameplay_rgb(native_style,key,fallback);};
         auto ng_rect=[&](const char* key,D2D1_RECT_F rect){return native_gameplay_d2d_rect(native_style,key,rect);};
         auto ng_color=[&](const char* key,D2D1_COLOR_F color){return native_gameplay_d2d_color(native_style,key,color);};
+        auto gauge_rainbow_brush = [&](const D2D1_RECT_F& rect, bool vertical, float alpha) -> ID2D1Brush* {
+            if (!d2d_->gameplay_gauge_gradient) {
+                D2D1_GRADIENT_STOP stops[7];
+                for (std::size_t s = 0; s < 7; ++s)
+                    stops[s] = {kClearRainbowStops[s], D2D1::ColorF(kClearRainbowRgb[s])};
+                Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> collection;
+                if (SUCCEEDED(ctx->CreateGradientStopCollection(stops, 7, &collection))) {
+                    ctx->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(
+                        D2D1::Point2F(0, 0), D2D1::Point2F(1, 0)), collection.Get(),
+                        &d2d_->gameplay_gauge_gradient);
+                }
+            }
+            if (d2d_->gameplay_gauge_gradient) {
+                d2d_->gameplay_gauge_gradient->SetStartPoint(D2D1::Point2F(rect.left, rect.top));
+                d2d_->gameplay_gauge_gradient->SetEndPoint(vertical
+                    ? D2D1::Point2F(rect.left, rect.bottom) : D2D1::Point2F(rect.right, rect.top));
+                d2d_->gameplay_gauge_gradient->SetOpacity(std::clamp(alpha, 0.0f, 1.0f));
+                return d2d_->gameplay_gauge_gradient.Get();
+            }
+            d2d_->accent_brush->SetOpacity(1.0f);
+            d2d_->accent_brush->SetColor(D2D1::ColorF(kClearExRgb, std::clamp(alpha, 0.0f, 1.0f)));
+            return d2d_->accent_brush.Get();
+        };
         auto ng_font=[&](const char* key,IDWriteTextFormat* fallback){
             const auto it=d2d_->native_gameplay_formats.find(key);
             return !use_imported_metrics && it!=d2d_->native_gameplay_formats.end()?it->second.Get():fallback;
@@ -1306,9 +1329,11 @@
                 static_cast<float>(std::clamp(gauge_value / 100.0, 0.0, 1.0));
             const float fill_top =
                 gauge_bottom - (gauge_bottom - gauge_top) * gauge_ratio;
-            const char* gauge_color_slot=gauge_token=="EX-HARD"?"gauge_ex_hard":gauge_token=="HARD"?"gauge_hard":gauge_token=="EASY"?"gauge_easy":"gauge_normal";
+            const char* gauge_color_slot=gameplay_gauge_is_ex(gauge_token)?"gauge_ex_hard":gauge_token=="HARD"?"gauge_hard":gauge_token=="EASY"?"gauge_easy":"gauge_normal";
             const uint32_t gauge_rgb = ng_rgb(gauge_color_slot,gameplay_gauge_color(gauge_token));
             const float gauge_alpha=ng_alpha(gauge_color_slot);
+            // EX is a semantic rainbow even when an older skin saved a solid EX color.
+            const bool rainbow = gameplay_gauge_is_ex(gauge_token);
 
             if (d2d_->accent_brush && gauge_ratio > 0.0f) {
                 const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
@@ -1326,7 +1351,8 @@
                                 gauge_left + gauge_width - 1.0f,
                                 gauge_bottom - 1.0f);
                 ctx->FillRoundedRectangle(D2D1::RoundedRect(halo, 10.0f, 10.0f),
-                                          d2d_->accent_brush.Get());
+                    rainbow ? gauge_rainbow_brush(gauge, true, 0.16f * visual_opacity * gauge_alpha)
+                            : static_cast<ID2D1Brush*>(d2d_->accent_brush.Get()));
 
                 if (inner_top < inner_bottom) {
                     const D2D1_RECT_F fill =
@@ -1337,7 +1363,8 @@
                     d2d_->accent_brush->SetColor(
                         color_from_rgb(gauge_rgb, 0.80f * visual_opacity*gauge_alpha));
                     ctx->FillRoundedRectangle(D2D1::RoundedRect(fill, 8.0f, 8.0f),
-                                              d2d_->accent_brush.Get());
+                        rainbow ? gauge_rainbow_brush(gauge, true, 0.80f * visual_opacity * gauge_alpha)
+                                : static_cast<ID2D1Brush*>(d2d_->accent_brush.Get()));
 
                     const D2D1_RECT_F sheen =
                         D2D1::RectF(fill.left + 5.0f,
@@ -1385,7 +1412,8 @@
                 draw_readable_text_aligned(gauge_label_text,
                                           scene_body_format.Get(),
                                           label_rect,
-                                          d2d_->accent_brush.Get(),
+                                          rainbow ? gauge_rainbow_brush(label_rect, false, 0.92f * gauge_alpha)
+                                                  : static_cast<ID2D1Brush*>(d2d_->accent_brush.Get()),
                                           DWRITE_TEXT_ALIGNMENT_CENTER);
                 d2d_->accent_brush->SetColor(saved_color);
                 d2d_->accent_brush->SetOpacity(saved_opacity);
@@ -2868,6 +2896,8 @@
                 DWRITE_TEXT_ALIGNMENT_TRAILING);
             d2d_->text_brush->SetColor(saved);
         }
+        #include "MenuWindow_draw_key_overlay.inl"
+
         // Resume keeps the frozen note field visible; only the opening countdown
         // uses the early-return card above. This also leaves LN bodies in place.
         // The count sits on the field the player is about to read, on a

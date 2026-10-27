@@ -154,7 +154,7 @@ struct UiConfig {
     std::string hispeed_decrease_key = "F5";
     std::string hispeed_increase_key = "F6";
     // Stable action slots: line up/down, speed down/up. Saved bindings keep their meaning.
-    std::array<std::string, 11> function_keys{"F3", "F4", "F2", "F1", "F5", "F6", "F7", "F8", "F9", "F10", "F11"};
+    std::array<std::string, 11> function_keys{"F3", "F4", "F1", "F2", "F5", "F6", "F7", "F8", "F9", "F10", "F11"};
     std::string active_song_source;
     std::string last_played_chart_path;
     // The aggregate library preserves the last individual source for switching back.
@@ -253,6 +253,10 @@ struct SkinConfig {
     // Native/LR2 solo HUD layout. Missing legacy-profile keys also select studio.
     std::string hud_layout = "studio";
     bool hud_riff_map_visible = true;
+    bool key_overlay_enabled = false;
+    double key_overlay_x = 0.0;
+    double key_overlay_y = 0.25;
+
     // Legacy preset field; native indicators are background-free since 1.8.9.3.
     bool indicator_background_visible = false;
     std::string key_label_position = "bottom";

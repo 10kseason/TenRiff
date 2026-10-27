@@ -1,3 +1,4 @@
+#include "app/TuningRepeatTiming.h"
 #include "app/NativeFileDialog.h"
 #include "app/MenuApp.h"
 #include "render/SkinGameplayPreview.h"
@@ -729,6 +730,7 @@ void MenuApp::reset_screen(Screen screen) noexcept {
     profile_control_key_status_.clear();
     close_skin_fullscreen_preview();
     reset_song_select_repeat();
+    if (screen == Screen::SessionMix) { session_mix_auto_dirty_ = true; session_mix_focus_ = 0; }
     menu_navigator_.reset(screen);
 }
 
@@ -737,6 +739,7 @@ void MenuApp::push_screen(Screen screen) {
     profile_control_key_status_.clear();
     close_skin_fullscreen_preview();
     reset_song_select_repeat();
+    if (screen == Screen::SessionMix) { session_mix_auto_dirty_ = true; session_mix_focus_ = 0; }
     menu_navigator_.push(screen);
 }
 
@@ -2282,7 +2285,8 @@ void MenuApp::handle_input_event(const input::InputEvent& incoming_event) {
         pressed_keys_.count(event.keycode) != 0;
     const bool duplicate_adjustment_press = event.state == input::InputState::Pressed &&
         (event.keycode == key_left_ || event.keycode == key_right_ ||
-         (event.keycode == key_backspace_ && is_song_select_repeat_key(event.keycode))) &&
+         ((event.keycode == key_backspace_ || event.keycode == key_minus_ || event.keycode == key_plus_) &&
+          is_song_select_repeat_key(event.keycode))) &&
         event.keycode == song_select_repeat_key_ && pressed_keys_.count(event.keycode) != 0;
     const bool fresh_press = event.state == input::InputState::Pressed && pressed_keys_.count(event.keycode) == 0;
     update_pressed_keys(event);
@@ -2795,6 +2799,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
     if (current_screen() == Screen::SongSelect) {
         sync_song_select_state();
     }
+    if (current_screen() == Screen::SessionMix && handle_session_mix_click(event)) return;
     if (event.kind == render::MenuHitTargetKind::MouseWheel) {
         if (current_screen() == Screen::SongSelect && event.wheel_steps != 0) {
             song_select_focus_ = SongSelectFocus::SongList;
@@ -4255,43 +4260,48 @@ void MenuApp::handle_options_hub_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_session_mix_input(uint32_t keycode) {
-    if (keycode == key_up_) {
-        settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, 5);
-        publish_snapshot();
+    if (keycode == key_escape_ || keycode == key_backspace_) {
+        if (!pop_screen()) reset_screen(Screen::SongSelect);
+        publish_snapshot(); return;
+    }
+    if (keycode == key_tab_) {
+        session_mix_focus_ = (session_mix_focus_ + 1) % 3;
+        settings_cursor_ = std::clamp(settings_cursor_, 0, 5);
+        reset_song_select_repeat(); publish_snapshot(); return;
+    }
+    if (keycode == key_up_ || keycode == key_down_ || keycode == key_page_up_ || keycode == key_page_down_) {
+        const int direction = keycode == key_up_ || keycode == key_page_up_ ? -1 : 1;
+        const int step = keycode == key_page_up_ || keycode == key_page_down_ ? 7 : 1;
+        if (session_mix_focus_ == 0) {
+            const int count = static_cast<int>(session_mix_lr2_courses_.size()) + 2;
+            session_mix_source_index_ = (session_mix_source_index_ + direction * step % count + count) % count;
+            session_mix_stage_offset_ = 0;
+            session_mix_status_message_.clear();
+        } else if (session_mix_focus_ == 1) settings_cursor_ = (settings_cursor_ + direction + 6) % 6;
+        else session_mix_stage_offset_ = std::max(0, session_mix_stage_offset_ + direction * step);
+        publish_snapshot(); return;
+    }
+    if ((keycode == key_left_ || keycode == key_right_) && session_mix_focus_ != 1) {
+        session_mix_focus_ = keycode == key_left_ ? 0 : 2;
+        reset_song_select_repeat(); publish_snapshot(); return;
+    }
+    if (session_mix_focus_ != 1) {
+        if (keycode == key_enter_) start_session_mix();
         return;
     }
-    if (keycode == key_down_) {
-        settings_cursor_ = clamp_int(settings_cursor_ + 1, 0, 5);
-        publish_snapshot();
-        return;
-    }
-    if ((keycode == key_left_ || keycode == key_right_) && settings_cursor_ == 0) {
-        const int option_count = static_cast<int>(session_mix_lr2_courses_.size()) + 2;
-        const int direction = keycode == key_left_ ? -1 : 1;
-        session_mix_source_index_ =
-            (session_mix_source_index_ + direction + option_count) % option_count;
-        session_mix_status_message_.clear();
-        publish_snapshot();
-        return;
-    }
-    if ((keycode == key_left_ || keycode == key_right_) && settings_cursor_ == 1 &&
-        session_mix_source_index_ == 0) {
-        session_mix_minutes_ = cycle_session_mix_minutes(
-            session_mix_minutes_, keycode == key_left_ ? -1 : 1);
-        publish_snapshot();
-        return;
+    if (settings_cursor_ == 0 && (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
+        session_mix_minutes_ = cycle_session_mix_minutes(session_mix_minutes_, keycode == key_left_ ? -1 : 1);
+        session_mix_auto_dirty_ = true;
+        select_session_mix_course(0);
+        session_mix_focus_ = 1;
+        publish_snapshot(); return;
     }
     if (keycode == key_enter_) {
-        if (settings_cursor_ == 0) {
-            const int option_count = static_cast<int>(session_mix_lr2_courses_.size()) + 2;
-            session_mix_source_index_ = (session_mix_source_index_ + 1) % option_count;
-            session_mix_status_message_.clear();
+        if (settings_cursor_ == 1) {
+            session_mix_auto_dirty_ = true;
+            select_session_mix_course(0);
+            session_mix_focus_ = 1;
             publish_snapshot();
-        } else if (settings_cursor_ == 1) {
-            if (session_mix_source_index_ == 0) {
-                session_mix_minutes_ = cycle_session_mix_minutes(session_mix_minutes_, 1);
-                publish_snapshot();
-            }
         } else if (settings_cursor_ == 2) {
 #ifdef _WIN32
             if (!session_mix_draft_.empty()) {
@@ -4314,21 +4324,8 @@ void MenuApp::handle_session_mix_input(uint32_t keycode) {
             }
 #endif
             publish_snapshot();
-        } else if (settings_cursor_ == 4) {
-            start_session_mix();
-        } else {
-            if (!pop_screen()) {
-                reset_screen(Screen::SongSelect);
-            }
-            publish_snapshot();
-        }
-        return;
-    }
-    if (keycode == key_escape_) {
-        if (!pop_screen()) {
-            reset_screen(Screen::SongSelect);
-        }
-        publish_snapshot();
+        } else if (settings_cursor_ == 4) start_session_mix();
+        else if (settings_cursor_ == 5) handle_session_mix_input(key_escape_);
     }
 }
 
@@ -5265,7 +5262,7 @@ void MenuApp::handle_result_input(uint32_t keycode) {
         if (keycode == key_escape_) {
             record_current_session_mix_result();
             stop_session_mix(false);
-            reset_screen(Screen::SongSelect);
+            reset_screen(Screen::SessionMix);
             publish_snapshot();
             return;
         }

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "app/KeyNoteOverlay.h"
+
 #ifdef _WIN32
 
 #include "GameplayHudLimits.h"
@@ -101,6 +103,7 @@ enum class MenuHitTargetKind {
     SkinModeTab,
     SkinSettingsSearch,
     KeymapModeTab,
+    SessionMixStagePage,
 };
 
 enum class SongDifficultyTableAction {
@@ -173,6 +176,29 @@ struct SongCardData {
     int song_index = -1;
     bool selected = false;
     bool favorite = false;
+};
+
+struct SessionMixStageData {
+    std::string title;
+    std::string detail;
+    bool missing = false;
+};
+
+struct SessionMixSelectionData {
+    bool active = false;
+    bool controls_focused = false;
+    bool stages_focused = false;
+    bool can_start = false;
+    int selected = 0;
+    int stage_offset = 0;
+    int control_cursor = 0;
+    std::string title;
+    std::string summary;
+    std::string status;
+    std::string source;
+    std::vector<MenuButtonData> courses;
+    std::vector<MenuButtonData> controls;
+    std::vector<SessionMixStageData> stages;
 };
 
 struct SongSelectData {
@@ -554,6 +580,10 @@ struct GameplayHudData {
     std::string hit_burst_style = "prism";
     std::string hud_layout = "studio";
     bool hud_riff_map_visible = true;
+    bool key_overlay_enabled = false;
+    double key_overlay_x = 0.0;
+    double key_overlay_y = 0.25;
+
     bool indicator_background_visible = false;
     std::string key_label_position = "bottom";
     bool note_border_enabled = true;
@@ -640,6 +670,7 @@ struct GameplayHudData {
 
     std::size_t lane_activity_count = 0;
     std::array<float, kGameplayHudMaxLanes> lane_activity{};
+    app::KeyOverlaySnapshot key_overlay;
     std::size_t lane_pressed_count = 0;
     std::array<uint8_t, kGameplayHudMaxLanes> lane_pressed{};
     std::size_t lane_color_count = 0;
@@ -769,6 +800,10 @@ struct SkinPreviewData {
     std::string hit_burst_style = "prism";
     std::string hud_layout = "studio";
     bool hud_riff_map_visible = true;
+    bool key_overlay_enabled = false;
+    double key_overlay_x = 0.0;
+    double key_overlay_y = 0.25;
+
     bool indicator_background_visible = false;
     std::string key_label_position = "bottom";
     bool note_border_enabled = true;
@@ -937,6 +972,7 @@ struct MenuRenderData {
 
     TitleMenuData title;
     SongSelectData song_select;
+    SessionMixSelectionData session_mix;
     BmsEditorData bms_editor;
     ResultScreenData result;
     GameplayHudData gameplay;

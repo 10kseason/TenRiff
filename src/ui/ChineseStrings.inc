@@ -1313,3 +1313,43 @@
 
 {"Krrcream remaps source notes only. nK2 E uses phrase search and adds LNs only inside source LN intervals; NK3 always uses strict P64 plus the host beam solver, and adds the NPU/GPU/CPU MLP only for non-10K sources converted to 10K.", "Krrcream仅重新分配原谱音符。nK2 E使用乐句搜索，只在原谱长按区间内添加长按。NK3始终使用严格P64和主机束搜索求解器，仅在非10K谱面转为10K时加入NPU/GPU/CPU MLP。"},
 {"NK2 only", "仅限NK2"},
+
+{"DRAFT COURSE", "草稿课程"},
+{"MISSING", "缺少谱面"},
+{"Missing chart", "缺少谱面"},
+{"Original course order · continuous gauge", "原课程顺序 · 连续血条"},
+{"Draft order and repeated stages are preserved.", "保留草稿顺序和重复关卡。"},
+{"Warm-up → challenge → cooldown · about 3 min per stage", "热身 → 挑战 → 放松 · 每关按约3分钟估算"},
+{"Select a course, then enter.", "选择课程后进入。"},
+{"All stages are required to enter.", "需要所有关卡谱面才能进入。"},
+{"Auto length", "自动混合时长"},
+{"Remix", "重新生成混合"},
+{"Save draft", "保存草稿"},
+{"Import courses", "导入课程"},
+{"Enter course", "进入课程"},
+{"Chart file unavailable: ", "谱面文件不可用："},
+{"Choose a course · review its stages · enter", "选择课程 · 查看关卡 · 进入"},
+{"COURSE OPTIONS", "课程菜单"},
+{"COURSES", "课程列表"},
+{"STAGE ORDER", "关卡顺序"},
+{"No stages yet", "尚无关卡"},
+{"Previous stages", "上一页关卡"},
+{"Next stages", "下一页关卡"},
+{"↑↓ / WHEEL SELECT   ENTER / DOUBLE CLICK ENTER   TAB PANEL   ESC BACK", "↑↓ / 滚轮 选择   ENTER / 双击 进入   TAB 切换区域   ESC 返回"},
+
+// Optional integrated key-note-overlay plugin.
+{"Key Overlay Plugin (4/5/7/8/10K)", "按键叠加插件 (4/5/7/8/10K)"},
+{"Key Overlay X", "按键叠加 X"},
+{"Key Overlay Y", "按键叠加 Y"},
+{"Input estimate", "输入模式估计"},
+{"Collecting again", "重新收集中"},
+{"Live input only", "等待实际输入"},
+{"Collecting input", "输入收集中"},
+
+{"BMS chart estimate", "BMS谱面估计"},
+
+{"BMS only", "仅限BMS"},
+
+{"Not rated", "无法估计"},
+
+{"Chart peak", "谱面峰值"},

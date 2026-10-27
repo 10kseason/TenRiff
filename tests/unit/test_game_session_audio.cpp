@@ -1,5 +1,6 @@
 #include "doctest/doctest.h"
 #include "app/GameSession.h"
+#include "app/ChartLoader.h"
 #include "app/GameplayStartPolicy.h"
 #include "app/JudgeTimingPolicy.h"
 #include "app/ModeManager.h"
@@ -40,6 +41,109 @@ struct CompletionTestDirectory {
 // Exercise the production input-to-voice-to-mixer path without starting a device,
 // input thread, decoder, profile or record writer.
 struct GameSessionAudioTestAccess {
+    static void check_bms_overlay_hud() {
+        CompletionTestDirectory directory;
+        const auto path = directory.path / "overlay.bms";
+        {
+            std::ofstream file(path);
+            file << "#TITLE Overlay integration\n#PLAYER 1\n#BPM 240\n";
+            const int channels[] = {11, 12, 13, 14, 15, 18, 19};
+            for (int measure = 1; measure <= 16; ++measure) {
+                for (int lane = 0; lane < 7; ++lane) {
+                    const auto number = std::to_string(1000 + measure).substr(1);
+                    file << '#' << number << channels[lane] << ':';
+                    for (int row = 0; row < 16; ++row) file << (row % 7 == lane ? "01" : "00");
+                    file << '\n';
+                }
+            }
+        }
+        const auto loaded = ChartLoader{}.load(path.u8string(), 48000, 1.0);
+        REQUIRE(loaded.success());
+        REQUIRE(loaded.format == ChartFormat::Bms);
+        REQUIRE(loaded.chart.lane_count == 7);
+        REQUIRE(loaded.chart.notes.size() == 256);
+        auto session = shift_lane_fixture(32, false);
+        session->key_overlay_chart_ = estimate_bms_overlay_difficulty(loaded.chart, 48000);
+        REQUIRE(session->key_overlay_chart_.difficulty.ready);
+        const auto rating = session->key_overlay_chart_.difficulty.rating;
+        session->key_overlay_.configure(true, 7);
+        REQUIRE(session->key_overlay_.start());
+        for (int state = 0; state < 3; ++state) {
+            session->paused_.store(state == 1);
+            session->autoplay_enabled_ = state == 2;
+            const auto hud = session->hud_snapshot();
+            CHECK(hud.key_overlay.visible);
+            CHECK(hud.key_overlay.bms_chart);
+            CHECK(hud.key_overlay.difficulty.ready);
+            CHECK(hud.key_overlay.difficulty.rating == rating);
+            if (state != 0) {
+                CHECK_FALSE(hud.key_overlay.live);
+                CHECK(hud.key_overlay.kps == 0);
+            }
+        }
+        session->key_overlay_.stop();
+    }
+    static void check_key_overlay_routing() {
+        for (int boundary = 0; boundary < 3; ++boundary) {
+            auto session = shift_lane_fixture(32, false);
+            session->key_overlay_.configure(true, 4);
+            session->physical_key_state_probe_ = [](uint32_t) { return false; };
+            queue_physical_edge(*session, 32, input::InputState::Pressed, 48000);
+            if (boundary == 0) session->process_countdown_input_queue();
+            if (boundary == 1) session->process_paused_input_queue();
+            if (boundary == 2) session->rebaseline_gameplay_start_input_state(48000);
+            CHECK(session->key_overlay_.update(1'050'000'000LL, true).note_count == 0);
+        }
+        for (bool future : {false, true}) {
+            std::vector<gameplay::ReplayEvent> baseline;
+            int64_t baseline_score = 0;
+            for (bool enabled : {false, true}) {
+                auto session = shift_lane_fixture(32, false);
+                session->key_overlay_.configure(enabled, 4);
+                session->key_to_lane_ = {{32, 1}, {33, 1}};
+                session->lane_binding_state_.configure(session->key_to_lane_);
+                queue_physical_edge(*session, 32, input::InputState::Pressed, 48000, future);
+                queue_physical_edge(*session, 33, input::InputState::Pressed, 48480, future);
+                queue_physical_edge(*session, 33, input::InputState::Released, 48960, future);
+                queue_physical_edge(*session, 32, input::InputState::Released, 49440, future);
+                queue_physical_edge(*session, 116, input::InputState::Pressed, 49920, future);
+                const auto state = session->key_overlay_.update(1'050'000'000LL, true);
+                CHECK(state.visible == enabled);
+                CHECK(state.note_count == (enabled ? 1u : 0u));
+                CHECK_FALSE(state.held[0]);
+                if (enabled) {
+                    CHECK(state.notes[0].press_ms == 1000);
+                    CHECK(state.notes[0].release_ms == 1020);
+                    CHECK(state.accepted_presses == 1);
+                    CHECK(state.kps == 1);
+                    CHECK_FALSE(state.difficulty.ready);
+                }
+                // Enabling this observer must not alter either accepted scoring edge.
+                const auto& events = session->engine_->replay().events;
+                if (!enabled) {
+                    baseline = events;
+                    baseline_score = session->engine_->stats().raw_score;
+                } else {
+                    REQUIRE(!baseline.empty());
+                    REQUIRE(events.size() == baseline.size());
+                    for (std::size_t i = 0; i < events.size(); ++i) {
+                        CHECK(events[i].lane == baseline[i].lane);
+                        CHECK(events[i].state == baseline[i].state);
+                        CHECK(events[i].sample == baseline[i].sample);
+                    }
+                    CHECK(session->engine_->stats().raw_score == baseline_score);
+                }
+            }
+        }
+        for (bool replay : {false, true}) {
+            auto session = shift_lane_fixture(32, false);
+            session->key_overlay_.configure(true, 4);
+            session->replay_playback_enabled_ = replay;
+            session->autoplay_enabled_ = !replay;
+            queue_physical_edge(*session, 32, input::InputState::Pressed, 48000);
+            CHECK(session->key_overlay_.update(1'050'000'000LL, true).note_count == 0);
+        }
+    }
     static void check_default_tuning_directions() {
         for (bool paused : {false, true}) {
             auto session = pause_fixture();
@@ -56,7 +160,7 @@ struct GameSessionAudioTestAccess {
                 REQUIRE(session->handle_control_input(release));
             };
             // Physical Windows F1-F4 codes, passed only to the production handler.
-            press(112); CHECK(session->config_.speed.hi_speed == doctest::Approx(4.25));
+            press(112); CHECK(session->config_.speed.hi_speed == doctest::Approx(3.75));
             CHECK(session->config_.skin.judgement_line_position == doctest::Approx(0.82));
             press(113); CHECK(session->config_.speed.hi_speed == doctest::Approx(4.0));
             press(114); CHECK(session->config_.skin.judgement_line_position == doctest::Approx(0.81));
@@ -69,6 +173,82 @@ struct GameSessionAudioTestAccess {
             CHECK(session->engine_->stats().raw_score == 0);
         }
     }
+    static void check_accelerated_tuning() {
+        constexpr int64_t start = 1'000'000'000LL;
+        for (bool paused : {false, true}) {
+            for (const int action : {0, 1, 2, 3, 6, 7}) {
+                auto session = pause_fixture();
+                const auto keys = resolve_function_keys(session->config_.ui, session->key_to_lane_);
+                session->f1_keycode_ = keys[0]; session->f2_keycode_ = keys[1];
+                session->f3_keycode_ = keys[2]; session->f4_keycode_ = keys[3];
+                session->f7_keycode_ = keys[6]; session->f8_keycode_ = keys[7];
+                session->config_.speed.hi_speed = 10.0;
+                session->config_.skin.judgement_line_position = 0.5;
+                session->config_.visual_offset_ms = 0.0;
+                if (paused) control(*session, 27);
+                const auto value = [&] {
+                    return action < 2 ? session->config_.skin.judgement_line_position
+                         : action < 4 ? session->config_.speed.hi_speed : session->config_.visual_offset_ms;
+                };
+                const double step = (action % 2 == 0 ? -1.0 : 1.0) *
+                    (action < 2 ? 0.01 : action < 4 ? 0.25 : 1.0);
+                const double initial = value();
+                const auto edge = [&](input::InputState state, int64_t time) {
+                    REQUIRE(session->handle_control_input({keys[action], state, time}));
+                };
+                edge(input::InputState::Pressed, start);
+                CHECK(value() == doctest::Approx(initial + step));
+                edge(input::InputState::Pressed, start + 100'000'000LL);
+                session->service_control_repeats(start + 179'000'000LL, true);
+                CHECK(value() == doctest::Approx(initial + step));
+                session->service_control_repeats(start + 180'000'000LL, true);
+                CHECK(value() == doctest::Approx(initial + 2 * step));
+                session->service_control_repeats(start + 224'000'000LL, true);
+                CHECK(value() == doctest::Approx(initial + 2 * step));
+                session->service_control_repeats(start + 225'000'000LL, true);
+                CHECK(value() == doctest::Approx(initial + 3 * step));
+                // Late ticks apply one step, then 25ms/15ms intervals after the
+                // specified hold thresholds instead of a burst of missed steps.
+                session->service_control_repeats(start + 600'000'000LL, true);
+                session->service_control_repeats(start + 624'000'000LL, true);
+                CHECK(value() == doctest::Approx(initial + 4 * step));
+                session->service_control_repeats(start + 625'000'000LL, true);
+                CHECK(value() == doctest::Approx(initial + 5 * step));
+                session->service_control_repeats(start + 1'500'000'000LL, true);
+                session->service_control_repeats(start + 1'514'000'000LL, true);
+                CHECK(value() == doctest::Approx(initial + 6 * step));
+                session->service_control_repeats(start + 1'515'000'000LL, true);
+                CHECK(value() == doctest::Approx(initial + 7 * step));
+                edge(input::InputState::Released, start + 1'516'000'000LL);
+                session->service_control_repeats(start + 5'000'000'000LL, true);
+                CHECK(value() == doctest::Approx(initial + 7 * step));
+                // A fresh press restarts the full delay, including after focus loss.
+                edge(input::InputState::Pressed, start + 6'000'000'000LL);
+                session->service_control_repeats(start + 6'179'000'000LL, true);
+                CHECK(value() == doctest::Approx(initial + 8 * step));
+                session->service_control_repeats(start + 6'180'000'000LL, false);
+                session->service_control_repeats(start + 7'000'000'000LL, true);
+                CHECK(value() == doctest::Approx(initial + 8 * step));
+                edge(input::InputState::Released, start + 7'000'000'001LL);
+                edge(input::InputState::Pressed, start + 8'000'000'000LL);
+                session->pause_resume_requested_.store(true);
+                session->service_control_repeats(start + 10'000'000'000LL, true);
+                CHECK(value() == doctest::Approx(initial + 9 * step));
+                CHECK(session->engine_->replay().events.empty());
+                CHECK(session->engine_->stats().raw_score == 0);
+            }
+        }
+        // Chat/help consumption also clears a previously held speed key.
+        auto session = pause_fixture();
+        session->f3_keycode_ = 112;
+        session->config_.speed.hi_speed = 10.0;
+        REQUIRE(session->handle_control_input({112, input::InputState::Pressed, start}));
+        session->control_input_callback_ = [](const input::InputEvent&) { return true; };
+        REQUIRE(session->handle_control_input({122, input::InputState::Pressed, start + 1}));
+        session->service_control_repeats(start + 2'000'000'000LL, true);
+        CHECK(session->config_.speed.hi_speed == doctest::Approx(9.75));
+    }
+
     static void check_pcm_retention_until_stop() {
         GameSession session;
         session.sample_rate_ = 1000;
@@ -3180,7 +3360,7 @@ TEST_CASE("Shift bindings share secondary LN state without premature release") {
 }
 
 #ifdef _WIN32
-TEST_CASE("fresh default F1 raises speed F2 lowers speed F3 raises line F4 lowers line") {
+TEST_CASE("fresh default F1 lowers speed F2 raises speed F3 raises line F4 lowers line") {
     tenriff::app::GameSessionAudioTestAccess::check_default_tuning_directions();
 }
 #endif
@@ -3415,4 +3595,16 @@ TEST_CASE("BMS chart volume controls BGM and keysounds independently of menu mus
 
 TEST_CASE("decoded chart PCM survives runtime maintenance and releases at session stop") {
     tenriff::app::GameSessionAudioTestAccess::check_pcm_retention_until_stop();
+}
+
+TEST_CASE("accelerated gameplay tuning keeps precise steps and cancels on release focus resume and overlay") {
+    tenriff::app::GameSessionAudioTestAccess::check_accelerated_tuning();
+}
+
+TEST_CASE("key overlay observes accepted gameplay edges without changing replay or counting controls autoplay replay") {
+    tenriff::app::GameSessionAudioTestAccess::check_key_overlay_routing();
+}
+
+TEST_CASE("BMS overlay parser and session HUD retain one chart estimate through pause and autoplay") {
+    tenriff::app::GameSessionAudioTestAccess::check_bms_overlay_hud();
 }

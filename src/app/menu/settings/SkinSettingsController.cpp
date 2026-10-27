@@ -559,6 +559,15 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
         case SkinSettingsRowId::IndicatorBackground:
             runtime.skin.indicator_background_visible = !runtime.skin.indicator_background_visible;
             return mark_changed();
+        case SkinSettingsRowId::KeyOverlayEnabled:
+            runtime.skin.key_overlay_enabled = !runtime.skin.key_overlay_enabled;
+            return mark_changed();
+        case SkinSettingsRowId::KeyOverlayX:
+            runtime.skin.key_overlay_x = clamp_step_value(runtime.skin.key_overlay_x + direction * 0.01, 0.0, 1.0, 0.01);
+            return mark_changed();
+        case SkinSettingsRowId::KeyOverlayY:
+            runtime.skin.key_overlay_y = clamp_step_value(runtime.skin.key_overlay_y + direction * 0.01, 0.0, 1.0, 0.01);
+            return mark_changed();
         case SkinSettingsRowId::HudRiffMapVisible:
             runtime.skin.hud_riff_map_visible = !runtime.skin.hud_riff_map_visible;
             return mark_changed();

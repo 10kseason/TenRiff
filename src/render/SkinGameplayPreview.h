@@ -104,6 +104,10 @@ inline GameplayHudData make_skin_gameplay_preview(const SkinPreviewData& preview
     hud.hit_burst_style = preview.hit_burst_style;
     hud.hud_layout = preview.hud_layout;
     hud.hud_riff_map_visible = preview.hud_riff_map_visible;
+    hud.key_overlay_enabled = preview.key_overlay_enabled;
+    hud.key_overlay_x = preview.key_overlay_x;
+    hud.key_overlay_y = preview.key_overlay_y;
+
     hud.indicator_background_visible = preview.indicator_background_visible;
     hud.key_label_position = preview.key_label_position;
     hud.note_border_enabled = preview.note_border_enabled;
@@ -136,6 +140,17 @@ inline GameplayHudData make_skin_gameplay_preview(const SkinPreviewData& preview
         const auto lane = static_cast<std::size_t>(preview.selected_lane - 1);
         hud.lane_activity[lane] = static_cast<float>(std::max(0.0, 1.0 - phase / 0.32));
         hud.lane_pressed[lane] = phase < 0.12 ? 1 : 0;
+    }
+    hud.key_overlay.visible = preview.key_overlay_enabled && app::key_overlay_supports(hud.lane_count);
+    hud.key_overlay.preview = true;
+    hud.key_overlay.now_ms = static_cast<double>(now_ns) / 1e6;
+    if (hud.key_overlay.visible) {
+        for (int lane = 0; lane < hud.lane_count; ++lane) {
+            const double age = std::fmod(hud.key_overlay.now_ms + lane * 95.0, 850.0);
+            hud.key_overlay.notes[hud.key_overlay.note_count++] = {lane, hud.key_overlay.now_ms - age,
+                lane == 1 ? -1.0 : hud.key_overlay.now_ms - age + 45.0};
+            hud.key_overlay.held[lane] = lane == 1 || age < 45.0;
+        }
     }
     for (int lane = 0; lane < hud.lane_count; ++lane) {
         auto& note = hud.notes[hud.note_count++];
