@@ -80,6 +80,7 @@ TEST_CASE("skin preset native settings round trip only appearance in Unicode pat
     skin.note_height_scales["7k"] = 1.35;
     skin.lane_colors["5k"] = {"rose", "azure", "ice", "azure", "rose"};
     skin.judgement_position = 0.6;
+    skin.gauge_width = "large";
     skin.hud_riff_map_visible = false;
     skin.key_overlay_enabled = true;
     skin.key_overlay_x = 0.35;
@@ -117,6 +118,7 @@ TEST_CASE("skin preset native settings round trip only appearance in Unicode pat
     const auto imported = tenriff::app::import_skin_preset(file.u8string(), (dir.path / fs::u8path(u8"다른 PC")).u8string());
     require_preset_success(imported);
     CHECK(imported.skin.ui_font == "default");
+    CHECK(imported.skin.gauge_width == "large");
     CHECK(imported.skin.ui_font_path.empty());
     CHECK(imported.skin.judgement_position == doctest::Approx(0.6));
     CHECK_FALSE(imported.skin.hud_riff_map_visible);

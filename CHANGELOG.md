@@ -1,5 +1,6 @@
 # 1.9.9.6 — 2026-10-29
 
+- Skin → HUD adds **Gauge Bar Width: Normal (100%) / Slightly Larger (125%) / Large (150%)**. Classic bars and Studio side rails expand horizontally away from the field. Fill, border and ticks share the width; profiles and `.trskin`/`.trprofile` preserve it. Missing older settings use Normal.
 - Unify historical/latest barcode indicator markers at2×18 while retaining dots, opacity, color and timing.
 - Display `EX CLEAR` without the Gauge Shift prefix and preserve other clear/ASSIST identities.
 - Show `NEW Record` for the first eligible local BEST or a meaningful improvement; exclude timestamp-only ties, replay/history and failed saves using a session-only flag.

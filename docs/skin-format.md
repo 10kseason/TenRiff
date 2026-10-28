@@ -181,6 +181,8 @@ MySkin/
 
 ## Native 인게임 편집
 
+`skin.gauge_width`는 프로필 및 `.trskin`/`.trprofile`의 HUD 사용자 설정입니다. `normal`(100%, 기본), `wide`(125%), `large`(150%)를 지원하고 Classic 게이지와 Studio 양옆 바의 가로 크기만 바꿉니다. 네이티브 `gauge` 사각형이 지정되어 있으면 해당 가로 폭에 배율을 적용합니다. 세로·게이지 계산은 유지하며 스킨 JSON 제작 슬롯에는 추가하지 않습니다.
+
 `gameplay.renderer`가 `native`이면 Luma Keys의 건반, 노트, 레일, 판정선, HUD와
 시각 애니메이션을 `gameplay.native`에서 편집한다. 이 선택은 `lobby.renderer`와
 독립적이다. `gameplay.renderer`가 없거나 `legacy`이면 기존 v1 스킨의 표시 경로를 유지한다.

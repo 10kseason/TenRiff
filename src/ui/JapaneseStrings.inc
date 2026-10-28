@@ -1354,3 +1354,6 @@
 {"Not rated", "推定不可"},
 
 {"Chart peak", "譜面ピーク"},
+
+    {"Gauge Bar Width", "ゲージバーの横幅"},
+    {"Slightly Larger", "少し大きい"},

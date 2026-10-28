@@ -201,6 +201,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.hit_burst_style = manifest_style && manifest_style->hit_burst_style.has_value()
                                  ? *manifest_style->hit_burst_style
                                  : config::normalize_skin_hit_burst_style_token(config_.skin.hit_burst_style);
+    target.gauge_width_scale = config::skin_gauge_width_scale(config_.skin.gauge_width);
     target.hud_layout = config::normalize_skin_hud_layout_token(config_.skin.hud_layout);
     target.hud_riff_map_visible = config_.skin.hud_riff_map_visible;
     target.key_overlay_enabled = config_.skin.key_overlay_enabled;

@@ -103,6 +103,7 @@ inline GameplayHudData make_skin_gameplay_preview(const SkinPreviewData& preview
     hud.key_backdrop_height = preview.key_backdrop_height;
     hud.hit_burst_style = preview.hit_burst_style;
     hud.hud_layout = preview.hud_layout;
+    hud.gauge_width_scale = preview.gauge_width_scale;
     hud.hud_riff_map_visible = preview.hud_riff_map_visible;
     hud.key_overlay_enabled = preview.key_overlay_enabled;
     hud.key_overlay_x = preview.key_overlay_x;

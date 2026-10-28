@@ -7,6 +7,7 @@ This is the source-time acceptance plan, not a completed-check claim. Release no
 | Release build | Versioned build, focused library/index/table checks and full CTest; separate optional integrations from executed checks. |
 | Native behavior | Menu/session smoke including source selection/import, difficulty-table loading, first/improved BEST, timestamp ties, replay/history exclusions and failed saves. Preserve existing identity/selection/record behavior. |
 | Rendering | Fresh Classic/Studio/ghost/scaled barcode and dot fixtures; EX/other clear labels, ASSIST, failed results; NEW Record summary/analysis/local multiplayer and geometry. State exact comparison limits. |
+| Gauge width | All three options persist through config/presets, default Normal; Classic/Studio/ghost, embedded/fullscreen preview and live cache changes. Horizontal-only geometry with unchanged heights and fill ratios. |
 | Loading semantics | No new score/replay formats; normal refresh retained for forced/empty/running/unpublished scans. Table reapplication preserves live metadata and records; same-path content refresh and Native LV restoration. |
 | Performance evidence | Label controlled candidate measurements, metadata parity, warm-cache/network assumptions and small cached-opening differences. Do not imply actual user-library or gameplay-start improvements. |
 | Source/package | Exact Git-blob source correspondence, ZIP CRC/hash readback, safe defaults, privacy/no local runtime data, licenses and existing model allowlist. Independently rebuild and test the final source ZIP. |

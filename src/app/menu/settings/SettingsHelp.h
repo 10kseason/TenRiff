@@ -162,6 +162,7 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Show the key viewer and 1-second KPS in 4/5/7/8/10K. Default: Off.", "4/5/7/8/10키에서 키뷰어와 최근 1초 KPS를 표시합니다. 기본값: OFF.", "4/5/7/8/10Kでキービューアと直近1秒のKPSを表示します。既定値：オフ。"},
         {"Move the key overlay horizontally in 1% steps. 0% is left and 100% is right; the full panel stays on screen.", "키 오버레이 가로 위치를 1%씩 조절합니다. 0%는 왼쪽, 100%는 오른쪽이며 패널 전체가 화면 안에 유지됩니다.", "キーオーバーレイの横位置を1%ずつ調整。0%は左、100%は右。パネル全体が画面内に収まります。"},
         {"Move the key overlay vertically in 1% steps. 0% is top and 100% is bottom. Enablement and position are saved with the skin settings.", "키 오버레이 세로 위치를 1%씩 조절합니다. 0%는 위, 100%는 아래이며 켜짐 상태와 위치를 스킨 설정에 저장합니다.", "キーオーバーレイの縦位置を1%ずつ調整。0%は上、100%は下。有効状態と位置をスキン設定に保存します。"},
+        {"Choose gauge bar width: Normal (100%), Slightly Larger (125%), or Large (150%). Only horizontal size changes.", "게이지 바 가로 크기를 보통(100%), 조금 더 크게(125%), 크게(150%) 중에서 고릅니다. 가로 크기만 바뀝니다.", "ゲージバーの横幅を標準（100%）、少し大きい（125%）、大きい（150%）から選びます。横幅だけ変わります。"},
     };
     static constexpr SettingsHelpText profile[] = {
         {"Choose the interface language. The change is applied and saved immediately.", "화면 언어를 선택합니다. 변경 즉시 적용하고 저장합니다.", "表示言語を選びます。すぐに適用・保存されます。"},

@@ -157,9 +157,10 @@
             const bool rainbow = gameplay_gauge_is_ex(token);
             const auto color = color_from_rgb(rgb, 1);
             auto* fill = d2d_->note_fill_brush.Get(); const auto saved = fill->GetColor(); fill->SetColor(color);
-            if (ratio > 0) for (float x : {field.left - 12, field.right + 2})
-                ctx->FillRectangle(D2D1::RectF(x, hit * (1 - ratio), x + 10, hit),
-                    rainbow ? gauge_rainbow_brush(D2D1::RectF(x, 0, x + 10, hit), true, 1)
+            const float rail_width = 10.0f * gameplay_gauge_width_scale(data.gameplay.gauge_width_scale);
+            if (ratio > 0) for (float x : {field.left - 2.0f - rail_width, field.right + 2.0f})
+                ctx->FillRectangle(D2D1::RectF(x, hit * (1 - ratio), x + rail_width, hit),
+                    rainbow ? gauge_rainbow_brush(D2D1::RectF(x, 0, x + rail_width, hit), true, 1)
                             : static_cast<ID2D1Brush*>(fill));
             const float x = studio_deck.gauge_marker_x, y = gameplay_studio_gauge_marker_y(hit, ratio);
             const auto marker = D2D1::RectF(x, y, x + 96, y + 40);

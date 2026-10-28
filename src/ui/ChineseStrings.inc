@@ -1355,3 +1355,6 @@
 {"Not rated", "无法估计"},
 
 {"Chart peak", "谱面峰值"},
+
+    {"Gauge Bar Width", "血条宽度"},
+    {"Slightly Larger", "稍大"},

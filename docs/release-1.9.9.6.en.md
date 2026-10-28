@@ -2,6 +2,7 @@
 
 1.9.9.6 continues released 1.9.9.5 with indicator/result feedback and song-library, folder and difficulty-table loading changes. The fixed baseline remains **1.9.6**.
 
+- Skin → HUD adds **Gauge Bar Width: Normal (100%) / Slightly Larger (125%) / Large (150%)**. Classic bars and Studio side rails expand horizontally away from the field. Fill, border and ticks share the width; profiles and `.trskin`/`.trprofile` preserve it. Missing older settings use Normal.
 - Historical/latest barcode markers share 2×18 base dimensions. Latest-hit opacity, dots, colors, lifetime, placement and scaling remain unchanged.
 - Results display `EX CLEAR` instead of `GAUGE SHIFT EX CLEAR`; other gauges lose only the same prefix. ASSIST identity and stored status remain.
 - Show `NEW Record` for the first eligible local BEST or a meaningful improvement under the existing clear-first ordering. Timestamp-only ties, replay playback, historical results and failed saves do not qualify. Existing autoplay/practice/added-note/LN Mix exclusions remain.

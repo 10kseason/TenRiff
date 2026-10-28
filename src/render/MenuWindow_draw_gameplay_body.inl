@@ -483,7 +483,7 @@
                 gameplay_field_drag_state_.has_local_override
                     ? gameplay_field_drag_state_.offset_x
                     : data.gameplay.gameplay_field_offset_x,
-                data.gameplay.note_divider_gap_px, hidden_scratch_mask);
+                data.gameplay.note_divider_gap_px, hidden_scratch_mask, studio ? 1.0 : data.gameplay.gauge_width_scale);
         const float solo_header_right =
             gameplay_solo_header_right(header_left, header_right, surface_layout.player_field.left);
         // Non-Studio paths do not consume this geometry.
@@ -1349,7 +1349,7 @@
                                        const std::wstring& gauge_label_text,
                                        const std::wstring& gauge_value_text,
                                        std::size_t gauge_grid_index) {
-            const auto gauge=ng_rect("gauge",D2D1::RectF(gauge_left,kGameplayGaugeTop,gauge_left+kGameplayGaugeWidth,kGameplayGaugeBottom));
+            const auto gauge = native_gameplay_gauge_rect(native_style, gauge_left, data.gameplay.gauge_width_scale, data.gameplay.ghost_visible && gauge_grid_index == 0);
             const float gauge_top=gauge.top,gauge_bottom=gauge.bottom,gauge_width=gauge.right-gauge.left;
             gauge_left=gauge.left;
             const float gauge_ratio =
@@ -2277,7 +2277,7 @@
                 std::min(player_summary.left, surface_layout.player_gauge_left),
                 std::max(player_summary.right, surface_layout.player_field.right), true,
                 std::min(ghost_summary.left, surface_layout.ghost_field.left),
-                std::max(ghost_summary.right, surface_layout.ghost_gauge_left + kGameplayGaugeWidth), 14.0f);
+                std::max(ghost_summary.right, surface_layout.ghost_gauge_left + surface_layout.gauge_width), 14.0f);
         }
         // At very wide note sizes there is no readable outside column. Use the
         // existing live card's left half instead of shrinking the title to pixels.
@@ -2293,7 +2293,7 @@
                 std::min(player_summary.left, surface_layout.player_gauge_left),
                 std::max(player_summary.right, player_handle_right), true,
                 std::min(ghost_summary.left, surface_layout.ghost_field.left),
-                std::max(ghost_summary.right, surface_layout.ghost_gauge_left + kGameplayGaugeWidth),
+                std::max(ghost_summary.right, surface_layout.ghost_gauge_left + surface_layout.gauge_width),
                 kProgressFieldClearance)
             : compute_gameplay_progress_track_layout(header_left, header_safe_right,
                 field_left, player_handle_right, false, 0.0f, 0.0f, kProgressFieldClearance);

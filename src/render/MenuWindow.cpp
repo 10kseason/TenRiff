@@ -10,6 +10,7 @@
 #include "config/GraphicsResolution.h"
 #include "render/GameplayFeedbackText.h"
 #include "render/GameplayStudioDeck.h"
+#include "render/GameplayGaugeLayout.h"
 #include "render/GameplayTimingIndicator.h"
 #include "render/GameplaySongTitle.h"
 #include "render/NativeMenuAssets.h"
@@ -730,6 +731,7 @@ struct GameplayFieldLayout {
 struct GameplaySurfaceLayout {
     GameplayFieldLayout player_field{};
     GameplayFieldLayout ghost_field{};
+    float gauge_width = kGameplayGaugeWidth;
     float player_gauge_left = 0.0f;
     float ghost_gauge_left = 0.0f;
     float offset_x = 0.0f;
@@ -890,9 +892,11 @@ GameplaySurfaceLayout build_gameplay_surface_layout(int lane_count,
                                                     double lane_center_gap_scale = 0.0,
                                                     double requested_offset_x = 0.0,
                                                     double note_divider_gap_px = kGameplayNoteDividerGapPxDefault,
-                                                    uint32_t hidden_scratch_mask = 0) {
+                                                    uint32_t hidden_scratch_mask = 0,
+                                                    double gauge_width_scale = 1.0) {
     GameplaySurfaceLayout layout;
     layout.ghost_visible = ghost_visible;
+    layout.gauge_width = kGameplayGaugeWidth * gameplay_gauge_width_scale(gauge_width_scale);
     if (ghost_visible) {
         const auto widths = compute_gameplay_battle_widths(note_width_scale);
         const float player_left = 80.0f;
@@ -925,7 +929,7 @@ GameplaySurfaceLayout build_gameplay_surface_layout(int lane_count,
                                                          lane_center_gap_scale,
                                                          note_divider_gap_px);
         layout.player_gauge_left =
-            layout.player_field.left - 76.0f;
+            layout.player_field.left - 16.0f - layout.gauge_width;
         layout.ghost_gauge_left =
             layout.ghost_field.right + 18.0f;
     } else {
@@ -948,18 +952,25 @@ GameplaySurfaceLayout build_gameplay_surface_layout(int lane_count,
 
     hide_gameplay_scratch_lanes(layout.player_field, hidden_scratch_mask);
     if (ghost_visible) hide_gameplay_scratch_lanes(layout.ghost_field, hidden_scratch_mask);
-    layout.player_gauge_left = ghost_visible ? layout.player_field.left - 76.0f : layout.player_field.right + 60.0f;
+    if (ghost_visible) {
+        // Reserve wider bars inside the existing 96px battle gap. Translate the
+        // fields without shrinking lanes so both outside bars remain on screen.
+        const float extra = layout.gauge_width - kGameplayGaugeWidth;
+        translate_gameplay_field_layout(layout.player_field, extra);
+        translate_gameplay_field_layout(layout.ghost_field, -extra);
+    }
+    layout.player_gauge_left = ghost_visible ? layout.player_field.left - 16.0f - layout.gauge_width : layout.player_field.right + 60.0f;
     if (ghost_visible) layout.ghost_gauge_left = layout.ghost_field.right + 18.0f;
     float surface_left = std::min(layout.player_field.left, layout.player_gauge_left);
     float surface_right = std::max(
         layout.player_field.right + kGameplayFieldDragHandleGap + kGameplayFieldDragHandleWidth,
-        layout.player_gauge_left + kGameplayGaugeWidth);
+        layout.player_gauge_left + layout.gauge_width);
     if (layout.ghost_visible) {
         surface_left = std::min(
             surface_left, std::min(layout.ghost_field.left, layout.ghost_gauge_left));
         surface_right = std::max(
             surface_right,
-            std::max(layout.ghost_field.right, layout.ghost_gauge_left + kGameplayGaugeWidth));
+            std::max(layout.ghost_field.right, layout.ghost_gauge_left + layout.gauge_width));
     }
 
     layout.min_offset_x = kGameplayFieldDragCanvasMargin - surface_left;
@@ -1298,6 +1309,13 @@ D2D1_RECT_F native_gameplay_d2d_rect(const app::NativeGameplaySkinStyle& style,c
     const auto v=native_gameplay_rect(style,key,{rect.left,rect.top,rect.right,rect.bottom});
     return D2D1::RectF(v[0],v[1],v[2],v[3]);
 }
+D2D1_RECT_F native_gameplay_gauge_rect(const app::NativeGameplaySkinStyle& style,
+                                       float left, double width_scale, bool grow_left) {
+    const auto rect = gameplay_gauge_rect(style, left, kGameplayGaugeTop,
+        kGameplayGaugeBottom, kGameplayGaugeWidth, width_scale, grow_left);
+    return D2D1::RectF(rect[0], rect[1], rect[2], rect[3]);
+}
+
 D2D1_COLOR_F native_gameplay_d2d_color(const app::NativeGameplaySkinStyle& style,const char* key,D2D1_COLOR_F color) {
     if (style.colors.find(key)==style.colors.end()) return color;
     const auto v=native_gameplay_color(style,key,{color.r,color.g,color.b,1.0f});
@@ -3936,6 +3954,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
         const auto accent = d2d_->accent_brush->GetColor();
         desired.accent = {accent.r, accent.g, accent.b, accent.a};
     }
+    desired.gauge_width_scale = gameplay_gauge_width_scale(data.gauge_width_scale);
     desired.native_skin = data.resolved_tenriff_skin;
     const auto& native_style = native_gameplay_style(data.resolved_tenriff_skin,desired.native_instrument);
     desired.lane_count = std::clamp(data.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
@@ -4021,6 +4040,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
     const bool cache_matches =
         d2d_->gameplay_static_command_list &&
         gameplay_static_cache_.studio == desired.studio &&
+        gameplay_static_cache_.gauge_width_scale == desired.gauge_width_scale &&
         gameplay_static_cache_.studio_safe_right == desired.studio_safe_right &&
         gameplay_static_cache_.hud_riff_map_visible == desired.hud_riff_map_visible &&
         gameplay_static_cache_.riff_map_revision == desired.riff_map_revision &&
@@ -4091,9 +4111,9 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
             desired.ghost_visible,
             desired.lane_center_gap_scale,
             desired.gameplay_field_offset_x,
-            desired.note_divider_gap_px, desired.hidden_scratch_mask);
+            desired.note_divider_gap_px, desired.hidden_scratch_mask, desired.studio ? 1.0 : desired.gauge_width_scale);
     auto build_gauge_grid = [&](std::size_t index, float gauge_left) {
-        const auto gauge=native_gameplay_d2d_rect(native_style,"gauge",D2D1::RectF(gauge_left,kGameplayGaugeTop,gauge_left+kGameplayGaugeWidth,kGameplayGaugeBottom));
+        const auto gauge = native_gameplay_gauge_rect(native_style, gauge_left, desired.gauge_width_scale, desired.ghost_visible && index == 0);
         const float gauge_top=gauge.top,gauge_bottom=gauge.bottom,gauge_width=gauge.right-gauge.left;
         gauge_left=gauge.left;
         Microsoft::WRL::ComPtr<ID2D1PathGeometry> geometry;
@@ -4331,9 +4351,8 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
             d2d_->accent_brush->SetOpacity(1.0f);
         }
     };
-    auto draw_gauge_frame = [&](float gauge_left) {
-        const D2D1_RECT_F gauge_frame = native_gameplay_d2d_rect(native_style,"gauge",D2D1::RectF(
-            gauge_left, kGameplayGaugeTop, gauge_left + kGameplayGaugeWidth, kGameplayGaugeBottom));
+    auto draw_gauge_frame = [&](float gauge_left, bool grow_left = false) {
+        const auto gauge_frame = native_gameplay_gauge_rect(native_style, gauge_left, desired.gauge_width_scale, grow_left);
         if (d2d_->footer_brush) {
             d2d_->footer_brush->SetOpacity(0.62f);
             d2d_->d2d_context->FillRoundedRectangle(D2D1::RoundedRect(gauge_frame, 10.0f, 10.0f),
@@ -4348,7 +4367,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
     };
 
     draw_field_panel(surface_layout.player_field);
-    if (!desired.studio) draw_gauge_frame(surface_layout.player_gauge_left);
+    if (!desired.studio) draw_gauge_frame(surface_layout.player_gauge_left, desired.ghost_visible);
     if (desired.studio) {
         auto* ctx = d2d_->d2d_context.Get();
         auto* fill = d2d_->note_fill_brush.Get();
@@ -4378,8 +4397,9 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
         }
         const float hit_y = gameplay_field_y(field.top, field.height, desired.judgement_line_position);
         fill->SetColor(D2D1::ColorF(0x12161E));
-        for (float x : {field.left - 12.0f, field.right + 2.0f})
-            ctx->FillRectangle(D2D1::RectF(x, 0, x + 10.0f, hit_y), fill);
+        const float rail_width = 10.0f * gameplay_gauge_width_scale(desired.gauge_width_scale);
+        for (float x : {field.left - 2.0f - rail_width, field.right + 2.0f})
+            ctx->FillRectangle(D2D1::RectF(x, 0, x + rail_width, hit_y), fill);
         if (deck.map_visible) {
             const float step = deck.map_width / 64.0f;
             const float gap = std::min(2.0f, step * 0.30f);
