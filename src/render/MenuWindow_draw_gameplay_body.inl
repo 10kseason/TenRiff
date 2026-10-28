@@ -1283,14 +1283,19 @@
         }
 
         {
+            const auto handle_x = surface_layout.ghost_visible
+                ? gameplay_battle_drag_handle_x(surface_layout.player_field.right, surface_layout.ghost_field.left,
+                    kGameplayFieldDragHandleWidth, kGameplayFieldDragHandleGap)
+                : std::array<float, 2>{surface_layout.player_field.right + kGameplayFieldDragHandleGap,
+                    surface_layout.player_field.right + kGameplayFieldDragHandleGap + kGameplayFieldDragHandleWidth};
             gameplay_field_drag_state_.scene_scale = std::max(0.001f, scene_scale);
             gameplay_field_drag_state_.visible = data.gameplay.active && !data.gameplay.loading && !data.gameplay.paused;
             gameplay_field_drag_state_.left =
-                scene_left + (surface_layout.player_field.right + kGameplayFieldDragHandleGap) * scene_scale;
+                scene_left + handle_x[0] * scene_scale;
             gameplay_field_drag_state_.top =
                 scene_top + (surface_layout.player_field.top + kGameplayFieldDragHandleTop) * scene_scale;
             gameplay_field_drag_state_.right =
-                gameplay_field_drag_state_.left + kGameplayFieldDragHandleWidth * scene_scale;
+                scene_left + handle_x[1] * scene_scale;
             gameplay_field_drag_state_.bottom =
                 gameplay_field_drag_state_.top + kGameplayFieldDragHandleHeight * scene_scale;
             gameplay_field_drag_state_.offset_x = surface_layout.offset_x;

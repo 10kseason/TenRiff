@@ -951,6 +951,9 @@ struct MenuWindowVisualTestAccess {
             {"requested_combo_position", JsonValue(source.generic.skin_preview.visible ? source.generic.skin_preview.combo_position : source.gameplay.combo_position)},
             {"lane_divider_brightness", JsonValue(window.gameplay_static_cache_.lane_divider_brightness)},
             {"gauge_width_scale", JsonValue(window.gameplay_static_cache_.gauge_width_scale)},
+            {"field_drag_handle", JsonValue(JsonObject{
+                {"left", JsonValue(static_cast<double>(window.gameplay_field_drag_state_.left))},
+                {"right", JsonValue(static_cast<double>(window.gameplay_field_drag_state_.right))}})},
             {"combo_placement", JsonValue(std::move(combo_placement))},
             {"combo_placement_coordinate_space", JsonValue("Actual final draw bounds in gameplay design coordinates, including font/pop transform and count collision movement; not source-position recomputation.")},
             {"pointer_dispatch_method", JsonValue("MenuWindow::on_mouse_click on the owned foreground window; no desktop pointer or physical click is synthesized.")},

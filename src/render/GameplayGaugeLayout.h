@@ -32,4 +32,12 @@ inline std::array<float, 4> gameplay_gauge_rect(const app::NativeGameplaySkinSty
     return scale_gameplay_gauge_rect(authored, scale, grow_left);
 }
 
+inline std::array<float, 2> gameplay_battle_drag_handle_x(float player_right, float ghost_left,
+    float normal_width, float normal_gap) {
+    const float gap = std::max(0.0f, ghost_left - player_right);
+    const float width = std::min(normal_width, std::max(0.0f, gap - normal_gap));
+    const float left = player_right + (gap - width) * 0.5f;
+    return {left, left + width};
+}
+
 }  // namespace tenriff::render

@@ -261,3 +261,18 @@ TEST_CASE("gauge width applies authored additive rectangles once and keeps the n
         }
     }
 }
+
+TEST_CASE("gauge width leaves the battle drag handle and its hit target between the fields") {
+    for (const double scale : {1.0, 1.25, 1.5}) {
+        const float extra = 60 * (scale - 1);
+        const float player_right = 1000 + extra, ghost_left = 1096 - extra;
+        const auto x = gameplay_battle_drag_handle_x(player_right, ghost_left, 72, 12);
+        CHECK(x[0] >= player_right + 6);
+        CHECK(x[1] <= ghost_left - 6);
+        CHECK(x[1] - x[0] >= 24);
+        if (scale == 1.0) {
+            CHECK(x[0] == 1012);
+            CHECK(x[1] == 1084);
+        }
+    }
+}
