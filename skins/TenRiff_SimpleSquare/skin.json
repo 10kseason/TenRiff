@@ -8,7 +8,7 @@
   },
   "gameplay": {
     "renderer": "native",
-    "note_shape": "rect",
+    "note_shape": "simple_rect",
     "note_border": false,
     "note_aspect": "stretch",
     "black_playfield": true,

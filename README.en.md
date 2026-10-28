@@ -1,3 +1,15 @@
+> **2026-10-28 · 1.9.9.5:** Integrates solid simple LNs, whole-chart ALL COMBO artwork, BGA/render-wait recovery, EX prism and rank text effects; the key overlay retains KPS/key viewing without a difficulty estimate. General fixed baseline: **1.9.6**. Older version, local-candidate, unpublished and verification-in-progress statements below are historical and do not describe current publication or verification status. [Release scope](docs/release-1.9.9.5.en.md) · [Verification](docs/release-1.9.9.5-gate.md).
+
+> **2026-10-28 local candidate:** [Prism rank text, seven-stop EX palette and key-overlay update](docs/rank-prism-20261028.en.md). S+ through S+++ use cached glyph effects; only the overlay difficulty estimate is removed, retaining KPS/key viewing. Supersedes the older EX gold/no-purple appearance below. Published version and fixed baseline remain unchanged.
+
+> **2026-10-28 local:** [Recovery from stale render wait compensation](docs/render-wait-20261028.en.md).
+
+> **2026-10-28 local:** [Champagne gold gradient for EX](docs/ex-gold-20261028.en.md).
+
+> **2026-10-28 local:** [Screen-share buffer audit and BGA recovery](docs/share-sync-20261028.en.md).
+
+> **2026-10-28 local candidate:** [Simple LNs, six-color EX and all-combo art](docs/skin-finish-20261028.en.md). Rounded border and subtle yellow glow. Published version and fixed baseline stay unchanged.
+
 > **2026-10-27 · 1.9.9.3:** Includes accelerated controls, LR2CRS courses, BMS/KPS overlay, clear cards, grade colors and EX rainbow fixes. General fixed baseline: **1.9.6**. Older release and local-candidate entries below are historical; this scope supersedes them. [1.9.9.3](docs/release-1.9.9.3.en.md) · [Verification](docs/release-1.9.9.3-gate.md).
 
 **2026-10-27 · Local:** [Rank/shift colors and EX rainbow correction](docs/rank-colors-20261027.en.md).

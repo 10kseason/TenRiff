@@ -41,31 +41,86 @@ struct CompletionTestDirectory {
 // Exercise the production input-to-voice-to-mixer path without starting a device,
 // input thread, decoder, profile or record writer.
 struct GameSessionAudioTestAccess {
-    static void check_bms_overlay_hud() {
-        CompletionTestDirectory directory;
-        const auto path = directory.path / "overlay.bms";
-        {
-            std::ofstream file(path);
-            file << "#TITLE Overlay integration\n#PLAYER 1\n#BPM 240\n";
-            const int channels[] = {11, 12, 13, 14, 15, 18, 19};
-            for (int measure = 1; measure <= 16; ++measure) {
-                for (int lane = 0; lane < 7; ++lane) {
-                    const auto number = std::to_string(1000 + measure).substr(1);
-                    file << '#' << number << channels[lane] << ':';
-                    for (int row = 0; row < 16; ++row) file << (row % 7 == lane ? "01" : "00");
-                    file << '\n';
-                }
+    static void check_full_combo_hud() {
+        for (bool hold : {false, true}) {
+            auto session = shift_lane_fixture(32, hold);
+            CHECK_FALSE(session->hud_snapshot().full_combo);
+            queue_physical_edge(*session, 32, input::InputState::Pressed, 48000);
+            CHECK(session->engine_->stats().total_combo_steps == (hold ? 2 : 1));
+            CHECK(session->hud_snapshot().full_combo == !hold);
+            if (hold) {
+                session->engine_->advance(95999);
+                CHECK_FALSE(session->hud_snapshot().full_combo);
+                queue_physical_edge(*session, 32, input::InputState::Released, 96000);
             }
+            REQUIRE(session->engine_->is_finished());
+            REQUIRE(session->hud_snapshot().full_combo);
+            const auto score = session->engine_->stats().raw_score;
+            const auto recorded = session->engine_->replay().events.size();
+            session->autoplay_enabled_ = true;
+            CHECK_FALSE(session->hud_snapshot().full_combo);
+            session->autoplay_enabled_ = false;
+            session->auto_scratch_enabled_ = true;
+            CHECK_FALSE(session->hud_snapshot().full_combo);
+            session->auto_scratch_enabled_ = false;
+            session->practice_no_fail_enabled_ = true;
+            CHECK_FALSE(session->hud_snapshot().full_combo);
+            session->practice_no_fail_enabled_ = false;
+            session->practice_start_seconds_ = 1.0;
+            CHECK_FALSE(session->hud_snapshot().full_combo);
+            // Immediate restart plays the entire chart despite an editor marker.
+            session->instant_restart_start_ = true;
+            CHECK(session->hud_snapshot().full_combo);
+            session->practice_start_seconds_ = 0.0;
+            session->user_aborted_.store(true);
+            CHECK_FALSE(session->hud_snapshot().full_combo);
+            session->user_aborted_.store(false);
+            session->replay_playback_enabled_ = true;
+            session->replay_source_.mode.autoplay_enabled = true;
+            CHECK_FALSE(session->hud_snapshot().full_combo);
+            session->replay_source_.mode.autoplay_enabled = false;
+            session->replay_source_.aborted = true;
+            CHECK_FALSE(session->hud_snapshot().full_combo);
+            session->replay_source_.aborted = false;
+            CHECK(session->hud_snapshot().full_combo);
+            CHECK(session->engine_->stats().raw_score == score);
+            CHECK(session->engine_->replay().events.size() == recorded);
         }
-        const auto loaded = ChartLoader{}.load(path.u8string(), 48000, 1.0);
-        REQUIRE(loaded.success());
-        REQUIRE(loaded.format == ChartFormat::Bms);
-        REQUIRE(loaded.chart.lane_count == 7);
-        REQUIRE(loaded.chart.notes.size() == 256);
+        auto broken = shift_lane_fixture(32, true);
+        queue_physical_edge(*broken, 32, input::InputState::Pressed, 48000);
+        queue_physical_edge(*broken, 32, input::InputState::Released, 60000);
+        broken->engine_->advance(120000);
+        REQUIRE(broken->engine_->is_finished());
+        CHECK_FALSE(broken->hud_snapshot().full_combo);
+
+        auto session = shift_lane_fixture(32, true);
+        gameplay::GameplayConfig config;
+        config.sample_rate = 48000;
+        session->ghost_engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+        queue_physical_edge(*session, 32, input::InputState::Pressed, 48000);
+        queue_physical_edge(*session, 32, input::InputState::Released, 96000);
+        REQUIRE(session->hud_snapshot().full_combo);
+        CHECK_FALSE(session->hud_snapshot().ghost_full_combo);
+        (void)session->ghost_engine_->handle_input(1, input::InputState::Pressed, 48000);
+        session->ghost_engine_->advance(95999);
+        CHECK_FALSE(session->hud_snapshot().ghost_full_combo);
+        (void)session->ghost_engine_->handle_input(1, input::InputState::Released, 96000);
+        session->ghost_engine_->advance(96000);
+        REQUIRE(session->hud_snapshot().ghost_full_combo);
+        session->ghost_replay_source_.mode.autoplay_enabled = true;
+        CHECK_FALSE(session->hud_snapshot().ghost_full_combo);
+        CHECK(session->hud_snapshot().full_combo);
+        session->ghost_replay_source_.mode.autoplay_enabled = false;
+        session->ghost_replay_source_.mode.practice_no_fail_enabled = true;
+        CHECK_FALSE(session->hud_snapshot().ghost_full_combo);
+        session->ghost_replay_source_.mode.practice_no_fail_enabled = false;
+        session->ghost_replay_source_.aborted = true;
+        CHECK_FALSE(session->hud_snapshot().ghost_full_combo);
+        CHECK(session->hud_snapshot().full_combo);
+    }
+
+    static void check_key_overlay_hud() {
         auto session = shift_lane_fixture(32, false);
-        session->key_overlay_chart_ = estimate_bms_overlay_difficulty(loaded.chart, 48000);
-        REQUIRE(session->key_overlay_chart_.difficulty.ready);
-        const auto rating = session->key_overlay_chart_.difficulty.rating;
         session->key_overlay_.configure(true, 7);
         REQUIRE(session->key_overlay_.start());
         for (int state = 0; state < 3; ++state) {
@@ -73,12 +128,10 @@ struct GameSessionAudioTestAccess {
             session->autoplay_enabled_ = state == 2;
             const auto hud = session->hud_snapshot();
             CHECK(hud.key_overlay.visible);
-            CHECK(hud.key_overlay.bms_chart);
-            CHECK(hud.key_overlay.difficulty.ready);
-            CHECK(hud.key_overlay.difficulty.rating == rating);
             if (state != 0) {
                 CHECK_FALSE(hud.key_overlay.live);
                 CHECK(hud.key_overlay.kps == 0);
+                CHECK(hud.key_overlay.note_count == 0);
             }
         }
         session->key_overlay_.stop();
@@ -116,7 +169,6 @@ struct GameSessionAudioTestAccess {
                     CHECK(state.notes[0].release_ms == 1020);
                     CHECK(state.accepted_presses == 1);
                     CHECK(state.kps == 1);
-                    CHECK_FALSE(state.difficulty.ready);
                 }
                 // Enabling this observer must not alter either accepted scoring edge.
                 const auto& events = session->engine_->replay().events;
@@ -2712,6 +2764,7 @@ struct GameSessionAudioTestAccess {
         CHECK(result.bms_control_flow_version == (bms_policy ? 2 : 1));
         CHECK(result.bms_random_seed == (bms_policy ? std::optional<uint32_t>(0xffffffffu) : std::nullopt));
         CHECK(result.finished);
+        CHECK(result.all_combo_badge == !auto_scratch);
         REQUIRE_FALSE(result.replay_path.empty());
         REQUIRE_FALSE(result.result_path.empty());
         CHECK(std::filesystem::u8path(result.replay_path).parent_path() == directory.path / "replays");
@@ -3605,6 +3658,10 @@ TEST_CASE("key overlay observes accepted gameplay edges without changing replay 
     tenriff::app::GameSessionAudioTestAccess::check_key_overlay_routing();
 }
 
-TEST_CASE("BMS overlay parser and session HUD retain one chart estimate through pause and autoplay") {
-    tenriff::app::GameSessionAudioTestAccess::check_bms_overlay_hud();
+TEST_CASE("key overlay session HUD keeps the panel and clears live KPS during pause and autoplay") {
+    tenriff::app::GameSessionAudioTestAccess::check_key_overlay_hud();
+}
+
+TEST_CASE("full combo HUD waits for the last LN tail and excludes partial assisted aborted play") {
+    tenriff::app::GameSessionAudioTestAccess::check_full_combo_hud();
 }

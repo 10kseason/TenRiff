@@ -2381,147 +2381,147 @@
     },
     "rects.result_single.rect.002": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 271,
+      "line": 337,
       "expression": "54.0f, 38.0f, 1866.0f, 122.0f"
     },
     "rects.result_single.rect.003": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 274,
+      "line": 340,
       "expression": "136, 32, 398, 108"
     },
     "rects.result_single.rect.004": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 277,
+      "line": 343,
       "expression": "410.0f, 44.0f, 600.0f, 84.0f"
     },
     "rects.result_single.rect.005": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 282,
+      "line": 348,
       "expression": "410.0f, 80.0f, 650.0f, 108.0f"
     },
     "rects.result_single.rect.006": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 296,
+      "line": 362,
       "expression": "1400.0f, 28.0f, 1848.0f, 108.0f"
     },
     "rects.result_single.rect.007": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 301,
+      "line": 367,
       "expression": "profile_rect.left + 15.0f, profile_rect.top + 9.0f, profile_rect.left + 77.0f, profile_rect.top + 71.0f"
     },
     "rects.result_single.rect.008": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 324,
+      "line": 390,
       "expression": "profile_text_left, profile_rect.top + 10.0f, profile_rect.right - 23.0f, profile_rect.top + 44.0f"
     },
     "rects.result_single.rect.009": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 330,
+      "line": 396,
       "expression": "profile_text_left, profile_rect.top + 44.0f, profile_rect.right - 23.0f, profile_rect.bottom - 9.0f"
     },
     "rects.result_single.rect.010": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 338,
+      "line": 404,
       "expression": "70.0f, 154.0f, 590.0f, modern_library_screen ? 738.0f : 704.0f"
     },
     "rects.result_single.rect.011": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 344,
+      "line": 410,
       "expression": "song_panel.left + 44.0f, song_panel.top + 42.0f, song_panel.right - 44.0f, song_panel.top + 382.0f - author_space"
     },
     "rects.result_single.rect.012": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 356,
+      "line": 422,
       "expression": "song_panel.left + 230.0f, song_panel.top + 14.0f, song_panel.right - 24.0f, song_panel.top + 38.0f"
     },
     "rects.result_single.rect.013": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 363,
+      "line": 429,
       "expression": "song_panel.left + 44.0f, song_panel.top + 402.0f - author_space, song_panel.right - 44.0f, song_panel.top + 455.0f - author_space"
     },
     "rects.result_single.rect.014": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 369,
+      "line": 435,
       "expression": "song_panel.left + 44.0f, song_panel.top + 455.0f - author_space, song_panel.right - 44.0f, song_panel.top + 488.0f - author_space"
     },
     "rects.result_single.chart_author": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 375,
+      "line": 441,
       "expression": "song_panel.left + 44.0f, song_panel.top + 464.0f, song_panel.right - 44.0f, song_panel.top + 490.0f"
     },
     "rects.result_single.rect.015": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 395,
+      "line": 461,
       "expression": "left, song_panel.top + 494.0f, left + metadata_width - 8.0f, song_panel.top + 522.0f"
     },
     "rects.result_single.rect.016": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 399,
+      "line": 465,
       "expression": "left, song_panel.top + 522.0f, left + metadata_width - 8.0f, song_panel.top + 568.0f"
     },
     "rects.result_single.rect.026": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 652,
+      "line": 720,
       "expression": "1320.0f, 154.0f, 1848.0f, modern_library_screen ? 738.0f : 704.0f"
     },
     "rects.result_single.rect.027": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 657,
+      "line": 725,
       "expression": "analysis_panel.left + 24.0f, analysis_panel.top + 18.0f, analysis_panel.right - 24.0f, analysis_panel.top + 48.0f"
     },
     "rects.result_single.rect.028": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 664,
+      "line": 732,
       "expression": "analysis_panel.left + 26.0f, analysis_panel.top + 66.0f, analysis_panel.right - 26.0f, analysis_panel.top + 98.0f"
     },
     "rects.result_single.rect.029": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 669,
+      "line": 737,
       "expression": "analysis_panel.left + 30.0f, analysis_panel.top + 118.0f, analysis_panel.right - 30.0f, analysis_panel.top + 226.0f"
     },
     "rects.result_single.rect.030": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 704,
+      "line": 772,
       "expression": "timing_track.left + 12.0f, timing_track.top + 8.0f, center_x - 12.0f, timing_track.top + 46.0f"
     },
     "rects.result_single.rect.031": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 707,
+      "line": 775,
       "expression": "center_x + 12.0f, timing_track.top + 8.0f, timing_track.right - 12.0f, timing_track.top + 46.0f"
     },
     "rects.result_single.rect.032": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 730,
+      "line": 798,
       "expression": "timing_track.left, timing_track.bottom + 8.0f, center_x, timing_track.bottom + 36.0f"
     },
     "rects.result_single.rect.033": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 738,
+      "line": 806,
       "expression": "center_x, timing_track.bottom + 8.0f, timing_track.right, timing_track.bottom + 36.0f"
     },
     "rects.result_single.rect.034": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 746,
+      "line": 814,
       "expression": "analysis_panel.left + 26.0f, analysis_panel.top + 286.0f, analysis_panel.right - 26.0f, analysis_panel.top + 318.0f"
     },
     "rects.result_single.rect.035": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 751,
+      "line": 819,
       "expression": "analysis_panel.left + 30.0f, analysis_panel.top + 332.0f, analysis_panel.right - 30.0f, analysis_panel.bottom - 36.0f"
     },
     "rects.result_single.rect.036": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 757,
+      "line": 825,
       "expression": "gauge_plot.left + gauge_axis_width, gauge_plot.top, gauge_plot.right, gauge_plot.bottom"
     },
     "rects.result_single.rect.037": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 771,
+      "line": 839,
       "expression": "gauge_plot.left, y - 16.0f, gauge_track.left - 8.0f, y + 16.0f"
     },
     "rects.result_single.rect.038": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 827,
+      "line": 895,
       "expression": "70.0f, 770.0f, 1270.0f, 994.0f"
     },
     "rects.result_summary.rect.001": {
@@ -2531,52 +2531,52 @@
     },
     "rects.result_single.rect.039": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 876,
+      "line": 944,
       "expression": "left, stats_panel.top, left + statistic_width, stats_panel.bottom"
     },
     "rects.result_single.rect.040": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 894,
+      "line": 962,
       "expression": "cell.left + 14.0f, cell.top + 28.0f + rise, cell.right - 14.0f, cell.top + 58.0f + rise"
     },
     "rects.result_single.rect.041": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 902,
+      "line": 970,
       "expression": "cell.left + 10.0f, cell.top + 70.0f + rise, cell.right - 10.0f, cell.top + 138.0f + rise"
     },
     "rects.result_single.rect.042": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 909,
+      "line": 975,
       "expression": "cell.left + 10.0f, cell.top + 153.0f + rise, cell.right - 10.0f, cell.top + 190.0f + rise"
     },
     "rects.result_single.rect.043": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 942,
+      "line": 1012,
       "expression": "1320.0f, 770.0f, 1848.0f, 856.0f"
     },
     "rects.result_single.rect.044": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 944,
+      "line": 1014,
       "expression": "1320.0f, 872.0f, 1574.0f, 942.0f"
     },
     "rects.result_single.rect.045": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 946,
+      "line": 1016,
       "expression": "1594.0f, 872.0f, 1848.0f, 942.0f"
     },
     "rects.result_single.rect.046": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 997,
+      "line": 1067,
       "expression": "1320.0f, 952.0f, 1848.0f, 982.0f"
     },
     "rects.result_single.rect.047": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 1005,
+      "line": 1075,
       "expression": "620.0f, 1022.0f, 1300.0f, 1050.0f"
     },
     "rects.result_single.rect.001": {
       "file": "MenuWindow_draw_result_single_body.inl",
-      "line": 226,
+      "line": 292,
       "expression": "0, 0, kBaseWidth, kBaseHeight"
     },
     "rects.result_summary.rect.002": {
@@ -2641,17 +2641,17 @@
     },
     "rects.result_summary.rect.014": {
       "file": "MenuWindow_draw_result_summary.inl",
-      "line": 77,
+      "line": 76,
       "expression": "status_chip.left + 16.0f, status_chip.top + 8.0f, status_chip.right - 16.0f, status_chip.bottom - 6.0f"
     },
     "rects.result_summary.rect.015": {
       "file": "MenuWindow_draw_result_summary.inl",
-      "line": 86,
+      "line": 89,
       "expression": "summary_left, 634.0f, summary_left + 300.0f, 666.0f"
     },
     "rects.result_summary.rect.016": {
       "file": "MenuWindow_draw_result_summary.inl",
-      "line": 90,
+      "line": 93,
       "expression": "summary_left + 312.0f, 634.0f, summary_right, 666.0f"
     },
     "rects.songselect.rect.001": {

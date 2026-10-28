@@ -6,10 +6,11 @@
                           DWRITE_TEXT_ALIGNMENT alignment = DWRITE_TEXT_ALIGNMENT_LEADING,
                           float text_scale = 1.0f) {
         const float width = std::ceil(rect.right - rect.left), height = std::ceil(rect.bottom - rect.top);
-        if (!format || text.empty() || alpha <= 0 || width <= 0 || height <= 0) return;
+        if (text.empty() || !format || alpha <= 0 || width <= 0 || height <= 0) return;
         auto& cache = d2d_->grade_bitmaps[slot];
         const auto color = D2D1::ColorF(grade_display_color(text));
         const bool rainbow = grade_uses_clear_rainbow(text);
+        const bool prism = text == L"S+" || text == L"S++" || text == L"S+++";
         constexpr float pad = 28.0f;
         if (!cache.attempted || cache.text != text || cache.format.Get() != format ||
             cache.width != width || cache.height != height || cache.alignment != alignment || cache.text_scale != text_scale) {
@@ -35,18 +36,18 @@
                 cache.layout->SetMaxWidth(width / cache.fit);
                 cache.layout->SetMaxHeight(height / cache.fit);
             }
-            // Anchor all seven clear colors to the actual glyph bounds, not the
+            // Anchor the clear palette to the actual glyph bounds, not the
             // often much wider rank slot. Build once with the existing glyph cache.
             auto make_rainbow = [&](ID2D1RenderTarget* target) {
                 Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> gradient;
                 if (!rainbow || !cache.layout) return gradient;
                 DWRITE_TEXT_METRICS metrics{};
                 cache.layout->GetMetrics(&metrics);
-                D2D1_GRADIENT_STOP stops[7];
-                for (std::size_t s = 0; s < 7; ++s)
+                std::array<D2D1_GRADIENT_STOP, kClearRainbowRgb.size()> stops;
+                for (std::size_t s = 0; s < stops.size(); ++s)
                     stops[s] = {kClearRainbowStops[s], D2D1::ColorF(kClearRainbowRgb[s])};
                 Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> collection;
-                if (SUCCEEDED(target->CreateGradientStopCollection(stops, 7, &collection)))
+                if (SUCCEEDED(target->CreateGradientStopCollection(stops.data(), static_cast<UINT>(stops.size()), &collection)))
                     target->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(
                         D2D1::Point2F(metrics.left, 0),
                         D2D1::Point2F(metrics.left + std::max(1.0f, metrics.width), 0)),
@@ -77,8 +78,54 @@
                 off->Clear(D2D1::ColorF(0, 0));
                 off->SetTransform(D2D1::Matrix3x2F::Scale(cache.fit, cache.fit) * D2D1::Matrix3x2F::Translation(pad, pad));
                 const auto gradient = make_rainbow(off.Get());
+                if (prism) {
+                    // Bake the bevel/depth with the glyph, so steady frames
+                    // have the same single-bitmap cost as the existing grades.
+                    // Bound physical edge width for both small records and
+                    // large result slots; these effects never affect layout.
+                    const float edge = std::clamp(format->GetFontSize() * text_scale * cache.fit * 0.018f,
+                                                  0.75f, 2.2f) / cache.fit;
+                    brush->SetColor(D2D1::ColorF(0x09244A));
+                    for (int layer = 3; layer >= 1; --layer)
+                        off->DrawTextLayout(D2D1::Point2F(edge * layer * 0.55f, edge * layer),
+                                            cache.layout.Get(), brush.Get());
+                    brush->SetColor(D2D1::ColorF(0x73BFFF));
+                    constexpr std::array<D2D1_POINT_2F, 8> rim{{
+                        {-1, 0}, {1, 0}, {0, -1}, {0, 1},
+                        {-0.7f, -0.7f}, {0.7f, -0.7f}, {-0.7f, 0.7f}, {0.7f, 0.7f}}};
+                    for (auto offset : rim)
+                        off->DrawTextLayout(D2D1::Point2F(offset.x * edge, offset.y * edge),
+                                            cache.layout.Get(), brush.Get());
+                    brush->SetColor(D2D1::ColorF(0xE8FFFF));
+                    off->DrawTextLayout(D2D1::Point2F(-edge * 0.45f, -edge * 0.7f),
+                                        cache.layout.Get(), brush.Get());
+                    brush->SetColor(color);
+                }
                 off->DrawTextLayout(D2D1::Point2F(0, 0), cache.layout.Get(),
                     gradient ? static_cast<ID2D1Brush*>(gradient.Get()) : brush.Get());
+                if (prism) {
+                    DWRITE_TEXT_METRICS metrics{};
+                    cache.layout->GetMetrics(&metrics);
+                    // A diagonal reflection band suggests a prism face without
+                    // animated shine, extra per-frame work or external artwork.
+                    const D2D1_GRADIENT_STOP shine_stops[] = {
+                        {0.0f, D2D1::ColorF(0xFFFFFF, 0.38f)},
+                        {0.24f, D2D1::ColorF(0xFFFFFF, 0.02f)},
+                        {0.44f, D2D1::ColorF(0xFFFFFF, 0.04f)},
+                        {0.49f, D2D1::ColorF(0xFFFFFF, 0.52f)},
+                        {0.53f, D2D1::ColorF(0xFFFFFF, 0.05f)},
+                        {0.76f, D2D1::ColorF(0xFFFFFF, 0.0f)},
+                        {1.0f, D2D1::ColorF(0xC9F9FF, 0.30f)}};
+                    Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> shine_collection;
+                    Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> shine;
+                    if (SUCCEEDED(off->CreateGradientStopCollection(shine_stops,
+                            static_cast<UINT>(std::size(shine_stops)), &shine_collection)) &&
+                        SUCCEEDED(off->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(
+                            D2D1::Point2F(metrics.left, metrics.top),
+                            D2D1::Point2F(metrics.left + std::max(1.0f, metrics.width), metrics.top + metrics.height)),
+                            shine_collection.Get(), &shine)))
+                        off->DrawTextLayout(D2D1::Point2F(0, 0), cache.layout.Get(), shine.Get());
+                }
                 const HRESULT glyph_hr = off->EndDraw();
                 off->SetTransform(D2D1::Matrix3x2F::Identity());
                 off->SetTarget(bloom.Get());

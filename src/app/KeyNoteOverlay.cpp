@@ -1,8 +1,6 @@
 #include "app/KeyNoteOverlay.h"
 #include <algorithm>
 #include <chrono>
-#include <cmath>
-#include <vector>
 #include "timing/HighResClock.h"
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -169,74 +167,6 @@ KeyOverlaySnapshot KeyNoteOverlay::update(int64_t now_ns, bool live) {
     }
     state_.kps = static_cast<double>(press_count_);
     return state_;
-}
-
-BmsOverlayEstimate estimate_bms_overlay_difficulty(const gameplay::GameplayChart& chart,
-    int sample_rate, const std::function<bool()>& cancelled) {
-    BmsOverlayEstimate result;
-    result.bms_chart = true;
-    result.difficulty.profile = pattern::ProfileForKeys(chart.lane_count);
-    if (!key_overlay_supports(chart.lane_count) || sample_rate <= 0 || chart.notes.empty()) return result;
-    // Reject unsupported loads instead of silently rating a truncated chart.
-    if (chart.notes.size() > 250000) { result.difficulty.limited = true; return result; }
-    struct Edge { double ms; int lane; int phase; };
-    std::vector<Edge> edges;
-    edges.reserve(chart.notes.size() * 2);
-    int64_t first = chart.notes.front().start_sample;
-    for (const auto& note : chart.notes) first = std::min(first, note.start_sample);
-    std::size_t count = 0;
-    for (const auto& note : chart.notes) {
-        if ((count++ % 1024) == 0 && cancelled && cancelled()) { result.cancelled = true; return result; }
-        if (note.lane < 1 || note.lane > chart.lane_count || note.start_sample < 0 ||
-            (note.end_sample && *note.end_sample < note.start_sample)) {
-            result.difficulty.limited = true; return result;
-        }
-        const double start = (static_cast<double>(note.start_sample) - first) * 1000.0 / sample_rate;
-        const double end = (static_cast<double>(note.end_sample.value_or(note.start_sample)) - first) * 1000.0 / sample_rate;
-        if (end > 3600000.0) { result.difficulty.limited = true; return result; }
-        edges.push_back({start, note.lane - 1, 1});
-        // Release a previous LN before the next head; release zero-length taps
-        // after all heads at that timestamp so simultaneous chords stay intact.
-        edges.push_back({end, note.lane - 1, end > start ? 0 : 2});
-    }
-    std::sort(edges.begin(), edges.end(), [](const Edge& a, const Edge& b) {
-        if (a.ms != b.ms) return a.ms < b.ms;
-        if (a.phase != b.phase) return a.phase < b.phase;
-        return a.lane < b.lane;
-    });
-    pattern::DifficultyEstimator estimator(chart.lane_count);
-    std::array<bool, 10> held{};
-    std::size_t next = 0;
-    const double finish = std::max(1500.0, edges.back().ms);
-    for (double window = 0;; window = std::min(finish, window + 500.0)) {
-        if (cancelled && cancelled()) { result.cancelled = true; result.difficulty = {}; return result; }
-        while (next < edges.size() && edges[next].ms <= window) {
-            const auto& edge = edges[next++];
-            if (edge.phase == 1) {
-                // Live estimators ignore repeat presses. A chart collision must
-                // instead be explicit; silently ignoring it would underrate it.
-                if (held[edge.lane]) {
-                    result.difficulty = {};
-                    result.difficulty.limited = true;
-                    return result;
-                }
-                held[edge.lane] = true;
-                estimator.KeyDown(edge.lane, edge.ms);
-            } else {
-                held[edge.lane] = false;
-                estimator.KeyUp(edge.lane, edge.ms);
-            }
-        }
-        const auto sample = estimator.Evaluate(window);
-        if (sample.limited) { result.difficulty = sample; result.difficulty.ready = false; return result; }
-        if (sample.ready && (!result.difficulty.ready || sample.rating > result.difficulty.rating ||
-            (sample.rating == result.difficulty.rating && sample.stars > result.difficulty.stars))) {
-            result.difficulty = sample;
-            result.peak_end_ms = window + static_cast<double>(first) * 1000.0 / sample_rate;
-        }
-        if (window >= finish) break;
-    }
-    return result;
 }
 
 }  // namespace tenriff::app

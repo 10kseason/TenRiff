@@ -97,6 +97,7 @@ public:
 
         int combo = 0;
         int max_combo = 0;
+        bool full_combo = false;
         gameplay::JudgementCounts counts;
         int64_t score = 0;
         bool auto_scratch_enabled = false;
@@ -147,6 +148,7 @@ public:
         int64_t ghost_osu_od8_score = 0;
         int ghost_combo = 0;
         int ghost_max_combo = 0;
+        bool ghost_full_combo = false;
         gameplay::JudgementCounts ghost_counts;
         double ghost_gauge = 0.0;
         game::GaugeType ghost_gauge_type = game::GaugeType::Normal;
@@ -198,6 +200,7 @@ public:
         bool has_value = false;
         bool game_over = false;
         bool finished = false;
+        bool all_combo_badge = false;
         std::string clear_status = "FAILED";
         std::string final_gauge = "normal";
         double final_gauge_value = 0.0;
@@ -690,7 +693,6 @@ private:
     std::vector<float> lane_activity_;
     std::vector<float> ghost_lane_activity_;
     KeyNoteOverlay key_overlay_;
-    BmsOverlayEstimate key_overlay_chart_;
     std::vector<uint8_t> lane_pressed_;
     std::vector<uint8_t> ghost_lane_pressed_;
     HudCallback hud_callback_;

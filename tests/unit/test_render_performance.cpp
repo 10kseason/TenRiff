@@ -373,6 +373,107 @@ TEST_CASE("render wait policy shrinks the busy tail for high off-vsync fps") {
     CHECK(vsync_policy.yield_threshold_ns == baseline.yield_threshold_ns);
 }
 
+TEST_CASE("render wait recovers timer use after transient scheduler oversleep") {
+    using namespace tenriff::render;
+    // Start at the maximum estimate to cover accumulated scheduler stalls.
+    // Without recovery, every subsequent wait remains busy forever.
+    for (const int fps : {600, 1050, 1500}) {
+        const auto policy = render_wait_policy(false, fps);
+        const int64_t interval = 1'000'000'000LL / fps;
+        const int64_t work = interval * 3 / 10;
+        const int64_t remaining = interval - work;
+        const int64_t threshold = policy.coarse_sleep_min_ns + policy.spin_guard_ns;
+        RenderOversleepEstimate estimate{2'000'000, 1'000'000'000};
+        int timer_waits = 0;
+        int64_t start = 1'000'000'000;
+        for (int frame = 0; frame < fps * 3; ++frame) {
+            const bool slept = remaining > threshold + estimate.value_ns;
+            if (slept) {
+                ++timer_waits;
+                // Normal on-time timer wake, using the existing EMA.
+                estimate.observe(start + interval, start + interval);
+            }
+            estimate.recover_after_wait(start + interval, !slept && remaining > threshold, slept);
+            const auto next = advance_frame_deadline_ns(start, interval, start + work);
+            CHECK(next == start + interval);
+            start = next;
+            if (frame == fps * 2) CHECK(timer_waits > 0);
+        }
+        CHECK(timer_waits > fps);
+    }
+}
+
+TEST_CASE("render wait ages only a compensation-blocked wait with no sleep sample") {
+    using tenriff::render::RenderOversleepEstimate;
+    constexpr int64_t sampled_at = 1'000'000'000;
+    for (const int64_t initial : {0LL, 1LL, 468'750LL, 2'000'000LL}) {
+        for (const auto [blocked, slept] : {std::pair{false, false}, std::pair{false, true},
+                                          std::pair{true, true}}) {
+            RenderOversleepEstimate estimate{initial, sampled_at};
+            estimate.recover_after_wait(sampled_at + 1'000'000'000, blocked, slept);
+            CHECK(estimate.value_ns == initial);
+            CHECK(estimate.last_update_ns == sampled_at);
+        }
+        RenderOversleepEstimate estimate{initial, sampled_at};
+        estimate.recover_after_wait(sampled_at + 99'999'999, true, false);
+        CHECK(estimate.value_ns == initial);
+        estimate.recover_after_wait(sampled_at + 100'000'000, true, false);
+        CHECK(estimate.value_ns == initial * 7 / 8);
+        // Neither another yield nor the next high-FPS frame may age it again.
+        estimate.recover_after_wait(sampled_at + 100'000'001, true, false);
+        estimate.recover_after_wait(sampled_at + 101'000'000, true, false);
+        CHECK(estimate.value_ns == initial * 7 / 8);
+    }
+    RenderOversleepEstimate estimate;
+    estimate.observe(sampled_at, sampled_at + 2'000'000);
+    estimate.observe(sampled_at + 3'000'000, sampled_at + 5'000'000);
+    REQUIRE(estimate.value_ns == 468'750);
+    int64_t now = estimate.last_update_ns;
+    const auto policy = tenriff::render::render_wait_policy(false, 1500);
+    constexpr int64_t remaining = 466'666;
+    int recovery_intervals = 0;
+    while (remaining <= policy.coarse_sleep_min_ns + policy.spin_guard_ns + estimate.value_ns) {
+        REQUIRE(recovery_intervals < 10);
+        now += RenderOversleepEstimate::kRecoveryIntervalNs;
+        estimate.recover_after_wait(now, true, false);
+        ++recovery_intervals;
+    }
+    CHECK(recovery_intervals == 4);
+}
+
+TEST_CASE("render wait limits timer retries under sustained scheduler lateness") {
+    using namespace tenriff::render;
+    const auto policy = render_wait_policy(false, 1500);
+    constexpr int64_t interval = 1'000'000'000LL / 1500;
+    constexpr int64_t work = 200'000;
+    for (const int64_t late : {1'000'000LL, 2'000'000LL}) {
+        RenderOversleepEstimate estimate;
+        int64_t start = 1'000'000'000;
+        const int64_t finish = start + 10'000'000'000;
+        int timer_calls = 0;
+        while (start < finish) {
+            const auto deadline = advance_frame_deadline_ns(start, interval, start + work);
+            const int64_t remaining = deadline - (start + work);
+            const int64_t threshold = policy.coarse_sleep_min_ns + policy.spin_guard_ns;
+            const bool slept = remaining > threshold + estimate.value_ns;
+            int64_t next_start = deadline;
+            if (slept) {
+                ++timer_calls;
+                const int64_t target = deadline - policy.spin_guard_ns - estimate.value_ns;
+                estimate.observe(target, target + late);
+                next_start = (std::max)(deadline, target + late);
+            }
+            estimate.recover_after_wait(next_start, !slept && remaining > threshold, slept);
+            CHECK(next_start >= deadline);
+            start = next_start;
+        }
+        // A handful of initial EMA samples, then at most ten retry intervals/s.
+        // This bounds probing; it is not a promise about physical frame timing.
+        CHECK(timer_calls <= 110);
+        CHECK(timer_calls > 2);
+    }
+}
+
 TEST_CASE("gameplay motion extrapolates from audio sample time and clamps stale HUD drift") {
     tenriff::render::GameplayMotionState state;
     state.current_sample = 1000;
@@ -393,6 +494,79 @@ TEST_CASE("gameplay motion extrapolates from audio sample time and clamps stale 
     CHECK(diagnostics.extrapolated_samples == 24);
     CHECK(diagnostics.extrapolated_ms == doctest::Approx(24.0));
     CHECK(diagnostics.display_sample == 1029);
+}
+
+TEST_CASE("ten minutes of repeated render stalls recover to fresh audio without growing frame debt") {
+    constexpr int64_t epoch_ns = 1'000'000'000LL;
+    constexpr int sample_rate = 48000;
+    constexpr int64_t cycle_ns = 5'000'000'000LL;
+    constexpr int cycles = 120;
+    for (const int fps : {60, 144, 1500}) {
+        const int64_t interval_ns = 1'000'000'000LL / fps;
+        for (const double rate : {0.75, 1.0, 1.5}) {
+            for (const double offset_ms : {-200.0, 0.0, 200.0}) {
+                tenriff::render::GameplayDisplaySampleCache cache;
+                tenriff::render::GameplayMotionState state;
+                state.sample_rate = sample_rate;
+                state.duration_samples = 1200LL * sample_rate;
+                state.audio_buffer_frames = 256;
+                state.audio_clock_rate = rate;
+                state.visual_offset_ms = offset_ms;
+                const int64_t offset_samples = static_cast<int64_t>(std::llround(
+                    offset_ms * sample_rate / 1000.0));
+                const auto audio_sample_at = [rate, sample_rate, epoch_ns](int64_t now_ns) {
+                    return sample_rate + static_cast<int64_t>(std::llround(
+                        static_cast<double>(now_ns - epoch_ns) * sample_rate * rate / 1e9));
+                };
+
+                // Keep one display cache across the entire synthetic ten-minute
+                // session. No sleep or input/audio-clock mutation is involved.
+                for (int cycle = 0; cycle < cycles; ++cycle) {
+                    const int64_t started_ns = epoch_ns + cycle * cycle_ns;
+                    const int64_t stalled_until_ns = started_ns +
+                        1'100'000'000LL + (cycle % 3) * 650'000'000LL;
+                    state.current_sample = audio_sample_at(started_ns);
+                    state.audio_sample_time_ns = started_ns;
+                    state.hud_publish_time_ns = started_ns;
+                    const auto stale = tenriff::render::compute_continuous_gameplay_motion_diagnostics(
+                        state, stalled_until_ns, cache);
+                    CHECK(stale.extrapolated_samples == 1152); // 24 ms at 48 kHz.
+                    CHECK(stale.display_sample == state.current_sample + 1152 + offset_samples);
+
+                    const int64_t resumed_ns = tenriff::render::advance_frame_deadline_ns(
+                        started_ns, interval_ns, stalled_until_ns);
+                    REQUIRE(resumed_ns == stalled_until_ns);
+                    state.current_sample = audio_sample_at(resumed_ns);
+                    state.audio_sample_time_ns = resumed_ns;
+                    state.hud_publish_time_ns = resumed_ns;
+                    const auto fresh = tenriff::render::compute_continuous_gameplay_motion_diagnostics(
+                        state, resumed_ns, cache);
+                    CHECK(fresh.display_sample == audio_sample_at(resumed_ns) + offset_samples);
+                    CHECK(fresh.extrapolated_samples == 0);
+                    CHECK(fresh.display_hold_samples == 0);
+
+                    const auto next_ns = tenriff::render::advance_frame_deadline_ns(
+                        resumed_ns, interval_ns, resumed_ns + interval_ns / 5);
+                    CHECK(next_ns == resumed_ns + interval_ns);
+                    const auto next = tenriff::render::compute_continuous_gameplay_motion_diagnostics(
+                        state, next_ns, cache);
+                    const int64_t frame_samples = std::min<int64_t>(1152,
+                        static_cast<int64_t>(std::llround(
+                            static_cast<double>(interval_ns) * sample_rate * rate / 1e9)));
+                    CHECK(next.display_sample == state.current_sample + frame_samples + offset_samples);
+                    CHECK(next.display_hold_samples == 0);
+                }
+                const int64_t session_end_ns = epoch_ns + cycles * cycle_ns;
+                state.current_sample = audio_sample_at(session_end_ns);
+                state.audio_sample_time_ns = session_end_ns;
+                state.hud_publish_time_ns = session_end_ns;
+                const auto final_frame = tenriff::render::compute_continuous_gameplay_motion_diagnostics(
+                    state, session_end_ns, cache);
+                CHECK(final_frame.display_sample == state.current_sample + offset_samples);
+                CHECK(final_frame.display_hold_samples == 0);
+            }
+        }
+    }
 }
 
 TEST_CASE("gameplay motion stops extrapolating after gameplay finishes") {
@@ -996,14 +1170,14 @@ TEST_CASE("imported pressed art is a transient hit pulse instead of an LN hold s
 
 TEST_CASE("gameplay gauge fallback colors match the clear card palette") {
     // Real MenuApp HUDs emit EX; EX-HARD is a legacy preview label.
-    CHECK(tenriff::render::gameplay_gauge_color("EX") == 0xFF44EFu);
-    CHECK(tenriff::render::gameplay_gauge_color("EX-HARD") == 0xFF44EFu);
+    CHECK(tenriff::render::gameplay_gauge_color("EX") == 0x4AF3F7u);
+    CHECK(tenriff::render::gameplay_gauge_color("EX-HARD") == 0x4AF3F7u);
     CHECK(tenriff::render::gameplay_gauge_color("HARD") == 0xFF3838u);
     CHECK(tenriff::render::gameplay_gauge_color("EASY") == 0x00ED57u);
     CHECK(tenriff::render::gameplay_gauge_color("NORMAL") == 0xFFF000u);
     CHECK(tenriff::render::gameplay_gauge_color("EX-HARD") !=
           tenriff::render::gameplay_gauge_color("HARD"));
-    CHECK(tenriff::render::song_select_gauge_text_color("ex_hard") == 0xFF44EFu);
+    CHECK(tenriff::render::song_select_gauge_text_color("ex_hard") == 0x4AF3F7u);
     CHECK(tenriff::render::song_select_gauge_text_color("hard") == 0xFF3838u);
     CHECK(tenriff::render::song_select_gauge_text_color("normal") == 0xFFF000u);
     CHECK(tenriff::render::song_select_gauge_text_color("easy") == 0x00ED57u);
@@ -1038,7 +1212,7 @@ TEST_CASE("lobby clear lamps remove Gauge Shift copy while preserving gauge and 
         const std::string_view tier(fixture.second);
         CHECK(lamp.badge_label == (tier == "ex_hard" ? "EX CLEAR" :
             tier == "hard" ? "HD CLEAR" : tier == "easy" ? "EZ CLEAR" : "NM CLEAR"));
-        CHECK(lamp.badge_rgb == (tier == "ex_hard" ? 0xFF44EF :
+        CHECK(lamp.badge_rgb == (tier == "ex_hard" ? 0x4AF3F7 :
             tier == "hard" ? 0xFF3838 : tier == "easy" ? 0x00ED57 : 0xFFF000));
         CHECK(lamp.rainbow_badge == (tier == "ex_hard"));
     }
@@ -1055,6 +1229,29 @@ TEST_CASE("lobby clear lamps remove Gauge Shift copy while preserving gauge and 
     CHECK(assisted.label == "ASSIST PRACTICE HARD CLEAR");
     CHECK_FALSE(assisted.tint_card);
     CHECK(assisted.badge_label.empty());
+}
+
+TEST_CASE("EX palette follows the selected static prism stops without changes to other semantic colors") {
+    using namespace tenriff::render;
+    CHECK(kClearExRgb == 0x4AF3F7u);
+    const std::array<std::uint32_t, 7> expected_rgb{
+        0x4AF3F7, 0x6391FC, 0xC75FFB, 0xFC94DE, 0xF4E289, 0x7CF69F, 0x4AF3F7};
+    const std::array<float, 7> expected_stops{0.0f, 0.18f, 0.36f, 0.54f, 0.70f, 0.85f, 1.0f};
+    REQUIRE(kClearRainbowRgb == expected_rgb);
+    REQUIRE(kClearRainbowStops == expected_stops);
+    REQUIRE(kClearRainbowRgb.size() == kClearRainbowStops.size());
+    CHECK(kClearRainbowStops.front() == 0.0f);
+    CHECK(kClearRainbowStops.back() == 1.0f);
+    for (std::size_t i = 1; i < kClearRainbowRgb.size(); ++i)
+        CHECK(kClearRainbowStops[i] > kClearRainbowStops[i - 1]);
+    CHECK(kClearExRgb == kClearRainbowRgb.front());
+    CHECK(kClearExRgb == kClearRainbowRgb.back());
+    CHECK(grade_display_color(L"S") == 0xFF3838u);
+    CHECK(grade_display_color(L"A+") == 0xFFF000u);
+    CHECK(grade_display_color(L"B") == 0x00ED57u);
+    CHECK(grade_display_color(L"E") == 0xC2A0FFu);
+    CHECK(grade_display_color(L"F") == 0xC2A0FFu);
+    CHECK(grade_display_color(L"AUTO") == 0xB6C0D0u);
 }
 
 TEST_CASE("native digital keys separate held depth from hit glitch") {

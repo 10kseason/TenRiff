@@ -38,7 +38,6 @@ TEST_CASE("key overlay preserves taps between frames and aligns only chord visua
     CHECK_FALSE(state.held[0]);
     CHECK(state.accepted_presses == 2);
     CHECK(state.kps == 2);
-    CHECK_FALSE(state.difficulty.ready);
     CHECK(overlay.update(ns(900), true).note_count == 0);
 }
 
@@ -55,8 +54,6 @@ TEST_CASE("key overlay KPS uses a rolling second without estimating input diffic
         const auto actual = overlay.update(ns(6100), true);
         CHECK(actual.kps == 19);
         CHECK(actual.accepted_presses == 120);
-        CHECK_FALSE(actual.difficulty.ready);
-        CHECK(actual.difficulty.samples == 0);
         CHECK(overlay.update(ns(7100), true).kps == 0);
     }
 }
@@ -102,7 +99,6 @@ TEST_CASE("key overlay worker publishes independently and pauses without blockin
     } while (observed.kps != 1 && std::chrono::steady_clock::now() < deadline);
     CHECK(observed.kps == 1);
     CHECK(observed.note_count == 1);
-    CHECK_FALSE(observed.difficulty.ready);
     const auto paused = overlay.snapshot(clock(), false);
     CHECK(paused.kps == 0);
     CHECK(paused.note_count == 0);
@@ -111,75 +107,6 @@ TEST_CASE("key overlay worker publishes independently and pauses without blockin
     overlay.configure(false, 4);
     REQUIRE(overlay.start());
     CHECK_FALSE(overlay.snapshot(clock(), true).visible);
-}
-
-namespace {
-tenriff::gameplay::GameplayChart overlay_chart(int lanes, int count, int gap_ms, int offset_ms = 0) {
-    tenriff::gameplay::GameplayChart chart;
-    chart.lane_count = lanes;
-    for (int i = 0; i < count; ++i) {
-        tenriff::gameplay::NoteEvent note;
-        note.lane = i % lanes + 1;
-        note.start_sample = offset_ms + i * gap_ms;
-        chart.notes.push_back(note);
-    }
-    return chart;
-}
-}
-
-TEST_CASE("BMS overlay estimate is fixed from the full chart and independent of live KPS") {
-    using tenriff::app::estimate_bms_overlay_difficulty;
-    for (int lanes : {4, 5, 7, 8, 10}) {
-        const auto chart = overlay_chart(lanes, 240, 50);
-        const auto fixed = estimate_bms_overlay_difficulty(chart, 1000);
-        REQUIRE(fixed.bms_chart);
-        REQUIRE(fixed.difficulty.ready);
-        CHECK(fixed.difficulty.profile == pattern::ProfileForKeys(lanes));
-        const auto shifted = estimate_bms_overlay_difficulty(overlay_chart(lanes, 240, 50, 10000), 1000);
-        CHECK(shifted.difficulty.rating == doctest::Approx(fixed.difficulty.rating));
-        CHECK(shifted.peak_end_ms == doctest::Approx(fixed.peak_end_ms + 10000));
-        // An easy intro separated by silence must not dilute the hardest section.
-        auto combined = overlay_chart(lanes, 10, 500);
-        const auto hard = overlay_chart(lanes, 240, 50, 20000);
-        combined.notes.insert(combined.notes.end(), hard.notes.begin(), hard.notes.end());
-        const auto full = estimate_bms_overlay_difficulty(combined, 1000);
-        CHECK(full.difficulty.rating == doctest::Approx(fixed.difficulty.rating));
-        CHECK(full.peak_end_ms >= 20000);
-        KeyNoteOverlay live;
-        live.configure(true, lanes);
-        for (int i = 0; i < 300; ++i) {
-            live.record(i % lanes, true, ns(i * 10));
-            live.record(i % lanes, false, ns(i * 10 + 1));
-        }
-        CHECK_FALSE(live.update(ns(3000), true).difficulty.ready);
-        CHECK(estimate_bms_overlay_difficulty(chart, 1000).difficulty.rating == doctest::Approx(fixed.difficulty.rating));
-    }
-}
-
-TEST_CASE("BMS overlay analysis preserves holds and handles unsupported sparse cancelled or invalid charts") {
-    using tenriff::app::estimate_bms_overlay_difficulty;
-    auto chart = overlay_chart(7, 240, 50);
-    const auto taps = estimate_bms_overlay_difficulty(chart, 1000);
-    for (auto& note : chart.notes) note.end_sample = note.start_sample + 200;
-    const auto holds = estimate_bms_overlay_difficulty(chart, 1000);
-    REQUIRE(holds.difficulty.ready);
-    CHECK(holds.difficulty.holdOverlapPercent > 0);
-    CHECK(holds.difficulty.stars != doctest::Approx(taps.difficulty.stars));
-    const auto cancelled = estimate_bms_overlay_difficulty(chart, 1000, [] { return true; });
-    CHECK(cancelled.cancelled);
-    CHECK_FALSE(cancelled.difficulty.ready);
-    CHECK_FALSE(estimate_bms_overlay_difficulty(overlay_chart(6, 240, 50), 1000).difficulty.ready);
-    CHECK_FALSE(estimate_bms_overlay_difficulty(overlay_chart(4, 2, 50), 1000).difficulty.ready);
-    CHECK_FALSE(estimate_bms_overlay_difficulty(chart, 0).difficulty.ready);
-    chart.notes[0].lane = 99;
-    CHECK(estimate_bms_overlay_difficulty(chart, 1000).difficulty.limited);
-    auto collision = overlay_chart(7, 240, 50);
-    collision.notes[0].end_sample = 400; // The next same-lane head is at 350 ms.
-    const auto rejected = estimate_bms_overlay_difficulty(collision, 1000);
-    CHECK(rejected.difficulty.limited);
-    CHECK_FALSE(rejected.difficulty.ready);
-    collision.notes[0].end_sample = 350; // Touching tails/heads remain valid.
-    CHECK(estimate_bms_overlay_difficulty(collision, 1000).difficulty.ready);
 }
 
 TEST_CASE("key overlay keeps long holds when bounded visual history fills") {
@@ -231,7 +158,7 @@ TEST_CASE("key overlay skin settings round trip with safe legacy defaults and fi
     CHECK(restored.key_overlay_y == 1.0);
 }
 
-TEST_CASE("key overlay skin preview is visibly synthetic and never invents an estimate") {
+TEST_CASE("key overlay skin preview shows synthetic key history without live KPS") {
     tenriff::render::SkinPreviewData preview;
     preview.key_overlay_enabled = true;
     for (int lanes : {4, 5, 6, 7, 8, 9, 10, 16}) {
@@ -239,7 +166,13 @@ TEST_CASE("key overlay skin preview is visibly synthetic and never invents an es
         const auto hud = tenriff::render::make_skin_gameplay_preview(preview, ns(1000));
         CHECK(hud.key_overlay.visible == tenriff::app::key_overlay_supports(lanes));
         CHECK(hud.key_overlay.preview);
-        CHECK_FALSE(hud.key_overlay.difficulty.ready);
-        CHECK(hud.key_overlay.difficulty.samples == 0);
+        CHECK_FALSE(hud.key_overlay.live);
+        CHECK(hud.key_overlay.kps == 0.0);
+        if (hud.key_overlay.visible) {
+            CHECK(hud.key_overlay.note_count == static_cast<std::size_t>(lanes));
+            CHECK(hud.key_overlay.held[1]);
+        } else {
+            CHECK(hud.key_overlay.note_count == 0);
+        }
     }
 }

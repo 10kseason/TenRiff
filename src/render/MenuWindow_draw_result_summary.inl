@@ -73,11 +73,14 @@
                                       d2d_->button_selected_brush.Get());
             d2d_->button_selected_brush->SetOpacity(saved);
         }
-        draw_result_text(localized_result_status(), d2d_->result_action_format.Get(),
-                         native_rect("result_summary.rect.014", D2D1::RectF(status_chip.left + 16.0f, status_chip.top + 8.0f,
-                                     status_chip.right - 16.0f, status_chip.bottom - 6.0f)),
+        const auto status_text_rect = native_rect("result_summary.rect.014", D2D1::RectF(
+            status_chip.left + 16.0f, status_chip.top + 8.0f, status_chip.right - 16.0f, status_chip.bottom - 6.0f));
+        const auto status_text = localized_result_status();
+        draw_result_text(status_text, d2d_->result_action_format.Get(), status_text_rect,
                          result_status_brush(result_success ? static_cast<ID2D1Brush*>(d2d_->accent_brush.Get())
-                                                           : static_cast<ID2D1Brush*>(d2d_->text_brush.Get())),
+                                                           : static_cast<ID2D1Brush*>(d2d_->text_brush.Get()),
+                                             status_text, d2d_->result_action_format.Get(), status_text_rect,
+                                             DWRITE_TEXT_ALIGNMENT_LEADING),
                          presentation.status);
         const std::string summary_detail = result_loc("DETAIL SCORE  ", "상세 점수  ") +
                   std::to_string(data.result.detail_score) + " / " +

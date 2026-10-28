@@ -177,6 +177,6 @@
     {"Show PG / GR / G / BAD / PR counts below the timing indicator inside the field. Counts remain visible between hits. Default: Off.", "在轨道内指示器正下方显示PG / GR / G / BAD / PR累计数量，击打间隔仍显示。默认关闭。"},
 
 {"NK2 E adds LNs only inside source LN intervals. Reducing keys uses placement only.", "NK2 E只在原谱长按区间内添加长按。减少键数时仅重新分配音符。"},
-{"Show keys and 1-second KPS from a separate worker, plus a fixed BMS chart peak estimate in 4/5/7/8/10K. Default Off; this is not player skill.", "在4/5/7/8/10K中显示独立线程处理的按键与1秒KPS，以及从完整BMS计算的固定峰值难度估计。默认关闭，不代表玩家实力。"},
+{"Show the key viewer and 1-second KPS in 4/5/7/8/10K. Default: Off.", "在4/5/7/8/10K中显示按键可视化和最近1秒的KPS。默认关闭。"},
 {"Move the key overlay horizontally in 1% steps. 0% is left and 100% is right; the full panel stays on screen.", "按1%调整叠加面板水平位置。0%为左侧，100%为右侧；整个面板保持在屏幕内。"},
 {"Move the key overlay vertically in 1% steps. 0% is top and 100% is bottom. Enablement and position are saved with the skin settings.", "按1%调整叠加面板垂直位置。0%为顶部，100%为底部。启用状态和位置随皮肤设置保存。"},

@@ -5786,7 +5786,7 @@
       },
       "gauge_ex_hard": {
         "label": "Gauge Ex Hard",
-        "default": "#FF44EF"
+        "default": "#4AF3F7"
       }
     },
     "rects": {

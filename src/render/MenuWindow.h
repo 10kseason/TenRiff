@@ -422,6 +422,7 @@ struct ResultScreenData {
     bool cleared = false;
     bool all_perfect = false;
     bool full_combo = false;
+    bool all_combo_badge = false;
     int64_t presentation_start_ns = 0;
     bool presentation_skipped = false;
 
@@ -617,6 +618,7 @@ struct GameplayHudData {
     int64_t osu_od8_score = 0;
     int combo = 0;
     int max_combo = 0;
+    bool full_combo = false;
     int total_notes = 0;
     double accuracy = 0.0;
     double detailed_accuracy = 0.0;
@@ -686,6 +688,7 @@ struct GameplayHudData {
     int64_t ghost_osu_od8_score = 0;
     int ghost_combo = 0;
     int ghost_max_combo = 0;
+    bool ghost_full_combo = false;
     double ghost_accuracy = 0.0;
     double ghost_detailed_accuracy = 0.0;
     int ghost_pg = 0;

@@ -7,7 +7,7 @@ TEST_CASE("Gauge Shift result accents do not recolor other result states") {
     CHECK(result_gauge_shift_clear_color("GAUGE SHIFT EASY CLEAR") == 0x72DB98);
     CHECK(result_gauge_shift_clear_color("GAUGE SHIFT NORMAL CLEAR") == 0xFFE477);
     CHECK(result_gauge_shift_clear_color("GAUGE SHIFT HARD CLEAR") == 0xFFAA60);
-    CHECK(result_gauge_shift_clear_color("GAUGE SHIFT EX CLEAR") == 0xFF647A);
+    CHECK(result_gauge_shift_clear_color("GAUGE SHIFT EX CLEAR") == 0x4AF3F7);
     for (const auto status : {"CLEAR", "EX CLEAR", "EASY CLEAR", "HARD CLEAR", "FAILED", "ABORTED",
                               "AUTOPLAY", "SUDDEN DEATH CLEAR", "PACEMAKER SCORE CLEAR",
                               "ASSIST PRACTICE GAUGE SHIFT EASY CLEAR"}) {

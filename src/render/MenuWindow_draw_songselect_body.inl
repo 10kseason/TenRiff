@@ -405,11 +405,11 @@
                                      const D2D1_RECT_F& rect) -> ID2D1Brush* {
             if (lamp.rainbow_badge) {
                 if (!d2d_->song_clear_gradient) {
-                    D2D1_GRADIENT_STOP stops[7];
-                    for (std::size_t s = 0; s < 7; ++s)
+                    std::array<D2D1_GRADIENT_STOP, kClearRainbowRgb.size()> stops;
+                    for (std::size_t s = 0; s < stops.size(); ++s)
                         stops[s] = {kClearRainbowStops[s], D2D1::ColorF(kClearRainbowRgb[s])};
                     Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> collection;
-                    if (SUCCEEDED(ctx->CreateGradientStopCollection(stops, 7, &collection))) {
+                    if (SUCCEEDED(ctx->CreateGradientStopCollection(stops.data(), static_cast<UINT>(stops.size()), &collection))) {
                         ctx->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(
                             D2D1::Point2F(0, 0), D2D1::Point2F(1, 0)),
                             collection.Get(), &d2d_->song_clear_gradient);

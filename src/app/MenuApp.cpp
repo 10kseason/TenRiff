@@ -1029,6 +1029,7 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
     input.past_visual_span = state.past_visual_span;
     input.combo = state.combo;
     input.max_combo = state.max_combo;
+    input.full_combo = state.full_combo;
     input.counts = state.counts;
     input.score = state.score;
     input.osu_od8_score_available = state.osu_od8_score_available;
@@ -1077,6 +1078,7 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
     input.ghost_osu_od8_score = state.ghost_osu_od8_score;
     input.ghost_combo = state.ghost_combo;
     input.ghost_max_combo = state.ghost_max_combo;
+    input.ghost_full_combo = state.ghost_full_combo;
     input.ghost_counts = state.ghost_counts;
     input.ghost_gauge = state.ghost_gauge;
     input.ghost_gauge_type = state.ghost_gauge_type;

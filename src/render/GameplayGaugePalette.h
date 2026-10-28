@@ -11,11 +11,14 @@ namespace tenriff::render {
 inline constexpr std::uint32_t kClearEasyRgb = 0x00ED57;
 inline constexpr std::uint32_t kClearNormalRgb = 0xFFF000;
 inline constexpr std::uint32_t kClearHardRgb = 0xFF3838;
-inline constexpr std::uint32_t kClearExRgb = 0xFF44EF; // Fallback when a gradient cannot be allocated.
+inline constexpr std::uint32_t kClearExRgb = 0x4AF3F7; // Selected prism cyan; shared fallback/base tone.
 inline constexpr std::uint32_t kGradeLowRgb = 0xC2A0FF;
+// The selected prism artwork supplies this static sRGB ramp, including lavender.
+// Keep its authored RGB stops instead of deriving colors from hue animation.
+// The existing paint caches, alpha/geometry and EX-only override policy remain.
 inline constexpr std::array<std::uint32_t, 7> kClearRainbowRgb{
-    0xFF32ED, 0xFF4848, 0xFFF000, 0x00ED57, 0x00E9FF, 0x7755FF, 0xFF32ED};
-inline constexpr std::array<float, 7> kClearRainbowStops{0.0f, 0.18f, 0.36f, 0.54f, 0.72f, 0.88f, 1.0f};
+    0x4AF3F7, 0x6391FC, 0xC75FFB, 0xFC94DE, 0xF4E289, 0x7CF69F, 0x4AF3F7};
+inline constexpr std::array<float, 7> kClearRainbowStops{0.0f, 0.18f, 0.36f, 0.54f, 0.70f, 0.85f, 1.0f};
 
 inline bool grade_uses_clear_rainbow(std::wstring_view grade) {
     return grade == L"S+" || grade == L"S++" || grade == L"S+++" ||

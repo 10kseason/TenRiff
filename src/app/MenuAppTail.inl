@@ -270,6 +270,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.hispeed = gameplay_hud_.hispeed;
     target.combo = gameplay_hud_.combo;
     target.max_combo = gameplay_hud_.max_combo;
+    target.full_combo = gameplay_hud_.full_combo;
     target.pg = gameplay_hud_.counts.pg;
     target.gr = gameplay_hud_.counts.gr;
     target.gd = gameplay_hud_.counts.gd;
@@ -479,6 +480,9 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         target.osu_od8_score = 0;
         target.combo = target.peer_combo;
         target.max_combo = target.peer_max_combo;
+        // Peer v7 carries no complete-chart combo target; never borrow the
+        // local player's achievement for a spectator's perspective.
+        target.full_combo = false;
         target.pg = target.peer_pg;
         target.gr = target.peer_gr;
         target.gd = target.peer_gd;
@@ -512,6 +516,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.ghost_osu_od8_score = gameplay_hud_.ghost_osu_od8_score;
     target.ghost_combo = gameplay_hud_.ghost_combo;
     target.ghost_max_combo = gameplay_hud_.ghost_max_combo;
+    target.ghost_full_combo = gameplay_hud_.ghost_full_combo;
     target.ghost_pg = gameplay_hud_.ghost_counts.pg;
     target.ghost_gr = gameplay_hud_.ghost_counts.gr;
     target.ghost_gd = gameplay_hud_.ghost_counts.gd;
@@ -1229,6 +1234,7 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     constexpr double kResultTimingGuidanceFallbackMeanMs = 6.0;
 
     render.kind = render::MenuScreenKind::ResultScreen;
+    render.result.all_combo_badge = has_result_ && last_all_combo_badge_;
     render.result.peer_battle = last_game_was_multiplayer_;
     render.result.profile_avatar_path = config_.ui.profile_avatar_path;
     render.result.presentation_start_ns = result_presentation_start_ns_;
@@ -2399,6 +2405,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.background_overlay_start_sample = hud.background_overlay_start_sample;
         gameplay_hud_.combo = hud.combo;
         gameplay_hud_.max_combo = hud.max_combo;
+        gameplay_hud_.full_combo = hud.full_combo;
         gameplay_hud_.counts = hud.counts;
         gameplay_hud_.score = hud.score;
         gameplay_hud_.accuracy = hud.accuracy;
@@ -2458,6 +2465,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.ghost_osu_od8_score = hud.ghost_osu_od8_score;
         gameplay_hud_.ghost_combo = hud.ghost_combo;
         gameplay_hud_.ghost_max_combo = hud.ghost_max_combo;
+        gameplay_hud_.ghost_full_combo = hud.ghost_full_combo;
         gameplay_hud_.ghost_counts = hud.ghost_counts;
         gameplay_hud_.ghost_gauge = hud.ghost_gauge;
         gameplay_hud_.ghost_gauge_type = hud.ghost_gauge_type;
@@ -2830,6 +2838,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         }
         last_result_ = result.stats;
         last_game_over_ = result.game_over;
+        last_all_combo_badge_ = result.all_combo_badge;
         last_clear_status_ = result.clear_status;
         last_final_gauge_ = result.final_gauge;
         has_result_ = true;

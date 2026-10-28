@@ -3,12 +3,9 @@
 #include <array>
 #include <atomic>
 #include <cstdint>
-#include <functional>
 #include <mutex>
 #include <thread>
-#include "gameplay/GameplayChart.h"
 #include "input/SPSCQueue.h"
-#include "key_note_overlay/pattern_difficulty.h"
 
 namespace tenriff::app {
 
@@ -35,22 +32,7 @@ struct KeyOverlaySnapshot {
     double kps = 0.0;
     bool limited = false;
     std::uint64_t accepted_presses = 0;
-    bool bms_chart = false;
-    // Immutable, loading-time chart estimate; never derived from live presses.
-    pattern::Snapshot difficulty;
 };
-
-struct BmsOverlayEstimate {
-    bool bms_chart = false;
-    bool cancelled = false;
-    pattern::Snapshot difficulty;
-    double peak_end_ms = 0.0;
-};
-
-// The already parsed, mode/rate-adjusted BMS is scanned before practice trimming
-// and countdown lead-in. No media, keyboard activity, or judgement results enter it.
-BmsOverlayEstimate estimate_bms_overlay_difficulty(const gameplay::GameplayChart& chart,
-    int sample_rate, const std::function<bool()>& cancelled = {});
 
 // One accepted-input producer, one optional low-priority overlay consumer.
 // record() only copies a bounded event: no allocation, mutex, OS wake or analysis.

@@ -26,7 +26,6 @@ namespace tenriff::render {
 
 namespace {
 
-constexpr int64_t kMaxOversleepEstimateNs = 2'000'000LL;
 constexpr std::size_t kMaxPerformanceHistory = 24000;
 constexpr int64_t kPerformanceWindowNs = 10'000'000'000LL;
 constexpr int64_t kGraphRefreshNs = 50'000'000LL;
@@ -83,44 +82,36 @@ void cpu_relax() {
 #endif
 }
 
-void update_oversleep_estimate(int64_t target_wake_ns,
-                               int64_t actual_wake_ns,
-                               int64_t* oversleep_estimate_ns) {
-    if (!oversleep_estimate_ns) {
-        return;
-    }
-
-    const int64_t overshoot_ns = (std::max)(int64_t{0}, actual_wake_ns - target_wake_ns);
-    const int64_t clamped = std::clamp(overshoot_ns, int64_t{0}, kMaxOversleepEstimateNs);
-    *oversleep_estimate_ns = std::clamp(((*oversleep_estimate_ns) * 7 + clamped) / 8,
-                                        int64_t{0},
-                                        kMaxOversleepEstimateNs);
-}
-
 template <typename Waiter>
 void precise_wait_until_ns(int64_t deadline_ns,
-                           int64_t* oversleep_estimate_ns,
+                           RenderOversleepEstimate& oversleep,
                            const RenderWaitPolicy& wait_policy,
                            const Waiter& waiter) {
+    bool estimate_blocked_sleep = false;
+    bool slept = false;
     for (;;) {
         const int64_t now_ns = timing::HighResClock::now_ns();
         if (now_ns >= deadline_ns) {
-            return;
+            break;
         }
 
         const int64_t remaining_ns = deadline_ns - now_ns;
-        const int64_t oversleep_ns = oversleep_estimate_ns ? *oversleep_estimate_ns : 0;
+        const int64_t oversleep_ns = oversleep.value_ns;
         if (remaining_ns > wait_policy.coarse_sleep_min_ns + wait_policy.spin_guard_ns + oversleep_ns) {
             const int64_t sleep_ns = remaining_ns - wait_policy.spin_guard_ns - oversleep_ns;
             const int64_t target_wake_ns = now_ns + sleep_ns;
+            slept = true;
             if (waiter(sleep_ns)) {
-                update_oversleep_estimate(target_wake_ns, timing::HighResClock::now_ns(), oversleep_estimate_ns);
+                oversleep.observe(target_wake_ns, timing::HighResClock::now_ns());
                 continue;
             }
             std::this_thread::sleep_for(std::chrono::nanoseconds(sleep_ns));
-            update_oversleep_estimate(target_wake_ns, timing::HighResClock::now_ns(), oversleep_estimate_ns);
+            oversleep.observe(target_wake_ns, timing::HighResClock::now_ns());
             continue;
         }
+
+        estimate_blocked_sleep |=
+            remaining_ns > wait_policy.coarse_sleep_min_ns + wait_policy.spin_guard_ns;
 
         if (remaining_ns > wait_policy.yield_threshold_ns) {
             std::this_thread::yield();
@@ -130,7 +121,10 @@ void precise_wait_until_ns(int64_t deadline_ns,
         while (timing::HighResClock::now_ns() < deadline_ns) {
             cpu_relax();
         }
-        return;
+        break;
+    }
+    if (estimate_blocked_sleep && !slept) {
+        oversleep.recover_after_wait(timing::HighResClock::now_ns(), true, false);
     }
 }
 
@@ -389,7 +383,7 @@ RenderConfig RenderThread::current_config() const {
 
 void RenderThread::thread_main() {
     int64_t next_tick_ns = timing::HighResClock::now_ns();
-    int64_t oversleep_estimate_ns = 0;
+    RenderOversleepEstimate oversleep;
 #ifdef _WIN32
     HighResolutionWaitableTimer waitable_timer;
 #endif
@@ -413,7 +407,7 @@ void RenderThread::thread_main() {
         if (!unlimited && now_ns < next_tick_ns) {
             precise_wait_until_ns(
                 next_tick_ns,
-                &oversleep_estimate_ns,
+                oversleep,
                 wait_policy,
 #ifdef _WIN32
                 [&waitable_timer](int64_t duration_ns) { return waitable_timer.wait_for_ns(duration_ns); }
@@ -429,7 +423,7 @@ void RenderThread::thread_main() {
         const int64_t after_callback_ns = timing::HighResClock::now_ns();
         if (unlimited) {
             next_tick_ns = after_callback_ns;
-            oversleep_estimate_ns = 0;
+            oversleep = {};
         } else {
             next_tick_ns = advance_frame_deadline_ns(now_ns, frame_interval_ns, after_callback_ns);
         }

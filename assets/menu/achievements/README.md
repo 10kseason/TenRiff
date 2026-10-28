@@ -1,0 +1,11 @@
+# ALL COMBO artwork
+
+Generated with the built-in image_gen tool for TenRiff. File: `all-combo.png` (RGBA, 2172 × 724). The original transparent pixels are preserved. Rendering ignores alpha ≤4 when measuring the visible bounds to avoid faint padding affecting layout. No external API fallback was used.
+
+Initial prompt (superseded by the rounded/glow edit below):
+
+> Create one production-ready transparent PNG HUD achievement wordmark for the rhythm game TenRiff. Exact text: "ALL COMBO", spelled A L L space C O M B O, one horizontal line. Clean bold slightly italic geometric sans-serif lettering, crisp bright ivory-white face, very restrained pale champagne-gold thin edge and dark navy outer outline for readability on gameplay. A small simple four-point sparkle at each end, integrated into the wordmark; tasteful minimal arcade celebration, no busy particles. Wide compact banner with aspect ratio about 4:1, letters occupy most of the canvas with only small transparent padding. Flat front view; no perspective, no photographic texture, no background, no frame or filled panel, no extra text, no numbers, no logo. Actual transparent alpha background, including around and between the letterforms. Designed to remain legible when rendered at about 230 by 58 screen pixels on a dark rhythm-game playfield. One finished image only.
+
+Final edit prompt (built-in image_gen, original alpha preserved):
+
+> Edit this transparent TenRiff ALL COMBO HUD image. Preserve exact ALL COMBO text, its bold italic lettering, ivory-white face, gold edge and small star accents. Add a thin smooth rounded-rectangle/capsule outline around the whole wordmark, with visibly rounded corners, and a small soft yellow outer glow around the outline and lettering. The glow must be restrained, narrow and semi-transparent, not large bloom. The rounded border must fit closely around the text with a little breathing room, and all sparkle tips must fit within it. Keep the interior and exterior background truly transparent (no black panel, no filled box, no checkerboard). Keep the wordmark horizontal, centered and very legible at 250 pixels wide. Trim excess empty padding so the actual badge fills almost all the output canvas, with enough margin to avoid cropping the glow. Do not add other words, shapes, particles or colors. Production-ready PNG with alpha.

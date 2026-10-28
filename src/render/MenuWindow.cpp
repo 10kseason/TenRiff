@@ -1411,7 +1411,8 @@ bool create_composited_gameplay_note_bitmap(ID2D1DeviceContext* d2d_context,
     return true;
 }
 
-bool compute_bitmap_alpha_source_rect(IWICBitmapSource* bitmap_source, D2D1_RECT_F& out_source_rect) {
+bool compute_bitmap_alpha_source_rect(IWICBitmapSource* bitmap_source, D2D1_RECT_F& out_source_rect,
+                                      BYTE alpha_cutoff = 0) {
     if (!bitmap_source) {
         return false;
     }
@@ -1437,7 +1438,7 @@ bool compute_bitmap_alpha_source_rect(IWICBitmapSource* bitmap_source, D2D1_RECT
         const BYTE* row = pixels.data() + static_cast<std::size_t>(y) * stride;
         for (UINT x = 0; x < width; ++x) {
             const BYTE alpha = row[static_cast<std::size_t>(x) * 4 + 3];
-            if (alpha == 0) {
+            if (alpha <= alpha_cutoff) {
                 continue;
             }
             found_opaque_pixel = true;
@@ -1506,7 +1507,8 @@ bool load_bitmap_from_utf8_path(IWICImagingFactory* wic_factory,
                                 Microsoft::WRL::ComPtr<ID2D1Bitmap>& out_bitmap,
                                 D2D1_RECT_F* out_source_rect = nullptr,
                                 bool trim_transparent_alpha = false,
-                                bool detached_avatar = false) {
+                                bool detached_avatar = false,
+                                BYTE trim_alpha_cutoff = 0) {
     if (!wic_factory || !d2d_context || path.empty()) {
         return false;
     }
@@ -1574,7 +1576,7 @@ bool load_bitmap_from_utf8_path(IWICImagingFactory* wic_factory,
         source_rect = D2D1::RectF(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height));
     }
     if (trim_transparent_alpha) {
-        static_cast<void>(compute_bitmap_alpha_source_rect(converter.Get(), source_rect));
+        static_cast<void>(compute_bitmap_alpha_source_rect(converter.Get(), source_rect, trim_alpha_cutoff));
     }
 
     Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap;
@@ -2389,6 +2391,9 @@ void configure_low_latency_presentation(IDXGIDevice* dxgi_device, IDXGISwapChain
 }  // namespace
 
 struct MenuWindow::D2DResources {
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> all_combo_bitmap;
+    D2D1_RECT_F all_combo_source_rect{};
+    bool all_combo_bitmap_attempted = false;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> native_menu_brush;
     Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> native_menu_background;
     std::unordered_map<uint32_t, D2D1_COLOR_F> native_menu_palette;
@@ -2534,6 +2539,10 @@ struct MenuWindow::D2DResources {
     std::array<Microsoft::WRL::ComPtr<ID2D1PathGeometry>, 2> result_action_icons{};
     std::array<bool, 2> result_action_icons_attempted{};
     Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> result_gauge_gradient;
+    Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> result_ex_status_gradient;
+    bool result_ex_status_gradient_attempted = false;
+    ReadableTextLayout result_ex_status_measure;
+    bool result_ex_status_measure_attempted = false;
     Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> song_clear_gradient;
     Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> gameplay_gauge_gradient;
     Microsoft::WRL::ComPtr<IDWriteTextLayout> generic_help_layout;
@@ -5523,6 +5532,8 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family, const app::Native
     d2d_->menu_ellipsis_signs.clear();
     d2d_->generic_help_layout.Reset();
     for (auto& text : d2d_->menu_readable_text) text = {};
+    d2d_->result_ex_status_measure = {};
+    d2d_->result_ex_status_measure_attempted = false;
     for (auto& grade : d2d_->grade_bitmaps) grade = {};
     auto& sf = d2d_->preview_fonts;
     if (!create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 30, &sf.studio_title, true) ||

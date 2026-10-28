@@ -1339,6 +1339,8 @@
 // Optional integrated key-note-overlay plugin.
 {"Key Overlay Plugin (4/5/7/8/10K)", "キーオーバーレイ プラグイン (4/5/7/8/10K)"},
 {"Key Overlay X", "キーオーバーレイ X"},
+{"Key Viewer", "キービューア"},
+{"Key Viewer · Preview", "キービューア · プレビュー"},
 {"Key Overlay Y", "キーオーバーレイ Y"},
 {"Input estimate", "入力推定"},
 {"Collecting again", "再収集中"},

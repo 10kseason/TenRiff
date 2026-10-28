@@ -1044,6 +1044,8 @@ int main(int argc, char** argv) {
     double fixture_hold_opacity = -1;
     bool resume_countdown = false;
     bool no_feedback = false;
+    bool full_combo_fixture = false;
+    bool ghost_full_combo_fixture = false;
     bool timing_text_off = false, timing_bar_off = false;
     bool judgement_counts = false;
     bool indicator_background_off = false;
@@ -1281,6 +1283,8 @@ int main(int argc, char** argv) {
             data.ui_font = "custom"; data.ui_font_path = argv[++i]; continue;
         }
         if (arg == "--indicator-background-off") { indicator_background_off = true; continue; }
+        if (arg == "--full-combo") { full_combo_fixture = true; continue; }
+        if (arg == "--ghost-full-combo") { ghost_full_combo_fixture = true; continue; }
         if (arg == "--result-perfect") { result = result_perfect = true; continue; }
         if (arg == "--gauge-ramp") { result = gauge_ramp = true; continue; }
         if (arg == "--result-grade" && i + 1 < argc) { result_grade = argv[++i]; continue; }
@@ -2183,6 +2187,7 @@ int main(int argc, char** argv) {
     if (!sites_records_title.empty() &&
         !tenriff::app::MenuAppVisualTestAccess::populate_sites_records(data, sites_records_title)) return 5;
     if (fullscreen_skin_preview) {
+        // Preview scenes do not claim a completed player run.
         data.generic.skin_preview.fullscreen = true;
         data.kind = MenuScreenKind::GameplayHud;
         data.gameplay = make_skin_gameplay_preview(data.generic.skin_preview);
@@ -2197,6 +2202,10 @@ int main(int argc, char** argv) {
         data.gameplay.max_combo = 12345;
         data.gameplay.accuracy = 99.98;
         data.gameplay.detailed_accuracy = 98.76;
+    }
+    if (full_combo_fixture) {
+        data.result.full_combo = true;
+        data.result.all_combo_badge = true;
     }
     if (resume_countdown) {
         data.gameplay.paused = data.gameplay.countdown_active = true;
@@ -2315,19 +2324,6 @@ int main(int argc, char** argv) {
         return MenuWindowVisualTestAccess::check_background_layers(window, data, layer_probe_directory) ? 0 : 5;
     if (benchmark_frames > 0) frame_limit = benchmark_warmup + benchmark_frames;
     const auto start = std::chrono::steady_clock::now();
-    tenriff::app::BmsOverlayEstimate fixture_overlay_estimate;
-    if (key_overlay_fixture && tenriff::app::key_overlay_supports(preview_keys)) {
-        tenriff::gameplay::GameplayChart fixture_chart;
-        fixture_chart.lane_count = preview_keys;
-        for (int i = 0; i < 240; ++i) {
-            tenriff::gameplay::NoteEvent note;
-            note.lane = i % preview_keys + 1;
-            note.start_sample = i * 60;
-            if (i % 9 == 0) note.end_sample = note.start_sample + 150;
-            fixture_chart.notes.push_back(note);
-        }
-        fixture_overlay_estimate = tenriff::app::estimate_bms_overlay_difficulty(fixture_chart, 1000);
-    }
     while (!window.should_close()) {
         MSG message;
         while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
@@ -2396,6 +2392,8 @@ int main(int argc, char** argv) {
             hud.text_revision = timing_sequence ? static_cast<uint64_t>(rendered_frames + 1) : static_cast<uint64_t>(hit + 1);
             hud.motion_revision++;
             hud.combo = 123 + hit; hud.pg = hit + 1;
+            hud.full_combo = full_combo_fixture;
+            hud.ghost_full_combo = ghost_full_combo_fixture;
             hud.current_sample = static_cast<int64_t>(seconds * 48000);
             hud.current_visual_position = seconds;
             if (measure_lines_fixture) {
@@ -2579,8 +2577,6 @@ int main(int argc, char** argv) {
             }
             fixture_overlay.record(1, true, 5'950'000'000LL);
             render_data.gameplay.key_overlay = fixture_overlay.update(6'200'000'000LL, true);
-            render_data.gameplay.key_overlay.bms_chart = fixture_overlay_estimate.bms_chart;
-            render_data.gameplay.key_overlay.difficulty = fixture_overlay_estimate.difficulty;
             render_data.gameplay.key_overlay_enabled = true;
             render_data.gameplay.key_overlay_x = key_overlay_x;
             render_data.gameplay.key_overlay_y = key_overlay_y;

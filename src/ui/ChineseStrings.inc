@@ -1340,6 +1340,8 @@
 // Optional integrated key-note-overlay plugin.
 {"Key Overlay Plugin (4/5/7/8/10K)", "按键叠加插件 (4/5/7/8/10K)"},
 {"Key Overlay X", "按键叠加 X"},
+{"Key Viewer", "按键显示"},
+{"Key Viewer · Preview", "按键显示 · 预览"},
 {"Key Overlay Y", "按键叠加 Y"},
 {"Input estimate", "输入模式估计"},
 {"Collecting again", "重新收集中"},
