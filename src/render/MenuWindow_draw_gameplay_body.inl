@@ -2271,12 +2271,8 @@
         const auto ghost_summary = surface_layout.ghost_visible
             ? battle_summary_layout(surface_layout.ghost_field, true) : GameplayBattleSummaryLayout{};
         if (surface_layout.ghost_visible) {
-            if (!is_skin_preview && player_summary.top < gameplay_field_drag_state_.bottom &&
-                player_summary.bottom > gameplay_field_drag_state_.top) {
-                gameplay_field_drag_state_.left = std::max(gameplay_field_drag_state_.left,
-                    player_summary.right + kGameplayFieldDragHandleGap);
-                gameplay_field_drag_state_.right = gameplay_field_drag_state_.left + kGameplayFieldDragHandleWidth;
-            }
+            // Summary cards stay inside their fields; the shared drag rectangle
+            // already fits the gap. Keep its width and screen-space coordinates.
             battle_header = compute_gameplay_progress_track_layout(
                 24.0f, header_safe_right,
                 std::min(player_summary.left, surface_layout.player_gauge_left),
