@@ -2376,7 +2376,7 @@
     },
     "rects.result_multiplayer.rect.007": {
       "file": "MenuWindow_draw_result_multiplayer.inl",
-      "line": 53,
+      "line": 57,
       "expression": "1160.0f, 960.0f, 1856.0f, 1040.0f"
     },
     "rects.result_single.rect.002": {
@@ -2611,47 +2611,47 @@
     },
     "rects.result_summary.rect.009": {
       "file": "MenuWindow_draw_result_summary.inl",
-      "line": 49,
+      "line": 50,
       "expression": "summary_left, 424.0f, summary_left + 230.0f, 452.0f"
     },
     "rects.result_summary.rect.010": {
       "file": "MenuWindow_draw_result_summary.inl",
-      "line": 53,
+      "line": 54,
       "expression": "summary_left, 458.0f, summary_left + 250.0f, 536.0f"
     },
     "rects.result_summary.rect.008": {
       "file": "MenuWindow_draw_result_summary.inl",
-      "line": 57,
+      "line": 58,
       "expression": "summary_left, 526.0f, summary_left + 250.0f, 554.0f"
     },
     "rects.result_summary.rect.011": {
       "file": "MenuWindow_draw_result_summary.inl",
-      "line": 60,
+      "line": 61,
       "expression": "summary_left + 274.0f, 424.0f, summary_right, 452.0f"
     },
     "rects.result_summary.rect.012": {
       "file": "MenuWindow_draw_result_summary.inl",
-      "line": 64,
+      "line": 65,
       "expression": "summary_left + 274.0f, 458.0f, summary_right, 536.0f"
     },
     "rects.result_summary.rect.013": {
       "file": "MenuWindow_draw_result_summary.inl",
-      "line": 68,
+      "line": 69,
       "expression": "summary_left, 558.0f, summary_right, 610.0f"
     },
     "rects.result_summary.rect.014": {
       "file": "MenuWindow_draw_result_summary.inl",
-      "line": 76,
+      "line": 77,
       "expression": "status_chip.left + 16.0f, status_chip.top + 8.0f, status_chip.right - 16.0f, status_chip.bottom - 6.0f"
     },
     "rects.result_summary.rect.015": {
       "file": "MenuWindow_draw_result_summary.inl",
-      "line": 89,
+      "line": 90,
       "expression": "summary_left, 634.0f, summary_left + 300.0f, 666.0f"
     },
     "rects.result_summary.rect.016": {
       "file": "MenuWindow_draw_result_summary.inl",
-      "line": 93,
+      "line": 94,
       "expression": "summary_left + 312.0f, 634.0f, summary_right, 666.0f"
     },
     "rects.songselect.rect.001": {

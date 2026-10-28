@@ -42,6 +42,8 @@ public:
 
     [[nodiscard]] bool is_running() const { return is_running_.load(std::memory_order_acquire); }
     [[nodiscard]] Progress progress() const;
+    // A finished worker can still own an unpublished result.
+    [[nodiscard]] bool is_idle();
 
     bool poll_result(SongIndex& out, std::vector<std::string>& warnings,
                      std::unordered_map<std::string, int>* source_counts = nullptr);

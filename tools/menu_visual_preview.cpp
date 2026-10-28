@@ -1120,6 +1120,7 @@ int main(int argc, char** argv) {
     bool empty = false;
     bool failed = false;
     bool result_perfect = false;
+    bool result_new_record = false;
     bool reveal = false;
     bool settings = false;
     bool filter_settings = false;
@@ -1285,6 +1286,7 @@ int main(int argc, char** argv) {
         if (arg == "--indicator-background-off") { indicator_background_off = true; continue; }
         if (arg == "--full-combo") { full_combo_fixture = true; continue; }
         if (arg == "--ghost-full-combo") { ghost_full_combo_fixture = true; continue; }
+        if (arg == "--new-record") { result = result_new_record = true; continue; }
         if (arg == "--result-perfect") { result = result_perfect = true; continue; }
         if (arg == "--gauge-ramp") { result = gauge_ramp = true; continue; }
         if (arg == "--result-grade" && i + 1 < argc) { result_grade = argv[++i]; continue; }
@@ -1850,6 +1852,7 @@ int main(int argc, char** argv) {
     score.rank = result_grade.empty() ? (failed ? "F" : "S+") : result_grade;
     score.status = result_status.empty() ? (failed ? "FAILED" : "CLEAR") : result_status;
     score.web_upload_status = web_upload_status;
+    score.new_record = result_new_record;
     score.cleared = !failed;
     score.score = failed ? 4230 : 9452;
     score.detail_score = 8901;

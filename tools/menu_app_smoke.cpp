@@ -1125,6 +1125,106 @@ struct MenuAppVisualTestAccess {
         app.last_game_was_multiplayer_ = saved_multiplayer;
         app.publish_snapshot();
     }
+    static void check_new_record_boundaries(MenuApp& app, Report& report) {
+        const auto saved_navigator = app.menu_navigator_;
+        const auto saved_presentation_start = app.result_presentation_start_ns_;
+        const bool saved_presentation_skipped = app.result_presentation_skipped_;
+        const bool saved_combo_badge = app.last_all_combo_badge_;
+        const auto saved_records = app.local_play_records_;
+        const auto saved_best = app.chart_best_results_;
+        const auto saved_indices = app.chart_play_record_indices_;
+        const auto saved_current = app.current_song_record_indices_;
+        const bool saved_new_record = app.last_result_new_record_;
+        const bool saved_replay = app.last_session_replay_playback_;
+        app.local_play_records_.clear();
+        app.chart_best_results_.clear();
+        app.chart_play_record_indices_.clear();
+        menu_records::ParsedResultRecord record;
+        record.chart_path = app.last_chart_path_;
+        record.ruleset_id = "tenriff-native-score-v2-ruleset-9";
+        record.stats = app.last_result_;
+        record.created_utc = "2026-01-01T00:00:00Z";
+        ReplayVerificationResult verified;
+        verified.status = ReplayVerificationStatus::Verified;
+        verified.official_eligible = true;
+        verified.stats = record.stats;
+        verified.final_score = 100;
+        verified.game_over = false;
+        verified.clear_status = "GAUGE SHIFT NORMAL CLEAR";
+        verified.final_gauge = "normal";
+        int sequence = 0;
+        const auto append = [&] {
+            return app.append_chart_result_record(record, "new-record-fixture-" + std::to_string(sequence++),
+                                                  "fixture-replay", verified);
+        };
+        report.check("new_record.first_eligible", append());
+        record.created_utc = "2026-01-02T00:00:00Z";
+        report.check("new_record.equal_later_is_not_improvement", !append());
+        report.check("new_record.recency_storage_preserved", !app.chart_best_results_.empty() &&
+            app.chart_best_results_.begin()->second.created_utc == record.created_utc);
+        verified.final_score = 99;
+        report.check("new_record.lower_score", !append());
+        verified.final_score = 101;
+        report.check("new_record.higher_score", append());
+        verified.final_score = 98;
+        verified.clear_status = "GAUGE SHIFT EX CLEAR";
+        verified.final_gauge = "ex_hard";
+        report.check("new_record.stronger_clear_matches_best_order", append());
+        verified.final_score = 500;
+        verified.clear_status = "GAUGE SHIFT NORMAL CLEAR";
+        verified.final_gauge = "normal";
+        report.check("new_record.weaker_clear_matches_best_order", !append());
+        verified.clear_status = "GAUGE SHIFT EX CLEAR";
+        verified.final_gauge = "ex_hard";
+        verified.official_eligible = false;
+        report.check("new_record.ineligible", !append());
+        verified.official_eligible = true;
+        record.autoplay_enabled = true;
+        report.check("new_record.autoplay", !append());
+        record.autoplay_enabled = false;
+        record.practice_no_fail_enabled = true;
+        report.check("new_record.practice", !append());
+        record.practice_no_fail_enabled = false;
+        record.mods = {"ln_mix_30"};
+        record.long_note_mix_version = 3;
+        report.check("new_record.current_ln_mix_excluded_from_legacy_best", !append());
+        record.mods.clear();
+        record.key_conversion_note_add_mode = "add_25_plus";
+        report.check("new_record.added_notes", !append());
+        record.key_conversion_note_add_mode.clear();
+        record.bms_timing_version = 2;
+        verified.final_score = 50;
+        report.check("new_record.new_policy_starts_fresh_best", append());
+        record.bms_timing_version = 1;
+        verified.final_score = 999;
+        report.check("new_record.old_policy_cannot_win", !append());
+
+        app.last_result_new_record_ = true;
+        app.last_session_replay_playback_ = false;
+        app.publish_snapshot();
+        report.check("new_record.live_snapshot", app.snapshot_.render.result.new_record);
+        app.last_session_replay_playback_ = true;
+        app.publish_snapshot();
+        report.check("new_record.replay_snapshot_suppressed", !app.snapshot_.render.result.new_record);
+        app.last_session_replay_playback_ = false;
+        app.cache_current_session_result(record.chart_path, "", "", "", false, true);
+        report.check("new_record.missing_export_resets", !app.last_result_new_record_);
+        app.last_result_new_record_ = true;
+        const bool opened = app.open_result_record(app.last_result_path_, app.last_replay_path_);
+        report.check("new_record.historical_result_resets", opened && !app.last_result_new_record_);
+
+        app.menu_navigator_ = saved_navigator;
+        app.result_presentation_start_ns_ = saved_presentation_start;
+        app.result_presentation_skipped_ = saved_presentation_skipped;
+        app.last_all_combo_badge_ = saved_combo_badge;
+        app.local_play_records_ = saved_records;
+        app.chart_best_results_ = saved_best;
+        app.chart_play_record_indices_ = saved_indices;
+        app.current_song_record_indices_ = saved_current;
+        app.last_result_new_record_ = saved_new_record;
+        app.last_session_replay_playback_ = saved_replay;
+        app.publish_snapshot();
+    }
     static void check_ln_mix_record_boundaries(MenuApp& app, Report& report) {
         const auto saved_records = app.local_play_records_;
         const auto saved_best = app.chart_best_results_;
@@ -2260,6 +2360,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
     Access::check_result_screenshot(app, report, "summary");
     Access::check_analysis_boundaries(app, report);
     Access::check_ln_mix_record_boundaries(app, report);
+    Access::check_new_record_boundaries(app, report);
     Access::click(app, Kind::SettingsRow, 4);
     const auto result_rows = Access::rows(app);
     Access::click(app, Kind::SettingsRow, 0);

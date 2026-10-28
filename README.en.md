@@ -1,3 +1,9 @@
+> **2026-10-29 · 1.9.9.6:** [Indicator/result feedback and library loading](docs/release-1.9.9.6.en.md). Fixed baseline: **1.9.6**. Earlier local/unpublished entries below are historical. [Verification](docs/release-1.9.9.6-gate.md).
+
+> **2026-10-29 · Local candidate:** [Library, folder and difficulty-table loading](docs/library-loading-20261029.en.md).
+
+> **2026-10-29 · Local candidate:** [Local indicator and result feedback](docs/result-feedback-20261029.en.md).
+
 > **2026-10-28 · 1.9.9.5:** Integrates solid simple LNs, whole-chart ALL COMBO artwork, BGA/render-wait recovery, EX prism and rank text effects; the key overlay retains KPS/key viewing without a difficulty estimate. General fixed baseline: **1.9.6**. Older version, local-candidate, unpublished and verification-in-progress statements below are historical and do not describe current publication or verification status. [Release scope](docs/release-1.9.9.5.en.md) · [Verification](docs/release-1.9.9.5-gate.md).
 
 > **2026-10-28 local candidate:** [Prism rank text, seven-stop EX palette and key-overlay update](docs/rank-prism-20261028.en.md). S+ through S+++ use cached glyph effects; only the overlay difficulty estimate is removed, retaining KPS/key viewing. Supersedes the older EX gold/no-purple appearance below. Published version and fixed baseline remain unchanged.

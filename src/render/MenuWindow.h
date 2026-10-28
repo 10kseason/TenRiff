@@ -423,6 +423,7 @@ struct ResultScreenData {
     bool all_perfect = false;
     bool full_combo = false;
     bool all_combo_badge = false;
+    bool new_record = false;
     int64_t presentation_start_ns = 0;
     bool presentation_skipped = false;
 

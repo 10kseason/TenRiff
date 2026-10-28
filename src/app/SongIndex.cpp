@@ -972,6 +972,17 @@ bool enumerate_song_candidates(const std::filesystem::path& root_dir,
             continue;
         }
 
+        ++discovered;
+        if (progress && ((discovered % 256u) == 0u)) {
+            publish_progress(progress, SongIndexProgressStage::ScanningFiles, clamp_progress_count(discovered), -1);
+        }
+        // The counting pass needs only the filtered file count. Metadata and
+        // canonical relative paths are read once, by the consuming pass.
+        if (!on_candidate) {
+            it.increment(ec);
+            continue;
+        }
+
         SongIndexCandidate candidate;
         candidate.full_path = entry.path();
         candidate.relative_path = relative_path_string(root_dir, candidate.full_path);
@@ -990,10 +1001,6 @@ bool enumerate_song_candidates(const std::filesystem::path& root_dir,
             ec.clear();
         }
 
-        ++discovered;
-        if (progress && ((discovered % 256u) == 0u)) {
-            publish_progress(progress, SongIndexProgressStage::ScanningFiles, clamp_progress_count(discovered), -1);
-        }
         on_candidate(std::move(candidate));
         it.increment(ec);
     }
@@ -1128,7 +1135,7 @@ public:
     [[nodiscard]] int version() const { return version_; }
     [[nodiscard]] bool cache_calculates_difficulty() const { return cache_calculates_difficulty_; }
     [[nodiscard]] bool cache_uses_minimal_metadata() const { return cache_uses_minimal_metadata_; }
-    [[nodiscard]] const std::vector<SongEntry>& entries() const { return entries_; }
+    [[nodiscard]] std::vector<SongEntry> take_entries() { return std::move(entries_); }
 
     bool parse() {
         if (!expect('{', "Song index root must be an object.")) {
@@ -1752,7 +1759,7 @@ SongIndexLoadResult load_song_index(const std::string& path, const SongIndexOpti
     }
 
     result.loaded_from_file = true;
-    result.index.entries = reader.entries();
+    result.index.entries = reader.take_entries();
     if (!uses_minimal_metadata(options)) {
         const auto difficulty_table = load_selected_difficulty_table(options, result.warnings);
         const DifficultyTable* selected_table = difficulty_table.has_value() ? &difficulty_table.value() : nullptr;
@@ -1896,6 +1903,10 @@ bool save_song_index(const std::string& path,
     return true;
 }
 
+void apply_song_index_difficulty_table(std::vector<SongEntry>& entries, const DifficultyTable* table) {
+    for (auto& entry : entries) apply_difficulty_table(entry, table);
+}
+
 SongIndex scan_songs(const std::string& root_path,
                      const SongIndex* cache,
                      std::vector<std::string>& warnings,
@@ -1931,7 +1942,7 @@ SongIndex scan_songs(const std::string& root_path,
 
     std::uint64_t total_candidates_u64 = 0;
     const bool count_completed = enumerate_song_candidates(
-        root_dir, nullptr, [](SongIndexCandidate&&) {}, &total_candidates_u64, progress, cancel);
+        root_dir, nullptr, {}, &total_candidates_u64, progress, cancel);
     if (!count_completed || cancel_requested(cancel)) {
         return result;
     }

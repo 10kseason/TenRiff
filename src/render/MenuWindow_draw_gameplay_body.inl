@@ -549,6 +549,9 @@
                                            feedback_center_x + 1.0f, indicator_rect.bottom + 3.0f),
                                d2d_->text_brush.Get());
 
+            // Recency changes opacity, not the barcode dimensions.
+            constexpr float barcode_half_width = 1.0f;
+            constexpr float barcode_half_height = 9.0f;
             for (std::size_t i = 0; i < timing_history_count; ++i) {
                 const double delta_ms = timing_history[i];
                 const float history_weight =
@@ -562,8 +565,8 @@
                     0.12f + 0.50f * history_weight * history_weight);
                 d2d_->text_brush->SetColor(marker_color);
                 if (data.gameplay.timing_marker_style == "barcode") {
-                    ctx->FillRectangle(D2D1::RectF(marker_center_x - 1.0f, indicator_center_y - 9.0f,
-                        marker_center_x + 1.0f, indicator_center_y + 9.0f), d2d_->text_brush.Get());
+                    ctx->FillRectangle(D2D1::RectF(marker_center_x - barcode_half_width, indicator_center_y - barcode_half_height,
+                        marker_center_x + barcode_half_width, indicator_center_y + barcode_half_height), d2d_->text_brush.Get());
                 } else {
                     ctx->FillEllipse(D2D1::Ellipse(D2D1::Point2F(marker_center_x, indicator_center_y),
                         marker_half_height, marker_half_height), d2d_->text_brush.Get());
@@ -581,8 +584,8 @@
                 d2d_->text_brush->SetColor(D2D1::ColorF(timing_marker_color(
                     live_feedback_delta_ms, maximum_ms, maximums[timing_history_count - 1]), 0.98f));
                 if (data.gameplay.timing_marker_style == "barcode") {
-                    ctx->FillRectangle(D2D1::RectF(live_marker_center_x - 1.5f, indicator_center_y - 10.0f,
-                        live_marker_center_x + 1.5f, indicator_center_y + 10.0f), d2d_->text_brush.Get());
+                    ctx->FillRectangle(D2D1::RectF(live_marker_center_x - barcode_half_width, indicator_center_y - barcode_half_height,
+                        live_marker_center_x + barcode_half_width, indicator_center_y + barcode_half_height), d2d_->text_brush.Get());
                 } else {
                     ctx->FillEllipse(D2D1::Ellipse(D2D1::Point2F(live_marker_center_x, indicator_center_y), 5.0f, 5.0f),
                                      d2d_->text_brush.Get());

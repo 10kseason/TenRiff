@@ -9,6 +9,8 @@
 
 namespace tenriff::app {
 
+class DifficultyTable;
+
 enum class SongIndexProfile {
     Safe,
     Fast,
@@ -95,6 +97,9 @@ bool save_song_index(const std::string& path,
                      std::string* error = nullptr,
                      SongIndexProgressCallback progress = {},
                      SongIndexCancelCallback cancel = {});
+
+// Reapply only display metadata to already indexed hashes; nullptr restores native LV.
+void apply_song_index_difficulty_table(std::vector<SongEntry>& entries, const DifficultyTable* table);
 
 SongIndex scan_songs(const std::string& root_path,
                      const SongIndex* cache,

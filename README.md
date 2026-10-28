@@ -1,3 +1,9 @@
+> **2026-10-29 · 1.9.9.6:** [인디케이터·리절트 및 라이브러리 로딩](docs/release-1.9.9.6.ko.md). Fixed baseline: **1.9.6**. Earlier local/unpublished entries below are historical. [Verification](docs/release-1.9.9.6-gate.md).
+
+> **2026-10-29 · Local candidate:** [곡 목록·폴더·난이도표 로딩 개선](docs/library-loading-20261029.ko.md).
+
+> **2026-10-29 · Local candidate:** [인디케이터·리절트 로컬 변경](docs/result-feedback-20261029.ko.md).
+
 > **2026-10-28 · 1.9.9.5:** 심플 롱노트 단색·전체 올콤보 이미지·BGA/렌더 대기 복구·EX 프리즘과 랭크 텍스트 효과를 통합하고, 키 오버레이는 난이도 추정 없이 KPS/키 뷰어를 유지합니다. 일반 고정 기준선은 **1.9.6**입니다. 아래의 이전 버전·로컬 후보·미공개·검증 진행 중 표기는 작성 당시의 이력이며 현재 공개/검증 상태를 뜻하지 않습니다. [Release scope](docs/release-1.9.9.5.ko.md) · [Verification](docs/release-1.9.9.5-gate.md).
 
 > **2026-10-28 로컬 후보:** [프리즘 랭크 텍스트·EX 7색·키 오버레이 정리](docs/rank-prism-20261028.ko.md). S+~S+++는 캐시한 글자 효과로 표시하며, 오버레이 추정 난이도만 제거하고 KPS/키 뷰어는 유지합니다. 아래의 이전 EX 금색·보라 제외 설명을 대체합니다. 공개 버전과 고정 기준선은 유지합니다.

@@ -475,12 +475,14 @@ private:
     void persist_runtime_config();
     void refresh_function_keys();
     void refresh_song_source(bool force_reindex);
+    void refresh_difficulty_table_view(bool force_reindex);
     void switch_song_source(const std::string& new_songs_path, bool force_reindex);
     void switch_all_song_sources(bool force_reindex);
     void open_selected_song_source();
     void exit_keymap_screen();
     void reload_chart_best_results();
-    void append_chart_result_record(const menu_records::ParsedResultRecord& parsed,
+    // Returns a meaningful official BEST improvement, excluding recency-only ties.
+    bool append_chart_result_record(const menu_records::ParsedResultRecord& parsed,
                                     const std::string& result_path,
                                     const std::string& replay_path,
                                     const ReplayVerificationResult& verification);
@@ -735,6 +737,7 @@ private:
     double last_result_rate_multiplier_ = 1.0;
     double last_result_score_multiplier_ = 1.0;
     int64_t last_result_final_score_ = 0;
+    bool last_result_new_record_ = false;
     bool last_pause_used_ = false;
     bool last_session_replay_playback_ = false;
     double last_chart_bpm_ = 0.0;
