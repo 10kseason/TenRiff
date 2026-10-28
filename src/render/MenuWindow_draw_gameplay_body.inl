@@ -483,7 +483,7 @@
                 gameplay_field_drag_state_.has_local_override
                     ? gameplay_field_drag_state_.offset_x
                     : data.gameplay.gameplay_field_offset_x,
-                data.gameplay.note_divider_gap_px, hidden_scratch_mask);
+                data.gameplay.note_divider_gap_px, hidden_scratch_mask, studio ? 1.0 : data.gameplay.gauge_width_scale);
         const float solo_header_right =
             gameplay_solo_header_right(header_left, header_right, surface_layout.player_field.left);
         // Non-Studio paths do not consume this geometry.
@@ -549,6 +549,9 @@
                                            feedback_center_x + 1.0f, indicator_rect.bottom + 3.0f),
                                d2d_->text_brush.Get());
 
+            // Recency changes opacity, not the barcode dimensions.
+            constexpr float barcode_half_width = 1.0f;
+            constexpr float barcode_half_height = 9.0f;
             for (std::size_t i = 0; i < timing_history_count; ++i) {
                 const double delta_ms = timing_history[i];
                 const float history_weight =
@@ -562,8 +565,8 @@
                     0.12f + 0.50f * history_weight * history_weight);
                 d2d_->text_brush->SetColor(marker_color);
                 if (data.gameplay.timing_marker_style == "barcode") {
-                    ctx->FillRectangle(D2D1::RectF(marker_center_x - 1.0f, indicator_center_y - 9.0f,
-                        marker_center_x + 1.0f, indicator_center_y + 9.0f), d2d_->text_brush.Get());
+                    ctx->FillRectangle(D2D1::RectF(marker_center_x - barcode_half_width, indicator_center_y - barcode_half_height,
+                        marker_center_x + barcode_half_width, indicator_center_y + barcode_half_height), d2d_->text_brush.Get());
                 } else {
                     ctx->FillEllipse(D2D1::Ellipse(D2D1::Point2F(marker_center_x, indicator_center_y),
                         marker_half_height, marker_half_height), d2d_->text_brush.Get());
@@ -581,8 +584,8 @@
                 d2d_->text_brush->SetColor(D2D1::ColorF(timing_marker_color(
                     live_feedback_delta_ms, maximum_ms, maximums[timing_history_count - 1]), 0.98f));
                 if (data.gameplay.timing_marker_style == "barcode") {
-                    ctx->FillRectangle(D2D1::RectF(live_marker_center_x - 1.5f, indicator_center_y - 10.0f,
-                        live_marker_center_x + 1.5f, indicator_center_y + 10.0f), d2d_->text_brush.Get());
+                    ctx->FillRectangle(D2D1::RectF(live_marker_center_x - barcode_half_width, indicator_center_y - barcode_half_height,
+                        live_marker_center_x + barcode_half_width, indicator_center_y + barcode_half_height), d2d_->text_brush.Get());
                 } else {
                     ctx->FillEllipse(D2D1::Ellipse(D2D1::Point2F(live_marker_center_x, indicator_center_y), 5.0f, 5.0f),
                                      d2d_->text_brush.Get());
@@ -1280,14 +1283,19 @@
         }
 
         {
+            const auto handle_x = surface_layout.ghost_visible
+                ? gameplay_battle_drag_handle_x(surface_layout.player_field.right, surface_layout.ghost_field.left,
+                    kGameplayFieldDragHandleWidth, kGameplayFieldDragHandleGap)
+                : std::array<float, 2>{surface_layout.player_field.right + kGameplayFieldDragHandleGap,
+                    surface_layout.player_field.right + kGameplayFieldDragHandleGap + kGameplayFieldDragHandleWidth};
             gameplay_field_drag_state_.scene_scale = std::max(0.001f, scene_scale);
             gameplay_field_drag_state_.visible = data.gameplay.active && !data.gameplay.loading && !data.gameplay.paused;
             gameplay_field_drag_state_.left =
-                scene_left + (surface_layout.player_field.right + kGameplayFieldDragHandleGap) * scene_scale;
+                scene_left + handle_x[0] * scene_scale;
             gameplay_field_drag_state_.top =
                 scene_top + (surface_layout.player_field.top + kGameplayFieldDragHandleTop) * scene_scale;
             gameplay_field_drag_state_.right =
-                gameplay_field_drag_state_.left + kGameplayFieldDragHandleWidth * scene_scale;
+                scene_left + handle_x[1] * scene_scale;
             gameplay_field_drag_state_.bottom =
                 gameplay_field_drag_state_.top + kGameplayFieldDragHandleHeight * scene_scale;
             gameplay_field_drag_state_.offset_x = surface_layout.offset_x;
@@ -1346,7 +1354,7 @@
                                        const std::wstring& gauge_label_text,
                                        const std::wstring& gauge_value_text,
                                        std::size_t gauge_grid_index) {
-            const auto gauge=ng_rect("gauge",D2D1::RectF(gauge_left,kGameplayGaugeTop,gauge_left+kGameplayGaugeWidth,kGameplayGaugeBottom));
+            const auto gauge = native_gameplay_gauge_rect(native_style, gauge_left, data.gameplay.gauge_width_scale, data.gameplay.ghost_visible && gauge_grid_index == 0);
             const float gauge_top=gauge.top,gauge_bottom=gauge.bottom,gauge_width=gauge.right-gauge.left;
             gauge_left=gauge.left;
             const float gauge_ratio =
@@ -2263,18 +2271,14 @@
         const auto ghost_summary = surface_layout.ghost_visible
             ? battle_summary_layout(surface_layout.ghost_field, true) : GameplayBattleSummaryLayout{};
         if (surface_layout.ghost_visible) {
-            if (!is_skin_preview && player_summary.top < gameplay_field_drag_state_.bottom &&
-                player_summary.bottom > gameplay_field_drag_state_.top) {
-                gameplay_field_drag_state_.left = std::max(gameplay_field_drag_state_.left,
-                    player_summary.right + kGameplayFieldDragHandleGap);
-                gameplay_field_drag_state_.right = gameplay_field_drag_state_.left + kGameplayFieldDragHandleWidth;
-            }
+            // Summary cards stay inside their fields; the shared drag rectangle
+            // already fits the gap. Keep its width and screen-space coordinates.
             battle_header = compute_gameplay_progress_track_layout(
                 24.0f, header_safe_right,
                 std::min(player_summary.left, surface_layout.player_gauge_left),
                 std::max(player_summary.right, surface_layout.player_field.right), true,
                 std::min(ghost_summary.left, surface_layout.ghost_field.left),
-                std::max(ghost_summary.right, surface_layout.ghost_gauge_left + kGameplayGaugeWidth), 14.0f);
+                std::max(ghost_summary.right, surface_layout.ghost_gauge_left + surface_layout.gauge_width), 14.0f);
         }
         // At very wide note sizes there is no readable outside column. Use the
         // existing live card's left half instead of shrinking the title to pixels.
@@ -2290,7 +2294,7 @@
                 std::min(player_summary.left, surface_layout.player_gauge_left),
                 std::max(player_summary.right, player_handle_right), true,
                 std::min(ghost_summary.left, surface_layout.ghost_field.left),
-                std::max(ghost_summary.right, surface_layout.ghost_gauge_left + kGameplayGaugeWidth),
+                std::max(ghost_summary.right, surface_layout.ghost_gauge_left + surface_layout.gauge_width),
                 kProgressFieldClearance)
             : compute_gameplay_progress_track_layout(header_left, header_safe_right,
                 field_left, player_handle_right, false, 0.0f, 0.0f, kProgressFieldClearance);

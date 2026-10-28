@@ -2128,6 +2128,40 @@ void MenuApp::persist_runtime_config() {
     }
 }
 
+void MenuApp::refresh_difficulty_table_view(bool force_reindex) {
+    // Safe/Fast transitions and pending scans must keep the normal reload path.
+    // Otherwise the live library already owns the hashes needed for a new table;
+    // re-reading caches and re-verifying every historical replay adds no table data.
+    if (force_reindex || indexed_songs_.empty() || !song_indexer_.is_idle()) {
+        refresh_song_source(force_reindex);
+        return;
+    }
+    const DifficultyTableLoadingScope loading(*this);
+    std::optional<DifficultyTable> table;
+    if (!config_.ui.difficulty_table_path.empty()) {
+        auto loaded = load_difficulty_table_utf8(config_.ui.difficulty_table_path);
+        for (const auto& warning : loaded.warnings) std::cerr << "[warn] Difficulty table: " << warning << std::endl;
+        if (loaded.success()) table = std::move(loaded.table);
+        else std::cerr << "[warn] Difficulty table disabled: " << loaded.error << std::endl;
+    }
+    const std::string selected_path = selected_song_path();
+    apply_song_index_difficulty_table(indexed_songs_, table ? &*table : nullptr);
+    ++song_index_revision_;
+    difficulty_table_display_path_ = config_.ui.difficulty_table_path;
+    difficulty_table_display_name_ = table ? menu_song_select::safe_ui_text(table->name()) : std::string{};
+    if (difficulty_table_display_name_.empty()) {
+        difficulty_table_display_name_ = menu_song_select::filename_only(difficulty_table_display_path_);
+    }
+    table_levels_path_ = config_.ui.difficulty_table_path;
+    table_levels_ = table ? table->levels() : std::vector<std::string>{};
+    std::stable_sort(table_levels_.begin(), table_levels_.end(), menu_song_select::table_level_less);
+    table_levels_.erase(std::unique(table_levels_.begin(), table_levels_.end()), table_levels_.end());
+    active_table_level_.clear();
+    selected_table_level_ = 0;
+    song_select_view_ = SongSelectView::Songs;
+    rebuild_visible_song_list(selected_path.empty() ? nullptr : &selected_path);
+}
+
 void MenuApp::refresh_song_source(bool force_reindex) {
     const DifficultyTableLoadingScope loading(*this, !config_.ui.difficulty_table_path.empty());
     difficulty_table_display_path_.clear();
@@ -4764,9 +4798,8 @@ void MenuApp::select_native_difficulty_levels() {
     song_browser_status_message_.clear();
     if (changed) {
         persist_runtime_config();
-        // Cache loading removes table labels/order and restores each stored native
-        // level, so both display and sorting revert without reparsing the library.
-        refresh_song_source(false);
+        // Restore native labels from the live library when no scan is pending.
+        refresh_difficulty_table_view(false);
     }
     publish_snapshot();
 }
@@ -4803,7 +4836,7 @@ bool MenuApp::apply_difficulty_table_url(std::string_view url, DifficultyTableFe
     }
     // The publisher may update the body at the same URL/cache path. Reapply the
     // freshly imported table even when the selected preset itself did not change.
-    refresh_song_source(force_table_reindex);
+    refresh_difficulty_table_view(force_table_reindex);
     song_browser_status_message_.clear();
     return true;
 }
@@ -4918,9 +4951,8 @@ void MenuApp::handle_difficulty_table_input(uint32_t keycode) {
             config_.ui.difficulty_table_path = std::move(selected_path);
             config_.ui.difficulty_table_url = std::move(selected_url);
             persist_runtime_config();
-            // Loading the cache reapplies the selected table to its stored chart
-            // hashes, so changing tables need not reparse a large library.
-            refresh_song_source(force_table_reindex);
+            // The live hashes suffice unless Fast mode requires a full index.
+            refresh_difficulty_table_view(force_table_reindex);
             publish_snapshot();
         }
         return;

@@ -2881,3 +2881,30 @@ TEST_CASE("field judgement counts default off and portable skin roundtrip preser
     REQUIRE(tenriff::config::deserialize_skin_config(R"({"show_judgement_counts":false})", restored));
     CHECK_FALSE(restored.show_judgement_counts);
 }
+
+TEST_CASE("gauge width config defaults and profile round trips retain the three options") {
+    using namespace tenriff::config;
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE_FALSE(temp.path.empty());
+    CurrentPathGuard cwd;
+    std::filesystem::current_path(temp.path);
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    CHECK(config.skin.gauge_width == "normal");
+    std::string error;
+    for (const auto token : {"normal", "wide", "large", "WIDE", "invalid", ""}) {
+        config.skin.gauge_width = token;
+        REQUIRE(loader.save_profile("profiles/test", config, &error));
+        const auto result = loader.load_profile("profiles/test");
+        REQUIRE(result.success());
+        CHECK(result.config.skin.gauge_width == normalize_skin_gauge_width_token(token));
+        SkinConfig restored;
+        REQUIRE(deserialize_skin_config(serialize_skin_config(config.skin), restored));
+        CHECK(restored.gauge_width == result.config.skin.gauge_width);
+    }
+    CHECK(skin_gauge_width_scale("normal") == 1.0);
+    CHECK(skin_gauge_width_scale("wide") == 1.25);
+    CHECK(skin_gauge_width_scale("large") == 1.5);
+    write_file("profiles/test/config.json", R"({"skin":{"hud_layout":"classic"}})");
+    CHECK(loader.load_profile("profiles/test").config.skin.gauge_width == "normal");
+}

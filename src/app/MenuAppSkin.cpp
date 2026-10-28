@@ -1017,6 +1017,11 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     append_menu_row(render.generic, ui_text("Hit Burst Style", "키 키밤 모양"),
                     config::skin_hit_burst_style_label(config_.skin.hit_burst_style),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::HitBurstStyle), false, true);
+    const auto gauge_width = config::normalize_skin_gauge_width_token(config_.skin.gauge_width);
+    append_menu_row(render.generic, ui_text("Gauge Bar Width", "게이지 바 가로 크기"),
+                    gauge_width == "large" ? ui_text("Large", "크게") : gauge_width == "wide"
+                        ? ui_text("Slightly Larger", "조금 더 크게") : ui_text("Normal", "보통"),
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::GaugeWidth), false, true);
     append_menu_row(render.generic, ui_text("HUD Style", "HUD 스타일"),
                     config::normalize_skin_hud_layout_token(config_.skin.hud_layout) == "classic"
                         ? ui_text("Classic", "클래식") : ui_text("Studio Deck", "스튜디오 덱"),
@@ -1180,6 +1185,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
             skin_settings_controller_.selected_id() == static_cast<SkinSettingsRowId>(row.row_index);
 
     render.generic.skin_preview.visible = true;
+    render.generic.skin_preview.gauge_width_scale = config::skin_gauge_width_scale(config_.skin.gauge_width);
     render.generic.skin_preview.hud_layout = config::normalize_skin_hud_layout_token(config_.skin.hud_layout);
     render.generic.skin_preview.hud_riff_map_visible = config_.skin.hud_riff_map_visible;
     render.generic.skin_preview.key_overlay_enabled = config_.skin.key_overlay_enabled;

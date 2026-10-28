@@ -24,6 +24,73 @@
 
 namespace tenriff::app {
 struct MenuAppSongSourceTestAccess {
+    static void check_table_reapply(const std::filesystem::path& profile, bool all_sources) {
+        namespace fs = std::filesystem;
+        fs::create_directories(profile);
+        const auto header = profile / "table-header.json";
+        const auto data = profile / "data.json";
+        std::ofstream(header) << R"({"name":"Live table","symbol":"T","data_url":"data.json","level_order":["1","2","9"]})";
+        const auto write_data = [&](const char* level) {
+            std::ofstream(data) << "[{\"md5\":\"0123456789abcdef0123456789abcdef\",\"level\":\""
+                                << level << "\"}]";
+        };
+        write_data("1");
+        auto menu = std::make_unique<MenuApp>();
+        menu->profile_dir_ = profile.u8string();
+        menu->songs_path_ = (profile / "songs").u8string();
+        menu->config_.ui.all_song_sources = all_sources;
+        menu->config_.mode.song_index_profile = "safe";
+        SongEntry entry;
+        entry.path = all_sources ? (profile / "songs/chart.bms").u8string() : "chart.bms";
+        entry.title = "Retained chart";
+        entry.format = "bms";
+        entry.level = entry.native_level = 4;
+        entry.md5 = "0123456789abcdef0123456789abcdef";
+        entry.sha256 = std::string(64, 'a');
+        entry.rating = 3.25;
+        entry.note_count = 128;
+        SongIndex index;
+        index.entries = {entry};
+        menu->update_song_list(std::move(index));
+        const auto* storage = menu->indexed_songs_.data();
+        const auto revision = menu->song_index_revision_;
+        MenuApp::LocalPlayRecord history;
+        history.result_path = "live-session-record";
+        menu->local_play_records_.push_back(history);
+        MenuApp::BestResultRecord best;
+        best.has_value = true;
+        best.best_score = 1234;
+        menu->chart_best_results_["retained-record-key"] = best;
+        menu->config_.ui.difficulty_table_path = header.u8string();
+        menu->refresh_difficulty_table_view(false);
+        REQUIRE(menu->indexed_songs_.size() == 1);
+        CHECK(menu->indexed_songs_.data() == storage);
+        CHECK(menu->indexed_songs_[0].difficulty_table_level == "1");
+        CHECK(menu->indexed_songs_[0].path == entry.path);
+        CHECK(menu->indexed_songs_[0].sha256 == entry.sha256);
+        CHECK(menu->indexed_songs_[0].rating == entry.rating);
+        CHECK(menu->indexed_songs_[0].note_count == entry.note_count);
+        CHECK((menu->table_levels_ == std::vector<std::string>{"1", "2", "9"}));
+        CHECK(menu->difficulty_table_display_name_ == "Live table");
+        CHECK(menu->song_index_revision_ > revision);
+        CHECK(menu->config_.ui.all_song_sources == all_sources);
+        REQUIRE(menu->local_play_records_.size() == 1);
+        CHECK(menu->local_play_records_[0].result_path == "live-session-record");
+        CHECK(menu->chart_best_results_.at("retained-record-key").best_score == 1234);
+        CHECK(menu->song_indexer_.is_idle());
+        CHECK_FALSE(menu->difficulty_table_loading());
+        write_data("2"); // Re-importing the same path must see the new body.
+        menu->refresh_difficulty_table_view(false);
+        CHECK(menu->indexed_songs_[0].difficulty_table_level == "2");
+        menu->select_native_difficulty_levels();
+        CHECK(menu->indexed_songs_.size() == 1);
+        CHECK(menu->indexed_songs_[0].difficulty_table_level.empty());
+        CHECK(menu->indexed_songs_[0].difficulty_table_order == -1);
+        CHECK(menu->indexed_songs_[0].level == 4);
+        CHECK(menu->table_levels_.empty());
+        CHECK(menu->local_play_records_.size() == 1);
+        CHECK(menu->chart_best_results_.at("retained-record-key").best_score == 1234);
+    }
     static void check_cyclic_lobby_navigation() {
         auto menu = std::make_unique<MenuApp>();
         menu->song_select_view_ = MenuApp::SongSelectView::Songs;
@@ -645,6 +712,16 @@ TEST_CASE("difficulty table loading is published before import and cleared on su
     MenuAppSongSourceTestAccess::check_table_loading(f.profile());
 }
 
+TEST_CASE("loading optimization reapplies a table without rereading a single folder or records") {
+    AggregateFixture f;
+    MenuAppSongSourceTestAccess::check_table_reapply(f.base / "single-profile", false);
+}
+
+TEST_CASE("loading optimization reapplies a table without rebuilding ALL SONG") {
+    AggregateFixture f;
+    MenuAppSongSourceTestAccess::check_table_reapply(f.base / "all-profile", true);
+}
+
 TEST_CASE("1.8.9.4 metadata passes indexed author and BPM changes into lobby and result without stale credits") {
     AggregateFixture f;
     const auto root = f.source("metadata");
@@ -883,4 +960,22 @@ TEST_CASE("polling a completed aggregate never leaves the loading state running"
         // Receiving the final list must also mean the worker has completed.
         CHECK_FALSE(indexer.is_running());
     }
+}
+
+TEST_CASE("loading optimization treats completed unpublished indexing as busy") {
+    AggregateFixture f;
+    const auto root = f.source("pending");
+    write_chart(root / "one.bms", "Pending result");
+    SongIndexerThread indexer;
+    CHECK(indexer.is_idle());
+    REQUIRE(indexer.start(root.u8string(), f.cache(root)));
+    REQUIRE(wait_until_finished(indexer));
+    CHECK_FALSE(indexer.is_idle());
+    SongIndex result;
+    std::vector<std::string> warnings;
+    REQUIRE(indexer.poll_result(result, warnings));
+    CHECK(result.entries.size() == 1);
+    CHECK(indexer.is_idle());
+    indexer.stop();
+    CHECK(indexer.is_idle());
 }

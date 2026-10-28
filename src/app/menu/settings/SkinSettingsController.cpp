@@ -552,6 +552,13 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
         case SkinSettingsRowId::HitBurstStyle:
             runtime.skin.hit_burst_style = cycle_hit_burst_style(runtime.skin.hit_burst_style, direction);
             return mark_changed();
+        case SkinSettingsRowId::GaugeWidth: {
+            const auto value = config::normalize_skin_gauge_width_token(runtime.skin.gauge_width);
+            const int current = value == "large" ? 2 : value == "wide" ? 1 : 0;
+            const int next = (current + (direction < 0 ? 2 : 1)) % 3;
+            runtime.skin.gauge_width = next == 2 ? "large" : next == 1 ? "wide" : "normal";
+            return mark_changed();
+        }
         case SkinSettingsRowId::HudLayout:
             runtime.skin.hud_layout = config::normalize_skin_hud_layout_token(runtime.skin.hud_layout) == "studio"
                 ? "classic" : "studio";

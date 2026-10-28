@@ -1607,3 +1607,15 @@ TEST_CASE("field judgement counts preview preserves toggle with inactive timing 
     CHECK(hud.bd == 0);
     CHECK(hud.pr == 0);
 }
+
+TEST_CASE("gauge width reaches gameplay preview for embedded and fullscreen layouts") {
+    for (const double scale : {1.0, 1.25, 1.5}) {
+        for (const bool fullscreen : {false, true}) {
+            tenriff::render::SkinPreviewData preview;
+            preview.fullscreen = fullscreen;
+            preview.gauge_width_scale = scale;
+            const auto hud = tenriff::render::make_skin_gameplay_preview(preview);
+            CHECK(hud.gauge_width_scale == scale);
+        }
+    }
+}

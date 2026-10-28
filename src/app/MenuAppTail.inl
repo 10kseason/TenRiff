@@ -201,6 +201,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.hit_burst_style = manifest_style && manifest_style->hit_burst_style.has_value()
                                  ? *manifest_style->hit_burst_style
                                  : config::normalize_skin_hit_burst_style_token(config_.skin.hit_burst_style);
+    target.gauge_width_scale = config::skin_gauge_width_scale(config_.skin.gauge_width);
     target.hud_layout = config::normalize_skin_hud_layout_token(config_.skin.hud_layout);
     target.hud_riff_map_visible = config_.skin.hud_riff_map_visible;
     target.key_overlay_enabled = config_.skin.key_overlay_enabled;
@@ -1235,6 +1236,7 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
 
     render.kind = render::MenuScreenKind::ResultScreen;
     render.result.all_combo_badge = has_result_ && last_all_combo_badge_;
+    render.result.new_record = has_result_ && !last_session_replay_playback_ && last_result_new_record_;
     render.result.peer_battle = last_game_was_multiplayer_;
     render.result.profile_avatar_path = config_.ui.profile_avatar_path;
     render.result.presentation_start_ns = result_presentation_start_ns_;
@@ -2832,6 +2834,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     // the comparison result as soon as it appears.
     restart_input_thread();
     restart_audio_thread();
+    last_result_new_record_ = false;
     if (result.has_value) {
         if (session_mix_active_ && !peer_battle && !replay_playback) {
             session_mix_gauge_value_ = std::clamp(result.final_gauge_value, 0.0, 100.0);

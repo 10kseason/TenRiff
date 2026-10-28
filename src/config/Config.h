@@ -252,6 +252,7 @@ struct SkinConfig {
     std::string hit_burst_style = "prism";
     // Native/LR2 solo HUD layout. Missing legacy-profile keys also select studio.
     std::string hud_layout = "studio";
+    std::string gauge_width = "normal";  // normal | wide | large (100/125/150%)
     bool hud_riff_map_visible = true;
     bool key_overlay_enabled = false;
     double key_overlay_x = 0.0;
@@ -396,6 +397,8 @@ void apply_skin_visual_preset(SkinConfig& skin, std::string_view token);
 [[nodiscard]] std::string normalize_skin_hit_burst_style_token(std::string_view token);
 [[nodiscard]] std::string skin_hit_burst_style_label(std::string_view token);
 [[nodiscard]] std::string normalize_skin_hud_layout_token(std::string_view token);
+[[nodiscard]] std::string normalize_skin_gauge_width_token(std::string_view token);
+[[nodiscard]] double skin_gauge_width_scale(std::string_view token);
 [[nodiscard]] std::string normalize_skin_ui_font_token(std::string_view token);
 [[nodiscard]] std::string skin_ui_font_label(std::string_view token);
 [[nodiscard]] std::string normalize_skin_color_token(std::string_view token);

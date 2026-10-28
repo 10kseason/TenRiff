@@ -18,6 +18,10 @@
         draw_analysis_tabs();
         text_at(data.result.title.empty() ? data.result.track : data.result.title, 94, 178, 638, false, 68);
         text_at(localized_result_status() + "  /  " + format_decimal(data.result.accuracy) + "%", 94, 254, 638, true);
+        if (data.result.new_record) {
+            draw_result_text("NEW Record", d2d_->result_label_format.Get(),
+                D2D1::RectF(94, 108, 638, 140), semantic_brush(0xFFE477), 1.0f);
+        }
         const auto& total = analysis.total;
         if (!analysis.available) {
             text_at(result_loc("No analysis data in this record.", "이 기록에는 분석 데이터가 없습니다."), 94, 340, 638);

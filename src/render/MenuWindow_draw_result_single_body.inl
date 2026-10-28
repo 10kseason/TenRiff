@@ -599,7 +599,7 @@
                          modern_library_screen ? native_color(0xFFFFFF, 1) : d2d_->text_brush.Get(),
                          score_alpha * pulse_scale,
                          DWRITE_TEXT_ALIGNMENT_CENTER);
-        draw_result_text(result_loc("SCORE", "점수"),
+        draw_result_text(data.result.new_record ? "NEW Record" : result_loc("SCORE", "점수"),
                          d2d_->result_label_format.Get(),
                          native_rect("result_single.rect.018", D2D1::RectF(prism_center.x - 120.0f, 132.0f,
                                      prism_center.x + 120.0f, 160.0f)),

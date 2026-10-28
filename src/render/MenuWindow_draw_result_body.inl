@@ -35,7 +35,8 @@
             if (data.result.status == "EASY CLEAR") {
                 return loc("EASY CLEAR", "이지 클리어");
             }
-            return data.result.status;
+            // Compact display only; stored Gauge Shift status and colors stay intact.
+            return song_select_lamp_presentation(data.result.status).label;
         };
         const auto localized_result_gauge = [&]() {
             if (data.result.gauge_label == "HARD") return loc("HARD", "하드");

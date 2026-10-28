@@ -180,3 +180,5 @@
 {"Show the key viewer and 1-second KPS in 4/5/7/8/10K. Default: Off.", "在4/5/7/8/10K中显示按键可视化和最近1秒的KPS。默认关闭。"},
 {"Move the key overlay horizontally in 1% steps. 0% is left and 100% is right; the full panel stays on screen.", "按1%调整叠加面板水平位置。0%为左侧，100%为右侧；整个面板保持在屏幕内。"},
 {"Move the key overlay vertically in 1% steps. 0% is top and 100% is bottom. Enablement and position are saved with the skin settings.", "按1%调整叠加面板垂直位置。0%为顶部，100%为底部。启用状态和位置随皮肤设置保存。"},
+
+    {"Choose gauge bar width: Normal (100%), Slightly Larger (125%), or Large (150%). Only horizontal size changes.", "选择血条宽度：普通（100%）、稍大（125%）或大（150%）。仅改变横向尺寸。"},

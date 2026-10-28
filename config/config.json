@@ -156,6 +156,7 @@
     "key_pulse_enabled": true,
     "hit_burst_style": "prism",
     "hud_layout": "studio",
+    "gauge_width": "normal",
     "hud_riff_map_visible": true,
     "key_overlay_enabled": false,
     "key_overlay_x": 0.0,

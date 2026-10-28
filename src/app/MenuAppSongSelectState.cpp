@@ -170,14 +170,16 @@ void MenuApp::rebuild_visible_song_list(const std::string* selected_path) {
 
     // Resolve selection against the filtered/sorted view, but preserve the original chart
     // path when possible so cursor focus survives reindex/filter/sort churn.
-    std::vector<SongEntry> selection_view;
-    selection_view.reserve(visible_song_indices_.size());
-    for (std::size_t song_index : visible_song_indices_) {
-        selection_view.push_back(indexed_songs_[song_index]);
+    selected_song_ = visible_song_indices_.empty() ? 0 :
+        std::clamp(selected_song_, 0, static_cast<int>(visible_song_indices_.size() - 1));
+    if (!preserved_path.empty()) {
+        for (std::size_t i = 0; i < visible_song_indices_.size(); ++i) {
+            if (indexed_songs_[visible_song_indices_[i]].path == preserved_path) {
+                selected_song_ = static_cast<int>(i);
+                break;
+            }
+        }
     }
-    selected_song_ = resolve_selected_song_index(selection_view,
-                                                 selected_song_,
-                                                 preserved_path.empty() ? nullptr : &preserved_path);
     sync_song_select_state();
     rebuild_current_song_record_indices();
 

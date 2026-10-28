@@ -1,3 +1,5 @@
+> **2026-10-29 · 1.9.9.6:** [Indicator/result feedback and library loading](release-1.9.9.6.en.md). Fixed baseline: **1.9.6**. Earlier local/unpublished entries below are historical. [Verification](release-1.9.9.6-gate.md).
+
 > **2026-10-28 · 1.9.9.5:** Integrates solid simple LNs, whole-chart ALL COMBO artwork, BGA/render-wait recovery, EX prism and rank text effects; the key overlay retains KPS/key viewing without a difficulty estimate. General fixed baseline: **1.9.6**. Older version, local-candidate, unpublished and verification-in-progress statements below are historical and do not describe current publication or verification status. [Release scope](release-1.9.9.5.en.md) · [Verification](release-1.9.9.5-gate.md).
 
 > **2026-10-27 · 1.9.9.3:** Includes accelerated controls, LR2CRS courses, BMS/KPS overlay, clear cards, grade colors and EX rainbow fixes. General fixed baseline: **1.9.6**. Older release and local-candidate entries below are historical; this scope supersedes them. [1.9.9.3](release-1.9.9.3.en.md) · [Verification](release-1.9.9.3-gate.md).

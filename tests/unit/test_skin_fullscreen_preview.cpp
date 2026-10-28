@@ -21,6 +21,31 @@
 namespace tenriff::app {
 
 struct MenuAppSkinPreviewTestAccess {
+    static void check_gauge_width() {
+        auto menu = fixture();
+        menu->config_.ui.language = "ko";
+        const std::array<const char*, 3> tokens{"normal", "wide", "large"};
+        const std::array<const char*, 3> labels{u8"보통", u8"조금 더 크게", u8"크게"};
+        for (std::size_t i = 0; i < tokens.size(); ++i) {
+            menu->config_.skin.gauge_width = tokens[i];
+            (void)menu->skin_settings_controller_.select(SkinSettingsRowId::GaugeWidth, false);
+            menu->publish_snapshot();
+            const auto& rows = menu->snapshot_.render.generic.rows;
+            const auto row = std::find_if(rows.begin(), rows.end(), [](const auto& r) {
+                return r.row_index == static_cast<int>(SkinSettingsRowId::GaugeWidth);
+            });
+            REQUIRE(row != rows.end());
+            CHECK(row->label == u8"게이지 바 가로 크기");
+            CHECK(row->value == labels[i]);
+            const double scale = config::skin_gauge_width_scale(tokens[i]);
+            CHECK(menu->snapshot_.render.generic.skin_preview.gauge_width_scale == scale);
+            click_preview(*menu);
+            REQUIRE(menu->skin_preview_fullscreen_);
+            CHECK(menu->snapshot_.render.gameplay.gauge_width_scale == scale);
+            click_preview(*menu);
+            REQUIRE_FALSE(menu->skin_preview_fullscreen_);
+        }
+    }
     static void check_common_keys() {
         struct TempProfile {
             std::filesystem::path path;
@@ -809,6 +834,9 @@ struct MenuAppSkinPreviewTestAccess {
 
 TEST_CASE("skin tabs search filtering source gates and UTF8 input share actual menu routing") {
     tenriff::app::MenuAppSkinPreviewTestAccess::check_mode_tabs_and_search();
+}
+TEST_CASE("gauge width Korean HUD choices reach embedded and fullscreen menu snapshots") {
+    tenriff::app::MenuAppSkinPreviewTestAccess::check_gauge_width();
 }
 TEST_CASE("skin overhaul lane buttons select visual lanes and fonts persist from Profile") {
     tenriff::app::MenuAppSkinPreviewTestAccess::check_overhaul();

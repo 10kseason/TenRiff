@@ -1,5 +1,6 @@
 #include "doctest/doctest.h"
 #include "render/GameplayStudioDeck.h"
+#include "render/GameplayGaugeLayout.h"
 #include "render/GameplaySongTitle.h"
 
 #include <limits>
@@ -223,4 +224,55 @@ TEST_CASE("Studio judgement ratios handle empty and large counts without overflo
     const auto invalid = gameplay_studio_judgement_ratios({-1, 1, 0, 0, 0});
     CHECK(invalid[0] == 0.0f);
     CHECK(invalid[1] == 1.0f);
+}
+
+TEST_CASE("gauge width expands away from the field without moving its vertical range") {
+    const std::array<float, 4> original{100, 200, 160, 800};
+    for (const double scale : {1.0, 1.25, 1.5}) {
+        for (const bool left : {false, true}) {
+            const auto rect = scale_gameplay_gauge_rect(original, scale, left);
+            CHECK(rect[2] - rect[0] == doctest::Approx(60 * scale));
+            CHECK(rect[1] == original[1]);
+            CHECK(rect[3] == original[3]);
+            CHECK(rect[left ? 2 : 0] == original[left ? 2 : 0]);
+        }
+    }
+    CHECK(gameplay_gauge_width_scale(std::numeric_limits<double>::quiet_NaN()) == 1.0f);
+    CHECK(gameplay_gauge_width_scale(-1) == 1.0f);
+    CHECK(gameplay_gauge_width_scale(3) == 1.5f);
+}
+
+TEST_CASE("gauge width applies authored additive rectangles once and keeps the normal anchor") {
+    for (const bool authored : {false, true}) {
+        for (const float delta_width : {0.0f, 20.0f, -100.0f}) {
+            tenriff::app::NativeGameplaySkinStyle style;
+            if (authored) style.rects["gauge"] = {3.0f, 7.0f, delta_width, 11.0f};
+            for (const bool left : {false, true}) {
+                const auto normal = gameplay_gauge_rect(style, 100, 200, 800, 60, 1, left);
+                for (const double scale : {1.0, 1.25, 1.5}) {
+                    const float surface_left = 100 - (left ? 60 * (scale - 1) : 0);
+                    const auto rect = gameplay_gauge_rect(style, surface_left, 200, 800, 60, scale, left);
+                    CHECK(rect[2] - rect[0] == doctest::Approx((normal[2] - normal[0]) * scale));
+                    CHECK(rect[1] == normal[1]);
+                    CHECK(rect[3] == normal[3]);
+                    CHECK(rect[left ? 2 : 0] == normal[left ? 2 : 0]);
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("gauge width leaves the battle drag handle and its hit target between the fields") {
+    for (const double scale : {1.0, 1.25, 1.5}) {
+        const float extra = 60 * (scale - 1);
+        const float player_right = 1000 + extra, ghost_left = 1096 - extra;
+        const auto x = gameplay_battle_drag_handle_x(player_right, ghost_left, 72, 12);
+        CHECK(x[0] >= player_right + 6);
+        CHECK(x[1] <= ghost_left - 6);
+        CHECK(x[1] - x[0] >= 24);
+        if (scale == 1.0) {
+            CHECK(x[0] == 1012);
+            CHECK(x[1] == 1084);
+        }
+    }
 }

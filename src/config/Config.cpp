@@ -194,6 +194,7 @@ void sanitize_skin_config(SkinConfig& skin) {
         kSkinKeyBackdropHeightMin, kSkinKeyBackdropHeightMax, kSkinKeyBackdropHeightDefault);
     skin.hit_burst_style = normalize_skin_hit_burst_style_token(skin.hit_burst_style);
     skin.hud_layout = normalize_skin_hud_layout_token(skin.hud_layout);
+    skin.gauge_width = normalize_skin_gauge_width_token(skin.gauge_width);
     skin.single_color = normalize_skin_single_color_token(skin.single_color);
     skin.note_outline_opacity = clamp_finite(
         skin.note_outline_opacity,
@@ -899,6 +900,7 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             kSkinKeyPulseBrightnessMin, kSkinKeyPulseBrightnessMax);
         config.skin.hit_burst_style = normalize_skin_hit_burst_style_token(
             get_string(*skin, "hit_burst_style", config.skin.hit_burst_style));
+        config.skin.gauge_width = normalize_skin_gauge_width_token(get_string(*skin, "gauge_width", config.skin.gauge_width));
         config.skin.hud_layout = normalize_skin_hud_layout_token(
             get_string(*skin, "hud_layout", config.skin.hud_layout));
         config.skin.indicator_background_visible = get_bool(*skin, "indicator_background_visible", false);
@@ -1383,6 +1385,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("hit_burst_style",
                  JsonValue{normalize_skin_hit_burst_style_token(config.skin.hit_burst_style)});
     skin.emplace("hud_layout", JsonValue{normalize_skin_hud_layout_token(config.skin.hud_layout)});
+    skin.emplace("gauge_width", JsonValue{normalize_skin_gauge_width_token(config.skin.gauge_width)});
     skin.emplace("key_overlay_enabled", JsonValue{config.skin.key_overlay_enabled});
     skin.emplace("key_overlay_x", JsonValue{config.skin.key_overlay_x});
     skin.emplace("key_overlay_y", JsonValue{config.skin.key_overlay_y});
@@ -1779,6 +1782,16 @@ std::string normalize_skin_key_label_position_token(std::string_view token) {
         return "off";
     }
     return "bottom";
+}
+
+std::string normalize_skin_gauge_width_token(std::string_view token) {
+    const auto value = to_lower_ascii(std::string(token));
+    return value == "wide" || value == "large" ? value : "normal";
+}
+
+double skin_gauge_width_scale(std::string_view token) {
+    const auto value = normalize_skin_gauge_width_token(token);
+    return value == "large" ? 1.5 : value == "wide" ? 1.25 : 1.0;
 }
 
 std::string normalize_skin_hud_layout_token(std::string_view token) {

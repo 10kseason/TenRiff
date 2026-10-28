@@ -1,3 +1,15 @@
+# 1.9.9.6 — 2026-10-29
+
+- Skin → HUD adds **Gauge Bar Width: Normal (100%) / Slightly Larger (125%) / Large (150%)**. Classic bars and Studio side rails expand horizontally away from the field. Fill, border and ticks share the width; profiles and `.trskin`/`.trprofile` preserve it. Missing older settings use Normal.
+- Unify historical/latest barcode indicator markers at2×18 while retaining dots, opacity, color and timing.
+- Display `EX CLEAR` without the Gauge Shift prefix and preserve other clear/ASSIST identities.
+- Show `NEW Record` for the first eligible local BEST or a meaningful improvement; exclude timestamp-only ties, replay/history and failed saves using a session-only flag.
+- Reapply difficulty tables to the loaded library instead of rereading caches and records/replay verification. Preserve same-URL updates and full refresh for forced, empty, running or unpublished scan states.
+- Reduce duplicate folder-count path/stat work and whole-vector metadata copies without changing file formats, validation, selection semantics or memory limits.
+- Controlled candidate scan/table medians improved25.6%/73.1%; cached-library opening changed only1.3% within variation. These are synthetic measurements, not actual-library, network or post-selection gameplay claims.
+- Preserve fixed baseline1.9.6, prior releases/profiles, input/audio/judgement/scoring/replay/online contracts. No website/DB/public-editor deployment.
+- [Scope](docs/release-1.9.9.6.en.md) · [Fresh release gates](docs/release-1.9.9.6-gate.md). Earlier entries below are historical.
+
 # 1.9.9.5 — 2026-10-28
 
 - Use solid lane colors for non-default native simple LN heads/bodies/tails while retaining original rect, tap materials, imported artwork and opacity/geometry controls.

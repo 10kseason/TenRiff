@@ -423,6 +423,7 @@ struct ResultScreenData {
     bool all_perfect = false;
     bool full_combo = false;
     bool all_combo_badge = false;
+    bool new_record = false;
     int64_t presentation_start_ns = 0;
     bool presentation_skipped = false;
 
@@ -580,6 +581,7 @@ struct GameplayHudData {
     double key_backdrop_height = 1.0;
     std::string hit_burst_style = "prism";
     std::string hud_layout = "studio";
+    double gauge_width_scale = 1.0;
     bool hud_riff_map_visible = true;
     bool key_overlay_enabled = false;
     double key_overlay_x = 0.0;
@@ -802,6 +804,7 @@ struct SkinPreviewData {
     double key_backdrop_height = 1.0;
     std::string hit_burst_style = "prism";
     std::string hud_layout = "studio";
+    double gauge_width_scale = 1.0;
     bool hud_riff_map_visible = true;
     bool key_overlay_enabled = false;
     double key_overlay_x = 0.0;
@@ -1268,6 +1271,7 @@ private:
     };
 
     struct GameplayStaticCache {
+        double gauge_width_scale = 1.0;
         bool studio = false;
         float studio_safe_right = 1856.0f;
         bool hud_riff_map_visible = false;

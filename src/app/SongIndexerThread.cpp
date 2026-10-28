@@ -88,6 +88,11 @@ void SongIndexerThread::stop() {
     is_running_.store(false, std::memory_order_release);
 }
 
+bool SongIndexerThread::is_idle() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return !is_running_.load(std::memory_order_acquire) && !has_result_;
+}
+
 SongIndexerThread::Progress SongIndexerThread::progress() const {
     Progress value;
     value.stage = static_cast<SongIndexProgressStage>(progress_stage_.load(std::memory_order_acquire));

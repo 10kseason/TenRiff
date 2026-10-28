@@ -1,3 +1,9 @@
+> **2026-10-29 · 1.9.9.6:** [指示条、结算与曲库加载](docs/release-1.9.9.6.zh-CN.md). Fixed baseline: **1.9.6**. Earlier local/unpublished entries below are historical. [Verification](docs/release-1.9.9.6-gate.md).
+
+> **2026-10-29 · Local candidate:** [曲目列表、文件夹与难度表加载改进](docs/library-loading-20261029.zh-CN.md).
+
+> **2026-10-29 · Local candidate:** [指示条与结算画面的本地修改](docs/result-feedback-20261029.zh-CN.md).
+
 > **2026-10-28 · 1.9.9.5:** 整合简洁长音符单色、完整谱面ALL COMBO图片、BGA/渲染等待恢复、EX棱镜及等级文字效果；按键叠加保留KPS/按键显示，不再估计难度。通用固定基线仍为 **1.9.6**。下方旧版本、本地候选、未发布及验证中的表述均属于当时的历史记录，不表示当前发布或验证状态。 [Release scope](docs/release-1.9.9.5.zh-CN.md) · [Verification](docs/release-1.9.9.5-gate.md).
 
 > **2026-10-28 本地候选：** [棱镜等级文字、EX七色及按键叠加调整](docs/rank-prism-20261028.zh-CN.md)。S+至S+++使用缓存的字形效果；叠加层仅移除难度估计，保留KPS/按键查看器。取代下方旧EX金色及排除紫色的说明；已发布版本和固定基线保持不变。

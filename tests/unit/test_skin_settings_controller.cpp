@@ -1018,3 +1018,24 @@ TEST_CASE("key overlay plugin toggle and position bounds use real skin settings 
     static_cast<void>(controller.handle(MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::KeyOverlayEnabled));
     CHECK_FALSE(runtime.skin.key_overlay_enabled);
 }
+
+TEST_CASE("gauge width settings cycle and persist for every skin source") {
+    CHECK(static_cast<int>(SkinSettingsRowId::GaugeWidth) == 79);
+    CHECK(tenriff::app::skin_settings_category(SkinSettingsRowId::GaugeWidth) == tenriff::app::SkinSettingsCategory::Hud);
+    for (const auto source : {"native", "lr2", "tenriff"}) {
+        tenriff::config::RuntimeConfig runtime;
+        runtime.skin.source = source;
+        SkinSettingsController controller;
+        controller.reset("10k");
+        for (const auto expected : {"wide", "large", "normal"}) {
+            const auto effects = controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::GaugeWidth);
+            CHECK(runtime.skin.gauge_width == expected);
+            CHECK(effects.menu.render_changed);
+        }
+        (void)controller.handle(MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::GaugeWidth);
+        CHECK(runtime.skin.gauge_width == "large");
+        (void)controller.handle(MenuAction::activate(), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::GaugeWidth);
+        CHECK(runtime.skin.gauge_width == "normal");
+        CHECK(controller.handle(MenuAction::back(), runtime, kLr2Names, kTenRiffNames).menu.persist_config);
+    }
+}

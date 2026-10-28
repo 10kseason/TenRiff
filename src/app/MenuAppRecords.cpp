@@ -128,7 +128,7 @@ bool live_result_claims_match(const menu_records::ParsedResultRecord& parsed,
 
 }  // namespace
 
-void MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord& parsed,
+bool MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord& parsed,
                                          const std::string& result_path,
                                          const std::string& replay_path,
                                          const ReplayVerificationResult& verification) {
@@ -225,6 +225,8 @@ void MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
         mode_mod_adds_notes(parsed.mods) ||
         parsed.key_conversion_note_add_mode == "add_25_plus";
 
+    bool new_record = false;
+
     // Fan results out across all normalized path keys so old exports still match
     // after source-root changes or relative/absolute-path differences.
     for (const auto& key : menu_songs::build_chart_path_keys(parsed.chart_path, songs_path_)) {
@@ -241,6 +243,7 @@ void MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
         auto existing = chart_best_results_.find(key);
         if (existing == chart_best_results_.end()) {
             chart_best_results_.emplace(key, candidate);
+            new_record = true;
             continue;
         }
 
@@ -254,7 +257,10 @@ void MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
         const auto existing_policy = std::tie(existing->second.judgement_generation, existing->second.bms_gauge_version,
             existing->second.bms_control_flow_version, existing->second.bms_timing_version);
         if (candidate_policy != existing_policy) {
-            if (candidate_policy > existing_policy) existing->second = candidate;
+            if (candidate_policy > existing_policy) {
+                existing->second = candidate;
+                new_record = true;
+            }
             continue;
         }
 
@@ -264,23 +270,30 @@ void MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
             menu_records::clear_status_priority(existing->second.clear_status,
                                                 existing->second.game_over,
                                                 existing->second.final_gauge);
-        if (menu_records::is_better_record(candidate.best_score,
+        const auto beats_existing = [&](std::string_view created_utc) {
+            return menu_records::is_better_record(candidate.best_score,
                                            candidate_clear_priority,
                                            candidate.detail_score,
                                            candidate.detailed_accuracy,
                                            candidate.max_combo,
                                            candidate_judged,
-                                           candidate.created_utc,
+                                           created_utc,
                                            existing->second.best_score,
                                            existing_clear_priority,
                                            existing->second.detail_score,
                                            existing->second.detailed_accuracy,
                                            existing->second.max_combo,
                                            existing_judged,
-                                           existing->second.created_utc)) {
+                                           existing->second.created_utc);
+        };
+        if (beats_existing(candidate.created_utc)) {
+            // Keep the existing recency tiebreak for storage, but do not
+            // celebrate an identical performance simply played later.
+            new_record = beats_existing(existing->second.created_utc) || new_record;
             existing->second = candidate;
         }
     }
+    return new_record;
 }
 
 void MenuApp::reload_chart_best_results() {
@@ -379,6 +392,7 @@ void MenuApp::cache_current_session_result(const std::string& chart_path,
                                            std::string_view replay_sha256,
                                            bool finished,
                                            bool aborted) {
+    last_result_new_record_ = false;
     if (result_path.empty()) {
         return;
     }
@@ -482,7 +496,7 @@ void MenuApp::cache_current_session_result(const std::string& chart_path,
         }
     }
 
-    append_chart_result_record(
+    last_result_new_record_ = append_chart_result_record(
         *parsed,
         result_path,
         resolved_replay.empty() ? parsed->replay_path : resolved_replay.u8string(),
@@ -637,6 +651,7 @@ bool MenuApp::open_result_record(const std::string& result_path,
     // Old files do not prove an untrimmed complete attempt. Retain their
     // existing FULL COMBO text, but never carry a new session's image into history.
     last_all_combo_badge_ = false;
+    last_result_new_record_ = false;
     // This is display state only. Older exports can carry an explicit abort
     // flag without the ABORTED label; do not present them as a gauge death.
     last_clear_status_ = parsed->aborted ? "ABORTED" : parsed->clear_status;

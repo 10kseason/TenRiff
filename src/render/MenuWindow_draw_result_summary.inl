@@ -45,9 +45,10 @@
                           d2d_->button_border_brush.Get(), 1.0f);
             d2d_->button_border_brush->SetOpacity(saved);
         }
-        draw_result_text(result_loc("YOUR SCORE", "이번 플레이 점수"), d2d_->result_label_format.Get(),
+        draw_result_text(data.result.new_record ? "NEW Record" : result_loc("YOUR SCORE", "이번 플레이 점수"),
+                         d2d_->result_label_format.Get(),
                          native_rect("result_summary.rect.009", D2D1::RectF(summary_left, 424.0f, summary_left + 230.0f, 452.0f)),
-                         d2d_->muted_brush.Get(), presentation.score);
+                         data.result.new_record ? semantic_brush(0xFFE477) : d2d_->muted_brush.Get(), presentation.score);
         draw_result_text(std::to_string(result_counted_score(data.result.score, presentation.score)),
                          d2d_->result_score_format.Get(),
                          native_rect("result_summary.rect.010", D2D1::RectF(summary_left, 458.0f, summary_left + 250.0f, 536.0f)),

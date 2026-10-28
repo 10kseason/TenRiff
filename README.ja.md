@@ -1,3 +1,9 @@
+> **2026-10-29 · 1.9.9.6:** [インジケーター・リザルトとライブラリー読み込み](docs/release-1.9.9.6.ja.md). Fixed baseline: **1.9.6**. Earlier local/unpublished entries below are historical. [Verification](docs/release-1.9.9.6-gate.md).
+
+> **2026-10-29 · Local candidate:** [曲一覧・フォルダー・難易度表の読み込み改善](docs/library-loading-20261029.ja.md).
+
+> **2026-10-29 · Local candidate:** [インジケーター・リザルトのローカル変更](docs/result-feedback-20261029.ja.md).
+
 > **2026-10-28 · 1.9.9.5:** シンプルLN単色・全譜面ALL COMBO画像・BGA/レンダー待機復帰・EXプリズムとランク文字効果を統合し、キーオーバーレイは推定難易度なしでKPS/キー表示を維持します。一般固定基準は **1.9.6**。下記の旧版・ローカル候補・未公開・検証中の記述は執筆当時の履歴で、現在の公開/検証状態を示しません。 [Release scope](docs/release-1.9.9.5.ja.md) · [Verification](docs/release-1.9.9.5-gate.md).
 
 > **2026-10-28 ローカル候補:** [プリズムのランク文字・EX7色・キーオーバーレイ調整](docs/rank-prism-20261028.ja.md)。S+～S+++は文字効果をキャッシュし、オーバーレイの推定難易度だけを削除してKPS/キービューアを維持します。下記の旧EX金色・紫除外の説明を置き換えます。公開版と固定基準は維持します。
