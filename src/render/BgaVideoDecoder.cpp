@@ -119,6 +119,7 @@ public:
         last_frame_.reset();
         future_frame_.reset();
         ended_ = false;
+        catchup_seek_enabled_ = true;
     }
 
     bool open(std::string_view path) {
@@ -204,6 +205,8 @@ public:
         // metadata or a post-seek first frame cannot establish this origin.
         if (initial_request && target_100ns > 0 && !read_at(0)) return {};
         bool check_seek_position = false;
+        bool catchup_seek_performed = false;
+        std::shared_ptr<BgaVideoFrame> retained_frame;
         // A 24/25 fps frame may be ahead of a 30 Hz request. Only the requested
         // clock moving backwards is a seek; decoded timestamps must not rewind it.
         if (requested_timestamp_ >= 0 && target_100ns < requested_timestamp_) {
@@ -219,11 +222,28 @@ public:
         if (last_frame_ && (ended_ || target_100ns <= last_timestamp_)) {
             return last_frame_;
         }
-        if (initial_request && target_100ns > 3 * kHundredNsPerSecond) {
+        if (!check_seek_position && catchup_seek_enabled_ && last_timestamp_ >= 0 &&
+            target_100ns - last_timestamp_ > 3 * kHundredNsPerSecond) {
+            // Latest-only requests do not bound the decoder's internal backlog.
+            // After a long stall, skip obsolete samples instead of draining
+            // another 240 old frames on every request. Normal cadence, known
+            // sparse-frame gaps and EOF have already returned above.
             // MF seeking is approximate. A one-second source-time preroll
             // avoids damaged/overshot MPG starts seen with exact PTS seeking.
-            if (!seek(target_100ns - kHundredNsPerSecond)) return {};
-            check_seek_position = true;
+            retained_frame = last_frame_;
+            if (seek(target_100ns - kHundredNsPerSecond)) {
+                check_seek_position = true;
+                catchup_seek_performed = true;
+                // A distant keyframe may take several bounded reads to catch
+                // up. Keep the published frame as a presentation floor through
+                // all of them; explicit backward seeks still reset this state.
+                last_frame_ = retained_frame;
+                last_timestamp_ = retained_frame->timestamp_100ns;
+            } else {
+                // Forward catch-up is optional for unseekable sources. Keep
+                // decoding them sequentially rather than breaking playback.
+                catchup_seek_enabled_ = false;
+            }
         }
 
         std::shared_ptr<BgaVideoFrame> latest;
@@ -243,6 +263,8 @@ public:
             }
             if ((flags & MF_SOURCE_READERF_ENDOFSTREAM) != 0) {
                 ended_ = true;
+                // Forward seeks retain the last displayed frame even when
+                // the source lands at EOF without returning another sample.
                 return last_frame_;
             }
             if ((flags & MF_SOURCE_READERF_CURRENTMEDIATYPECHANGED) != 0) {
@@ -276,6 +298,13 @@ public:
                 const std::string reopen_path = path_;
                 if (!open(reopen_path)) return {};
                 requested_timestamp_ = target_100ns;
+                if (catchup_seek_performed && retained_frame) {
+                    last_frame_ = retained_frame;
+                    last_timestamp_ = retained_frame->timestamp_100ns;
+                }
+                // Do not repeat the same inaccurate forward seek on the next
+                // request and restart forever from the beginning.
+                catchup_seek_enabled_ = false;
                 check_seek_position = false;
                 continue;
             }
@@ -310,6 +339,10 @@ public:
             }
         }
         // Exhausting the bounded loop on old samples must keep the last image.
+        // A long GOP may seek back beyond our read budget. Continue from the
+        // progress made here next time; seeking to that keyframe again would
+        // repeatedly discard that progress and leave the video stuck.
+        if (catchup_seek_performed) catchup_seek_enabled_ = false;
         return last_frame_;
     }
 
@@ -327,6 +360,7 @@ private:
     std::shared_ptr<BgaVideoFrame> last_frame_;
     std::shared_ptr<BgaVideoFrame> future_frame_;
     bool ended_ = false;
+    bool catchup_seek_enabled_ = true;
 };
 #endif
 

@@ -83,6 +83,19 @@ inline bool gameplay_session_cleared(bool finished,
     return finished && !game_over && !user_aborted && !autoplay_enabled;
 }
 
+inline bool gameplay_session_full_combo(bool notes_finished,
+                                        bool game_over,
+                                        bool user_aborted,
+                                        bool assisted_or_partial,
+                                        const gameplay::ResultStats& stats) {
+    // A long note contributes both its head and resolved tail. Judged note
+    // counts alone would announce completion while the final hold is active.
+    // Empty POORs keep the existing combo semantics; they are not chart misses.
+    return notes_finished && !game_over && !user_aborted && !assisted_or_partial &&
+           stats.total_combo_steps > 0 && stats.combo >= stats.total_combo_steps &&
+           stats.counts.bd == 0;
+}
+
 inline bool gameplay_session_assist_active(bool autoplay_enabled, bool practice_no_fail_enabled) {
     return autoplay_enabled || practice_no_fail_enabled;
 }

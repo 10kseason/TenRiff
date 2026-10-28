@@ -1,3 +1,16 @@
+# 1.9.9.5 — 2026-10-28
+
+- Use solid lane colors for non-default native simple LN heads/bodies/tails while retaining original rect, tap materials, imported artwork and opacity/geometry controls.
+- Show rounded, softly yellow-glowing ALL COMBO artwork after full-chart completion through the last LN tail, independently for player/ghost and on fresh results; preserve exclusions and historical result semantics.
+- Recover Media Foundation BGA after large time jumps without forward presented-PTS regression; retain rewind, sparse-frame, EOF and bounded long-GOP progress behavior.
+- Recover stale render oversleep estimates at bounded 100ms intervals without changing target FPS, VSync, unlimited mode or normal sleep measurement.
+- Apply the selected seven-stop EX prism palette, including lavender, and cached S+/S++/S+++ text glow/faceted depth effects. Earlier gold-only/no-purple concepts are historical; rank PNGs are not shipped or loaded.
+- Remove only the key-overlay difficulty estimate; retain KPS/key-note viewing, default OFF, saved positions and chart/library difficulty ratings.
+- Preserve judgement, input, audio, score, replay, grade thresholds, existing online boundaries and fixed baseline 1.9.6. No measured Discord/FPS/latency gains and no website/DB/public-editor deployment are claimed.
+- Fresh release verification is tracked in the [1.9.9.5 gates](docs/release-1.9.9.5-gate.md); previous candidate results are historical, not fresh release passes. See [release scope](docs/release-1.9.9.5.en.md).
+
+> Earlier dated release/local-candidate entries below are preserved history. Their unpublished and in-progress statements do not define current 1.9.9.5 status.
+
 # 1.9.9.3 — 2026-10-27
 
 - Fix real gameplay `EX` labels falling back to NM yellow; share EX/EX-HARD recognition across Classic/Studio/player/ghost and make visual fixtures use the live label.

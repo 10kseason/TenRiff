@@ -17,6 +17,32 @@ struct RenderWaitPolicy {
     int64_t yield_threshold_ns = kRenderDefaultYieldThresholdNs;
 };
 
+struct RenderOversleepEstimate {
+    static constexpr int64_t kMaximumNs = 2'000'000;
+    static constexpr int64_t kRecoveryIntervalNs = 100'000'000;
+    int64_t value_ns = 0;
+    int64_t last_update_ns = 0;
+
+    void observe(int64_t target_wake_ns, int64_t actual_wake_ns) {
+        const int64_t overshoot = std::clamp(actual_wake_ns - target_wake_ns,
+                                            int64_t{0}, kMaximumNs);
+        value_ns = std::clamp((value_ns * 7 + overshoot) / 8, int64_t{0}, kMaximumNs);
+        last_update_ns = actual_wake_ns;
+    }
+
+    void recover_after_wait(int64_t now_ns, bool estimate_blocked_sleep, bool slept) {
+        // A stale estimate can exclude all later timer sleeps, preventing new
+        // EMA samples forever. Reconsider it only after a sample-free interval.
+        // Per-frame decay would retry bad timers too often under sustained load.
+        // Short waits and waits with a real sleep sample retain their behavior.
+        if (estimate_blocked_sleep && !slept &&
+            now_ns - last_update_ns >= kRecoveryIntervalNs) {
+            value_ns = value_ns * 7 / 8;
+            last_update_ns = now_ns;
+        }
+    }
+};
+
 inline bool should_use_unlimited_render_pacing(bool vsync_enabled, int target_fps) {
     return !vsync_enabled && target_fps <= 0;
 }

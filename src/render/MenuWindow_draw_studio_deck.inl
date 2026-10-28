@@ -175,18 +175,23 @@
         };
         auto draw_studio_combo = [&](const GameplayFieldLayout& field, const std::wstring& value,
                                      const GameplayTextPopAnimation& animation, float top, float bottom, float offset, bool ghost) {
-            auto rect = gameplay_combo_overlay_rect(field, combo_position, 47, top, bottom, offset, 8, 18);
+            const bool full_combo = !is_skin_preview &&
+                (ghost ? data.gameplay.ghost_full_combo : data.gameplay.full_combo);
+            const float label_height = full_combo ? 34.0f : 20.0f;
+            auto rect = gameplay_combo_overlay_rect(field, combo_position, 47, top, bottom, offset, 8,
+                full_combo ? label_height : 18.0f);
             const auto center = D2D1::Point2F((rect.left + rect.right) * .5f, (rect.top + rect.bottom) * .5f);
             D2D1_MATRIX_3X2_F saved{}; ctx->GetTransform(&saved);
             const float scale = animation.scale * hud_font_scale(data.gameplay.combo_font_scale);
-            const float shift_y = animation.offset_y + avoid_field_counts(field, rect, scale, animation.offset_y, 20);
-            record_combo_placement(rect, scale, shift_y, 20, ghost);
+            const float shift_y = animation.offset_y + avoid_field_counts(field, rect, scale, animation.offset_y, label_height);
+            record_combo_placement(rect, scale, shift_y, label_height, ghost);
             ctx->SetTransform(D2D1::Matrix3x2F::Scale(scale, scale, center) *
                 D2D1::Matrix3x2F::Translation(static_cast<float>(data.gameplay.combo_offset_x), shift_y) * saved);
             auto color = ng_color("combo", D2D1::ColorF(0xFFFFFF, .92f)); color.a *= animation.opacity;
             studio_text(value, studio_fonts.studio_combo.Get(), rect, color, DWRITE_TEXT_ALIGNMENT_CENTER);
             static const std::wstring label = L"COMBO";
-            studio_text(label, studio_fonts.studio_numbers[1].Get(), D2D1::RectF(rect.left, rect.bottom, rect.right, rect.bottom + 20),
+            if (full_combo) draw_all_combo_badge(D2D1::RectF(rect.left, rect.bottom, rect.right, rect.bottom + label_height), animation.opacity);
+            else studio_text(label, studio_fonts.studio_numbers[1].Get(), D2D1::RectF(rect.left, rect.bottom, rect.right, rect.bottom + 20),
                 D2D1::ColorF(0x6E7A8C, animation.opacity), DWRITE_TEXT_ALIGNMENT_CENTER, 5);
             ctx->SetTransform(saved);
         };

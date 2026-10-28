@@ -57,6 +57,16 @@ TEST_CASE("HUD followup always timing retains a real sample without initial fake
     CHECK(tenriff::app::diff_gameplay_hud_revisions(previous, next).text_changed);
 }
 
+TEST_CASE("full combo completion invalidates player and ghost HUD text independently") {
+    tenriff::app::GameplayHudRevisionInput previous;
+    auto next = previous;
+    next.full_combo = true;
+    CHECK(tenriff::app::diff_gameplay_hud_revisions(previous, next).text_changed);
+    next = previous;
+    next.ghost_full_combo = true;
+    CHECK(tenriff::app::diff_gameplay_hud_revisions(previous, next).text_changed);
+}
+
 TEST_CASE("HUD followup measure movement invalidates motion and preserves chart transformations") {
     tenriff::app::GameplayHudRevisionInput previous;
     auto next = previous;

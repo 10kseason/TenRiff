@@ -838,7 +838,7 @@ TEST_CASE("simple square skin loads without assets for all supported lane counts
         CHECK(skin.warnings.empty());
         CHECK(skin.native_gameplay_fallback);
         CHECK(skin.referenced_asset_paths.empty());
-        CHECK(skin.gameplay_style.note_shape.value() == "rect");
+        CHECK(skin.gameplay_style.note_shape.value() == "simple_rect");
         const auto& sprite = skin.gameplay.native.sprites.at("note");
         REQUIRE(sprite.size() == 3);
         CHECK(sprite[0].alpha == 0);

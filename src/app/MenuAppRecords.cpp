@@ -634,6 +634,9 @@ bool MenuApp::open_result_record(const std::string& result_path,
 
     last_result_ = parsed->stats;
     last_game_over_ = parsed->game_over;
+    // Old files do not prove an untrimmed complete attempt. Retain their
+    // existing FULL COMBO text, but never carry a new session's image into history.
+    last_all_combo_badge_ = false;
     // This is display state only. Older exports can carry an explicit abort
     // flag without the ABORTED label; do not present them as a gauge death.
     last_clear_status_ = parsed->aborted ? "ABORTED" : parsed->clear_status;

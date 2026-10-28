@@ -18,7 +18,73 @@
             d2d_->note_fill_brush->SetOpacity(1.0f);
             return d2d_->note_fill_brush.Get();
         };
-        const auto result_status_brush = [&](ID2D1Brush* fallback) -> ID2D1Brush* {
+        const auto result_status_brush = [&](ID2D1Brush* fallback, const std::string& text,
+                                              IDWriteTextFormat* format, const D2D1_RECT_F& bounds,
+                                              DWRITE_TEXT_ALIGNMENT alignment) -> ID2D1Brush* {
+            if (song_select_lamp_presentation(data.result.status).rainbow_badge) {
+                auto paint_bounds = bounds;
+                const float width = bounds.right - bounds.left, height = bounds.bottom - bounds.top;
+                if (format && !text.empty() && width > 0.0f && height > 0.0f) {
+                    const auto wide = to_wide(text);
+                    const auto wrapping = format->GetWordWrapping();
+                    const auto paragraph = format->GetParagraphAlignment();
+                    DWRITE_TRIMMING trimming{};
+                    Microsoft::WRL::ComPtr<IDWriteInlineObject> trimming_sign;
+                    format->GetTrimming(&trimming, trimming_sign.GetAddressOf());
+                    DWRITE_LINE_SPACING_METHOD line_method{};
+                    float line_spacing = 0.0f, baseline = 0.0f;
+                    format->GetLineSpacing(&line_method, &line_spacing, &baseline);
+                    // Match draw_text_clipped's expanded layout and threshold.
+                    // Its local scale transforms both glyphs and these brush
+                    // coordinates, including narrow authored status rectangles.
+                    const float estimated_scale = (data.lobby_skin.enabled || modern_menu_screen) &&
+                        wrapping == DWRITE_WORD_WRAPPING_NO_WRAP
+                        ? estimate_single_line_text_scale(wide, format->GetFontSize(), width, height) : 1.0f;
+                    const float fit = estimated_scale < 0.995f ? estimated_scale : 1.0f;
+                    auto& measure = d2d_->result_ex_status_measure;
+                    if (!d2d_->result_ex_status_measure_attempted || measure.text != wide ||
+                        measure.format.Get() != format || measure.width != width / fit || measure.height != height / fit ||
+                        measure.alignment != alignment || measure.paragraph != paragraph || measure.wrapping != wrapping ||
+                        measure.trimming.granularity != trimming.granularity || measure.trimming.delimiter != trimming.delimiter ||
+                        measure.trimming.delimiterCount != trimming.delimiterCount || measure.trimming_sign.Get() != trimming_sign.Get() ||
+                        measure.line_spacing_method != line_method || measure.line_spacing != line_spacing || measure.baseline != baseline) {
+                        measure = {};
+                        d2d_->result_ex_status_measure_attempted = true;
+                        measure.text = wide; measure.format = format;
+                        measure.width = width / fit; measure.height = height / fit; measure.alignment = alignment;
+                        measure.paragraph = paragraph; measure.wrapping = wrapping; measure.trimming = trimming;
+                        measure.trimming_sign = trimming_sign; measure.line_spacing_method = line_method;
+                        measure.line_spacing = line_spacing; measure.baseline = baseline;
+                        if (SUCCEEDED(d2d_->dwrite_factory->CreateTextLayout(wide.c_str(), static_cast<UINT32>(wide.size()),
+                            format, measure.width, measure.height, measure.layout.GetAddressOf())))
+                            measure.layout->SetTextAlignment(alignment);
+                    }
+                    if (measure.layout) {
+                        DWRITE_TEXT_METRICS metrics{};
+                        if (SUCCEEDED(measure.layout->GetMetrics(&metrics))) {
+                            paint_bounds.left = bounds.left + metrics.left;
+                            paint_bounds.right = paint_bounds.left + std::max(1.0f, metrics.width);
+                        }
+                    }
+                }
+                if (!d2d_->result_ex_status_gradient_attempted) {
+                    d2d_->result_ex_status_gradient_attempted = true;
+                    std::array<D2D1_GRADIENT_STOP, kClearRainbowRgb.size()> stops;
+                    for (std::size_t i = 0; i < stops.size(); ++i)
+                        stops[i] = {kClearRainbowStops[i], D2D1::ColorF(kClearRainbowRgb[i])};
+                    Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> collection;
+                    if (SUCCEEDED(ctx->CreateGradientStopCollection(stops.data(), static_cast<UINT>(stops.size()), &collection)))
+                        ctx->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(
+                            D2D1::Point2F(paint_bounds.left, 0), D2D1::Point2F(paint_bounds.right, 0)),
+                            collection.Get(), &d2d_->result_ex_status_gradient);
+                }
+                if (d2d_->result_ex_status_gradient) {
+                    d2d_->result_ex_status_gradient->SetStartPoint(D2D1::Point2F(paint_bounds.left, 0));
+                    d2d_->result_ex_status_gradient->SetEndPoint(D2D1::Point2F(paint_bounds.right, 0));
+                    return d2d_->result_ex_status_gradient.Get();
+                }
+                return semantic_brush(kClearExRgb);
+            }
             const auto rgb = result_gauge_shift_clear_color(data.result.status);
             return rgb ? semantic_brush(*rgb) : fallback;
         };
@@ -586,11 +652,13 @@
         const D2D1_RECT_F status_rect =
             native_rect("result_single.rect.023", D2D1::RectF(prism_center.x - 260.0f, 526.0f,
                         prism_center.x + 260.0f, 586.0f));
-        draw_result_text(localized_result_status(),
+        const auto status_text = localized_result_status();
+        draw_result_text(status_text,
                          d2d_->title_format.Get(),
                          status_rect,
                          result_status_brush(result_success ? static_cast<ID2D1Brush*>(d2d_->text_brush.Get())
-                                                           : static_cast<ID2D1Brush*>(d2d_->muted_brush.Get())),
+                                                           : static_cast<ID2D1Brush*>(d2d_->muted_brush.Get()),
+                                             status_text, d2d_->title_format.Get(), status_rect, DWRITE_TEXT_ALIGNMENT_CENTER),
                          presentation.status,
                          DWRITE_TEXT_ALIGNMENT_CENTER);
         if (presentation.status_scan > 0.0f && presentation.status_scan < 1.0f &&
@@ -904,10 +972,12 @@
                                  d2d_->accent_brush.Get(),
                                  alpha * zero_scale,
                                  DWRITE_TEXT_ALIGNMENT_CENTER);
-                draw_result_text(result_statistics[index].detail,
+                const auto detail_rect = native_rect("result_single.rect.042", D2D1::RectF(cell.left + 10.0f, cell.top + 153.0f + rise,
+                                             cell.right - 10.0f, cell.top + 190.0f + rise));
+                if (!(index == 5 && data.result.all_combo_badge && draw_all_combo_image(detail_rect, alpha)))
+                    draw_result_text(result_statistics[index].detail,
                                  d2d_->result_label_format.Get(),
-                                 native_rect("result_single.rect.042", D2D1::RectF(cell.left + 10.0f, cell.top + 153.0f + rise,
-                                             cell.right - 10.0f, cell.top + 190.0f + rise)),
+                                 detail_rect,
                                  d2d_->accent_brush.Get(),
                                  alpha * zero_scale,
                                  DWRITE_TEXT_ALIGNMENT_CENTER);

@@ -185,11 +185,11 @@
         auto ng_color=[&](const char* key,D2D1_COLOR_F color){return native_gameplay_d2d_color(native_style,key,color);};
         auto gauge_rainbow_brush = [&](const D2D1_RECT_F& rect, bool vertical, float alpha) -> ID2D1Brush* {
             if (!d2d_->gameplay_gauge_gradient) {
-                D2D1_GRADIENT_STOP stops[7];
-                for (std::size_t s = 0; s < 7; ++s)
+                std::array<D2D1_GRADIENT_STOP, kClearRainbowRgb.size()> stops;
+                for (std::size_t s = 0; s < stops.size(); ++s)
                     stops[s] = {kClearRainbowStops[s], D2D1::ColorF(kClearRainbowRgb[s])};
                 Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> collection;
-                if (SUCCEEDED(ctx->CreateGradientStopCollection(stops, 7, &collection))) {
+                if (SUCCEEDED(ctx->CreateGradientStopCollection(stops.data(), static_cast<UINT>(stops.size()), &collection))) {
                     ctx->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(
                         D2D1::Point2F(0, 0), D2D1::Point2F(1, 0)), collection.Get(),
                         &d2d_->gameplay_gauge_gradient);
@@ -352,6 +352,9 @@
                       blend_rgb(pulse_color, 0xFFFFFF, 0.86f), 0.40f + 0.60f * pulse);
         };
         const std::string note_shape = normalize_gameplay_note_shape(data.gameplay.note_shape);
+        // Procedural shapes use flat lane-colored holds; the original rect material
+        // and authored imported sprites retain their existing appearance.
+        const bool simple_hold_body = !use_imported_metrics && note_shape != "rect";
         ID2D1Geometry* note_polygon_geometry = gameplay_note_polygon_geometry(
             d2d_->gameplay_note_shape_geometries, note_shape);
         const float visual_opacity =
@@ -804,6 +807,27 @@
             }
             draw_fitted_readable_text(scene_hud_cache.artist_text, font, rect,
                 d2d_->muted_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING);
+        };
+        auto draw_all_combo_badge = [&](const D2D1_RECT_F& bounds, float opacity) {
+            const auto& source = d2d_->all_combo_source_rect;
+            if (d2d_->all_combo_bitmap && source.right > source.left && source.bottom > source.top) {
+                const float width = std::min(280.0f, bounds.right - bounds.left);
+                const float scale = std::min(width / (source.right - source.left),
+                    (bounds.bottom - bounds.top) / (source.bottom - source.top));
+                const float half_width = (source.right - source.left) * scale * 0.5f;
+                const float half_height = (source.bottom - source.top) * scale * 0.5f;
+                const float cx = (bounds.left + bounds.right) * 0.5f;
+                const float cy = (bounds.top + bounds.bottom) * 0.5f;
+                ctx->DrawBitmap(d2d_->all_combo_bitmap.Get(),
+                    D2D1::RectF(cx - half_width, cy - half_height, cx + half_width, cy + half_height),
+                    opacity, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, &source);
+            } else if (d2d_->text_brush && scene_hud_format) {
+                const float saved = d2d_->text_brush->GetOpacity();
+                d2d_->text_brush->SetOpacity(opacity);
+                draw_readable_text_aligned(L"ALL COMBO", scene_hud_format.Get(), bounds,
+                    d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+                d2d_->text_brush->SetOpacity(saved);
+            }
         };
 #include "MenuWindow_draw_studio_deck.inl"
         auto draw_gameplay_header = [&](const GameplayProgressTrackLayout* battle_column = nullptr) {
@@ -1330,7 +1354,8 @@
             const float fill_top =
                 gauge_bottom - (gauge_bottom - gauge_top) * gauge_ratio;
             const char* gauge_color_slot=gameplay_gauge_is_ex(gauge_token)?"gauge_ex_hard":gauge_token=="HARD"?"gauge_hard":gauge_token=="EASY"?"gauge_easy":"gauge_normal";
-            const uint32_t gauge_rgb = ng_rgb(gauge_color_slot,gameplay_gauge_color(gauge_token));
+            const uint32_t gauge_rgb = gameplay_gauge_is_ex(gauge_token)
+                ? gameplay_gauge_color(gauge_token) : ng_rgb(gauge_color_slot,gameplay_gauge_color(gauge_token));
             const float gauge_alpha=ng_alpha(gauge_color_slot);
             // EX is a semantic rainbow even when an older skin saved a solid EX color.
             const bool rainbow = gameplay_gauge_is_ex(gauge_token);
@@ -1440,7 +1465,9 @@
                 return;
             }
             constexpr float kComboHalfHeight = 30.0f;
-            constexpr float kComboLabelExtension = 18.0f;
+            const bool full_combo = !is_skin_preview &&
+                (ghost ? data.gameplay.ghost_full_combo : data.gameplay.full_combo);
+            const float kComboLabelExtension = full_combo ? 34.0f : 18.0f;
             const D2D1_RECT_F combo_rect = readable_text_rect(ng_rect("combo",gameplay_combo_overlay_rect(combo_field_layout,
                                             combo_position,
                                             kComboHalfHeight,
@@ -1473,7 +1500,10 @@
                                       DWRITE_TEXT_ALIGNMENT_CENTER);
             d2d_->accent_brush->SetOpacity(saved_opacity);
             d2d_->accent_brush->SetColor(combo_color);
-            if (scene_hud_format && d2d_->muted_brush) {
+            if (full_combo) {
+                draw_all_combo_badge(D2D1::RectF(combo_rect.left, combo_rect.bottom - 2.0f,
+                    combo_rect.right, combo_rect.bottom + kComboLabelExtension), animation.opacity);
+            } else if (scene_hud_format && d2d_->muted_brush) {
                 const float saved_muted_opacity = d2d_->muted_brush->GetOpacity();
                 d2d_->muted_brush->SetOpacity(saved_muted_opacity * animation.opacity);
                 draw_readable_text_aligned(combo_label_text,
@@ -1906,11 +1936,16 @@
                     lane_color, note_outline_opacity, note_polygon_geometry != nullptr));
             }
             if (note_hold_fill) {
-                note_hold_fill->SetColor(gameplay_note_hold_color(lane_color, native_hold_body_opacity));
+                note_hold_fill->SetColor(simple_hold_body
+                    ? color_from_rgb(lane_color, native_hold_body_opacity)
+                    : gameplay_note_hold_color(lane_color, native_hold_body_opacity));
             }
-            ID2D1LinearGradientBrush* note_material = note_shape == "simple_rect" ? nullptr
+            // Flat hold caps match the body; ordinary tap materials stay unchanged.
+            ID2D1LinearGradientBrush* note_material = (note_shape == "simple_rect" ||
+                (note.hold && simple_hold_body)) ? nullptr
                 : d2d_->lane_native_note_brushes[lane_index].Get();
-            ID2D1LinearGradientBrush* hold_material = d2d_->lane_native_hold_brushes[lane_index].Get();
+            ID2D1LinearGradientBrush* hold_material = simple_hold_body ? nullptr
+                : d2d_->lane_native_hold_brushes[lane_index].Get();
             ID2D1Bitmap* note_head_bitmap = d2d_->lane_note_head_bitmaps[lane_index].Get();
             ID2D1Bitmap* note_hold_head_bitmap =
                 d2d_->lane_note_hold_head_bitmaps[lane_index].Get();
@@ -2583,11 +2618,15 @@
                         lane_color, note_outline_opacity, note_polygon_geometry != nullptr));
                 }
                 if (note_hold_fill) {
-                    note_hold_fill->SetColor(gameplay_note_hold_color(lane_color, native_hold_body_opacity));
+                    note_hold_fill->SetColor(simple_hold_body
+                        ? color_from_rgb(lane_color, native_hold_body_opacity)
+                        : gameplay_note_hold_color(lane_color, native_hold_body_opacity));
                 }
-                ID2D1LinearGradientBrush* note_material = note_shape == "simple_rect" ? nullptr
+                ID2D1LinearGradientBrush* note_material = (note_shape == "simple_rect" ||
+                    (note.hold && simple_hold_body)) ? nullptr
                     : d2d_->lane_native_note_brushes[lane_index].Get();
-                ID2D1LinearGradientBrush* hold_material = d2d_->lane_native_hold_brushes[lane_index].Get();
+                ID2D1LinearGradientBrush* hold_material = simple_hold_body ? nullptr
+                    : d2d_->lane_native_hold_brushes[lane_index].Get();
                 ID2D1Bitmap* note_head_bitmap = d2d_->lane_note_head_bitmaps[lane_index].Get();
                 ID2D1Bitmap* note_hold_head_bitmap =
                     d2d_->lane_note_hold_head_bitmaps[lane_index].Get();

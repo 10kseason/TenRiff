@@ -39,6 +39,31 @@ void MenuWindow::draw(const MenuRenderData& data) {
     }
 
     auto* ctx = d2d_->d2d_context.Get();
+    // Decode once with the device resources, before BeginDraw and before a
+    // finishing hit. Missing optional art falls back to an ALL COMBO label.
+    if (!d2d_->all_combo_bitmap_attempted) {
+        d2d_->all_combo_bitmap_attempted = true;
+        const auto path = util::path_from_utf8_lossy(built_in_title_background_path()).parent_path() /
+            "achievements" / "all-combo.png";
+        static_cast<void>(load_bitmap_from_utf8_path(d2d_->wic_factory.Get(), ctx, path.u8string(),
+            d2d_->all_combo_bitmap, &d2d_->all_combo_source_rect, true, false, 4));
+    }
+    auto draw_all_combo_image = [&](const D2D1_RECT_F& bounds, float opacity) {
+        const auto& source = d2d_->all_combo_source_rect;
+        if (!d2d_->all_combo_bitmap || source.right <= source.left || source.bottom <= source.top ||
+            bounds.right <= bounds.left || bounds.bottom <= bounds.top) return false;
+        const float width = std::min(280.0f, bounds.right - bounds.left);
+        const float scale = std::min(width / (source.right - source.left),
+            (bounds.bottom - bounds.top) / (source.bottom - source.top));
+        const float half_width = (source.right - source.left) * scale * 0.5f;
+        const float half_height = (source.bottom - source.top) * scale * 0.5f;
+        const float cx = (bounds.left + bounds.right) * 0.5f;
+        const float cy = (bounds.top + bounds.bottom) * 0.5f;
+        ctx->DrawBitmap(d2d_->all_combo_bitmap.Get(),
+            D2D1::RectF(cx - half_width, cy - half_height, cx + half_width, cy + half_height),
+            opacity, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, &source);
+        return true;
+    };
     const auto viewport = menu_viewport(static_cast<int>(width_), static_cast<int>(height_));
     const D2D1_RECT_F full_screen_rect = D2D1::RectF(
         viewport.background_left, 0.0f, viewport.background_right, kBaseHeight);

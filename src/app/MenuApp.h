@@ -209,6 +209,7 @@ private:
 
         int combo = 0;
         int max_combo = 0;
+        bool full_combo = false;
         gameplay::JudgementCounts counts;
         int64_t score = 0;
         double accuracy = 0.0;
@@ -257,6 +258,7 @@ private:
         int64_t ghost_osu_od8_score = 0;
         int ghost_combo = 0;
         int ghost_max_combo = 0;
+        bool ghost_full_combo = false;
         gameplay::JudgementCounts ghost_counts;
         double ghost_gauge = 0.0;
         game::GaugeType ghost_gauge_type = game::GaugeType::Normal;
@@ -871,6 +873,7 @@ private:
 
     bool has_result_ = false;
     bool last_game_over_ = false;
+    bool last_all_combo_badge_ = false;
     gameplay::ResultStats last_result_{};
     int64_t result_presentation_start_ns_ = 0;
     bool result_presentation_skipped_ = false;

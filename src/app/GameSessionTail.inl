@@ -835,15 +835,6 @@ bool GameSession::initialize(const CommandLineOptions& options) {
             std::cerr << "[info] Matching the ghost's recorded key-conversion and LN Mix versions." << std::endl;
         }
     }
-    // Analyze the full resolved BMS once while loading, before a practice marker
-    // removes notes. No difficulty work runs on a playing input/audio/HUD thread.
-    key_overlay_chart_ = {};
-    if (config_.skin.key_overlay_enabled && key_overlay_supports(chart_.lane_count) &&
-        chart_result.format == ChartFormat::Bms) {
-        key_overlay_chart_ = estimate_bms_overlay_difficulty(chart_, sample_rate_,
-            [this] { return loading_cancel_requested(); });
-        if (key_overlay_chart_.cancelled) return false;
-    }
     // The immediate shortcut means the beginning of the song even when this
     // attempt came from an editor practice marker. Ordinary Retry keeps it.
     if (practice_start_seconds_ > 0.0 && !instant_restart_start_) {
@@ -1325,6 +1316,13 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         const auto& stats = engine_->stats();
         snapshot.combo = stats.combo;
         snapshot.max_combo = stats.max_combo;
+        const bool partial_chart = practice_start_seconds_ > 0.0 && !instant_restart_start_;
+        const bool assisted = autoplay_enabled_ || auto_scratch_enabled_ || practice_no_fail_enabled_ ||
+            (replay_playback_enabled_ &&
+                (replay_source_.mode.autoplay_enabled || replay_source_.mode.practice_no_fail_enabled));
+        snapshot.full_combo = gameplay_session_full_combo(engine_->is_finished(), snapshot.game_over,
+            snapshot.user_aborted || (replay_playback_enabled_ && replay_source_.aborted),
+            assisted || partial_chart, stats);
         snapshot.counts = stats.counts;
         snapshot.score = gameplay::scale_native_score(stats.raw_score, score_multiplier_);
         snapshot.auto_scratch_enabled = auto_scratch_enabled_;
@@ -1380,6 +1378,11 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             const auto& ghost_stats = ghost_engine_->stats();
             snapshot.ghost_combo = ghost_stats.combo;
             snapshot.ghost_max_combo = ghost_stats.max_combo;
+            snapshot.ghost_full_combo = gameplay_session_full_combo(snapshot.ghost_finished,
+                snapshot.ghost_game_over, snapshot.user_aborted || ghost_replay_source_.aborted,
+                partial_chart || auto_scratch_enabled_ || ghost_replay_source_.mode.autoplay_enabled ||
+                    ghost_replay_source_.mode.practice_no_fail_enabled,
+                ghost_stats);
             snapshot.ghost_counts = ghost_stats.counts;
             snapshot.ghost_score = ghost_stats.raw_score;
             snapshot.ghost_accuracy = ghost_stats.accuracy_percent();
@@ -1707,8 +1710,6 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
     snapshot.key_overlay = key_overlay_.snapshot(snapshot.hud_publish_time_ns,
         !snapshot.paused && !snapshot.countdown_active && !snapshot.finished &&
         !snapshot.spectating_peer && !replay_playback_enabled_ && !autoplay_enabled_ && process_owns_foreground_window());
-    snapshot.key_overlay.bms_chart = key_overlay_chart_.bms_chart;
-    snapshot.key_overlay.difficulty = key_overlay_chart_.difficulty;
     return snapshot;
 }
 
@@ -2478,6 +2479,13 @@ void GameSession::shutdown() {
             autoplay_enabled_, practice_no_fail_enabled_, one_miss_fail_enabled_, gauge_shift_enabled_);
         result_.game_over = !gameplay_session_cleared(
             engine_finished, engine_game_over, user_aborted, autoplay_enabled_);
+        result_.all_combo_badge = gameplay_session_full_combo(engine_finished, engine_game_over,
+            user_aborted || (replay_playback_enabled_ && replay_source_.aborted),
+            autoplay_enabled_ || auto_scratch_enabled_ || practice_no_fail_enabled_ ||
+                (practice_start_seconds_ > 0.0 && !instant_restart_start_) ||
+                (replay_playback_enabled_ &&
+                    (replay_source_.mode.autoplay_enabled || replay_source_.mode.practice_no_fail_enabled)),
+            result_.stats);
         if (auto_scratch_enabled_) result_.clear_status = "ASSIST AUTO SCRATCH " + result_.clear_status;
         result_.pause_used = replay_playback_enabled_
                                  ? replay_source_.pause_used

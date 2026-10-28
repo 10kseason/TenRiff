@@ -1,4 +1,5 @@
 #include "render/ResultPresentation.h"
+#include "render/GameplayGaugePalette.h"
 
 #include <algorithm>
 #include <cmath>
@@ -32,7 +33,7 @@ std::optional<uint32_t> result_gauge_shift_clear_color(std::string_view status) 
     if (status == "GAUGE SHIFT EASY CLEAR") return 0x72DB98;
     if (status == "GAUGE SHIFT NORMAL CLEAR") return 0xFFE477;
     if (status == "GAUGE SHIFT HARD CLEAR") return 0xFFAA60;
-    if (status == "GAUGE SHIFT EX CLEAR") return 0xFF647A;
+    if (status == "GAUGE SHIFT EX CLEAR") return kClearExRgb;
     return std::nullopt;
 }
 

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.9.9.3 LANGUAGES C CXX)
+project(TenRiff VERSION 1.9.9.5 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -195,9 +195,6 @@ add_library(tenriff_core
     src/app/GraphicsTiming.cpp
     src/app/ImportedGameplaySkin.cpp
     src/app/KeyNoteOverlay.cpp
-    third_party/key_note_overlay/pattern_difficulty.cpp
-    third_party/key_note_overlay/mania_strain.cpp
-    third_party/key_note_overlay/dan_rating.cpp
     src/app/Lr2Course.cpp
     src/app/Lr2Skin.cpp
     src/app/TenRiffSkin.cpp
