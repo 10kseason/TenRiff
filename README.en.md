@@ -1,4 +1,8 @@
+> **2026-10-29 · 1.9.9.7:** [Standard LN early-release fix and online submission](docs/release-1.9.9.7.en.md). R11/R12 online submission; R9/R10 records and submissions preserved. General fixed baseline: **1.9.6**. Earlier local/unpublished notices are historical.
+
 > **2026-10-29 · 1.9.9.6:** [Indicator/result feedback and library loading](docs/release-1.9.9.6.en.md). Fixed baseline: **1.9.6**. Earlier local/unpublished entries below are historical. [Verification](docs/release-1.9.9.6-gate.md).
+
+
 
 > **2026-10-29 · Local candidate:** [Library, folder and difficulty-table loading](docs/library-loading-20261029.en.md).
 

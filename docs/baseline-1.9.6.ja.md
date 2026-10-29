@@ -1,3 +1,5 @@
+> **2026-10-29 · 1.9.9.7:** [通常LNの早期離鍵修正とオンライン送信](release-1.9.9.7.ja.md). R11/R12 online submission; R9/R10 records and submissions preserved. General fixed baseline: **1.9.6**. Earlier local/unpublished notices are historical.
+
 > **2026-10-29 · 1.9.9.6:** [インジケーター・リザルトとライブラリー読み込み](release-1.9.9.6.ja.md). Fixed baseline: **1.9.6**. Earlier local/unpublished entries below are historical. [Verification](release-1.9.9.6-gate.md).
 
 > **2026-10-28 · 1.9.9.5:** シンプルLN単色・全譜面ALL COMBO画像・BGA/レンダー待機復帰・EXプリズムとランク文字効果を統合し、キーオーバーレイは推定難易度なしでKPS/キー表示を維持します。一般固定基準は **1.9.6**。下記の旧版・ローカル候補・未公開・検証中の記述は執筆当時の履歴で、現在の公開/検証状態を示しません。 [Release scope](release-1.9.9.5.ja.md) · [Verification](release-1.9.9.5-gate.md).

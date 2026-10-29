@@ -1,5 +1,10 @@
 # 1.9.9.6 — 2026-10-29
 
+## 1.9.9.7 · 2026-10-29
+
+- Tighten standard LN early release to the current PG window; fail earlier drops immediately, including course and OD8 completion. Preserve charge-note release timing and R1–R10 replay behavior; new R11/R12 identities and peer v8 prevent mixing incompatible scores. Sites now accepts R11/R12 and retains separate R9/R10 submissions and history. [Scope](docs/ln-release-20261029.en.md).
+
+
 - Skin → HUD adds **Gauge Bar Width: Normal (100%) / Slightly Larger (125%) / Large (150%)**. Classic bars and Studio side rails expand horizontally away from the field. Fill, border and ticks share the width; profiles and `.trskin`/`.trprofile` preserve it. Missing older settings use Normal.
 - Unify historical/latest barcode indicator markers at2×18 while retaining dots, opacity, color and timing.
 - Display `EX CLEAR` without the Gauge Shift prefix and preserve other clear/ASSIST identities.

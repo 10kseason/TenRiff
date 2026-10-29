@@ -1,4 +1,8 @@
+> **2026-10-29 · 1.9.9.7:** [일반 롱노트 조기 해제 수정 및 온라인 제출](release-1.9.9.7.ko.md). R11/R12 online submission; R9/R10 records and submissions preserved. General fixed baseline: **1.9.6**. Earlier local/unpublished notices are historical.
+
 > **2026-10-29 · 1.9.9.6:** [인디케이터·리절트 및 라이브러리 로딩](release-1.9.9.6.ko.md). Fixed baseline: **1.9.6**. Earlier local/unpublished entries below are historical. [Verification](release-1.9.9.6-gate.md).
+
+
 
 > **2026-10-29 · Local candidate:** [곡 목록·폴더·난이도표 로딩 개선](library-loading-20261029.ko.md).
 

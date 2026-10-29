@@ -25,6 +25,8 @@ int judgement_generation_for_record(std::string_view ruleset_id) {
     // New timing starts a fresh BEST without rewriting historical result files.
     // Custom records share the generation for ghost selection, but still cannot
     // become an official BEST unless the existing verification gate permits it.
+    if (ruleset_id == kCanonicalReplayRulesetId || ruleset_id == kExReplayRulesetId ||
+        ruleset_id == "custom-ruleset-11" || ruleset_id == "custom-ruleset-12") return 3;
     return ruleset_id == "tenriff-native-score-v2-ruleset-9" ||
            ruleset_id == "tenriff-native-score-v2-ruleset-10" ||
            ruleset_id == "custom-ruleset-9" || ruleset_id == "custom-ruleset-10" ? 2 : 1;

@@ -1,3 +1,5 @@
+> **2026-10-29 · 1.9.9.7:** [일반 롱노트 조기 해제 수정 및 온라인 제출](release-1.9.9.7.ko.md). R11/R12 online submission; R9/R10 records and submissions preserved. General fixed baseline: **1.9.6**. Earlier local/unpublished notices are historical.
+
 > **2026-10-29 · 1.9.9.6:** [인디케이터·리절트 및 라이브러리 로딩](release-1.9.9.6.ko.md). Fixed baseline: **1.9.6**. Earlier local/unpublished entries below are historical. [Verification](release-1.9.9.6-gate.md).
 
 > **2026-10-28 · 1.9.9.5:** 심플 롱노트 단색·전체 올콤보 이미지·BGA/렌더 대기 복구·EX 프리즘과 랭크 텍스트 효과를 통합하고, 키 오버레이는 난이도 추정 없이 KPS/키 뷰어를 유지합니다. 일반 고정 기준선은 **1.9.6**입니다. 아래의 이전 버전·로컬 후보·미공개·검증 진행 중 표기는 작성 당시의 이력이며 현재 공개/검증 상태를 뜻하지 않습니다. [Release scope](release-1.9.9.5.ko.md) · [Verification](release-1.9.9.5-gate.md).

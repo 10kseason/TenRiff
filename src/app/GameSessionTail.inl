@@ -632,6 +632,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     gameplay_config.sample_rate = sample_rate_;
     gameplay_config.rate = config_.speed.rate;
     gameplay_config.judge = mode_result.judge;
+    gameplay_config.strict_standard_hold_release = !replay_playback_enabled_ ||
+        replay_uses_strict_standard_hold_release(replay_source_);
     gameplay_config.legacy_hold_release = replay_playback_enabled_ &&
         replay_uses_legacy_hold_release(replay_source_);
     gameplay_config.chronological_judgement = !replay_playback_enabled_ ||
@@ -982,6 +984,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         const auto ghost_base_judge = is_supported_canonical_replay_ruleset(ghost_replay_source_.ruleset_id)
                                           ? config::JudgeConfig{} : config_.judge;
         ghost_config.judge = replay_judge_config_for_playback(ghost_replay_source_, ghost_base_judge, chart_.bms_rank);
+        ghost_config.strict_standard_hold_release = replay_uses_strict_standard_hold_release(ghost_replay_source_);
         ghost_config.legacy_hold_release = replay_uses_legacy_hold_release(ghost_replay_source_);
         ghost_config.chronological_judgement = replay_uses_chronological_judgement(ghost_replay_source_);
         ghost_config.empty_poor_affects_accuracy = replay_empty_poor_affects_accuracy(ghost_replay_source_);
@@ -2524,7 +2527,7 @@ void GameSession::shutdown() {
                                                               course_gauge_enabled_,
                                                               "off", result_.mods);
             if (auto_scratch_enabled_ || stale_input_catchup_used_) {
-                replay.ruleset_id = mode_mod_judge_ex(result_.mods) ? "custom-ruleset-10" : "custom-ruleset-9";
+                replay.ruleset_id = mode_mod_judge_ex(result_.mods) ? "custom-ruleset-12" : "custom-ruleset-11";
             }
             if (stale_input_catchup_used_) {
                 const std::string warning = "Official scoring disabled: stale input state catch-up is not represented in the replay trace.";

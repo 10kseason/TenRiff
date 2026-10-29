@@ -2603,17 +2603,15 @@ void separate_judge_flow(tenriff::app::CommandLineOptions options, Report& repor
             std::string payload;
             const bool built = app::build_sites_score_json(*replay.replay, result.replay_sha256,
                 "Judge Boundary Fixture", result.clear_status, payload, error);
-            report.check(name + ".fixed_ruleset_upload_eligible", built && !payload.empty() &&
+            report.check(name + ".ln_release_ruleset_upload_eligible", built && !payload.empty() &&
                 replay.replay->record_play_mode == "online" && error.empty(), error);
-            if (built) {
-                const auto json = config::parse_json(payload);
-                const auto* fields = json.success() ? json.root->as_object() : nullptr;
-                report.check(name + ".fixed_payload_identity", fields &&
-                    fields->at("schema_version").as_number() == 1 &&
-                    fields->at("ruleset_id").as_string() == expected_ruleset &&
-                    fields->at("timing_profile").as_string() == "bms-easy" &&
-                    fields->at("mods").as_array()->size() == config.mode.mods.size());
-            }
+            const auto json = config::parse_json(payload);
+            const auto* fields = json.success() ? json.root->as_object() : nullptr;
+            report.check(name + ".ln_release_policy_identity", fields &&
+                fields->at("ruleset_id").as_string() == expected_ruleset &&
+                fields->at("timing_profile").as_string() == "bms-easy" &&
+                fields->at("mods").as_array()->size() == config.mode.mods.size() &&
+                app::replay_uses_strict_standard_hold_release(*replay.replay) && verified.official_eligible);
             auto historical = *replay.replay;
             historical.ruleset_id = std::string(expected_ruleset == app::kExReplayRulesetId
                 ? app::kRuleset8ReplayRulesetId : app::kRuleset7ReplayRulesetId);

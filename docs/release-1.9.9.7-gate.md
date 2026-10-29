@@ -1,0 +1,3 @@
+# TenRiff 1.9.9.7 verification gates
+
+Release requires fresh Release build/CTest, LN boundary and replay compatibility tests, actual native score payloads accepted by both real API handlers and loopback HTTP, web typecheck/production build, native menu/session smoke, ZIP/source-byte/privacy/default checks, independent source-ZIP build/tests, exact PR/main CI, and fresh draft/public asset downloads. Runtime tests and public snapshots are recorded outside the shipped source in the release evidence report. Historical tests are not presented as fresh physical-input or real-account upload evidence. No data migration or published-asset replacement is allowed.

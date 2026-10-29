@@ -39,7 +39,9 @@ constexpr std::size_t kMaximumReplayBytes = 5 * 1024 * 1024;
 
 bool ranked_timing_requires_server_support(std::string_view ruleset_id) {
     return ruleset_id == kCanonicalReplayRulesetId || ruleset_id == kExReplayRulesetId ||
-           ruleset_id == "custom-ruleset-9" || ruleset_id == "custom-ruleset-10";
+           ruleset_id == kRuleset9ReplayRulesetId || ruleset_id == kRuleset10ReplayRulesetId ||
+           ruleset_id == "custom-ruleset-9" || ruleset_id == "custom-ruleset-10" ||
+           ruleset_id == "custom-ruleset-11" || ruleset_id == "custom-ruleset-12";
 }
 
 struct Credentials {

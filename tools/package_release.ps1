@@ -3,7 +3,7 @@ param(
     [string]$BuildReleaseDirectory,
     [Parameter(Mandatory = $true)]
     [string]$OutputDirectory,
-    [string]$Version = "1.9.9.6",
+    [string]$Version = "1.9.9.7",
     [switch]$BinaryOnly
 )
 

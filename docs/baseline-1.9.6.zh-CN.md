@@ -1,3 +1,5 @@
+> **2026-10-29 · 1.9.9.7:** [普通LN提前松键修复与在线提交](release-1.9.9.7.zh-CN.md). R11/R12 online submission; R9/R10 records and submissions preserved. General fixed baseline: **1.9.6**. Earlier local/unpublished notices are historical.
+
 > **2026-10-29 · 1.9.9.6:** [指示条、结算与曲库加载](release-1.9.9.6.zh-CN.md). Fixed baseline: **1.9.6**. Earlier local/unpublished entries below are historical. [Verification](release-1.9.9.6-gate.md).
 
 > **2026-10-28 · 1.9.9.5:** 整合简洁长音符单色、完整谱面ALL COMBO图片、BGA/渲染等待恢复、EX棱镜及等级文字效果；按键叠加保留KPS/按键显示，不再估计难度。通用固定基线仍为 **1.9.6**。下方旧版本、本地候选、未发布及验证中的表述均属于当时的历史记录，不表示当前发布或验证状态。 [Release scope](release-1.9.9.5.zh-CN.md) · [Verification](release-1.9.9.5-gate.md).
