@@ -1,5 +1,11 @@
 # 1.9.9.7 — 2026-10-29
 
+## 1.9.9.8 · 2026-10-29
+
+- Standard LN early release accepts GREAT; GOOD and earlier drops immediately fail. CN, tap/head and held-through behavior are unchanged.
+- R13/R14 online submission, BEST generation4 and peer v9 preserve historical scoring policies, including R11/R12 PG releases. Existing R9–R12 submissions remain separate.
+
+
 - Tighten standard LN early release to the current PG window; fail earlier drops immediately, including course and OD8 completion. Preserve charge-note release timing and R1–R10 replay behavior; new R11/R12 identities and peer v8 prevent mixing incompatible scores. Sites now accepts R11/R12 and retains separate R9/R10 submissions and history. [Scope](docs/ln-release-20261029.en.md).
 
 

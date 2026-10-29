@@ -1,3 +1,5 @@
+> **2026-10-29 · 1.9.9.8:** [일반 LN GREAT 허용 핫픽스](release-1.9.9.8.ko.md). R13/R14 online; historical R9–R12 preserved. Fixed baseline **1.9.6**. Earlier notices are historical.
+
 > **2026-10-29 · 1.9.9.7:** [일반 롱노트 조기 해제 수정 및 온라인 제출](release-1.9.9.7.ko.md). R11/R12 online submission; R9/R10 records and submissions preserved. General fixed baseline: **1.9.6**. Earlier local/unpublished notices are historical.
 
 > **2026-10-29 · 1.9.9.6:** [인디케이터·리절트 및 라이브러리 로딩](release-1.9.9.6.ko.md). Fixed baseline: **1.9.6**. Earlier local/unpublished entries below are historical. [Verification](release-1.9.9.6-gate.md).

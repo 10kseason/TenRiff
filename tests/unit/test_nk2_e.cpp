@@ -234,6 +234,7 @@ TEST_CASE("NK2 E R9 and R10 saved replays verify and serialize Sites identity fo
         config.sample_rate = 44100;
         config.judge = app::replay_judge_config_for_playback(replay, {}, source.bms_rank);
         config.strict_standard_hold_release = app::replay_uses_strict_standard_hold_release(replay);
+        config.great_standard_hold_release = app::replay_uses_great_standard_hold_release(replay);
         config.gauge_shift_enabled = true;
         config.gauge_policy.bms_lr2_deltas = true;
         GameplayEngine engine(played, config);

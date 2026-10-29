@@ -1,3 +1,5 @@
+> **2026-10-29 · 1.9.9.8:** [通常LNのGREAT離鍵許容ホットフィックス](docs/release-1.9.9.8.ja.md). R13/R14 online; historical R9–R12 preserved. Fixed baseline **1.9.6**. Earlier notices are historical.
+
 > **2026-10-29 · 1.9.9.7:** [通常LNの早期離鍵修正とオンライン送信](docs/release-1.9.9.7.ja.md). R11/R12 online submission; R9/R10 records and submissions preserved. General fixed baseline: **1.9.6**. Earlier local/unpublished notices are historical.
 
 > **2026-10-29 · 1.9.9.6:** [インジケーター・リザルトとライブラリー読み込み](docs/release-1.9.9.6.ja.md). Fixed baseline: **1.9.6**. Earlier local/unpublished entries below are historical. [Verification](docs/release-1.9.9.6-gate.md).

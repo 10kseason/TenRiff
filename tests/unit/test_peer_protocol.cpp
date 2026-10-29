@@ -192,14 +192,14 @@ TEST_CASE("peer protocol rejects pre-rate version five before payload decoding")
     CHECK(error.find("version") != std::string::npos);
 }
 
-TEST_CASE("peer protocol accepts LN release version eight and rejects version seven") {
+TEST_CASE("peer protocol accepts GREAT LN release version nine and rejects version eight") {
     PeerMessage message;
     message.type = PeerMessageType::Hello;
     message.text = "Fixed timing baseline client";
     auto frame = tenriff::network::encode_peer_message(message);
     REQUIRE(frame.size() > 5);
     CHECK(frame[4] == 0);
-    CHECK(frame[5] == 8);
+    CHECK(frame[5] == 9);
     std::size_t consumed = 0;
     std::string error;
     PeerMessage decoded;
@@ -207,7 +207,7 @@ TEST_CASE("peer protocol accepts LN release version eight and rejects version se
     CHECK(decoded.text == message.text);
     CHECK(consumed == frame.size());
     // The payload layout did not change, but its timing contract did.
-    frame[5] = 7;
+    frame[5] = 8;
     consumed = 0;
     CHECK(tenriff::network::decode_peer_message(frame, decoded, consumed, error) == PeerDecodeStatus::Error);
     CHECK(error.find("version") != std::string::npos);

@@ -783,7 +783,8 @@ ReplayValidationResult validate_replay_evidence(const ReplayFile& replay) {
              replay.ruleset_id != "custom-ruleset-6" && replay.ruleset_id != "custom-ruleset-7" &&
              replay.ruleset_id != "custom-ruleset-8" && replay.ruleset_id != "custom-ruleset-9" &&
              replay.ruleset_id != "custom-ruleset-10" && replay.ruleset_id != "custom-ruleset-11" &&
-             replay.ruleset_id != "custom-ruleset-12")) {
+             replay.ruleset_id != "custom-ruleset-12" && replay.ruleset_id != "custom-ruleset-13" &&
+             replay.ruleset_id != "custom-ruleset-14")) {
             result.error = "Replay course gauge requires a supported custom rule and a bounded carried value.";
             return result;
         }
