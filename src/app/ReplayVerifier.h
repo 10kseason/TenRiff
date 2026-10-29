@@ -13,9 +13,13 @@
 namespace tenriff::app {
 
 inline constexpr std::string_view kCanonicalReplayRulesetId =
-    "tenriff-native-score-v2-ruleset-9";
-// The fixed timing baseline has its own identity; never reinterpret R1-R8.
+    "tenriff-native-score-v2-ruleset-11";
+// Tightened standard LN releases have their own identity; never reinterpret R1-R10.
 inline constexpr std::string_view kExReplayRulesetId =
+    "tenriff-native-score-v2-ruleset-12";
+inline constexpr std::string_view kRuleset9ReplayRulesetId =
+    "tenriff-native-score-v2-ruleset-9";
+inline constexpr std::string_view kRuleset10ReplayRulesetId =
     "tenriff-native-score-v2-ruleset-10";
 inline constexpr std::string_view kRuleset7ReplayRulesetId =
     "tenriff-native-score-v2-ruleset-7";
@@ -78,6 +82,7 @@ struct ReplayVerificationResult {
     const gameplay::ReplayFile& replay, const config::JudgeConfig& base,
     std::optional<int> bms_rank = std::nullopt);
 [[nodiscard]] bool replay_uses_chronological_judgement(const gameplay::ReplayFile& replay);
+[[nodiscard]] bool replay_uses_strict_standard_hold_release(const gameplay::ReplayFile& replay);
 [[nodiscard]] bool replay_uses_legacy_hold_release(const gameplay::ReplayFile& replay);
 [[nodiscard]] bool replay_empty_poor_affects_accuracy(const gameplay::ReplayFile& replay);
 [[nodiscard]] bool is_sites_supported_replay_ruleset(

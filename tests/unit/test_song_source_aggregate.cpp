@@ -183,13 +183,15 @@ struct MenuAppSongSourceTestAccess {
         append(kRuleset7ReplayRulesetId, 9000, 1);
         REQUIRE_FALSE(menu->chart_best_results_.empty());
         for (const auto& item : menu->chart_best_results_) CHECK(item.second.best_score == 9000);
-        append(kCanonicalReplayRulesetId, 1000, 2);
+        append(kCanonicalReplayRulesetId, 1000, 3);
         append(kRuleset7ReplayRulesetId, 9999, 1);
         REQUIRE(menu->local_play_records_.size() == 3);
         for (const auto& item : menu->chart_best_results_) {
             CHECK(item.second.best_score == 1000);
-            CHECK(item.second.judgement_generation == 2);
+            CHECK(item.second.judgement_generation == 3);
         }
+        append(kRuleset9ReplayRulesetId, 9999, 2);
+        CHECK(menu->chart_best_results_.begin()->second.best_score == 1000);
         // Feed score-sorted history: the current generation takes priority,
         // while an old replay remains selectable when no current one exists.
         menu->current_song_record_indices_ = {2, 0, 1};
@@ -212,7 +214,7 @@ struct MenuAppSongSourceTestAccess {
             menu->chart_best_results_[keys[1]] = reverse ? historical : current;
             const auto best = menu->best_result_for_song_entry(entry);
             CHECK(best.best_score == 1000);
-            CHECK(best.judgement_generation == 2);
+            CHECK(best.judgement_generation == 3);
         }
     }
 

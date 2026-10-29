@@ -1,4 +1,8 @@
+> **2026-10-29 · 1.9.9.7:** [普通LN提前松键修复与在线提交](release-1.9.9.7.zh-CN.md). R11/R12 online submission; R9/R10 records and submissions preserved. General fixed baseline: **1.9.6**. Earlier local/unpublished notices are historical.
+
 > **2026-10-29 · 1.9.9.6:** [指示条、结算与曲库加载](release-1.9.9.6.zh-CN.md). Fixed baseline: **1.9.6**. Earlier local/unpublished entries below are historical. [Verification](release-1.9.9.6-gate.md).
+
+
 
 > **2026-10-29 · Local candidate:** [曲目列表、文件夹与难度表加载改进](library-loading-20261029.zh-CN.md).
 

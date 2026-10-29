@@ -67,6 +67,9 @@ struct GameplayConfig {
     // Replay rulesets 1/2 deferred LN releases and let a re-press cancel them.
     // Only historical replay playback/verification should opt into that behavior.
     bool legacy_hold_release = false;
+    // R11/R12: ordinary LN releases earlier than PG are failed holds.
+    // Replay playback/verification explicitly disables this for R1-R10.
+    bool strict_standard_hold_release = true;
     // R5 orders automatic events by their due sample before each input.
     // R1-R4 playback/verifiers explicitly select false to retain historical ordering.
     bool chronological_judgement = true;
@@ -206,6 +209,7 @@ private:
     bool practice_no_fail_enabled_ = false;
     bool one_miss_fail_enabled_ = false;
     bool legacy_hold_release_ = false;
+    bool strict_standard_hold_release_ = true;
     bool chronological_judgement_ = true;
     bool empty_poor_affects_accuracy_ = false;
 };

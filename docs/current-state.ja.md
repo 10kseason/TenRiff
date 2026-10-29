@@ -1,4 +1,8 @@
+> **2026-10-29 · 1.9.9.7:** [通常LNの早期離鍵修正とオンライン送信](release-1.9.9.7.ja.md). R11/R12 online submission; R9/R10 records and submissions preserved. General fixed baseline: **1.9.6**. Earlier local/unpublished notices are historical.
+
 > **2026-10-29 · 1.9.9.6:** [インジケーター・リザルトとライブラリー読み込み](release-1.9.9.6.ja.md). Fixed baseline: **1.9.6**. Earlier local/unpublished entries below are historical. [Verification](release-1.9.9.6-gate.md).
+
+
 
 > **2026-10-29 · Local candidate:** [曲一覧・フォルダー・難易度表の読み込み改善](library-loading-20261029.ja.md).
 

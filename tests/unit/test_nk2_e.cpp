@@ -216,7 +216,7 @@ TEST_CASE("NK2 E R9 and R10 saved replays verify and serialize Sites identity fo
         replay.chart_format = "bms";
         replay.chart_sha256 = std::string(64, 'a');
         replay.bms_rank = source.bms_rank;
-        replay.ruleset_id = std::string(ex ? app::kExReplayRulesetId : app::kCanonicalReplayRulesetId);
+        replay.ruleset_id = std::string(ex ? app::kRuleset10ReplayRulesetId : app::kRuleset9ReplayRulesetId);
         replay.sample_rate = 44100;
         replay.created_utc = "20261022_000000Z";
         replay.record_play_mode = "online"; // Synthetic opt-in, never uploaded.
@@ -233,6 +233,7 @@ TEST_CASE("NK2 E R9 and R10 saved replays verify and serialize Sites identity fo
         GameplayConfig config;
         config.sample_rate = 44100;
         config.judge = app::replay_judge_config_for_playback(replay, {}, source.bms_rank);
+        config.strict_standard_hold_release = app::replay_uses_strict_standard_hold_release(replay);
         config.gauge_shift_enabled = true;
         config.gauge_policy.bms_lr2_deltas = true;
         GameplayEngine engine(played, config);

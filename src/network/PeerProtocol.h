@@ -8,9 +8,9 @@
 
 namespace tenriff::network {
 
-// Same wire layout, different fixed timing policy. Reject old peers rather than
+// Same wire layout, different standard LN release policy. Reject old peers rather than
 // compare scores produced under different judgement windows in one room.
-constexpr uint16_t kPeerProtocolVersion = 7;
+constexpr uint16_t kPeerProtocolVersion = 8;
 constexpr uint32_t kPeerMinRateMilli = 500;
 constexpr uint32_t kPeerMaxRateMilli = 2000;
 constexpr uint32_t kPeerRateStepMilli = 50;

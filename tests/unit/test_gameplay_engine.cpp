@@ -5,8 +5,113 @@
 #include <iostream>
 
 #include "app/ModeManager.h"
+#include "app/JudgeTimingPolicy.h"
 #include "gameplay/GameplayEngine.h"
 #include "input/ModalInputFence.h"
+
+TEST_CASE("LN PG release rejects the old GOOD early-release success") {
+    using namespace tenriff;
+    gameplay::GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes = {{1, 1000, 2000}};
+    gameplay::GameplayConfig config;
+    config.sample_rate = 1000;
+    config.judge = app::judge_timing_for_fixed_baseline({}, 3, false, false, false);
+    gameplay::GameplayEngine engine(chart, config);
+    (void)engine.handle_input(1, input::InputState::Pressed, 1000);
+    (void)engine.handle_input(1, input::InputState::Released, 1900);
+    CHECK(engine.stats().counts.bd == 1);
+    CHECK(engine.stats().counts.gd == 0);
+    CHECK(engine.stats().combo == 0);
+    CHECK(engine.live_feedback().judgement == game::Judgement::BD);
+}
+
+TEST_CASE("LN PG release sample boundaries preserve CN and held-through completion") {
+    using namespace tenriff;
+    for (const int sr : {44100, 48000}) for (const double rate : {0.75, 1.0, 1.5})
+    for (const int rank : {0, 1, 2, 3}) for (const int mode : {0, 1, 2})
+    for (const bool charge : {false, true}) for (const bool synced : {false, true})
+    for (const int offset : {-1, 0, 1}) {
+        gameplay::GameplayConfig cfg;
+        cfg.sample_rate = sr;
+        cfg.rate = rate;
+        cfg.judge = app::judge_timing_for_fixed_baseline({}, rank, false, mode == 1, mode == 2);
+        const int64_t pg = std::llround(cfg.judge.pg_ms * sr / 1000.0);
+        const int64_t tail = std::llround(2.0 * sr / rate);
+        gameplay::GameplayChart chart;
+        chart.lane_count = 1;
+        chart.duration_samples = tail + sr;
+        chart.notes = {{1, std::llround(sr / rate), tail, charge}};
+        gameplay::GameplayEngine engine(chart, cfg);
+        (void)engine.handle_input(1, input::InputState::Pressed, chart.notes[0].start_sample);
+        const int64_t release = tail - pg + offset;
+        if (synced) engine.sync_input_state(1, input::InputState::Released, release);
+        else (void)engine.handle_input(1, input::InputState::Released, release);
+        const bool failed = !charge && offset < 0;
+        CHECK(engine.stats().counts.bd == (failed ? 1 : 0));
+        CHECK(engine.stats().counts.pg == (offset < 0 ? 1 : 2));
+        CHECK(engine.stats().counts.gr == (charge && offset < 0 ? 1 : 0));
+        CHECK(engine.stats().combo == (failed ? 0 : 2));
+        CHECK(engine.stats().osu_od8.counts.miss == (failed ? 1 : 0));
+        const auto score = engine.stats().raw_score;
+        (void)engine.handle_input(1, input::InputState::Pressed, release + 1);
+        engine.advance(tail + sr);
+        CHECK(engine.stats().raw_score == score);
+        CHECK(engine.stats().counts.bd == (failed ? 1 : 0));
+        CHECK(engine.stats().osu_od8.judged_objects == 1);
+
+        if (!charge) {
+            gameplay::GameplayEngine held(chart, cfg);
+            (void)held.handle_input(1, input::InputState::Pressed, chart.notes[0].start_sample);
+            held.advance(tail);
+            (void)held.handle_input(1, input::InputState::Released, tail + sr / 10);
+            CHECK(held.stats().counts.pg == 2);
+            CHECK(held.stats().counts.bd == 0);
+        }
+    }
+}
+
+TEST_CASE("LN PG release failure triggers sudden death and stays a failure after regrab") {
+    using namespace tenriff;
+    gameplay::GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes = {{1, 1000, 2000}};
+    gameplay::GameplayConfig cfg;
+    cfg.sample_rate = 1000;
+    cfg.judge.pg_ms = 22;
+    cfg.one_miss_fail_enabled = true;
+    gameplay::GameplayEngine engine(chart, cfg);
+    (void)engine.handle_input(1, input::InputState::Pressed, 1000);
+    (void)engine.handle_input(1, input::InputState::Released, 1977);
+    CHECK(engine.is_game_over());
+    CHECK(engine.stats().counts.bd == 1);
+    CHECK(engine.stats().osu_od8.counts.miss == 1);
+    (void)engine.handle_input(1, input::InputState::Pressed, 1977);
+    engine.advance(3000);
+    CHECK(engine.stats().counts.bd == 1);
+    CHECK(engine.stats().counts.pg == 1);
+}
+
+TEST_CASE("LN PG release applies to charge notes converted by No LN Release") {
+    using namespace tenriff;
+    gameplay::GameplayChart source;
+    source.lane_count = 4; source.duration_samples = 144000;
+    source.notes = {{1, 48000, 96000, true}};
+    config::ModeConfig mode;
+    mode.key_mode = "auto"; mode.random = "off"; mode.mods = {"no_ln_release"};
+    const auto managed = app::manage_modes(source, app::ChartFormat::Bms, mode, {}, 1.0, 120, 48000);
+    REQUIRE(managed.chart.notes.size() == 1);
+    CHECK_FALSE(managed.chart.notes[0].release_required);
+    gameplay::GameplayConfig cfg;
+    cfg.judge = managed.judge;
+    gameplay::GameplayEngine engine(managed.chart, cfg);
+    (void)engine.handle_input(1, input::InputState::Pressed, 48000);
+    (void)engine.handle_input(1, input::InputState::Released, 96000 - std::llround(cfg.judge.pg_ms * 48) - 1);
+    CHECK(engine.stats().counts.bd == 1);
+    CHECK(engine.stats().osu_od8.counts.miss == 1);
+}
 
 TEST_CASE("modal input fence rejects delayed mouse and text at original message time") {
     tenriff::input::ModalInputFence fence;
@@ -877,6 +982,7 @@ TEST_CASE("legacy LN release keeps historical late standard hold timing grades")
             GameplayConfig config;
             config.sample_rate = 1000;
             config.chronological_judgement = false;
+            config.strict_standard_hold_release = false;
             config.judge.pg_ms = 10.0;
             config.judge.gr_ms = 20.0;
             config.judge.gd_ms = 30.0;
@@ -1287,6 +1393,7 @@ TEST_CASE("sudden death catches an OD8 hold-tail miss even when native timing st
     config.judge.hold_grace_ms = 80.0;
     config.judge.hold_break_ms = 200.0;
     config.one_miss_fail_enabled = true;
+    config.strict_standard_hold_release = false; // Historical native/OD8 independence.
 
     GameplayEngine engine(chart, config);
     (void)engine.handle_input(1, InputState::Pressed, 1000);
@@ -2064,17 +2171,30 @@ TEST_CASE("LR2 course LN early release damages once and regrab cannot refund it"
     CHECK(fatal.gauge_state().value == doctest::Approx(1.99));
 }
 
-TEST_CASE("LR2 course LN release at the GOOD grace boundary retains the head judgement") {
+TEST_CASE("LR2 course LN release uses PG instead of the historical GOOD grace") {
     GameplayChart chart;
     chart.lane_count = 1;
     chart.duration_samples = 3000;
     chart.notes = {NoteEvent{1, 1000, 2000}};
-    GameplayEngine engine(chart, lr2_course_test_config());
+    auto config = lr2_course_test_config();
+    config.strict_standard_hold_release = false;
+    GameplayEngine engine(chart, config);
     (void)engine.handle_input(1, InputState::Pressed, 1015);
     (void)engine.handle_input(1, InputState::Released, 1960);
     CHECK(engine.gauge_state().value == doctest::Approx(50.1));
     engine.advance(2000);
     CHECK(engine.gauge_state().value == doctest::Approx(50.1));
+    config.strict_standard_hold_release = true;
+    for (const int early : {10, 11, 40}) {
+        GameplayEngine current(chart, config);
+        (void)current.handle_input(1, InputState::Pressed, 1015);
+        (void)current.handle_input(1, InputState::Released, 2000 - early);
+        CHECK(current.gauge_state().value == doctest::Approx(early <= 10 ? 50.1 : 48.0));
+        CHECK(current.stats().counts.bd == (early <= 10 ? 0 : 1));
+        (void)current.handle_input(1, InputState::Pressed, 2000 - early + 1);
+        current.advance(2000);
+        CHECK(current.gauge_state().value == doctest::Approx(early <= 10 ? 50.1 : 48.0));
+    }
 }
 
 TEST_CASE("LR2 course missed LN consumes one full poor and never earns a tail recovery") {

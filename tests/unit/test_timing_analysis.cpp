@@ -190,7 +190,8 @@ TEST_CASE("engine measured LN releases distinguish graded tails from dropped hol
             (void)engine.handle_input(1, InputState::Pressed, release + 1);
             engine.advance(2500);
             const auto& analysis = engine.stats().analysis;
-            const auto expected_kind = release == 1500 ? TimingEventKind::HoldFailure : TimingEventKind::LnRelease;
+            const bool dropped = release == 1500 || !charge;
+            const auto expected_kind = dropped ? TimingEventKind::HoldFailure : TimingEventKind::LnRelease;
             CHECK(analysis.total.event_count == 2);
             CHECK(analysis.total.measured_count == 2);
             CHECK(analysis.total.unmeasured_miss_count == 0);
@@ -198,8 +199,8 @@ TEST_CASE("engine measured LN releases distinguish graded tails from dropped hol
             CHECK(kind(analysis, expected_kind).mean_delta_ms == release - 2000);
             CHECK(kind(analysis, TimingEventKind::AutoCompletion).event_count == 0);
             CHECK(engine.stats().counts.pg == 1);
-            CHECK(engine.stats().counts.gd == (release == 1975 ? 1 : 0));
-            CHECK(engine.stats().counts.bd == (release == 1500 ? 1 : 0));
+            CHECK(engine.stats().counts.gd == (!dropped ? 1 : 0));
+            CHECK(engine.stats().counts.bd == (dropped ? 1 : 0));
             check_accuracy_matches(engine.stats());
         }
     }
