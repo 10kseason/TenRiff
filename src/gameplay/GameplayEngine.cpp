@@ -71,6 +71,7 @@ GameplayEngine::GameplayEngine(const GameplayChart& chart, const GameplayConfig&
       one_miss_fail_enabled_(config.one_miss_fail_enabled),
       legacy_hold_release_(config.legacy_hold_release),
       strict_standard_hold_release_(config.strict_standard_hold_release),
+      great_standard_hold_release_(config.great_standard_hold_release),
       chronological_judgement_(config.chronological_judgement),
       empty_poor_affects_accuracy_(config.empty_poor_affects_accuracy) {
     if (config.gauge_policy.course_lr2_deltas) {
@@ -737,10 +738,10 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
     if (hold.release_active) {
         if (hold.release_required || !legacy_hold_release_ || current_sample >= hold.end_sample) {
             const int64_t delta_samples = hold.release_sample - hold.end_sample;
-            // Standard holds require sustained contact up to the PG tolerance.
+            // Standard holds require sustained contact up to the selected historical or current tolerance.
             // Charge notes intentionally retain their authored release judgement.
             const bool dropped_standard_hold = strict_standard_hold_release_ &&
-                !hold.release_required && delta_samples < -windows_.pg;
+                !hold.release_required && delta_samples < -(great_standard_hold_release_ ? windows_.gr : windows_.pg);
             const auto judgement = dropped_standard_hold ? game::Judgement::BD
                                                          : classify_judgement(delta_samples);
             double delta_ms = static_cast<double>(delta_samples) * 1000.0 / static_cast<double>(sample_rate_);
@@ -840,7 +841,8 @@ void GameplayEngine::update_lane_input_state(LaneState& lane, input::InputState 
     if (lane.hold.has_value()) {
         // Grade gauge follows LR2's single LN outcome. Re-grabbing must not
         // refund a drop, while native score/accuracy retain their split heads/tails.
-        const int64_t release_tolerance = strict_standard_hold_release_ ? windows_.pg : windows_.gd;
+        const int64_t release_tolerance = strict_standard_hold_release_
+            ? (great_standard_hold_release_ ? windows_.gr : windows_.pg) : windows_.gd;
         finish_course_hold_gauge(*lane.hold, input_sample,
                                  input_sample + release_tolerance < lane.hold->end_sample);
         const int64_t osu_early_meh_window =

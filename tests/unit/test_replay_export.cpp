@@ -86,12 +86,13 @@ void write_file(const std::filesystem::path& path, const std::string& content) {
 
 TEST_CASE("LN PG release replay identities preserve every historical hold policy") {
     using namespace tenriff;
-    for (int version = 1; version <= 12; ++version) for (const bool custom : {false, true})
+    for (int version = 1; version <= 14; ++version) for (const bool custom : {false, true})
     for (const int format : {2, gameplay::kReplayFormatVersion}) {
         ReplayFile replay;
         replay.ruleset_id = (custom ? "custom-ruleset-" : "tenriff-native-score-v2-ruleset-") + std::to_string(version);
         replay.replay_format_version = format;
         CHECK(app::replay_uses_strict_standard_hold_release(replay) == (version >= 11));
+        CHECK(app::replay_uses_great_standard_hold_release(replay) == (version >= 13));
         if (!custom) CHECK(app::is_supported_canonical_replay_ruleset(replay.ruleset_id));
         if (version >= 9) {
             CHECK(app::replay_uses_chronological_judgement(replay));
@@ -101,13 +102,18 @@ TEST_CASE("LN PG release replay identities preserve every historical hold policy
     }
 }
 
-TEST_CASE("LN PG release uploads preserve R9 R10 and use distinct R11 R12 identities") {
+TEST_CASE("LN release uploads preserve R9 through R14 distinct identities") {
     using namespace tenriff::app;
     CHECK(is_sites_supported_replay_ruleset(kCanonicalReplayRulesetId, {}));
     CHECK(is_sites_supported_replay_ruleset(kCanonicalReplayRulesetId, {"judge_hard"}));
-    CHECK(is_sites_supported_replay_ruleset(kExReplayRulesetId, {"judge_ex"}));
     CHECK_FALSE(is_sites_supported_replay_ruleset(kCanonicalReplayRulesetId, {"judge_ex"}));
     CHECK_FALSE(is_sites_supported_replay_ruleset(kExReplayRulesetId, {}));
+    CHECK(is_sites_supported_replay_ruleset(kExReplayRulesetId, {"judge_ex"}));
+    CHECK(is_sites_supported_replay_ruleset(kRuleset11ReplayRulesetId, {}));
+    CHECK(is_sites_supported_replay_ruleset(kRuleset11ReplayRulesetId, {"judge_hard"}));
+    CHECK(is_sites_supported_replay_ruleset(kRuleset12ReplayRulesetId, {"judge_ex"}));
+    CHECK_FALSE(is_sites_supported_replay_ruleset(kRuleset11ReplayRulesetId, {"judge_ex"}));
+    CHECK_FALSE(is_sites_supported_replay_ruleset(kRuleset12ReplayRulesetId, {}));
     CHECK(is_sites_supported_replay_ruleset(kRuleset9ReplayRulesetId, {}));
     CHECK(is_sites_supported_replay_ruleset(kRuleset10ReplayRulesetId, {"judge_ex"}));
     CHECK_FALSE(is_current_canonical_replay_ruleset(kRuleset9ReplayRulesetId, {}));
@@ -129,7 +135,7 @@ TEST_CASE("LN PG release new and historical replay claims roundtrip without rela
         auto played = managed.chart;
         gameplay::offset_gameplay_chart_samples(played, sr * app::kReplayVerificationLeadInMs / 1000);
         ReplayFile replay;
-        replay.ruleset_id = strict ? (mode == 2 ? app::kExReplayRulesetId : app::kCanonicalReplayRulesetId)
+        replay.ruleset_id = strict ? (mode == 2 ? app::kRuleset12ReplayRulesetId : app::kRuleset11ReplayRulesetId)
                                   : (mode == 2 ? app::kRuleset10ReplayRulesetId : app::kRuleset9ReplayRulesetId);
         replay.chart_format = "bms"; replay.chart_sha256 = std::string(64, 'd'); replay.bms_rank = rank;
         replay.sample_rate = sr; replay.rate = rate; replay.mods = managed.active_mods;
@@ -139,6 +145,7 @@ TEST_CASE("LN PG release new and historical replay claims roundtrip without rela
         cfg.sample_rate = sr; cfg.rate = rate; cfg.gauge_shift_enabled = true;
         cfg.judge = app::replay_judge_config_for_playback(replay, {}, rank);
         cfg.strict_standard_hold_release = app::replay_uses_strict_standard_hold_release(replay);
+        cfg.great_standard_hold_release = tenriff::app::replay_uses_great_standard_hold_release(replay);
         gameplay::GameplayEngine live(played, cfg);
         const int64_t pg = std::llround(cfg.judge.pg_ms * sr / 1000.0);
         (void)live.handle_input(1, InputState::Pressed, played.notes[0].start_sample);
@@ -179,7 +186,81 @@ TEST_CASE("LN PG release new and historical replay claims roundtrip without rela
         }
         if (outside) {
             replay.ruleset_id = strict ? (mode == 2 ? app::kRuleset10ReplayRulesetId : app::kRuleset9ReplayRulesetId)
-                                      : (mode == 2 ? app::kExReplayRulesetId : app::kCanonicalReplayRulesetId);
+                                      : (mode == 2 ? app::kRuleset12ReplayRulesetId : app::kRuleset11ReplayRulesetId);
+            CHECK_FALSE(app::verify_replay_against_chart(replay, source, app::ChartFormat::Bms, 120).claims_match);
+        }
+    }
+}
+
+TEST_CASE("LN GREAT release replay preserves GD PG GR generations at sample boundaries") {
+    using namespace tenriff;
+    for (int sr : {44100, 48000}) for (double rate : {0.75, 1.0, 1.5})
+    for (int rank : {0, 1, 2, 3}) for (int mode : {0, 1, 2})
+    for (int generation : {0, 1, 2}) for (int outside : {-1, 0, 1}) {
+        gameplay::GameplayChart source;
+        source.lane_count = 4; source.bms_rank = rank;
+        source.duration_samples = 3 * sr; source.notes = {{1, sr, 2 * sr}};
+        config::ModeConfig selected;
+        selected.key_mode = "auto"; selected.random = "off"; selected.gauge = "normal";
+        if (mode) selected.mods = {mode == 1 ? "judge_hard" : "judge_ex"};
+        const auto managed = app::manage_modes(source, app::ChartFormat::Bms, selected, {}, rate, 120, sr);
+        auto played = managed.chart;
+        gameplay::offset_gameplay_chart_samples(played, sr * app::kReplayVerificationLeadInMs / 1000);
+        ReplayFile replay;
+        replay.ruleset_id = generation == 2 ? (mode == 2 ? app::kExReplayRulesetId : app::kCanonicalReplayRulesetId)
+            : generation == 1 ? (mode == 2 ? app::kRuleset12ReplayRulesetId : app::kRuleset11ReplayRulesetId)
+            : (mode == 2 ? app::kRuleset10ReplayRulesetId : app::kRuleset9ReplayRulesetId);
+        replay.chart_format = "bms"; replay.chart_sha256 = std::string(64, 'd'); replay.bms_rank = rank;
+        replay.sample_rate = sr; replay.rate = rate; replay.mods = managed.active_mods;
+        replay.mode.key_mode = "auto"; replay.mode.random = "off"; replay.mode.gauge = "normal";
+        replay.score_multiplier = managed.final_multiplier; replay.rate_multiplier = managed.rate_multiplier;
+        gameplay::GameplayConfig cfg;
+        cfg.sample_rate = sr; cfg.rate = rate; cfg.gauge_shift_enabled = true;
+        cfg.judge = app::replay_judge_config_for_playback(replay, {}, rank);
+        cfg.strict_standard_hold_release = app::replay_uses_strict_standard_hold_release(replay);
+        cfg.great_standard_hold_release = app::replay_uses_great_standard_hold_release(replay);
+        gameplay::GameplayEngine live(played, cfg);
+        const double tolerance = generation == 2 ? cfg.judge.gr_ms : generation == 1 ? cfg.judge.pg_ms : cfg.judge.gd_ms;
+        const int64_t boundary = std::llround(tolerance * sr / 1000.0);
+        (void)live.handle_input(1, InputState::Pressed, played.notes[0].start_sample);
+        (void)live.handle_input(1, InputState::Released, *played.notes[0].end_sample - boundary - outside);
+        live.advance(played.duration_samples);
+        replay.trace = live.replay(); replay.stats = live.stats();
+        replay.final_score = gameplay::scale_native_score(live.stats().raw_score, managed.final_multiplier);
+        const auto result = app::verify_replay_against_chart(replay, source, app::ChartFormat::Bms, 120);
+        REQUIRE(result.verified()); CHECK(result.claims_match);
+        CHECK(result.final_gauge_value == doctest::Approx(live.gauge_state().value));
+        if (generation == 2 && outside >= 0 && sr == 48000 && rate == 1.0 && rank == 3) {
+#ifdef _WIN32
+            const auto* directory = _wgetenv(L"TENRIFF_GR_PAYLOAD_DIR");
+#else
+            const auto* directory = std::getenv("TENRIFF_GR_PAYLOAD_DIR");
+#endif
+            if (directory && *directory) {
+                const auto folder = std::filesystem::path(directory);
+                std::filesystem::create_directories(folder);
+                const std::string name = std::string(mode == 2 ? "ex" : mode == 1 ? "hard" : "normal") +
+                    (outside ? "-drop" : "-boundary");
+                replay.record_play_mode = "online"; // Synthetic local API fixture, never publicly submitted.
+                replay.created_utc = "20261028_000000Z";
+                const auto path = folder / (name + "-replay.json");
+                REQUIRE(save_replay_json(path.u8string(), replay).success());
+                const auto hash = app::hash_chart_file(path);
+                REQUIRE(hash.valid());
+                std::string payload, error;
+                REQUIRE(app::build_sites_score_json(replay, hash.sha256, "LN GREAT release QA",
+                    result.clear_status, payload, error));
+                std::ofstream output(folder / (name + "-payload.json"));
+                output << payload << '\n';
+                REQUIRE(output.good());
+            }
+        }
+        if (generation > 0) {
+            CHECK(result.stats.counts.bd == (outside > 0 ? 1 : 0));
+            CHECK(result.stats.osu_od8.counts.miss == (outside > 0 ? 1 : 0));
+        }
+        if (generation == 2 && outside <= 0) {
+            replay.ruleset_id = mode == 2 ? app::kRuleset12ReplayRulesetId : app::kRuleset11ReplayRulesetId;
             CHECK_FALSE(app::verify_replay_against_chart(replay, source, app::ChartFormat::Bms, 120).claims_match);
         }
     }
@@ -1086,6 +1167,7 @@ TEST_CASE("explicit R3 R4 R7 replay rules keep rank and LN timing without chart 
             hold_config.practice_no_fail_enabled = true;
             hold_config.judge = hard;
             hold_config.strict_standard_hold_release = tenriff::app::replay_uses_strict_standard_hold_release(replay);
+            hold_config.great_standard_hold_release = tenriff::app::replay_uses_great_standard_hold_release(replay);
             hold_config.legacy_hold_release = tenriff::app::replay_uses_legacy_hold_release(replay);
             hold_config.chronological_judgement = tenriff::app::replay_uses_chronological_judgement(replay);
             tenriff::gameplay::GameplayEngine hold_engine(hold_chart, hold_config);
@@ -1427,6 +1509,7 @@ TEST_CASE("replay verifier reconstructs all LN Mix conversions without changing 
             config.gauge_shift_enabled = true;
             config.judge = tenriff::app::replay_judge_config_for_playback(replay, tenriff::config::JudgeConfig{});
             config.strict_standard_hold_release = tenriff::app::replay_uses_strict_standard_hold_release(replay);
+            config.great_standard_hold_release = tenriff::app::replay_uses_great_standard_hold_release(replay);
             config.legacy_hold_release = tenriff::app::replay_uses_legacy_hold_release(replay);
             config.chronological_judgement = tenriff::app::replay_uses_chronological_judgement(replay);
             tenriff::gameplay::GameplayEngine engine(chart, config);
@@ -2045,6 +2128,7 @@ TEST_CASE("R7 through R10 preserve old empty POOR replay accuracy and change onl
         engine_config.sample_rate = sample_rate;
         engine_config.judge = app::replay_judge_config_for_playback(replay, config::JudgeConfig{}, source.bms_rank);
         engine_config.strict_standard_hold_release = tenriff::app::replay_uses_strict_standard_hold_release(replay);
+        engine_config.great_standard_hold_release = tenriff::app::replay_uses_great_standard_hold_release(replay);
         engine_config.legacy_hold_release = app::replay_uses_legacy_hold_release(replay);
         engine_config.chronological_judgement = app::replay_uses_chronological_judgement(replay);
         engine_config.empty_poor_affects_accuracy = app::replay_empty_poor_affects_accuracy(replay);
@@ -2129,7 +2213,7 @@ TEST_CASE("R5 and newer identities select chronological processing independently
     }
 }
 
-TEST_CASE("R11 R12 bind runtime identities and preserve historical EX timing") {
+TEST_CASE("R13 R14 bind runtime identities and preserve historical EX timing") {
     using namespace tenriff::app;
     const tenriff::config::JudgeConfig judge;
     const tenriff::game::GaugeConfig gauge;
@@ -2139,11 +2223,11 @@ TEST_CASE("R11 R12 bind runtime identities and preserve historical EX timing") {
     CHECK(replay_ruleset_id_for_runtime(judge, gauge, true, false, "off", {"judge_easy"}) ==
           kCanonicalReplayRulesetId);
     CHECK(replay_ruleset_id_for_runtime(judge, gauge, true, false, "off", {"judge_ex"}) == kExReplayRulesetId);
-    CHECK(replay_ruleset_id_for_runtime(judge, gauge, false, false, "off", {"judge_ex"}) == "custom-ruleset-12");
-    CHECK(replay_ruleset_id_for_runtime(judge, gauge, true, true, "off", {"judge_ex"}) == "custom-ruleset-12");
+    CHECK(replay_ruleset_id_for_runtime(judge, gauge, false, false, "off", {"judge_ex"}) == "custom-ruleset-14");
+    CHECK(replay_ruleset_id_for_runtime(judge, gauge, true, true, "off", {"judge_ex"}) == "custom-ruleset-14");
     auto custom_judge = judge;
     custom_judge.pg_ms = 20.0;
-    CHECK(replay_ruleset_id_for_runtime(custom_judge, gauge, true, false, "off", {"judge_ex"}) == "custom-ruleset-12");
+    CHECK(replay_ruleset_id_for_runtime(custom_judge, gauge, true, false, "off", {"judge_ex"}) == "custom-ruleset-14");
     CHECK(is_current_canonical_replay_ruleset(kCanonicalReplayRulesetId, {"judge_hard"}));
     CHECK(is_current_canonical_replay_ruleset(kExReplayRulesetId, {"judge_ex", "no_ln_release"}));
     CHECK_FALSE(is_current_canonical_replay_ruleset(kExReplayRulesetId, {}));
@@ -2267,7 +2351,7 @@ TEST_CASE("course replay accepts versioned custom identities without admitting c
     replay.trace.duration_samples = 48000;
     replay.mode.course_gauge = kLr2CourseGaugeId;
     replay.mode.course_gauge_initial_value = 37.5;
-    for (const auto id : {"custom", "custom-ruleset-5", "custom-ruleset-6", "custom-ruleset-7", "custom-ruleset-8", "custom-ruleset-9", "custom-ruleset-10"}) {
+    for (const auto id : {"custom", "custom-ruleset-5", "custom-ruleset-6", "custom-ruleset-7", "custom-ruleset-8", "custom-ruleset-9", "custom-ruleset-10", "custom-ruleset-11", "custom-ruleset-12", "custom-ruleset-13", "custom-ruleset-14"}) {
         replay.ruleset_id = id;
         CHECK(validate_replay_evidence(replay).success());
     }

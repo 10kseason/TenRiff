@@ -394,7 +394,7 @@ struct GameSessionAudioTestAccess {
                     REQUIRE(recorded.size() == 2);
                     const auto& counts = session->engine_->stats().counts;
                     const auto& feedback = session->engine_->live_feedback();
-                    // An early -27 ms release must fail under the PG-only policy. A standard LN
+                    // An early -27 ms release earns GREAT under the current policy. A standard LN
                     // held through its tail and released +30 ms later instead
                     // completes as PG, per the current held-through contract.
                     const bool early_release = release_ms < 2000;
@@ -402,7 +402,7 @@ struct GameSessionAudioTestAccess {
                         ? static_cast<double>(sample_at_ms(release_ms) - rate * 2) * 1000.0 / rate : 0.0;
                     const bool matches = recorded[1].sample == sample_at_ms(release_ms) &&
                         counts.pg == (early_release ? 1 : 2) &&
-                        counts.gr == 0 && counts.bd == (early_release ? 1 : 0) && feedback.has_value &&
+                        counts.gr == (early_release ? 1 : 0) && counts.bd == 0 && feedback.has_value &&
                         std::abs(feedback.delta_ms - expected_delta) < 0.000001;
                     if (!matches) ++mismatches;
                     std::cout << "[timing-audit-ln-write-ahead] rate=" << rate
@@ -528,9 +528,9 @@ struct GameSessionAudioTestAccess {
                         ms * 48, ms * 48, epoch + ms * 1'000'000LL);
                 };
                 const int head_ms = 1000 - offset_ms;
-                // Stay just outside the pinned 10ms RANK0 PG window, so a
+                // Stay just outside the 24.7619ms RANK0 GREAT window, so a
                 // callback crossing the LN tail cannot hide an early drop.
-                const int release_ms = 1989 - offset_ms;
+                const int release_ms = 1975 - offset_ms;
                 REQUIRE(session->input_thread_.queue().push({32, input::InputState::Pressed, epoch + head_ms * 1'000'000LL}));
                 callback(head_ms);
                 int next = head_ms + buffer_ms;
@@ -538,12 +538,12 @@ struct GameSessionAudioTestAccess {
                 REQUIRE(session->input_thread_.queue().push({32, input::InputState::Released, epoch + release_ms * 1'000'000LL}));
                 callback(next);
                 REQUIRE(session->engine_->replay().events.size() == 2);
-                CHECK(session->engine_->replay().events[1].sample == 95472);
+                CHECK(session->engine_->replay().events[1].sample == 94800);
                 CHECK(session->engine_->stats().counts.pg == 1);
                 CHECK(session->engine_->stats().counts.gr == 0);
                 CHECK(session->engine_->stats().counts.bd == 1);
                 CHECK(session->engine_->stats().osu_od8.counts.miss == 1);
-                CHECK(session->engine_->live_feedback().delta_ms == doctest::Approx(-11.0));
+                CHECK(session->engine_->live_feedback().delta_ms == doctest::Approx(-25.0));
                 CHECK(session->hud_snapshot().current_sample == next * 48);
             }
         }
@@ -2806,7 +2806,7 @@ struct GameSessionAudioTestAccess {
         CHECK(error.empty() == expected_upload);
         if (!(auto_scratch || stale_catchup)) CHECK(replay.replay->ruleset_id == kCanonicalReplayRulesetId);
         if (stale_catchup) {
-            CHECK(replay.replay->ruleset_id == "custom-ruleset-11");
+            CHECK(replay.replay->ruleset_id == "custom-ruleset-13");
             CHECK_FALSE(is_supported_canonical_replay_ruleset(replay.replay->ruleset_id));
             CHECK_FALSE(result.pause_used);
             CHECK(std::any_of(result.export_warnings.begin(), result.export_warnings.end(),
@@ -2814,10 +2814,10 @@ struct GameSessionAudioTestAccess {
             std::ifstream saved_result(std::filesystem::u8path(result.result_path));
             REQUIRE(saved_result.is_open());
             const std::string saved((std::istreambuf_iterator<char>(saved_result)), std::istreambuf_iterator<char>());
-            CHECK(saved.find("custom-ruleset-11") != std::string::npos);
+            CHECK(saved.find("custom-ruleset-13") != std::string::npos);
         }
         if (auto_scratch) {
-            CHECK(replay.replay->ruleset_id == "custom-ruleset-11");
+            CHECK(replay.replay->ruleset_id == "custom-ruleset-13");
             CHECK(result.final_score == 0);
             CHECK(replay.replay->final_score == 0);
             CHECK(result.clear_status.find("ASSIST AUTO SCRATCH") == 0);

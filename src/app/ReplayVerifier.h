@@ -13,9 +13,13 @@
 namespace tenriff::app {
 
 inline constexpr std::string_view kCanonicalReplayRulesetId =
-    "tenriff-native-score-v2-ruleset-11";
-// Tightened standard LN releases have their own identity; never reinterpret R1-R10.
+    "tenriff-native-score-v2-ruleset-13";
+// GREAT-tolerant LN releases have their own identity; never reinterpret R1-R12.
 inline constexpr std::string_view kExReplayRulesetId =
+    "tenriff-native-score-v2-ruleset-14";
+inline constexpr std::string_view kRuleset11ReplayRulesetId =
+    "tenriff-native-score-v2-ruleset-11";
+inline constexpr std::string_view kRuleset12ReplayRulesetId =
     "tenriff-native-score-v2-ruleset-12";
 inline constexpr std::string_view kRuleset9ReplayRulesetId =
     "tenriff-native-score-v2-ruleset-9";
@@ -82,6 +86,7 @@ struct ReplayVerificationResult {
     const gameplay::ReplayFile& replay, const config::JudgeConfig& base,
     std::optional<int> bms_rank = std::nullopt);
 [[nodiscard]] bool replay_uses_chronological_judgement(const gameplay::ReplayFile& replay);
+[[nodiscard]] bool replay_uses_great_standard_hold_release(const gameplay::ReplayFile& replay);
 [[nodiscard]] bool replay_uses_strict_standard_hold_release(const gameplay::ReplayFile& replay);
 [[nodiscard]] bool replay_uses_legacy_hold_release(const gameplay::ReplayFile& replay);
 [[nodiscard]] bool replay_empty_poor_affects_accuracy(const gameplay::ReplayFile& replay);
