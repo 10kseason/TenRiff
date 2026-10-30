@@ -289,7 +289,21 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                     : ui_text("TAB QUICK SETTINGS     UP/DOWN SELECT     LEFT/RIGHT ADJUST     F2 FOLDER     F5 REINDEX     F1 HELP",
                               "TAB 빠른 설정     위/아래 선택     좌/우 조정     F2 폴더     F5 재인덱스     F1 도움말")));
 
-    if (render.song_select.showing_records) {
+    // The old status field is only drawn inside the table URL editor. Use the
+    // always-visible footer for a failed play so the recovery step cannot hide there.
+    render.song_select.audio_setup_required = gameplay_audio_failed_;
+    if (gameplay_audio_failed_) {
+        render.song_select.primary_hint = ui_text(
+            "Cannot start gameplay: audio output is unavailable.",
+            "오디오 출력 장치를 사용할 수 없어 게임을 시작할 수 없습니다.");
+        render.song_select.secondary_hint = config_.audio.backend == audio::AudioBackend::ASIO
+            ? ui_text("Settings > Audio > ASIO Driver: select an installed driver, then retry.",
+                      "설정 > 오디오 > ASIO 드라이버에서 설치된 드라이버를 선택한 뒤 다시 시작하세요.")
+            : ui_text("Settings > Audio > Sound Output Device: select a connected device, then retry.",
+                      "설정 > 오디오 > 사운드 출력 장치에서 연결된 장치를 선택한 뒤 다시 시작하세요.");
+    }
+
+    if (render.song_select.showing_records && !gameplay_audio_failed_) {
         render.song_select.primary_hint = online_records_view_
             ? ui_text("UP/DOWN  RANKS     TAB  LOCAL / WEB / SERVER     F5  REFRESH", "위/아래  순위 선택     TAB  로컬 / 웹 / 서버     F5  새로고침")
             : ui_text("UP/DOWN  MOVE     ENTER  RESULT     TAB  WEB LEADERBOARD", "위/아래  이동     ENTER  결과     TAB  웹 리더보드");

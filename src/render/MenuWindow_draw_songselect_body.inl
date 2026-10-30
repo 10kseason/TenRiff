@@ -1396,14 +1396,16 @@
                                back_button, d2d_->text_brush.Get(), true);
         }
         if (d2d_->hud_format && d2d_->muted_brush) {
+            ID2D1Brush* hint_brush = data.song_select.audio_setup_required
+                ? semantic_color(0xFFD18A) : d2d_->muted_brush.Get();
             draw_centered_text(to_wide(data.song_select.primary_hint), d2d_->hud_format.Get(),
                                native_rect("songselect.rect.094", D2D1::RectF(back_button.right + 28.0f, bottom_bar.top + 12.0f,
                                            bottom_bar.right - 28.0f, bottom_bar.top + 48.0f)),
-                               d2d_->muted_brush.Get());
+                               hint_brush);
             draw_centered_text(to_wide(data.song_select.secondary_hint), d2d_->hud_format.Get(),
                                native_rect("songselect.rect.095", D2D1::RectF(back_button.right + 28.0f, bottom_bar.top + 48.0f,
                                            bottom_bar.right - 28.0f, bottom_bar.bottom - 10.0f)),
-                               d2d_->muted_brush.Get());
+                               hint_brush);
         }
 
         if (data.song_select.difficulty_table_editing) {

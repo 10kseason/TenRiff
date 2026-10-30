@@ -483,7 +483,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         });
         if (audio_result != audio::AudioResult::Success) {
             audio_error_message_ = audio_thread_.error_message();
-            if (audio_error_message_.empty()) audio_error_message_ = "Could not open the selected audio device.";
+            if (audio_error_message_.empty()) {
+                audio_error_message_ = "Audio output is unavailable. Select a connected device in Settings > Audio > Sound Output Device, then retry.";
+            }
             std::cerr << "[error] " << audio_error_message_ << std::endl;
             return false;
         }

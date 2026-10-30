@@ -997,6 +997,8 @@ private:
     bool online_records_url_editing_ = false;
     std::string online_records_url_input_{};
     std::string song_browser_status_message_{};
+    // Session-only failure notice; clear only after a successful audio/session retry.
+    bool gameplay_audio_failed_ = false;
     int song_key_filter_ = 0;
     int song_level_min_filter_ = 0;
     int song_level_max_filter_ = 0;

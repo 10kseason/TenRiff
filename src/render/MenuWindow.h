@@ -275,6 +275,7 @@ struct SongSelectData {
     std::string sort_summary;
     std::string primary_hint;
     std::string secondary_hint;
+    bool audio_setup_required = false;
     std::string empty_title;
     std::string empty_message;
     int list_total_count = 0;

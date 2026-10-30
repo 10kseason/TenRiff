@@ -2589,7 +2589,10 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     }
     if (!session.initialize(play_options)) {
         const bool loading_canceled = session.was_user_aborted();
-        if (!session.audio_error().empty()) song_browser_status_message_ = session.audio_error();
+        if (!session.audio_error().empty()) {
+            gameplay_audio_failed_ = true;
+            song_browser_status_message_ = session.audio_error();
+        }
         session.shutdown();
         last_gameplay_input_backend_state_ = session.input_backend_state();
         remember_input_backend_fallback(last_gameplay_input_backend_state_);
@@ -2634,6 +2637,10 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         return;
     }
 
+    if (gameplay_audio_failed_) {
+        gameplay_audio_failed_ = false;
+        song_browser_status_message_.clear();
+    }
     if (peer_battle && !coordinate_multiplayer_start()) {
         session.shutdown();
         last_gameplay_input_backend_state_ = session.input_backend_state();
@@ -2678,7 +2685,10 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     const bool session_exit_requested = session.was_exit_requested();
     session.shutdown();
     const bool session_aborted = session.was_user_aborted() || !session.audio_error().empty();
-    if (!session.audio_error().empty()) song_browser_status_message_ = session.audio_error();
+    if (!session.audio_error().empty()) {
+        gameplay_audio_failed_ = true;
+        song_browser_status_message_ = session.audio_error();
+    }
     last_gameplay_input_backend_state_ = session.input_backend_state();
     remember_input_backend_fallback(last_gameplay_input_backend_state_);
 
