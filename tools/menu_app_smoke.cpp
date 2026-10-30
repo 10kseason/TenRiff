@@ -119,6 +119,81 @@ namespace tenriff::app {
 // These existing test friends are defined only in this executable. Menu actions
 // run on their owner thread; the observer reads only mutex-protected HUD data.
 struct MenuAppVisualTestAccess {
+    static void capture_audio_guidance(MenuApp& app, Report& report, const std::string& label) {
+        const auto directory = std::filesystem::current_path() / "screenshots";
+        std::vector<std::filesystem::path> previous;
+        if (std::filesystem::exists(directory))
+            for (const auto& entry : std::filesystem::directory_iterator(directory)) previous.push_back(entry.path());
+        std::string detail;
+        const bool live = present(app, detail);
+        app.menu_window_.request_screenshot();
+        bool complete = false;
+        const auto deadline = Clock::now() + std::chrono::seconds(3);
+        while (!complete && Clock::now() < deadline) {
+            if (std::filesystem::exists(directory)) {
+                for (const auto& entry : std::filesystem::directory_iterator(directory)) {
+                    if (entry.path().extension() != ".png" ||
+                        std::find(previous.begin(), previous.end(), entry.path()) != previous.end()) continue;
+                    std::ifstream input(entry.path(), std::ios::binary | std::ios::ate);
+                    if (!input || input.tellg() < 32) continue;
+                    std::array<unsigned char, 8> end{};
+                    input.seekg(-12, std::ios::end);
+                    input.read(reinterpret_cast<char*>(end.data()), end.size());
+                    complete = input.good() && end == std::array<unsigned char, 8>{0,0,0,0,73,69,78,68};
+                    if (complete) { detail = entry.path().filename().string(); break; }
+                }
+            }
+            if (!complete) std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        report.check(label + ".screenshot", live && complete, detail);
+    }
+    static void check_missing_audio_launch(MenuApp& app, Report& report) {
+        const auto original = app.config_;
+        for (const bool asio : {false, true}) {
+            app.config_.audio.backend = asio ? audio::AudioBackend::ASIO : audio::AudioBackend::WASAPI;
+            app.config_.audio.device_id = "tenriff-nonexistent-output-test";
+            app.config_.audio.asio_driver = "tenriff-nonexistent-asio-test";
+            app.persist_runtime_config();
+            const std::string label = asio ? "audio_launch.asio" : "audio_launch.wasapi";
+            app.launch_gameplay("songs/fixture/smoke.bms");
+            report.check(label + ".returns_to_song_select", app.current_screen() == Screen::SongSelect);
+            const auto saved = config::ConfigLoader{}.load_profile(app.profile_dir_);
+            report.check(label + ".keeps_selected_device", saved.success() &&
+                saved.config.audio.device_id == "tenriff-nonexistent-output-test" &&
+                saved.config.audio.asio_driver == "tenriff-nonexistent-asio-test");
+            report.check(label + ".no_result", !app.has_result_);
+            for (const char* language : {"en", "ko", "ja", "zh-CN"}) {
+                app.config_.ui.language = language;
+                app.publish_snapshot();
+                {
+                std::lock_guard<std::mutex> lock(app.snapshot_mutex_);
+                const auto& view = app.snapshot_.render.song_select;
+                report.check(label + ".visible_guidance_" + language,
+                    view.audio_setup_required && view.primary_hint == app.ui_text(
+                        "Cannot start gameplay: audio output is unavailable.",
+                        "오디오 출력 장치를 사용할 수 없어 게임을 시작할 수 없습니다.") &&
+                    view.secondary_hint == (asio ? app.ui_text(
+                        "Settings > Audio > ASIO Driver: select an installed driver, then retry.",
+                        "설정 > 오디오 > ASIO 드라이버에서 설치된 드라이버를 선택한 뒤 다시 시작하세요.") : app.ui_text(
+                        "Settings > Audio > Sound Output Device: select a connected device, then retry.",
+                        "설정 > 오디오 > 사운드 출력 장치에서 연결된 장치를 선택한 뒤 다시 시작하세요.")));
+                }
+                if (!asio || std::string(language) == "ko")
+                    capture_audio_guidance(app, report, label + "." + language);
+            }
+        }
+        app.config_ = original;
+        app.persist_runtime_config();
+        app.publish_snapshot();
+    }
+    static bool audio_guidance_cleared(MenuApp& app) {
+        app.publish_snapshot();
+        std::lock_guard<std::mutex> lock(app.snapshot_mutex_);
+        return !app.snapshot_.render.song_select.audio_setup_required &&
+            app.snapshot_.render.song_select.primary_hint != app.ui_text(
+            "Cannot start gameplay: audio output is unavailable.",
+            "오디오 출력 장치를 사용할 수 없어 게임을 시작할 수 없습니다.");
+    }
     static bool online_mode(MenuApp& app) { return app.online_play_mode_; }
     static void check_play_mode(MenuApp& app, Report& report) {
         report.check("playmode.startup_guest_selector", app.ranked_account_overlay_visible_ &&
@@ -2302,6 +2377,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
     Access::check_hud_feedback_followup(app, report);
     tenriff::app::MenuAppFeedbackTestAccess::check_maximum_text_sequence(report);
     Access::check_launch_level_metadata(app, report);
+    Access::check_missing_audio_launch(app, report);
 
     std::atomic<bool> observing{true};
     bool loading = false, countdown = false, playing = false, gameplay_present = false;
@@ -2375,6 +2451,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
     }
     expect_screen(app, report, "result_to_lobby", Screen::SongSelect);
     report.check("lobby.no_stale_gameplay_hud", !Access::observe(app).playing);
+    report.check("audio_launch.successful_retry_clears_guidance", Access::audio_guidance_cleared(app));
     report.check("lobby.network_guards_preserved", Access::offline(app));
 }
 

@@ -1,3 +1,9 @@
+# 1.9.9.8 hot fix 1 — 2026-10-30
+
+- Show an amber, localized audio-output selection notice when solo gameplay fails to start and returns to Song Select. Previously the failure text was only visible inside the difficulty-table URL editor.
+- Keep the saved WASAPI output/ASIO driver; clear the notice after successful session initialization. No audio-processing, input, judgement, scoring, replay or peer protocol changes.
+- Add native missing-device/driver and recovery regressions with four-language render checks. [Scope](docs/release-1.9.9.8-hotfix1.en.md).
+
 # 1.9.9.8 — 2026-10-29
 
 - Standard LN early release accepts GREAT; GOOD and earlier drops immediately fail. CN, tap/head and held-through behavior are unchanged.
