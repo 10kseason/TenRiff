@@ -1,3 +1,5 @@
+> **2026-11-03 · 1.9.9.9:** [选曲、记录反馈与结算动态背景](docs/release-1.9.9.9.zh-CN.md). Fixed baseline **1.9.6**. Earlier candidate/release notices below are historical; Result uses the restored layout.
+
 > **2026-10-30 · 1.9.9.8 hot fix 1:** [音频输出设备提示修复](docs/release-1.9.9.8-hotfix1.zh-CN.md). Fixed baseline **1.9.6**; earlier notices are historical.
 
 > **2026-10-29 · 1.9.9.8:** [普通LN GREAT松键热修复](docs/release-1.9.9.8.zh-CN.md). R13/R14 online; historical R9–R12 preserved. Fixed baseline **1.9.6**. Earlier notices are historical.

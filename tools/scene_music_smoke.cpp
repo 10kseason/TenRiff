@@ -1,5 +1,6 @@
 #include "app/MenuApp.h"
 #include "app/MenuMusicController.h"
+#include "app/AudioFileDecoder.h"
 #include "audio/WasapiBackend.h"
 #include "config/SimpleJson.h"
 #include "../tests/support/MockAsioDriver.h"
@@ -10,6 +11,7 @@
 #include <fstream>
 #include <iostream>
 #include <thread>
+#include <algorithm>
 
 namespace {
 using Clock = std::chrono::steady_clock;
@@ -132,13 +134,58 @@ struct MenuAppAudioSettingsTestAccess {
 }
 
 int wmain(int argc,wchar_t** argv) {
-    if(argc!=2) return 2;
+    if(argc!=2 && argc!=3) return 2;
     const auto folder=std::filesystem::absolute(argv[1]);
     if(!std::filesystem::create_directory(folder)) return 2;
     const auto path=folder/"fixture.wav"; write_wave(path);
     Report report;
     using namespace tenriff;
     using Access=app::MenuMusicControllerTestAccess;
+    for (const auto kind : {app::MenuSoundKind::Button, app::MenuSoundKind::Slider,
+         app::MenuSoundKind::OptionsEdit, app::MenuSoundKind::Start, app::MenuSoundKind::Done}) {
+        const auto file = app::menu_music_detail::resolve_bundled_sound(kind);
+        std::vector<float> full, bounded;
+        std::string error;
+        const bool full_ok = app::decode_audio_file_stereo_resampled(file, 48'000, full, &error);
+        const auto max_frames = app::menu_music_detail::sound_max_frames(kind);
+        const bool bounded_ok = app::decode_audio_file_stereo_resampled(file, 48'000, bounded, &error, max_frames);
+        const auto name = std::string(app::menu_music_detail::bundled_sound_filename(kind));
+        report.check("bundled." + name + ".full_clip_decode", full_ok && bounded_ok && !full.empty() &&
+            full.size() == bounded.size() && full.size() <= max_frames * 2 &&
+            std::all_of(bounded.begin(), bounded.end(), [](float value) { return std::isfinite(value); }) &&
+            std::any_of(bounded.begin(), bounded.end(), [](float value) { return std::abs(value) > 0.0001f; }));
+        const auto wave = app::menu_music_detail::sound_wave(bounded, 0.5, max_frames);
+        report.check("bundled." + name + ".full_clip_wave", wave.size() == 44 + full.size() * sizeof(std::int16_t));
+        if (kind == app::MenuSoundKind::Done)
+            report.check("bundled.done.exceeds_old_two_second_limit", full.size() > 48'000 * 2 * 2);
+        std::cout << "bundled." << name << ".frames=" << full.size() / 2 << " max_frames=" << max_frames << '\n';
+    }
+    if (argc == 3) {
+        const auto fixtures = std::filesystem::absolute(argv[2]);
+        for (const auto extension : {"wav", "mp3", "ogg", "flac"}) {
+            const auto fixture = fixtures / (std::string("fixture.") + extension);
+            std::vector<float> full, limited;
+            std::string error;
+            const bool full_ok = app::decode_audio_file_stereo_resampled(fixture.u8string(), 44'100, full, &error);
+            report.check(std::string("codec.") + extension + ".music_decode",
+                full_ok && full.size() >= 44'100 * 2 * 2 && full.size() % 2 == 0 &&
+                std::all_of(full.begin(), full.end(), [](float value) { return std::isfinite(value); }) &&
+                std::any_of(full.begin(), full.end(), [](float value) { return std::abs(value) > 0.0001f; }));
+            const bool limited_ok = app::decode_audio_file_stereo_resampled(
+                fixture.u8string(), 48'000, limited, &error, 48'000 * 2);
+            report.check(std::string("codec.") + extension + ".ui_clip_two_second_cap",
+                limited_ok && limited.size() == 48'000 * 2 * 2 &&
+                std::all_of(limited.begin(), limited.end(), [](float value) { return std::isfinite(value); }));
+            std::cout << "codec." << extension << ".full_frames=" << full.size() / 2
+                      << " limited_frames=" << limited.size() / 2 << '\n';
+        }
+        const auto invalid = folder / "corrupt.wav";
+        { std::ofstream output(invalid, std::ios::binary); output << "not a wave file"; }
+        std::vector<float> rejected;
+        std::string error;
+        report.check("codec.corrupt_file_rejected", !app::decode_audio_file_stereo_resampled(
+            invalid.u8string(), 48'000, rejected, &error, 4'800) && !error.empty());
+    }
     {
         const auto devices=audio::WasapiBackend::enumerate_output_devices();
         report.check("wasapi.active_endpoint_available",!devices.empty());

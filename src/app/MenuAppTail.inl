@@ -13,6 +13,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.pacemaker_mode = gameplay_hud_.pacemaker_mode;
     target.pacemaker_target = gameplay_hud_.pacemaker_target;
     target.pacemaker_delta = gameplay_hud_.pacemaker_delta;
+    target.score_comparison = gameplay_hud_.score_comparison;
     target.loading = gameplay_hud_.loading;
     target.paused = gameplay_hud_.paused;
     target.pause_menu_cursor = gameplay_hud_.pause_menu_cursor;
@@ -207,6 +208,9 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.key_overlay_enabled = config_.skin.key_overlay_enabled;
     target.key_overlay_x = config_.skin.key_overlay_x;
     target.key_overlay_y = config_.skin.key_overlay_y;
+    target.score_comparison_enabled = config_.skin.score_comparison_enabled;
+    target.score_comparison_x = config_.skin.score_comparison_x;
+    target.score_comparison_y = config_.skin.score_comparison_y;
 
     target.indicator_background_visible = config_.skin.indicator_background_visible;
     target.key_label_position = manifest_style && manifest_style->key_label_position.has_value()
@@ -591,6 +595,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
 }
 
 void MenuApp::update_gameplay_loading_state(int percent, std::string_view stage) {
+    service_menu_sounds();
     {
         std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
         const GameplayHudRevisionInput previous = gameplay_hud_revision_input(gameplay_hud_);
@@ -740,6 +745,21 @@ void MenuApp::update_title_music_target() {
             title_music_preview_path_ = entry.audio_preview_path;
         }
     }
+}
+
+bool MenuApp::service_song_nps_profile() {
+    const int64_t now_ns = timing::HighResClock::now_ns();
+    // Density is a chart preview, not an audio preview: it also works with BGM
+    // muted and no score/replay. Completion must publish while selection is idle.
+    const SongEntry* density_entry = current_screen() == Screen::SongSelect &&
+        song_select_view_ != SongSelectView::Sources && !showing_table_level_folders() && selected_song_ >= 0
+        ? visible_song_entry(static_cast<std::size_t>(selected_song_)) : nullptr;
+    auto key = density_entry ? song_nps_profile_key(*density_entry) : std::string{};
+    // Resolve filesystem paths only when the selection/revision changes, not
+    // on every 5 ms idle poll. An unchanged key retains the worker's path.
+    auto path = density_entry && key != song_select_screen_.nps_selection_key()
+        ? song_absolute_path(*density_entry) : std::string{};
+    return song_select_screen_.service_nps_profile(std::move(key), std::move(path), now_ns);
 }
 
 void MenuApp::service_song_preview() {
@@ -948,7 +968,7 @@ void MenuApp::sync_menu_music() {
             menu_navigator_.parent().value_or(Screen::Title) == Screen::SongSelect
                 ? "Song Selecte.mp3"
                 : "Main Menu.mp3";
-        music_path = select_scene_slot("options", "Options.mp3", fallback, "Main Menu.mp3");
+        music_path = select_scene_slot("options", "Main Menu 3.mp3", fallback, "Main Menu.mp3");
     } else if (current_screen() == Screen::SongSelect || current_screen() == Screen::SongBrowser ||
                current_screen() == Screen::SessionMix) {
         music_path = select_scene_slot("song_select", "Song Selecte.mp3", "Song Select.mp3", "Main Menu.mp3");
@@ -958,6 +978,31 @@ void MenuApp::sync_menu_music() {
         music_path = select_scene_slot("title", "Main Menu.mp3");
     }
 
+    const std::string fallback_music_path = music_path;
+    const std::string* custom_music = nullptr;
+    if (current_screen() == Screen::Result) {
+        custom_music = last_game_over_ || last_clear_status_ == "FAILED"
+            ? &config_.audio_ui.fail_music_file : &config_.audio_ui.clear_music_file;
+    } else if (title_screen && config_.audio_ui.title_music == "default") {
+        custom_music = &config_.audio_ui.main_music_file;
+    }
+    bool using_custom_music = false;
+    if (custom_music && !custom_music->empty()) {
+        if (*custom_music == "none") {
+            music_path.clear();
+        } else if (failed_menu_music_files_.find(*custom_music) == failed_menu_music_files_.end()) {
+            std::error_code error;
+            if (menu_music_detail::supported_audio_file(*custom_music) &&
+                std::filesystem::is_regular_file(path_from_utf8(*custom_music), error)) {
+                music_path = *custom_music;
+                using_custom_music = true;
+            } else {
+                failed_menu_music_files_.insert(*custom_music);
+                audio_file_status_ = ui_text("Selected BGM unavailable; using default music. Choose another file.",
+                    "선택한 BGM을 사용할 수 없어 기본 음악을 재생합니다. 다른 파일을 선택하세요.");
+            }
+        }
+    }
     if (music_path.empty()) {
         menu_music_.stop();
         return;
@@ -971,6 +1016,14 @@ void MenuApp::sync_menu_music() {
     const double gain = tenriff_music_gain(
         true, config_.audio_ui.master_volume, config_.audio_ui.menu_music_volume);
     menu_music_.play_looping_file(music_path, gain, config_.audio);
+    if (using_custom_music && menu_music_.decode_failed()) {
+        // Remember bad selections for this session: do not bounce between a
+        // corrupt custom file and the fallback on every 20 ms music tick.
+        failed_menu_music_files_.insert(music_path);
+        audio_file_status_ = ui_text("Selected BGM unavailable; using default music. Choose another file.",
+            "선택한 BGM을 사용할 수 없어 기본 음악을 재생합니다. 다른 파일을 선택하세요.");
+        menu_music_.play_looping_file(fallback_music_path, gain, config_.audio);
+    }
 }
 
 void MenuApp::populate_common_key_rows(render::MenuRenderData& render) {
@@ -1237,6 +1290,11 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     render.kind = render::MenuScreenKind::ResultScreen;
     render.result.all_combo_badge = has_result_ && last_all_combo_badge_;
     render.result.new_record = has_result_ && !last_session_replay_playback_ && last_result_new_record_;
+    render.result.has_previous_score = last_result_record_feedback_.has_previous;
+    render.result.previous_score = last_result_record_feedback_.previous_score;
+    render.result.previous_rank = last_result_record_feedback_.previous_rank;
+    render.result.rank_upgraded = has_result_ && !last_session_replay_playback_ &&
+        last_result_record_feedback_.rank_upgraded;
     render.result.peer_battle = last_game_was_multiplayer_;
     render.result.profile_avatar_path = config_.ui.profile_avatar_path;
     render.result.presentation_start_ns = result_presentation_start_ns_;
@@ -1505,29 +1563,33 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
         graph_end_sample = std::max(graph_end_sample, shift.sample);
     }
 
-    const std::size_t gauge_count = last_result_.gauge_history.size();
+    render.result.gauge_shift_graph = !last_result_.shifts.empty() ||
+        last_clear_status_.find("GAUGE SHIFT") != std::string::npos;
+    const auto display_gauges = result_display_gauge_history(
+        last_result_, final_gauge_type, render.result.gauge_shift_graph);
+    const std::size_t gauge_count = display_gauges.size();
     std::size_t gauge_stride = 1;
     if (gauge_count > 240) {
         gauge_stride = (gauge_count + 239) / 240;
     }
 
-    for (std::size_t i = 0; i < gauge_count; i += gauge_stride) {
-        const auto& sample = last_result_.gauge_history[i];
+    for (std::size_t i = 0; i < gauge_count; ++i) {
+        const auto& sample = display_gauges[i];
+        if (i % gauge_stride != 0 && i + 1 != gauge_count && !sample.shifted) continue;
         const float position = (gauge_count == 1)
                                    ? 1.0f
                                    : static_cast<float>(
                                          std::clamp(static_cast<double>(sample.sample) /
                                                         static_cast<double>(graph_end_sample),
                                                     0.0, 1.0));
-        const float value = static_cast<float>(std::clamp(sample.value / 100.0, 0.0, 1.0));
-        render.result.gauge_points.push_back(render::ResultGaugePoint{position, value});
+        render.result.gauge_points.push_back(render::ResultGaugePoint{position, sample.value});
     }
     if (gauge_count > 1) {
-        const auto& last_sample = last_result_.gauge_history.back();
+        const auto& last_sample = display_gauges.back();
         const float last_position = static_cast<float>(
             std::clamp(static_cast<double>(last_sample.sample) / static_cast<double>(graph_end_sample),
                        0.0, 1.0));
-        const float last_value = static_cast<float>(std::clamp(last_sample.value / 100.0, 0.0, 1.0));
+        const float last_value = last_sample.value;
         if (render.result.gauge_points.empty() ||
             render.result.gauge_points.back().position != last_position) {
             render.result.gauge_points.push_back(render::ResultGaugePoint{last_position, last_value});
@@ -1682,6 +1744,7 @@ void MenuApp::publish_snapshot() {
     if (current_screen() == Screen::SongSelect) {
         sync_song_select_state();
     }
+    static_cast<void>(service_song_nps_profile());
     service_song_preview();
     sync_menu_music();
 
@@ -1736,6 +1799,7 @@ void MenuApp::publish_snapshot() {
                 key, std::array<float, 4>{rect.left, rect.top, rect.right, rect.bottom});
         }
     }
+    render.transition_start_ns = scene_transition_start_ns_;
     render.screen_title = screen_title();
     render.performance.visible = config_.graphics.performance_overlay;
 
@@ -2254,6 +2318,9 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     }
 
     reset_screen(Screen::Gameplay);
+    if (!peer_battle && !instant_restart_start) {
+        scene_transition_start_ns_ = timing::HighResClock::now_ns();
+    }
     last_gameplay_input_backend_state_ =
         input_backend_fallback_policy_.runtime_state(config_.input.rawinput);
     {
@@ -2272,6 +2339,9 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     stop_song_preview_audio();
 
     GameSession session;
+    if (scene_transition_start_ns_ > 0) {
+        session.set_loading_transition_deadline(scene_transition_start_ns_ + render::kSceneTransitionDurationNs);
+    }
     session.set_instant_restart_start(instant_restart_start);
     session.set_session_mode_mods(config_.mode.mods);
     if (!peer_battle && replay_path.empty() && bms_editor_practice_start_seconds_.has_value()) {
@@ -2314,6 +2384,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     auto escape_was_down = std::make_shared<std::atomic<bool>>((GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0);
     const bool ignore_course_escape = session_mix_active_ && !peer_battle && replay_path.empty();
     session.set_loading_cancel_callback([this, escape_was_down, peer_battle, ignore_course_escape]() {
+        if (menu_window_.should_close()) return true;
         if (ignore_course_escape) return false;
         if (peer_battle) {
             const network::PeerSessionSnapshot peer = peer_session_.snapshot();
@@ -2333,6 +2404,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     session.set_loading_cancel_callback([]() { return false; });
 #endif
     session.set_hud_callback([this, peer_battle, &session](const GameSession::HudSnapshot& hud) {
+        service_menu_sounds();
         uint64_t peer_revision = 0;
         if (peer_battle) {
             network::PeerScore score;
@@ -2377,6 +2449,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.pacemaker_mode = hud.pacemaker_mode;
         gameplay_hud_.pacemaker_target = hud.pacemaker_target;
         gameplay_hud_.pacemaker_delta = hud.pacemaker_delta;
+        gameplay_hud_.score_comparison = hud.score_comparison;
         gameplay_hud_.scratch_lane_count = hud.scratch_lane_count;
         gameplay_hud_.scratch_lanes.fill(0);
         std::copy_n(hud.scratch_lanes.begin(),
@@ -2584,8 +2657,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     }
     if (!peer_battle && !session_mix_active_ && replay_path.empty() &&
         !bms_editor_practice_start_seconds_.has_value() &&
-        config_.mode.ghost_battle_enabled) {
-        play_options.ghost_replay_path = best_replay_path_for_selected_song();
+        (config_.mode.ghost_battle_enabled || config_.skin.score_comparison_enabled)) {
+        prepare_score_comparison_replay(session, play_options);
     }
     if (!session.initialize(play_options)) {
         const bool loading_canceled = session.was_user_aborted();
@@ -2672,6 +2745,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         return;
     }
 
+    notify_menu_load_complete(true, session.hud_snapshot().duration_samples > 0);
+    service_menu_sounds();
     session.run();
     if (session.did_start_gameplay() && !replay_playback && !bms_editor_practice_start_seconds_.has_value() &&
         config_.ui.last_played_chart_path != chart_path) {
@@ -2845,6 +2920,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     restart_input_thread();
     restart_audio_thread();
     last_result_new_record_ = false;
+    last_result_record_feedback_ = {};
     if (result.has_value) {
         if (session_mix_active_ && !peer_battle && !replay_playback) {
             session_mix_gauge_value_ = std::clamp(result.final_gauge_value, 0.0, 100.0);

@@ -1,3 +1,5 @@
+> **2026-11-03 · 1.9.9.9:** [Song Select, record feedback and Result video background](docs/release-1.9.9.9.en.md). Fixed baseline **1.9.6**. Earlier candidate/release notices below are historical; Result uses the restored layout.
+
 > **2026-10-30 · 1.9.9.8 hot fix 1:** [Audio output selection guidance](docs/release-1.9.9.8-hotfix1.en.md). Fixed baseline **1.9.6**; earlier notices are historical.
 
 > **2026-10-29 · 1.9.9.8:** [Standard LN GREAT-release hotfix](docs/release-1.9.9.8.en.md). R13/R14 online; historical R9–R12 preserved. Fixed baseline **1.9.6**. Earlier notices are historical.

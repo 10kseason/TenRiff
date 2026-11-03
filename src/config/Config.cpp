@@ -140,6 +140,8 @@ void sanitize_skin_config(SkinConfig& skin) {
         std::clamp(skin.note_divider_gap_px, kNoteDividerGapPxMin, kNoteDividerGapPxMax);
     skin.key_overlay_x = clamp_finite(skin.key_overlay_x, 0.0, 1.0, 0.0);
     skin.key_overlay_y = clamp_finite(skin.key_overlay_y, 0.0, 1.0, 0.25);
+    skin.score_comparison_x = clamp_finite(skin.score_comparison_x, 0.0, 1.0, 0.0);
+    skin.score_comparison_y = clamp_finite(skin.score_comparison_y, 0.0, 1.0, 0.28);
     skin.lane_divider_brightness = clamp_finite(skin.lane_divider_brightness, 0.0, 1.0, 1.0);
     skin.gameplay_field_offset_x = clamp_finite(
         skin.gameplay_field_offset_x,
@@ -559,6 +561,15 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_bool(*audio, "background_sound_enabled", config.audio_ui.background_sound_enabled);
         config.audio_ui.title_music = normalize_title_music_token(
             get_string(*audio, "title_music", config.audio_ui.title_music));
+        config.audio_ui.main_music_file = get_string(*audio, "main_music_file", config.audio_ui.main_music_file);
+        config.audio_ui.clear_music_file = get_string(*audio, "clear_music_file", config.audio_ui.clear_music_file);
+        config.audio_ui.fail_music_file = get_string(*audio, "fail_music_file", config.audio_ui.fail_music_file);
+        config.audio_ui.button_sound_file = get_string(*audio, "button_sound_file", config.audio_ui.button_sound_file);
+        config.audio_ui.slider_sound_file = get_string(*audio, "slider_sound_file", config.audio_ui.slider_sound_file);
+        config.audio_ui.drop_sound_file = get_string(*audio, "drop_sound_file", config.audio_ui.drop_sound_file);
+        config.audio_ui.options_sound_file = get_string(*audio, "options_sound_file", config.audio_ui.options_sound_file);
+        config.audio_ui.start_sound_file = get_string(*audio, "start_sound_file", config.audio_ui.start_sound_file);
+        config.audio_ui.done_sound_file = get_string(*audio, "done_sound_file", config.audio_ui.done_sound_file);
         config.audio_ui.master_volume =
             std::clamp(get_number(*audio, "volume", config.audio_ui.master_volume),
                        kMasterVolumeMin, kMasterVolumeMax);
@@ -907,6 +918,9 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.skin.key_overlay_enabled = get_bool(*skin, "key_overlay_enabled", config.skin.key_overlay_enabled);
         config.skin.key_overlay_x = get_number(*skin, "key_overlay_x", config.skin.key_overlay_x);
         config.skin.key_overlay_y = get_number(*skin, "key_overlay_y", config.skin.key_overlay_y);
+        config.skin.score_comparison_enabled = get_bool(*skin, "score_comparison_enabled", config.skin.score_comparison_enabled);
+        config.skin.score_comparison_x = get_number(*skin, "score_comparison_x", config.skin.score_comparison_x);
+        config.skin.score_comparison_y = get_number(*skin, "score_comparison_y", config.skin.score_comparison_y);
         config.skin.hud_riff_map_visible =
             get_bool(*skin, "hud_riff_map_visible", config.skin.hud_riff_map_visible);
         config.skin.ui_font = normalize_skin_ui_font_token(
@@ -1138,6 +1152,15 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     audio.emplace("bms_keysound_policy", JsonValue{config.audio_ui.bms_keysound_policy});
     audio.emplace("background_sound_enabled", JsonValue{config.audio_ui.background_sound_enabled});
     audio.emplace("title_music", JsonValue{normalize_title_music_token(config.audio_ui.title_music)});
+    audio.emplace("main_music_file", JsonValue{config.audio_ui.main_music_file});
+    audio.emplace("clear_music_file", JsonValue{config.audio_ui.clear_music_file});
+    audio.emplace("fail_music_file", JsonValue{config.audio_ui.fail_music_file});
+    audio.emplace("button_sound_file", JsonValue{config.audio_ui.button_sound_file});
+    audio.emplace("slider_sound_file", JsonValue{config.audio_ui.slider_sound_file});
+    audio.emplace("drop_sound_file", JsonValue{config.audio_ui.drop_sound_file});
+    audio.emplace("options_sound_file", JsonValue{config.audio_ui.options_sound_file});
+    audio.emplace("start_sound_file", JsonValue{config.audio_ui.start_sound_file});
+    audio.emplace("done_sound_file", JsonValue{config.audio_ui.done_sound_file});
     audio.emplace("volume", JsonValue{config.audio_ui.master_volume});
     audio.emplace("gameplay_volume", JsonValue{config.audio_ui.gameplay_volume});
     audio.emplace("menu_music_volume", JsonValue{config.audio_ui.menu_music_volume});
@@ -1389,6 +1412,9 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("key_overlay_enabled", JsonValue{config.skin.key_overlay_enabled});
     skin.emplace("key_overlay_x", JsonValue{config.skin.key_overlay_x});
     skin.emplace("key_overlay_y", JsonValue{config.skin.key_overlay_y});
+    skin.emplace("score_comparison_enabled", JsonValue{config.skin.score_comparison_enabled});
+    skin.emplace("score_comparison_x", JsonValue{config.skin.score_comparison_x});
+    skin.emplace("score_comparison_y", JsonValue{config.skin.score_comparison_y});
     skin.emplace("hud_riff_map_visible", JsonValue{config.skin.hud_riff_map_visible});
     skin.emplace("indicator_background_visible", JsonValue{config.skin.indicator_background_visible});
     skin.emplace("key_label_position",

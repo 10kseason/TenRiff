@@ -1,4 +1,5 @@
 #include "app/MemoryReclamation.h"
+#include "app/SongSelectState.h"
 #include "key_note_overlay/dan_rating.h"
 #include "render/SettingsListLayout.h"
 #include "render/DifficultyLabel.h"
@@ -74,6 +75,7 @@
 #include "render/GameplayMotion.h"
 #include "render/GameplayNativeDigitalKey.h"
 #include "render/ResultPresentation.h"
+#include "render/SceneTransition.h"
 #include "render/TargaImage.h"
 #include "render/TextFit.h"
 #include "render/SkinGameplayPreview.h"
@@ -2409,6 +2411,23 @@ void configure_low_latency_presentation(IDXGIDevice* dxgi_device, IDXGISwapChain
 }  // namespace
 
 struct MenuWindow::D2DResources {
+    // One menu-only decoder and one reused GPU bitmap; no gameplay upscaler,
+    // frame history or audio stream is attached to the decorative loop.
+    std::unique_ptr<BgaVideoDecoder> menu_motion_decoder;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> menu_motion_bitmap;
+    MenuMotionDiagnostics menu_motion_stats;
+    std::string menu_motion_path;
+    std::array<bool, 3> menu_motion_failed_assets{};
+    int64_t menu_motion_clock_ns = 0;
+    int64_t menu_motion_first_request_ns = 0;
+    int64_t menu_motion_last_ready_ns = 0;
+    int64_t menu_motion_request_tick = -1;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> ten_mark_bitmap;
+    D2D1_RECT_F ten_mark_source_rect{};
+    bool ten_mark_bitmap_attempted = false;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> transition_bitmap;
+    D2D1_RECT_F transition_source_rect{};
+    bool transition_bitmap_attempted = false;
     Microsoft::WRL::ComPtr<ID2D1Bitmap> all_combo_bitmap;
     D2D1_RECT_F all_combo_source_rect{};
     bool all_combo_bitmap_attempted = false;
@@ -2539,13 +2558,21 @@ struct MenuWindow::D2DResources {
         Microsoft::WRL::ComPtr<IDWriteTextFormat> format;
         Microsoft::WRL::ComPtr<IDWriteTextLayout> layout;
         Microsoft::WRL::ComPtr<ID2D1Bitmap1> bitmap;
+        Microsoft::WRL::ComPtr<ID2D1Bitmap1> crisp_glyph;
         Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> fallback_gradient;
         D2D1_COLOR_F color{};
+        uint32_t paint_rgb = 0;
+        bool paint_prism = false;
+        bool paint_rainbow = false;
+        UINT32 skip_prefix = 0;
+        DWRITE_PARAGRAPH_ALIGNMENT paragraph = DWRITE_PARAGRAPH_ALIGNMENT_CENTER;
         float width = 0, height = 0;
         bool attempted = false;
         DWRITE_TEXT_ALIGNMENT alignment = DWRITE_TEXT_ALIGNMENT_LEADING;
     };
-    std::array<GradeBitmap, 3> grade_bitmaps{};
+    // Dedicated list-score slots keep the ten visible EX ramps cached while
+    // result/rank/detail text retain their own independent caches.
+    std::array<GradeBitmap, 19> grade_bitmaps{};
     struct PanelGlowBitmap {
         Microsoft::WRL::ComPtr<ID2D1Bitmap1> bitmap;
         float width = 0, height = 0, radius = 0;
@@ -2673,6 +2700,7 @@ void MenuWindow::shutdown() {
 
     fullscreen_ = false;
     fullscreen_restore_pending_ = false;
+    clear_menu_motion_background();
     invalidate_gameplay_note_sprite_cache();
     invalidate_gameplay_background_cache();
     invalidate_song_select_preview_cache();
@@ -3312,6 +3340,8 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
 
     return true;
 }
+
+#include "MenuWindow_menu_motion_background.inl"
 
 void MenuWindow::invalidate_gameplay_background_cache() {
     gameplay_background_cache_ = GameplayBackgroundCache{};
@@ -5123,7 +5153,9 @@ void MenuWindow::render(const MenuRenderData& data) {
         fullscreen_restore_pending_ = false;
     }
 
-    if (window_minimized || (fullscreen_requested && !window_in_foreground)) {
+    if (window_minimized || (hwnd && !IsWindowVisible(hwnd)) ||
+        (fullscreen_requested && !window_in_foreground)) {
+        clear_menu_motion_background();
         return;
     }
     draw(data);

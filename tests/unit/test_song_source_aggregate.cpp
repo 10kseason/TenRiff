@@ -946,6 +946,37 @@ TEST_CASE("ALL SONG empty roots complete without scanning default or current dir
     CHECK(combined.warnings.empty());
 }
 
+TEST_CASE("index completion success status excludes missing empty and cancelled work and is consumed once") {
+    AggregateFixture f;
+    const auto root = f.source("notification");
+    write_chart(root / "one.bms", "Load success");
+    SongIndexerThread indexer;
+    SongIndex visible;
+    std::vector<std::string> warnings;
+    bool succeeded = false;
+    REQUIRE(indexer.start_sources({root.u8string()}, f.profile()));
+    REQUIRE(wait_until_finished(indexer));
+    REQUIRE(indexer.poll_result(visible, warnings, nullptr, &succeeded));
+    CHECK(succeeded);
+    CHECK(visible.entries.size() == 1);
+    CHECK_FALSE(indexer.poll_result(visible, warnings, nullptr, &succeeded));
+
+    REQUIRE(indexer.start_sources({(f.base / "missing").u8string()}, f.profile()));
+    REQUIRE(wait_until_finished(indexer));
+    succeeded = true;
+    REQUIRE(indexer.poll_result(visible, warnings, nullptr, &succeeded));
+    CHECK_FALSE(succeeded);
+    REQUIRE(indexer.start_sources({}, f.profile()));
+    REQUIRE(wait_until_finished(indexer));
+    succeeded = true;
+    REQUIRE(indexer.poll_result(visible, warnings, nullptr, &succeeded));
+    CHECK_FALSE(succeeded);
+
+    REQUIRE(indexer.start_sources({root.u8string()}, f.profile(), {}, true));
+    indexer.stop();
+    CHECK_FALSE(indexer.poll_result(visible, warnings, nullptr, &succeeded));
+}
+
 TEST_CASE("polling a completed aggregate never leaves the loading state running") {
     AggregateFixture f;
     SongIndexerThread indexer;

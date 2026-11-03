@@ -31,11 +31,17 @@
                 const std::string name = (player.rank > 0 ? std::to_string(player.rank) : "--") +
                     "   " + player.name + (player.local ? loc(" / YOU", " / 나") : "");
                 column_text(to_wide(name), 96, 600, y + 16, d2d_->body_format.Get(), ink);
-                column_text(to_wide(player.has_score ? std::to_string(player.score) : "--"),
+                column_text(to_wide(!player.has_score ? "--" : player.local
+                    ? result_record_score_text(player.score, 1.0f, record_elapsed_ns, data.result.new_record,
+                                               record_effect_skipped)
+                    : std::to_string(player.score)),
                     620, 875, y + 14, d2d_->title_format.Get(), ink);
                 if (player.local && player.has_score && data.result.new_record) {
-                    draw_text_clipped(L"NEW Record", d2d_->hud_format.Get(),
+                    const float old_opacity = d2d_->accent_brush->GetOpacity();
+                    d2d_->accent_brush->SetOpacity(record_effect.score_visibility);
+                    draw_text_clipped(L"NEW RECORD", d2d_->hud_format.Get(),
                         D2D1::RectF(620, y + 50, 875, y + 74), d2d_->accent_brush.Get());
+                    d2d_->accent_brush->SetOpacity(old_opacity);
                 }
                 column_text(to_wide(player.has_score ? std::to_string(player.max_combo) : "--"),
                     890, 1070, y + 16, d2d_->body_format.Get(), d2d_->text_brush.Get());

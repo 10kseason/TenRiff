@@ -1,5 +1,8 @@
 // UTF-8 Simplified Chinese settings help. Keys mirror SettingsHelp.h.
 // Kept separate from the main catalog so help coverage can be audited independently.
+{"Choose the options click and edit sound. Left restores the bundled clip; Right silences this slot. Slider and Start actions keep their own sounds.", "选择选项界面的点击与编辑音效。左键恢复随游戏提供的默认音效，右键静音。滑块和开始操作使用各自的专用音效。"},
+{"Choose the manual Start button sound. It plays once for a selected song, course entry or result retry; automatic stages and restarts do not play it.", "选择手动开始按钮的音效。开始歌曲、进入课程或从结果界面重试时播放一次；自动进入下一阶段和即时重启不播放。"},
+{"Choose the successful loading and import completion sound. Failure, cancellation and empty results stay quiet. This slot allows four seconds so the bundled completion clip plays fully.", "选择加载或导入成功的完成提示音。失败、取消和空结果不会播放。此项最长播放4秒，以完整保留随游戏提供的完成提示音。"},
 {"Basic favors stable playback; High reduces buffering. Use Basic if audio crackles.", "基础模式优先保证播放稳定；高性能模式减小缓冲。如果声音出现爆音，请使用基础模式。"},
 {"Follow plays BMS key sounds when you hit notes. Autoplay plays them with the chart; Off silences them.", "跟随模式在击打音符时播放BMS键音；自动模式随谱面播放；关闭则不播放键音。"},
 {"Toggle menu, result and song-preview music. Gameplay chart BGM keeps playing.", "开关菜单、结果页和曲目试听音乐。游玩中的谱面BGM仍会播放。"},

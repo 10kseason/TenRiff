@@ -208,6 +208,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     gauge_shift_enabled_ = false;
     ghost_replay_source_ = {};
     ghost_replay_enabled_ = false;
+    score_comparison_compatible_ = false;
+    reset_score_reference();
     ghost_replay_event_index_ = 0;
     judgement_loop_plan_ = {};
     judgement_loop_step_carry_ = 0;
@@ -734,6 +736,27 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     }
     if (ghost_replay_enabled_) {
         bool ghost_compatible = true;
+        score_comparison_compatible_ = !score_comparison_replay_path_.empty() &&
+            score_comparison_replay_path_ == options.ghost_replay_path && live_score_replay_policy_matches(
+            ghost_replay_source_.ruleset_id,
+            replay_ruleset_id_for_runtime(config_.judge, config_.gauge, gauge_shift_enabled_,
+                                         course_gauge_enabled_, "off", active_mods_),
+            ghost_replay_source_.mode.key_conversion_version, key_conversion_version_,
+            ghost_replay_source_.mode.bms_timing_version, bms_timing_version_,
+            ghost_replay_source_.mode.bms_gauge_version, bms_gauge_version_,
+            ghost_replay_source_.mode.bms_control_flow_version, bms_control_flow_version_,
+            ghost_replay_source_.mode.autoplay_enabled || ghost_replay_source_.mode.practice_no_fail_enabled,
+            ghost_replay_source_.aborted);
+        if (config_.skin.score_comparison_enabled && score_comparison_compatible_) {
+            // A file edited in place after indexing cannot reuse the old chart's
+            // score trace, even when its path, lanes and mode still match.
+            const auto current_hashes = hash_chart_file_utf8(chart_path_);
+            score_comparison_compatible_ = current_hashes.valid() &&
+                !ghost_replay_source_.chart_sha256.empty() &&
+                current_hashes.sha256 == ghost_replay_source_.chart_sha256;
+        }
+        if (score_comparison_only_ && !score_comparison_compatible_)
+            ghost_compatible = false;
         if (ghost_replay_source_.trace.lane_count > 0 &&
             chart_.lane_count != ghost_replay_source_.trace.lane_count) {
             ghost_compatible = false;
@@ -822,6 +845,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
             }
         }
         if (!ghost_compatible) {
+            score_comparison_compatible_ = false;
             std::cerr << "[warn] Ghost replay metadata does not match the current gameplay settings. "
                       << "Ghost comparison will be disabled for this run." << std::endl;
             ghost_replay_enabled_ = false;
@@ -1015,6 +1039,24 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         }
         ghost_engine_ = std::make_unique<gameplay::GameplayEngine>(chart_, ghost_config);
     }
+    if (config_.skin.score_comparison_enabled && !score_comparison_replay_path_.empty() &&
+        (!ghost_engine_ || score_comparison_replay_path_ != options.ghost_replay_path)) {
+        // A visible clear-first ghost and the score high-water replay can be
+        // different performances. This third engine only reads the latter;
+        // it never supplies input, sound, gauge, or conversion to either field.
+        int source_key_lanes = chart_result.chart.lane_count;
+        for (const int lane : chart_result.chart.scratch_lanes)
+            if (lane >= 1 && lane <= chart_result.chart.lane_count) --source_key_lanes;
+        const bool seedless_conversion = mode_result.settings.key_mode == gameplay::KeyMode::Auto ||
+            (mode_result.settings.key_conversion_algorithm == gameplay::KeyModeConversionAlgorithm::NK2 &&
+             mode_result.settings.key_conversion_nk2_preset == gameplay::Nk2Preset::SourceLnE) ||
+            (mode_result.settings.key_conversion_algorithm != gameplay::KeyModeConversionAlgorithm::NK3 &&
+             gameplay::to_string(mode_result.settings.key_mode) == std::to_string(source_key_lanes) + "K");
+        const bool seed_independent = seedless_conversion &&
+            (mode_result.settings.random == gameplay::RandomMode::Off || mode_result.settings.random == gameplay::RandomMode::Mirror) &&
+            !mode_mod_adds_notes(active_mods_) && !mode_mod_long_note_mix(active_mods_);
+        initialize_score_reference(gameplay_config, seed_independent);
+    }
     report_loading_progress(96, "Starting gameplay");
     if (loading_cancel_requested()) {
         return false;
@@ -1055,6 +1097,13 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     }
     std::cerr << std::endl;
 
+    // Loading and transition run concurrently. Fast charts wait here, before
+    // countdown/audio start; slow charts incur no additional delay. Cancellation
+    // remains available throughout this short presentation barrier.
+    while (timing::HighResClock::now_ns() < loading_transition_deadline_ns_) {
+        if (loading_cancel_requested()) return false;
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
     countdown_value_ = gameplay_start_countdown_seconds(config_.ui.skip_start_countdown,
                                                        peer_battle_mode_, instant_restart_start_);
     countdown_active_ = countdown_value_ > 0;
@@ -1340,6 +1389,16 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             ? config_.mode.pacemaker_target_accuracy : static_cast<double>(config_.mode.pacemaker_target_score);
         snapshot.pacemaker_delta = pacemaker_live_delta(pacemaker_mode_, stats, score_multiplier_,
             config_.mode.pacemaker_target_accuracy, config_.mode.pacemaker_target_score);
+        const gameplay::ResultStats* best_score_stats = score_reference_engine_ ? &score_reference_engine_->stats()
+            : ghost_engine_ && score_comparison_compatible_ ? &ghost_engine_->stats() : nullptr;
+        const double best_score_multiplier = score_reference_engine_
+            ? score_reference_source_.score_multiplier : ghost_replay_source_.score_multiplier;
+        // Local BEST permits pauses. Player and reference both freeze on the
+        // logical chart clock, so pausing must not permanently hide this HUD.
+        snapshot.score_comparison = live_score_comparison(stats, score_multiplier_,
+            config_.skin.score_comparison_enabled && !assisted && !partial_chart && !replay_playback_enabled_ &&
+                !snapshot.spectating_peer,
+            best_score_stats, best_score_multiplier);
         snapshot.accuracy = stats.accuracy_percent();
         snapshot.detailed_accuracy = stats.detailed_accuracy_percent();
         snapshot.osu_od8_score_available = stats.osu_od8.available;
@@ -1379,7 +1438,7 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         std::copy_n(lane_pressed_.begin(), snapshot.lane_pressed_count, snapshot.lane_pressed.begin());
 
         if (ghost_engine_) {
-            snapshot.ghost_visible = true;
+            snapshot.ghost_visible = !score_comparison_only_;
             snapshot.ghost_finished = ghost_engine_->is_finished();
             snapshot.ghost_game_over = ghost_engine_->is_game_over();
 
@@ -2657,6 +2716,7 @@ void GameSession::shutdown() {
     }
     engine_.reset();
     ghost_engine_.reset();
+    reset_score_reference();
     clock_sync_.reset();
     shared_input_clock_.reset();
     audio_input_timing_anchor_ = {};
@@ -2918,6 +2978,7 @@ void GameSession::audio_callback(float* output,
                 if (ghost_engine_) {
                     ghost_engine_->advance(ghost_chronological_judgement_ ? shared_clock_sample : buffer_end_samples);
                 }
+                advance_score_reference(shared_clock_sample);
                 // Live input can fail the run in this callback. Decide scratch
                 // keysounds afterward, while retaining their future write time.
                 schedule_input_audio(logical_buffer_start_samples, buffer_end_samples + lookahead_samples);
@@ -3047,6 +3108,7 @@ void GameSession::run_judgement_loop(int64_t buffer_start_samples,
             ghost_mine_trigger_buffer_.clear();
             ghost_engine_->drain_mine_triggers(ghost_mine_trigger_buffer_);
         }
+        advance_score_reference(tick_end_samples);
         tick_cursor = tick_end_samples;
     }
 }
@@ -3750,6 +3812,83 @@ void GameSession::dispatch_ghost_lane_input(int lane, input::InputState state, i
         hit_note->note_id < ghost_hidden_hit_note_ids_.size()) {
         ghost_hidden_hit_note_ids_[hit_note->note_id] = 1;
     }
+}
+
+bool GameSession::score_reference_matches(const gameplay::ReplayFile& replay, bool seed_independent) const {
+    if (!live_score_replay_policy_matches(replay.ruleset_id,
+        replay_ruleset_id_for_runtime(config_.judge, config_.gauge, gauge_shift_enabled_, course_gauge_enabled_, "off", active_mods_),
+        replay.mode.key_conversion_version, key_conversion_version_, replay.mode.bms_timing_version, bms_timing_version_,
+        replay.mode.bms_gauge_version, bms_gauge_version_, replay.mode.bms_control_flow_version, bms_control_flow_version_,
+        replay.mode.autoplay_enabled || replay.mode.practice_no_fail_enabled, replay.aborted)) return false;
+    if (replay.version != gameplay::kNativeScoreVersion || replay.trace.lane_count != chart_.lane_count ||
+        !(replay.trace.sample_rate > 0 || replay.sample_rate > 0) || !std::isfinite(replay.rate) || replay.rate <= 0 ||
+        std::abs(replay.rate - config_.speed.rate) > 0.001 || !std::isfinite(replay.score_multiplier) ||
+        std::abs(replay.score_multiplier - score_multiplier_) > 0.000001 || !replay.mode.course_gauge.empty() ||
+        replay.mode.one_miss_fail_enabled != one_miss_fail_enabled_) return false;
+    if (normalize_runtime_key_mode_local(replay.mode.key_mode) != normalize_runtime_key_mode_local(config_.mode.key_mode) ||
+        replay.mode.key_conversion_algorithm != config_.mode.key_conversion_algorithm ||
+        ((config_.mode.key_conversion_algorithm == "nk2" || config_.mode.key_conversion_algorithm == "nk3") &&
+         normalize_nk2_preset_local(replay.mode.key_conversion_nk2_preset) != normalize_nk2_preset_local(config_.mode.key_conversion_nk2_preset)) ||
+        (!replay.mode.key_conversion_note_add_mode.empty() && replay.mode.key_conversion_note_add_mode != "default") ||
+        replay.mode.random != config_.mode.random || !equivalent_mode_mod_tokens(replay.mods, active_mods_)) return false;
+    if ((!seed_independent && (!replay.mode.random_seed.has_value() ||
+         replay.mode.random_seed.value() != static_cast<int>(config_.mode.random_seed))) ||
+        (mode_mod_long_note_mix(active_mods_) && replay.mode.long_note_mix_version != long_note_mix_version_) ||
+        (chart_.bms_has_random && gameplay::replay_bms_random_seed(replay.mode) != bms_random_seed_)) return false;
+    const auto hashes = hash_chart_file_utf8(chart_path_);
+    return hashes.valid() && !replay.chart_sha256.empty() && hashes.sha256 == replay.chart_sha256;
+}
+
+void GameSession::initialize_score_reference(const gameplay::GameplayConfig& config, bool seed_independent) {
+    reset_score_reference();
+    if (!config_.skin.score_comparison_enabled || score_comparison_replay_path_.empty() ||
+        replay_playback_enabled_ || autoplay_enabled_ || practice_no_fail_enabled_ || auto_scratch_enabled_ ||
+        (practice_start_seconds_ > 0.0 && !instant_restart_start_)) return;
+    auto loaded = gameplay::load_replay_json(score_comparison_replay_path_);
+    if (!loaded.success() || !score_reference_matches(*loaded.replay, seed_independent)) {
+        std::cerr << "[warn] Score comparison replay is unavailable or incompatible; visible ghost is unchanged." << std::endl;
+        return;
+    }
+    score_reference_source_ = std::move(*loaded.replay);
+    auto reference_config = config;
+    reference_config.judge = replay_judge_config_for_playback(score_reference_source_, config_.judge, chart_.bms_rank);
+    reference_config.strict_standard_hold_release = replay_uses_strict_standard_hold_release(score_reference_source_);
+    reference_config.great_standard_hold_release = replay_uses_great_standard_hold_release(score_reference_source_);
+    reference_config.legacy_hold_release = replay_uses_legacy_hold_release(score_reference_source_);
+    reference_config.chronological_judgement = replay_uses_chronological_judgement(score_reference_source_);
+    reference_config.empty_poor_affects_accuracy = replay_empty_poor_affects_accuracy(score_reference_source_);
+    reference_config.initial_gauge_value.reset();
+    if (is_gauge_shift_token(score_reference_source_.mode.gauge)) reference_config.initial_gauge = game::GaugeType::ExHard;
+    else if (auto gauge = parse_gauge_type(score_reference_source_.mode.gauge)) reference_config.initial_gauge = *gauge;
+    reference_config.practice_no_fail_enabled = false;
+    reference_config.one_miss_fail_enabled = score_reference_source_.mode.one_miss_fail_enabled;
+    score_reference_engine_ = std::make_unique<gameplay::GameplayEngine>(chart_, reference_config);
+    score_reference_mine_triggers_.reserve(chart_.mines.size());
+}
+
+void GameSession::advance_score_reference(int64_t sample) {
+    if (!score_reference_engine_ || paused_.load(std::memory_order_relaxed) || sample < score_reference_sample_) return;
+    // Only recorded edges due at this exact chart time are fed to this engine.
+    // No audio scheduling, physical key state, visible-ghost or player writes.
+    while (score_reference_event_index_ < score_reference_source_.trace.events.size()) {
+        const auto& event = score_reference_source_.trace.events[score_reference_event_index_];
+        const auto due = playback_sample_for_replay_event(score_reference_source_, event.sample);
+        if (due > sample) break;
+        (void)score_reference_engine_->handle_input(event.lane, event.state, due);
+        ++score_reference_event_index_;
+    }
+    score_reference_engine_->advance(sample);
+    score_reference_sample_ = sample;
+    score_reference_mine_triggers_.clear();
+    score_reference_engine_->drain_mine_triggers(score_reference_mine_triggers_);
+}
+
+void GameSession::reset_score_reference() {
+    score_reference_engine_.reset();
+    score_reference_source_ = {};
+    score_reference_event_index_ = 0;
+    score_reference_sample_ = (std::numeric_limits<int64_t>::min)();
+    score_reference_mine_triggers_.clear();
 }
 
 void GameSession::process_ghost_replay_queue(int64_t buffer_end_samples, int64_t lookahead_samples) {

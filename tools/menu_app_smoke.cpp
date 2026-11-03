@@ -402,6 +402,7 @@ struct MenuAppVisualTestAccess {
         app.menu_key_owners_.clear();
         app.reset_song_select_repeat();
         const auto saved_ui = app.config_.ui;
+        const auto saved_skin_source = app.config_.skin.source;
         const auto saved_songs = app.indexed_songs_;
         const auto saved_visible = app.visible_song_indices_;
         const auto saved_best = app.chart_best_results_;
@@ -415,6 +416,7 @@ struct MenuAppVisualTestAccess {
         const int saved_song = app.selected_song_, saved_source = app.selected_source_;
         const int saved_record = app.selected_record_;
         app.config_.ui.difficulty_table_path.clear();
+        app.config_.skin.source = "native";
         app.song_search_query_.clear();
         app.song_select_search_active_ = false;
         app.song_select_view_ = MenuApp::SongSelectView::Songs;
@@ -422,7 +424,7 @@ struct MenuAppVisualTestAccess {
         app.online_records_view_ = false;
         app.indexed_songs_.clear();
         app.visible_song_indices_.clear();
-        for (std::size_t i = 0; i < 10; ++i) {
+        for (std::size_t i = 0; i < 13; ++i) {
             auto entry = saved_songs.front();
             entry.title = "Cyclic fixture " + std::to_string(i);
             entry.path = "cyclic-fixture-" + std::to_string(i) + ".bms";
@@ -431,20 +433,24 @@ struct MenuAppVisualTestAccess {
         }
         app.selected_song_ = 0;
         app.publish_snapshot();
+        report.check("lobby.compact_viewport_ten_visible_rows",
+            app.snapshot_.render.song_select.native_list_layout &&
+            app.snapshot_.render.song_select.list_visible_count == kNativeSongSelectVisibleCardCount &&
+            app.snapshot_.render.song_select.songs.size() == kNativeSongSelectVisibleCardCount);
         key(app, "Up");
-        report.check("lobby.wrap_up_first_to_last", app.selected_song_ == 9 &&
-            app.snapshot_.render.song_select.list_selected_index == 9);
+        report.check("lobby.wrap_up_first_to_last", app.selected_song_ == 12 &&
+            app.snapshot_.render.song_select.list_selected_index == 12);
         key(app, "Down");
         report.check("lobby.wrap_down_last_to_first", app.selected_song_ == 0 &&
             app.snapshot_.render.song_select.list_selected_index == 0);
         key(app, "PageDown");
         key(app, "PageDown");
-        report.check("lobby.wrap_page_preserves_distance", app.selected_song_ == 4);
+        report.check("lobby.wrap_page_preserves_distance", app.selected_song_ == 7);
         render::MenuClickEvent wheel;
         wheel.kind = Kind::MouseWheel;
         wheel.wheel_steps = 5;
         app.handle_menu_click(wheel);
-        report.check("lobby.wrap_wheel_preserves_distance", app.selected_song_ == 9);
+        report.check("lobby.wrap_wheel_preserves_distance", app.selected_song_ == 2);
         app.visible_song_indices_ = {0};
         app.selected_song_ = 0;
         app.publish_snapshot();
@@ -509,6 +515,7 @@ struct MenuAppVisualTestAccess {
             app.local_play_records_.front().clear_status == "GAUGE SHIFT HARD CLEAR");
 
         app.config_.ui = saved_ui;
+        app.config_.skin.source = saved_skin_source;
         app.indexed_songs_ = saved_songs;
         app.visible_song_indices_ = saved_visible;
         app.chart_best_results_ = saved_best;
@@ -737,6 +744,84 @@ struct MenuAppVisualTestAccess {
             app.publish_snapshot();
         }
         return app.visible_song_count() == 1;
+    }
+    static void check_nps_idle_loop(MenuApp& app, Report& report) {
+        isolate(app);
+        // This instance is used only by the idle-loop probe and is shut down
+        // afterward. Disable the physical producer and its fallback restart;
+        // the fixture injects no input and calls neither service nor publish
+        // while run() is active.
+        app.config_.input.rawinput = false;
+        app.config_.audio_ui.background_sound_enabled = false;
+        app.input_thread_.stop();
+        while (app.input_thread_.queue().pop()) {}
+        app.pressed_keys_.clear();
+        app.menu_key_owners_.clear();
+        const auto library_deadline = Clock::now() + std::chrono::seconds(20);
+        bool indexed = false;
+        while (Clock::now() < library_deadline) {
+            indexed = poll_library(app) && !app.song_indexer_.is_running();
+            if (indexed) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        report.check("nps_idle.synthetic_library_ready", indexed);
+        if (!indexed) return;
+        app.song_select_view_ = MenuApp::SongSelectView::Songs;
+        app.song_select_focus_ = MenuApp::SongSelectFocus::SongList;
+        app.selected_song_ = 0;
+        app.reset_screen(Screen::SongSelect);
+        app.publish_snapshot();
+        {
+            std::lock_guard<std::mutex> lock(app.snapshot_mutex_);
+            report.check("nps_idle.initial_snapshot_pending",
+                app.snapshot_.render.kind == render::MenuScreenKind::SongSelect &&
+                !app.snapshot_.render.song_select.selected_song_nps_available &&
+                app.snapshot_.render.song_select.selected_song_nps_bins.empty());
+        }
+
+        bool available = false;
+        bool exact_values = false;
+        double observed_average = 0.0;
+        std::atomic<bool> stop_observer{false};
+        // Only the owner thread runs MenuApp. The observer reads its published
+        // snapshot under the existing mutex, then requests a bounded exit.
+        std::thread observer([&]() {
+            const auto deadline = Clock::now() + std::chrono::seconds(3);
+            while (!stop_observer.load(std::memory_order_acquire) && Clock::now() < deadline) {
+                {
+                    std::lock_guard<std::mutex> lock(app.snapshot_mutex_);
+                    const auto& view = app.snapshot_.render.song_select;
+                    if (app.snapshot_.render.kind == render::MenuScreenKind::SongSelect &&
+                        view.selected_song_nps_available) {
+                        available = true;
+                        observed_average = view.selected_song_nps_average;
+                        constexpr std::array<float, 6> expected{1, 0, 1, 0, 1, 1};
+                        exact_values = view.selected_song_title == "Menu App Smoke Fixture" &&
+                            view.selected_song_nps_min == 0.0 && view.selected_song_nps_max == 1.0 &&
+                            std::abs(observed_average - 4.0 / 6.0) < 1e-9 &&
+                            view.selected_song_nps_bins.size() == expected.size() &&
+                            std::equal(expected.begin(), expected.end(), view.selected_song_nps_bins.begin());
+                    }
+                }
+                if (available) break;
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            }
+            app.exit_requested_.store(true, std::memory_order_release);
+        });
+        try {
+            app.run();
+        } catch (...) {
+            stop_observer.store(true, std::memory_order_release);
+            observer.join();
+            throw;
+        }
+        stop_observer.store(true, std::memory_order_release);
+        observer.join();
+        report.check("nps_idle.run_publishes_without_input", available,
+            "Actual MenuApp::run; observer never invokes service or publish; 3-second deadline.");
+        report.check("nps_idle.snapshot_has_exact_density", available && exact_values,
+            "Expected MIN 0, AVG 4/6, MAX 1 and bins [1,0,1,0,1,1]; observed AVG=" +
+            std::to_string(observed_average));
     }
     static bool present(MenuApp& app, std::string& detail) {
         const auto prior = present_probe.successful_presents.load(std::memory_order_acquire);
@@ -1207,12 +1292,15 @@ struct MenuAppVisualTestAccess {
         const bool saved_combo_badge = app.last_all_combo_badge_;
         const auto saved_records = app.local_play_records_;
         const auto saved_best = app.chart_best_results_;
+        const auto saved_score_high_water = app.chart_score_high_water_;
+        const auto saved_record_feedback = app.last_result_record_feedback_;
         const auto saved_indices = app.chart_play_record_indices_;
         const auto saved_current = app.current_song_record_indices_;
         const bool saved_new_record = app.last_result_new_record_;
         const bool saved_replay = app.last_session_replay_playback_;
         app.local_play_records_.clear();
         app.chart_best_results_.clear();
+        app.chart_score_high_water_.clear();
         app.chart_play_record_indices_.clear();
         menu_records::ParsedResultRecord record;
         record.chart_path = app.last_chart_path_;
@@ -1223,15 +1311,20 @@ struct MenuAppVisualTestAccess {
         verified.status = ReplayVerificationStatus::Verified;
         verified.official_eligible = true;
         verified.stats = record.stats;
-        verified.final_score = 100;
+        verified.stats.accuracy_weight = 100;
+        verified.stats.accuracy_points = 90;
+        verified.final_score = 0;
         verified.game_over = false;
         verified.clear_status = "GAUGE SHIFT NORMAL CLEAR";
         verified.final_gauge = "normal";
         int sequence = 0;
+        RecordFeedback feedback;
         const auto append = [&] {
             return app.append_chart_result_record(record, "new-record-fixture-" + std::to_string(sequence++),
-                                                  "fixture-replay", verified);
+                                                  "fixture-replay", verified, &feedback);
         };
+        report.check("new_record.zero_first_score_is_not_improvement", !append());
+        verified.final_score = 100;
         report.check("new_record.first_eligible", append());
         record.created_utc = "2026-01-02T00:00:00Z";
         report.check("new_record.equal_later_is_not_improvement", !append());
@@ -1244,11 +1337,23 @@ struct MenuAppVisualTestAccess {
         verified.final_score = 98;
         verified.clear_status = "GAUGE SHIFT EX CLEAR";
         verified.final_gauge = "ex_hard";
-        report.check("new_record.stronger_clear_matches_best_order", append());
+        report.check("new_record.stronger_clear_lower_score_does_not_celebrate", !append());
+        report.check("new_record.stronger_clear_still_stored", !app.chart_best_results_.empty() &&
+            app.chart_best_results_.begin()->second.final_gauge == "ex_hard" &&
+            app.chart_best_results_.begin()->second.best_score == 98);
         verified.final_score = 500;
         verified.clear_status = "GAUGE SHIFT NORMAL CLEAR";
         verified.final_gauge = "normal";
-        report.check("new_record.weaker_clear_matches_best_order", !append());
+        verified.stats.accuracy_points = 95;
+        report.check("new_record.weaker_clear_higher_score_celebrates", append());
+        report.check("new_record.score_snapshot_and_rank_upgrade", feedback.has_previous &&
+            feedback.previous_score == 101 && feedback.previous_rank == "A" && feedback.rank_upgraded);
+        report.check("new_record.weaker_clear_does_not_replace_clear_best", !app.chart_best_results_.empty() &&
+            app.chart_best_results_.begin()->second.final_gauge == "ex_hard" &&
+            app.chart_best_results_.begin()->second.best_score == 98);
+        report.check("new_record.high_water_retains_actual_score_replay", !app.chart_score_high_water_.empty() &&
+            app.chart_score_high_water_.begin()->second.best.best_score == 500 &&
+            app.chart_score_high_water_.begin()->second.best.replay_path == "fixture-replay");
         verified.clear_status = "GAUGE SHIFT EX CLEAR";
         verified.final_gauge = "ex_hard";
         verified.official_eligible = false;
@@ -1294,6 +1399,8 @@ struct MenuAppVisualTestAccess {
         app.last_all_combo_badge_ = saved_combo_badge;
         app.local_play_records_ = saved_records;
         app.chart_best_results_ = saved_best;
+        app.chart_score_high_water_ = saved_score_high_water;
+        app.last_result_record_feedback_ = saved_record_feedback;
         app.chart_play_record_indices_ = saved_indices;
         app.current_song_record_indices_ = saved_current;
         app.last_result_new_record_ = saved_new_record;
@@ -1686,10 +1793,30 @@ struct MenuAppVisualTestAccess {
         // immediate request can capture the previous search frame instead.
         app.menu_window_.request_screenshot();
         report.check("folders.capture_present", present(app, folder_detail), folder_detail);
+        const auto folder_snapshot = [&] {
+            std::lock_guard<std::mutex> lock(app.snapshot_mutex_);
+            return app.snapshot_;
+        }();
+        report.check("folders.counts_in_rows", folder_snapshot.render.song_select.songs.size() == 5 &&
+            folder_snapshot.render.song_select.songs[2].chart_count == 1 &&
+            folder_snapshot.render.song_select.songs[3].chart_count == 0);
+        report.check("folders.no_backend_label", folder_snapshot.render.song_select.browser_summary.find("RawInput") == std::string::npos &&
+            folder_snapshot.render.song_select.browser_summary.find("입력 백엔드") == std::string::npos);
         click(app, Kind::SongScrollbar, 2);
-        click(app, Kind::SongStartButton, 0);
+        key(app, "Right");
+        report.check("folders.right_opens_level", app.active_table_level_ == "st16");
         report.check("folders.exact_selected_level", app.active_table_level_ == "st16" &&
             app.visible_song_count() == 1 && app.visible_song_entry(0)->difficulty_table_level == "st16");
+        key(app, "Left");
+        report.check("folders.left_returns_to_level_folders", app.active_table_level_.empty() &&
+            app.showing_table_level_folders() && app.song_select_focus_ == MenuApp::SongSelectFocus::SongList);
+        click(app, Kind::SongScrollbar, 2);
+        click(app, Kind::SongStartButton, 0);
+        key(app, "Right");
+        report.check("folders.right_returns_to_level_folders", app.active_table_level_.empty() &&
+            app.showing_table_level_folders() && app.song_select_focus_ == MenuApp::SongSelectFocus::SongList);
+        click(app, Kind::SongScrollbar, 2);
+        click(app, Kind::SongStartButton, 0);
         key(app, "Esc");
         click(app, Kind::SongScrollbar, 3);
         click(app, Kind::SongStartButton, 0);
@@ -1697,6 +1824,9 @@ struct MenuAppVisualTestAccess {
         key(app, "Esc");
         key(app, "Backspace");
         report.check("folders.backspace_no_navigation", app.showing_table_level_folders() && screen(app) == Screen::SongSelect);
+        key(app, "Left");
+        report.check("folders.left_returns_to_title", screen(app) == Screen::Title);
+        app.reset_screen(Screen::SongSelect);
 
         app.indexed_songs_ = saved_songs;
         app.config_.ui = saved_ui;
@@ -3146,6 +3276,26 @@ int wmain(int argc, wchar_t** argv) {
             dropped->shutdown();
             report.check("drop.exit_code", dropped->exit_code() == 0);
         }
+        {
+            // A separate library/profile keeps the idle-loop assertion free
+            // from earlier controller fixtures, scores and pending imports.
+            write_chart("nps-idle-fixture");
+            auto nps_options = options;
+            nps_options.profile = "nps-idle-smoke";
+            nps_options.songs_path = "nps-idle-fixture";
+            auto nps_config = config;
+            nps_config.input.rawinput = false;
+            nps_config.audio_ui.background_sound_enabled = false;
+            if (!loader.save_profile("profiles/nps-idle-smoke", nps_config) ||
+                !keymaps.save_profile("profiles/nps-idle-smoke", keymaps.default_keymap()))
+                throw std::runtime_error("Cannot seed isolated NPS idle-loop profile");
+            auto nps_app = std::make_unique<tenriff::app::MenuApp>();
+            const bool initialized = nps_app->initialize(nps_options);
+            report.check("nps_idle.initialize", initialized);
+            if (initialized) Access::check_nps_idle_loop(*nps_app, report);
+            nps_app->shutdown();
+            report.check("nps_idle.exit_code", nps_app->exit_code() == 0);
+        }
         options.chart_path = "songs/fixture/smoke.bms";
         separate_pause_flow(options, report);
         separate_restart_flow(options, report);
@@ -3164,7 +3314,7 @@ int wmain(int argc, wchar_t** argv) {
     const JsonObject result{
         {"passed", JsonValue(report.failed == 0)}, {"failed_checks", JsonValue(double(report.failed))},
         {"elapsed_seconds", JsonValue(std::chrono::duration<double>(Clock::now() - began).count())},
-        {"scope", JsonValue("Actual MenuApp initialize/index/controller/launch/GameSession/result/return with real window, renderer and muted shared audio; owner-thread internal input dispatch, not MenuApp::run main-loop or physical OS input. Drop fixture separately sends real WM_DROPFILES to the owned HWND after windowed/borderless/windowed changes, consumes its mailbox, then invokes the normal MenuApp event handler.")},
+        {"scope", JsonValue("Actual MenuApp initialize/index/controller/launch/GameSession/result/return with real window, renderer and muted shared audio. Primary menu flow uses owner-thread internal input dispatch, not the main loop; the separate NPS idle-loop probe runs actual MenuApp::run without injected input and observes only mutex-protected snapshots. No physical OS input coverage. Drop fixture separately sends real WM_DROPFILES to the owned HWND after windowed/borderless/windowed changes, consumes its mailbox, then invokes the normal MenuApp event handler.")},
         {"pause_scope", JsonValue("Separate real GameSession, serialized internal Escape and public pause actions; its physical input producer is stopped. No claim of full MenuApp pause-overlay integration.")},
         {"present_observer", JsonValue(JsonObject{
             {"method", JsonValue("Smoke-only render callback wraps unchanged MenuApp::render_tick and accumulates its successful Present result before the next render clears it. One fixture window restart installs the callback before transition checks; FPS, VSync and overlay settings are unchanged by the observer.")},

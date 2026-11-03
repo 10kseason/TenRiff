@@ -1292,6 +1292,16 @@ struct MenuAppFeedbackTestAccess {
                         CHECK(menu->config_.mode.mods == expected_mods);
                     }
                     check_value_unchanged();
+                } else if (row.value_activatable && screen == MenuApp::Screen::SettingsAudio) {
+                    const auto id = static_cast<menu::settings::AudioSettingId>(row.row_index);
+                    REQUIRE(menu::settings::is_audio_file_setting(id));
+                    // The shell picker is a native boundary. Exercise its
+                    // controller request and cancellation without opening a
+                    // modal desktop dialog inside this headless regression.
+                    (void)menu->audio_settings_controller_.handle(menu::MenuAction::activate(), menu->config_, id);
+                    CHECK(menu->audio_settings_controller_.take_file_pick_request() == id);
+                    CHECK_FALSE(menu->audio_settings_controller_.take_file_pick_request().has_value());
+                    check_value_unchanged();
                 } else if (row.value_activatable) {
                     REQUIRE(screen == MenuApp::Screen::SettingsGraphics);
                     REQUIRE(row.row_index == static_cast<int>(menu::settings::GraphicsSettingId::Resolution));

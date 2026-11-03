@@ -28,14 +28,23 @@
         const std::string grade_label = result_loc("GRADE", "등급") +
             (data.result.all_perfect ? result_loc(" · ALL PERFECT", " · 올 퍼펙트")
              : data.result.full_combo ? result_loc(" · FULL COMBO", " · 풀 콤보") : "");
-        draw_result_text(grade_label,
-                         d2d_->result_label_format.Get(),
-                         native_rect("result_summary.rect.006", D2D1::RectF(summary_left, 186.0f, summary_right, 216.0f)),
-                         d2d_->muted_brush.Get(), presentation.rank);
-        draw_grade(0, to_wide(data.result.rank.empty() ? "--" : data.result.rank),
-                   d2d_->result_grade_format.Get(),
+        const auto grade_label_rect = native_rect("result_summary.rect.006", D2D1::RectF(summary_left, 186.0f, summary_right, 216.0f));
+        if (data.result.full_combo && !data.result.all_perfect) {
+            const auto plain_prefix = result_loc("GRADE", "등급") + " · ";
+            const auto combo_range = result_semantic_suffix_range(to_wide(grade_label),
+                to_wide(result_loc("FULL COMBO", "풀 콤보")));
+            draw_result_text(plain_prefix, d2d_->result_label_format.Get(), grade_label_rect,
+                             d2d_->muted_brush.Get(), presentation.rank);
+            if (combo_range) draw_grade(5, to_wide(grade_label), d2d_->result_label_format.Get(), grade_label_rect,
+                presentation.rank, DWRITE_TEXT_ALIGNMENT_LEADING, 1.0f, 0.25f, kFullComboTextRgb, false,
+                static_cast<UINT32>(combo_range->start));
+        } else {
+            draw_result_text(grade_label, d2d_->result_label_format.Get(), grade_label_rect,
+                             d2d_->muted_brush.Get(), presentation.rank);
+        }
+        draw_record_rank(d2d_->result_grade_format.Get(),
                    native_rect("result_summary.rect.007", D2D1::RectF(summary_left - 4.0f, 216.0f, summary_right, 398.0f)),
-                   presentation.rank);
+                   DWRITE_TEXT_ALIGNMENT_LEADING);
 
         if (d2d_->button_border_brush) {
             const float saved = d2d_->button_border_brush->GetOpacity();
@@ -45,14 +54,14 @@
                           d2d_->button_border_brush.Get(), 1.0f);
             d2d_->button_border_brush->SetOpacity(saved);
         }
-        draw_result_text(data.result.new_record ? "NEW Record" : result_loc("YOUR SCORE", "이번 플레이 점수"),
+        const float record_score_alpha = data.result.new_record ? record_effect.score_visibility : presentation.score;
+        draw_result_text(data.result.new_record ? "NEW RECORD" : result_loc("YOUR SCORE", "이번 플레이 점수"),
                          d2d_->result_label_format.Get(),
                          native_rect("result_summary.rect.009", D2D1::RectF(summary_left, 424.0f, summary_left + 230.0f, 452.0f)),
-                         data.result.new_record ? semantic_brush(0xFFE477) : d2d_->muted_brush.Get(), presentation.score);
-        draw_result_text(std::to_string(result_counted_score(data.result.score, presentation.score)),
-                         d2d_->result_score_format.Get(),
+                         data.result.new_record ? semantic_brush(0xFFE477) : d2d_->muted_brush.Get(), record_score_alpha);
+        draw_record_score(d2d_->result_score_format.Get(),
                          native_rect("result_summary.rect.010", D2D1::RectF(summary_left, 458.0f, summary_left + 250.0f, 536.0f)),
-                         d2d_->text_brush.Get(), presentation.score);
+                         d2d_->text_brush.Get(), record_score_alpha, DWRITE_TEXT_ALIGNMENT_LEADING, std::string{});
         draw_result_text(result_loc("OUT OF ", "최대 ") + std::to_string(data.result.max_score),
                          d2d_->result_label_format.Get(),
                          native_rect("result_summary.rect.008", D2D1::RectF(summary_left, 526.0f, summary_left + 250.0f, 554.0f)),

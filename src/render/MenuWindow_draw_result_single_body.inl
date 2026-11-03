@@ -85,7 +85,9 @@
                 }
                 return semantic_brush(kClearExRgb);
             }
-            const auto rgb = result_gauge_shift_clear_color(data.result.status);
+            // Clear text shares the established clear-lamp semantics; ordinary
+            // UI labels and failed/assisted states keep their original brushes.
+            const auto rgb = song_select_lamp_presentation(data.result.status).color;
             return rgb ? semantic_brush(*rgb) : fallback;
         };
         const auto draw_result_outline = [&](const D2D1_RECT_F& rect, uint32_t rgb,
@@ -123,6 +125,93 @@
             format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
             draw_result_text(text, format, rect, brush, alpha, DWRITE_TEXT_ALIGNMENT_CENTER);
             format->SetParagraphAlignment(saved_alignment);
+        };
+
+#include "MenuWindow_draw_result_text_fit.inl"
+        // Keep the whole-title clipping fix while restoring the original layout.
+        const auto draw_result_title = [&](const std::string& text, IDWriteTextFormat* format,
+                                           const D2D1_RECT_F& rect, ID2D1Brush* ink, float opacity) {
+            if (modern_library_screen) draw_result_fitted_text(text, format, rect, ink, opacity, true, 0);
+            else draw_result_text(text, format, rect, ink, opacity);
+        };
+
+        const auto draw_record_score = [&](IDWriteTextFormat* format, const D2D1_RECT_F& rect,
+                                           ID2D1Brush* brush, float alpha,
+                                           DWRITE_TEXT_ALIGNMENT alignment,
+                                           const std::string& suffix) {
+            const auto text = result_record_score_text(data.result.score, presentation.score,
+                record_elapsed_ns, data.result.new_record, record_effect_skipped) + suffix;
+            draw_result_text(text, format, rect, brush, alpha, alignment);
+            if (data.result.new_record && record_effect.distortion > 0.0f) {
+                const int tick = static_cast<int>((record_elapsed_ns / 33'333'334LL) % 7);
+                const float top = rect.top + (rect.bottom - rect.top) * (0.20f + 0.08f * tick);
+                ctx->PushAxisAlignedClip(D2D1::RectF(rect.left, top, rect.right, top + 6.0f), D2D1_ANTIALIAS_MODE_ALIASED);
+                const float offset = (tick % 2 ? -1.0f : 1.0f) * (2.0f + 5.0f * record_effect.distortion);
+                draw_result_text(text, format, D2D1::RectF(rect.left + offset, rect.top,
+                    rect.right + offset, rect.bottom), semantic_brush(0x79E6FF), alpha * 0.72f, alignment);
+                ctx->PopAxisAlignedClip();
+            }
+        };
+
+        const auto draw_record_rank = [&](IDWriteTextFormat* format, const D2D1_RECT_F& rect,
+                                          DWRITE_TEXT_ALIGNMENT alignment) {
+            const auto rank = to_wide(data.result.rank.empty() ? "--" : data.result.rank);
+            if (!data.result.rank_upgraded || record_effect_skipped) {
+                draw_grade(0, rank, format, rect, presentation.rank, alignment, 1.0f,
+                           data.result.rank_upgraded ? 0.35f : 1.0f);
+                return;
+            }
+            const auto& old_rank = data.result.previous_rank;
+            if (record_effect.old_rank_opacity > 0.0f) {
+                const auto draw_old = [&]() {
+                    draw_grade(1, to_wide(old_rank), format, rect, record_effect.old_rank_opacity, alignment);
+                    draw_result_text(old_rank, format, rect, semantic_brush(0xFFFFFF),
+                        record_effect.old_rank_opacity * record_effect.old_rank_brightness * 0.82f, alignment);
+                };
+                if (record_effect.shatter <= 0.0f) {
+                    draw_old();
+                } else {
+                    D2D1_MATRIX_3X2_F saved{};
+                    ctx->GetTransform(&saved);
+                    const float glyph_width = std::min(rect.right - rect.left,
+                        format->GetFontSize() * static_cast<float>(old_rank.size()) * 0.75f);
+                    auto pieces = D2D1::RectF(rect.left, rect.top, rect.left + glyph_width, rect.bottom);
+                    if (alignment == DWRITE_TEXT_ALIGNMENT_CENTER) {
+                        pieces.left = (rect.left + rect.right - glyph_width) * 0.5f;
+                        pieces.right = pieces.left + glyph_width;
+                    }
+                    // Brightening has normally populated slot 1 already. Use
+                    // measured glyph bounds so a left-aligned A still breaks
+                    // into columns rather than occupying a single wide slice.
+                    const auto& old_cache = d2d_->grade_bitmaps[1];
+                    DWRITE_TEXT_METRICS metrics{};
+                    if (old_cache.layout && old_cache.text == to_wide(old_rank) && old_cache.format.Get() == format &&
+                        old_cache.width == std::ceil(rect.right - rect.left) &&
+                        old_cache.height == std::ceil(rect.bottom - rect.top) &&
+                        SUCCEEDED(old_cache.layout->GetMetrics(&metrics))) {
+                        pieces = D2D1::RectF(rect.left + metrics.left * old_cache.fit,
+                            rect.top + metrics.top * old_cache.fit,
+                            rect.left + (metrics.left + metrics.width) * old_cache.fit,
+                            rect.top + (metrics.top + metrics.height) * old_cache.fit);
+                    }
+                    // Twelve clipped glyph pieces, bounded for the short
+                    // shatter interval. No random state or per-frame bitmaps.
+                    for (int row = 0; row < 3; ++row) for (int col = 0; col < 4; ++col) {
+                        const float dx = (col - 1.5f) * 44.0f * record_effect.shatter;
+                        const float dy = ((row - 1.0f) * 34.0f + (col % 2 ? -12.0f : 12.0f)) * record_effect.shatter;
+                        ctx->SetTransform(D2D1::Matrix3x2F::Translation(dx, dy) * saved);
+                        ctx->PushAxisAlignedClip(D2D1::RectF(
+                            pieces.left + (pieces.right - pieces.left) * col / 4.0f,
+                            pieces.top + (pieces.bottom - pieces.top) * row / 3.0f,
+                            pieces.left + (pieces.right - pieces.left) * (col + 1) / 4.0f,
+                            pieces.top + (pieces.bottom - pieces.top) * (row + 1) / 3.0f), D2D1_ANTIALIAS_MODE_ALIASED);
+                        draw_old();
+                        ctx->PopAxisAlignedClip();
+                    }
+                    ctx->SetTransform(saved);
+                }
+            }
+            draw_grade(0, rank, format, rect, record_effect.new_rank_opacity, alignment, 1.0f, 0.35f);
         };
 
         auto draw_result_panel = [&](const D2D1_RECT_F& rect, float alpha, bool accent = false) {
@@ -424,7 +513,7 @@
                          d2d_->accent_brush.Get(),
                          presentation.information,
                          DWRITE_TEXT_ALIGNMENT_TRAILING);
-        draw_result_text(data.result.title.empty() ? std::string("Unknown Chart") : data.result.title,
+        draw_result_title(data.result.title.empty() ? std::string("Unknown Chart") : data.result.title,
                          d2d_->result_action_format.Get(),
                          native_rect("result_single.rect.013", D2D1::RectF(song_panel.left + 44.0f, song_panel.top + 402.0f - author_space,
                                      song_panel.right - 44.0f, song_panel.top + 455.0f - author_space)),
@@ -584,22 +673,24 @@
             d2d_->accent_brush->SetOpacity(saved_opacity);
         }
 
-        const int64_t counted_score = result_counted_score(data.result.score, presentation.score);
-        const float score_alpha = presentation.score;
+        const float score_alpha = data.result.new_record ? record_effect.score_visibility : presentation.score;
         const float pulse_scale = 1.0f + presentation.score_pulse * 0.06f;
         const D2D1_RECT_F score_rect =
             native_rect("result_single.rect.017", D2D1::RectF(prism_center.x - 260.0f,
                         158.0f - 5.0f * presentation.score_pulse,
                         prism_center.x + 260.0f,
                         230.0f + 5.0f * presentation.score_pulse));
-        draw_result_text(std::to_string(counted_score) + " / " +
-                             std::to_string(data.result.max_score),
-                         d2d_->title_format.Get(),
-                         score_rect,
-                         modern_library_screen ? native_color(0xFFFFFF, 1) : d2d_->text_brush.Get(),
-                         score_alpha * pulse_scale,
-                         DWRITE_TEXT_ALIGNMENT_CENTER);
-        draw_result_text(data.result.new_record ? "NEW Record" : result_loc("SCORE", "점수"),
+        if (data.result.new_record) {
+            draw_record_score(d2d_->title_format.Get(), score_rect, d2d_->text_brush.Get(),
+                              score_alpha * pulse_scale, DWRITE_TEXT_ALIGNMENT_CENTER,
+                              " / " + std::to_string(data.result.max_score));
+        } else {
+            draw_result_text(std::to_string(result_counted_score(data.result.score, presentation.score)) + " / " +
+                             std::to_string(data.result.max_score), d2d_->title_format.Get(), score_rect,
+                             modern_library_screen ? native_color(0xFFFFFF, 1) : d2d_->text_brush.Get(),
+                             score_alpha * pulse_scale, DWRITE_TEXT_ALIGNMENT_CENTER);
+        }
+        draw_result_text(data.result.new_record ? "NEW RECORD" : result_loc("SCORE", "점수"),
                          d2d_->result_label_format.Get(),
                          native_rect("result_single.rect.018", D2D1::RectF(prism_center.x - 120.0f, 132.0f,
                                      prism_center.x + 120.0f, 160.0f)),
@@ -620,7 +711,7 @@
         const D2D1_RECT_F rank_rect =
             native_rect("result_single.rect.020", D2D1::RectF(prism_center.x - 250.0f, 285.0f,
                         prism_center.x + 250.0f, 500.0f));
-        if (presentation.chromatic > 0.0f && result_success) {
+        if (presentation.chromatic > 0.0f && result_success && !data.result.rank_upgraded) {
             draw_result_text(rank_text,
                              d2d_->rank_format.Get(),
                              native_rect("result_single.rect.021", D2D1::RectF(rank_rect.left - 4.0f, rank_rect.top,
@@ -636,8 +727,7 @@
                              presentation.rank * presentation.chromatic * 0.45f,
                              DWRITE_TEXT_ALIGNMENT_CENTER);
         }
-        draw_grade(0, to_wide(rank_text), d2d_->rank_format.Get(), rank_rect,
-                   presentation.rank, DWRITE_TEXT_ALIGNMENT_CENTER);
+        draw_record_rank(d2d_->rank_format.Get(), rank_rect, DWRITE_TEXT_ALIGNMENT_CENTER);
 
         if (result_success && presentation.shockwave > 0.0f && presentation.shockwave < 1.0f &&
             d2d_->accent_brush) {
@@ -681,13 +771,12 @@
                              presentation.all_perfect,
                              DWRITE_TEXT_ALIGNMENT_CENTER);
         } else if (data.result.full_combo) {
-            draw_result_text(result_loc("FULL COMBO", "풀 콤보"),
+            draw_grade(6, to_wide(result_loc("FULL COMBO", "풀 콤보")),
                              d2d_->result_label_format.Get(),
                              native_rect("result_single.rect.025", D2D1::RectF(prism_center.x - 160.0f, 590.0f,
                                          prism_center.x + 160.0f, 622.0f)),
-                             d2d_->accent_brush.Get(),
                              presentation.status,
-                             DWRITE_TEXT_ALIGNMENT_CENTER);
+                             DWRITE_TEXT_ALIGNMENT_CENTER, 1.0f, 0.25f, kFullComboTextRgb);
         }
 
         if (result_success && presentation.rank > 0.0f && presentation.rank < 1.0f &&
@@ -834,7 +923,9 @@
                 ctx->DrawLine(D2D1::Point2F(gauge_track.left, y),
                               D2D1::Point2F(gauge_track.right, y),
                               d2d_->button_border_brush.Get(), edge ? 1.1f : 0.8f);
-                draw_result_text(std::to_string(100 - line * 25) + "%",
+                constexpr const char* shift_axis[]{"EX100%", "HD100%", "NM100%", "EZ100%", "EZ0%"};
+                draw_result_text(data.result.gauge_shift_graph ? std::string(shift_axis[line]) :
+                                 std::to_string(100 - line * 25) + "%",
                                  d2d_->result_label_format.Get(),
                                  native_rect("result_single.rect.037", D2D1::RectF(gauge_plot.left, y - 16.0f,
                                              gauge_track.left - 8.0f, y + 16.0f)),
@@ -924,7 +1015,7 @@
             {"POOR", std::to_string(data.result.poor), percent_for(data.result.poor), D2D1::ColorF(0xFF647A)},
             {"FAIL", std::to_string(data.result.bad), percent_for(data.result.bad), D2D1::ColorF(0xC399FF)},
             {result_loc("MAX COMBO", "최대 콤보"), std::to_string(data.result.max_combo),
-             data.result.full_combo ? result_loc("FULL COMBO", "풀 콤보") : "COMBO / " + std::to_string(data.result.total_notes), D2D1::ColorF(0xCBEF6B)},
+             data.result.full_combo ? result_loc("FULL COMBO", "풀 콤보") : "COMBO / " + std::to_string(data.result.total_notes), D2D1::ColorF(kFullComboTextRgb)},
             {result_loc("ACCURACY", "정확도"), format_decimal(data.result.accuracy) + "%",
              result_loc("DETAIL", "상세") + " " + format_decimal(data.result.detailed_accuracy) + "%", D2D1::ColorF(0x63E9FF)},
         }};
@@ -974,13 +1065,18 @@
                                  DWRITE_TEXT_ALIGNMENT_CENTER);
                 const auto detail_rect = native_rect("result_single.rect.042", D2D1::RectF(cell.left + 10.0f, cell.top + 153.0f + rise,
                                              cell.right - 10.0f, cell.top + 190.0f + rise));
-                if (!(index == 5 && data.result.all_combo_badge && draw_all_combo_image(detail_rect, alpha)))
-                    draw_result_text(result_statistics[index].detail,
+                if (!(index == 5 && data.result.all_combo_badge && draw_all_combo_image(detail_rect, alpha))) {
+                    if (index == 5 && data.result.full_combo) {
+                        draw_grade(7, to_wide(result_statistics[index].detail), d2d_->result_label_format.Get(),
+                            detail_rect, alpha * zero_scale, DWRITE_TEXT_ALIGNMENT_CENTER,
+                            1.0f, 0.25f, kFullComboTextRgb);
+                    } else draw_result_text(result_statistics[index].detail,
                                  d2d_->result_label_format.Get(),
                                  detail_rect,
                                  d2d_->accent_brush.Get(),
                                  alpha * zero_scale,
                                  DWRITE_TEXT_ALIGNMENT_CENTER);
+                }
                 d2d_->accent_brush->SetColor(saved_color);
                 d2d_->accent_brush->SetOpacity(saved_opacity);
             }

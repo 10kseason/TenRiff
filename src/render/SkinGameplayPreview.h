@@ -108,6 +108,13 @@ inline GameplayHudData make_skin_gameplay_preview(const SkinPreviewData& preview
     hud.key_overlay_enabled = preview.key_overlay_enabled;
     hud.key_overlay_x = preview.key_overlay_x;
     hud.key_overlay_y = preview.key_overlay_y;
+    hud.score_comparison_enabled = preview.score_comparison_enabled;
+    hud.score_comparison_x = preview.score_comparison_x;
+    hud.score_comparison_y = preview.score_comparison_y;
+    hud.score_comparison.live = hud.score_comparison.best_available = hud.score_comparison.rank_available = true;
+    hud.score_comparison.best_score = 4160;
+    hud.score_comparison.score_difference = 42;
+    hud.score_comparison.rank_difference = {3.25, 1.25, 0.25, -0.75};
 
     hud.indicator_background_visible = preview.indicator_background_visible;
     hud.key_label_position = preview.key_label_position;

@@ -362,6 +362,9 @@ TEST_CASE("profile start controls retain legacy defaults and roundtrip without c
     edited.skin.key_overlay_enabled = true;
     edited.skin.key_overlay_x = 0.17;
     edited.skin.key_overlay_y = 0.72;
+    edited.skin.score_comparison_enabled = true;
+    edited.skin.score_comparison_x = 0.81;
+    edited.skin.score_comparison_y = 0.29;
     edited.skin.timing_marker_style = "barcode";
     edited.skin.judgement_line_type = 2;
     edited.audio.device_id = "synthetic-endpoint";
@@ -381,6 +384,9 @@ TEST_CASE("profile start controls retain legacy defaults and roundtrip without c
     CHECK(loaded.config.skin.key_overlay_enabled);
     CHECK(loaded.config.skin.key_overlay_x == doctest::Approx(0.17));
     CHECK(loaded.config.skin.key_overlay_y == doctest::Approx(0.72));
+    CHECK(loaded.config.skin.score_comparison_enabled);
+    CHECK(loaded.config.skin.score_comparison_x == doctest::Approx(0.81));
+    CHECK(loaded.config.skin.score_comparison_y == doctest::Approx(0.29));
     CHECK(loaded.config.skin.timing_marker_style == "barcode");
     CHECK(loaded.config.skin.judgement_line_type == 2);
     CHECK(loaded.config.audio.device_id == "synthetic-endpoint");
@@ -726,6 +732,57 @@ TEST_CASE("title music choice and last played chart persist without populating p
     REQUIRE(loader.save_profile("profiles/music", config));
     CHECK(loader.load_profile("profiles/music").config.audio_ui.title_music == "default");
     CHECK(tenriff::config::normalize_title_music_token("RANDOM_BMS") == "random_bms");
+}
+
+TEST_CASE("audio file selections roundtrip Unicode paths defaults and explicit silence") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    CurrentPathGuard cwd;
+    std::filesystem::current_path(temp.path);
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    CHECK(config.audio_ui.main_music_file.empty());
+    CHECK(config.audio_ui.clear_music_file.empty());
+    CHECK(config.audio_ui.fail_music_file.empty());
+    CHECK(config.audio_ui.button_sound_file.empty());
+    CHECK(config.audio_ui.slider_sound_file.empty());
+    CHECK(config.audio_ui.drop_sound_file == "none");
+    config.audio_ui.main_music_file = "audio/메인.mp3";
+    config.audio_ui.clear_music_file = "audio/成功.ogg";
+    config.audio_ui.fail_music_file = "none";
+    config.audio_ui.button_sound_file = "audio/click.wav";
+    config.audio_ui.slider_sound_file = "audio/drag.flac";
+    config.audio_ui.drop_sound_file = "audio/drop.mp3";
+    config.audio_ui.options_sound_file = "none";
+    config.audio_ui.start_sound_file = "audio/start.mp3";
+    config.audio_ui.done_sound_file = "audio/done.flac";
+    REQUIRE(loader.save_profile("profiles/audio-files", config));
+    auto result = loader.load_profile("profiles/audio-files");
+    REQUIRE(result.success());
+    CHECK(result.config.audio_ui.main_music_file == config.audio_ui.main_music_file);
+    CHECK(result.config.audio_ui.clear_music_file == config.audio_ui.clear_music_file);
+    CHECK(result.config.audio_ui.fail_music_file == config.audio_ui.fail_music_file);
+    CHECK(result.config.audio_ui.button_sound_file == config.audio_ui.button_sound_file);
+    CHECK(result.config.audio_ui.slider_sound_file == config.audio_ui.slider_sound_file);
+    CHECK(result.config.audio_ui.drop_sound_file == config.audio_ui.drop_sound_file);
+    CHECK(result.config.audio_ui.options_sound_file == "none");
+    CHECK(result.config.audio_ui.start_sound_file == config.audio_ui.start_sound_file);
+    CHECK(result.config.audio_ui.done_sound_file == config.audio_ui.done_sound_file);
+    write_file("profiles/audio-files/config.json", R"({"audio":{"title_music":"last_played"}})");
+    result = loader.load_profile("profiles/audio-files");
+    REQUIRE(result.success());
+    CHECK(result.config.audio_ui.title_music == "last_played");
+    CHECK(result.config.audio_ui.main_music_file.empty());
+    CHECK(result.config.audio_ui.button_sound_file.empty());
+    CHECK(result.config.audio_ui.drop_sound_file == "none");
+    CHECK(result.config.audio_ui.options_sound_file.empty());
+    write_file("profiles/audio-files/config.json", R"({"audio":{"button_sound_file":"none","slider_sound_file":"custom.wav","options_sound_file":"none"}})");
+    result = loader.load_profile("profiles/audio-files");
+    REQUIRE(result.success());
+    CHECK(result.config.audio_ui.button_sound_file == "none");
+    CHECK(result.config.audio_ui.slider_sound_file == "custom.wav");
+    CHECK(result.config.audio_ui.options_sound_file == "none");
 }
 
 TEST_CASE("ASIO profile roundtrip preserves driver sample rate and buffer independently of WASAPI presets") {

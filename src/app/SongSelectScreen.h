@@ -6,8 +6,11 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
+
+#include "app/SongIndex.h"
 
 namespace tenriff::app {
 
@@ -51,6 +54,13 @@ public:
     void cancel_preview_decode();
     void shutdown();
 
+    // Independent of preview audio being enabled. One debounced worker, one
+    // cached result, and no synchronous file parsing in the menu/render loop.
+    [[nodiscard]] bool service_nps_profile(std::string selection_key,
+                                            std::string chart_path, int64_t now_ns);
+    [[nodiscard]] const SongNpsProfile* nps_profile_for(std::string_view selection_key) const;
+    [[nodiscard]] const std::string& nps_selection_key() const { return nps_selection_key_; }
+
     [[nodiscard]] const std::string& preview_active_path() const { return preview_active_path_; }
     void set_preview_active_path(std::string path) { preview_active_path_ = std::move(path); }
     void clear_preview_active_path() { preview_active_path_.clear(); }
@@ -65,6 +75,18 @@ private:
     std::future<PreviewDecodeResult> preview_decode_future_{};
     std::shared_ptr<std::atomic<bool>> preview_decode_cancel_{};
     std::atomic<float> preview_gain_{0.0f};
+    struct NpsDecodeResult {
+        std::string selection_key;
+        SongNpsProfile profile;
+    };
+    std::string nps_selection_key_{};
+    std::string nps_chart_path_{};
+    std::string nps_cached_key_{};
+    SongNpsProfile nps_cached_profile_{};
+    int64_t nps_due_ns_ = 0;
+    bool nps_pending_ = false;
+    std::future<NpsDecodeResult> nps_future_{};
+    std::shared_ptr<std::atomic<bool>> nps_cancel_{};
 };
 
 }  // namespace tenriff::app

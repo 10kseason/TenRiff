@@ -34,6 +34,8 @@
 #include "app/menu/MenuScreenDescriptor.h"
 #include "app/menu/OptionsHubController.h"
 #include "app/menu/settings/AudioSettingsController.h"
+#include "app/RecordFeedback.h"
+#include "app/ResultGaugeHistory.h"
 #include "app/menu/settings/CalibrationSettingsController.h"
 #include "app/menu/settings/GraphicsSettingsController.h"
 #include "app/menu/settings/InputSettingsController.h"
@@ -62,6 +64,8 @@
 
 namespace tenriff::app {
 
+class GameSession;
+
 namespace menu_records {
 struct ParsedResultRecord;
 }
@@ -87,6 +91,8 @@ class MenuApp {
     friend struct MenuAppRepeatTestAccess;
     friend struct MenuAppSessionMixTestAccess;
     friend struct MenuAppSkinPreviewTestAccess;
+    friend struct MenuAppScoreComparisonTestAccess;
+    friend struct MenuAppLobbySemanticTestAccess;
     friend struct MenuAppFeedbackTestAccess;
 public:
     MenuApp();
@@ -169,6 +175,7 @@ private:
         std::string pacemaker_mode = "off";
         double pacemaker_target = 0.0;
         double pacemaker_delta = 0.0;
+        LiveScoreComparison score_comparison;
         bool game_over = false;
         bool spectating_peer = false;
         bool user_aborted = false;
@@ -346,6 +353,10 @@ private:
     [[nodiscard]] int bms_editor_snap_division() const noexcept;
     void handle_audio_settings_input(uint32_t keycode);
     void apply_audio_settings_effects(const menu::MenuEffectFlags& effects);
+    void play_menu_sound(MenuSoundKind kind);
+    [[nodiscard]] const std::string& menu_sound_token(MenuSoundKind kind) const;
+    void service_menu_sounds();
+    void notify_menu_load_complete(bool succeeded, bool nonempty);
     void apply_input_settings_effects(const menu::MenuEffectFlags& effects);
     void apply_calibration_settings_effects(const menu::MenuEffectFlags& effects);
     void refresh_graphics_resolutions();
@@ -481,11 +492,12 @@ private:
     void open_selected_song_source();
     void exit_keymap_screen();
     void reload_chart_best_results();
-    // Returns a meaningful official BEST improvement, excluding recency-only ties.
+    // Score celebration is independent of the saved clear-first BEST.
     bool append_chart_result_record(const menu_records::ParsedResultRecord& parsed,
                                     const std::string& result_path,
                                     const std::string& replay_path,
-                                    const ReplayVerificationResult& verification);
+                                    const ReplayVerificationResult& verification,
+                                    RecordFeedback* feedback = nullptr);
     void cache_current_session_result(const std::string& chart_path,
                                       const std::string& result_path,
                                       const std::string& replay_path,
@@ -535,9 +547,12 @@ private:
     [[nodiscard]] bool open_current_song_best_result();
     [[nodiscard]] const ReplaySummary* replay_summary_for_path(const std::string& path);
     [[nodiscard]] std::string best_replay_path_for_selected_song() const;
+    [[nodiscard]] std::string score_comparison_replay_path_for_selected_song() const;
+    void prepare_score_comparison_replay(GameSession& session, CommandLineOptions& options) const;
     [[nodiscard]] bool move_song_select_selection(int delta);
     [[nodiscard]] bool handle_settings_shortcut(uint32_t keycode, Screen return_screen);
     [[nodiscard]] std::string song_absolute_path(const SongEntry& entry) const;
+    [[nodiscard]] std::string song_nps_profile_key(const SongEntry& entry) const;
     void update_last_chart_metadata(const std::string& chart_path,
                                     const SongEntry* preferred_entry = nullptr);
     [[nodiscard]] std::string profile_display_name() const;
@@ -561,6 +576,7 @@ private:
     std::atomic<bool> menu_audio_muted_{false};
     bool menu_audio_foreground_ = true;
     void service_song_preview();
+    [[nodiscard]] bool service_song_nps_profile();
     void update_title_music_target();
     [[nodiscard]] bool start_song_preview_audio(const SongSelectScreen::PreviewDecodeResult& preview);
     void cancel_song_preview_decode();
@@ -621,6 +637,7 @@ private:
         std::string final_gauge = "normal";
         bool game_over = true;
         int max_combo = 0;
+        bool verified_full_combo = false;
         int perfect = 0;
         int great = 0;
         int good = 0;
@@ -629,6 +646,11 @@ private:
         std::string created_utc;
         std::string result_path;
         std::string replay_path;
+    };
+
+    struct ScoreHighWaterRecord {
+        BestResultRecord best;
+        std::string highest_rank = "--";
     };
 
     struct LocalPlayRecord {
@@ -664,6 +686,7 @@ private:
         double accuracy = 0.0;
         double detailed_accuracy = 0.0;
         int max_combo = 0;
+        bool verified_full_combo = false;
         int total_notes = 0;
         int judged_notes = 0;
         int perfect = 0;
@@ -738,6 +761,8 @@ private:
     double last_result_score_multiplier_ = 1.0;
     int64_t last_result_final_score_ = 0;
     bool last_result_new_record_ = false;
+    int64_t scene_transition_start_ns_ = 0;
+    RecordFeedback last_result_record_feedback_{};
     bool last_pause_used_ = false;
     bool last_session_replay_playback_ = false;
     double last_chart_bpm_ = 0.0;
@@ -784,6 +809,8 @@ private:
     uint64_t song_index_revision_ = 0;
     std::vector<std::size_t> visible_song_indices_{};
     std::unordered_map<std::string, BestResultRecord> chart_best_results_{};
+    // Rebuilt from eligible history; contains actual replay-backed score records.
+    std::unordered_map<std::string, ScoreHighWaterRecord> chart_score_high_water_{};
     std::unordered_set<std::string> favorite_song_keys_{};
     std::unordered_map<std::string, std::unordered_set<std::string>> song_collection_membership_{};
     int indexed_favorite_count_ = 0;
@@ -892,6 +919,9 @@ private:
     input::InputThread input_thread_{};
     audio::AudioThread audio_thread_{};
     MenuMusicController menu_music_{};
+    MenuSoundController menu_sounds_{};
+    std::string audio_file_status_;
+    std::unordered_set<std::string> failed_menu_music_files_;
     std::string menu_music_scene_key_{};
     std::string menu_music_scene_path_{};
     std::unordered_map<std::string, std::size_t> menu_music_variant_cursors_{};

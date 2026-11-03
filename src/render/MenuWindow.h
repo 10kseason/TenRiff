@@ -1,6 +1,7 @@
 #pragma once
 
 #include "app/KeyNoteOverlay.h"
+#include "app/LiveScoreComparison.h"
 
 #ifdef _WIN32
 
@@ -168,6 +169,9 @@ struct SongCardData {
     std::string detail;
     std::string background_path;
     std::string lamp;
+    bool has_score = false;
+    int64_t score = 0;
+    int chart_count = -1; // Folder inventory; never a score or difficulty.
     std::string level_label;
     bool difficulty_is_aery_five_key = false;
     int difficulty_prefix_key_count = 0;
@@ -212,6 +216,7 @@ struct SongSelectData {
     bool showing_sources = false;
     bool showing_level_folders = false;
     bool showing_records = false;
+    bool native_list_layout = true;
     bool online_records = false;
     bool sites_records = false;
     bool online_detail_score_available = false;
@@ -244,6 +249,9 @@ struct SongSelectData {
     double selected_song_nps_min = 0.0;
     double selected_song_nps_median = 0.0;
     double selected_song_nps_max = 0.0;
+    bool selected_song_nps_available = false;
+    double selected_song_nps_average = 0.0;
+    std::vector<float> selected_song_nps_bins;
     int selected_song_note_count = 0;
     std::string current_visual_latency;
     std::string current_hi_speed;
@@ -295,6 +303,8 @@ struct SongSelectData {
 
     std::string rank;
     int64_t best_score = 0;
+    std::string score_clear_status;
+    bool verified_full_combo = false;
     int64_t max_score = 10'000;
     int64_t detail_score = 0;
     int64_t max_detail_score = 0;
@@ -425,6 +435,11 @@ struct ResultScreenData {
     bool full_combo = false;
     bool all_combo_badge = false;
     bool new_record = false;
+    bool has_previous_score = false;
+    int64_t previous_score = 0;
+    std::string previous_rank = "--";
+    bool rank_upgraded = false;
+    bool gauge_shift_graph = false;
     int64_t presentation_start_ns = 0;
     bool presentation_skipped = false;
 
@@ -490,6 +505,7 @@ struct GameplayHudData {
     std::string pacemaker_mode = "off";
     double pacemaker_target = 0.0;
     double pacemaker_delta = 0.0;
+    app::LiveScoreComparison score_comparison;
     std::string title;
     std::string artist;
     std::string difficulty_label;
@@ -587,6 +603,9 @@ struct GameplayHudData {
     bool key_overlay_enabled = false;
     double key_overlay_x = 0.0;
     double key_overlay_y = 0.25;
+    bool score_comparison_enabled = false;
+    double score_comparison_x = 0.0;
+    double score_comparison_y = 0.28;
 
     bool indicator_background_visible = false;
     std::string key_label_position = "bottom";
@@ -810,6 +829,9 @@ struct SkinPreviewData {
     bool key_overlay_enabled = false;
     double key_overlay_x = 0.0;
     double key_overlay_y = 0.25;
+    bool score_comparison_enabled = false;
+    double score_comparison_x = 0.0;
+    double score_comparison_y = 0.28;
 
     bool indicator_background_visible = false;
     std::string key_label_position = "bottom";
@@ -959,6 +981,7 @@ struct LobbySkinData {
 
 struct MenuRenderData {
     MenuScreenKind kind = MenuScreenKind::GenericList;
+    int64_t transition_start_ns = 0;
     ui::Language ui_language = ui::Language::English;
     std::string ui_font = "default";
     std::string ui_font_path;
@@ -1077,6 +1100,20 @@ private:
     [[nodiscard]] bool song_select_preview_loading_deferred(int64_t now_ns) const;
     [[nodiscard]] ID2D1Bitmap* find_song_card_preview_bitmap(std::string_view path);
     [[nodiscard]] bool load_song_card_preview_bitmap(std::string_view path);
+    enum class MenuMotionSource { None, SongSelect, Result };
+    struct MenuMotionDiagnostics {
+        MenuMotionSource source = MenuMotionSource::None;
+        int64_t duration_ns = 0;
+        int frame_rate = 0;
+        bool active = false, decoder_active = false, asset_available = false;
+        bool failed = false, has_frame = false, reduced_motion = false;
+        int64_t position_ns = 0, frame_timestamp_100ns = -1;
+        uint64_t decode_requests = 0, uploaded_frames = 0;
+    };
+    void update_menu_motion_background(MenuMotionSource source, bool reduced_motion,
+                                       int64_t now_ns);
+    void clear_menu_motion_background();
+    MenuMotionDiagnostics menu_motion_background_diagnostics() const;
     [[nodiscard]] bool load_selected_song_preview_bitmap(const SongSelectData& data, int64_t now_ns);
     void touch_song_card_preview_lru(std::string_view path);
     void trim_song_card_preview_cache();
@@ -1128,6 +1165,8 @@ private:
         uint32_t characters = 0, line_count = 0;
         uint64_t layout_builds = 0;
     } benchmark_song_title_;
+    SongTitleDiagnostics benchmark_result_title_{};
+    std::array<SongTitleDiagnostics, 2> benchmark_result_details_{};
     struct GameplayComboPlacementMetrics {
         bool combo_visible = false, counts_visible = false;
         std::array<float, 4> combo_rect{}, counts_rect{};

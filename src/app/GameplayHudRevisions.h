@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "GameplayHudLimits.h"
+#include "LiveScoreComparison.h"
 #include "game/GaugeManager.h"
 #include "gameplay/GameplayChart.h"
 #include "gameplay/ResultStats.h"
@@ -66,6 +67,7 @@ struct GameplayHudRevisionInput {
     bool full_combo = false;
     gameplay::JudgementCounts counts;
     int64_t score = 0;
+    LiveScoreComparison score_comparison;
     bool osu_od8_score_available = false;
     int64_t osu_od8_score = 0;
 
@@ -249,6 +251,14 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.counts.bd != next.counts.bd ||
         previous.counts.pr != next.counts.pr ||
         previous.score != next.score ||
+        // The independent BEST replay can score between player judgements.
+        // Its values and availability must publish without another HUD change.
+        previous.score_comparison.live != next.score_comparison.live ||
+        previous.score_comparison.best_available != next.score_comparison.best_available ||
+        previous.score_comparison.rank_available != next.score_comparison.rank_available ||
+        previous.score_comparison.best_score != next.score_comparison.best_score ||
+        previous.score_comparison.score_difference != next.score_comparison.score_difference ||
+        previous.score_comparison.rank_difference != next.score_comparison.rank_difference ||
         previous.osu_od8_score_available != next.osu_od8_score_available ||
         previous.osu_od8_score != next.osu_od8_score ||
         previous.gauge != next.gauge ||

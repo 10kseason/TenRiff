@@ -2,6 +2,16 @@
 #include "app/MenuApp.h"
 
 #include <utility>
+#include <filesystem>
+#include <iterator>
+#include <optional>
+#include <iostream>
+#include "app/NativeFileDialog.h"
+#include "app/MenuAudioFileDialog.h"
+#include "util/Utf8Compat.h"
+#ifdef _WIN32
+#include <wrl/client.h>
+#endif
 
 #include "app/MenuAppSettingsUtils.h"
 #include "app/MenuAppSkinUtils.h"
@@ -11,6 +21,90 @@
 #include "audio/WasapiBackend.h"
 
 namespace tenriff::app {
+
+namespace {
+MenuAudioFileChoice pick_menu_audio_file() {
+#ifdef _WIN32
+    return run_menu_audio_picker_sta([] {
+        MenuAudioFileChoice result;
+        const auto failed = [&](HRESULT error) {
+            result.error = "Audio file dialog failed (HRESULT " +
+                std::to_string(static_cast<unsigned long>(error)) + ").";
+            return result;
+        };
+        Microsoft::WRL::ComPtr<IFileOpenDialog> dialog;
+        HRESULT status = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER,
+                                          IID_PPV_ARGS(&dialog));
+        if (FAILED(status)) return failed(status);
+        DWORD options = 0;
+        status = dialog->GetOptions(&options);
+        if (FAILED(status)) return failed(status);
+        status = dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_FILEMUSTEXIST |
+                                   FOS_PATHMUSTEXIST | FOS_NOCHANGEDIR);
+        if (FAILED(status)) return failed(status);
+        const COMDLG_FILTERSPEC filters[] = {
+            {L"Audio (*.mp3;*.ogg;*.wav;*.flac)", L"*.mp3;*.ogg;*.wav;*.flac"},
+        };
+        status = dialog->SetFileTypes(static_cast<UINT>(std::size(filters)), filters);
+        if (FAILED(status)) return failed(status);
+        status = dialog->SetTitle(L"Select music or UI sound");
+        if (FAILED(status)) return failed(status);
+        status = show_native_file_dialog(dialog.Get());
+        if (status == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
+            result.cancelled = true;
+            return result;
+        }
+        if (FAILED(status)) return failed(status);
+        Microsoft::WRL::ComPtr<IShellItem> item;
+        status = dialog->GetResult(&item);
+        if (FAILED(status) || !item) return failed(FAILED(status) ? status : E_FAIL);
+        struct ShellPath { PWSTR value = nullptr; ~ShellPath() { CoTaskMemFree(value); } } raw;
+        status = item->GetDisplayName(SIGDN_FILESYSPATH, &raw.value);
+        if (FAILED(status) || !raw.value) return failed(FAILED(status) ? status : E_FAIL);
+        result.path = std::filesystem::path(raw.value).u8string();
+        return result;
+    });
+#else
+    return {{}, "Native audio file selection is available on Windows.", false};
+#endif
+}
+}  // namespace
+
+void MenuApp::play_menu_sound(MenuSoundKind kind) {
+    const auto& token = menu_sound_token(kind);
+    menu_sounds_.request(kind, token.empty() ? menu_music_detail::resolve_bundled_sound(kind) : token,
+                         menu_output_master_gain());
+}
+
+void MenuApp::notify_menu_load_complete(bool succeeded, bool nonempty) {
+    if (succeeded && nonempty) play_menu_sound(MenuSoundKind::Done);
+}
+
+const std::string& MenuApp::menu_sound_token(MenuSoundKind kind) const {
+    switch (kind) {
+        case MenuSoundKind::Button: return config_.audio_ui.button_sound_file;
+        case MenuSoundKind::Slider: return config_.audio_ui.slider_sound_file;
+        case MenuSoundKind::Drop: return config_.audio_ui.drop_sound_file;
+        case MenuSoundKind::OptionsEdit: return config_.audio_ui.options_sound_file;
+        case MenuSoundKind::Start: return config_.audio_ui.start_sound_file;
+        case MenuSoundKind::Done: return config_.audio_ui.done_sound_file;
+    }
+    return config_.audio_ui.drop_sound_file;
+}
+
+void MenuApp::service_menu_sounds() {
+    menu_sounds_.service(!(menu_output_master_gain() > 0.0));
+    if (!menu_sounds_.take_error().empty()) {
+        audio_file_status_ = ui_text("Selected UI sound could not be decoded. Choose another file.",
+                                    "선택한 UI 효과음을 읽지 못했습니다. 다른 파일을 선택하세요.");
+        if (current_screen() == Screen::SettingsAudio) publish_snapshot();
+    }
+    for (std::size_t index = 0; index < kMenuSoundKindCount; ++index) {
+        const auto kind = static_cast<MenuSoundKind>(index);
+        const auto& token = menu_sound_token(kind);
+        menu_sounds_.preload(kind, token.empty() ? menu_music_detail::resolve_bundled_sound(kind) : token);
+    }
+}
 
 void MenuApp::handle_audio_settings_input(uint32_t keycode) {
     if (keycode == key_f5_) {
@@ -43,7 +137,43 @@ void MenuApp::handle_audio_settings_input(uint32_t keycode) {
     apply_audio_settings_effects(effects);
 }
 
-void MenuApp::apply_audio_settings_effects(const menu::MenuEffectFlags& effects) {
+void MenuApp::apply_audio_settings_effects(const menu::MenuEffectFlags& requested) {
+    auto effects = requested;
+    const auto invalidate_sound_slot = [&](menu::settings::AudioSettingId slot) {
+        using menu::settings::AudioSettingId;
+        if (slot == AudioSettingId::ButtonSoundFile) menu_sounds_.invalidate(MenuSoundKind::Button);
+        if (slot == AudioSettingId::SliderSoundFile) menu_sounds_.invalidate(MenuSoundKind::Slider);
+        if (slot == AudioSettingId::DropSoundFile) menu_sounds_.invalidate(MenuSoundKind::Drop);
+        if (slot == AudioSettingId::OptionsSoundFile) menu_sounds_.invalidate(MenuSoundKind::OptionsEdit);
+        if (slot == AudioSettingId::StartSoundFile) menu_sounds_.invalidate(MenuSoundKind::Start);
+        if (slot == AudioSettingId::DoneSoundFile) menu_sounds_.invalidate(MenuSoundKind::Done);
+    };
+    if (effects.render_changed) invalidate_sound_slot(audio_settings_controller_.selected_id());
+    if (const auto slot = audio_settings_controller_.take_file_pick_request()) {
+        const auto choice = pick_menu_audio_file();
+        if (!choice.error.empty()) {
+            audio_file_status_ = ui_text(
+                "Audio file selection failed. Try again, or drop an MP3, OGG, WAV or FLAC file onto this row.",
+                "오디오 파일 선택기를 열지 못했습니다. 다시 시도하거나 이 항목에 MP3, OGG, WAV, FLAC 파일을 드롭하세요.");
+            effects.render_changed = true;
+            std::cerr << "[warn] " << choice.error << '\n';
+        } else if (!choice.cancelled && !choice.path.empty()) {
+            const auto& file = choice.path;
+            std::error_code error;
+            if (!menu_music_detail::supported_audio_file(file) ||
+                !std::filesystem::is_regular_file(std::filesystem::u8path(file), error)) {
+                audio_file_status_ = ui_text("Choose an existing MP3, OGG, WAV or FLAC file.",
+                                             "존재하는 MP3, OGG, WAV, FLAC 파일을 선택하세요.");
+            } else {
+                effects.merge(audio_settings_controller_.set_audio_file(config_, *slot, file));
+                effects.persist_config = true;
+                invalidate_sound_slot(*slot);
+                failed_menu_music_files_.erase(file);
+                menu_music_scene_key_.clear();
+                audio_file_status_.clear();
+            }
+        }
+    }
     if (effects.empty()) {
         return;
     }
@@ -152,6 +282,7 @@ void MenuApp::populate_audio_settings_render_data(render::MenuRenderData& render
         row.value = std::move(source.value);
         row.selected = source.selected;
         row.activatable = source.activatable;
+        row.value_activatable = menu::settings::is_audio_file_setting(source.id);
         row.adjustable = source.adjustable;
         row.increment_enabled = source.adjustable;
         row.decrement_enabled = source.adjustable;
@@ -162,6 +293,7 @@ void MenuApp::populate_audio_settings_render_data(render::MenuRenderData& render
         render.generic.rows.push_back(std::move(row));
     }
     render.generic.notes = std::move(view.notes);
+    if (!audio_file_status_.empty()) render.generic.notes.insert(render.generic.notes.begin(), audio_file_status_);
     for (auto& note : render.generic.notes) note = ui::function_key_labels(note, config::function_key_labels(config_.ui));
 }
 

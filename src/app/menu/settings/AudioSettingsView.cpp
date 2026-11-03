@@ -169,6 +169,26 @@ AudioSettingsViewModel AudioSettingsView::build(
         AudioSettingId::TitleMusic, SettingsRowKind::Choice,
         localized(language, "Title Music", "타이틀 음악"),
         title_music_label(runtime.audio_ui.title_music, language), controller, true, true));
+    const std::pair<AudioSettingId, std::pair<const char*, const char*>> file_rows[] = {
+        {AudioSettingId::MainMusicFile, {"Main BGM File", "메인 BGM 파일"}},
+        {AudioSettingId::ClearMusicFile, {"Clear BGM File", "클리어 BGM 파일"}},
+        {AudioSettingId::FailMusicFile, {"Fail BGM File", "실패 BGM 파일"}},
+        {AudioSettingId::ButtonSoundFile, {"Button Click Sound", "버튼 클릭음"}},
+        {AudioSettingId::SliderSoundFile, {"Slider Drag Sound", "슬라이더 드래그음"}},
+        {AudioSettingId::DropSoundFile, {"File Drop Sound", "파일 드롭 알림음"}},
+        {AudioSettingId::OptionsSoundFile, {"Options Edit Sound", "옵션 편집음"}},
+        {AudioSettingId::StartSoundFile, {"Start Button Sound", "시작 버튼음"}},
+        {AudioSettingId::DoneSoundFile, {"Load Complete Sound", "로딩 완료음"}},
+    };
+    for (const auto& [id, label] : file_rows) {
+        const auto& token = *audio_file_setting_value(runtime, id);
+        const auto separator = token.find_last_of("/\\");
+        const std::string value = token.empty() ? localized(language, "Default", "기본값")
+            : token == "none" ? localized(language, "None", "없음")
+            : token.substr(separator == std::string::npos ? 0 : separator + 1);
+        view.rows.push_back(make_row(id, SettingsRowKind::Choice,
+            localized(language, label.first, label.second), value, controller, true, true));
+    }
     view.rows.push_back(make_slider_row(
         AudioSettingId::MasterVolume,
         localized(language, "Master Volume", "마스터 볼륨"),
@@ -279,6 +299,9 @@ AudioSettingsViewModel AudioSettingsView::build(
     view.notes.push_back(localized(language,
         "Title Music: Random BMS picks one library chart per title visit. Last Played remembers the last game across launches. Unavailable charts use default music; chart music loops up to five minutes including keysounds.",
         "타이틀 음악: 랜덤 BMS는 타이틀에 올 때 라이브러리에서 한 곡을 고릅니다. 마지막 플레이 곡은 재실행 후에도 유지됩니다. 곡을 읽지 못하면 기본 음악을 재생하며, 차트 음악은 키음 포함 최대 5분을 반복합니다."));
+    view.notes.push_back(localized(language,
+        "Audio files: Enter or click the filename to choose MP3/OGG/WAV/FLAC. Left restores bundled defaults; Right mutes the slot. Escape cancels the picker. UI sounds use system output; completion cues allow four seconds, others two. Main BGM replaces Default Music only.",
+        "오디오 파일: Enter나 파일명을 눌러 MP3/OGG/WAV/FLAC을 선택합니다. 왼쪽은 동봉 기본음, 오른쪽은 음소거입니다. Esc는 선택 취소입니다. UI 효과음은 시스템 출력으로 완료음 최대 4초, 나머지 최대 2초 재생하며 메인 BGM 파일은 기본 음악 모드에 적용됩니다."));
 
     std::sort(view.rows.begin(), view.rows.end(), [](const auto& left, const auto& right) {
         return audio_setting_index(left.id).value_or(kAudioSettingOrder.size()) <
@@ -289,6 +312,15 @@ AudioSettingsViewModel AudioSettingsView::build(
             case AudioSettingId::KeysoundMode:
             case AudioSettingId::BackgroundSound:
             case AudioSettingId::TitleMusic:
+            case AudioSettingId::MainMusicFile:
+            case AudioSettingId::ClearMusicFile:
+            case AudioSettingId::FailMusicFile:
+            case AudioSettingId::ButtonSoundFile:
+            case AudioSettingId::SliderSoundFile:
+            case AudioSettingId::DropSoundFile:
+            case AudioSettingId::OptionsSoundFile:
+            case AudioSettingId::StartSoundFile:
+            case AudioSettingId::DoneSoundFile:
             case AudioSettingId::PlayToEnd:
             case AudioSettingId::MuteWhenInactive:
                 row.category = localized(language, "Playback", "재생");

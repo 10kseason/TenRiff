@@ -13,6 +13,7 @@
 #include "app/MenuSongUtils.h"
 #include "app/ModeManager.h"
 #include "app/ReplayVerifier.h"
+#include "app/SessionResultStatus.h"
 #include "chart/BmsParser.h"
 #include "gameplay/Replay.h"
 #include "timing/HighResClock.h"
@@ -135,7 +136,8 @@ bool live_result_claims_match(const menu_records::ParsedResultRecord& parsed,
 bool MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord& parsed,
                                          const std::string& result_path,
                                          const std::string& replay_path,
-                                         const ReplayVerificationResult& verification) {
+                                         const ReplayVerificationResult& verification,
+                                         RecordFeedback* feedback) {
     const bool replay_verified = verification.verified();
     const gameplay::ResultStats& effective_stats =
         replay_verified ? verification.stats : parsed.stats;
@@ -180,6 +182,60 @@ bool MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
                                             effective_game_over,
                                             effective_final_gauge);
 
+    const auto chart_keys = menu_songs::build_chart_path_keys(parsed.chart_path, songs_path_);
+    const bool official_eligible = !mode_mod_adds_notes(parsed.mods) &&
+        parsed.key_conversion_note_add_mode != "add_25_plus" && !mode_mod_auto_scratch(parsed.mods) &&
+        (!mode_mod_long_note_mix(parsed.mods) || parsed.long_note_mix_version == 1) &&
+        !parsed.autoplay_enabled && !parsed.practice_no_fail_enabled && verification.official_eligible;
+    candidate.verified_full_combo = verified_record_full_combo(replay_verified && verification.claims_match,
+        official_eligible, effective_game_over, parsed.aborted,
+        parsed.autoplay_enabled || parsed.practice_no_fail_enabled || mode_mod_auto_scratch(parsed.mods),
+        effective_stats);
+    const auto candidate_policy = std::tie(candidate.judgement_generation, candidate.bms_gauge_version,
+        candidate.bms_control_flow_version, candidate.bms_timing_version);
+    RecordFeedback previous;
+    bool current_policy = true;
+    if (official_eligible) {
+        // Read every path alias before updating any of them. A missing alias
+        // must not manufacture a first-play celebration for an existing chart.
+        for (const auto& key : chart_keys) {
+            const auto prior = chart_score_high_water_.find(key);
+            if (prior == chart_score_high_water_.end()) continue;
+            const auto& best = prior->second.best;
+            const auto prior_policy = std::tie(best.judgement_generation, best.bms_gauge_version,
+                best.bms_control_flow_version, best.bms_timing_version);
+            if (candidate_policy < prior_policy) current_policy = false;
+            if (candidate_policy != prior_policy) continue;
+            previous.has_previous = true;
+            previous.previous_score = std::max(previous.previous_score, best.best_score);
+            if (record_rank_priority(prior->second.highest_rank) > record_rank_priority(previous.previous_rank))
+                previous.previous_rank = prior->second.highest_rank;
+        }
+        if (current_policy) {
+            previous.rank_upgraded = previous.has_previous && record_rank_priority(previous.previous_rank) >= 0 &&
+                record_rank_priority(candidate.rank) > record_rank_priority(previous.previous_rank);
+            for (const auto& key : chart_keys) {
+                auto prior = chart_score_high_water_.find(key);
+                if (prior == chart_score_high_water_.end()) {
+                    chart_score_high_water_.emplace(key, ScoreHighWaterRecord{candidate, candidate.rank});
+                    continue;
+                }
+                auto& best = prior->second.best;
+                const auto prior_policy = std::tie(best.judgement_generation, best.bms_gauge_version,
+                    best.bms_control_flow_version, best.bms_timing_version);
+                if (candidate_policy > prior_policy) {
+                    prior->second = ScoreHighWaterRecord{candidate, candidate.rank};
+                    continue;
+                }
+                if (candidate.best_score > best.best_score) best = candidate;
+                if (record_rank_priority(candidate.rank) > record_rank_priority(prior->second.highest_rank))
+                    prior->second.highest_rank = candidate.rank;
+            }
+        }
+    }
+    if (feedback) *feedback = official_eligible && current_policy ? previous : RecordFeedback{};
+    const bool new_record = official_eligible && current_policy && record_score_improved(effective_score, previous);
+
     LocalPlayRecord record;
     record.judgement_generation = candidate.judgement_generation;
     record.bms_timing_version = parsed.bms_timing_version;
@@ -214,6 +270,7 @@ bool MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
     record.accuracy = menu_records::calculate_accuracy(effective_stats);
     record.detailed_accuracy = menu_records::calculate_detailed_accuracy(effective_stats);
     record.max_combo = effective_stats.max_combo;
+    record.verified_full_combo = candidate.verified_full_combo;
     record.total_notes = effective_stats.total_notes;
     record.judged_notes = candidate_judged;
     record.perfect = effective_stats.counts.pg;
@@ -225,29 +282,20 @@ bool MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
     record.stddev_delta_ms = effective_stats.stddev_delta_ms();
     const std::size_t record_index = local_play_records_.size();
     local_play_records_.push_back(record);
-    const bool note_count_modified =
-        mode_mod_adds_notes(parsed.mods) ||
-        parsed.key_conversion_note_add_mode == "add_25_plus";
-
-    bool new_record = false;
-
     // Fan results out across all normalized path keys so old exports still match
     // after source-root changes or relative/absolute-path differences.
-    for (const auto& key : menu_songs::build_chart_path_keys(parsed.chart_path, songs_path_)) {
+    for (const auto& key : chart_keys) {
         chart_play_record_indices_[key].push_back(record_index);
         // Keep autoplay runs in local history/replay browsing, but never let
         // them become the chart's official best score or clear lamp.
         // The old chart-wide best has no conversion-version dimension. Keep
         // musical LN Mix in history without replacing legacy/default bests.
-        if (note_count_modified || mode_mod_auto_scratch(parsed.mods) ||
-            (mode_mod_long_note_mix(parsed.mods) && parsed.long_note_mix_version != 1) || parsed.autoplay_enabled ||
-            parsed.practice_no_fail_enabled || !verification.official_eligible) {
+        if (!official_eligible) {
             continue;
         }
         auto existing = chart_best_results_.find(key);
         if (existing == chart_best_results_.end()) {
             chart_best_results_.emplace(key, candidate);
-            new_record = true;
             continue;
         }
 
@@ -256,14 +304,11 @@ bool MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
         // run is never compared with an old, numerically higher score.
         // Historical outcomes stay in history; random branch seeds identify a
         // performance but do not create a separate chart BEST for every play.
-        const auto candidate_policy = std::tie(candidate.judgement_generation, candidate.bms_gauge_version,
-            candidate.bms_control_flow_version, candidate.bms_timing_version);
         const auto existing_policy = std::tie(existing->second.judgement_generation, existing->second.bms_gauge_version,
             existing->second.bms_control_flow_version, existing->second.bms_timing_version);
         if (candidate_policy != existing_policy) {
             if (candidate_policy > existing_policy) {
                 existing->second = candidate;
-                new_record = true;
             }
             continue;
         }
@@ -291,9 +336,8 @@ bool MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
                                            existing->second.created_utc);
         };
         if (beats_existing(candidate.created_utc)) {
-            // Keep the existing recency tiebreak for storage, but do not
-            // celebrate an identical performance simply played later.
-            new_record = beats_existing(existing->second.created_utc) || new_record;
+            // Keep clear-first storage and its recency tiebreak independent
+            // of score-only celebration and the replay comparison maximum.
             existing->second = candidate;
         }
     }
@@ -304,6 +348,7 @@ void MenuApp::reload_chart_best_results() {
     using namespace menu_song_select;
 
     chart_best_results_.clear();
+    chart_score_high_water_.clear();
     local_play_records_.clear();
     chart_play_record_indices_.clear();
     current_song_record_indices_.clear();
@@ -397,6 +442,7 @@ void MenuApp::cache_current_session_result(const std::string& chart_path,
                                            bool finished,
                                            bool aborted) {
     last_result_new_record_ = false;
+    last_result_record_feedback_ = {};
     if (result_path.empty()) {
         return;
     }
@@ -504,7 +550,7 @@ void MenuApp::cache_current_session_result(const std::string& chart_path,
         *parsed,
         result_path,
         resolved_replay.empty() ? parsed->replay_path : resolved_replay.u8string(),
-        verification);
+        verification, &last_result_record_feedback_);
     rebuild_current_song_record_indices();
 }
 
@@ -656,6 +702,7 @@ bool MenuApp::open_result_record(const std::string& result_path,
     // existing FULL COMBO text, but never carry a new session's image into history.
     last_all_combo_badge_ = false;
     last_result_new_record_ = false;
+    last_result_record_feedback_ = {};
     // This is display state only. Older exports can carry an explicit abort
     // flag without the ABORTED label; do not present them as a gauge death.
     last_clear_status_ = parsed->aborted ? "ABORTED" : parsed->clear_status;
@@ -896,6 +943,7 @@ void MenuApp::launch_selected_song() {
     if (chart_path.empty()) {
         return;
     }
+    play_menu_sound(MenuSoundKind::Start);
     launch_gameplay(chart_path);
 }
 

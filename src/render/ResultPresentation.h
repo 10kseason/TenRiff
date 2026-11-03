@@ -2,12 +2,40 @@
 
 #include <array>
 #include <cstdint>
+#include <cstddef>
 #include <optional>
+#include <string>
 #include <string_view>
 
 namespace tenriff::render {
 
 inline constexpr int64_t kResultPresentationDurationNs = 2'200'000'000LL;
+inline constexpr int64_t kRecordScoreEffectStartNs = 650'000'000LL;
+inline constexpr int64_t kRecordScoreEffectDurationNs = 1'200'000'000LL;
+
+struct ResultTextRange {
+    std::size_t start = 0;
+    std::size_t length = 0;
+};
+
+// Wide string indices match the DirectWrite drawing-effect range. Matching the
+// terminal localized token keeps the ordinary heading prefix out of its glow.
+[[nodiscard]] std::optional<ResultTextRange> result_semantic_suffix_range(
+    std::wstring_view text, std::wstring_view suffix);
+
+struct ResultRecordEffectFrame {
+    float score_visibility = 0.0f;
+    float distortion = 0.0f;
+    float old_rank_opacity = 0.0f;
+    float old_rank_brightness = 0.0f;
+    float shatter = 0.0f;
+    float new_rank_opacity = 1.0f;
+};
+
+[[nodiscard]] ResultRecordEffectFrame result_record_effect_frame(int64_t elapsed_ns, bool rank_upgraded,
+                                                                bool skipped = false);
+[[nodiscard]] std::string result_record_score_text(int64_t target_score, float countup_progress,
+                                                 int64_t elapsed_ns, bool new_record, bool skipped = false);
 
 struct ResultPresentationFrame {
     float background = 0.0f;

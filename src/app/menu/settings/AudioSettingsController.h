@@ -36,15 +36,33 @@ enum class AudioSettingId : std::uint8_t {
     GameplayVolume = 16,
     MenuMusicVolume = 17,
     OutputDevice = 18,
+    MainMusicFile = 19,
+    ClearMusicFile = 20,
+    FailMusicFile = 21,
+    ButtonSoundFile = 22,
+    SliderSoundFile = 23,
+    DropSoundFile = 24,
+    OptionsSoundFile = 25,
+    StartSoundFile = 26,
+    DoneSoundFile = 27,
 };
 
-inline constexpr std::array<AudioSettingId, 17> kAudioSettingOrder{
+inline constexpr std::array<AudioSettingId, 26> kAudioSettingOrder{
     AudioSettingId::MasterVolume,
     AudioSettingId::GameplayVolume,
     AudioSettingId::MenuMusicVolume,
     AudioSettingId::KeysoundMode,
     AudioSettingId::BackgroundSound,
     AudioSettingId::TitleMusic,
+    AudioSettingId::MainMusicFile,
+    AudioSettingId::ClearMusicFile,
+    AudioSettingId::FailMusicFile,
+    AudioSettingId::ButtonSoundFile,
+    AudioSettingId::SliderSoundFile,
+    AudioSettingId::DropSoundFile,
+    AudioSettingId::OptionsSoundFile,
+    AudioSettingId::StartSoundFile,
+    AudioSettingId::DoneSoundFile,
     AudioSettingId::PlayToEnd,
     AudioSettingId::MuteWhenInactive,
     AudioSettingId::Normalize,
@@ -66,6 +84,9 @@ struct AudioDriverChoice {
 [[nodiscard]] std::optional<std::size_t> audio_setting_index(AudioSettingId id) noexcept;
 [[nodiscard]] std::optional<AudioSettingId> audio_setting_id_at(std::size_t index) noexcept;
 [[nodiscard]] std::optional<NumericSettingRange> audio_setting_numeric_range(AudioSettingId id) noexcept;
+[[nodiscard]] bool is_audio_file_setting(AudioSettingId id) noexcept;
+[[nodiscard]] std::string* audio_file_setting_value(config::RuntimeConfig& runtime, AudioSettingId id) noexcept;
+[[nodiscard]] const std::string* audio_file_setting_value(const config::RuntimeConfig& runtime, AudioSettingId id) noexcept;
 
 class AudioSettingsController {
 public:
@@ -85,6 +106,8 @@ public:
     // Pointer selection is kept separate because it has no keyboard-equivalent
     // mutation. Pointer activation/adjustment then uses handle() with a target.
     [[nodiscard]] MenuEffectFlags select(AudioSettingId target) noexcept;
+    [[nodiscard]] std::optional<AudioSettingId> take_file_pick_request() noexcept;
+    [[nodiscard]] MenuEffectFlags set_audio_file(config::RuntimeConfig& runtime, AudioSettingId id, std::string value);
 
     // A target identifies the row hit by a pointer. Keyboard callers omit it and
     // act on the current selection.
@@ -102,6 +125,7 @@ private:
     [[nodiscard]] MenuEffectFlags mark_changed() noexcept;
 
     AudioSettingId selected_id_ = AudioSettingId::MasterVolume;
+    std::optional<AudioSettingId> file_pick_request_;
     bool dirty_ = false;
     bool asio_drivers_loaded_ = false;
     std::vector<AudioDriverChoice> asio_drivers_;

@@ -384,6 +384,7 @@ bool MenuApp::import_lr2_skin_path(std::string_view source_path) {
     std::cerr << "[info] Imported " << imported.skin_names.size()
               << " LR2 skin(s), files=" << imported.copied_files
               << " bytes=" << imported.copied_bytes << "." << std::endl;
+    notify_menu_load_complete(true, imported.copied_files > 0);
     return true;
 }
 
@@ -418,6 +419,7 @@ bool MenuApp::import_tenriff_skin_path(std::string_view source_path) {
     std::cerr << "[info] Imported TenRiff skin " << imported.skin_name
               << ", files=" << imported.copied_files
               << " bytes=" << imported.copied_bytes << "." << std::endl;
+    notify_menu_load_complete(true, imported.copied_files > 0);
     return true;
 }
 
@@ -436,6 +438,7 @@ bool MenuApp::import_skin_path_auto(std::string_view source_path) {
         static_cast<void>(skin_settings_controller_.mark_external_change());
         persist_runtime_config();
         skin_status_messages_ = {ui_text("Imported and applied the skin preset.", "스킨 프리셋을 가져와 적용했습니다.")};
+        notify_menu_load_complete(true, true);
         return true;
     }
     std::error_code ec;
@@ -1036,6 +1039,15 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     append_menu_row(render.generic, ui_text("Studio Riff Map", "그래프 맵"),
                     ui_on_off(config_.skin.hud_riff_map_visible),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::HudRiffMapVisible), false, true);
+    append_menu_row(render.generic, ui_text("Score / Rank Comparison", "점수 / 랭크 비교기"),
+                    ui_on_off(config_.skin.score_comparison_enabled), false, render::MenuHitTargetKind::SettingsRow,
+                    static_cast<int>(SkinSettingsRowId::ScoreComparisonEnabled), false, true);
+    append_slider_menu_row(render.generic, ui_text("Comparison X", "비교기 X"), format_percent(config_.skin.score_comparison_x),
+                    config_.skin.score_comparison_x, false, render::MenuHitTargetKind::SettingsRow,
+                    static_cast<int>(SkinSettingsRowId::ScoreComparisonX));
+    append_slider_menu_row(render.generic, ui_text("Comparison Y", "비교기 Y"), format_percent(config_.skin.score_comparison_y),
+                    config_.skin.score_comparison_y, false, render::MenuHitTargetKind::SettingsRow,
+                    static_cast<int>(SkinSettingsRowId::ScoreComparisonY));
     append_menu_row(render.generic, ui_text("Hit Burst Brightness", "키 키밤 밝기"),
                     format_percent(config_.skin.key_pulse_brightness),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::KeyPulse), false, true);
@@ -1191,6 +1203,9 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.skin_preview.key_overlay_enabled = config_.skin.key_overlay_enabled;
     render.generic.skin_preview.key_overlay_x = config_.skin.key_overlay_x;
     render.generic.skin_preview.key_overlay_y = config_.skin.key_overlay_y;
+    render.generic.skin_preview.score_comparison_enabled = config_.skin.score_comparison_enabled;
+    render.generic.skin_preview.score_comparison_x = config_.skin.score_comparison_x;
+    render.generic.skin_preview.score_comparison_y = config_.skin.score_comparison_y;
 
     render.generic.skin_preview.indicator_background_visible = config_.skin.indicator_background_visible;
     render.generic.skin_preview.mode_label = skin_mode_label;

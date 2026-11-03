@@ -87,6 +87,21 @@ struct SongIndexLoadResult {
 using SongIndexProgressCallback = std::function<void(const SongIndexProgress&)>;
 using SongIndexCancelCallback = std::function<bool()>;
 
+// Session-only density for the selected chart; never serialized in the index.
+// Statistics cover integer seconds [0, last playable head second], including
+// silence. Bars are at most 96 chronological peak aggregates of those bins.
+struct SongNpsProfile {
+    bool available = false;
+    double minimum = 0.0;
+    double average = 0.0;
+    double maximum = 0.0;
+    int64_t covered_seconds = 0;
+    std::vector<float> bins;
+};
+
+[[nodiscard]] SongNpsProfile load_song_nps_profile(const std::string& chart_path,
+                                                   SongIndexCancelCallback cancel = {});
+
 [[nodiscard]] std::string song_index_cache_path_for_source(std::string_view profile_root,
                                                            std::string_view source_root);
 [[nodiscard]] std::string legacy_song_index_cache_path_for_source(std::string_view source_root);

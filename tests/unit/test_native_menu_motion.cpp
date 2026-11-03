@@ -1,9 +1,32 @@
 #include "doctest/doctest.h"
 #include "render/NativeMenuMotion.h"
+#include "render/SceneTransition.h"
 
 #include <limits>
 
 using tenriff::render::NativeMenuMotion;
+
+TEST_CASE("scene transition has exactly thirty time samples and ends at one second") {
+    using namespace tenriff::render;
+    CHECK_FALSE(scene_transition_frame(-1).active);
+    for (int index = 0; index < kSceneTransitionFrames; ++index) {
+        const auto start = (index * kSceneTransitionDurationNs + 29) / 30;
+        const auto frame = scene_transition_frame(start);
+        CHECK(frame.active);
+        CHECK(frame.index == index);
+        CHECK(frame.opacity > 0);
+        CHECK(frame.opacity <= 1);
+        CHECK(frame.travel >= 0);
+        CHECK(frame.travel <= 1);
+    }
+    CHECK(scene_transition_frame(kSceneTransitionDurationNs - 1).index == 29);
+    CHECK_FALSE(scene_transition_frame(kSceneTransitionDurationNs).active);
+    CHECK_FALSE(scene_transition_frame(INT64_MAX).active);
+    const auto still = scene_transition_frame(500'000'000, true);
+    CHECK(still.active);
+    CHECK(still.travel == 0.5f);
+    CHECK(still.opacity == 0.70f);
+}
 
 TEST_CASE("native menu transitions reset across screens and gameplay") {
     NativeMenuMotion motion;

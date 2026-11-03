@@ -2940,6 +2940,7 @@
             d2d_->text_brush->SetColor(saved);
         }
         #include "MenuWindow_draw_key_overlay.inl"
+        #include "MenuWindow_draw_score_comparison.inl"
 
         // Resume keeps the frozen note field visible; only the opening countdown
         // uses the early-return card above. This also leaves LN bodies in place.

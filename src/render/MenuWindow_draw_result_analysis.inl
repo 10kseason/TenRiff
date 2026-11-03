@@ -16,10 +16,11 @@
         draw_result_text(result_loc("RESULT ANALYSIS", "결과 분석"), d2d_->title_format.Get(),
             D2D1::RectF(72, 48, 640, 104), d2d_->text_brush.Get(), 1.0f);
         draw_analysis_tabs();
-        text_at(data.result.title.empty() ? data.result.track : data.result.title, 94, 178, 638, false, 68);
+        draw_result_title(data.result.title.empty() ? data.result.track : data.result.title,
+            d2d_->result_label_format.Get(), D2D1::RectF(94, 178, 638, 246), d2d_->text_brush.Get(), 1.0f);
         text_at(localized_result_status() + "  /  " + format_decimal(data.result.accuracy) + "%", 94, 254, 638, true);
         if (data.result.new_record) {
-            draw_result_text("NEW Record", d2d_->result_label_format.Get(),
+            draw_result_text("NEW RECORD", d2d_->result_label_format.Get(),
                 D2D1::RectF(94, 108, 638, 140), semantic_brush(0xFFE477), 1.0f);
         }
         const auto& total = analysis.total;

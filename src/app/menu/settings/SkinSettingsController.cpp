@@ -303,6 +303,13 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
         runtime.skin.lane_divider_brightness = clamp_step_value(action.ratio, 0.0, 1.0, 0.01);
         return mark_changed();
     }
+    if (action.kind == MenuActionKind::SetRatio &&
+        (selected_id_ == SkinSettingsRowId::ScoreComparisonX || selected_id_ == SkinSettingsRowId::ScoreComparisonY)) {
+        auto& value = selected_id_ == SkinSettingsRowId::ScoreComparisonX
+            ? runtime.skin.score_comparison_x : runtime.skin.score_comparison_y;
+        value = clamp_step_value(action.ratio, 0.0, 1.0, 0.01);
+        return mark_changed();
+    }
     if (action.kind == MenuActionKind::SetRatio && backdrop_slider) {
         auto& value = selected_id_ == SkinSettingsRowId::KeyBackdropBrightness ? runtime.skin.key_backdrop_brightness
             : selected_id_ == SkinSettingsRowId::KeyBackdropHeight ? runtime.skin.key_backdrop_height : runtime.skin.key_backdrop_opacity;
@@ -568,6 +575,15 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
             return mark_changed();
         case SkinSettingsRowId::KeyOverlayEnabled:
             runtime.skin.key_overlay_enabled = !runtime.skin.key_overlay_enabled;
+            return mark_changed();
+        case SkinSettingsRowId::ScoreComparisonEnabled:
+            runtime.skin.score_comparison_enabled = !runtime.skin.score_comparison_enabled;
+            return mark_changed();
+        case SkinSettingsRowId::ScoreComparisonX:
+            runtime.skin.score_comparison_x = clamp_step_value(runtime.skin.score_comparison_x + direction * 0.01, 0.0, 1.0, 0.01);
+            return mark_changed();
+        case SkinSettingsRowId::ScoreComparisonY:
+            runtime.skin.score_comparison_y = clamp_step_value(runtime.skin.score_comparison_y + direction * 0.01, 0.0, 1.0, 0.01);
             return mark_changed();
         case SkinSettingsRowId::KeyOverlayX:
             runtime.skin.key_overlay_x = clamp_step_value(runtime.skin.key_overlay_x + direction * 0.01, 0.0, 1.0, 0.01);

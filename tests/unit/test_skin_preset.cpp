@@ -85,6 +85,9 @@ TEST_CASE("skin preset native settings round trip only appearance in Unicode pat
     skin.key_overlay_enabled = true;
     skin.key_overlay_x = 0.35;
     skin.key_overlay_y = 0.9;
+    skin.score_comparison_enabled = true;
+    skin.score_comparison_x = 0.62;
+    skin.score_comparison_y = 0.81;
     skin.judgement_offset_x = 42;
     skin.show_timing_feedback = false;
     skin.show_timing_bar = true;
@@ -125,6 +128,9 @@ TEST_CASE("skin preset native settings round trip only appearance in Unicode pat
     CHECK(imported.skin.key_overlay_enabled);
     CHECK(imported.skin.key_overlay_x == doctest::Approx(0.35));
     CHECK(imported.skin.key_overlay_y == doctest::Approx(0.9));
+    CHECK(imported.skin.score_comparison_enabled);
+    CHECK(imported.skin.score_comparison_x == doctest::Approx(0.62));
+    CHECK(imported.skin.score_comparison_y == doctest::Approx(0.81));
     CHECK(imported.skin.judgement_offset_x == 42);
     CHECK_FALSE(imported.skin.show_timing_feedback);
     CHECK(imported.skin.show_timing_bar);
