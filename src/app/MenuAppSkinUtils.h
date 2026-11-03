@@ -94,11 +94,14 @@ enum class SkinSettingsRowId {
     KeyOverlayX,
     KeyOverlayY,
     GaugeWidth,
+    ScoreComparisonEnabled,
+    ScoreComparisonX,
+    ScoreComparisonY,
 };
 
 // The same order drives keyboard navigation, rendered rows and mouse hit targets.
 // Keep related controls adjacent instead of deriving positions from row labels.
-inline constexpr std::array<SkinSettingsRowId, 56> kSkinSettingsRowOrder = {
+inline constexpr std::array<SkinSettingsRowId, 59> kSkinSettingsRowOrder = {
     SkinSettingsRowId::ScratchPosition,
     SkinSettingsRowId::SkinSource,
     SkinSettingsRowId::ImportedSkin,
@@ -133,6 +136,9 @@ inline constexpr std::array<SkinSettingsRowId, 56> kSkinSettingsRowOrder = {
     SkinSettingsRowId::KeyOverlayEnabled,
     SkinSettingsRowId::KeyOverlayX,
     SkinSettingsRowId::KeyOverlayY,
+    SkinSettingsRowId::ScoreComparisonEnabled,
+    SkinSettingsRowId::ScoreComparisonX,
+    SkinSettingsRowId::ScoreComparisonY,
     SkinSettingsRowId::LaneDividers,
     SkinSettingsRowId::LaneDividerBrightness,
     SkinSettingsRowId::JudgementLine,
@@ -198,6 +204,9 @@ enum class SkinSettingsCategory { Source, Geometry, Notes, LongNotes, Effects, H
         case SkinSettingsRowId::KeyOverlayEnabled:
         case SkinSettingsRowId::KeyOverlayX:
         case SkinSettingsRowId::KeyOverlayY:
+        case SkinSettingsRowId::ScoreComparisonEnabled:
+        case SkinSettingsRowId::ScoreComparisonX:
+        case SkinSettingsRowId::ScoreComparisonY:
         case SkinSettingsRowId::HudRiffMapVisible:
         case SkinSettingsRowId::JudgementLineType:
         case SkinSettingsRowId::LaneDividers: case SkinSettingsRowId::JudgementLine:

@@ -127,6 +127,16 @@ struct AudioUiConfig {
     std::string bms_keysound_policy = "follow";
     bool background_sound_enabled = true;
     std::string title_music = "default";
+    // Empty keeps the bundled/default sound; "none" explicitly mutes this slot.
+    std::string main_music_file;
+    std::string clear_music_file;
+    std::string fail_music_file;
+    std::string button_sound_file;
+    std::string slider_sound_file;
+    std::string drop_sound_file = "none";
+    std::string options_sound_file;
+    std::string start_sound_file;
+    std::string done_sound_file;
     double master_volume = 0.30;
     // Chart-wide gain is independent of TenRiff menu/scene music.
     double gameplay_volume = 0.20;
@@ -257,6 +267,9 @@ struct SkinConfig {
     bool key_overlay_enabled = false;
     double key_overlay_x = 0.0;
     double key_overlay_y = 0.25;
+    bool score_comparison_enabled = false;
+    double score_comparison_x = 0.0;
+    double score_comparison_y = 0.28;
 
     // Legacy preset field; native indicators are background-free since 1.8.9.3.
     bool indicator_background_visible = false;

@@ -9,6 +9,15 @@
 
 namespace tenriff::app {
 
+inline constexpr int kNativeSongSelectVisibleCardCount = 10;
+inline constexpr int kLegacySongSelectVisibleCardCount = 7;
+
+// The native compact list and authored layouts share the same selection model,
+// but authored rectangles retain the seven-row viewport they were made for.
+[[nodiscard]] inline constexpr int song_select_visible_card_count(bool native_list_layout) {
+    return native_list_layout ? kNativeSongSelectVisibleCardCount : kLegacySongSelectVisibleCardCount;
+}
+
 struct SongSelectState {
     int selected_song = 0;
     int selected_source = 0;

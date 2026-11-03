@@ -32,6 +32,15 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Adjust BMS accompaniment, keysounds and previews together. Default: 20%. TenRiff menu music is independent.", "BMS 반주·키음·미리듣기를 함께 조절합니다. 기본값은 20%이며 텐리프 메뉴 음악과는 별개입니다.", "BMSの伴奏・キー音・試聴をまとめて調整します。既定値は20%で、TenRiffメニュー音楽とは独立しています。"},
         {"Adjust TenRiff menu and result music. 100% uses a quiet 12.5% reference level; BMS songs are unchanged.", "텐리프 메뉴·결과 음악을 조절합니다. 100%는 기본 12.5% 음량이며 BMS 곡에는 적용되지 않습니다.", "TenRiffのメニュー・結果音楽です。100%は原音の12.5%を基準とし、BMS曲には適用しません。"},
         {"Choose the output for gameplay, BMS previews, and menu/result music. F5 refreshes; Back applies. ASIO has its own driver selector.", "플레이·BMS 미리듣기·메뉴·결과 음악의 출력을 고릅니다. F5 갱신, 뒤로 가기 적용. ASIO는 별도 드라이버를 사용합니다.", "プレイ・BMS試聴・メニュー・結果音楽の出力を選択。F5更新、戻るで適用。ASIOは別途ドライバーを選択します。"},
+        {"Choose the default main-menu music file. Enter selects MP3, OGG, WAV or FLAC; Left restores default and Right silences this slot.", "기본 메인 메뉴 음악 파일을 고릅니다. Enter로 MP3/OGG/WAV/FLAC 선택, 왼쪽은 기본값, 오른쪽은 없음입니다.", "標準メニュー音楽ファイルを選択。EnterでMP3/OGG/WAV/FLAC、左で既定、右でなし。"},
+        {"Choose the clear-result music file. Cancel keeps the current selection; missing files use default music.", "클리어 결과 음악 파일을 고릅니다. 취소하면 선택을 유지하고, 파일이 없으면 기본 음악을 사용합니다.", "クリア結果の音楽ファイルを選択。取消は変更せず、不明なファイルは既定音楽に戻ります。"},
+        {"Choose the failed-result music file. Left restores the default; Right silences this slot.", "실패 결과 음악 파일을 고릅니다. 왼쪽은 기본값, 오른쪽은 없음입니다.", "失敗結果の音楽ファイルを選択。左で既定、右でなし。"},
+        {"Choose a short button-click sound. Effects follow master volume and use Windows system audio.", "짧은 버튼 클릭음을 고릅니다. 효과음은 마스터 볼륨과 Windows 시스템 출력을 사용합니다.", "短いボタンクリック音を選択。効果音はマスター音量とWindows標準出力を使用します。"},
+        {"Choose the slider-drag sound. Long files use only the first two seconds; rapid requests are limited.", "슬라이더 드래그음을 고릅니다. 긴 파일은 처음 2초만 사용하며 빠른 반복 재생은 제한합니다.", "スライダードラッグ音を選択。長い音は最初の2秒のみ、連続要求は制限します。"},
+        {"Choose the file-drop notification sound. Enter selects a file; Right disables this sound.", "파일 드롭 알림음을 고릅니다. Enter로 파일 선택, 오른쪽으로 이 소리를 끕니다.", "ファイルドロップ通知音を選択。Enterでファイル選択、右で無効。"},
+        {"Choose the options click and edit sound. Left restores the bundled clip; Right silences this slot. Slider and Start actions keep their own sounds.", "옵션 창 클릭·편집음을 고릅니다. 왼쪽은 동봉 기본음, 오른쪽은 음소거입니다. 슬라이더와 시작 동작은 각 전용음을 사용합니다.", "オプションのクリック・編集音を選択。左で同梱の標準音、右で消音します。スライダーと開始操作には専用音を使用します。"},
+        {"Choose the manual Start button sound. It plays once for a selected song, course entry or result retry; automatic stages and restarts do not play it.", "수동 시작 버튼음을 고릅니다. 곡 시작·코스 입장·결과 재시도에 한 번 재생하며, 자동 스테이지 진행·즉시 재시작에는 재생하지 않습니다.", "手動開始ボタン音を選択。選曲開始・コース入場・結果からの再試行で一度鳴らし、自動ステージ進行や即時再開では鳴らしません。"},
+        {"Choose the successful loading and import completion sound. Failure, cancellation and empty results stay quiet. This slot allows four seconds so the bundled completion clip plays fully.", "로딩·가져오기 성공 완료음을 고릅니다. 실패·취소·빈 결과에는 재생하지 않습니다. 동봉 완료음이 잘리지 않도록 최대 4초까지 재생합니다.", "読み込み・インポート成功の完了音を選択。失敗・取消・空の結果では鳴らしません。同梱の完了音を最後まで再生できるよう最大4秒です。"},
     };
     static constexpr SettingsHelpText graphics[] = {
         {"Choose windowed, borderless, or fullscreen display.", "창 모드, 테두리 없는 창, 전체 화면 중 표시 방식을 고릅니다.", "ウィンドウ、ボーダーレス、全画面を選びます。"},
@@ -163,6 +172,9 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Move the key overlay horizontally in 1% steps. 0% is left and 100% is right; the full panel stays on screen.", "키 오버레이 가로 위치를 1%씩 조절합니다. 0%는 왼쪽, 100%는 오른쪽이며 패널 전체가 화면 안에 유지됩니다.", "キーオーバーレイの横位置を1%ずつ調整。0%は左、100%は右。パネル全体が画面内に収まります。"},
         {"Move the key overlay vertically in 1% steps. 0% is top and 100% is bottom. Enablement and position are saved with the skin settings.", "키 오버레이 세로 위치를 1%씩 조절합니다. 0%는 위, 100%는 아래이며 켜짐 상태와 위치를 스킨 설정에 저장합니다.", "キーオーバーレイの縦位置を1%ずつ調整。0%は上、100%は下。有効状態と位置をスキン設定に保存します。"},
         {"Choose gauge bar width: Normal (100%), Slightly Larger (125%), or Large (150%). Only horizontal size changes.", "게이지 바 가로 크기를 보통(100%), 조금 더 크게(125%), 크게(150%) 중에서 고릅니다. 가로 크기만 바뀝니다.", "ゲージバーの横幅を標準（100%）、少し大きい（125%）、大きい（150%）から選びます。横幅だけ変わります。"},
+        {"Show live BEST score differences and S to S+++ accuracy margins. Default Off. A compatible replay is required for BEST.", "실시간 BEST 점수 차이와 S~S+++ 정확도 차이를 표시합니다. 기본 OFF이며 BEST에는 호환 리플레이가 필요합니다.", "BESTとの差とS～S+++の精度差を表示。既定はオフ。BESTには互換リプレイが必要です。"},
+        {"Move the score comparison panel horizontally. The full panel remains within the screen.", "점수 비교기의 가로 위치를 옮깁니다. 패널 전체를 화면 안에 유지합니다.", "スコア比較パネルを左右に移動。パネル全体が画面内に収まります。"},
+        {"Move the score comparison panel vertically. Position is saved with skin presets and profiles.", "점수 비교기의 세로 위치를 옮깁니다. 위치는 스킨 프리셋과 프로필에 저장됩니다.", "スコア比較パネルを上下に移動。位置はスキンプリセットとプロフィールに保存します。"},
     };
     static constexpr SettingsHelpText profile[] = {
         {"Choose the interface language. The change is applied and saved immediately.", "화면 언어를 선택합니다. 변경 즉시 적용하고 저장합니다.", "表示言語を選びます。すぐに適用・保存されます。"},

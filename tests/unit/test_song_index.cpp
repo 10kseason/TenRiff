@@ -1549,6 +1549,64 @@ TEST_CASE("fast song scan retains only song-list metadata") {
     CHECK(safe.entries.front().nps_max == doctest::Approx(entry.nps_max));
 }
 
+TEST_CASE("selected chart NPS profile includes silent seconds and counts LN heads only") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    const auto chart = temp.path / "density.bms";
+    write_file(chart,
+        "#TITLE Density\n#BPM 240\n#4K\n"
+        "#00111:01010101\n"
+        "#00251:01\n#00651:01\n"
+        "#00412:01\n#007D2:05\n");
+    const auto profile = tenriff::app::load_song_nps_profile(chart.u8string());
+    REQUIRE(profile.available);
+    CHECK(profile.covered_seconds == 5);
+    CHECK(profile.minimum == doctest::Approx(0.0));
+    CHECK(profile.average == doctest::Approx(1.2));
+    CHECK(profile.maximum == doctest::Approx(4.0));
+    CHECK((profile.bins == std::vector<float>{0, 4, 1, 0, 1}));
+    // Legacy on-disk statistics retain their occupied-second definition.
+    SongIndexOptions options;
+    options.profile = tenriff::app::SongIndexProfile::Fast;
+    std::vector<std::string> warnings;
+    const auto index = scan_songs(temp.path.u8string(), nullptr, warnings, {}, options);
+    REQUIRE(index.entries.size() == 1);
+    CHECK(index.entries[0].nps_min == doctest::Approx(1.0));
+    CHECK(index.entries[0].nps_median == doctest::Approx(1.0));
+    CHECK(profile.average != doctest::Approx(index.entries[0].nps_median));
+}
+
+TEST_CASE("selected chart NPS profile keeps spikes within bounded chronological bars") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    const auto chart = temp.path / "sparse-density.bms";
+    write_file(chart, "#TITLE Sparse\n#BPM 240\n#4K\n#00111:01\n#20011:01010101\n");
+    const auto profile = tenriff::app::load_song_nps_profile(chart.u8string());
+    REQUIRE(profile.available);
+    CHECK(profile.covered_seconds == 201);
+    REQUIRE(profile.bins.size() == 96);
+    CHECK(profile.bins.front() == doctest::Approx(1.0f));
+    CHECK(profile.bins.back() == doctest::Approx(4.0f));
+    CHECK(profile.bins[48] == doctest::Approx(0.0f));
+    CHECK(profile.average == doctest::Approx(5.0 / 201.0));
+    CHECK(profile.maximum == doctest::Approx(4.0));
+}
+
+TEST_CASE("selected chart NPS profile declines empty missing cancelled oversized and extreme timelines") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    CHECK_FALSE(tenriff::app::load_song_nps_profile((temp.path / "missing.bms").u8string()).available);
+    const auto chart = temp.path / "density.bms";
+    write_file(chart, "#TITLE Empty\n#BPM 240\n#4K\n");
+    CHECK_FALSE(tenriff::app::load_song_nps_profile(chart.u8string()).available);
+    write_file(chart, "#TITLE Cancel\n#BPM 240\n#4K\n#00111:01\n");
+    CHECK_FALSE(tenriff::app::load_song_nps_profile(chart.u8string(), [] { return true; }).available);
+    write_file(chart, "#TITLE Extreme\n#BPM 0.001\n#4K\n#00111:01\n");
+    CHECK_FALSE(tenriff::app::load_song_nps_profile(chart.u8string()).available);
+    write_file(chart, std::string(8 * 1024 * 1024 + 1, ' '));
+    CHECK_FALSE(tenriff::app::load_song_nps_profile(chart.u8string()).available);
+}
+
 TEST_CASE("song index cache rejects Safe and Fast profile mismatches") {
     TempDirGuard temp;
     temp.path = make_temp_dir();

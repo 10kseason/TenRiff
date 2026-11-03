@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <algorithm>
+#include <cmath>
 #include <array>
 #include <optional>
 #include <string>
@@ -13,6 +15,13 @@ inline constexpr std::uint32_t kClearNormalRgb = 0xFFF000;
 inline constexpr std::uint32_t kClearHardRgb = 0xFF3838;
 inline constexpr std::uint32_t kClearExRgb = 0x4AF3F7; // Selected prism cyan; shared fallback/base tone.
 inline constexpr std::uint32_t kGradeLowRgb = 0xC2A0FF;
+inline constexpr std::uint32_t kFullComboTextRgb = 0xCBEF6B;
+
+[[nodiscard]] inline float semantic_text_bloom_strength(float requested, bool semantic_label) {
+    // Small semantic labels must remain readable instead of acquiring the
+    // broad rank award's bloom. Zero keeps the normal score glyph crisp.
+    return std::isfinite(requested) ? std::clamp(requested, 0.0f, semantic_label ? 0.25f : 1.0f) : 0.0f;
+}
 // The selected prism artwork supplies this static sRGB ramp, including lavender.
 // Keep its authored RGB stops instead of deriving colors from hue animation.
 // The existing paint caches, alpha/geometry and EX-only override policy remain.
@@ -105,6 +114,16 @@ inline SongSelectLampPresentation song_select_lamp_presentation(std::string_view
     }
     result.tint_card = result.color.has_value();
     return result;
+}
+
+struct SongSelectScorePaint {
+    std::uint32_t rgb = 0xFFFFFF;
+    bool rainbow = false;
+};
+
+inline SongSelectScorePaint song_select_score_paint(std::string_view clear_status) {
+    const auto lamp = song_select_lamp_presentation(clear_status);
+    return {lamp.color.value_or(0xFFFFFF), lamp.rainbow_badge};
 }
 
 }  // namespace tenriff::render

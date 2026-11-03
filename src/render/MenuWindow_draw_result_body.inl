@@ -54,6 +54,13 @@
                     DWRITE_TEXT_ALIGNMENT_CENTER);
             }
         };
+        const int64_t record_elapsed_ns = data.result.presentation_start_ns > 0
+            ? std::max<int64_t>(0, render_now_ns - data.result.presentation_start_ns)
+            : kResultPresentationDurationNs;
+        const bool record_effect_skipped = data.result.presentation_skipped ||
+            data.result.presentation_start_ns <= 0 || native_system_reduced_motion_ || config_.reduce_menu_motion;
+        const auto record_effect = result_record_effect_frame(record_elapsed_ns, data.result.rank_upgraded,
+                                                              record_effect_skipped);
         if (data.result.peer_battle) {
 #include "MenuWindow_draw_result_multiplayer.inl"
             draw_web_upload_status();

@@ -1,3 +1,5 @@
+> **2026-11-03 · 1.9.9.9:** [選曲・記録フィードバック・リザルト背景動画](release-1.9.9.9.ja.md). Fixed baseline **1.9.6**. Earlier candidate/release notices below are historical; Result uses the restored layout.
+
 > **2026-10-30 · 1.9.9.8 hot fix 1:** [オーディオ出力デバイスの案内修正](release-1.9.9.8-hotfix1.ja.md). Fixed baseline **1.9.6**; earlier notices are historical.
 
 > **2026-10-29 · 1.9.9.8:** [通常LNのGREAT離鍵許容ホットフィックス](release-1.9.9.8.ja.md). R13/R14 online; historical R9–R12 preserved. Fixed baseline **1.9.6**. Earlier notices are historical.

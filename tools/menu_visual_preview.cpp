@@ -5,6 +5,7 @@
 #include "timing/HighResClock.h"
 #include "app/PeerBattleRuntimeRules.h"
 #include "app/MemoryReclamation.h"
+#include "app/ResultGaugeHistory.h"
 #include "app/TenRiffSkin.h"
 #include "app/Lr2Skin.h"
 #include "app/MenuApp.h"
@@ -168,6 +169,9 @@ struct MenuAppVisualTestAccess {
         skin.key_overlay_enabled = preview.key_overlay_enabled;
         skin.key_overlay_x = preview.key_overlay_x;
         skin.key_overlay_y = preview.key_overlay_y;
+        skin.score_comparison_enabled = preview.score_comparison_enabled;
+        skin.score_comparison_x = preview.score_comparison_x;
+        skin.score_comparison_y = preview.score_comparison_y;
         // Keep the deterministic scene's values reflected in its actual rows.
         skin.note_height_scale = preview.note_height_scale;
         skin.note_height_scales[mode] = preview.note_height_scale;
@@ -611,6 +615,217 @@ struct MenuWindowVisualTestAccess {
             {"line_count", JsonValue(static_cast<double>(t.line_count))},
             {"layout_builds", JsonValue(static_cast<double>(t.layout_builds))}});
     }
+    static config::JsonValue result_text_stats(const MenuWindow& window) {
+        using namespace config;
+        JsonArray stats;
+        const std::array<const MenuWindow::SongTitleDiagnostics*, 3> fields{
+            &window.benchmark_result_title_, &window.benchmark_result_details_[0], &window.benchmark_result_details_[1]};
+        for (const auto* t : fields) {
+            stats.emplace_back(JsonObject{
+                {"width", JsonValue(t->right - t->left)}, {"height", JsonValue(t->bottom - t->top)},
+                {"text_width", JsonValue(t->text_width)}, {"text_height", JsonValue(t->text_height)},
+                {"font_size", JsonValue(t->font_size)}, {"characters", JsonValue(static_cast<double>(t->characters))},
+                {"line_count", JsonValue(static_cast<double>(t->line_count))},
+                {"layout_builds", JsonValue(static_cast<double>(t->layout_builds))}});
+        }
+        return JsonValue(std::move(stats));
+    }
+    static config::JsonValue menu_motion_stats(const MenuWindow& window) {
+        using namespace config;
+        const auto s = window.menu_motion_background_diagnostics();
+        return JsonValue(JsonObject{
+            {"source", JsonValue(s.source == MenuWindow::MenuMotionSource::Result ? "result" :
+                s.source == MenuWindow::MenuMotionSource::SongSelect ? "song_select" : "none")},
+            {"duration_ns", JsonValue(static_cast<double>(s.duration_ns))},
+            {"frame_rate", JsonValue(static_cast<double>(s.frame_rate))},
+            {"active", JsonValue(s.active)}, {"decoder_active", JsonValue(s.decoder_active)},
+            {"asset_available", JsonValue(s.asset_available)}, {"failed", JsonValue(s.failed)},
+            {"has_frame", JsonValue(s.has_frame)}, {"reduced_motion", JsonValue(s.reduced_motion)},
+            {"position_ns", JsonValue(static_cast<double>(s.position_ns))},
+            {"frame_timestamp_100ns", JsonValue(static_cast<double>(s.frame_timestamp_100ns))},
+            {"decode_requests", JsonValue(static_cast<double>(s.decode_requests))},
+            {"uploaded_frames", JsonValue(static_cast<double>(s.uploaded_frames))}});
+    }
+    static bool check_menu_motion(MenuWindow& window, MenuRenderData source, const std::string& output_path,
+                                  bool result_video) {
+        using namespace config;
+        using Clock = std::chrono::steady_clock;
+        const auto began = Clock::now();
+        const int loop_seconds = result_video ? 60 : 12;
+        const int expected_frame_rate = result_video ? 60 : 30;
+        const auto primary_kind = result_video ? MenuScreenKind::ResultScreen : MenuScreenKind::SongSelect;
+        const auto primary_source = result_video ? MenuWindow::MenuMotionSource::Result : MenuWindow::MenuMotionSource::SongSelect;
+        const auto total_deadline = began + std::chrono::seconds(loop_seconds + 30);
+        JsonArray checks, samples;
+        unsigned failed = 0, rendered_frames = 0, presented_frames = 0;
+        unsigned clock_wraps = 0, decoded_wraps = 0;
+        double playback_seconds = 0.0;
+        auto motion_config = window.pending_config_;
+        motion_config.reduce_menu_motion = false;
+        window.set_config(motion_config);
+        source.kind = primary_kind;
+        source.session_mix.active = false;
+        source.song_select.native_list_layout = true;
+        source.lobby_skin = {};
+        source.generic.skin_preview.visible = source.generic.skin_preview.fullscreen = false;
+        source.transition_start_ns = 0;
+        const auto check = [&](const char* name, bool passed) {
+            failed += !passed;
+            checks.emplace_back(JsonObject{{"name", JsonValue(name)}, {"passed", JsonValue(passed)},
+                {"motion", menu_motion_stats(window)}});
+        };
+        const auto snapshot = [&](const char* phase) {
+            samples.emplace_back(JsonObject{{"phase", JsonValue(phase)},
+                {"elapsed_ms", JsonValue(std::chrono::duration<double, std::milli>(Clock::now() - began).count())},
+                {"motion", menu_motion_stats(window)}});
+        };
+        const auto render = [&] {
+            if (window.should_close() || window.had_fatal_error() || Clock::now() >= total_deadline) return false;
+            window.render(source); // Production draw hook, real clock, decoder and GPU upload.
+            ++rendered_frames;
+            presented_frames += window.last_present_completion_ns() > 0;
+            std::this_thread::sleep_for(std::chrono::milliseconds(8));
+            return !window.should_close() && !window.had_fatal_error();
+        };
+        const auto render_for = [&](std::chrono::milliseconds duration) {
+            const auto deadline = Clock::now() + duration;
+            do { if (!render()) return false; } while (Clock::now() < deadline);
+            return true;
+        };
+        const auto ready = [&] {
+            const auto deadline = Clock::now() + std::chrono::seconds(6);
+            do {
+                if (!render()) return false;
+                const auto stats = window.menu_motion_background_diagnostics();
+                if (stats.failed) return false;
+                const auto expected_source = source.kind == MenuScreenKind::ResultScreen
+                    ? MenuWindow::MenuMotionSource::Result : MenuWindow::MenuMotionSource::SongSelect;
+                if (stats.source == expected_source && stats.active && stats.decoder_active && stats.has_frame) return true;
+            } while (Clock::now() < deadline);
+            return false;
+        };
+        const auto cleared = [&] {
+            const auto stats = window.menu_motion_background_diagnostics();
+            return !stats.active && !stats.decoder_active && !stats.has_frame && stats.position_ns == 0 &&
+                stats.frame_timestamp_100ns == -1;
+        };
+        const auto finish = [&] {
+            const bool fatal = window.had_fatal_error();
+            const bool system_reduced_motion = window.native_system_reduced_motion_;
+            snapshot("before_shutdown");
+            window.shutdown();
+            check("shutdown_releases_decoder_and_bitmap", cleared());
+            const bool passed = failed == 0 && !fatal;
+            const auto json = json_stringify(JsonValue(JsonObject{
+                {"passed", JsonValue(passed)}, {"asset", JsonValue(result_video
+                    ? "assets/menu/continue_result_bga_ko_1080p60.mp4" : "assets/menu/song-select-loop.mp4")},
+                {"expected_frame_rate", JsonValue(static_cast<double>(expected_frame_rate))},
+                {"system_reduced_motion", JsonValue(system_reduced_motion)},
+                {"real_clock_playback_seconds", JsonValue(playback_seconds)},
+                {"elapsed_ms", JsonValue(std::chrono::duration<double, std::milli>(Clock::now() - began).count())},
+                {"rendered_frames", JsonValue(static_cast<double>(rendered_frames))},
+                {"presented_frames", JsonValue(static_cast<double>(presented_frames))},
+                {"clock_wraps", JsonValue(static_cast<double>(clock_wraps))},
+                {"decoded_wraps", JsonValue(static_cast<double>(decoded_wraps))},
+                {"checks", JsonValue(std::move(checks))}, {"samples", JsonValue(std::move(samples))}}), 2);
+            std::ofstream output(std::filesystem::u8path(output_path), std::ios::binary);
+            output << json << '\n';
+            output.flush();
+            const bool written = output.good();
+            std::cout << json << '\n';
+            if (!written) std::cerr << "Could not write menu motion probe report: " << output_path << '\n';
+            return passed && written;
+        };
+        const bool first_ready = ready();
+        check("first_frame_decodes_and_uploads", first_ready);
+        snapshot("first_frame");
+        if (!first_ready) return finish();
+        // Respect the real OS accessibility preference; never switch it globally
+        // to manufacture a passing animated-background result.
+        check("environment_allows_animation", !window.native_system_reduced_motion_);
+        if (window.native_system_reduced_motion_) return finish();
+        const auto first = window.menu_motion_background_diagnostics();
+        check("asset_identity_duration_and_frame_rate", first.source == primary_source &&
+            first.duration_ns == static_cast<int64_t>(loop_seconds) * 1'000'000'000LL &&
+            first.frame_rate == expected_frame_rate);
+        auto previous = first;
+        const auto playback_start = Clock::now();
+        auto next_sample = playback_start + std::chrono::seconds(1);
+        bool healthy = true;
+        while (Clock::now() - playback_start < std::chrono::seconds(loop_seconds + 1)) {
+            if (!render()) { healthy = false; break; }
+            const auto current = window.menu_motion_background_diagnostics();
+            healthy = healthy && current.active && current.decoder_active && current.has_frame && !current.failed;
+            if (current.position_ns < previous.position_ns) { ++clock_wraps; snapshot("clock_wrap"); }
+            if (previous.frame_timestamp_100ns >= static_cast<int64_t>(loop_seconds - 1) * 10'000'000LL && current.frame_timestamp_100ns < 10'000'000) {
+                ++decoded_wraps;
+                snapshot("decoded_wrap");
+            }
+            previous = current;
+            if (Clock::now() >= next_sample) {
+                snapshot("playing");
+                next_sample += std::chrono::seconds(1);
+            }
+        }
+        playback_seconds = std::chrono::duration<double>(Clock::now() - playback_start).count();
+        const auto played = window.menu_motion_background_diagnostics();
+        check("real_clock_playback_stays_healthy", healthy && playback_seconds >= loop_seconds + 1.0);
+        check("timestamps_and_uploads_advance", played.uploaded_frames > first.uploaded_frames + 30 &&
+            played.decode_requests > first.decode_requests + 30 && played.frame_timestamp_100ns != first.frame_timestamp_100ns);
+        check("loop_rewinds_clock_and_decoded_frames", clock_wraps == 1 && decoded_wraps == 1);
+        check("frames_were_presented", presented_frames > 30);
+
+        motion_config.reduce_menu_motion = true;
+        window.set_config(motion_config);
+        // A request already in flight may publish once. Wait for a stable ready
+        // state, then ensure the frozen interval makes no requests or uploads.
+        bool settled = render_for(std::chrono::milliseconds(500));
+        const auto frozen = window.menu_motion_background_diagnostics();
+        snapshot("reduced_motion_settled");
+        settled = render_for(std::chrono::milliseconds(700)) && settled;
+        const auto still = window.menu_motion_background_diagnostics();
+        check("reduced_motion_freezes_frame_clock_and_requests", settled && still.reduced_motion && still.has_frame &&
+            !still.failed && still.position_ns == frozen.position_ns &&
+            still.frame_timestamp_100ns == frozen.frame_timestamp_100ns &&
+            still.decode_requests == frozen.decode_requests && still.uploaded_frames == frozen.uploaded_frames);
+        snapshot("reduced_motion_end");
+
+        if (result_video) {
+            source.result.analysis_page = (source.result.analysis_page + 1) % 4;
+            const bool tab_rendered = render();
+            const auto tab = window.menu_motion_background_diagnostics();
+            check("result_tab_keeps_video_position_and_bitmap", tab_rendered && tab.source == primary_source &&
+                tab.has_frame && tab.position_ns == still.position_ns &&
+                tab.frame_timestamp_100ns == still.frame_timestamp_100ns &&
+                tab.decode_requests == still.decode_requests && tab.uploaded_frames == still.uploaded_frames);
+        }
+        // Switching directly between the two video screens must not reuse the
+        // old bitmap or its timeline. Only one decoder exists at a time.
+        source.kind = result_video ? MenuScreenKind::SongSelect : MenuScreenKind::ResultScreen;
+        const bool other_ready = ready();
+        const auto other = window.menu_motion_background_diagnostics();
+        check("other_menu_uses_its_own_asset_and_restarts_clock", other_ready && other.source != primary_source &&
+            other.frame_rate == (result_video ? 30 : 60) &&
+            other.duration_ns == (result_video ? 12'000'000'000LL : 60'000'000'000LL) &&
+            other.position_ns == 0 && other.frame_timestamp_100ns == 0);
+        source.kind = MenuScreenKind::TitleMenu;
+        bool phase_rendered = render();
+        check("title_releases_decoder_and_bitmap", phase_rendered && cleared());
+        source.kind = primary_kind;
+        motion_config.reduce_menu_motion = false;
+        window.set_config(motion_config);
+        const bool reopened = ready();
+        const auto returned = window.menu_motion_background_diagnostics();
+        check("return_to_primary_menu_decodes_again", reopened && returned.source == primary_source && !returned.failed &&
+            returned.decode_requests > still.decode_requests && returned.uploaded_frames > still.uploaded_frames);
+        snapshot("returned");
+        // Any explicit custom background wins, even if its own asset is absent.
+        source.lobby_skin.enabled = source.lobby_skin.native_menu_renderer = true;
+        source.lobby_skin.background_path = "preview/custom-background-not-loaded.png";
+        phase_rendered = render();
+        check("explicit_custom_background_disables_default_video", phase_rendered && cleared());
+        return finish();
+    }
     static std::array<int64_t, 2> present_times(const MenuWindow& window) {
         return {window.benchmark_present_started_ns_, window.benchmark_present_ended_ns_};
     }
@@ -785,16 +1000,24 @@ struct MenuWindowVisualTestAccess {
             });
             if (search == window.hit_regions_.end()) failures.emplace_back("song search field missing");
             else {
+                const bool review_layout = source.song_select.native_list_layout &&
+                    (!source.lobby_skin.enabled || source.lobby_skin.native_menu_renderer);
                 std::size_t cards = 0;
                 for (const auto& hit : window.hit_regions_) {
                     if (hit.kind != MenuHitTargetKind::SongCard) continue;
                     ++cards;
-                    if (hit.bottom > search->top || std::abs(hit.left - search->left) > 1.0f ||
-                        std::abs(hit.right - search->right) > 1.0f)
-                        failures.emplace_back("song search must align below every visible card");
+                    if (review_layout) {
+                        if (hit.top < search->bottom)
+                            failures.emplace_back("song search header overlaps a visible row");
+                    } else if (hit.bottom > search->top || std::abs(hit.left - search->left) > 1.0f ||
+                               std::abs(hit.right - search->right) > 1.0f) {
+                        failures.emplace_back("authored song search must align below every visible card");
+                    }
                 }
                 if (cards != source.song_select.songs.size()) failures.emplace_back("visible song card lost to search field");
-                if (window.song_scrollbar_state_.visible && window.song_scrollbar_state_.bottom > search->top)
+                if (window.song_scrollbar_state_.visible &&
+                    (review_layout ? window.song_scrollbar_state_.top < search->bottom
+                                   : window.song_scrollbar_state_.bottom > search->top))
                     failures.emplace_back("song scrollbar overlaps search field");
             }
         }
@@ -973,6 +1196,9 @@ struct MenuWindowVisualTestAccess {
                 [](const BmsEditorNoteData& note) { return note.long_note; })))},
             {"width", JsonValue(static_cast<double>(window.width_))}, {"height", JsonValue(static_cast<double>(window.height_))},
             {"scale", JsonValue(static_cast<double>(window.scale_))}, {"foreground", JsonValue(foreground)},
+            {"result_text_fit", result_text_stats(window)},
+            {"menu_motion", menu_motion_stats(window)},
+            {"song_select_motion", menu_motion_stats(window)},
             {"geometry_resolver_verified", JsonValue(verify && checked > 0 && failures.empty())},
             {"native_dispatch_verified", JsonValue(native_dispatch_verified && checked > 0)},
             {"limitations", JsonValue(std::move(limitations))},
@@ -1041,10 +1267,15 @@ int main(int argc, char** argv) {
     bool ghost_paused = false;
     bool auto_scratch_hidden = false;
     bool pacemaker_fixture = false;
+    bool score_comparison_fixture = false;
+    bool score_comparison_missing_best = false;
+    double score_comparison_x = 0.0, score_comparison_y = 0.28;
     std::string hud_style = "studio";
     bool riff_map_visible = true;
     int toggle_riff_map_frame = -1;
     std::string fixture_gauge = "NORMAL";
+    std::string lobby_score_clear;
+    bool lobby_full_combo = false;
     double fixture_gauge_value = 75.0;
     std::string fixture_pacemaker_mode;
     double fixture_pacemaker_delta = 240.0;
@@ -1055,6 +1286,7 @@ int main(int argc, char** argv) {
     bool resume_countdown = false;
     bool no_feedback = false;
     bool full_combo_fixture = false;
+    bool result_text_combo_fixture = false;
     bool ghost_full_combo_fixture = false;
     bool timing_text_off = false, timing_bar_off = false;
     bool judgement_counts = false;
@@ -1133,6 +1365,10 @@ int main(int argc, char** argv) {
     bool failed = false;
     bool result_perfect = false;
     bool result_new_record = false;
+    std::string result_previous_rank;
+    bool result_gauge_shift = false;
+    int transition_frame_fixture = -1;
+    bool transition_sequence = false;
     bool reveal = false;
     bool settings = false;
     bool filter_settings = false;
@@ -1156,6 +1392,8 @@ int main(int argc, char** argv) {
     int table_prefix_keys = 0;
     bool mixed_table_prefixes = false;
     bool lamp_fixture = false;
+    bool level_folders_fixture = false;
+    bool long_title_fixture = false;
     bool clear_card_fixture = false;
     bool backdrop_off = false;
     double backdrop_opacity = -1.0;
@@ -1171,6 +1409,8 @@ int main(int argc, char** argv) {
     std::string hitmap_path;
     std::string retention_probe_directory;
     std::string layer_probe_directory;
+    std::string song_motion_probe_path;
+    std::string result_motion_probe_path;
     bool profile_settings = false;
     bool title = false;
     bool focus_options = false;
@@ -1250,12 +1490,21 @@ int main(int argc, char** argv) {
             continue;
         }
         // Keep new independent flags outside the legacy nested else-if chain (MSVC limit).
+        if (arg == "--transition-frame" && i + 1 < argc) {
+            transition_frame_fixture = std::clamp(std::stoi(argv[++i]), 0, 29);
+            continue;
+        }
+        if (arg == "--transition-sequence") { transition_sequence = true; continue; }
         if (arg == "--bga-retention-probe" && i + 1 < argc) {
             retention_probe_directory = argv[++i];
             continue;
         }
         if (arg == "--bga-layer-probe" && i + 1 < argc) {
             layer_probe_directory = argv[++i];
+            continue;
+        }
+        if ((arg == "--song-motion-probe" || arg == "--result-motion-probe") && i + 1 < argc) {
+            (arg == "--result-motion-probe" ? result_motion_probe_path : song_motion_probe_path) = argv[++i];
             continue;
         }
         if (arg == "--timing-marker" && i + 1 < argc) {
@@ -1271,6 +1520,8 @@ int main(int argc, char** argv) {
             if (judgement_line_type != 1 && judgement_line_type != 2) return 2;
             continue;
         }
+        if (arg == "--level-folders") { level_folders_fixture = true; continue; }
+        if (arg == "--long-title-fixture") { long_title_fixture = true; continue; }
         if (arg == "--measure-lines") { measure_lines_fixture = true; continue; }
         if (arg == "--measure-alignment" || arg == "--measure-alignment-no-lines") {
             measure_alignment_fixture = true;
@@ -1280,6 +1531,12 @@ int main(int argc, char** argv) {
         if (arg == "--bms-rank" && i + 1 < argc) { bms_rank_fixture = argv[++i]; continue; }
         if (arg == "--artist-text" && i + 1 < argc) { artist_fixture = argv[++i]; continue; }
         if (arg == "--key-overlay") { key_overlay_fixture = true; continue; }
+        if (arg == "--lobby-score-clear" && i + 1 < argc) { lobby_score_clear = argv[++i]; continue; }
+        if (arg == "--lobby-full-combo") { lobby_full_combo = true; continue; }
+        if (arg == "--score-comparison") { score_comparison_fixture = true; continue; }
+        if (arg == "--score-comparison-missing-best") { score_comparison_fixture = true; score_comparison_missing_best = true; continue; }
+        if (arg == "--score-comparison-x" && i + 1 < argc) { score_comparison_x = std::stod(argv[++i]); continue; }
+        if (arg == "--score-comparison-y" && i + 1 < argc) { score_comparison_y = std::stod(argv[++i]); continue; }
         if (arg == "--key-overlay-x" && i + 1 < argc) { key_overlay_x = std::stod(argv[++i]); continue; }
         if (arg == "--key-overlay-y" && i + 1 < argc) { key_overlay_y = std::stod(argv[++i]); continue; }
         if (arg=="--session-mix") { session_mix=true; continue; }
@@ -1305,8 +1562,11 @@ int main(int argc, char** argv) {
         }
         if (arg == "--indicator-background-off") { indicator_background_off = true; continue; }
         if (arg == "--full-combo") { full_combo_fixture = true; continue; }
+        if (arg == "--result-full-combo-text") { result = full_combo_fixture = result_text_combo_fixture = true; continue; }
         if (arg == "--ghost-full-combo") { ghost_full_combo_fixture = true; continue; }
         if (arg == "--new-record") { result = result_new_record = true; continue; }
+        if (arg == "--rank-upgrade-from" && i + 1 < argc) { result = true; result_previous_rank = argv[++i]; continue; }
+        if (arg == "--result-gauge-shift") { result = result_gauge_shift = true; continue; }
         if (arg == "--result-perfect") { result = result_perfect = true; continue; }
         if (arg == "--gauge-ramp") { result = gauge_ramp = true; continue; }
         if (arg == "--result-grade" && i + 1 < argc) { result_grade = argv[++i]; continue; }
@@ -1737,9 +1997,15 @@ int main(int argc, char** argv) {
     songs.selected_song_difficulty_prefix_key_count = table_prefix_keys;
     songs.selected_song_bpm = 180;
     songs.selected_song_note_count = 1824;
-    songs.selected_song_nps_min = 3;
+    // Synthetic chronological preview bins; actual library bins come from the
+    // selected chart worker and are covered by SongSelectScreen tests.
+    songs.selected_song_nps_min = 0;
     songs.selected_song_nps_median = 10;
     songs.selected_song_nps_max = 24;
+    songs.selected_song_nps_available = !empty;
+    constexpr std::array<float, 12> density_fixture{0, 6, 12, 9, 24, 18, 0, 3, 15, 8, 16, 9};
+    for (int i = 0; i < 48; ++i) songs.selected_song_nps_bins.push_back(density_fixture[i % density_fixture.size()]);
+    songs.selected_song_nps_average = 10.0;
     songs.selected_song_chart_name = "ANOTHER";
     songs.current_gauge_tier = fixture_gauge == "EX" ? "ex_hard" :
         fixture_gauge == "HARD" ? "hard" : fixture_gauge == "EASY" ? "easy" : "normal";
@@ -1771,6 +2037,8 @@ int main(int argc, char** argv) {
     songs.empty_message = loc("Clear the current search/filter or switch the active library to see more charts.",
                               "검색·필터를 지우거나 활성 라이브러리를 바꿔 더 많은 차트를 확인하세요.");
     songs.result_available = !empty;
+    songs.score_clear_status = lobby_score_clear;
+    songs.verified_full_combo = lobby_full_combo && !empty;
     songs.search_active = search_active;
     songs.search_query = search_query;
     songs.rank = empty ? "--" : (result_grade.empty() ? "S+" : result_grade);
@@ -1794,9 +2062,10 @@ int main(int argc, char** argv) {
         songs.left_nav.push_back(button);
     }
     const char* titles[] = {"Luminous Horizon / A very long chart title [Another]", "Blue Hour", "Afterglow",
-                            "Orbit", "Midnight Transit", "Parallel Lines", "First Light"};
+                            "Orbit", "Midnight Transit", "Parallel Lines", "First Light",
+                            "Starlight", "Last Horizon", "New Dawn"};
     if (!empty) {
-        for (int i = 0; i < 7; ++i) {
+        for (int i = 0; i < 10; ++i) {
             SongCardData card;
             card.title = titles[i];
             card.artist = artist;
@@ -1811,8 +2080,8 @@ int main(int argc, char** argv) {
             if (mixed_table_prefixes) {
                 const std::array<int, 7> prefix_modes = {4, 6, 8, 10, 0, 5, 0};
                 const std::array<const char*, 7> prefix_labels = {"4UE18+", "6UE4", "8UE?!", u8"Ⓡ10", "10", u8"⑤LEVEL 17+", "st4"};
-                card.level_label = prefix_labels[static_cast<std::size_t>(i)];
-                card.difficulty_prefix_key_count = prefix_modes[static_cast<std::size_t>(i)];
+                card.level_label = prefix_labels[static_cast<std::size_t>(i) % prefix_labels.size()];
+                card.difficulty_prefix_key_count = prefix_modes[static_cast<std::size_t>(i) % prefix_modes.size()];
                 card.difficulty_is_aery_five_key = card.difficulty_prefix_key_count == 5;
             }
             card.song_index = i;
@@ -1823,14 +2092,14 @@ int main(int argc, char** argv) {
                 constexpr std::array<const char*, 7> statuses{
                     "GAUGE SHIFT NORMAL CLEAR", "GAUGE SHIFT HARD CLEAR", "GAUGE SHIFT EX CLEAR",
                     "GAUGE SHIFT EASY CLEAR", "FAILED", "", "ASSIST PRACTICE GAUGE SHIFT NORMAL CLEAR"};
-                card.lamp = statuses[static_cast<std::size_t>(i)];
+                card.lamp = statuses[static_cast<std::size_t>(i) % statuses.size()];
                 card.favorite = false;
             }
             if (clear_card_fixture) {
                 constexpr std::array<const char*, 7> statuses{
                     "EASY CLEAR", "NORMAL CLEAR", "HARD CLEAR", "EX CLEAR",
                     "FAILED", "", "ASSIST PRACTICE GAUGE SHIFT NORMAL CLEAR"};
-                card.lamp = statuses[static_cast<std::size_t>(i)];
+                card.lamp = statuses[static_cast<std::size_t>(i) % statuses.size()];
                 card.title = "feeling(bms edit)[Hierarchie]";
                 card.artist = u8"天使真央 / obj.森さん";
                 card.detail = "7K SP BMS / Insane / Satellite sl11";
@@ -1839,12 +2108,17 @@ int main(int argc, char** argv) {
                 card.difficulty_prefix_key_count = 0;
                 card.background_path = bga_path;
             }
+            card.has_score = !card.lamp.empty();
+            card.score = 9452 - i * 207;
             songs.songs.push_back(card);
         }
         songs.song_count = songs.list_total_count = 42;
         songs.record_count = songs.source_count = 42;
-        songs.list_visible_count = 7;
-        if (lamp_fixture) songs.selected_song_lamp = songs.songs.front().lamp;
+        songs.list_visible_count = 10;
+        if (lamp_fixture) {
+            songs.selected_song_lamp = songs.songs.front().lamp;
+            if (lobby_score_clear.empty()) songs.score_clear_status = songs.songs.front().lamp;
+        }
     }
     if (songs.showing_sources && !empty) {
         songs.selected_source_all = true;
@@ -1856,6 +2130,26 @@ int main(int argc, char** argv) {
         songs.songs.front().artist = songs.selected_source_path;
         songs.songs.front().detail = loc("Combined library · duplicates removed", "통합 라이브러리 · 중복 제외");
         songs.songs.front().level = 42;
+        for (auto& card : songs.songs) { card.has_score = false; card.lamp.clear(); card.chart_count = 42; }
+    }
+    if (level_folders_fixture) {
+        songs.showing_level_folders = true;
+        songs.result_available = false;
+        songs.selected_song_title = "Level 0";
+        songs.selected_song_chart_name.clear();
+        songs.selected_song_chart_author.clear();
+        songs.selected_song_artist = "Stella";
+        songs.selected_song_layout = "65 charts";
+        songs.browser_summary = "Stella / LV ascending";
+        for (std::size_t i = 0; i < songs.songs.size(); ++i) {
+            auto& card = songs.songs[i];
+            card.title = "Level " + std::to_string(i);
+            card.artist = "Stella";
+            card.chart_count = i == 0 ? 65 : i == 1 ? 0 : 12 + static_cast<int>(i);
+            card.detail = std::to_string(card.chart_count) + " charts";
+            card.has_score = false;
+            card.lamp.clear();
+        }
     }
     auto& score = data.result;
     score.title = songs.selected_song_title;
@@ -1873,10 +2167,22 @@ int main(int argc, char** argv) {
     score.status = result_status.empty() ? (failed ? "FAILED" : "CLEAR") : result_status;
     score.web_upload_status = web_upload_status;
     score.new_record = result_new_record;
+    score.previous_rank = result_previous_rank.empty() ? "--" : result_previous_rank;
+    score.rank_upgraded = !result_previous_rank.empty();
+    score.gauge_shift_graph = result_gauge_shift;
     score.cleared = !failed;
     score.score = failed ? 4230 : 9452;
     score.detail_score = 8901;
     score.max_detail_score = 9120;
+    if (long_title_fixture) {
+        score.title = "QSHELL -拒色のシェルル- [Hexagon]";
+        score.artist = "Se-U-Ra / obj:hex";
+        score.layout_label = "7+1 SP";
+        score.difficulty_table_label = "Stella st1";
+        score.detail_score = 11217;
+        score.max_detail_score = 13680;
+        score.detailed_accuracy = 83.47;
+    }
     score.accuracy = songs.accuracy;
     score.detailed_accuracy = songs.detailed_accuracy;
     score.max_combo = 742;
@@ -1930,6 +2236,27 @@ int main(int argc, char** argv) {
         const float position = static_cast<float>(i) / 80.0f;
         score.gauge_points.push_back({position, gauge_ramp ? 1.0f - position : failed ? 0.7f * (1.0f - position)
             : 0.65f + 0.17f * std::sin(position * 18.0f)});
+    }
+    if (result_gauge_shift) {
+        // Exercise the actual raw-history projection, including the reset to
+        // 100 at each downshift, rather than merely relabeling a percent curve.
+        tenriff::gameplay::ResultStats raw;
+        using Gauge = tenriff::game::GaugeType;
+        const Gauge gauges[]{Gauge::ExHard, Gauge::Hard, Gauge::Normal, Gauge::Easy};
+        const char* shifts[]{"EX -> HD", "HD -> NM", "NM -> EZ"};
+        for (int band = 0; band < 4; ++band) {
+            const int64_t start = band * 800;
+            raw.record_gauge_sample(start, 100);
+            raw.record_gauge_sample(start + 300, 65);
+            raw.record_gauge_sample(start + 800, 0);
+            if (band < 3) {
+                raw.record_shift(start + 800, gauges[band], gauges[band + 1]);
+                score.gauge_shifts.push_back({static_cast<float>(start + 800) / 3200, shifts[band]});
+            }
+        }
+        score.gauge_points.clear();
+        for (const auto& point : tenriff::app::result_display_gauge_history(raw, Gauge::Easy, true))
+            score.gauge_points.push_back({static_cast<float>(point.sample) / 3200, point.value});
     }
     if (options_grid) {
         data.kind = MenuScreenKind::GenericList;
@@ -2180,6 +2507,14 @@ int main(int argc, char** argv) {
     data.gameplay.key_overlay_enabled = data.generic.skin_preview.key_overlay_enabled = key_overlay_fixture;
     data.gameplay.key_overlay_x = data.generic.skin_preview.key_overlay_x = key_overlay_x;
     data.gameplay.key_overlay_y = data.generic.skin_preview.key_overlay_y = key_overlay_y;
+    data.gameplay.score_comparison_enabled = data.generic.skin_preview.score_comparison_enabled = score_comparison_fixture;
+    data.gameplay.score_comparison_x = data.generic.skin_preview.score_comparison_x = score_comparison_x;
+    data.gameplay.score_comparison_y = data.generic.skin_preview.score_comparison_y = score_comparison_y;
+    data.gameplay.score_comparison.live = data.gameplay.score_comparison.rank_available = true;
+    data.gameplay.score_comparison.best_available = !score_comparison_missing_best;
+    data.gameplay.score_comparison.best_score = 4160;
+    data.gameplay.score_comparison.score_difference = 42;
+    data.gameplay.score_comparison.rank_difference = {3.25, 1.25, 0.25, -0.75};
     if (skin_settings) {
         tenriff::app::MenuAppVisualTestAccess::populate_skin_rows(
             data, fixture_skin ? &*fixture_skin : nullptr, selected_row,
@@ -2229,7 +2564,7 @@ int main(int argc, char** argv) {
     }
     if (full_combo_fixture) {
         data.result.full_combo = true;
-        data.result.all_combo_badge = true;
+        data.result.all_combo_badge = !result_text_combo_fixture;
     }
     if (resume_countdown) {
         data.gameplay.paused = data.gameplay.countdown_active = true;
@@ -2346,6 +2681,10 @@ int main(int argc, char** argv) {
         return MenuWindowVisualTestAccess::check_background_retention(window, data, retention_probe_directory) ? 0 : 5;
     if (!layer_probe_directory.empty())
         return MenuWindowVisualTestAccess::check_background_layers(window, data, layer_probe_directory) ? 0 : 5;
+    if (!song_motion_probe_path.empty())
+        return MenuWindowVisualTestAccess::check_menu_motion(window, data, song_motion_probe_path, false) ? 0 : 5;
+    if (!result_motion_probe_path.empty())
+        return MenuWindowVisualTestAccess::check_menu_motion(window, data, result_motion_probe_path, true) ? 0 : 5;
     if (benchmark_frames > 0) frame_limit = benchmark_warmup + benchmark_frames;
     const auto start = std::chrono::steady_clock::now();
     while (!window.should_close()) {
@@ -2358,6 +2697,11 @@ int main(int argc, char** argv) {
         if (score.presentation_start_ns == 0 && reveal) {
             score.presentation_start_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
                 std::chrono::steady_clock::now().time_since_epoch()).count();
+        }
+        if (result && fixture_seconds >= 0.0) {
+            score.presentation_start_ns = tenriff::timing::HighResClock::now_ns() -
+                static_cast<int64_t>(fixture_seconds * 1'000'000'000.0);
+            score.presentation_skipped = false;
         }
         if (gameplay || menu_roundtrip) {
             const double seconds = fixture_seconds >= 0.0 ? fixture_seconds
@@ -2581,6 +2925,14 @@ int main(int argc, char** argv) {
         if (std::find(capture_frames.begin(), capture_frames.end(), rendered_frames) != capture_frames.end()) {
             window.request_screenshot();
             std::cout << "capture frame=" << rendered_frames << '\n';
+        }
+        if (transition_sequence && rendered_frames >= 30 && rendered_frames < 60) {
+            transition_frame_fixture = rendered_frames - 30;
+            window.request_screenshot();
+        }
+        if (transition_frame_fixture >= 0) {
+            data.transition_start_ns = tenriff::timing::HighResClock::now_ns() -
+                (static_cast<int64_t>(transition_frame_fixture) * 1'000'000'000LL + 500'000'000LL) / 30;
         }
         if (capture_once && !capture_requested && rendered_frames >= 30) {
             window.request_screenshot();

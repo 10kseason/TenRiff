@@ -29,6 +29,49 @@ float pulse(double seconds, double center, double half_width) {
 
 }  // namespace
 
+std::optional<ResultTextRange> result_semantic_suffix_range(std::wstring_view text, std::wstring_view suffix) {
+    if (suffix.empty() || suffix.size() > text.size()) return std::nullopt;
+    const std::size_t start = text.size() - suffix.size();
+    if (text.substr(start) != suffix) return std::nullopt;
+    return ResultTextRange{start, suffix.size()};
+}
+
+ResultRecordEffectFrame result_record_effect_frame(int64_t elapsed_ns, bool rank_upgraded, bool skipped) {
+    ResultRecordEffectFrame frame;
+    if (skipped) {
+        frame.score_visibility = 1.0f;
+        return frame;
+    }
+    const double seconds = std::max(0.0, static_cast<double>(elapsed_ns) * 1e-9);
+    frame.score_visibility = smooth(phase(seconds, 0.65, 0.75));
+    if (elapsed_ns >= kRecordScoreEffectStartNs &&
+        elapsed_ns < kRecordScoreEffectStartNs + kRecordScoreEffectDurationNs)
+        frame.distortion = 1.0f - phase(seconds, 0.65, 1.85) * 0.65f;
+    if (rank_upgraded) {
+        frame.old_rank_brightness = smooth(phase(seconds, 0.65, 1.25));
+        frame.shatter = smooth(phase(seconds, 1.25, 1.65));
+        frame.old_rank_opacity = smooth(phase(seconds, 0.65, 0.82)) * (1.0f - frame.shatter);
+        frame.new_rank_opacity = smooth(phase(seconds, 1.50, 1.95));
+    }
+    return frame;
+}
+
+std::string result_record_score_text(int64_t target_score, float countup_progress,
+                                     int64_t elapsed_ns, bool new_record, bool skipped) {
+    if (!new_record) return std::to_string(result_counted_score(target_score, countup_progress));
+    target_score = std::max<int64_t>(0, target_score);
+    if (skipped || elapsed_ns >= kRecordScoreEffectStartNs + kRecordScoreEffectDurationNs)
+        return std::to_string(target_score);
+    if (elapsed_ns < kRecordScoreEffectStartNs) return "0";
+    // Fixed 30 Hz deterministic interference, never written back into score
+    // state. The final frame always resolves to the exact stored integer.
+    std::string text = std::to_string(target_score);
+    const uint64_t tick = static_cast<uint64_t>((elapsed_ns - kRecordScoreEffectStartNs) * 30 / 1'000'000'000LL);
+    for (std::size_t i = 0; i < text.size(); ++i)
+        text[i] = static_cast<char>('0' + (tick * 7 + i * 3 + static_cast<uint64_t>(target_score) + 1) % 10);
+    return text;
+}
+
 std::optional<uint32_t> result_gauge_shift_clear_color(std::string_view status) {
     if (status == "GAUGE SHIFT EASY CLEAR") return 0x72DB98;
     if (status == "GAUGE SHIFT NORMAL CLEAR") return 0xFFE477;

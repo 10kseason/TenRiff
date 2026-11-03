@@ -46,7 +46,8 @@ public:
     [[nodiscard]] bool is_idle();
 
     bool poll_result(SongIndex& out, std::vector<std::string>& warnings,
-                     std::unordered_map<std::string, int>* source_counts = nullptr);
+                     std::unordered_map<std::string, int>* source_counts = nullptr,
+                     bool* operation_succeeded = nullptr);
 
 private:
     void thread_main(std::string songs_path, std::string cache_path, SongIndexOptions options);
@@ -69,6 +70,7 @@ private:
     std::vector<std::string> warnings_;
     std::unordered_map<std::string, int> source_counts_;
     bool has_result_ = false;
+    bool result_succeeded_ = false;
 };
 
 }  // namespace tenriff::app

@@ -1,3 +1,45 @@
+# 1.9.9.9 — 2026-11-03
+
+- Add the supplied silent 1080p60/60-second Result video backdrop while preserving the restored layout; respect custom backgrounds/reduced motion and release menu video resources on screen changes.
+- Ship the updated Song Select list with clear-logo rows, folder counts, real MIN/AVG/MAX density bars and its 1080p30 background loop. Hide lobby detailed accuracy.
+- Add selectable BGM/UI effects and fix native audio file selection; include default sounds, the 10 emblem and one-second transitions.
+- Add score-only NEW RECORD feedback, rank/FULL COMBO effects and continuous gauge history; retain clear-first BEST storage.
+- Ship the optional BEST replay/accuracy-threshold comparator and its idle/paused-record fixes, folder navigation and long record titles. [Full scope](docs/release-1.9.9.9.en.md).
+
+Earlier local-candidate notes below document intermediate designs; the release scope above supersedes them.
+
+## Local Song Select follow-up · 2026-11-03 (unpublished)
+
+- Replace list scores with the existing clear badges and leave unplayed slots empty; retain folder counts and selected BEST score.
+- Group chart metadata with a real MIN/AVG/MAX NPS bar; hide lobby detailed accuracy while preserving stored/result values.
+- Use the supplied 12-second silent loop as the default native Song Select background, respecting reduced motion and custom backgrounds. Preserve the restored Result layout. [Scope](docs/lobby-detail-20261103.en.md).
+
+## Local result-only rollback · 2026-11-03 (unpublished)
+
+- Restore the pre-HTML result layout, background, four analysis tabs and action positions. Retain measured whole-title fitting.
+- Keep Song Select, audio, BEST comparison, record/rank effects, full-combo glow and gauge-transition corrections. [Scope](docs/result-rollback-20261103.en.md). Separate result-rollback-local profile; previous candidates remain preserved.
+
+## Local follow-up · 2026-11-03 (unpublished UI fixes)
+
+- Keep valid paused local BEST replays available for live comparison and refresh comparison-only HUD changes; online eligibility is unchanged.
+
+- Replace missing-cover TR with the supplied 10 emblem; show folder chart counts and hide browser input-backend text.
+- Support folder arrow entry/back and measured full result titles/detail metrics.
+- Fix custom audio file selection from an MTA caller using a request-scoped STA dialog.
+
+# Unpublished Song Select / Result UI follow-up — 2026-11-03
+
+- Apply the supplied HTML composition to native Song Select and Result while keeping existing real metrics, fonts, semantic colors and gameplay/record rules. Omit the user-confirmed masked components.
+- Use ten native song rows with matching paging; retain seven for authored legacy song layouts. Preserve existing controls, four result tabs, timing/lane/type/interval distributions and old-record scalar timing fallback.
+- Inherit the complete preceding feedback and color/sound changes. [Scope](docs/ui-layout-20261103.en.md) · [Verification](docs/ui-layout-20261103-gate.md). Local `ui-layout-local` profile; no version or fixed-baseline promotion.
+
+# Unpublished color/sound follow-up — 2026-11-03
+
+- Continue the complete local feedback candidate. Color lobby scores from their displayed record's existing clear palette, retaining font geometry and ordinary white UI.
+- Retain the original result font and metric colors; add modest existing-color glow/bloom only to verified FULL COMBO text.
+- Bundle the five provided button/options/slider/start/done sounds unchanged, add optional selectors and dispatch dedicated cues at manual actions or successful completion boundaries without duplicate clicks.
+- [Scope and usage](docs/color-sound-20261103.en.md) · [Fresh local checks](docs/color-sound-20261103-gate.md). Fixed baseline 1.9.6 and prior artifacts/profiles remain preserved; this is not a published version.
+
 # 1.9.9.8 hot fix 1 — 2026-10-30
 
 - Show an amber, localized audio-output selection notice when solo gameplay fails to start and returns to Song Select. Previously the failure text was only visible inside the difficulty-table URL editor.

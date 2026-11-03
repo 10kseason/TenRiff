@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cmath>
 #include <string>
 #include <string_view>
 
@@ -98,6 +99,21 @@ inline bool gameplay_session_full_combo(bool notes_finished,
 
 inline bool gameplay_session_assist_active(bool autoplay_enabled, bool practice_no_fail_enabled) {
     return autoplay_enabled || practice_no_fail_enabled;
+}
+
+// Historical FULL COMBO text requires recomputed replay evidence for the whole
+// chart, including LN heads and tails. A max combo matching only note count can
+// still describe a chart whose final hold has not resolved.
+inline bool verified_record_full_combo(bool verified_claims,
+                                       bool official_eligible,
+                                       bool game_over,
+                                       bool aborted,
+                                       bool assisted_or_partial,
+                                       const gameplay::ResultStats& stats) {
+    const bool whole_chart_judged = stats.total_notes > 0 && std::isfinite(stats.accuracy_weight) &&
+        stats.accuracy_weight + 1e-9 >= static_cast<double>(stats.total_notes);
+    return verified_claims && official_eligible && stats.max_combo >= stats.total_combo_steps &&
+        gameplay_session_full_combo(whole_chart_judged, game_over, aborted, assisted_or_partial, stats);
 }
 
 inline std::string gameplay_session_assist_prefix(bool autoplay_enabled, bool practice_no_fail_enabled) {

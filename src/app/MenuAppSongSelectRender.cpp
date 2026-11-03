@@ -18,8 +18,6 @@ namespace tenriff::app {
 
 namespace {
 
-constexpr int kSongSelectVisibleCardCount = 7;
-
 std::string song_sort_detail_label(MenuApp::SongSortMode mode, ui::Language language) {
     switch (mode) {
         case MenuApp::SongSortMode::DifficultyDesc: return ui::text(language, "LV DESC", "LV 내림");
@@ -67,6 +65,12 @@ std::string song_group_section_label(MenuApp::SongGroupMode mode, const SongEntr
 
 }  // namespace
 
+std::string MenuApp::song_nps_profile_key(const SongEntry& entry) const {
+    // F5 and library replacement invalidate even a timestamp-preserving edit.
+    return songs_path_ + "\n" + entry.path + "\n" + std::to_string(entry.mtime) + "\n" +
+        std::to_string(entry.file_size) + "\n" + std::to_string(song_index_revision_);
+}
+
 std::string MenuApp::difficulty_table_display_name() {
     if (difficulty_table_loading()) return ui_text("Loading...", "로딩 중");
     if (config_.ui.difficulty_table_path.empty()) return ui_text("Native LV", "기본 LV");
@@ -100,6 +104,20 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                                                const MenuApp::BestResultRecord& current_best,
                                                const MenuApp::LocalPlayRecord* selected_record) {
     using namespace menu_song_select;
+    render.song_select.score_clear_status.clear();
+    render.song_select.verified_full_combo = false;
+    render.song_select.selected_song_nps_available = false;
+    render.song_select.selected_song_nps_average = 0.0;
+    render.song_select.selected_song_nps_bins.clear();
+    render.song_select.native_list_layout = (!render.lobby_skin.enabled || render.lobby_skin.native_menu_renderer) &&
+        !std::any_of(render.lobby_skin.layout_rects.begin(), render.lobby_skin.layout_rects.end(), [](const auto& entry) {
+            return entry.first.find("song_select.") == 0;
+        }) && !std::any_of(render.lobby_skin.native_menu.rects.begin(), render.lobby_skin.native_menu.rects.end(), [](const auto& entry) {
+            return entry.first.find("songselect.") == 0 && std::any_of(entry.second.begin(), entry.second.end(), [](float delta) {
+                return std::isfinite(delta) && std::abs(delta) > 0.001f;
+            });
+        });
+    const int visible_card_count = song_select_visible_card_count(render.song_select.native_list_layout);
 
     // Song Select, Sources, and Records intentionally share one render payload so the
     // renderer can switch views without a second screen-specific data model.
@@ -244,13 +262,6 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
     render.song_select.browser_summary = browser_summary();
     render.song_select.search_query = safe_ui_text(song_search_query_);
     render.song_select.search_active = song_select_search_active_;
-    const std::string input_backend_label = current_input_backend_status_label();
-    if (!input_backend_label.empty()) {
-        if (!render.song_select.browser_summary.empty()) {
-            render.song_select.browser_summary += " / ";
-        }
-        render.song_select.browser_summary += input_backend_label;
-    }
     if (!session_mix_status_message_.empty()) {
         if (!render.song_select.browser_summary.empty()) {
             render.song_select.browser_summary += " / ";
@@ -404,7 +415,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         const int total_sources = static_cast<int>(config_.ui.recent_song_sources.size()) + 1;
         if (total_sources > 0) {
             selected_source_ = clamp_int(selected_source_, 0, total_sources - 1);
-            constexpr int visible = kSongSelectVisibleCardCount;
+            const int visible = visible_card_count;
             int start = std::max(0, selected_source_ - (visible / 2));
             const int max_start = std::max(0, total_sources - visible);
             start = std::min(start, max_start);
@@ -424,6 +435,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                     card.detail = config_.ui.all_song_sources ? ui_text("CURRENT LIBRARY", "현재 라이브러리")
                         : ui_text("Combined library · duplicates removed", "통합 라이브러리 · 중복 제외");
                     card.level = std::max(0, all_source_song_count_);
+                    card.chart_count = card.level;
                     render.song_select.songs.push_back(std::move(card));
                     continue;
                 }
@@ -433,6 +445,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 const auto count_it =
                     source_song_counts_.find(menu_songs::normalize_path_key(path_from_utf8(source_path)));
                 card.level = (count_it != source_song_counts_.end()) ? count_it->second : 0;
+                card.chart_count = card.level;
                 card.detail = safe_ui_text((!config_.ui.all_song_sources && menu_songs::normalize_path_key(path_from_utf8(source_path)) ==
                                             menu_songs::normalize_path_key(path_from_utf8(songs_path_)))
                                                ? ui_text("CURRENT LIBRARY", "현재 라이브러리")
@@ -472,7 +485,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
     } else if (render.song_select.showing_records) {
         const int total = render.song_select.record_count;
         if (total > 0) {
-            constexpr int visible = kSongSelectVisibleCardCount;
+            const int visible = visible_card_count;
             int& active_selection = render.song_select.online_records
                                         ? selected_online_record_
                                         : selected_record_;
@@ -491,6 +504,9 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                     const OnlineRecordEntry& record =
                         online_snapshot.records[static_cast<std::size_t>(i)];
                     render::SongCardData card;
+                    card.has_score = true;
+                    card.score = record.score;
+                    card.lamp = record.clear_status;
                     card.title = "#" + std::to_string(record.rank) + "  " +
                                  safe_ui_text(record.player_name, "PLAYER");
                     card.artist = render::song_select_lamp_presentation(record.clear_status).label + "  " +
@@ -509,6 +525,9 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 const LocalPlayRecord& record =
                     local_play_records_[current_song_record_indices_[static_cast<std::size_t>(i)]];
                 render::SongCardData card;
+                card.has_score = true;
+                card.score = record.score;
+                card.lamp = record.clear_status;
                 card.title = menu_records::compact_timestamp_label(record.created_utc);
                 card.artist = record.player_name + "  " + render::song_select_lamp_presentation(record.clear_status).label + "  " +
                               record.rank + "  " + ui_text("SCORE ", "점수 ") +
@@ -561,9 +580,9 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         }
     } else if (showing_table_level_folders()) {
         const int total = static_cast<int>(table_levels_.size());
-        const int start = std::clamp(selected_table_level_ - kSongSelectVisibleCardCount / 2,
-            0, std::max(0, total - kSongSelectVisibleCardCount));
-        const int end = std::min(total, start + kSongSelectVisibleCardCount);
+        const int start = std::clamp(selected_table_level_ - visible_card_count / 2,
+            0, std::max(0, total - visible_card_count));
+        const int end = std::min(total, start + visible_card_count);
         render.song_select.list_total_count = total;
         render.song_select.list_visible_count = end - start;
         render.song_select.list_window_start = start;
@@ -573,18 +592,19 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             card.title = ui_text("Level ", "레벨 ") + safe_ui_text(table_levels_[i]);
             card.artist = difficulty_table_display_name();
             const int count = i < static_cast<int>(table_level_counts_.size()) ? table_level_counts_[i] : 0;
+            card.chart_count = count;
             card.detail = std::to_string(count) + ui_text(" charts", "곡");
             card.level_label = safe_ui_text(table_levels_[i]);
             card.song_index = i;
             card.selected = i == selected_table_level_;
             render.song_select.songs.push_back(std::move(card));
         }
-        render.song_select.primary_hint = ui_text("Enter / Double-click: Open level", "Enter / 두 번 클릭: 레벨 열기");
+        render.song_select.primary_hint = ui_text("Enter / Double-click: Open level", "Enter / 두 번 클릭: 레벨 열기") + "    → Enter / ← Esc";
         render.song_select.empty_title = ui_text("NO TABLE LEVELS", "난이도표 레벨 없음");
     } else {
         const int total = static_cast<int>(visible_song_count());
         if (total > 0) {
-            constexpr int visible = kSongSelectVisibleCardCount;
+            const int visible = visible_card_count;
             int start = std::max(0, selected_song_ - (visible / 2));
             const int max_start = std::max(0, total - visible);
             start = std::min(start, max_start);
@@ -614,6 +634,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 card.background_path = song_background_preview_path_for_entry(*entry);
                 const BestResultRecord best = best_result_for_song_entry(*entry);
                 card.lamp = best.has_value ? best.clear_status : std::string{};
+                card.has_score = best.has_value;
+                card.score = best.has_value ? best.best_score : 0;
                 card.level_label = song_difficulty_label(*entry);
                 card.difficulty_is_aery_five_key =
                     song_difficulty_is_aery_five_key(*entry, config_.ui.difficulty_table_url);
@@ -683,6 +705,14 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             render.song_select.selected_song_nps_min = entry->nps_min;
             render.song_select.selected_song_nps_median = entry->nps_median;
             render.song_select.selected_song_nps_max = entry->nps_max;
+            if (const auto* density = song_select_screen_.nps_profile_for(song_nps_profile_key(*entry));
+                density && density->available) {
+                render.song_select.selected_song_nps_available = true;
+                render.song_select.selected_song_nps_min = density->minimum;
+                render.song_select.selected_song_nps_average = density->average;
+                render.song_select.selected_song_nps_max = density->maximum;
+                render.song_select.selected_song_nps_bins = density->bins;
+            }
             render.song_select.selected_song_note_count = entry->note_count;
             render.song_select.current_visual_latency = format_signed_offset_ms(config_.visual_offset_ms);
             render.song_select.current_hi_speed = format_decimal(config_.speed.hi_speed);
@@ -712,6 +742,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         if (render.song_select.online_records && selected_online_record) {
             render.song_select.rank = "#" + std::to_string(selected_online_record->rank);
             render.song_select.best_score = selected_online_record->score;
+            render.song_select.score_clear_status = selected_online_record->clear_status;
+            // The online summary has no verified whole-chart LN-step evidence.
             render.song_select.max_score = gameplay::kNativeScoreMaximum;
             render.song_select.max_combo = selected_online_record->max_combo;
             render.song_select.accuracy = selected_online_record->accuracy;
@@ -732,6 +764,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         } else if (!render.song_select.online_records && selected_record) {
             render.song_select.rank = selected_record->rank;
             render.song_select.best_score = selected_record->score;
+            render.song_select.score_clear_status = selected_record->clear_status;
+            render.song_select.verified_full_combo = selected_record->verified_full_combo;
             render.song_select.max_score = gameplay::kNativeScoreMaximum;
             render.song_select.detail_score = selected_record->detail_score;
             render.song_select.max_detail_score =
@@ -776,6 +810,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
     } else if (!render.song_select.showing_sources) {
         render.song_select.rank = current_best.has_value ? current_best.rank : "--";
         render.song_select.best_score = current_best.has_value ? current_best.best_score : 0;
+        render.song_select.score_clear_status = current_best.has_value ? current_best.clear_status : std::string{};
+        render.song_select.verified_full_combo = current_best.has_value && current_best.verified_full_combo;
         render.song_select.max_score = gameplay::kNativeScoreMaximum;
         render.song_select.detail_score = current_best.has_value ? current_best.detail_score : 0;
         render.song_select.max_detail_score = current_best.has_value

@@ -105,7 +105,8 @@ SongIndexerThread::Progress SongIndexerThread::progress() const {
 }
 
 bool SongIndexerThread::poll_result(SongIndex& out, std::vector<std::string>& warnings,
-                                   std::unordered_map<std::string, int>* source_counts) {
+                                   std::unordered_map<std::string, int>* source_counts,
+                                   bool* operation_succeeded) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (!has_result_) {
         return false;
@@ -113,10 +114,12 @@ bool SongIndexerThread::poll_result(SongIndex& out, std::vector<std::string>& wa
     out = std::move(result_);
     warnings = std::move(warnings_);
     if (source_counts) *source_counts = std::move(source_counts_);
+    if (operation_succeeded) *operation_succeeded = result_succeeded_;
     result_ = {};
     warnings_.clear();
     source_counts_.clear();
     has_result_ = false;
+    result_succeeded_ = false;
     return true;
 }
 
@@ -139,6 +142,8 @@ void SongIndexerThread::sources_thread_main(std::vector<std::string> source_root
             }, stop_requested, force_rescan);
         if (!combined.cancelled && !stop_requested()) {
             std::lock_guard<std::mutex> lock(mutex_);
+            result_succeeded_ = combined.missing_sources == 0 && combined.warnings.empty() &&
+                !combined.index.entries.empty();
             result_ = std::move(combined.index);
             warnings_ = std::move(combined.warnings);
             source_counts_ = std::move(combined.source_counts);
@@ -161,6 +166,7 @@ void SongIndexerThread::sources_thread_main(std::vector<std::string> source_root
 void SongIndexerThread::thread_main(std::string songs_path, std::string cache_path, SongIndexOptions options) {
     std::vector<std::string> warnings;
     SongIndex index;
+    bool operation_succeeded = false;
     const auto stop_requested = [this]() {
         return should_stop_.load(std::memory_order_acquire);
     };
@@ -224,6 +230,8 @@ void SongIndexerThread::thread_main(std::string songs_path, std::string cache_pa
                         return;
                     }
                     warnings.push_back(save_error);
+                } else {
+                    operation_succeeded = !index.entries.empty();
                 }
             }
         }
@@ -236,6 +244,9 @@ void SongIndexerThread::thread_main(std::string songs_path, std::string cache_pa
     if (!stop_requested()) {
         std::lock_guard<std::mutex> lock(mutex_);
         result_ = std::move(index);
+        // Existing callers still receive diagnostic/partial results, but they
+        // must not be announced as a completed successful load.
+        result_succeeded_ = operation_succeeded && warnings.empty();
         warnings_ = std::move(warnings);
         is_running_.store(false, std::memory_order_release);
         has_result_ = true;

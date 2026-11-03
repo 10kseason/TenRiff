@@ -338,6 +338,7 @@ bool MenuApp::load_session_mix_lr2_course_file(std::string_view path, bool remem
     session_mix_status_message_ =
         ui_text("Loaded LR2 courses: ", "LR2 코스 로드: ") +
         std::to_string(session_mix_lr2_courses_.size());
+    if (remember_path) notify_menu_load_complete(result.warnings.empty(), !session_mix_lr2_courses_.empty());
     return true;
 }
 
@@ -443,6 +444,7 @@ void MenuApp::start_session_mix() {
         return;
     }
 
+    play_menu_sound(MenuSoundKind::Start);
     session_mix_cursor_ = 0;
     session_mix_completed_ = 0;
     session_mix_cleared_ = 0;

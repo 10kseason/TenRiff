@@ -1,3 +1,5 @@
+> **2026-11-03 · 1.9.9.9:** [선곡·기록 피드백과 리절트 영상 배경](release-1.9.9.9.ko.md). Fixed baseline **1.9.6**. Earlier candidate/release notices below are historical; Result uses the restored layout.
+
 > **2026-10-30 · 1.9.9.8 hot fix 1:** [오디오 장치 안내 수정](release-1.9.9.8-hotfix1.ko.md). Fixed baseline **1.9.6**; earlier notices are historical.
 
 > **2026-10-29 · 1.9.9.6:** [인디케이터·리절트 및 라이브러리 로딩](release-1.9.9.6.ko.md). Fixed baseline: **1.9.6**. Earlier local/unpublished entries below are historical. [Verification](release-1.9.9.6-gate.md).

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.9.9.8 DESCRIPTION "TenRiff 1.9.9.8 hot fix 1" LANGUAGES C CXX)
+project(TenRiff VERSION 1.9.9.9 DESCRIPTION "TenRiff 1.9.9.9" LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -351,6 +351,7 @@ if(WIN32)
         src/app/MenuAppDeviceSettings.cpp
         src/app/MenuAppKeymap.cpp
         src/app/MenuAppRecords.cpp
+        src/app/MenuAppScoreComparison.cpp
         src/app/MenuAppSessionMix.cpp
         src/app/MenuAppSongSelect.cpp
         src/app/MenuAppSongSelectRender.cpp
@@ -476,18 +477,6 @@ if(WIN32 AND TENRIFF_ENABLE_ONNX_UPSCALER AND MSVC)
     foreach(filter_target tenriff deblock_smoke onnx_upscaler_winml_smoke)
         tenriff_copy_ffmpeg_deblock(${filter_target})
     endforeach()
-endif()
-
-# Keep menu music beside the runnable binary. Copying the directory as a
-# post-build step also makes newly added numbered variants available without
-# maintaining an asset list in CMake.
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Mainmusic")
-    add_custom_command(TARGET tenriff POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_CURRENT_SOURCE_DIR}/Mainmusic"
-            "$<TARGET_FILE_DIR:tenriff>/Mainmusic"
-        COMMENT "Copying Mainmusic assets"
-    )
 endif()
 
 if(WIN32)
@@ -883,6 +872,8 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_bga_image_loader.cpp
         tests/unit/test_targa_image.cpp
         tests/unit/test_result_presentation.cpp
+        tests/unit/test_live_score_comparison.cpp
+        tests/unit/test_lobby_semantic_text.cpp
         tests/unit/test_lan_discovery.cpp
         tests/unit/test_peer_protocol.cpp
         tests/unit/test_peer_session.cpp
@@ -941,4 +932,18 @@ if(TENRIFF_ENABLE_TESTS)
         add_test(NAME bms_parser_tests COMMAND bms_parser_tests)
         set_tests_properties(bms_parser_tests PROPERTIES TIMEOUT 600)
     endif()
+endif()
+
+# Bundled menu music/SFX are resolved from the executable, including standalone
+# developer tools and a test-only build launched from another working directory.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Mainmusic")
+    foreach(audio_asset_target tenriff menu_visual_preview menu_app_smoke scene_music_smoke bms_parser_tests)
+        if(TARGET ${audio_asset_target})
+            add_custom_command(TARGET ${audio_asset_target} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_directory
+                    "${CMAKE_CURRENT_SOURCE_DIR}/Mainmusic"
+                    "$<TARGET_FILE_DIR:${audio_asset_target}>/Mainmusic"
+                COMMENT "Copying menu music and bundled UI sounds")
+        endif()
+    endforeach()
 endif()

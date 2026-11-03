@@ -72,6 +72,7 @@
 #include "render/GameplayMotion.h"
 #include "render/GameplayBackgroundPolicy.h"
 #include "render/ResultPresentation.h"
+#include "render/SceneTransition.h"
 #include "timing/HighResClock.h"
 #include "util/Utf8Compat.h"
 
@@ -87,7 +88,6 @@ using menu_song_select::song_artist_for_ui;
 using menu_song_select::song_title_for_ui;
 
 constexpr int kSnapshotSongCount = 10;
-constexpr int kSongSelectVisibleCardCount = 7;
 constexpr int kSongSelectNavLastIndex = 6;
 constexpr int kSongBrowserRowCount = 12;
 constexpr int64_t kSongSelectRepeatInitialDelayNs = 250'000'000LL;
@@ -726,6 +726,11 @@ std::string format_signed_ms(double value) {
 }  // namespace
 
 void MenuApp::reset_screen(Screen screen) noexcept {
+    if (current_screen() == Screen::Title && screen == Screen::SongSelect) {
+        scene_transition_start_ns_ = timing::HighResClock::now_ns();
+    } else {
+        scene_transition_start_ns_ = 0;
+    }
     profile_control_key_capture_active_ = false;
     profile_control_key_status_.clear();
     close_skin_fullscreen_preview();
@@ -1032,6 +1037,7 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
     input.full_combo = state.full_combo;
     input.counts = state.counts;
     input.score = state.score;
+    input.score_comparison = state.score_comparison;
     input.osu_od8_score_available = state.osu_od8_score_available;
     input.osu_od8_score = state.osu_od8_score;
     input.gauge = state.gauge;
@@ -1395,7 +1401,7 @@ double MenuApp::menu_output_master_gain() const {
 
 void MenuApp::play_speed_adjustment_if_changed(const config::SpeedConfig& previous) {
     if (previous.rate != config_.speed.rate || previous.hi_speed != config_.speed.hi_speed)
-        play_settings_adjustment_click(menu_output_master_gain());
+        play_menu_sound(MenuSoundKind::Slider);
 }
 
 void MenuApp::run() {
@@ -1412,6 +1418,7 @@ void MenuApp::run() {
             sync_menu_music();
         }
         const auto scene_now = std::chrono::steady_clock::now();
+        service_menu_sounds();
         if (scene_now >= next_scene_music_tick) {
             next_scene_music_tick = scene_now + std::chrono::milliseconds(20);
             // A completed decode must start even while a menu is idle.
@@ -1473,7 +1480,8 @@ void MenuApp::run() {
         SongIndex updated;
         std::vector<std::string> warnings;
         std::unordered_map<std::string, int> indexed_source_counts;
-        if (song_indexer_.poll_result(updated, warnings, &indexed_source_counts)) {
+        bool index_succeeded = false;
+        if (song_indexer_.poll_result(updated, warnings, &indexed_source_counts, &index_succeeded)) {
             if (config_.ui.all_song_sources) {
                 all_source_song_count_ = static_cast<int>(updated.entries.size());
                 for (const auto& [source, count] : indexed_source_counts) {
@@ -1481,6 +1489,7 @@ void MenuApp::run() {
                 }
             }
             update_song_list(std::move(updated));
+            notify_menu_load_complete(index_succeeded, !indexed_songs_.empty());
             for (const auto& warning : warnings) {
                 std::cerr << "[warn] " << warning << std::endl;
             }
@@ -1497,6 +1506,9 @@ void MenuApp::run() {
         update_keymap_capture_timeout();
         update_song_select_repeat();
         update_bms_editor_repeat();
+        if (service_song_nps_profile()) {
+            publish_snapshot();
+        }
         service_song_preview();
         service_bms_editor_preview();
 
@@ -2136,6 +2148,7 @@ void MenuApp::refresh_difficulty_table_view(bool force_reindex) {
         refresh_song_source(force_reindex);
         return;
     }
+    const bool nested_table_load = difficulty_table_loading_;
     const DifficultyTableLoadingScope loading(*this);
     std::optional<DifficultyTable> table;
     if (!config_.ui.difficulty_table_path.empty()) {
@@ -2160,14 +2173,19 @@ void MenuApp::refresh_difficulty_table_view(bool force_reindex) {
     selected_table_level_ = 0;
     song_select_view_ = SongSelectView::Songs;
     rebuild_visible_song_list(selected_path.empty() ? nullptr : &selected_path);
+    if (!nested_table_load && table)
+        notify_menu_load_complete(true, table->entry_count() > 0);
 }
 
 void MenuApp::refresh_song_source(bool force_reindex) {
+    const bool owns_table_load = !difficulty_table_loading_ && !config_.ui.difficulty_table_path.empty();
     const DifficultyTableLoadingScope loading(*this, !config_.ui.difficulty_table_path.empty());
     difficulty_table_display_path_.clear();
     table_levels_path_.clear();
     if (config_.ui.all_song_sources) switch_all_song_sources(force_reindex);
     else switch_song_source(songs_path_, force_reindex);
+    if (owns_table_load && !song_indexer_.is_running())
+        notify_menu_load_complete(true, !indexed_songs_.empty());
 }
 
 void MenuApp::switch_song_source(const std::string& new_songs_path, bool force_reindex) {
@@ -2224,6 +2242,9 @@ void MenuApp::switch_song_source(const std::string& new_songs_path, bool force_r
     if (force_reindex || !cache_result.success() || !cache_result.loaded_from_file) {
         std::cerr << "[info] Indexing song source: " << songs_path_ << std::endl;
         (void)song_indexer_.start(songs_path_, cache_path_, index_options);
+    } else {
+        if (!difficulty_table_loading_)
+            notify_menu_load_complete(cache_result.warnings.empty(), !indexed_songs_.empty());
     }
 
     if (source_history_changed) {
@@ -2449,6 +2470,18 @@ void MenuApp::handle_input_event(const input::InputEvent& incoming_event) {
         return;
     }
 
+    const auto keyboard_sound_serial = menu_sounds_.request_serial();
+    const bool keyboard_options_edit = menu::screen_descriptor(current_screen()).options_family &&
+        (event.keycode == key_enter_ || event.keycode == key_left_ || event.keycode == key_right_);
+    const auto keyboard_feedback = [&] {
+        if (keyboard_options_edit && menu_sounds_.request_serial() == keyboard_sound_serial)
+            play_menu_sound(MenuSoundKind::OptionsEdit);
+    };
+    struct KeyboardFeedback {
+        decltype(keyboard_feedback)& emit;
+        ~KeyboardFeedback() noexcept { try { emit(); } catch (...) {} }
+    } keyboard_completion{keyboard_feedback};
+
     switch (current_screen()) {
         case Screen::QuickSetup:
             handle_quick_setup_input(event.keycode);
@@ -2551,6 +2584,34 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
         return;
     }
     if (skin_preview_fullscreen_ && event.kind != render::MenuHitTargetKind::GameplayFieldDrag) return;
+    const bool slider_sound = (event.kind == render::MenuHitTargetKind::SettingsRow &&
+                                event.part == render::MenuHitPart::SetValue) ||
+        (event.kind == render::MenuHitTargetKind::GameplayFieldDrag && (event.dragging || event.drag_finished));
+    const bool options_sound = menu::screen_descriptor(current_screen()).options_family;
+    const bool clickable_sound = event.kind != render::MenuHitTargetKind::MouseWheel &&
+        event.kind != render::MenuHitTargetKind::FileDrop &&
+        (event.part != render::MenuHitPart::SelectOnly ||
+         (options_sound && event.kind == render::MenuHitTargetKind::SettingsRow));
+    const bool start_intent = event.kind == render::MenuHitTargetKind::SongStartButton ||
+        (event.kind == render::MenuHitTargetKind::SongCard && event.double_click &&
+         (current_screen() == Screen::SessionMix ||
+          (current_screen() == Screen::SongSelect && song_select_view_ == SongSelectView::Songs &&
+           !showing_table_level_folders() && !multiplayer_selecting_chart_))) ||
+        (event.kind == render::MenuHitTargetKind::SettingsRow &&
+         ((current_screen() == Screen::Result && event.index == 2) ||
+          (current_screen() == Screen::SessionMix && event.index == 4)));
+    const auto pointer_sound = menu_music_detail::pointer_sound(clickable_sound, slider_sound, options_sound, start_intent);
+    const auto pointer_sound_serial = menu_sounds_.request_serial();
+    const auto pointer_feedback = [&] {
+        // Dedicated Start, Slider and Done boundaries own their event. Only
+        // otherwise silent actions receive the generic/options click fallback.
+        if (pointer_sound && menu_sounds_.request_serial() == pointer_sound_serial)
+            play_menu_sound(*pointer_sound);
+    };
+    struct PointerFeedback {
+        decltype(pointer_feedback)& emit;
+        ~PointerFeedback() noexcept { try { emit(); } catch (...) {} }
+    } pointer_completion{pointer_feedback};
     // Pointer selection takes ownership immediately, even if it changes the row
     // and then returns before the next repeat tick.
     reset_song_select_repeat();
@@ -2936,6 +2997,26 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
     }
     if (event.kind == render::MenuHitTargetKind::FileDrop) {
         if (current_screen() == Screen::Multiplayer) {
+            return;
+        }
+        play_menu_sound(MenuSoundKind::Drop);
+        if (current_screen() == Screen::SettingsAudio &&
+            menu::settings::is_audio_file_setting(audio_settings_controller_.selected_id())) {
+            std::error_code error;
+            if (!menu_music_detail::supported_audio_file(event.path) ||
+                !std::filesystem::is_regular_file(path_from_utf8(event.path), error)) {
+                audio_file_status_ = ui_text("Choose an existing MP3, OGG, WAV or FLAC file.",
+                                             "존재하는 MP3, OGG, WAV, FLAC 파일을 선택하세요.");
+                publish_snapshot();
+                return;
+            }
+            auto effects = audio_settings_controller_.set_audio_file(
+                config_, audio_settings_controller_.selected_id(), event.path);
+            effects.persist_config = true;
+            effects.render_changed = true;
+            failed_menu_music_files_.erase(event.path);
+            audio_file_status_.clear();
+            apply_audio_settings_effects(effects);
             return;
         }
         std::string dropped_extension;
@@ -4470,7 +4551,11 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
     }
 
     if (keycode == key_backspace_) return;
-    if (keycode == key_escape_ && !active_table_level_.empty()) {
+    const bool level_folder_arrow_back =
+        song_select_view_ == SongSelectView::Songs &&
+        song_select_focus_ == SongSelectFocus::SongList &&
+        (keycode == key_left_ || keycode == key_right_);
+    if ((keycode == key_escape_ || level_folder_arrow_back) && !active_table_level_.empty()) {
         active_table_level_.clear();
         song_select_search_active_ = false;
         rebuild_visible_song_list();
@@ -4579,6 +4664,19 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
             return;
         }
     }
+    if (song_select_focus_ == SongSelectFocus::SongList &&
+        (showing_table_level_folders() || song_select_view_ == SongSelectView::Sources)) {
+        if (keycode == key_right_) {
+            if (showing_table_level_folders()) open_selected_table_level();
+            else { open_selected_song_source(); publish_snapshot(); }
+            return;
+        }
+        if (keycode == key_left_) {
+            // Use the established Back route without changing table/filter state.
+            handle_song_select_input(key_escape_);
+            return;
+        }
+    }
     if (keycode == key_left_) {
         song_select_search_active_ = false;
         song_select_focus_ = SongSelectFocus::LeftNav;
@@ -4594,7 +4692,12 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
     if (keycode == key_page_up_ || keycode == key_page_down_) {
         song_select_search_active_ = false;
         song_select_focus_ = SongSelectFocus::SongList;
-        const int delta = (keycode == key_page_up_) ? -kSongSelectVisibleCardCount : kSongSelectVisibleCardCount;
+        int page_size;
+        {
+            std::lock_guard<std::mutex> lock(snapshot_mutex_);
+            page_size = song_select_visible_card_count(snapshot_.render.song_select.native_list_layout);
+        }
+        const int delta = (keycode == key_page_up_) ? -page_size : page_size;
         if (move_song_select_selection(delta)) {
             publish_snapshot();
         }
@@ -4838,6 +4941,8 @@ bool MenuApp::apply_difficulty_table_url(std::string_view url, DifficultyTableFe
     // freshly imported table even when the selected preset itself did not change.
     refresh_difficulty_table_view(force_table_reindex);
     song_browser_status_message_.clear();
+    if (!song_indexer_.is_running())
+        notify_menu_load_complete(imported.warnings.empty(), !table_levels_.empty());
     return true;
 }
 
@@ -5277,6 +5382,7 @@ void MenuApp::handle_result_input(uint32_t keycode) {
     }
     if (keycode == key_left_ || (key_r_ != 0 && keycode == key_r_)) {
         if (!last_chart_path_.empty()) {
+            play_menu_sound(MenuSoundKind::Start);
             launch_gameplay(last_chart_path_);
         } else {
             launch_selected_song();

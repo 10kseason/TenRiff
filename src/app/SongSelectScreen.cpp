@@ -108,8 +108,66 @@ void SongSelectScreen::cancel_preview_decode() {
     }
 }
 
+bool SongSelectScreen::service_nps_profile(std::string selection_key,
+                                           std::string chart_path, int64_t now_ns) {
+    bool changed = false;
+    if (selection_key != nps_selection_key_) {
+        if (nps_cancel_) nps_cancel_->store(true, std::memory_order_release);
+        nps_selection_key_ = std::move(selection_key);
+        nps_chart_path_ = std::move(chart_path);
+        nps_due_ns_ = now_ns + 150'000'000LL;
+        nps_pending_ = !nps_selection_key_.empty() && nps_selection_key_ != nps_cached_key_;
+        changed = true;
+    }
+    if (nps_future_.valid() && nps_future_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        NpsDecodeResult decoded;
+        try { decoded = nps_future_.get(); } catch (...) {}
+        const bool cancelled = nps_cancel_ && nps_cancel_->load(std::memory_order_acquire);
+        nps_cancel_.reset();
+        if (!cancelled && !decoded.selection_key.empty() && decoded.selection_key == nps_selection_key_) {
+            nps_cached_key_ = std::move(decoded.selection_key);
+            nps_cached_profile_ = std::move(decoded.profile);
+            nps_pending_ = false;
+            changed = true;
+        }
+    }
+    if (nps_pending_ && !nps_future_.valid() && now_ns >= nps_due_ns_) {
+        const auto key = nps_selection_key_;
+        const auto path = nps_chart_path_;
+        auto cancelled = std::make_shared<std::atomic<bool>>(false);
+        nps_cancel_ = cancelled;
+        nps_pending_ = false;
+        try {
+            nps_future_ = std::async(std::launch::async, [key, path, cancelled]() {
+                NpsDecodeResult result;
+                result.selection_key = key;
+                try {
+                    result.profile = load_song_nps_profile(path, [cancelled]() {
+                        return cancelled->load(std::memory_order_acquire);
+                    });
+                } catch (...) {
+                    // A bad preview must not affect selection or gameplay.
+                }
+                return result;
+            });
+        } catch (...) {
+            nps_cached_key_ = key;
+            nps_cached_profile_ = {};
+            nps_cancel_.reset();
+            changed = true;
+        }
+    }
+    return changed;
+}
+
+const SongNpsProfile* SongSelectScreen::nps_profile_for(std::string_view selection_key) const {
+    return !selection_key.empty() && selection_key == nps_selection_key_ && selection_key == nps_cached_key_
+        ? &nps_cached_profile_ : nullptr;
+}
+
 void SongSelectScreen::shutdown() {
     active_ = false;
+    if (nps_cancel_) nps_cancel_->store(true, std::memory_order_release);
     clear_preview_target();
     preview_gain_.store(0.0f, std::memory_order_release);
     preview_active_path_.clear();
@@ -125,6 +183,16 @@ void SongSelectScreen::shutdown() {
         }
     }
     preview_decode_cancel_.reset();
+    if (nps_future_.valid()) {
+        nps_future_.wait();
+        try { static_cast<void>(nps_future_.get()); } catch (...) {}
+    }
+    nps_cancel_.reset();
+    nps_selection_key_.clear();
+    nps_chart_path_.clear();
+    nps_cached_key_.clear();
+    nps_cached_profile_ = {};
+    nps_pending_ = false;
 }
 
 }  // namespace tenriff::app

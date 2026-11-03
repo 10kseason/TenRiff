@@ -1,4 +1,5 @@
 #include "app/menu/settings/AudioSettingsController.h"
+#include "app/MenuMusicController.h"
 
 #include <algorithm>
 #include <cmath>
@@ -100,6 +101,30 @@ std::string cycle_keysound_policy(std::string_view current, int direction) {
 
 }  // namespace
 
+bool is_audio_file_setting(AudioSettingId id) noexcept {
+    return id >= AudioSettingId::MainMusicFile && id <= AudioSettingId::DoneSoundFile;
+}
+
+std::string* audio_file_setting_value(config::RuntimeConfig& runtime, AudioSettingId id) noexcept {
+    switch (id) {
+        case AudioSettingId::MainMusicFile: return &runtime.audio_ui.main_music_file;
+        case AudioSettingId::ClearMusicFile: return &runtime.audio_ui.clear_music_file;
+        case AudioSettingId::FailMusicFile: return &runtime.audio_ui.fail_music_file;
+        case AudioSettingId::ButtonSoundFile: return &runtime.audio_ui.button_sound_file;
+        case AudioSettingId::SliderSoundFile: return &runtime.audio_ui.slider_sound_file;
+        case AudioSettingId::DropSoundFile: return &runtime.audio_ui.drop_sound_file;
+        case AudioSettingId::OptionsSoundFile: return &runtime.audio_ui.options_sound_file;
+        case AudioSettingId::StartSoundFile: return &runtime.audio_ui.start_sound_file;
+        case AudioSettingId::DoneSoundFile: return &runtime.audio_ui.done_sound_file;
+        default: return nullptr;
+    }
+}
+
+const std::string* audio_file_setting_value(const config::RuntimeConfig& runtime, AudioSettingId id) noexcept {
+    // The mutable overload never writes and keeps the slot mapping in one place.
+    return audio_file_setting_value(const_cast<config::RuntimeConfig&>(runtime), id);
+}
+
 std::optional<std::size_t> audio_setting_index(AudioSettingId id) noexcept {
     for (std::size_t index = 0; index < kAudioSettingOrder.size(); ++index) {
         if (kAudioSettingOrder[index] == id) {
@@ -129,6 +154,15 @@ std::optional<NumericSettingRange> audio_setting_numeric_range(AudioSettingId id
         case AudioSettingId::BackgroundSound:
         case AudioSettingId::PlayToEnd:
         case AudioSettingId::TitleMusic:
+        case AudioSettingId::MainMusicFile:
+        case AudioSettingId::ClearMusicFile:
+        case AudioSettingId::FailMusicFile:
+        case AudioSettingId::ButtonSoundFile:
+        case AudioSettingId::SliderSoundFile:
+        case AudioSettingId::DropSoundFile:
+        case AudioSettingId::OptionsSoundFile:
+        case AudioSettingId::StartSoundFile:
+        case AudioSettingId::DoneSoundFile:
         case AudioSettingId::Normalize:
         case AudioSettingId::MuteWhenInactive:
         case AudioSettingId::Back:
@@ -158,6 +192,7 @@ void AudioSettingsController::set_asio_drivers(std::vector<AudioDriverChoice> dr
 }
 
 void AudioSettingsController::reset(AudioSettingId selected) noexcept {
+    file_pick_request_.reset();
     selected_id_ = audio_setting_index(selected).has_value() ? selected : AudioSettingId::MasterVolume;
     dirty_ = false;
     asio_drivers_loaded_ = false;
@@ -221,6 +256,18 @@ MenuEffectFlags AudioSettingsController::apply_selected_action(
     const bool is_activate = action.kind == MenuActionKind::Activate;
     const bool is_set_ratio = action.kind == MenuActionKind::SetRatio;
     bool changed = false;
+
+    if (is_audio_file_setting(selected_id_)) {
+        if (is_activate) {
+            file_pick_request_ = selected_id_;
+            return MenuEffectFlags{true, false, false, false};
+        }
+        if (is_adjust) {
+            // Left restores the bundled sound; Right explicitly silences it.
+            return set_audio_file(runtime, selected_id_, action.direction < 0 ? "" : "none");
+        }
+        return {};
+    }
 
     switch (selected_id_) {
         case AudioSettingId::Preset:
@@ -368,6 +415,15 @@ MenuEffectFlags AudioSettingsController::apply_selected_action(
         }
         case AudioSettingId::BgmVolume:
         case AudioSettingId::KeysoundVolume:
+        case AudioSettingId::MainMusicFile:
+        case AudioSettingId::ClearMusicFile:
+        case AudioSettingId::FailMusicFile:
+        case AudioSettingId::ButtonSoundFile:
+        case AudioSettingId::SliderSoundFile:
+        case AudioSettingId::DropSoundFile:
+        case AudioSettingId::OptionsSoundFile:
+        case AudioSettingId::StartSoundFile:
+        case AudioSettingId::DoneSoundFile:
             break;
         case AudioSettingId::SoundOffset:
             if (is_adjust) {
@@ -389,6 +445,7 @@ MenuEffectFlags AudioSettingsController::apply_selected_action(
 }
 
 MenuEffectFlags AudioSettingsController::leave_screen() noexcept {
+    file_pick_request_.reset();
     const bool was_dirty = dirty_;
     selected_id_ = AudioSettingId::MasterVolume;
     dirty_ = false;
@@ -403,6 +460,19 @@ MenuEffectFlags AudioSettingsController::leave_screen() noexcept {
 MenuEffectFlags AudioSettingsController::mark_changed() noexcept {
     dirty_ = true;
     return MenuEffectFlags{true, false, false, false};
+}
+
+std::optional<AudioSettingId> AudioSettingsController::take_file_pick_request() noexcept {
+    return std::exchange(file_pick_request_, std::nullopt);
+}
+
+MenuEffectFlags AudioSettingsController::set_audio_file(config::RuntimeConfig& runtime,
+                                                       AudioSettingId id, std::string value) {
+    auto* slot = audio_file_setting_value(runtime, id);
+    if (!slot || (!value.empty() && value != "none" && !menu_music_detail::supported_audio_file(value)) ||
+        *slot == value) return {};
+    *slot = std::move(value);
+    return mark_changed();
 }
 
 }  // namespace tenriff::app::menu::settings

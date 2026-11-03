@@ -1,40 +1,67 @@
-    // Grades are semantic colors, independent of the monochrome menu palette.
+    // Grades and explicitly colored labels keep semantic colors independently
+    // of the monochrome UI palette. Explicit text roles retain their font's
+    // paragraph alignment and the regular menu text fit calculation.
     // Rasterize two Gaussian bloom layers and the crisp glyph once per slot;
     // steady frames (including gameplay) never run a blur or rebuild a layout.
     auto draw_grade = [&](std::size_t slot, const std::wstring& text, IDWriteTextFormat* format,
                           const D2D1_RECT_F& rect, float alpha,
                           DWRITE_TEXT_ALIGNMENT alignment = DWRITE_TEXT_ALIGNMENT_LEADING,
-                          float text_scale = 1.0f) {
+                          float text_scale = 1.0f, float bloom_strength = 1.0f,
+                          std::optional<uint32_t> rgb_override = std::nullopt,
+                          bool force_prism = false, UINT32 skip_prefix = 0) {
         const float width = std::ceil(rect.right - rect.left), height = std::ceil(rect.bottom - rect.top);
         if (text.empty() || !format || alpha <= 0 || width <= 0 || height <= 0) return;
+        bloom_strength = semantic_text_bloom_strength(bloom_strength, rgb_override.has_value());
         auto& cache = d2d_->grade_bitmaps[slot];
-        const auto color = D2D1::ColorF(grade_display_color(text));
-        const bool rainbow = grade_uses_clear_rainbow(text);
-        const bool prism = text == L"S+" || text == L"S++" || text == L"S+++";
+        const uint32_t rgb = rgb_override.value_or(grade_display_color(text));
+        const auto color = D2D1::ColorF(rgb);
+        const bool rainbow = force_prism || (!rgb_override && grade_uses_clear_rainbow(text));
+        const bool prism = !rgb_override && (text == L"S+" || text == L"S++" || text == L"S+++");
+        const auto paragraph = rgb_override ? format->GetParagraphAlignment() : DWRITE_PARAGRAPH_ALIGNMENT_CENTER;
         constexpr float pad = 28.0f;
         if (!cache.attempted || cache.text != text || cache.format.Get() != format ||
-            cache.width != width || cache.height != height || cache.alignment != alignment || cache.text_scale != text_scale) {
+            cache.width != width || cache.height != height || cache.alignment != alignment || cache.text_scale != text_scale ||
+            cache.paint_rgb != rgb || cache.paint_prism != prism || cache.paint_rainbow != rainbow ||
+            cache.paragraph != paragraph || cache.skip_prefix != skip_prefix) {
             cache = {};
             // Cache failure too: an unavailable effect must not allocate again
             // every frame. Device/font recreation invalidates this entry.
             cache.attempted = true; cache.text = text; cache.format = format;
             cache.text_scale = text_scale;
             cache.width = width; cache.height = height; cache.alignment = alignment;
+            cache.paint_rgb = rgb; cache.paint_prism = prism; cache.paint_rainbow = rainbow; cache.paragraph = paragraph;
+            cache.skip_prefix = skip_prefix;
             // Measure once for both bloom and plain-glyph fallback. A wider
             // grade such as S++ must fit even when an effect/device fails.
             if (SUCCEEDED(d2d_->dwrite_factory->CreateTextLayout(text.c_str(), static_cast<UINT32>(text.size()),
                     format, width, height, cache.layout.GetAddressOf()))) {
                 cache.layout->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
                 cache.layout->SetTextAlignment(alignment);
-                cache.layout->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+                cache.layout->SetParagraphAlignment(paragraph);
                 if (text_scale != 1.0f) cache.layout->SetFontSize(format->GetFontSize() * text_scale,
                     DWRITE_TEXT_RANGE{0, static_cast<UINT32>(text.size())});
                 DWRITE_TEXT_METRICS metrics{};
                 cache.layout->GetMetrics(&metrics);
                 cache.fit = std::min({1.0f, width / std::max(1.0f, metrics.widthIncludingTrailingWhitespace),
                                           height / std::max(1.0f, metrics.height)});
+                if (rgb_override) {
+                    const float estimated = ((data.lobby_skin.enabled &&
+                        !(data.kind == MenuScreenKind::GameplayHud && data.lobby_skin.native_menu_renderer)) || modern_menu_screen) &&
+                        format->GetWordWrapping() == DWRITE_WORD_WRAPPING_NO_WRAP
+                        ? estimate_single_line_text_scale(text, format->GetFontSize(), width, height) : 1.0f;
+                    cache.fit = estimated < 0.995f ? estimated : 1.0f;
+                }
                 cache.layout->SetMaxWidth(width / cache.fit);
                 cache.layout->SetMaxHeight(height / cache.fit);
+                if (skip_prefix > 0) {
+                    // A semantic suffix can glow without painting its ordinary
+                    // UI prefix. The layout retains the original full text so
+                    // the suffix's glyph positions and font metrics stay put.
+                    Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> transparent;
+                    if (SUCCEEDED(ctx->CreateSolidColorBrush(D2D1::ColorF(0, 0), &transparent)))
+                        cache.layout->SetDrawingEffect(transparent.Get(),
+                            DWRITE_TEXT_RANGE{0, std::min<UINT32>(skip_prefix, static_cast<UINT32>(text.size()))});
+                }
             }
             // Anchor the clear palette to the actual glyph bounds, not the
             // often much wider rank slot. Build once with the existing glyph cache.
@@ -78,6 +105,17 @@
                 off->Clear(D2D1::ColorF(0, 0));
                 off->SetTransform(D2D1::Matrix3x2F::Scale(cache.fit, cache.fit) * D2D1::Matrix3x2F::Translation(pad, pad));
                 const auto gradient = make_rainbow(off.Get());
+                if (rgb_override) {
+                    // Match the ordinary readable menu text's contour. Only
+                    // the fill and optional small bloom gain semantic color.
+                    const float luminance = 0.2126f * color.r + 0.7152f * color.g + 0.0722f * color.b;
+                    brush->SetColor(D2D1::ColorF(luminance < 0.35f ? 0xEAF3FD : 0x061118, 0.9f));
+                    const float stroke = format->GetFontSize() >= 36.0f ? 1.1f : 0.85f;
+                    const D2D1_POINT_2F offsets[] = {{-stroke, 0}, {stroke, 0}, {0, -stroke}, {0, stroke}};
+                    for (const auto offset : offsets)
+                        off->DrawTextLayout(offset, cache.layout.Get(), brush.Get());
+                    brush->SetColor(color);
+                }
                 if (prism) {
                     // Bake the bevel/depth with the glyph, so steady frames
                     // have the same single-bitmap cost as the existing grades.
@@ -142,13 +180,22 @@
                 if (SUCCEEDED(glyph_hr) && SUCCEEDED(bloom_hr)) {
                     cache.text = text; cache.format = format; cache.width = width; cache.height = height;
                     cache.alignment = alignment; cache.color = color; cache.bitmap = std::move(bloom);
+                    cache.crisp_glyph = std::move(glyph);
                 }
             }
         }
         if (cache.bitmap) {
             ctx->DrawBitmap(cache.bitmap.Get(), D2D1::RectF(rect.left - pad, rect.top - pad,
-                rect.left + width + pad, rect.top + height + pad), std::clamp(alpha, 0.0f, 1.0f),
+                rect.left + width + pad, rect.top + height + pad),
+                std::clamp(alpha * bloom_strength, 0.0f, 1.0f),
                 D2D1_INTERPOLATION_MODE_LINEAR);
+            if (bloom_strength < 1.0f && cache.crisp_glyph) {
+                // Reuse the crisp raster to soften only the upgraded rank's
+                // surrounding bloom, without dimming or rebuilding its glyph.
+                ctx->DrawBitmap(cache.crisp_glyph.Get(), D2D1::RectF(rect.left - pad, rect.top - pad,
+                    rect.left + width + pad, rect.top + height + pad), std::clamp(alpha, 0.0f, 1.0f),
+                    D2D1_INTERPOLATION_MODE_LINEAR);
+            }
         } else {
             const auto saved = d2d_->accent_brush->GetColor();
             const auto opacity = d2d_->accent_brush->GetOpacity();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "app/KeyNoteOverlay.h"
+#include "app/LiveScoreComparison.h"
 
 #include "audio/MixNormalizer.h"
 #include "audio/SettingsAdjustmentClick.h"
@@ -20,6 +21,7 @@
 #include <string_view>
 #include <thread>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "app/ChartLoader.h"
@@ -105,6 +107,7 @@ public:
         std::string pacemaker_mode = "off";
         double pacemaker_target = 0.0;
         double pacemaker_delta = 0.0;
+        LiveScoreComparison score_comparison;
         double accuracy = 0.0;
         double detailed_accuracy = 0.0;
         bool osu_od8_score_available = false;
@@ -236,10 +239,14 @@ public:
     void set_hud_callback(HudCallback callback);
     void set_loading_progress_callback(LoadingProgressCallback callback);
     void set_loading_cancel_callback(LoadingCancelCallback callback);
+    // Menu-only presentation barrier; chart/audio time has not started yet.
+    void set_loading_transition_deadline(int64_t deadline_ns) { loading_transition_deadline_ns_ = deadline_ns; }
     void set_screenshot_callback(ScreenshotCallback callback);
     void set_peer_spectator_done_callback(PeerSpectatorDoneCallback callback);
     void set_control_input_callback(ControlInputCallback callback);
     void set_practice_no_fail_override(bool enabled) { practice_no_fail_override_ = enabled; }
+    void set_score_comparison_only(bool enabled) { score_comparison_only_ = enabled; }
+    void set_score_comparison_replay_path(std::string path) { score_comparison_replay_path_ = std::move(path); }
     void set_practice_start_seconds(double seconds) { practice_start_seconds_ = std::max(0.0, seconds); }
     void set_instant_restart_start(bool enabled) { instant_restart_start_ = enabled; }
     void set_session_mode_mods(const std::vector<std::string>& mods) { session_mode_mods_ = mods; }
@@ -284,6 +291,7 @@ private:
     GameplayMemoryDeferral memory_deferral_;
 
     friend struct GameSessionAudioTestAccess;
+    friend struct GameSessionScoreComparisonTestAccess;
     friend struct MenuAppFeedbackTestAccess;
     struct FutureEvent {
         input::InputEvent event;
@@ -490,6 +498,10 @@ private:
                                 int64_t buffer_end_samples,
                                 int64_t lookahead_samples);
     void process_ghost_replay_queue(int64_t buffer_end_samples, int64_t lookahead_samples);
+    [[nodiscard]] bool score_reference_matches(const gameplay::ReplayFile& replay, bool seed_independent) const;
+    void initialize_score_reference(const gameplay::GameplayConfig& config, bool seed_independent);
+    void advance_score_reference(int64_t sample);
+    void reset_score_reference();
     void dispatch_ghost_lane_input(int lane, input::InputState state, int64_t sample);
 
     [[nodiscard]] std::optional<int> lane_from_keycode(uint32_t keycode) const;
@@ -545,6 +557,14 @@ private:
     double course_gauge_initial_value_ = 100.0;
     gameplay::ReplayFile ghost_replay_source_{};
     bool ghost_replay_enabled_ = false;
+    bool score_comparison_only_ = false;
+    bool score_comparison_compatible_ = false;
+    std::string score_comparison_replay_path_;
+    gameplay::ReplayFile score_reference_source_{};
+    std::size_t score_reference_event_index_ = 0;
+    int64_t score_reference_sample_ = (std::numeric_limits<int64_t>::min)();
+    std::unique_ptr<gameplay::GameplayEngine> score_reference_engine_;
+    std::vector<gameplay::MineTrigger> score_reference_mine_triggers_;
     std::size_t ghost_replay_event_index_ = 0;
 
     std::unique_ptr<gameplay::GameplayEngine> engine_;
@@ -698,6 +718,7 @@ private:
     HudCallback hud_callback_;
     LoadingProgressCallback loading_progress_callback_;
     LoadingCancelCallback loading_cancel_callback_;
+    int64_t loading_transition_deadline_ns_ = 0;
     ScreenshotCallback screenshot_callback_;
     PeerSpectatorDoneCallback peer_spectator_done_callback_;
     ControlInputCallback control_input_callback_;

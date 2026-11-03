@@ -458,6 +458,7 @@ struct BmsNpsStats {
     double median = 0.0;
     double maximum = 0.0;
     int note_count = 0;
+    SongNpsProfile profile;
 };
 
 std::string normalized_bms_credit_text(std::string_view value) {
@@ -620,17 +621,27 @@ bool bms_has_running_tempo_changes(const chart::BmsNormalizedChart& chart) {
            different_running_tempo();
 }
 
-std::optional<BmsNpsStats> calculate_bms_nps_stats(const chart::BmsChart& parsed_chart) {
+std::optional<BmsNpsStats> calculate_bms_nps_stats(const chart::BmsChart& parsed_chart,
+                                                 bool build_profile = false,
+                                                 const SongIndexCancelCallback& cancel = {}) {
+    if (cancel_requested(cancel)) return std::nullopt;
     chart::BmsChartNormalizer normalizer;
     auto normalized = normalizer.normalize(parsed_chart);
-    if (!normalized.success()) {
+    if (!normalized.success() || cancel_requested(cancel)) {
         return std::nullopt;
     }
 
     // Build at 1 kHz so gameplay note start samples map directly to milliseconds.
     chart::BmsTimelineBuilder timeline_builder;
     auto timeline = timeline_builder.build(normalized.chart, 1000);
-    if (!timeline.success()) {
+    if (!timeline.success() || cancel_requested(cancel)) {
+        return std::nullopt;
+    }
+    if (build_profile && (timeline.timeline.duration_samples < 0 ||
+        std::any_of(timeline.timeline.events.begin(), timeline.timeline.events.end(),
+                    [](const chart::BmsScheduledEvent& event) { return event.time_samples < 0; }))) {
+        // Extremely small BPM values can exceed the timeline's sample range.
+        // A preview must not turn an invalid negative schedule into a bin at 0.
         return std::nullopt;
     }
 
@@ -638,12 +649,15 @@ std::optional<BmsNpsStats> calculate_bms_nps_stats(const chart::BmsChart& parsed
     stats.reference_bpm = timeline.timeline.reference_bpm;
     stats.has_bpm_changes = bms_has_running_tempo_changes(normalized.chart);
     const auto gameplay = build_bms_gameplay_chart(timeline.timeline, parsed_chart, 1.0);
+    if (cancel_requested(cancel)) return std::nullopt;
     if (gameplay.chart.notes.empty()) {
         return stats;
     }
 
     std::unordered_map<int64_t, int> notes_per_occupied_second;
+    std::size_t examined = 0;
     for (const auto& note : gameplay.chart.notes) {
+        if ((examined++ % 4096u) == 0u && cancel_requested(cancel)) return std::nullopt;
         const int64_t second = std::max<int64_t>(0, note.start_sample) / 1000;
         ++notes_per_occupied_second[second];
     }
@@ -668,6 +682,31 @@ std::optional<BmsNpsStats> calculate_bms_nps_stats(const chart::BmsChart& parsed
                        ? static_cast<double>(samples[middle])
                        : (static_cast<double>(samples[middle - 1]) +
                           static_cast<double>(samples[middle])) * 0.5;
+    if (build_profile) {
+        int64_t last_second = 0;
+        for (const auto& [second, count] : notes_per_occupied_second) {
+            (void)count;
+            last_second = std::max(last_second, second);
+        }
+        // Do not manufacture a truncated profile for malformed/very long charts.
+        // The metadata size limit also bounds parsing; no array scales with time.
+        constexpr int64_t kMaxProfileSeconds = 6 * 60 * 60;
+        if (last_second < kMaxProfileSeconds) {
+            auto& profile = stats.profile;
+            profile.covered_seconds = last_second + 1;
+            profile.available = true;
+            profile.minimum = notes_per_occupied_second.size() < static_cast<std::size_t>(profile.covered_seconds)
+                ? 0.0 : stats.minimum;
+            profile.average = static_cast<double>(gameplay.chart.notes.size()) / profile.covered_seconds;
+            profile.maximum = stats.maximum;
+            const std::size_t count = static_cast<std::size_t>(std::min<int64_t>(96, profile.covered_seconds));
+            profile.bins.assign(count, 0.0f);
+            for (const auto& [second, notes] : notes_per_occupied_second) {
+                const auto bar = static_cast<std::size_t>(second * count / profile.covered_seconds);
+                profile.bins[bar] = std::max(profile.bins[bar], static_cast<float>(notes));
+            }
+        }
+    }
     return stats;
 }
 
@@ -1706,6 +1745,22 @@ private:
 };
 
 }  // namespace
+
+SongNpsProfile load_song_nps_profile(const std::string& chart_path, SongIndexCancelCallback cancel) {
+    if (chart_path.empty() || cancel_requested(cancel)) return {};
+    const auto path = path_from_utf8(chart_path);
+    if (!ensure_metadata_chart_size_supported(path, nullptr)) return {};
+    chart::BmsParserOptions options;
+    options.retain_wav_bmp = false;
+    options.retain_unknown_headers = false;
+    options.retain_nonessential_commands = false;
+    // Use the same deterministic branch and note-head semantics as indexing.
+    // No audio/media decoding or gameplay session is needed for an unplayed song.
+    const auto parsed = chart::BmsParser{}.parseFile(chart_path, options);
+    if (!parsed.success() || cancel_requested(cancel)) return {};
+    const auto stats = calculate_bms_nps_stats(parsed.chart, true, cancel);
+    return stats && !cancel_requested(cancel) ? stats->profile : SongNpsProfile{};
+}
 
 std::string song_index_cache_path_for_source(std::string_view profile_root, std::string_view source_root) {
     const std::filesystem::path profile_path = path_from_utf8(profile_root);

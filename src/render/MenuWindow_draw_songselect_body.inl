@@ -102,10 +102,12 @@
             draw_text_clipped(text, format, rect, brush);
             format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
         };
+        const auto score_paint = song_select_score_paint(data.song_select.score_clear_status);
+        const bool tint_score = score_paint.rgb != 0xFFFFFF;
         auto draw_meta_pair = [&](const D2D1_RECT_F& rect,
                                   std::string_view label,
                                   std::string_view value,
-                                  bool emphasized = false) {
+                                  bool emphasized = false, bool score_value = false) {
             if (d2d_->hud_format && d2d_->muted_brush) {
                 draw_text_clipped(to_wide(std::string(label)),
                                   d2d_->hud_format.Get(),
@@ -123,10 +125,46 @@
                 const auto value_rect = native_rect("songselect.rect.002",
                     D2D1::RectF(rect.left, rect.top + 22.0f, rect.right, rect.bottom));
                 const auto text = to_wide(std::string(value));
-                draw_text_clipped(text, d2d_->title_format.Get(), value_rect, value_brush);
+                if (score_value && tint_score) {
+                    draw_grade(8, text, d2d_->title_format.Get(), value_rect, 1.0f,
+                               DWRITE_TEXT_ALIGNMENT_LEADING, 1.0f, 0.0f, score_paint.rgb, score_paint.rainbow);
+                } else {
+                    draw_text_clipped(text, d2d_->title_format.Get(), value_rect, value_brush);
+                }
             }
         };
 
+        // One device-owned gradient serves the frame, badge and compiled logo.
+        // It is static: EX stays readable even when menu motion is disabled.
+        auto clear_badge_brush = [&](const SongSelectLampPresentation& lamp,
+                                     const D2D1_RECT_F& rect) -> ID2D1Brush* {
+            if (lamp.rainbow_badge) {
+                if (!d2d_->song_clear_gradient) {
+                    std::array<D2D1_GRADIENT_STOP, kClearRainbowRgb.size()> stops;
+                    for (std::size_t s = 0; s < stops.size(); ++s)
+                        stops[s] = {kClearRainbowStops[s], D2D1::ColorF(kClearRainbowRgb[s])};
+                    Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> collection;
+                    if (SUCCEEDED(ctx->CreateGradientStopCollection(stops.data(), static_cast<UINT>(stops.size()), &collection))) {
+                        ctx->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(
+                            D2D1::Point2F(0, 0), D2D1::Point2F(1, 0)),
+                            collection.Get(), &d2d_->song_clear_gradient);
+                    }
+                }
+                if (d2d_->song_clear_gradient) {
+                    d2d_->song_clear_gradient->SetStartPoint(D2D1::Point2F(rect.left, rect.top));
+                    d2d_->song_clear_gradient->SetEndPoint(D2D1::Point2F(rect.right, rect.top));
+                    return d2d_->song_clear_gradient.Get();
+                }
+            }
+            return semantic_color(lamp.badge_rgb);
+        };
+        // EX's existing face, weight and size are shared by every clear badge.
+        // Only the paint varies; native font overrides remain effective.
+        auto* clear_badge_format = d2d_->stats_value_format.Get();
+
+        if (modern_library_screen && data.song_select.native_list_layout) {
+#include "MenuWindow_draw_songselect_review.inl"
+        } else {
         if (d2d_->accent_brush && !modern_library_screen) {
             const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
             const float saved_opacity = d2d_->accent_brush->GetOpacity();
@@ -265,8 +303,8 @@
         } else {
             draw_glass_panel(avatar_rect, 12.0f, 0.92f, 0.54f, true, 2.0f);
             if (d2d_->title_format && d2d_->accent_brush) {
-                draw_centered_text(L"TR", d2d_->title_format.Get(),
-                                   avatar_rect, d2d_->accent_brush.Get());
+                draw_ten_mark(D2D1::RectF(avatar_rect.left + 12, avatar_rect.top + 12,
+                                         avatar_rect.right - 12, avatar_rect.bottom - 12), d2d_->accent_brush.Get(), 1.0f);
             }
         }
         if (d2d_->button_border_brush) {
@@ -399,33 +437,6 @@
             std::max(1.0f, (card_bottom - card_top) / 7.0f));
         const float card_gap = std::min(native_metric("songselect.card_gap", 8.0f),
             std::max(0.0f, (card_bottom - card_top - card_height * 7.0f) / 6.0f));
-        // One device-owned gradient serves the frame, badge and compiled logo.
-        // It is static: EX stays readable even when menu motion is disabled.
-        auto clear_badge_brush = [&](const SongSelectLampPresentation& lamp,
-                                     const D2D1_RECT_F& rect) -> ID2D1Brush* {
-            if (lamp.rainbow_badge) {
-                if (!d2d_->song_clear_gradient) {
-                    std::array<D2D1_GRADIENT_STOP, kClearRainbowRgb.size()> stops;
-                    for (std::size_t s = 0; s < stops.size(); ++s)
-                        stops[s] = {kClearRainbowStops[s], D2D1::ColorF(kClearRainbowRgb[s])};
-                    Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> collection;
-                    if (SUCCEEDED(ctx->CreateGradientStopCollection(stops.data(), static_cast<UINT>(stops.size()), &collection))) {
-                        ctx->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(
-                            D2D1::Point2F(0, 0), D2D1::Point2F(1, 0)),
-                            collection.Get(), &d2d_->song_clear_gradient);
-                    }
-                }
-                if (d2d_->song_clear_gradient) {
-                    d2d_->song_clear_gradient->SetStartPoint(D2D1::Point2F(rect.left, rect.top));
-                    d2d_->song_clear_gradient->SetEndPoint(D2D1::Point2F(rect.right, rect.top));
-                    return d2d_->song_clear_gradient.Get();
-                }
-            }
-            return semantic_color(lamp.badge_rgb);
-        };
-        // EX's existing face, weight and size are shared by every clear badge.
-        // Only the paint varies; native font overrides remain effective.
-        auto* clear_badge_format = d2d_->stats_value_format.Get();
         for (std::size_t i = 0; i < data.song_select.songs.size(); ++i) {
             const auto& song = data.song_select.songs[i];
             const auto lamp = song_select_lamp_presentation(song.lamp);
@@ -815,10 +826,8 @@
                  ? format_decimal(data.song_select.accuracy, 2) + "%"
                  : std::string("--"),
              std::string(),
-             metrics_available && (!data.song_select.online_records || data.song_select.online_detailed_accuracy_available)
-                 ? "DETAIL " + format_decimal(data.song_select.detailed_accuracy, 2) + "%"
-                 : std::string()},
-            {loc("MAX COMBO", "최대 콤보"),
+             std::string()},
+            {metrics_available && data.song_select.verified_full_combo ? "FULL COMBO" : loc("MAX COMBO", "최대 콤보"),
              metrics_available
                  ? std::to_string(data.song_select.max_combo) +
                        (modern_library_screen ? std::string() : " COMBO")
@@ -845,19 +854,27 @@
                 best_columns_left + static_cast<float>(i) * (best_column_width + best_column_gap);
             const float column_right = column_left + best_column_width;
             if (d2d_->song_record_label_format && d2d_->muted_brush) {
-                draw_centered_text(to_wide(best_columns[i][0]),
-                                   d2d_->song_record_label_format.Get(),
-                                   native_rect("songselect.rect.047", D2D1::RectF(column_left, best_panel.top + 152.0f + best_rank_extra,
-                                               column_right, best_panel.top + 184.0f + best_rank_extra)),
-                                   modern_library_screen ? semantic_color(best_colors[i]) : d2d_->muted_brush.Get(), false, center_text_scale);
+                const auto label_rect = native_rect("songselect.rect.047", D2D1::RectF(column_left,
+                    best_panel.top + 152.0f + best_rank_extra, column_right, best_panel.top + 184.0f + best_rank_extra));
+                if (i == 2 && metrics_available && data.song_select.verified_full_combo) {
+                    draw_grade(4, L"FULL COMBO", d2d_->song_record_label_format.Get(), label_rect, 1.0f,
+                               DWRITE_TEXT_ALIGNMENT_CENTER, center_text_scale, 0.25f, kFullComboTextRgb);
+                } else {
+                    draw_centered_text(to_wide(best_columns[i][0]), d2d_->song_record_label_format.Get(), label_rect,
+                        modern_library_screen ? semantic_color(best_colors[i]) : d2d_->muted_brush.Get(), false, center_text_scale);
+                }
             }
             if (d2d_->song_record_value_format && d2d_->text_brush) {
-                draw_centered_text(to_wide(best_columns[i][1]),
-                                   d2d_->song_record_value_format.Get(),
-                                   native_rect("songselect.rect.048", D2D1::RectF(column_left,
-                                               best_panel.top + (modern_library_screen ? 186.0f : 188.0f) + best_rank_extra,
-                                               column_right, best_panel.top + (modern_library_screen ? 242.0f : 228.0f) + best_rank_extra)),
-                                   modern_library_screen ? semantic_color(best_colors[i]) : d2d_->text_brush.Get(), false, center_text_scale);
+                const auto value_rect = native_rect("songselect.rect.048", D2D1::RectF(column_left,
+                    best_panel.top + (modern_library_screen ? 186.0f : 188.0f) + best_rank_extra,
+                    column_right, best_panel.top + (modern_library_screen ? 242.0f : 228.0f) + best_rank_extra));
+                if (i == 0 && metrics_available && tint_score) {
+                    draw_grade(3, to_wide(best_columns[i][1]), d2d_->song_record_value_format.Get(), value_rect, 1.0f,
+                               DWRITE_TEXT_ALIGNMENT_CENTER, center_text_scale, 0.0f, score_paint.rgb, score_paint.rainbow);
+                } else {
+                    draw_centered_text(to_wide(best_columns[i][1]), d2d_->song_record_value_format.Get(), value_rect,
+                        modern_library_screen ? semantic_color(best_colors[i]) : d2d_->text_brush.Get(), false, center_text_scale);
+                }
             }
             if (modern_library_screen && !best_columns[i][2].empty() && d2d_->song_record_detail_format) {
                 draw_centered_text(to_wide(best_columns[i][2]), d2d_->song_record_detail_format.Get(),
@@ -1292,13 +1309,11 @@
                                        right_right, right_panel.top + 238.0f)),
                            loc("SCORE", "점수"),
                            std::to_string(data.song_select.best_score) + " / " +
-                               std::to_string(data.song_select.max_score));
+                               std::to_string(data.song_select.max_score), false, true);
             draw_meta_pair(native_rect("songselect.rect.086", D2D1::RectF(right_left, right_panel.top + 252.0f,
                                        right_left + (right_right - right_left) * 0.62f, right_panel.top + 332.0f)),
                            loc("ACCURACY", "정확도"),
-                           format_decimal(data.song_select.accuracy, 2) + "%" +
-                               ((!data.song_select.online_records || data.song_select.online_detailed_accuracy_available)
-                                ? " / D " + format_decimal(data.song_select.detailed_accuracy, 2) + "%" : ""));
+                           format_decimal(data.song_select.accuracy, 2) + "%");
             draw_meta_pair(native_rect("songselect.rect.087", D2D1::RectF(right_left + (right_right - right_left) * 0.67f, right_panel.top + 252.0f,
                                        right_right, right_panel.top + 332.0f)),
                            loc("COMBO", "콤보"),
@@ -1410,4 +1425,5 @@
 
         if (data.song_select.difficulty_table_editing) {
 #include "MenuWindow_draw_difficulty_table_editor.inl"
+        }
         }

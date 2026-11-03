@@ -48,6 +48,37 @@ void MenuWindow::draw(const MenuRenderData& data) {
         static_cast<void>(load_bitmap_from_utf8_path(d2d_->wic_factory.Get(), ctx, path.u8string(),
             d2d_->all_combo_bitmap, &d2d_->all_combo_source_rect, true, false, 4));
     }
+    if (!d2d_->transition_bitmap_attempted) {
+        d2d_->transition_bitmap_attempted = true;
+        const auto path = util::path_from_utf8_lossy(built_in_title_background_path()).parent_path() /
+            "transition-prism.png";
+        static_cast<void>(load_bitmap_from_utf8_path(d2d_->wic_factory.Get(), ctx, path.u8string(),
+            d2d_->transition_bitmap, &d2d_->transition_source_rect, true, false, 4));
+    }
+    if (!d2d_->ten_mark_bitmap_attempted) {
+        d2d_->ten_mark_bitmap_attempted = true;
+        const auto path = util::path_from_utf8_lossy(built_in_title_background_path()).parent_path() / "ten-mark.png";
+        static_cast<void>(load_bitmap_from_utf8_path(d2d_->wic_factory.Get(), ctx, path.u8string(),
+            d2d_->ten_mark_bitmap, &d2d_->ten_mark_source_rect, true, false, 4));
+    }
+    // The supplied emblem is an alpha mask: retain its cutouts and aspect,
+    // painting it with the existing placeholder ink on dark menu backgrounds.
+    auto draw_ten_mark = [&](const D2D1_RECT_F& bounds, ID2D1Brush* ink, float opacity) {
+        const auto& source = d2d_->ten_mark_source_rect;
+        if (!d2d_->ten_mark_bitmap || !ink || source.right <= source.left || source.bottom <= source.top) return;
+        const float scale = std::min((bounds.right - bounds.left) / (source.right - source.left),
+                                     (bounds.bottom - bounds.top) / (source.bottom - source.top));
+        const float w = (source.right - source.left) * scale, h = (source.bottom - source.top) * scale;
+        const float x = (bounds.left + bounds.right - w) * 0.5f, y = (bounds.top + bounds.bottom - h) * 0.5f;
+        const auto dest = D2D1::RectF(x, y, x + w, y + h);
+        const auto old_aa = ctx->GetAntialiasMode();
+        const float old_opacity = ink->GetOpacity();
+        ctx->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
+        ink->SetOpacity(opacity);
+        ctx->FillOpacityMask(d2d_->ten_mark_bitmap.Get(), ink, &dest, &source);
+        ink->SetOpacity(old_opacity);
+        ctx->SetAntialiasMode(old_aa);
+    };
     auto draw_all_combo_image = [&](const D2D1_RECT_F& bounds, float opacity) {
         const auto& source = d2d_->all_combo_source_rect;
         if (!d2d_->all_combo_bitmap || source.right <= source.left || source.bottom <= source.top ||
@@ -207,12 +238,21 @@ void MenuWindow::draw(const MenuRenderData& data) {
          data.kind == MenuScreenKind::ResultScreen ||
          data.kind == MenuScreenKind::BmsEditor);
     const bool modern_menu_screen = modern_library_screen || modern_settings_screen || modern_title_screen;
+    // Only Song Select uses the flat review layout. Result keeps its original
+    // background and header rules after the result-only layout rollback.
+    const bool flat_library_layout = use_native_menu && data.kind == MenuScreenKind::SongSelect &&
+        !data.session_mix.active && data.song_select.native_list_layout;
     const std::string title_background_path = modern_title_screen && data.lobby_skin.background_path.empty()
         ? built_in_title_background_path() : std::string{};
     if (!title_background_path.empty()) static_cast<void>(load_song_card_preview_bitmap(title_background_path));
     ID2D1Bitmap* title_background = find_song_card_preview_bitmap(title_background_path);
     const bool has_title_art = title_background != nullptr;
 #include "MenuWindow_draw_native_motion.inl"
+    const bool result_motion_background = use_native_menu && data.kind == MenuScreenKind::ResultScreen &&
+        data.lobby_skin.background_path.empty();
+    const auto menu_motion_source = data.lobby_skin.background_path.empty() && flat_library_layout
+        ? MenuMotionSource::SongSelect : result_motion_background ? MenuMotionSource::Result : MenuMotionSource::None;
+    update_menu_motion_background(menu_motion_source, !native_menu_motion_.moving(), render_now_ns);
     // Never collect while showing gameplay or its pause/loading overlay.
     // Static BGA retention is per visit to gameplay, not a process-lifetime cache.
     if (data.kind != MenuScreenKind::GameplayHud && !data.generic.skin_preview.visible) {
@@ -344,7 +384,9 @@ void MenuWindow::draw(const MenuRenderData& data) {
     ctx->BeginDraw();
 
     ctx->SetTransform(D2D1::Matrix3x2F::Identity());
-    if (has_menu_scene && d2d_->bg_brush) {
+    if (flat_library_layout) {
+        ctx->Clear(D2D1::ColorF(D2D1::ColorF::Black));
+    } else if (has_menu_scene && d2d_->bg_brush) {
         const float saved_opacity = d2d_->bg_brush->GetOpacity();
         d2d_->bg_brush->SetOpacity(data.kind == MenuScreenKind::TitleMenu ? 0.16f : 0.18f);
         ctx->FillRectangle(D2D1::RectF(0.0f, 0.0f, static_cast<float>(width_),
@@ -363,7 +405,15 @@ void MenuWindow::draw(const MenuRenderData& data) {
         D2D1::Matrix3x2F(scale_, 0.0f, 0.0f, scale_, offset_x_, offset_y_);
     ctx->SetTransform(transform);
 
-    draw_native_background();
+    if (!flat_library_layout) draw_native_background();
+
+    if (menu_motion_source != MenuMotionSource::None && d2d_->menu_motion_bitmap) {
+        const auto source = centered_bitmap_source_rect(d2d_->menu_motion_bitmap->GetSize(), full_screen_rect);
+        // The authored Result video includes text. Keep it behind the unchanged
+        // result panels and soften its contrast so scores and labels remain clear.
+        ctx->DrawBitmap(d2d_->menu_motion_bitmap.Get(), full_screen_rect, result_motion_background ? 0.35f : 1.0f,
+                        D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, &source);
+    }
 
     if (title_background) {
         const auto source = centered_bitmap_source_rect(title_background->GetSize(), full_screen_rect);
@@ -1445,6 +1495,41 @@ void MenuWindow::draw(const MenuRenderData& data) {
     }
 
     draw_loading_progress();
+
+    const auto transition = scene_transition_frame(
+        data.transition_start_ns > 0 ? render_now_ns - data.transition_start_ns : -1,
+        native_system_reduced_motion_ || config_.reduce_menu_motion);
+    if (transition.active) {
+        // One cached generated texture, sampled at 30 Hz independently of FPS.
+        // It cannot cover live notes: the loader waits before starting time.
+        const auto canvas = D2D1::RectF(viewport.background_left, 0, viewport.background_right, kBaseHeight);
+        if (d2d_->transition_bitmap) {
+            auto source = centered_bitmap_source_rect(d2d_->transition_bitmap->GetSize(), canvas);
+            const float zoom = 1.03f;
+            const float width = source.right - source.left;
+            const float height = source.bottom - source.top;
+            source.left += width * (1 - 1 / zoom) * transition.travel;
+            source.top += height * (1 - 1 / zoom) * (1 - transition.travel);
+            source.right = source.left + width / zoom;
+            source.bottom = source.top + height / zoom;
+            ctx->DrawBitmap(d2d_->transition_bitmap.Get(), canvas, transition.opacity,
+                D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, source);
+        } else if (d2d_->bg_brush) {
+            const auto saved = d2d_->bg_brush->GetOpacity();
+            d2d_->bg_brush->SetOpacity(transition.opacity);
+            ctx->FillRectangle(canvas, d2d_->bg_brush.Get());
+            d2d_->bg_brush->SetOpacity(saved);
+        }
+        const float saved = d2d_->text_brush->GetOpacity();
+        d2d_->text_brush->SetOpacity(transition.opacity);
+        draw_text_clipped_aligned(L"TENRIFF", d2d_->title_format.Get(),
+            D2D1::RectF(620, 450, 1300, 565), d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+        draw_text_clipped_aligned(data.kind == MenuScreenKind::GameplayHud
+                ? wloc("LOADING SONG", "곡 불러오는 중") : wloc("SINGLE PLAYER", "싱글 플레이"),
+            d2d_->body_format.Get(), D2D1::RectF(620, 575, 1300, 625),
+            d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+        d2d_->text_brush->SetOpacity(saved);
+    }
 
     if (!data.help_overlay.visible) {
         draw_performance_overlay();

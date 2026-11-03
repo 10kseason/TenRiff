@@ -8,6 +8,7 @@
 #include <limits>
 #include <memory>
 #include <thread>
+#include <stdexcept>
 
 #ifdef _WIN32
 #include "app/MenuApp.h"
@@ -16,6 +17,11 @@
 #include "app/menu/MenuAction.h"
 #include "app/menu/settings/AudioSettingsController.h"
 #include "app/menu/settings/AudioSettingsView.h"
+#include "app/MenuMusicController.h"
+#include "app/MenuAudioFileDialog.h"
+#ifdef _WIN32
+#include <wrl/client.h>
+#endif
 
 namespace {
 
@@ -47,10 +53,191 @@ void check_no_effects(const MenuEffectFlags& effects) {
 
 }  // namespace
 
+namespace tenriff::app {
+struct MenuSoundControllerTestAccess {
+    static std::uint64_t count(const MenuSoundController& sound, MenuSoundKind kind) {
+        return sound.request_counts_[static_cast<std::size_t>(kind)];
+    }
+    static void check_late_decode_and_mute() {
+        MenuSoundController sound;
+        std::promise<MenuSoundController::Decoded> result;
+        sound.decoding_ = result.get_future();
+        sound.pending_ = MenuSoundController::Request{MenuSoundKind::Slider, "fixture.wav", 0.5};
+        sound.invalidate(MenuSoundKind::Slider);
+        result.set_value({MenuSoundKind::Slider, {"fixture.wav", {0.5f, -0.5f}, ""}, 0});
+        sound.service(false);
+        CHECK(sound.clips_[static_cast<std::size_t>(MenuSoundKind::Slider)].token.empty());
+        CHECK_FALSE(sound.pending_.has_value());
+        sound.pending_ = MenuSoundController::Request{MenuSoundKind::Button, "queued.wav", 0.5};
+        sound.service(true);
+        CHECK_FALSE(sound.pending_.has_value());
+        CHECK_FALSE(sound.decoding_.valid());
+        sound.service(false);
+        CHECK_FALSE(sound.pending_.has_value()); // Focus recovery must not replay a stale click.
+        std::promise<MenuSoundController::Decoded> pending_decode;
+        sound.decoding_ = pending_decode.get_future();
+        sound.pending_ = MenuSoundController::Request{MenuSoundKind::Done, "done.mp3", 0.5};
+        sound.request(MenuSoundKind::Button, "click.mp3", 0.5);
+        REQUIRE(sound.pending_.has_value());
+        CHECK(sound.pending_->kind == MenuSoundKind::Done);
+        sound.request(MenuSoundKind::Start, "start.mp3", 0.5);
+        REQUIRE(sound.pending_.has_value());
+        CHECK(sound.pending_->kind == MenuSoundKind::Start);
+        sound.service(true);
+        pending_decode.set_value({MenuSoundKind::Done, {"done.mp3", {}, "fixture"}, 0});
+        sound.service(true);
+    }
+};
+}
+
+TEST_CASE("UI sound late decodes cannot resurrect invalidated clips or muted clicks") {
+    tenriff::app::MenuSoundControllerTestAccess::check_late_decode_and_mute();
+}
+
+#ifdef _WIN32
+TEST_CASE("audio file picker uses a real STA shell apartment while its audio caller remains MTA") {
+    using namespace tenriff::app;
+    HRESULT mta = E_FAIL, old_picker = E_FAIL, created = E_FAIL;
+    APTTYPE caller_type = APTTYPE_CURRENT, worker_type = APTTYPE_CURRENT;
+    APTTYPEQUALIFIER caller_qualifier{}, worker_qualifier{};
+    MenuAudioFileChoice result;
+    int input_resets = 0;
+    bool reset_on_caller = false;
+    std::thread caller([&] {
+        const auto caller_id = std::this_thread::get_id();
+        mta = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+        if (FAILED(mta)) return;
+        struct ResetState { int& count; bool& on_caller; std::thread::id caller; } reset{
+            input_resets, reset_on_caller, caller_id};
+        const NativeFileDialogInputScope input_scope(&reset, [](void* value) {
+            auto& state = *static_cast<ResetState*>(value);
+            ++state.count;
+            state.on_caller = std::this_thread::get_id() == state.caller;
+        });
+        {
+            const NativeFileDialogApartment old_same_thread_picker;
+            old_picker = old_same_thread_picker.result();
+        }
+        result = run_menu_audio_picker_sta([&] {
+            (void)CoGetApartmentType(&worker_type, &worker_qualifier);
+            Microsoft::WRL::ComPtr<IFileOpenDialog> dialog;
+            created = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER,
+                                       IID_PPV_ARGS(&dialog));
+            return MenuAudioFileChoice{{}, {}, true}; // No shell UI or audio is played by this regression.
+        });
+        (void)CoGetApartmentType(&caller_type, &caller_qualifier);
+        CoUninitialize();
+    });
+    caller.join();
+    REQUIRE(SUCCEEDED(mta));
+    CHECK(old_picker == RPC_E_CHANGED_MODE);
+    CHECK(SUCCEEDED(created));
+    CHECK((worker_type == APTTYPE_STA || worker_type == APTTYPE_MAINSTA));
+    CHECK(caller_type == APTTYPE_MTA);
+    CHECK(result.cancelled);
+    CHECK(result.path.empty());
+    CHECK(result.error.empty());
+    CHECK(input_resets == 1);
+    CHECK(reset_on_caller);
+}
+
+TEST_CASE("audio STA picker propagates selected Unicode paths cancellation and errors and fences caller input") {
+    using namespace tenriff::app;
+    int input_resets = 0;
+    const NativeFileDialogInputScope input_scope(&input_resets, [](void* count) {
+        ++*static_cast<int*>(count);
+    });
+    const auto chosen = run_menu_audio_picker_sta([] {
+        return MenuAudioFileChoice{"audio/선택한 음악.flac", {}, false};
+    });
+    CHECK(chosen.path == "audio/선택한 음악.flac");
+    CHECK_FALSE(chosen.cancelled);
+    CHECK(chosen.error.empty());
+    const auto cancelled = run_menu_audio_picker_sta([] {
+        return MenuAudioFileChoice{{}, {}, true};
+    });
+    CHECK(cancelled.cancelled);
+    CHECK(cancelled.path.empty());
+    const auto failed = run_menu_audio_picker_sta([]() -> MenuAudioFileChoice {
+        throw std::runtime_error("picker failure fixture");
+    });
+    CHECK_FALSE(failed.error.empty());
+    CHECK_FALSE(failed.cancelled);
+    CHECK(failed.path.empty());
+    CHECK(input_resets == 3);
+}
+#endif
+
 #ifdef _WIN32
 namespace tenriff::app {
 
 struct MenuAppAudioSettingsTestAccess {
+    static void check_sound_routing_and_completion() {
+        auto menu = std::make_unique<MenuApp>();
+        menu->config_.audio_ui.master_volume = 0.0;
+        menu->config_.audio_ui.background_sound_enabled = false;
+        menu->audio_settings_controller_.set_asio_drivers({});
+        menu->menu_navigator_.reset(MenuApp::Screen::SettingsAudio);
+        menu->audio_settings_controller_.reset(menu::settings::AudioSettingId::MenuMusicVolume);
+        menu->publish_snapshot();
+        const auto count = [&](MenuSoundKind kind) { return MenuSoundControllerTestAccess::count(menu->menu_sounds_, kind); };
+        render::MenuClickEvent event;
+        event.kind = render::MenuHitTargetKind::SettingsRow;
+        event.index = static_cast<int>(menu::settings::AudioSettingId::MenuMusicVolume);
+        event.part = render::MenuHitPart::SetValue;
+        event.value = 0.4;
+        menu->handle_menu_click(event);
+        CHECK(count(MenuSoundKind::Slider) == 1);
+        CHECK(count(MenuSoundKind::OptionsEdit) == 0);
+        CHECK(count(MenuSoundKind::Button) == 0);
+        event.part = render::MenuHitPart::SelectOnly;
+        menu->handle_menu_click(event);
+        CHECK(count(MenuSoundKind::OptionsEdit) == 1);
+        CHECK(count(MenuSoundKind::Button) == 0);
+        const auto serial = menu->menu_sounds_.request_serial();
+        menu->notify_menu_load_complete(false, true);
+        menu->notify_menu_load_complete(true, false);
+        try {
+            const MenuApp::MenuLoadingScope loading(*menu, "failure fixture");
+            throw std::runtime_error("cancelled/failed import");
+        } catch (const std::runtime_error&) {}
+        CHECK(menu->menu_sounds_.request_serial() == serial);
+        CHECK(count(MenuSoundKind::Done) == 0);
+        menu->notify_menu_load_complete(true, true);
+        CHECK(count(MenuSoundKind::Done) == 1);
+        menu->menu_navigator_.reset(MenuApp::Screen::SongSelect);
+        menu->launch_selected_song(); // No selected chart: never claim a start or completion.
+        CHECK(count(MenuSoundKind::Start) == 0);
+        CHECK(count(MenuSoundKind::Done) == 1);
+    }
+
+    static void check_custom_slot_fallback_and_mute() {
+        auto menu = std::make_unique<MenuApp>();
+        menu->config_.audio_ui.master_volume = 0.0; // This contract test never opens an endpoint.
+        menu->menu_navigator_.reset(MenuApp::Screen::Title);
+        menu->config_.audio_ui.title_music = "default";
+        menu->config_.audio_ui.main_music_file = "missing-fixture/음악.flac";
+        menu->sync_menu_music();
+        CHECK(menu->failed_menu_music_files_.count(menu->config_.audio_ui.main_music_file) == 1);
+        CHECK_FALSE(menu->audio_file_status_.empty());
+        CHECK(menu->config_.audio_ui.main_music_file == "missing-fixture/음악.flac");
+        CHECK_FALSE(menu->audio_thread_.is_running());
+        for (const bool failed : {false, true}) {
+            menu->menu_navigator_.reset(MenuApp::Screen::Result);
+            menu->last_game_over_ = failed;
+            menu->config_.audio_ui.clear_music_file = "none";
+            menu->config_.audio_ui.fail_music_file = "none";
+            menu->sync_menu_music();
+            CHECK(menu->failed_menu_music_files_.size() == 1);
+            CHECK(menu->config_.audio_ui.main_music_file == "missing-fixture/음악.flac");
+        }
+        menu->menu_navigator_.reset(MenuApp::Screen::Title);
+        menu->config_.audio_ui.title_music = "last_played";
+        menu->config_.audio_ui.main_music_file = "other-missing-fixture.mp3";
+        menu->sync_menu_music();
+        CHECK(menu->failed_menu_music_files_.size() == 1); // Custom default file cannot override chart modes.
+    }
+
     static render::MenuRenderData build_render_rows() {
         auto menu = std::make_unique<MenuApp>();
         menu->config_.audio.backend = audio::AudioBackend::ASIO;
@@ -637,7 +824,7 @@ TEST_CASE("audio settings expose unified BMS performance volume and retain legac
     CHECK(runtime.audio_ui.gameplay_volume == doctest::Approx(0.4));
     CHECK(runtime.audio_ui.menu_music_volume == doctest::Approx(0.2));
     const auto view = AudioSettingsView::build(controller, runtime, tenriff::ui::Language::Korean);
-    REQUIRE(view.rows.size() == 17);
+    REQUIRE(view.rows.size() == tenriff::app::menu::settings::kAudioSettingOrder.size());
     CHECK(view.rows[1].label == "BMS 연주 볼륨");
     CHECK(view.rows[1].value == "40%");
     CHECK(view.rows[2].value == "20%");
@@ -833,9 +1020,17 @@ TEST_CASE("audio settings view groups related controls and preserves saved value
     AudioSettingsController controller;
     static_cast<void>(controller.select(AudioSettingId::GameplayVolume));
 
-    const auto english = AudioSettingsView::build(controller, runtime, tenriff::ui::Language::English);
+    const auto legacy_view = [&](tenriff::ui::Language language) {
+        auto view = AudioSettingsView::build(controller, runtime, language);
+        REQUIRE(view.rows.size() == tenriff::app::menu::settings::kAudioSettingOrder.size());
+        view.rows.erase(std::remove_if(view.rows.begin(), view.rows.end(), [](const auto& row) {
+            return tenriff::app::menu::settings::is_audio_file_setting(row.id);
+        }), view.rows.end());
+        return view;
+    };
+    const auto english = legacy_view(tenriff::ui::Language::English);
     REQUIRE(english.rows.size() == 17);
-    REQUIRE(english.notes.size() == 10);
+    REQUIRE(english.notes.size() == 11);
     const std::array<const char*, 17> labels{
         "Master Volume", "BMS Performance Volume", "TenRiff Menu Music", "Keysound Mode", "Background Sound", "Title Music", "Song Ending",
         "Mute When Inactive", "Normalize Audio", "Sound Offset", "Preset",
@@ -851,7 +1046,7 @@ TEST_CASE("audio settings view groups related controls and preserves saved value
     };
     for (std::size_t index = 0; index < english.rows.size(); ++index) {
         const auto& row = english.rows[index];
-        CHECK(row.id == tenriff::app::menu::settings::kAudioSettingOrder[index]);
+        CHECK(tenriff::app::menu::settings::audio_setting_index(row.id) == (index < 6 ? index : index + 9));
         CHECK(row.label == labels[index]);
         CHECK(row.value == values[index]);
         CHECK(row.category == categories[index]);
@@ -874,7 +1069,7 @@ TEST_CASE("audio settings view groups related controls and preserves saved value
         CHECK_FALSE(english.rows[index].activatable);
         CHECK_FALSE(english.rows[index].adjustable);
     }
-    const auto korean = AudioSettingsView::build(controller, runtime, tenriff::ui::Language::Korean);
+    const auto korean = legacy_view(tenriff::ui::Language::Korean);
     CHECK(korean.rows[0].label == "마스터 볼륨");
     CHECK(korean.rows[1].label == "BMS 연주 볼륨");
     CHECK(korean.rows[5].label == "타이틀 음악");
@@ -885,7 +1080,7 @@ TEST_CASE("audio settings view groups related controls and preserves saved value
     CHECK(korean.rows[10].category == "출력 장치");
     CHECK(korean.rows[15].label == "ASIO 버퍼 사이즈");
     CHECK(korean.rows[15].value == "128 샘플");
-    const auto japanese = AudioSettingsView::build(controller, runtime, tenriff::ui::Language::Japanese);
+    const auto japanese = legacy_view(tenriff::ui::Language::Japanese);
     CHECK(japanese.rows[5].label == "タイトル音楽");
     CHECK(japanese.rows[5].value == "標準の音楽");
     CHECK(japanese.rows[15].label == "ASIO バッファサイズ");
@@ -1168,4 +1363,87 @@ TEST_CASE("sound output selector retains unplugged IDs and applies selected endp
     runtime.audio.backend = tenriff::audio::AudioBackend::ASIO;
     controller.set_output_devices({{"endpoint-a", "Speakers"}});
     check_no_effects(change(1)); CHECK(runtime.audio.device_id.empty());
+}
+
+TEST_CASE("audio file selectors distinguish pick cancellation default and explicit silence") {
+    using namespace tenriff::app::menu::settings;
+    tenriff::config::RuntimeConfig runtime;
+    AudioSettingsController controller;
+    for (const auto id : {AudioSettingId::MainMusicFile, AudioSettingId::ClearMusicFile,
+        AudioSettingId::FailMusicFile, AudioSettingId::ButtonSoundFile,
+        AudioSettingId::SliderSoundFile, AudioSettingId::DropSoundFile, AudioSettingId::OptionsSoundFile,
+        AudioSettingId::StartSoundFile, AudioSettingId::DoneSoundFile}) {
+        REQUIRE(is_audio_file_setting(id));
+        REQUIRE(audio_file_setting_value(runtime, id));
+        controller.reset(id);
+        const auto original = *audio_file_setting_value(runtime, id);
+        check_render_only(controller.handle(MenuAction::activate(), runtime));
+        CHECK(controller.take_file_pick_request() == id);
+        CHECK_FALSE(controller.take_file_pick_request().has_value());
+        CHECK(*audio_file_setting_value(runtime, id) == original);
+        CHECK_FALSE(controller.dirty()); // Cancellation has no config mutation.
+        for (const auto extension : {"mp3", "OGG", "WaV", "flac"}) {
+            const std::string path = std::string("audio/선택.") + extension;
+            CHECK(controller.set_audio_file(runtime, id, path).render_changed);
+            CHECK(*audio_file_setting_value(runtime, id) == path);
+        }
+        CHECK_FALSE(controller.set_audio_file(runtime, id, "audio/not-a-sound.txt").render_changed);
+        CHECK(*audio_file_setting_value(runtime, id) == "audio/선택.flac");
+        CHECK(controller.handle(MenuAction::adjust(1), runtime).render_changed);
+        CHECK(*audio_file_setting_value(runtime, id) == "none");
+        CHECK(controller.handle(MenuAction::adjust(-1), runtime).render_changed);
+        CHECK(audio_file_setting_value(runtime, id)->empty());
+        CHECK(controller.handle(MenuAction::back(), runtime).persist_config);
+    }
+    const auto view = AudioSettingsView::build(controller, runtime, tenriff::ui::Language::English);
+    REQUIRE(view.rows.size() == kAudioSettingOrder.size());
+    for (std::size_t index = 0; index < view.rows.size(); ++index) {
+        CHECK(view.rows[index].id == kAudioSettingOrder[index]);
+        if (is_audio_file_setting(view.rows[index].id)) {
+            CHECK(view.rows[index].activatable);
+            CHECK(view.rows[index].adjustable);
+            CHECK(view.rows[index].value == "Default");
+        }
+    }
+}
+
+#ifdef _WIN32
+TEST_CASE("custom BGM slots retain unavailable selections and isolate chart music modes") {
+    tenriff::app::MenuAppAudioSettingsTestAccess::check_custom_slot_fallback_and_mute();
+}
+TEST_CASE("menu sound dispatch gives slider priority and only successful nonempty loads announce completion") {
+    tenriff::app::MenuAppAudioSettingsTestAccess::check_sound_routing_and_completion();
+}
+#endif
+
+TEST_CASE("custom UI sound PCM encoding bounds duration gain and nonfinite samples") {
+    using namespace tenriff::app::menu_music_detail;
+    CHECK(supported_audio_file("audio/선택.MP3"));
+    CHECK(supported_audio_file("audio/file.ogg"));
+    CHECK_FALSE(supported_audio_file("audio/file.mp3.exe"));
+    CHECK_FALSE(supported_audio_file("audio/file"));
+    const auto little16 = [](const std::vector<unsigned char>& wave, std::size_t index) {
+        return static_cast<std::int16_t>(wave[index] | (static_cast<std::uint16_t>(wave[index + 1]) << 8));
+    };
+    const auto wave = sound_wave({1.0f, -1.0f, std::numeric_limits<float>::quiet_NaN(), 0.5f, 1.0f}, 0.5);
+    CHECK(wave.size() == 44 + 4 * 2); // Never encode a partial stereo frame.
+    CHECK(little16(wave, 44) == 16384);
+    CHECK(little16(wave, 46) == -16384);
+    CHECK(little16(wave, 48) == 0);
+    const auto bounded = sound_wave(std::vector<float>(48'000 * 2 * 4, 2.0f), 2.0);
+    CHECK(bounded.size() == 44 + 48'000 * 2 * 2 * 2);
+    CHECK(little16(bounded, 44) == 32767);
+    CHECK(little16(sound_wave({1.0f, -1.0f}, std::numeric_limits<double>::quiet_NaN()), 44) == 0);
+    const std::vector<float> provided_done(48'000 * 2 * 3 + 100, 0.1f);
+    CHECK(sound_wave(provided_done, 0.5, sound_max_frames(tenriff::app::MenuSoundKind::Done)).size() ==
+          44 + provided_done.size() * 2);
+    CHECK(sound_wave(provided_done, 0.5, sound_max_frames(tenriff::app::MenuSoundKind::Button)).size() ==
+          44 + 48'000 * 2 * 2 * 2);
+    using Kind = tenriff::app::MenuSoundKind;
+    CHECK(pointer_sound(true, true, true, false) == Kind::Slider);
+    CHECK(pointer_sound(true, false, true, false) == Kind::OptionsEdit);
+    CHECK(pointer_sound(true, false, false, false) == Kind::Button);
+    CHECK_FALSE(pointer_sound(true, true, true, true).has_value());
+    CHECK(bundled_sound_filename(Kind::Done) == "SFX/done.mp3");
+    CHECK(bundled_sound_filename(Kind::Slider) == "SFX/Silder Moving.mp3");
 }
