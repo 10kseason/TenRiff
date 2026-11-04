@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <filesystem>
+#include <memory>
 #include <string_view>
 
 #ifdef _WIN32
@@ -80,6 +81,7 @@ bool open_vorbis_stream(const std::string& path,
     }
 
     int decode_error = VORBIS__no_error;
+    // stb owns the FILE on both successful close and failed header setup.
     stb_vorbis* vorbis = stb_vorbis_open_file(file, TRUE, &decode_error, nullptr);
     if (!vorbis) {
         if (error) {
@@ -132,13 +134,14 @@ bool decode_ogg_vorbis_stereo(const std::string& path,
     if (!open_vorbis_stream(path, &vorbis, error)) {
         return false;
     }
+    // Vector allocation may throw after parsing; keep FILE/parser ownership scoped.
+    const std::unique_ptr<stb_vorbis, decltype(&stb_vorbis_close)> owner(vorbis, stb_vorbis_close);
 
     const stb_vorbis_info info = stb_vorbis_get_info(vorbis);
     if (info.sample_rate <= 0 || info.channels <= 0) {
         if (error) {
             *error = "OGG decoder returned an invalid audio format.";
         }
-        stb_vorbis_close(vorbis);
         return false;
     }
 
@@ -191,7 +194,6 @@ bool decode_ogg_vorbis_stereo(const std::string& path,
         }
     }
 
-    stb_vorbis_close(vorbis);
     return true;
 }
 

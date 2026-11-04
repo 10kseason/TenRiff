@@ -1,3 +1,10 @@
+# 1.9.9.9-hotfix1 — 2026-11-04
+
+- Backport five stb_vorbis upstream fixes plus local EOF/ownership checks; cover both Windows probe/decode, truncated headers and allocation-failure cleanup.
+- Add optional Common BGA in Graphics to replace every chart BGA with a selected silent looping video; default OFF/empty and retain BGA OFF priority.
+- Update the bundled offline skin editor's Graphics preview, current grade/metadata examples and profile-setting guidance; retain skin.json v1 and native catalog compatibility.
+- Preserve Media Foundation fallback, existing timing/records and fixed baseline 1.9.6. [Scope](docs/release-1.9.9.9-hotfix1.en.md) · [Validation](docs/release-1.9.9.9-hotfix1-gate.md).
+
 # 1.9.9.9 — 2026-11-03
 
 - Add the supplied silent 1080p60/60-second Result video backdrop while preserving the restored layout; respect custom backgrounds/reduced motion and release menu video resources on screen changes.

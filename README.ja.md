@@ -1,3 +1,5 @@
+> **2026-11-04 · 1.9.9.9-hotfix1:** [OGG セキュリティ修正・共通 BGA・スキンエディター](docs/release-1.9.9.9-hotfix1.ja.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
+
 > **2026-11-03 · 1.9.9.9:** [選曲・記録フィードバック・リザルト背景動画](docs/release-1.9.9.9.ja.md). Fixed baseline **1.9.6**. Earlier candidate/release notices below are historical; Result uses the restored layout.
 
 > **2026-10-30 · 1.9.9.8 hot fix 1:** [オーディオ出力デバイスの案内修正](docs/release-1.9.9.8-hotfix1.ja.md). Fixed baseline **1.9.6**; earlier notices are historical.

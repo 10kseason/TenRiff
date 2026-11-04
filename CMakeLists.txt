@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.9.9.9 DESCRIPTION "TenRiff 1.9.9.9" LANGUAGES C CXX)
+project(TenRiff VERSION 1.9.9.9 DESCRIPTION "TenRiff 1.9.9.9 hot fix 1" LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -713,6 +713,16 @@ if(WIN32 AND TENRIFF_BUILD_STANDALONE_BMS_KEY_CONVERTER)
 endif()
 
 if(TENRIFF_ENABLE_TESTS)
+    add_executable(stb_vorbis_security_tests tests/unit/test_stb_vorbis_security.cpp)
+    target_include_directories(stb_vorbis_security_tests PRIVATE external)
+    target_compile_definitions(stb_vorbis_security_tests PRIVATE TENRIFF_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    add_test(NAME stb_vorbis_security_tests COMMAND stb_vorbis_security_tests)
+    set_tests_properties(stb_vorbis_security_tests PROPERTIES TIMEOUT 120)
+    if(TENRIFF_ENABLE_ASAN AND MSVC)
+        add_custom_command(TARGET stb_vorbis_security_tests POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${TENRIFF_ASAN_RUNTIME_DLL}" "$<TARGET_FILE_DIR:stb_vorbis_security_tests>")
+    endif()
     enable_testing()
     if(TENRIFF_NK3_ONNX_AVAILABLE)
         add_executable(nk3_onnx_smoke
@@ -902,6 +912,7 @@ if(TENRIFF_ENABLE_TESTS)
         tenriff_copy_nk3_runtime(bms_parser_tests)
     endif()
     target_compile_definitions(bms_parser_tests PRIVATE
+        TENRIFF_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
         TENRIFF_TEST_REPLAY_VERIFIER_PATH="$<TARGET_FILE:tenriff_replay_verifier>")
     add_dependencies(bms_parser_tests tenriff_replay_verifier)
     # The test target can be built without the GUI (notably under ASan). Keep

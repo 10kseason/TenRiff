@@ -3,7 +3,7 @@ param(
     [string]$BuildReleaseDirectory,
     [Parameter(Mandatory = $true)]
     [string]$OutputDirectory,
-    [string]$Version = "1.9.9.9",
+    [string]$Version = "1.9.9.9-hotfix1",
     [switch]$BinaryOnly
 )
 
@@ -110,6 +110,10 @@ foreach ($relative in @(
     }
 }
 $keyweaverNoticeDirectory = Join-Path $binaryRoot "third_party\keyweaver-e"
+# Keep the security provenance link usable from the offline release notes.
+$vorbisNoticeDirectory = Join-Path $binaryRoot "external"
+New-Item -ItemType Directory -Path $vorbisNoticeDirectory -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $repoRoot "external\stb_vorbis.TENRIFF.md") -Destination $vorbisNoticeDirectory
 New-Item -ItemType Directory -Path $keyweaverNoticeDirectory -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repoRoot "nk2e\LICENSE") -Destination $keyweaverNoticeDirectory
 $keyOverlayNoticeDirectory = Join-Path $binaryRoot "third_party\key_note_overlay"

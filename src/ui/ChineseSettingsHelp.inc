@@ -185,3 +185,6 @@
 {"Move the key overlay vertically in 1% steps. 0% is top and 100% is bottom. Enablement and position are saved with the skin settings.", "按1%调整叠加面板垂直位置。0%为顶部，100%为底部。启用状态和位置随皮肤设置保存。"},
 
     {"Choose gauge bar width: Normal (100%), Slightly Larger (125%), or Large (150%). Only horizontal size changes.", "选择血条宽度：普通（100%）、稍大（125%）或大（150%）。仅改变横向尺寸。"},
+
+{"Replace all chart BGA layers with the selected silent looping video. BGA OFF takes priority.", "将所有谱面的 BGA 层替换为所选静音循环视频。BGA OFF 优先。"},
+{"Select a local video for Common BGA. Selection alone does not enable it; cancelling keeps the current file.", "选择通用 BGA 使用的本地视频。仅选择文件不会开启；取消保留当前文件。"},

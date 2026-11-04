@@ -12,6 +12,15 @@
 #include <vector>
 
 #include "audio/OggVorbisDecoder.h"
+#include "app/SongPreviewBuilder.h"
+#include "app/BmsEditorPreview.h"
+#include "app/AudioFileDecoder.h"
+#include "../support/OggTestFixture.h"
+#include <chrono>
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
 
 namespace {
 
@@ -36,7 +45,7 @@ std::vector<unsigned char> decode_base64(std::string_view input) {
     };
 
     std::vector<unsigned char> output;
-    int val = 0;
+    unsigned int val = 0;
     int valb = -8;
     for (unsigned char ch : input) {
         if (std::isspace(ch) || ch == '=') {
@@ -158,4 +167,91 @@ TEST_CASE("ogg vorbis decoder probes and decodes utf8 paths without ffmpeg") {
     std::filesystem::remove(temp_dir, ec);
 }
 
+namespace {
+struct OggTemp {
+    std::filesystem::path path=std::filesystem::temp_directory_path()/
+        ("tenriff-ogg-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    OggTemp() { std::filesystem::create_directories(path); }
+    ~OggTemp() { std::error_code ec; std::filesystem::remove_all(path,ec); }
+};
+void write_ogg(const std::filesystem::path& p,const ogg_test::Bytes& b) {
+    std::ofstream f(p,std::ios::binary); f.write(reinterpret_cast<const char*>(b.data()),b.size()); REQUIRE(f.good());
+}
+}
+
+TEST_CASE("ogg vorbis malformed headers reject in both public entry points") {
+    OggTemp temp; auto path=temp.path/std::filesystem::u8path(u8"잘린헤더.ogg");
+    const auto packets=ogg_test::packets(ogg_test::read(ogg_test::fixture("mono22050.ogg")));
+    std::vector<ogg_test::Bytes> inputs;
+    for(auto count:{0x20000001u,0x7fffffffu,0x80000000u,0xffffffffu})
+        inputs.push_back(ogg_test::stream(packets[0],ogg_test::comment(count),packets[2]));
+    for(auto n:{0x7ffffff8u,0x7fffffffu,0xffffffffu})
+        inputs.push_back(ogg_test::stream(packets[0],ogg_test::comment(1,n),packets[2]));
+    for(std::size_t i=0;i<packets[1].size();++i)
+        inputs.push_back(ogg_test::stream(packets[0],ogg_test::Bytes(packets[1].begin(),packets[1].begin()+i),packets[2]));
+    DWORD before=0,after=0; REQUIRE(GetProcessHandleCount(GetCurrentProcess(),&before));
+    for(int repeat=0;repeat<3;++repeat) for(const auto& b:inputs) {
+        write_ogg(path,b); std::string error; std::vector<float> out{1}; int rate=1;
+        CHECK_FALSE(tenriff::audio::probe_ogg_vorbis_sample_rate(path.u8string(),&error).has_value());
+        CHECK_FALSE(error.empty());
+        CHECK_FALSE(tenriff::audio::decode_ogg_vorbis_stereo(path.u8string(),&rate,out,&error,1));
+        CHECK(out.empty()); CHECK(rate==0);
+    }
+    REQUIRE(GetProcessHandleCount(GetCurrentProcess(),&after)); CHECK(after<=before+2);
+}
+
+TEST_CASE("ogg vorbis normal rates stereo long audio and bounded previews") {
+    OggTemp temp;
+    struct Control { const char* name; int rate; bool mono; };
+    for(const auto c:{Control{"mono22050.ogg",22050,true},Control{"stereo44100.ogg",44100,false},
+                     Control{"stereo96000.ogg",96000,false},Control{"long48000.ogg",48000,true}}) {
+        const auto path=temp.path/std::filesystem::u8path(u8"정상음원.ogg");
+        write_ogg(path,ogg_test::read(ogg_test::fixture(c.name)));
+        auto probe=tenriff::audio::probe_ogg_vorbis_sample_rate(path.u8string());
+        REQUIRE(probe.has_value()); CHECK(*probe==c.rate);
+        std::vector<float> full,limited; int rate=0; std::string error;
+        REQUIRE(tenriff::audio::decode_ogg_vorbis_stereo(path.u8string(),&rate,full,&error));
+        CHECK(rate==c.rate); REQUIRE(full.size()>128);
+        if(c.rate==48000) CHECK(full.size()>=65u*48000u*2u);
+        for(float sample:full) CHECK(std::isfinite(sample));
+        if(c.mono) for(std::size_t i=0;i<full.size();i+=2) CHECK(full[i]==full[i+1]);
+        for(std::size_t limit:{1u,64u,4096u}) {
+            REQUIRE(tenriff::audio::decode_ogg_vorbis_stereo(path.u8string(),&rate,limited,&error,limit));
+            CHECK(limited.size()==std::min(full.size(),limit*2));
+            CHECK(std::equal(limited.begin(),limited.end(),full.begin()));
+        }
+        auto chart=temp.path/"preview.bms";
+        { std::ofstream f(chart); f<<"#PLAYER 1\n#BPM 120\n#WAV01 "<<path.filename().u8string()<<"\n#00011:01\n"; }
+        std::vector<float> preview; std::string source;
+        REQUIRE(tenriff::app::build_song_preview_audio(chart.u8string(),path.u8string(),48000,1,preview,source,&error));
+        // The existing preview contract clamps requests to at least five seconds.
+        CHECK_FALSE(preview.empty()); CHECK(preview.size()<=5u*96000u);
+        tenriff::app::BmsEditorPreviewRequest request;
+        request.chart_text="#PLAYER 1\n#BPM 120\n#WAV01 "+path.filename().u8string()+"\n#00011:01\n";
+        request.source_chart_path=chart.u8string(); request.keysound_id="01"; request.keysound_only=true;
+        request.max_duration_seconds=1;
+        auto result=tenriff::app::build_bms_editor_preview(request);
+        REQUIRE(result.success()); CHECK_FALSE(result.stereo_samples->empty());
+    }
+}
+TEST_CASE("ogg vorbis retains Media Foundation fallback for non Vorbis input") {
+    auto path=ogg_test::fixture("opus48000.ogg");
+    CHECK_FALSE(tenriff::audio::probe_ogg_vorbis_sample_rate(path.u8string()).has_value());
+    std::vector<float> out; std::string error;
+    const bool opus=tenriff::app::decode_audio_file_stereo_resampled(path.u8string(),48000,out,&error,4800);
+    std::cout<<"non-Vorbis Ogg Opus MF available="<<opus<<" "<<error<<"\n";
+    if(opus) { CHECK_FALSE(out.empty()); CHECK(out.size()<=9600); }
+    else CHECK(error.find("MF fallback:")!=std::string::npos);
+    // MF sniffs the container: a WAV named .ogg exercises successful fallback
+    // even on Windows installations without an Ogg/Opus Media Foundation handler.
+    OggTemp temp; path=temp.path/"fallback.ogg";
+    ogg_test::Bytes b={'R','I','F','F'}; ogg_test::le32(b,36+128);
+    for(auto c:std::string("WAVEfmt "))b.push_back(c);
+    ogg_test::le32(b,16); b.insert(b.end(),{1,0,1,0});
+    ogg_test::le32(b,48000); ogg_test::le32(b,96000); b.insert(b.end(),{2,0,16,0,'d','a','t','a'});
+    ogg_test::le32(b,128); for(int i=0;i<64;++i)b.insert(b.end(),{0,64}); write_ogg(path,b);
+    CHECK_FALSE(tenriff::audio::probe_ogg_vorbis_sample_rate(path.u8string()).has_value());
+    REQUIRE(tenriff::app::decode_audio_file_stereo_resampled(path.u8string(),48000,out,&error));
+    CHECK(out.size()==128); CHECK(out.front()>0.1f);
+}
 #endif

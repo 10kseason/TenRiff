@@ -85,7 +85,7 @@ bool valid_frame(const std::shared_ptr<const tenriff::render::BgaVideoFrame>& fr
 
 int wmain(int argc, wchar_t** argv) {
     if (argc < 2 || argc > 3) {
-        std::wcerr << L"usage: bga_video_smoke <video> [--timeline|--ffmpeg|--stall-recovery|--stall-eof|--long-gop]\n"
+        std::wcerr << L"usage: bga_video_smoke <video> [--timeline|--ffmpeg|--stall-recovery|--stall-eof|--long-gop|--loop]\n"
                    << L"--stall-recovery requires a native Media Foundation video fixture at least 65 seconds long.\n"
                    << L"--stall-eof requires a native Media Foundation video fixture EXACTLY 65 seconds long.\n";
         return 2;
@@ -117,6 +117,42 @@ int wmain(int argc, wchar_t** argv) {
             restarted->timestamp_100ns == a->timestamp_100ns;
         std::cout << "{\"ffmpeg_repeat_seek_passed\":" << (ok ? "true" : "false") << "}\n";
         return ok ? 0 : 6;
+    }
+    if (argc == 3 && std::wstring_view(argv[2]) == L"--loop") {
+        // Use a short (two-second) fixture. Three complete passes must rewind,
+        // pause must issue no work, and switching loop off must restore EOF hold.
+        bool ok = true;
+        int wraps = 0;
+        std::int64_t previous = -1;
+        for (int tick = 0; tick <= 180; ++tick) {
+            const double position = tick / 30.0;
+            decoder.request(path_utf8, position, true);
+            const auto frame = wait_for_frame(decoder, std::chrono::seconds(5));
+            if (!valid_frame(frame)) { ok = false; break; }
+            if (previous > 10'000'000 && frame->timestamp_100ns < previous) ++wraps;
+            previous = frame->timestamp_100ns;
+            if (tick == 90) {
+                decoder.request(path_utf8, position, true);
+                ok = ok && !wait_for_frame(decoder, std::chrono::milliseconds(80));
+            }
+        }
+        ok = ok && wraps >= 2;
+        decoder.request(path_utf8, 0.0, false);
+        ok = valid_frame(wait_for_frame(decoder, std::chrono::seconds(5))) && ok;
+        decoder.request(path_utf8, 3.0, false);
+        const auto end = wait_for_frame(decoder, std::chrono::seconds(5));
+        decoder.request(path_utf8, 4.0, false);
+        const auto held = wait_for_frame(decoder, std::chrono::seconds(5));
+        ok = ok && valid_frame(end) && valid_frame(held) &&
+             held->timestamp_100ns == end->timestamp_100ns && end->timestamp_100ns > 10'000'000;
+        decoder.clear();
+        ok = ok && !decoder.take_ready();
+        decoder.request(path_utf8, 0.0, true);
+        const auto restarted = wait_for_frame(decoder, std::chrono::seconds(5));
+        ok = ok && valid_frame(restarted) && restarted->timestamp_100ns < 1'000'000;
+        std::cout << "{\"common_bga_loop_passed\":" << (ok ? "true" : "false")
+                  << ",\"wraps\":" << wraps << "}\n";
+        return ok ? 0 : 12;
     }
     decoder.request(path_utf8, 0.0);
     const auto first = wait_for_frame(decoder, std::chrono::seconds(10));

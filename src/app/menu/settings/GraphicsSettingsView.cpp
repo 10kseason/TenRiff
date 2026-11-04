@@ -104,7 +104,7 @@ GraphicsSettingsViewModel GraphicsSettingsView::build(
     ui::Language language) {
     GraphicsSettingsViewModel view;
     view.rows.reserve(kGraphicsSettingOrder.size());
-    view.notes.reserve(11);
+    view.notes.reserve(12);
 
     const std::string refresh_hz_label =
         runtime.graphics.refresh_hz == kGraphicsRefreshHzUnlimited
@@ -178,6 +178,14 @@ GraphicsSettingsViewModel GraphicsSettingsView::build(
         on_off(runtime.graphics.background_upscale_prefer_npu, language),
         controller, false, true));
     view.rows.push_back(make_row(
+        GraphicsSettingId::CommonBga, SettingsRowKind::Toggle,
+        localized(language, "Common BGA", "범용 BGA"),
+        on_off(runtime.graphics.common_bga_enabled, language), controller, false, true));
+    view.rows.push_back(make_row(
+        GraphicsSettingId::CommonBgaFile, SettingsRowKind::Action,
+        localized(language, "Common BGA Video", "범용 BGA 영상"),
+        model_label(runtime.graphics.common_bga_path, language), controller, true, false));
+    view.rows.push_back(make_row(
         GraphicsSettingId::Back, SettingsRowKind::Action,
         localized(language, "Back", "뒤로"), "", controller, true, false));
 
@@ -223,6 +231,9 @@ GraphicsSettingsViewModel GraphicsSettingsView::build(
     view.notes.push_back(localized(language,
         "Performance HUD shows frame graph, AVG ms/FPS, 0.1%/0.01% lows, and max FPS.",
         "성능 HUD는 프레임 그래프, 평균 ms/FPS, 0.1%/0.01% low, 최대 FPS를 표시합니다."));
+    view.notes.push_back(localized(language,
+        "Common BGA replaces every chart background with the selected silent looping video. Enable it separately; BGA OFF takes priority. An unavailable video shows the default background.",
+        "범용 BGA는 모든 곡의 배경을 선택한 무음 반복 영상으로 바꿉니다. 별도로 켜야 하며 BGA OFF가 우선합니다. 영상을 사용할 수 없으면 기본 배경을 표시합니다."));
     view.notes.push_back(localized(language,
         "BGA OFF suppresses gameplay image/video backgrounds and disables their decoder/upscaler work. Song Select background previews remain visible.",
         "BGA를 끄면 게임플레이 이미지/영상 배경과 디코더/업스케일러 작업이 비활성화됩니다. 선곡 배경 미리보기는 유지됩니다."));

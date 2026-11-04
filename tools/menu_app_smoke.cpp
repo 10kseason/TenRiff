@@ -119,6 +119,76 @@ namespace tenriff::app {
 // These existing test friends are defined only in this executable. Menu actions
 // run on their owner thread; the observer reads only mutex-protected HUD data.
 struct MenuAppVisualTestAccess {
+    static void check_common_bga_hud(MenuApp& app, Report& report) {
+        const auto saved_graphics = app.config_.graphics;
+        const auto saved_controller = app.graphics_settings_controller_;
+        MenuApp::GameplayHudState saved_hud;
+        {
+            std::lock_guard<std::mutex> lock(app.gameplay_hud_mutex_);
+            saved_hud = app.gameplay_hud_;
+            app.reset_gameplay_hud_state(app.gameplay_hud_);
+            app.gameplay_hud_.background_base_path = "fixture/chart.mp4";
+            app.gameplay_hud_.background_overlay_path = "fixture/overlay.png";
+            app.gameplay_hud_.background_base_start_sample = 100;
+            app.gameplay_hud_.background_overlay_start_sample = 200;
+        }
+        // Exercise the actual settings completion and MenuApp HUD population.
+        // No file dialog, decoder, user media or gameplay session is launched.
+        const std::string common_path = u8"fixture/공통 영상.mp4";
+        const auto chosen = app.graphics_settings_controller_.set_common_bga_path(app.config_, common_path);
+        report.check("graphics.common_bga.selection_completion", chosen.menu.render_changed &&
+            app.config_.graphics.common_bga_path == common_path);
+        const auto empty = app.graphics_settings_controller_.set_common_bga_path(app.config_, "");
+        report.check("graphics.common_bga.empty_selection_keeps_path", empty.empty() &&
+            app.config_.graphics.common_bga_path == common_path);
+        app.config_.graphics.bga_enabled = true;
+        app.config_.graphics.common_bga_enabled = true;
+        app.config_.graphics.background_upscale_mode = "onnx";
+        render::GameplayHudData hud;
+        app.populate_gameplay_render_data(hud);
+        report.check("graphics.common_bga.actual_hud_replaces_both_layers",
+            hud.background_base_path == common_path && hud.background_overlay_path.empty() &&
+            hud.background_base_start_sample == 0 && hud.background_overlay_start_sample == 0 &&
+            hud.background_base_loop && hud.background_upscale_mode == "onnx");
+        {
+            std::lock_guard<std::mutex> lock(app.gameplay_hud_mutex_);
+            app.gameplay_hud_.background_base_path.clear();
+            app.gameplay_hud_.background_overlay_path.clear();
+        }
+        app.populate_gameplay_render_data(hud);
+        report.check("graphics.common_bga.actual_hud_without_chart_bga",
+            hud.background_base_path == common_path && hud.background_base_loop);
+        {
+            std::lock_guard<std::mutex> lock(app.gameplay_hud_mutex_);
+            app.gameplay_hud_.background_base_path = "fixture/next-event.mp4";
+            app.gameplay_hud_.background_overlay_path = "fixture/next-overlay.png";
+            app.gameplay_hud_.background_base_start_sample = 300;
+            app.gameplay_hud_.background_overlay_start_sample = 400;
+        }
+        app.populate_gameplay_render_data(hud);
+        report.check("graphics.common_bga.chart_events_do_not_reset_loop",
+            hud.background_base_path == common_path && hud.background_overlay_path.empty() &&
+            hud.background_base_start_sample == 0 && hud.background_base_loop);
+        app.config_.graphics.common_bga_enabled = false;
+        app.populate_gameplay_render_data(hud);
+        report.check("graphics.common_bga.off_restores_actual_chart_hud",
+            hud.background_base_path == "fixture/next-event.mp4" &&
+            hud.background_overlay_path == "fixture/next-overlay.png" &&
+            hud.background_base_start_sample == 300 && hud.background_overlay_start_sample == 400 &&
+            !hud.background_base_loop);
+        app.config_.graphics.common_bga_enabled = true;
+        app.config_.graphics.bga_enabled = false;
+        app.populate_gameplay_render_data(hud);
+        report.check("graphics.common_bga.bga_off_wins_actual_hud",
+            hud.background_base_path.empty() && hud.background_overlay_path.empty() &&
+            !hud.background_base_loop && hud.background_upscale_mode == "off");
+        app.config_.graphics = saved_graphics;
+        app.graphics_settings_controller_ = saved_controller;
+        {
+            std::lock_guard<std::mutex> lock(app.gameplay_hud_mutex_);
+            app.gameplay_hud_ = std::move(saved_hud);
+        }
+    }
     static void capture_audio_guidance(MenuApp& app, Report& report, const std::string& label) {
         const auto directory = std::filesystem::current_path() / "screenshots";
         std::vector<std::filesystem::path> previous;
@@ -2460,6 +2530,13 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
             Access::click(app, Kind::SettingsRow,
                 static_cast<int>(tenriff::app::menu::settings::GraphicsSettingId::Bga), Part::Increment);
             report.check("graphics.bga_toggle", !Access::config(app).graphics.bga_enabled);
+            report.check("graphics.common_bga_default_off", !Access::config(app).graphics.common_bga_enabled &&
+                Access::config(app).graphics.common_bga_path.empty());
+            Access::click(app, Kind::SettingsRow,
+                static_cast<int>(tenriff::app::menu::settings::GraphicsSettingId::CommonBga), Part::Increment);
+            report.check("graphics.common_bga_toggle", Access::config(app).graphics.common_bga_enabled &&
+                !Access::config(app).graphics.bga_enabled);
+            Access::check_common_bga_hud(app, report);
         } else if (page.index == 4) {
             Access::click(app, Kind::SettingsRow,
                 static_cast<int>(tenriff::app::menu::settings::AudioSettingId::Normalize), Part::Increment);
@@ -2492,7 +2569,8 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
     }
     const auto saved = tenriff::config::ConfigLoader{}.load_profile("profiles/menu-smoke");
     report.check("settings.profile_readback", saved.success() &&
-        !saved.config.graphics.bga_enabled && saved.config.audio_ui.normalize_audio);
+        !saved.config.graphics.bga_enabled && saved.config.graphics.common_bga_enabled &&
+        saved.config.audio_ui.normalize_audio);
     report.check("settings.live_network_guards_preserved", Access::offline(app));
     Access::key(app, "Esc");
     expect_screen(app, report, "options.back", Screen::Title);

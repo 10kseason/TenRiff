@@ -347,6 +347,7 @@ public:
     }
 
     [[nodiscard]] const std::string& path() const { return path_; }
+    [[nodiscard]] bool ended() const { return ended_; }
 
 private:
     Microsoft::WRL::ComPtr<IMFSourceReader> reader_;
@@ -372,6 +373,8 @@ struct BgaVideoDecoder::Impl {
     bool stop = false;
     bool has_pending = false;
     std::string requested_path;
+    bool requested_loop = false;
+    bool pending_loop = false;
     std::int64_t requested_timestamp_100ns = -1;
     std::string pending_path;
     std::int64_t pending_timestamp_100ns = 0;
@@ -412,9 +415,11 @@ struct BgaVideoDecoder::Impl {
         BgaVideoFfmpegReader ffmpeg_reader;
         std::string failed_path;
         std::uint64_t reader_generation = 0;
+        std::int64_t loop_origin_100ns = 0;
         auto failed_retry_after = std::chrono::steady_clock::time_point::min();
         while (true) {
             std::string path;
+            bool loop = false;
             std::int64_t timestamp_100ns = 0;
             std::uint64_t id = 0;
             std::uint64_t active_generation = 0;
@@ -425,6 +430,7 @@ struct BgaVideoDecoder::Impl {
                     break;
                 }
                 path = pending_path;
+                loop = pending_loop;
                 timestamp_100ns = pending_timestamp_100ns;
                 id = pending_id;
                 active_generation = pending_generation;
@@ -436,10 +442,11 @@ struct BgaVideoDecoder::Impl {
                 ffmpeg_reader.close();
                 failed_path.clear();
                 reader_generation = active_generation;
+                loop_origin_100ns = 0;
             }
             if (reader.path() != path && ffmpeg_reader.path() != path) {
                 if (failed_path == path &&
-                    std::chrono::steady_clock::now() < failed_retry_after) {
+                    (loop || std::chrono::steady_clock::now() < failed_retry_after)) {
                     continue;
                 }
                 if (reader.open(path)) {
@@ -456,17 +463,30 @@ struct BgaVideoDecoder::Impl {
                     continue;
                 }
             }
+            const auto local_timestamp = std::max<std::int64_t>(0, timestamp_100ns - loop_origin_100ns);
             auto frame = reader.path() == path
-                ? reader.read_at(timestamp_100ns)
-                : ffmpeg_reader.read_at(timestamp_100ns);
+                ? reader.read_at(local_timestamp)
+                : ffmpeg_reader.read_at(local_timestamp);
             // Media Foundation can accept a container and then fail on its codec.
             // Retry the same frame through FFmpeg before treating it as unavailable.
             if ((!frame || frame->bgra.empty()) && reader.path() == path) {
                 reader.close();
                 if (ffmpeg_reader.open(path)) {
-                    frame = ffmpeg_reader.read_at(timestamp_100ns);
+                    frame = ffmpeg_reader.read_at(local_timestamp);
                     std::cerr << "[BGA Video] Media Foundation decode failed; using FFmpeg fallback: "
                               << path << '\n';
+                }
+            }
+            if (loop && frame && (reader.path() == path ? reader.ended() : ffmpeg_reader.ended())) {
+                // EOF is detected by the selected video backend. Restart from the
+                // current visual clock without changing the chart/audio clock.
+                // Paused requests stay deduplicated and cannot repeatedly restart.
+                loop_origin_100ns = timestamp_100ns;
+                if (reader.path() == path) {
+                    frame = reader.read_at(0);
+                    if (!frame && reader.open(path)) frame = reader.read_at(0);
+                } else {
+                    frame = ffmpeg_reader.read_at(0);
                 }
             }
             if (!frame || frame->bgra.empty()) {
@@ -498,19 +518,22 @@ struct BgaVideoDecoder::Impl {
 BgaVideoDecoder::BgaVideoDecoder() : impl_(std::make_unique<Impl>()) {}
 BgaVideoDecoder::~BgaVideoDecoder() = default;
 
-void BgaVideoDecoder::request(std::string path, double position_seconds) {
+void BgaVideoDecoder::request(std::string path, double position_seconds, bool loop) {
     if (!impl_ || path.empty() || !is_supported_video_path(path)) {
         return;
     }
     const std::int64_t timestamp_100ns = quantize_position(position_seconds);
     std::lock_guard<std::mutex> lock(impl_->mutex);
-    if (path == impl_->requested_path && timestamp_100ns == impl_->requested_timestamp_100ns) {
+    if (path == impl_->requested_path && loop == impl_->requested_loop &&
+        timestamp_100ns == impl_->requested_timestamp_100ns) {
         return;
     }
-    if (path != impl_->requested_path || timestamp_100ns < impl_->requested_timestamp_100ns) {
+    if (path != impl_->requested_path || loop != impl_->requested_loop ||
+        timestamp_100ns < impl_->requested_timestamp_100ns) {
         ++impl_->generation;
         impl_->ready.reset();
     }
+    impl_->requested_loop = impl_->pending_loop = loop;
     impl_->requested_path = std::move(path);
     impl_->requested_timestamp_100ns = timestamp_100ns;
     impl_->pending_path = impl_->requested_path;
@@ -534,6 +557,7 @@ void BgaVideoDecoder::clear() {
         return;
     }
     std::lock_guard<std::mutex> lock(impl_->mutex);
+    impl_->requested_loop = impl_->pending_loop = false;
     impl_->requested_path.clear();
     impl_->requested_timestamp_100ns = -1;
     impl_->pending_path.clear();

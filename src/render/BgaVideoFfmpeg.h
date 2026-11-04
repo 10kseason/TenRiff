@@ -24,6 +24,7 @@ public:
     void close();
 
     [[nodiscard]] const std::string& path() const;
+    [[nodiscard]] bool ended() const;
 
 private:
     struct Impl;

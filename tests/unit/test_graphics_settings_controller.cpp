@@ -24,7 +24,7 @@ TEST_CASE("graphics setting and ONNX confirmation identifiers are stable") {
     using tenriff::app::menu::settings::onnx_upscaler_confirm_id_at;
 
     static_assert(static_cast<std::uint8_t>(GraphicsSettingId::Display) == 0);
-    static_assert(static_cast<std::uint8_t>(GraphicsSettingId::Back) == 11);
+    static_assert(static_cast<std::uint8_t>(GraphicsSettingId::Back) == 13);
     static_assert(static_cast<std::uint8_t>(OnnxUpscalerConfirmId::Enable) == 0);
     static_assert(static_cast<std::uint8_t>(OnnxUpscalerConfirmId::KeepNative) == 1);
     for (std::size_t index = 0; index < kGraphicsSettingOrder.size(); ++index) {
@@ -300,12 +300,12 @@ TEST_CASE("graphics settings views preserve values localization and safe default
     static_cast<void>(controller.select(GraphicsSettingId::OnnxModel));
 
     const auto korean = GraphicsSettingsView::build(controller, runtime, tenriff::ui::Language::Korean);
-    REQUIRE(korean.rows.size() == 12);
-    REQUIRE(korean.notes.size() == 11);
+    REQUIRE(korean.rows.size() == 14);
+    REQUIRE(korean.notes.size() == 12);
     CHECK(korean.rows[2].value == "무제한 (최대 1500 FPS)");
     CHECK(korean.rows[8].value == "model.onnx");
     CHECK(korean.rows[8].selected);
-    CHECK(korean.rows[11].label == "뒤로");
+    CHECK(korean.rows[13].label == "뒤로");
 
     controller.prepare_onnx_confirmation();
     const auto confirmation =
@@ -348,14 +348,15 @@ TEST_CASE("graphics uses the profile language while language editing lives in pr
     GraphicsSettingsController controller;
     const auto japanese = GraphicsSettingsView::build(
         controller, runtime, tenriff::ui::Language::Japanese);
-    REQUIRE(japanese.rows.size() == 12);
-    CHECK(japanese.rows[11].label == "戻る");
+    REQUIRE(japanese.rows.size() == 14);
+    CHECK(japanese.rows[13].label == "戻る");
     CHECK(japanese.rows[0].value == "ボーダーレス");
     CHECK(japanese.rows[2].value == "ディスプレイに合わせる");
     for (const auto& row : japanese.rows) CHECK(row.label != "言語");
     // Out-of-range pointer targets cannot change profile settings.
     const auto effects = controller.handle(
-        MenuAction::activate(), runtime, static_cast<GraphicsSettingId>(12));
+        MenuAction::activate(), runtime, static_cast<GraphicsSettingId>(
+            tenriff::app::menu::settings::kGraphicsSettingOrder.size()));
     CHECK(effects.empty());
     CHECK(runtime.ui.language == "ja");
     CHECK_FALSE(controller.dirty());
@@ -381,4 +382,30 @@ TEST_CASE("graphics brightness uses percent steps and retains hidden legacy sync
         CHECK(view.rows[5].value == "100%");
         for (const auto& row : view.rows) CHECK(row.label != "VSync");
     }
+}
+
+TEST_CASE("common BGA selection stays opt in and persists on Back") {
+    tenriff::config::RuntimeConfig runtime;
+    GraphicsSettingsController controller;
+    CHECK_FALSE(runtime.graphics.common_bga_enabled);
+    CHECK(runtime.graphics.common_bga_path.empty());
+    const auto picker = controller.handle(MenuAction::activate(), runtime, GraphicsSettingId::CommonBgaFile);
+    CHECK(picker.choose_common_bga);
+    CHECK_FALSE(picker.empty());
+    CHECK_FALSE(controller.dirty());
+    CHECK(controller.set_common_bga_path(runtime, "").empty());
+    CHECK_FALSE(controller.dirty());
+    const auto chosen = controller.set_common_bga_path(runtime, "video/common.mp4");
+    CHECK(chosen.menu.render_changed);
+    CHECK_FALSE(runtime.graphics.common_bga_enabled);
+    static_cast<void>(controller.handle(MenuAction::adjust(1), runtime, GraphicsSettingId::CommonBga));
+    CHECK(runtime.graphics.common_bga_enabled);
+    for (auto language : {tenriff::ui::Language::English, tenriff::ui::Language::Korean,
+                          tenriff::ui::Language::Japanese, tenriff::ui::Language::Chinese}) {
+        const auto view = GraphicsSettingsView::build(controller, runtime, language);
+        CHECK(view.rows[12].value == "common.mp4");
+        CHECK(view.rows[12].activatable);
+        CHECK(view.rows[11].adjustable);
+    }
+    CHECK(controller.handle(MenuAction::back(), runtime).menu.persist_config);
 }

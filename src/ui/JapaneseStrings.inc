@@ -1429,3 +1429,9 @@
     {"LOADING SONG", "曲を読み込み中"},
     {"SINGLE PLAYER", "シングルプレイ"},
     {"BEST: same song time / ranks: accuracy", "BEST: 同じ曲内時刻 / ランク: 精度"},
+
+{"Common BGA", "共通BGA"},
+{"Common BGA Video", "共通BGA動画"},
+{"Common BGA replaces every chart background with the selected silent looping video. Enable it separately; BGA OFF takes priority. An unavailable video shows the default background.", "共通BGAは全曲の背景を選択した無音ループ動画に置き換えます。別途有効にしてください。BGA OFFが優先され、動画を利用できない場合は標準背景を表示します。"},
+
+{"Video selection failed. Try selecting a supported video again.", "動画の選択に失敗しました。対応動画をもう一度選択してください。"},

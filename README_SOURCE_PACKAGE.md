@@ -1,3 +1,9 @@
+TenRiff 1.9.9.9-hotfix1 source package — 2026-11-04
+
+Current scope: scoped stb_vorbis header/cleanup security fixes, optional Common BGA and the bundled offline skin editor update. See docs/release-1.9.9.9-hotfix1.en.md and docs/release-1.9.9.9-hotfix1-gate.md. Fixed baseline remains 1.9.6; existing R13/R14 compatibility is preserved.
+
+The earlier release-specific descriptions below are historical. The inclusion/privacy rules remain applicable; this package adds synthetic OGG regression fixtures and no user media, profiles, logs or external BGA model weights.
+
 TenRiff source package notes (`1.9.9.1`)
 
 - Release scope: 21:9 backgrounds with uniformly scaled centered UI, released long-note bodies and final-tail result waiting, and LN Mix v3 with 50ms same-lane mine clearance. Based on published 1.9.9 with NK2 E and 16K submission support retained. Historical v1/v2 replays keep their original layouts; v3 needs the 1.9.9.1 verifier. See [scope](docs/release-1.9.9.1.en.md), [verification gates](docs/release-1.9.9.1-gate.md) and the [release page](https://github.com/10kseason/TenRiff/releases/tag/1.9.9.1).

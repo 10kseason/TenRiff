@@ -115,6 +115,8 @@ struct GraphicsConfig {
     int refresh_hz = -1;
     bool performance_overlay = false;
     bool bga_enabled = true;
+    bool common_bga_enabled = false;
+    std::string common_bga_path;
     int bga_brightness_percent = 100;
     std::string background_upscale_mode = "off";
     std::string background_upscale_model_path;

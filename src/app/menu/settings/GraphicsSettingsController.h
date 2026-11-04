@@ -27,10 +27,12 @@ enum class GraphicsSettingId : std::uint8_t {
     OnnxOutput = 9,
     PreferLowPowerDirectX = 10,
     // Pointer events use the row ID as the visible row index.
-    Back = 11,
+    CommonBga = 11,
+    CommonBgaFile = 12,
+    Back = 13,
 };
 
-inline constexpr std::array<GraphicsSettingId, 12> kGraphicsSettingOrder{
+inline constexpr std::array<GraphicsSettingId, 14> kGraphicsSettingOrder{
     GraphicsSettingId::Display,
     GraphicsSettingId::Resolution,
     GraphicsSettingId::RefreshHz,
@@ -42,6 +44,8 @@ inline constexpr std::array<GraphicsSettingId, 12> kGraphicsSettingOrder{
     GraphicsSettingId::OnnxModel,
     GraphicsSettingId::OnnxOutput,
     GraphicsSettingId::PreferLowPowerDirectX,
+    GraphicsSettingId::CommonBga,
+    GraphicsSettingId::CommonBgaFile,
     GraphicsSettingId::Back,
 };
 
@@ -66,6 +70,7 @@ struct GraphicsSettingsEffects {
     MenuEffectFlags menu{};
     bool apply_runtime_graphics = false;
     bool choose_onnx_model = false;
+    bool choose_common_bga = false;
     bool show_onnx_confirmation = false;
 
     [[nodiscard]] bool empty() const noexcept;
@@ -96,6 +101,8 @@ public:
     [[nodiscard]] GraphicsSettingsEffects set_onnx_model_path(
         config::RuntimeConfig& runtime,
         std::string model_path);
+    [[nodiscard]] GraphicsSettingsEffects set_common_bga_path(
+        config::RuntimeConfig& runtime, std::string path);
     void prepare_onnx_confirmation() noexcept;
     [[nodiscard]] GraphicsSettingsEffects select_confirmation(
         OnnxUpscalerConfirmId target) noexcept;

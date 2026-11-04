@@ -1,3 +1,5 @@
+> **2026-11-04 · 1.9.9.9-hotfix1:** [OGG security, Common BGA and skin editor](release-1.9.9.9-hotfix1.en.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
+
 > **2026-11-03 · 1.9.9.9:** [Song Select, record feedback and Result video background](release-1.9.9.9.en.md). Fixed baseline **1.9.6**. Earlier candidate/release notices below are historical; Result uses the restored layout.
 
 > **2026-10-29 · 1.9.9.6:** [Indicator/result feedback and library loading](release-1.9.9.6.en.md). Fixed baseline: **1.9.6**. Earlier local/unpublished entries below are historical. [Verification](release-1.9.9.6-gate.md).

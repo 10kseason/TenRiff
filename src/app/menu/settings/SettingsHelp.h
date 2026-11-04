@@ -54,6 +54,8 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Select a local ONNX or supported Safetensors model for background upscaling.", "배경 업스케일에 사용할 로컬 ONNX 또는 지원되는 Safetensors 모델을 선택합니다.", "背景拡大に使うローカルONNXまたは対応Safetensorsモデルを選びます。"},
         {"Residual adds AI corrections to the enlarged original. Complete Image uses model RGB directly. Auto recognizes the legacy residual contract or model metadata.", "잔차는 확대한 원본에 AI 보정값을 더합니다. 완성 이미지는 모델 RGB를 그대로 사용합니다. 자동은 기존 잔차 형식이나 모델 메타데이터를 따릅니다.", "残差は拡大した原画像にAI補正を加えます。完成画像はモデルのRGBを直接使用します。自動は既存の残差形式またはメタデータに従います。"},
         {"Prefer the lower-power DirectX adapter for ONNX background upscaling. This does not select the main renderer's GPU.", "ONNX 배경 업스케일에 전력 소모가 적은 DirectX 어댑터를 우선합니다. 게임 전체의 렌더링 GPU를 바꾸는 설정은 아닙니다.", "ONNX背景拡大で低消費電力のDirectX機器を優先します。メイン描画のGPUは変更しません。"},
+        {"Replace all chart BGA layers with the selected silent looping video. BGA OFF takes priority.", "모든 곡의 BGA를 선택한 무음 반복 영상으로 대체합니다. BGA OFF가 우선합니다.", "全譜面のBGAを選択した無音ループ動画に置き換えます。BGA OFFが優先されます。"},
+        {"Select a local video for Common BGA. Selection alone does not enable it; cancelling keeps the current file.", "범용 BGA에 쓸 로컬 영상을 고릅니다. 선택만으로 켜지지 않으며 취소하면 기존 파일을 유지합니다.", "共通BGAのローカル動画を選びます。選択だけでは有効にならず、キャンセルすると現在のファイルを保持します。"},
         {"Save graphics settings and return.", "그래픽 설정을 저장하고 돌아갑니다.", "画面設定を保存して戻ります。"},
     };
     static constexpr SettingsHelpText input[] = {

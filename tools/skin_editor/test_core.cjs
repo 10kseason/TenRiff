@@ -363,3 +363,13 @@ test('overhaul automatic aspect uses destination geometry and line supports 1 to
  for(const p of [.01,1])assert.deepEqual(errors({...basic(),gameplay:{judgement_line_position:p,modes:{'5k':{judgement_line_position:p}}}}),[]);
  for(const p of [0,1.01])assert.ok(errors({...basic(),gameplay:{judgement_line_position:p}}).length);
 });
+
+test('graphics preview follows native row order with localized profile guidance',()=>{
+  const native=fs.readFileSync(path.join(root,'src/app/menu/settings/GraphicsSettingsController.h'),'utf8');
+  const order=native.match(/kGraphicsSettingOrder\{([\s\S]*?)\};/)[1];
+  assert.deepEqual(I.graphicsRows.map(row=>row.id),Array.from(order.matchAll(/GraphicsSettingId::(\w+)/g),match=>match[1]));
+  for(const key of [...I.graphicsRows.map(row=>row.key),'commonBgaHint','previewScope'])
+    for(const language of I.languages)assert.ok(I.text(key,language)&&I.text(key,language)!==key);
+  assert.match(I.text('commonBgaHint','en'),/profile, not in skin.json/);
+  assert.equal(actualSchema.properties.common_bga_enabled,undefined);
+});
