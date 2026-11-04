@@ -844,6 +844,7 @@ private:
     menu::settings::CalibrationSettingsController calibration_settings_controller_{};
     menu::settings::GraphicsSettingsController graphics_settings_controller_{};
     std::string graphics_resolution_status_;
+    bool common_bga_picker_failed_ = false;
     menu::settings::KeymapSettingsController keymap_settings_controller_{};
     menu::settings::ModeSettingsController mode_settings_controller_{};
     menu::settings::SkinSettingsController skin_settings_controller_{};

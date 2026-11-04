@@ -27,7 +27,8 @@ public:
     BgaVideoDecoder(const BgaVideoDecoder&) = delete;
     BgaVideoDecoder& operator=(const BgaVideoDecoder&) = delete;
 
-    void request(std::string path, double position_seconds);
+    // Looping is opt-in for common BGA only; authored chart videos retain EOF stills.
+    void request(std::string path, double position_seconds, bool loop = false);
     [[nodiscard]] std::shared_ptr<const BgaVideoFrame> take_ready();
     void clear();
 

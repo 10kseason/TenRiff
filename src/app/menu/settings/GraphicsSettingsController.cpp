@@ -78,13 +78,14 @@ std::optional<OnnxUpscalerConfirmId> onnx_upscaler_confirm_id_at(
 
 bool GraphicsSettingsEffects::empty() const noexcept {
     return menu.empty() && !apply_runtime_graphics && !choose_onnx_model &&
-           !show_onnx_confirmation;
+           !show_onnx_confirmation && !choose_common_bga;
 }
 
 void GraphicsSettingsEffects::merge(const GraphicsSettingsEffects& other) noexcept {
     menu.merge(other.menu);
     apply_runtime_graphics = apply_runtime_graphics || other.apply_runtime_graphics;
     choose_onnx_model = choose_onnx_model || other.choose_onnx_model;
+    choose_common_bga = choose_common_bga || other.choose_common_bga;
     show_onnx_confirmation =
         show_onnx_confirmation || other.show_onnx_confirmation;
 }
@@ -228,6 +229,13 @@ GraphicsSettingsEffects GraphicsSettingsController::set_onnx_model_path(
     runtime.graphics.background_upscale_model_path = std::move(model_path);
     // Output semantics belong to the selected model, not to the next file.
     runtime.graphics.background_upscale_output_mode = "auto";
+    return mark_changed();
+}
+
+GraphicsSettingsEffects GraphicsSettingsController::set_common_bga_path(
+    config::RuntimeConfig& runtime, std::string path) {
+    if (path.empty() || runtime.graphics.common_bga_path == path) return {};
+    runtime.graphics.common_bga_path = std::move(path);
     return mark_changed();
 }
 
@@ -402,6 +410,14 @@ GraphicsSettingsEffects GraphicsSettingsController::apply_selected_action(
             runtime.graphics.background_upscale_prefer_npu =
                 !runtime.graphics.background_upscale_prefer_npu;
             return mark_changed();
+        case GraphicsSettingId::CommonBga:
+            runtime.graphics.common_bga_enabled = !runtime.graphics.common_bga_enabled;
+            return mark_changed();
+        case GraphicsSettingId::CommonBgaFile: {
+            GraphicsSettingsEffects effects;
+            effects.choose_common_bga = true;
+            return effects;
+        }
         case GraphicsSettingId::Back:
             return {};
     }

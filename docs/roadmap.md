@@ -1,3 +1,5 @@
+> **2026-11-04 · 1.9.9.9-hotfix1:** [OGG 보안 수정·범용 BGA·스킨 에디터](release-1.9.9.9-hotfix1.ko.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
+
 > **2026-11-03 · 1.9.9.9:** [선곡·기록 피드백과 리절트 영상 배경](release-1.9.9.9.ko.md). Fixed baseline **1.9.6**. Earlier candidate/release notices below are historical; Result uses the restored layout.
 
 > **2026-10-30 · 1.9.9.8 hot fix 1:** [오디오 장치 안내 수정](release-1.9.9.8-hotfix1.ko.md). Fixed baseline **1.9.6**; earlier notices are historical.

@@ -542,6 +542,7 @@ struct GameplayHudData {
     int64_t past_samples = 0;
     float bga_brightness = 1.0f;
     std::string background_base_path;
+    bool background_base_loop = false;
     std::string background_overlay_path;
     int64_t background_base_start_sample = 0;
     int64_t background_overlay_start_sample = 0;

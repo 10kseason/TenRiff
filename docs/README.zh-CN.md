@@ -1,3 +1,5 @@
+> **2026-11-04 · 1.9.9.9-hotfix1:** [OGG 安全修复、通用 BGA 与皮肤编辑器](release-1.9.9.9-hotfix1.zh-CN.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
+
 > **2026-11-03 · 1.9.9.9:** [选曲、记录反馈与结算动态背景](release-1.9.9.9.zh-CN.md). Fixed baseline **1.9.6**. Earlier candidate/release notices below are historical; Result uses the restored layout.
 
 > **2026-10-29 · 1.9.9.6:** [指示条、结算与曲库加载](release-1.9.9.6.zh-CN.md). Fixed baseline: **1.9.6**. Earlier local/unpublished entries below are historical. [Verification](release-1.9.9.6-gate.md).

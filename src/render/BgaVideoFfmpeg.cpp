@@ -332,6 +332,10 @@ void BgaVideoFfmpegReader::close() {
     impl_->ended = false;
 }
 
+bool BgaVideoFfmpegReader::ended() const {
+    return impl_->ended;
+}
+
 const std::string& BgaVideoFfmpegReader::path() const {
     return impl_->path;
 }

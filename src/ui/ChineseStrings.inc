@@ -1439,3 +1439,9 @@
     {"Show live BEST score differences and S to S+++ accuracy margins. Default Off. A compatible replay is required for BEST.", "显示实时BEST分差及S至S+++准确率差。默认关闭，BEST需要兼容回放。"},
     {"Move the score comparison panel horizontally. The full panel remains within the screen.", "横向移动分数对比面板，面板整体保持在屏幕内。"},
     {"Move the score comparison panel vertically. Position is saved with skin presets and profiles.", "纵向移动分数对比面板，位置随皮肤预设和配置保存。"},
+
+{"Common BGA", "通用 BGA"},
+{"Common BGA Video", "通用 BGA 视频"},
+{"Common BGA replaces every chart background with the selected silent looping video. Enable it separately; BGA OFF takes priority. An unavailable video shows the default background.", "通用 BGA 用所选的静音循环视频替换所有谱面的背景。需单独开启；BGA OFF 优先。视频不可用时显示默认背景。"},
+
+{"Video selection failed. Try selecting a supported video again.", "视频选择失败。请重新选择受支持的视频。"},

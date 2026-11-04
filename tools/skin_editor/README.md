@@ -1,4 +1,18 @@
-# TenRiff Skin Editor — 1.9.5.3
+# TenRiff Skin Editor — 1.9.9.9 hot fix 1
+
+모든 곡에 같은 BGA를 쓰려면 게임의 옵션 > 그래픽에서 범용 BGA 영상을 선택하고 범용 BGA를 켜세요. BGA 표시도 켜져 있어야 합니다. 이 설정은 게임 프로필에 저장되며 skin.json에는 저장하지 않습니다.
+
+To replace every chart BGA, choose Common BGA Video and enable Common BGA in the game under Options > Graphics. BGA must also be enabled. This is saved in the game profile, not in skin.json.
+
+全曲の BGA を置き換えるには、ゲームのオプション > グラフィックスで共通 BGA 動画を選び、共通 BGA と BGA 表示をオンにします。この設定はゲームのプロフィールに保存され、skin.json には保存されません。
+
+브라우저 미리보기는 배치와 스킨 편집용 예시입니다. 실제 곡 데이터·영상·리절트 효과는 재현하지 않으므로 저장한 스킨은 게임에서 확인하세요.
+
+Browser previews are illustrative layout and skin examples. They do not reproduce real chart data, videos or result effects; verify the saved skin in the game.
+
+ブラウザーのプレビューは配置とスキン編集用のサンプルです。実際の譜面データ・動画・リザルト効果は再現しないため、保存したスキンはゲームで確認してください。
+
+Graphics previews now list all 14 current settings, including Common BGA. The legacy-layout Song Select sample shows seven rows (the default native client uses ten), a clear label and synthetic NPS metadata; the Result sample uses the current S+ grade. The native catalog is synchronized with the client. Existing skin.json v1 import/export and offline operation remain unchanged.
 
 Opaque playfield ON, LN tail/taper OFF, LN opacity 100%, bottom key labels. These controls are hidden from the form; imported explicit values and the JSON editor remain compatible. Gameplay Cursor is a game Profile setting. This editor writes skin.json/ZIP; portable .trskin files are saved by the game.
 

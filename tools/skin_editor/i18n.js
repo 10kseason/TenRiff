@@ -2,6 +2,22 @@
   'use strict';
   // Technical JSON keys remain visible below translated labels for exact lookup.
   const rows = {
+    commonBgaHint: ["모든 곡에 같은 BGA를 쓰려면 게임의 옵션 > 그래픽에서 범용 BGA 영상을 선택하고 범용 BGA를 켜세요. BGA 표시도 켜져 있어야 합니다. 이 설정은 게임 프로필에 저장되며 skin.json에는 저장하지 않습니다.", "To replace every chart BGA, choose Common BGA Video and enable Common BGA in the game under Options > Graphics. BGA must also be enabled. This is saved in the game profile, not in skin.json.", "全曲の BGA を置き換えるには、ゲームのオプション > グラフィックスで共通 BGA 動画を選び、共通 BGA と BGA 表示をオンにします。この設定はゲームのプロフィールに保存され、skin.json には保存されません。"],
+    previewScope: ["브라우저 미리보기는 배치와 스킨 편집용 예시입니다. 실제 곡 데이터·영상·리절트 효과는 재현하지 않으므로 저장한 스킨은 게임에서 확인하세요.", "Browser previews are illustrative layout and skin examples. They do not reproduce real chart data, videos or result effects; verify the saved skin in the game.", "ブラウザーのプレビューは配置とスキン編集用のサンプルです。実際の譜面データ・動画・リザルト効果は再現しないため、保存したスキンはゲームで確認してください。"],
+    graphicsDisplay: ["표시 모드", "Display", "表示モード"],
+    graphicsResolution: ["해상도", "Resolution", "解像度"],
+    graphicsRefreshHz: ["주사율", "Refresh Hz", "リフレッシュレート"],
+    graphicsPerformanceHud: ["성능 HUD", "Performance HUD", "性能 HUD"],
+    graphicsBga: ["BGA 표시", "BGA", "BGA 表示"],
+    graphicsBgaBrightness: ["BGA 밝기", "BGA Brightness", "BGA の明るさ"],
+    graphicsBgaBehindNotes: ["기어 뒤 BGA", "BGA Behind Notes", "ノート背面 BGA"],
+    graphicsBgaUpscaler: ["BGA 업스케일러", "BGA Upscaler", "BGA アップスケーラー"],
+    graphicsOnnxModel: ["ONNX / Safetensors", "ONNX / Safetensors", "ONNX / Safetensors"],
+    graphicsOnnxOutput: ["ONNX 출력 방식", "ONNX Output", "ONNX 出力方式"],
+    graphicsPreferLowPowerDirectX: ["저전력 DirectX (실험)", "Low-Power DirectX (Experimental)", "省電力 DirectX（実験）"],
+    graphicsCommonBga: ["범용 BGA", "Common BGA", "共通 BGA"],
+    graphicsCommonBgaFile: ["범용 BGA 영상", "Common BGA Video", "共通 BGA 動画"],
+    graphicsBack: ["뒤로", "Back", "戻る"],
     app: ['TenRiff 스킨 에디터', 'TenRiff Skin Editor', 'TenRiff スキンエディター'],
     fontBytes: ['글꼴 이름의 최대 UTF-8 바이트:', 'Maximum UTF-8 bytes for a font family:', 'フォント名の UTF-8 最大バイト数：'],
     offline: ['오프라인', 'Offline', 'オフライン'], inspector: ['속성 편집', 'Inspector', 'プロパティ編集'],
@@ -174,6 +190,7 @@
     required: ['필수 항목입니다.', 'Required field.', '必須項目です。'], type: ['올바른 타입:', 'Expected type:', '必要な型：'], constant: ['필요한 값:', 'Required value:', '必要な値：'], enum: ['허용 값:', 'Allowed values:', '使用可能な値：'], finite: ['유한한 숫자만 가능합니다.', 'Use a finite number.', '有限の数値を指定してください。'], minimum: ['최솟값:', 'Minimum:', '最小値：'], maximum: ['최댓값:', 'Maximum:', '最大値：'], exclusiveMinimum: ['이 값보다 커야 합니다:', 'Must be greater than:', 'この値より大きくしてください：'], minLength: ['최소 글자 수:', 'Minimum characters:', '最小文字数：'], maxLength: ['최대 글자 수:', 'Maximum characters:', '最大文字数：'], minItems: ['최소 항목 수:', 'Minimum items:', '最小項目数：'], maxItems: ['최대 항목 수:', 'Maximum items:', '最大項目数：'], pattern: ['형식이 맞지 않습니다:', 'Invalid format:', '形式が正しくありません：'], assetPath: ['폴더 밖 경로·URL은 금지입니다. PNG/JPG/BMP 상대 경로만 쓰세요.', 'Use a relative PNG/JPG/BMP path inside the skin folder; URLs and parent paths are not allowed.', 'スキン内の PNG/JPG/BMP 相対パスを指定してください。URL や親フォルダーへの参照は使えません。'], rectangle: ['오른쪽 > 왼쪽, 아래 > 위가 되어야 합니다.', 'Right must exceed left, and bottom must exceed top.', '右 > 左、下 > 上にしてください。'], unknown: ['알 수 없는 키를 보존합니다. 게임에서 무시될 수 있습니다.', 'Unknown key preserved. The game may ignore it.', '不明なキーを保持します。ゲームで無視される場合があります。'],
     start: ['플레이 시작', 'Start playing', 'プレイ開始'], library: ['곡 라이브러리', 'Song library', '楽曲ライブラリー'], collection: ['전체 곡', 'All songs', '全楽曲'], sampleSong: ['SAMPLE TRACK', 'SAMPLE TRACK', 'SAMPLE TRACK'], nativeMissing: ['Native 카탈로그가 없어 현재 JSON의 키만 표시합니다.', 'Native catalog unavailable; showing keys present in this JSON.', 'Native カタログがないため、現在の JSON にあるキーのみ表示します。']
   };
-  root.TenRiffI18n = {rows, languages: ['ko', 'en', 'ja'], text(key, language) { const row = rows[key]; return row ? row[{ko: 0, en: 1, ja: 2}[language] ?? 1] : key; }};
+  const graphicsRows = [{"id": "Display", "key": "graphicsDisplay"}, {"id": "Resolution", "key": "graphicsResolution"}, {"id": "RefreshHz", "key": "graphicsRefreshHz"}, {"id": "PerformanceHud", "key": "graphicsPerformanceHud"}, {"id": "Bga", "key": "graphicsBga"}, {"id": "BgaBrightness", "key": "graphicsBgaBrightness"}, {"id": "BgaBehindNotes", "key": "graphicsBgaBehindNotes"}, {"id": "BgaUpscaler", "key": "graphicsBgaUpscaler"}, {"id": "OnnxModel", "key": "graphicsOnnxModel"}, {"id": "OnnxOutput", "key": "graphicsOnnxOutput"}, {"id": "PreferLowPowerDirectX", "key": "graphicsPreferLowPowerDirectX"}, {"id": "CommonBga", "key": "graphicsCommonBga"}, {"id": "CommonBgaFile", "key": "graphicsCommonBgaFile"}, {"id": "Back", "key": "graphicsBack"}];
+  root.TenRiffI18n = {rows, graphicsRows, languages: ['ko', 'en', 'ja'], text(key, language) { const row = rows[key]; return row ? row[{ko: 0, en: 1, ja: 2}[language] ?? 1] : key; }};
   if (typeof module === 'object' && module.exports) module.exports = root.TenRiffI18n;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

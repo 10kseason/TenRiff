@@ -71,9 +71,12 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
             gameplay_hud_.background_overlay_path,
             gameplay_hud_.background_base_start_sample,
             gameplay_hud_.background_overlay_start_sample,
-            config_.graphics.background_upscale_mode);
+            config_.graphics.background_upscale_mode,
+            config_.graphics.common_bga_enabled,
+            config_.graphics.common_bga_path);
     target.bga_brightness = static_cast<float>(std::clamp(config_.graphics.bga_brightness_percent, 0, 100)) / 100.0f;
     target.background_base_path = background_policy.base_path;
+    target.background_base_loop = background_policy.loop_base_video;
     target.background_overlay_path = background_policy.overlay_path;
     target.background_base_start_sample = background_policy.base_start_sample;
     target.background_overlay_start_sample = background_policy.overlay_start_sample;

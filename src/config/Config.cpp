@@ -676,6 +676,10 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_number(*graphics, "bga_brightness_percent", config.graphics.bga_brightness_percent), 0.0, 100.0, 100.0));
         config.graphics.bga_enabled =
             get_bool(*graphics, "bga_enabled", config.graphics.bga_enabled);
+        config.graphics.common_bga_enabled =
+            get_bool(*graphics, "common_bga_enabled", config.graphics.common_bga_enabled);
+        config.graphics.common_bga_path =
+            get_string(*graphics, "common_bga_path", config.graphics.common_bga_path);
         config.graphics.background_upscale_mode = normalize_background_upscale_mode(
             get_string(*graphics,
                        "background_upscale_mode",
@@ -1248,6 +1252,8 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     graphics.emplace("performance_overlay", JsonValue{config.graphics.performance_overlay});
     graphics.emplace("bga_brightness_percent", JsonValue{static_cast<double>(std::clamp(config.graphics.bga_brightness_percent, 0, 100))});
     graphics.emplace("bga_enabled", JsonValue{config.graphics.bga_enabled});
+    graphics.emplace("common_bga_enabled", JsonValue{config.graphics.common_bga_enabled});
+    graphics.emplace("common_bga_path", JsonValue{config.graphics.common_bga_path});
     graphics.emplace("background_upscale_mode",
                      JsonValue{normalize_background_upscale_mode(
                          config.graphics.background_upscale_mode)});

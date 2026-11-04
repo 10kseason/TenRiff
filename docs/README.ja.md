@@ -1,3 +1,5 @@
+> **2026-11-04 · 1.9.9.9-hotfix1:** [OGG セキュリティ修正・共通 BGA・スキンエディター](release-1.9.9.9-hotfix1.ja.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
+
 > **2026-11-03 · 1.9.9.9:** [選曲・記録フィードバック・リザルト背景動画](release-1.9.9.9.ja.md). Fixed baseline **1.9.6**. Earlier candidate/release notices below are historical; Result uses the restored layout.
 
 > **2026-10-29 · 1.9.9.6:** [インジケーター・リザルトとライブラリー読み込み](release-1.9.9.6.ja.md). Fixed baseline: **1.9.6**. Earlier local/unpublished entries below are historical. [Verification](release-1.9.9.6-gate.md).

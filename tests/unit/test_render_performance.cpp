@@ -1619,3 +1619,33 @@ TEST_CASE("gauge width reaches gameplay preview for embedded and fullscreen layo
         }
     }
 }
+
+TEST_CASE("common BGA replaces both chart layers while BGA off wins") {
+    using tenriff::render::resolve_gameplay_background_policy;
+    const auto common = resolve_gameplay_background_policy(
+        true, "chart.mp4", "overlay.png", 100, 200, "onnx", true, "common.mp4");
+    CHECK(common.base_path == "common.mp4");
+    CHECK(common.overlay_path.empty());
+    CHECK(common.base_start_sample == 0);
+    CHECK(common.overlay_start_sample == 0);
+    CHECK(common.loop_base_video);
+    CHECK(common.upscale_mode == "onnx");
+    const auto without_chart = resolve_gameplay_background_policy(
+        true, "", "", 0, 0, "off", true, "common.mp4");
+    CHECK(without_chart.base_path == common.base_path);
+    const auto off = resolve_gameplay_background_policy(
+        false, "chart.mp4", "overlay.png", 100, 200, "onnx", true, "common.mp4");
+    CHECK(off.base_path.empty());
+    CHECK(off.overlay_path.empty());
+    CHECK_FALSE(off.loop_base_video);
+    CHECK(off.upscale_mode == "off");
+    const auto unset = resolve_gameplay_background_policy(
+        true, "chart.mp4", "overlay.png", 100, 200, "off", true, "");
+    CHECK(unset.base_path == "chart.mp4");
+    CHECK(unset.overlay_path == "overlay.png");
+    CHECK_FALSE(unset.loop_base_video);
+    const auto disabled = resolve_gameplay_background_policy(
+        true, "chart.mp4", "overlay.png", 100, 200, "off", false, "common.mp4");
+    CHECK(disabled.base_path == "chart.mp4");
+    CHECK(disabled.base_start_sample == 100);
+}

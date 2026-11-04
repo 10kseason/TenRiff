@@ -3578,6 +3578,7 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
 
     const auto process_video_layer = [&](const std::string& path,
                                          int64_t start_sample,
+                                         bool loop,
                                          BgaVideoDecoder* decoder,
                                          OnnxBackgroundUpscaler* upscaler,
                                          Microsoft::WRL::ComPtr<ID2D1Bitmap>& bitmap,
@@ -3593,7 +3594,7 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
         const double playback_rate = std::clamp(data.rate, 0.05, 4.0);
         const double position_seconds =
             std::max<int64_t>(0, data.current_sample - start_sample) / sample_rate * playback_rate;
-        decoder->request(path, position_seconds);
+        decoder->request(path, position_seconds, loop);
         if (const auto frame = decoder->take_ready();
             frame && frame->source_path == path && !frame->bgra.empty()) {
             if (upload_bgra(frame->width, frame->height, frame->bgra, bitmap)) {
@@ -3631,6 +3632,7 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
 
     process_video_layer(gameplay_background_cache_.base_path,
                         gameplay_background_cache_.base_start_sample,
+                        data.background_base_loop,
                         gameplay_base_video_decoder_.get(),
                         gameplay_background_upscaler_.get(),
                         d2d_->gameplay_background_base_bitmap,
@@ -3639,6 +3641,7 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
                         gameplay_background_cache_.base_is_upscaled);
     process_video_layer(gameplay_background_cache_.overlay_path,
                         gameplay_background_cache_.overlay_start_sample,
+                        false,
                         gameplay_overlay_video_decoder_.get(),
                         gameplay_overlay_background_upscaler_.get(),
                         d2d_->gameplay_background_overlay_bitmap,

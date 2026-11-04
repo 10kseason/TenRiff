@@ -1,5 +1,6 @@
 #include "ui/FunctionKeyLabels.h"
 #include "app/NativeFileDialog.h"
+#include "app/MenuAudioFileDialog.h"
 #include "app/MenuApp.h"
 
 #include <filesystem>
@@ -30,6 +31,53 @@ namespace tenriff::app {
 namespace {
 
 #ifdef _WIN32
+MenuAudioFileChoice pick_common_bga_dialog_utf8() {
+    // Menu audio owns an MTA apartment; reuse the request-scoped STA picker.
+    return run_menu_audio_picker_sta([] {
+        MenuAudioFileChoice result;
+        const auto failed = [&](HRESULT error) {
+            result.error = "Video file dialog failed (HRESULT " +
+                std::to_string(static_cast<unsigned long>(error)) + ").";
+            return result;
+        };
+        Microsoft::WRL::ComPtr<IFileOpenDialog> dialog;
+        HRESULT status = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER,
+                                          IID_PPV_ARGS(&dialog));
+        if (FAILED(status)) return failed(status);
+        DWORD options = 0;
+        status = dialog->GetOptions(&options);
+        if (FAILED(status)) return failed(status);
+        status = dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_FILEMUSTEXIST |
+                                   FOS_PATHMUSTEXIST | FOS_NOCHANGEDIR);
+        if (FAILED(status)) return failed(status);
+        const COMDLG_FILTERSPEC filters[] = {
+            {L"Video", L"*.mp4;*.m4v;*.mpg;*.mpeg;*.wmv;*.avi;*.mov;*.webm;*.mkv;*.flv"},
+        };
+        status = dialog->SetFileTypes(static_cast<UINT>(std::size(filters)), filters);
+        if (FAILED(status)) return failed(status);
+        status = dialog->SetTitle(L"Select common gameplay BGA video");
+        if (FAILED(status)) return failed(status);
+        status = show_native_file_dialog(dialog.Get());
+        if (status == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
+            result.cancelled = true;
+            return result;
+        }
+        if (FAILED(status)) return failed(status);
+        Microsoft::WRL::ComPtr<IShellItem> item;
+        status = dialog->GetResult(&item);
+        if (FAILED(status) || !item) return failed(FAILED(status) ? status : E_FAIL);
+        struct ShellPath { PWSTR value = nullptr; ~ShellPath() { CoTaskMemFree(value); } } raw;
+        status = item->GetDisplayName(SIGDN_FILESYSPATH, &raw.value);
+        if (FAILED(status) || !raw.value) return failed(FAILED(status) ? status : E_FAIL);
+        result.path = std::filesystem::path(raw.value).u8string();
+        if (!render::BgaVideoDecoder::is_supported_video_path(result.path)) {
+            result.path.clear();
+            result.error = "Unsupported video extension.";
+        }
+        return result;
+    });
+}
+
 std::optional<std::string> pick_onnx_model_dialog_utf8() {
     const NativeFileDialogApartment apartment;
     if (FAILED(apartment.result())) return std::nullopt;
@@ -125,6 +173,15 @@ void MenuApp::apply_graphics_settings_effects(
     }
 
     auto effects = requested_effects;
+    if (effects.choose_common_bga) {
+#ifdef _WIN32
+        const auto selected = pick_common_bga_dialog_utf8();
+        common_bga_picker_failed_ = !selected.error.empty();
+        if (!selected.path.empty()) {
+            effects.merge(graphics_settings_controller_.set_common_bga_path(config_, selected.path));
+        }
+#endif
+    }
     bool model_selection_allows_confirmation = true;
     if (effects.choose_onnx_model) {
 #ifdef _WIN32
@@ -263,6 +320,9 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
         render.generic.rows.push_back(std::move(row));
     }
     render.generic.notes = std::move(view.notes);
+    if (common_bga_picker_failed_) render.generic.notes.insert(render.generic.notes.begin(), ui_text(
+        "Video selection failed. Try selecting a supported video again.",
+        "영상 선택에 실패했습니다. 지원되는 영상을 다시 선택하세요."));
     for (auto& note : render.generic.notes) note = ui::function_key_labels(note, config::function_key_labels(config_.ui));
     if (!graphics_resolution_status_.empty()) render.generic.notes.insert(render.generic.notes.begin(), graphics_resolution_status_);
     if (graphics_settings_controller_.editing_resolution()) {
