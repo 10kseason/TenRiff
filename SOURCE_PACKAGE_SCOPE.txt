@@ -1,3 +1,9 @@
+TenRiff 1.9.9.9-hotfix1 source package — 2026-11-04
+
+Current scope: scoped stb_vorbis header/cleanup security fixes, optional Common BGA and the bundled offline skin editor update. See docs/release-1.9.9.9-hotfix1.en.md and docs/release-1.9.9.9-hotfix1-gate.md. Fixed baseline remains 1.9.6; existing R13/R14 compatibility is preserved.
+
+The earlier release-specific descriptions below are historical. The inclusion/privacy rules remain applicable; this package adds synthetic OGG regression fixtures and no user media, profiles, logs or external BGA model weights.
+
 TenRiff 1.9.8.5 source scope
 
 Release scope: BGA playback/layer transparency, filtered song-list wrapping and Library/clear labels, outward decimal timing, Esc binding rejection, native scratch-free 7K and latest secondary-key ownership. Based on published 1.9.8 with its skin X/Y/divider brightness and all 1.9.7 behavior retained. Fixed timing/grades and historical rulesets remain; down/down/up traces require the updated replay verifier, while old native8 and explicit conversion/peer v7 retain legacy source mapping. Only the release page determines publication. See docs/release-1.9.8.5.en.md and docs/release-1.9.8.5-gate.md.
