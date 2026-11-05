@@ -17,6 +17,7 @@ std::string to_string(Nk2Preset preset) {
         case Nk2Preset::Transform: return "transform";
         case Nk2Preset::Remaster: return "remaster";
         case Nk2Preset::SourceLnE: return "source_ln_e_v1";
+        case Nk2Preset::FullFieldTapsEPlus: return "fullfield_taps_eplus_v1";
         case Nk2Preset::Native: break;
     }
     return "native";
@@ -100,6 +101,8 @@ std::optional<Nk2Preset> parse_nk2_preset(std::string_view token) {
         return Nk2Preset::Native;
     }
     if (normalized == "E" || normalized == "SOURCE_LN_E_V1") return Nk2Preset::SourceLnE;
+    if (normalized == "E+" || normalized == "EPLUS" || normalized == "FULLFIELD_TAPS_EPLUS_V1")
+        return Nk2Preset::FullFieldTapsEPlus;
     if (normalized == "TRANSFORM" || normalized == "TRANSFORM35") {
         return Nk2Preset::Transform;
     }

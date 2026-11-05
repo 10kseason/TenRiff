@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.9.9.9 DESCRIPTION "TenRiff 1.9.9.9 hot fix 1" LANGUAGES C CXX)
+project(TenRiff VERSION 1.9.9.9 DESCRIPTION "TenRiff 1.9.9.9 hot fix 2" LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -157,6 +157,14 @@ add_library(tenriff_nk2_e
 target_include_directories(tenriff_nk2_e PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_features(tenriff_nk2_e PRIVATE cxx_std_20)
 
+# E+ is opt-in; its new upstream engine must not alter E or older replay output.
+add_library(tenriff_nk2_eplus
+    nk2eplus/intent_graph.cpp nk2eplus/layout_model.cpp nk2eplus/nk2_convert.cpp
+    nk2eplus/nk2_report.cpp nk2eplus/safety_audit.cpp
+    nk2eplus/e_fullfield.cpp nk2eplus/e_tap_boost.cpp)
+target_include_directories(tenriff_nk2_eplus PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_features(tenriff_nk2_eplus PRIVATE cxx_std_20)
+
 add_library(tenriff_core
     src/ui/Localization.cpp
     src/config/SimpleJson.cpp
@@ -170,6 +178,7 @@ add_library(tenriff_core
     src/gameplay/KeyModeConverter.cpp
     src/gameplay/Nk2KeyModeAdapter.cpp
     src/gameplay/Nk2EKeyModeAdapter.cpp
+    src/gameplay/Nk2EPlusKeyModeAdapter.cpp
     src/gameplay/Nk3OnnxKeyModeAdapter.cpp
     src/gameplay/ModeApplier.cpp
     src/gameplay/ModeSettings.cpp
@@ -229,6 +238,7 @@ target_link_libraries(tenriff_core
     PUBLIC
         tenriff_nk2
         tenriff_nk2_e
+        tenriff_nk2_eplus
         tenriff_chart
         tenriff_game
         tenriff_runtime
@@ -262,6 +272,7 @@ if(TENRIFF_BUILD_STANDALONE_BMS_KEY_CONVERTER)
         src/gameplay/KeyModeConverter.cpp
         src/gameplay/Nk2KeyModeAdapter.cpp
     src/gameplay/Nk2EKeyModeAdapter.cpp
+    src/gameplay/Nk2EPlusKeyModeAdapter.cpp
         src/gameplay/Nk3OnnxKeyModeAdapter.cpp
     )
 
@@ -271,7 +282,7 @@ if(TENRIFF_BUILD_STANDALONE_BMS_KEY_CONVERTER)
     )
 
     target_compile_features(tenriff_bms_key_converter_core PUBLIC cxx_std_17)
-    target_link_libraries(tenriff_bms_key_converter_core PUBLIC tenriff_nk2 tenriff_nk2_e)
+    target_link_libraries(tenriff_bms_key_converter_core PUBLIC tenriff_nk2 tenriff_nk2_e tenriff_nk2_eplus)
 
     if(TENRIFF_NK3_ONNX_AVAILABLE)
         target_compile_definitions(tenriff_bms_key_converter_core PRIVATE TENRIFF_ENABLE_NK3_ONNX=1)
@@ -827,6 +838,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_simple_json.cpp
         tests/unit/test_mode_applier.cpp
         tests/unit/test_nk2_e.cpp
+        tests/unit/test_nk2_eplus.cpp
         tests/unit/test_mode_manager.cpp
         tests/unit/test_gameplay_engine.cpp
         tests/unit/test_judgement_boundary_audit.cpp

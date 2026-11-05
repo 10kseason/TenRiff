@@ -260,3 +260,11 @@ Key Note Overlay integration (`third_party/key_note_overlay/`)
 - Copyright (c) 2026 something-ai
 - License: MIT; full text in `third_party/key_note_overlay/LICENSE`.
 - Only the platform-independent difficulty/strain/rank core and calibration tables are included. TenRiff owns the input adapter and rendering. No global hook, tray, process-memory reader or external application is bundled.
+
+## KeyWeaver E+ (isolated 1.4.0 engine)
+
+- Upstream: https://github.com/10kseason/key-weaver
+- Commit: `fb15fb2e44c3c14450e36877d4df96a865bb5553` (tag `1.4.0`)
+- License: MIT; see `nk2eplus/LICENSE` in source or `third_party/keyweaver-eplus/LICENSE` in the binary package.
+- Adaptation: namespace/include paths only, with LF normalization; source/import hashes are in `nk2eplus/provenance.json`.
+- Historical NK2 and E engines remain separate to preserve existing conversion/replay behavior.

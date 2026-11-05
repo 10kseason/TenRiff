@@ -3,7 +3,7 @@ param(
     [string]$BuildReleaseDirectory,
     [Parameter(Mandatory = $true)]
     [string]$OutputDirectory,
-    [string]$Version = "1.9.9.9-hotfix1",
+    [string]$Version = "1.9.9.9-hotfix2",
     [switch]$BinaryOnly
 )
 
@@ -116,6 +116,11 @@ New-Item -ItemType Directory -Path $vorbisNoticeDirectory -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repoRoot "external\stb_vorbis.TENRIFF.md") -Destination $vorbisNoticeDirectory
 New-Item -ItemType Directory -Path $keyweaverNoticeDirectory -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repoRoot "nk2e\LICENSE") -Destination $keyweaverNoticeDirectory
+$keyweaverPlusNoticeDirectory = Join-Path $binaryRoot "third_party\keyweaver-eplus"
+New-Item -ItemType Directory -Path $keyweaverPlusNoticeDirectory -Force | Out-Null
+foreach ($notice in @("LICENSE", "README.md", "provenance.json")) {
+    Copy-Item -LiteralPath (Join-Path $repoRoot "nk2eplus\$notice") -Destination $keyweaverPlusNoticeDirectory
+}
 $keyOverlayNoticeDirectory = Join-Path $binaryRoot "third_party\key_note_overlay"
 New-Item -ItemType Directory -Path $keyOverlayNoticeDirectory -Force | Out-Null
 foreach ($notice in @("LICENSE", "README.md", "provenance.json")) {

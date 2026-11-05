@@ -96,7 +96,7 @@ struct MenuAppVisualTestAccess {
     }
     static void populate_inner_settings(render::MenuRenderData& source, bool graphics, int selected,
                                          bool edit_resolution = false, bool invalid_resolution = false,
-                                         bool mods = false, std::string_view judge_window = "normal") {
+                                         bool mods = false, std::string_view judge_window = "normal", int eplus_keys = 0) {
         auto app = std::make_unique<MenuApp>();
         app->config_.ui.language = ui::language_token(source.ui_language);
         source.generic.rows.clear();
@@ -126,6 +126,11 @@ struct MenuAppVisualTestAccess {
             app->populate_mode_mods_render_data(source);
         } else {
             app->settings_cursor_ = std::max(0, selected);
+            if (eplus_keys == 8 || eplus_keys == 10) {
+                app->config_.mode.key_mode = std::to_string(eplus_keys) + "k";
+                app->config_.mode.key_conversion_algorithm = "nk2";
+                app->config_.mode.key_conversion_nk2_preset = "fullfield_taps_eplus_v1";
+            }
             app->populate_mode_settings_render_data(source);
         }
     }
@@ -1373,6 +1378,7 @@ int main(int argc, char** argv) {
     bool settings = false;
     bool filter_settings = false;
     bool mode_settings = false;
+    bool nk2_eplus = false;
     bool mode_mods_settings = false;
     std::string judge_window = "normal";
     bool graphics_settings = false;
@@ -1542,6 +1548,7 @@ int main(int argc, char** argv) {
         if (arg=="--session-mix") { session_mix=true; continue; }
         if (arg=="--session-mix-missing") { session_mix=session_mix_missing=true; continue; }
         if (arg=="--session-mix-stage-offset" && i+1<argc) { session_mix_stage_offset=std::max(0,std::stoi(argv[++i])); continue; }
+        if (arg == "--nk2-eplus") { settings = mode_settings = nk2_eplus = true; continue; }
         if (arg == "--language" && i + 1 < argc) { data.ui_language = tenriff::ui::language_from_token(argv[++i]); continue; }
         if (arg == "--bga-brightness" && i + 1 < argc) { bga_brightness_percent = std::clamp(std::stoi(argv[++i]), 0, 100); continue; }
         if (arg == "--play-mode") { mode_selection = true; sites_account = true; continue; }
@@ -1878,7 +1885,8 @@ int main(int argc, char** argv) {
                                graphics_settings ? loc("Graphics Settings", "그래픽 설정")
                                                 : loc("Game Mode Settings", "게임 모드 설정");
         tenriff::app::MenuAppVisualTestAccess::populate_inner_settings(data, graphics_settings, selected_setting,
-            edit_resolution, invalid_resolution, mode_mods_settings, judge_window);
+            edit_resolution, invalid_resolution, mode_mods_settings, judge_window,
+            nk2_eplus ? preview_keys : 0);
     }
     if (keymap_settings) {
         using namespace tenriff::app::menu::settings;

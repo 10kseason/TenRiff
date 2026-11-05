@@ -3131,32 +3131,36 @@ void separate_timing_flow(tenriff::app::CommandLineOptions options, Report& repo
         ghost->shutdown();
     }
     const auto original_mode = config.mode;
-    config.mode.key_mode = "16K";
+    for (const auto& [target, preset] : std::array<std::pair<int,const char*>,3>{{
+            {16,"source_ln_e_v1"}, {8,"fullfield_taps_eplus_v1"}, {10,"fullfield_taps_eplus_v1"}}}) {
+    config.mode.key_mode = std::to_string(target) + "K";
     config.mode.key_conversion_algorithm = "nk2";
-    config.mode.key_conversion_nk2_preset = "source_ln_e_v1";
+    config.mode.key_conversion_nk2_preset = preset;
+    const std::string check_prefix = target == 16 ? "e_" : "eplus_" + std::to_string(target) + "_";
     for (const char* random : {"off", "mirror", "sr"}) {
         config.mode.random = random;
         if (!loader.save_profile(profile, app::build_persisted_runtime_config(config)))
             throw std::runtime_error("Cannot seed NK2 E ghost profile");
         auto fixture = *replay.replay;
-        fixture.mode.key_mode = "16K";
+        fixture.mode.key_mode = std::to_string(target) + "K";
         fixture.mode.key_conversion_algorithm = "nk2";
-        fixture.mode.key_conversion_nk2_preset = "source_ln_e_v1";
+        fixture.mode.key_conversion_nk2_preset = preset;
         // This fixture isolates initialize() compatibility, not ghost scoring.
-        fixture.trace.lane_count = 16;
+        fixture.trace.lane_count = target;
         fixture.mode.random = random;
-        const auto path = std::filesystem::absolute(std::string("timing-fixture/seed-e-") + random + ".json").u8string();
-        report.check(std::string("seed_ghost.e_fixture_") + random, gameplay::save_replay_json(path, fixture).success());
+        const auto path = std::filesystem::absolute(std::string("timing-fixture/seed-") + check_prefix + random + ".json").u8string();
+        report.check(std::string("seed_ghost.") + check_prefix + "fixture_" + random, gameplay::save_replay_json(path, fixture).success());
         auto ghost_options = options;
         ghost_options.ghost_replay_path = path;
         auto ghost = std::make_unique<app::GameSession>();
         const bool initialized = ghost->initialize(ghost_options);
-        report.check(std::string("seed_ghost.e_compatibility_") + random, initialized &&
-            SessionAccess::chart_lanes(*ghost) == 16 &&
+        report.check(std::string("seed_ghost.") + check_prefix + "compatibility_" + random, initialized &&
+            SessionAccess::chart_lanes(*ghost) == target &&
             fixture.mode.random_seed.has_value() &&
             SessionAccess::mode_seed(*ghost) != static_cast<uint32_t>(*fixture.mode.random_seed) &&
             SessionAccess::timing_state(*ghost, 2, std::string(random) != "sr"));
         ghost->shutdown();
+    }
     }
     config.mode = original_mode;
     config.mode.random = "off";

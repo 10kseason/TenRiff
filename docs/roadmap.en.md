@@ -1,3 +1,5 @@
+> **2026-11-05 · 1.9.9.9-hotfix2:** [NK2 E+ preset for 8K and 10K](release-1.9.9.9-hotfix2.en.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
+
 > **2026-11-04 · 1.9.9.9-hotfix1:** [OGG security, Common BGA and skin editor](release-1.9.9.9-hotfix1.en.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 
 > **2026-11-03 · 1.9.9.9:** [Song Select, record feedback and Result video background](release-1.9.9.9.en.md). Fixed baseline **1.9.6**. Earlier candidate/release notices below are historical; Result uses the restored layout.

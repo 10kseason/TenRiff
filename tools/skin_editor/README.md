@@ -1,4 +1,4 @@
-# TenRiff Skin Editor — 1.9.9.9 hot fix 1
+# TenRiff Skin Editor — 1.9.9.9 hot fix 2
 
 모든 곡에 같은 BGA를 쓰려면 게임의 옵션 > 그래픽에서 범용 BGA 영상을 선택하고 범용 BGA를 켜세요. BGA 표시도 켜져 있어야 합니다. 이 설정은 게임 프로필에 저장되며 skin.json에는 저장하지 않습니다.
 
