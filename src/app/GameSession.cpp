@@ -124,6 +124,8 @@ std::string normalize_nk2_preset_local(std::string value) {
         return static_cast<char>(std::tolower(ch));
     });
     if (value == "e" || value == "source_ln_e_v1") return "source_ln_e_v1";
+    if (value == "e+" || value == "eplus" || value == "fullfield_taps_eplus_v1")
+        return "fullfield_taps_eplus_v1";
     if (value == "transform" || value == "transform35") {
         return "transform";
     }

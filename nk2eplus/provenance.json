@@ -1,0 +1,116 @@
+{
+  "repository": "https://github.com/10kseason/key-weaver",
+  "tag": "1.4.0",
+  "commit": "fb15fb2e44c3c14450e36877d4df96a865bb5553",
+  "adaptation": "Only keyconv namespace changed to keyweaver_eplus, include paths localized, and line endings normalized to LF.",
+  "files": [
+    {
+      "upstream": "src/nk2/e_fullfield.cpp",
+      "file": "e_fullfield.cpp",
+      "upstream_sha256": "c633ab08777aae780b344046f4011baa404b87e2b137eeeaa28f74a451b9be36",
+      "imported_sha256": "aa70e2fb1adf723a8556376ef68720ea6c17186b5f36ac875c6e661809f0c371"
+    },
+    {
+      "upstream": "src/nk2/e_fullfield.hpp",
+      "file": "e_fullfield.hpp",
+      "upstream_sha256": "403ce4630716cd087519acedb870517dc9bfc5f347c3cf299bf7873e412ce69a",
+      "imported_sha256": "007cff0de3e43fc8652c192b486c5bad5532d45acf6c99fcb25e36412c809125"
+    },
+    {
+      "upstream": "src/nk2/e_tap_boost.cpp",
+      "file": "e_tap_boost.cpp",
+      "upstream_sha256": "8fff5e3943e357b74625d1298bff807cb0eda41103b9eaea6886e1334507b349",
+      "imported_sha256": "2e22a20ef4b38d52d0d4ea4099b4228470f3d541efd67ccb84b14ffad99e2c24"
+    },
+    {
+      "upstream": "src/nk2/e_tap_boost.hpp",
+      "file": "e_tap_boost.hpp",
+      "upstream_sha256": "c66c0994a0c9c209551d728cc13378ad357990f4d36210325e12d6b35e95abb1",
+      "imported_sha256": "a96fa41b903a3da0d8827a5dd15fa1a53ba3fc8f2b51b6811ab33889bffcdbbd"
+    },
+    {
+      "upstream": "src/nk2/intent_graph.cpp",
+      "file": "intent_graph.cpp",
+      "upstream_sha256": "1dbd1862b06d7a562ba862e5ba5c34c625881125dd4e7dae5ac21e8ac9a01de6",
+      "imported_sha256": "d55cf7013426e797ea9bb025c469e19dd04617f1a779b54d892a06cc5482c6e9"
+    },
+    {
+      "upstream": "src/nk2/intent_graph.hpp",
+      "file": "intent_graph.hpp",
+      "upstream_sha256": "d2b5846500528305100ddfaa02fda12fbcd6867e4d1f8d8015270aa5ad7cfe7c",
+      "imported_sha256": "e1aa14e8ee18537964284ecfbfb0bbeeb54b832308efe0e4ffd282b34e8213fd"
+    },
+    {
+      "upstream": "src/nk2/layout_model.cpp",
+      "file": "layout_model.cpp",
+      "upstream_sha256": "94408970882caca875f669b060576906f6adae10729a16f12d0a80b8b5736088",
+      "imported_sha256": "0e92a96b579978d46d984369fda57e6518d27c4bee00f9751013ad1e452d2720"
+    },
+    {
+      "upstream": "src/nk2/layout_model.hpp",
+      "file": "layout_model.hpp",
+      "upstream_sha256": "468c48bde7faf7ed532750101178e6b646e33ae22c55b005e25fc1f4667d3074",
+      "imported_sha256": "f853a31db072c82027adf4e6fd6bd7898bcf75ca511e63863712de5c6d4c7b49"
+    },
+    {
+      "upstream": "src/nk2/nk2_convert.cpp",
+      "file": "nk2_convert.cpp",
+      "upstream_sha256": "daa334e1bf54685591f57b9819ccb2be9bc3e3a5fa2e640b6aa1a8b92ce08fc3",
+      "imported_sha256": "0226229098462893f5108ca4f367ff82e9b242055878faaf31677cface7d924f"
+    },
+    {
+      "upstream": "src/nk2/nk2_convert.hpp",
+      "file": "nk2_convert.hpp",
+      "upstream_sha256": "8cfe344d355ac9fda08dcb986613cb2dc83aa182065103deeb5b48e2aa0d314c",
+      "imported_sha256": "46e392450ca71bf892e3f74b7f36680e8052110b8adfae2c5e285f0b1d90ca8f"
+    },
+    {
+      "upstream": "src/nk2/nk2_report.cpp",
+      "file": "nk2_report.cpp",
+      "upstream_sha256": "54284cf5deddda82bc0b8208207e35b0b2f9983044e9df25369fd329bdf9fefd",
+      "imported_sha256": "9d1a7c636b26d0ed9fb30725615484dd74e515f9eb6c44c4a869fa6269b272dd"
+    },
+    {
+      "upstream": "src/nk2/nk2_report.hpp",
+      "file": "nk2_report.hpp",
+      "upstream_sha256": "c38f1766195a3fc8bb6f8b73bb003cc438f7881f23f9e44ad10272ca6b8e8159",
+      "imported_sha256": "d2a7f49fb83c46f5cf54634869662ab8d311af8b4c4af435c209964463b0f17e"
+    },
+    {
+      "upstream": "src/nk2/safety_audit.cpp",
+      "file": "safety_audit.cpp",
+      "upstream_sha256": "60052880167d865d0ea469f5b78bb56a8af6b15308b15b5a6c4693153215ba81",
+      "imported_sha256": "ef54c45bd5be66ee6ae918c1515ebbbf7ec323b32160ffb9c1f70906f2dba662"
+    },
+    {
+      "upstream": "src/nk2/safety_audit.hpp",
+      "file": "safety_audit.hpp",
+      "upstream_sha256": "4dfea98219e709469e23f6c5b0caeae7cc8b1fa034e5682bfdef24d09fa76fec",
+      "imported_sha256": "994b920412ce5e905009323412258533e1765a0577cfaa24b23b7905fc52706b"
+    },
+    {
+      "upstream": "include/keyconv/chart.hpp",
+      "file": "chart.hpp",
+      "upstream_sha256": "a7671113897c38d1fbe5f9c7891b7830a86a2c661e068c8c0a03916298ab3850",
+      "imported_sha256": "864f54b75056aba8df2fe4f5a7d1cf27598bfe148eeba6b78e591c528b42ce42"
+    },
+    {
+      "upstream": "include/keyconv/note.hpp",
+      "file": "note.hpp",
+      "upstream_sha256": "47700af28310d8fc6ca929127bf5da60e72b3bfadb20060d346353d45a49f17b",
+      "imported_sha256": "53628bb4a8505501cae9cdb3b93a2d9215fa6a54785d3e6cad985feee5bd2589"
+    },
+    {
+      "upstream": "include/keyconv/timing.hpp",
+      "file": "timing.hpp",
+      "upstream_sha256": "9dde0340bfc522626e95876f550bc990228379ab6ca61c6a6890278b595f06e3",
+      "imported_sha256": "36b9701563e907d2bad7695848d6446c5ca93705b3fa1dcc2721dbb39a94a742"
+    },
+    {
+      "upstream": "LICENSE",
+      "file": "LICENSE",
+      "upstream_sha256": "0f34803c21871a40570b17a2c6bc924e486a72ab6b4d43eae740ca3dee032941",
+      "imported_sha256": "0f34803c21871a40570b17a2c6bc924e486a72ab6b4d43eae740ca3dee032941"
+    }
+  ]
+}

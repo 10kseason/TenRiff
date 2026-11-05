@@ -565,16 +565,18 @@ ModeApplyResult apply_mode_settings(const GameplayChart& chart,
     if (target_count > 0) {
         const bool nk3_remaster =
             settings.key_conversion_algorithm == KeyModeConversionAlgorithm::NK3;
-        if (target_count == conversion_source->lane_count && !nk3_remaster) {
+        const bool nk2_eplus = settings.key_conversion_algorithm == KeyModeConversionAlgorithm::NK2 &&
+            settings.key_conversion_nk2_preset == Nk2Preset::FullFieldTapsEPlus;
+        if (target_count == conversion_source->lane_count && !nk3_remaster && !nk2_eplus) {
             result.chart = *conversion_source;
             conversion_succeeded = true;
         } else {
             const bool grouped_applicable =
                 effective_group_size(*conversion_source) > 0 && target_count % 2 == 0 &&
-                // E searches the complete target field; per-hand targets such as
+                // E/E+ search the complete target field; per-hand targets such as
                 // 2K/3K would be outside its supported menu modes and alter budgets.
                 !(settings.key_conversion_algorithm == KeyModeConversionAlgorithm::NK2 &&
-                  settings.key_conversion_nk2_preset == Nk2Preset::SourceLnE);
+                  is_source_ln_preset(settings.key_conversion_nk2_preset));
             if (grouped_applicable) {
                 GameplayChart grouped_chart;
                 if (convert_grouped_chart(*conversion_source,
@@ -616,9 +618,9 @@ ModeApplyResult apply_mode_settings(const GameplayChart& chart,
                 result.warnings.push_back(
                     "Scratch-aware key conversion could not remap the key lanes; the native scratch layout was kept.");
             } else if (settings.key_conversion_algorithm == KeyModeConversionAlgorithm::NK2 &&
-                       settings.key_conversion_nk2_preset == Nk2Preset::SourceLnE) {
+                       is_source_ln_preset(settings.key_conversion_nk2_preset)) {
                 result.chart = chart;
-                result.warnings.push_back("NK2 E could not safely convert; the native layout was kept.");
+                result.warnings.push_back("NK2 E/E+ could not safely convert; the native layout was kept.");
             } else {
                 apply_legacy_key_mode_fallback(result.chart, target_count, result.warnings);
             }

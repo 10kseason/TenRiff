@@ -215,6 +215,11 @@ ModeSettingsEffects ModeSettingsController::apply_selected_action(
         case ModeSettingId::KeyMode:
             runtime.mode.key_mode = cycle_runtime_key_mode(
                 runtime.mode.key_mode, direction, true);
+            // E+ has no meaning outside its two explicit targets. Keep the
+            // historical E as the menu fallback instead of silently playing E+.
+            if (normalize_key_conversion_nk2_preset(runtime.mode.key_conversion_nk2_preset) == "fullfield_taps_eplus_v1" &&
+                runtime.mode.key_mode != "8k" && runtime.mode.key_mode != "10k")
+                runtime.mode.key_conversion_nk2_preset = "source_ln_e_v1";
             return mark_changed();
         case ModeSettingId::KeyConverter:
             runtime.mode.key_conversion_algorithm = cycle_key_conversion_algorithm(
@@ -224,7 +229,9 @@ ModeSettingsEffects ModeSettingsController::apply_selected_action(
             if (normalize_key_conversion_algorithm(runtime.mode.key_conversion_algorithm) !=
                 "nk2") return {};
             runtime.mode.key_conversion_nk2_preset = cycle_key_conversion_nk2_preset(
-                runtime.mode.key_conversion_nk2_preset);
+                runtime.mode.key_conversion_nk2_preset,
+                normalize_runtime_key_mode(runtime.mode.key_mode) == "8k" ||
+                normalize_runtime_key_mode(runtime.mode.key_mode) == "10k");
             return mark_changed();
         case ModeSettingId::Gauge:
             runtime.mode.gauge = cycle_gauge_mode(runtime.mode.gauge, direction);

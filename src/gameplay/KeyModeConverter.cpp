@@ -5,6 +5,7 @@
 #include "gameplay/KeyModeConverter.h"
 #include "gameplay/Nk2KeyModeAdapter.h"
 #include "gameplay/Nk2EKeyModeAdapter.h"
+#include "gameplay/Nk2EPlusKeyModeAdapter.h"
 #include "gameplay/Nk3OnnxKeyModeAdapter.h"
 
 #include <algorithm>
@@ -1331,6 +1332,8 @@ struct OverlapResolutionStats {
 }  // namespace
 
 static KeyModeConverterResult convert_key_mode_chart_impl(const GameplayChart& chart, const KeyModeConverterOptions& options) {
+    if (options.algorithm == KeyModeConversionAlgorithm::NK2 && options.nk2_preset == Nk2Preset::FullFieldTapsEPlus)
+        return convert_key_mode_chart_nk2_eplus(chart, options);
     if (options.algorithm == KeyModeConversionAlgorithm::NK2 && options.nk2_preset == Nk2Preset::SourceLnE) {
         return convert_key_mode_chart_nk2_e(chart, options);
     }
@@ -1477,11 +1480,11 @@ KeyModeConverterResult convert_key_mode_chart(const GameplayChart& chart, const 
     for (std::size_t i = 0; i < indexed.notes.size(); ++i) indexed.notes[i].note_id = i;
     auto result = convert_key_mode_chart_impl(indexed, options);
     std::size_t next_generated_id = chart.notes.size();
-    if (options.algorithm == KeyModeConversionAlgorithm::NK2 && options.nk2_preset == Nk2Preset::SourceLnE)
+    if (options.algorithm == KeyModeConversionAlgorithm::NK2 && is_source_ln_preset(options.nk2_preset))
         for (const auto& note : chart.notes) next_generated_id = std::max(next_generated_id, note.note_id + 1);
     for (auto& note : result.chart.notes) {
         if (note.note_id < chart.notes.size()) note.note_id = chart.notes[note.note_id].note_id;
-        else if (options.algorithm == KeyModeConversionAlgorithm::NK2 && options.nk2_preset == Nk2Preset::SourceLnE)
+        else if (options.algorithm == KeyModeConversionAlgorithm::NK2 && is_source_ln_preset(options.nk2_preset))
             note.note_id = next_generated_id++;
     }
     if (result.converted) preserve_chart_keysounds(chart, result.chart);

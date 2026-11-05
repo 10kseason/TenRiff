@@ -1,3 +1,10 @@
+# 1.9.9.9-hotfix2 — 2026-11-05
+
+- Add explicit NK2 **E+ - Full-field + taps** for 8K/10K, including equal-key remix, using isolated KeyWeaver 1.4.0 code.
+- Preserve original timing, LN semantics and audio, keep generated notes silent, and retain the source chart on failed safety validation.
+- Persist a separate E+ identity across profiles/replays/BEST/ghost/online payloads. Existing engines, defaults and R13/R14 rules remain unchanged.
+- Retain hotfix1 OGG security/Common BGA and fixed baseline 1.9.6. [Usage](docs/release-1.9.9.9-hotfix2.en.md) · [Validation](docs/release-1.9.9.9-hotfix2-gate.md).
+
 # 1.9.9.9-hotfix1 — 2026-11-04
 
 - Backport five stb_vorbis upstream fixes plus local EOF/ownership checks; cover both Windows probe/decode, truncated headers and allocation-failure cleanup.

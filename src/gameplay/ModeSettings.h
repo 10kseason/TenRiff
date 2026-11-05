@@ -19,7 +19,12 @@ enum class Nk2Preset {
     // 65% support budget aimed at keeping the source placement readable.
     Remaster,
     SourceLnE,  // KeyWeaver 1.3.0 E, isolated from historical presets.
+    FullFieldTapsEPlus,  // KeyWeaver 1.4.0 E+, explicit 8K/10K only.
 };
+
+constexpr bool is_source_ln_preset(Nk2Preset preset) {
+    return preset == Nk2Preset::SourceLnE || preset == Nk2Preset::FullFieldTapsEPlus;
+}
 
 enum class KeyMode {
     Auto,

@@ -363,6 +363,11 @@ struct MenuAppVisualTestAccess {
         app.publish_snapshot();
     }
     static void check_browser_sort_and_range(MenuApp& app, Report& report) {
+        // The earlier picker probe snapshots real held keys. The search probe
+        // restores that fence afterward, so isolate this synthetic keyboard
+        // sequence too; the production close-key guard must remain effective.
+        const auto saved_dialog_holds = app.native_dialog_held_keys_;
+        app.native_dialog_held_keys_.clear();
         const auto saved_songs = app.indexed_songs_;
         const auto saved_ui = app.config_.ui;
         const auto saved_sort = app.song_sort_mode_;
@@ -410,6 +415,24 @@ struct MenuAppVisualTestAccess {
         const auto range = std::find_if(view.generic.rows.begin(), view.generic.rows.end(), [](const auto& row) { return row.row_index == 3; });
         report.check("filter.range_is_one_row_two_endpoints", view.generic.rows.size() == 11 &&
             range != view.generic.rows.end() && range->secondary_row_index == 4 && !range->secondary_value.empty());
+        // Reproduce the one-edge suppression explicitly, without depending on
+        // which desktop key happened to be held during the native picker test.
+        for (const bool upward : {false, true}) {
+            const auto code = upward ? app.key_up_ : app.key_right_;
+            const char* name = upward ? "Up" : "Right";
+            const std::string prefix = upward ? "filter.guard_up" : "filter.guard_right";
+            app.settings_cursor_ = upward ? 5 : 3;
+            app.song_level_min_filter_ = app.song_level_max_filter_ = 0;
+            app.native_dialog_held_keys_.insert(code);
+            key(app, name);
+            report.check(prefix + ".blocks_first_press_until_release",
+                app.settings_cursor_ == (upward ? 5 : 3) && app.song_level_min_filter_ == 0 &&
+                app.native_dialog_held_keys_.count(code) == 0);
+            key(app, name);
+            report.check(prefix + ".accepts_next_press",
+                app.settings_cursor_ == 3 && app.song_level_min_filter_ == (upward ? 0 : 1));
+        }
+        app.song_level_min_filter_ = app.song_level_max_filter_ = 0;
         click(app, Kind::SettingsRow, 3, Part::SelectOnly);
         key(app, "Right");
         report.check("filter.minimum_keyboard_adjust", app.song_level_min_filter_ == 1 && app.song_level_max_filter_ == 0);
@@ -435,6 +458,7 @@ struct MenuAppVisualTestAccess {
         app.persist_runtime_config();
         app.reset_screen(Screen::SongSelect);
         app.publish_snapshot();
+        app.native_dialog_held_keys_ = saved_dialog_holds;
     }
     static void check_keymap_palette(MenuApp& app, Report& report) {
         const auto saved_skin = app.config_.skin;
@@ -983,6 +1007,7 @@ struct MenuAppVisualTestAccess {
         report.check("graphics.explicit_size_after_resize_present", present(app, detail), detail);
     }
     static void check_start_controls(MenuApp& app, Report& report) {
+        const auto saved_dialog_holds = app.native_dialog_held_keys_;
         const auto image_path = std::filesystem::absolute("dialog-fixture.png");
         { // Valid 1x1 PNG owned by this disposable smoke sandbox.
             const unsigned char png[] = {137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,1,0,0,0,1,8,4,0,0,0,181,28,12,2,0,0,0,11,73,68,65,84,120,218,99,100,248,15,0,1,5,1,1,39,24,227,102,0,0,0,0,73,69,78,68,174,66,96,130};
@@ -1181,6 +1206,9 @@ struct MenuAppVisualTestAccess {
         app.menu_window_.request_screenshot();
         std::string detail;
         report.check("profile.final_controls_present", present(app, detail), detail);
+        // The modal probes above observe real desktop holds. Do not export
+        // that environment-dependent state into later synthetic key fixtures.
+        app.native_dialog_held_keys_ = saved_dialog_holds;
     }
     static HWND owned_menu_window() {
         HWND owned = nullptr;
@@ -3131,32 +3159,36 @@ void separate_timing_flow(tenriff::app::CommandLineOptions options, Report& repo
         ghost->shutdown();
     }
     const auto original_mode = config.mode;
-    config.mode.key_mode = "16K";
+    for (const auto& [target, preset] : std::array<std::pair<int,const char*>,3>{{
+            {16,"source_ln_e_v1"}, {8,"fullfield_taps_eplus_v1"}, {10,"fullfield_taps_eplus_v1"}}}) {
+    config.mode.key_mode = std::to_string(target) + "K";
     config.mode.key_conversion_algorithm = "nk2";
-    config.mode.key_conversion_nk2_preset = "source_ln_e_v1";
+    config.mode.key_conversion_nk2_preset = preset;
+    const std::string check_prefix = target == 16 ? "e_" : "eplus_" + std::to_string(target) + "_";
     for (const char* random : {"off", "mirror", "sr"}) {
         config.mode.random = random;
         if (!loader.save_profile(profile, app::build_persisted_runtime_config(config)))
             throw std::runtime_error("Cannot seed NK2 E ghost profile");
         auto fixture = *replay.replay;
-        fixture.mode.key_mode = "16K";
+        fixture.mode.key_mode = std::to_string(target) + "K";
         fixture.mode.key_conversion_algorithm = "nk2";
-        fixture.mode.key_conversion_nk2_preset = "source_ln_e_v1";
+        fixture.mode.key_conversion_nk2_preset = preset;
         // This fixture isolates initialize() compatibility, not ghost scoring.
-        fixture.trace.lane_count = 16;
+        fixture.trace.lane_count = target;
         fixture.mode.random = random;
-        const auto path = std::filesystem::absolute(std::string("timing-fixture/seed-e-") + random + ".json").u8string();
-        report.check(std::string("seed_ghost.e_fixture_") + random, gameplay::save_replay_json(path, fixture).success());
+        const auto path = std::filesystem::absolute(std::string("timing-fixture/seed-") + check_prefix + random + ".json").u8string();
+        report.check(std::string("seed_ghost.") + check_prefix + "fixture_" + random, gameplay::save_replay_json(path, fixture).success());
         auto ghost_options = options;
         ghost_options.ghost_replay_path = path;
         auto ghost = std::make_unique<app::GameSession>();
         const bool initialized = ghost->initialize(ghost_options);
-        report.check(std::string("seed_ghost.e_compatibility_") + random, initialized &&
-            SessionAccess::chart_lanes(*ghost) == 16 &&
+        report.check(std::string("seed_ghost.") + check_prefix + "compatibility_" + random, initialized &&
+            SessionAccess::chart_lanes(*ghost) == target &&
             fixture.mode.random_seed.has_value() &&
             SessionAccess::mode_seed(*ghost) != static_cast<uint32_t>(*fixture.mode.random_seed) &&
             SessionAccess::timing_state(*ghost, 2, std::string(random) != "sr"));
         ghost->shutdown();
+    }
     }
     config.mode = original_mode;
     config.mode.random = "off";

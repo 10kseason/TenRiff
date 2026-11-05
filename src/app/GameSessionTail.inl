@@ -608,8 +608,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     }
 
     if (config_.mode.key_conversion_algorithm != "nk2" &&
-        normalize_nk2_preset_local(config_.mode.key_conversion_nk2_preset) == "source_ln_e_v1") {
-        // E is NK2-only; do not split unchanged Krrcream/NK3 records or ghosts.
+        (normalize_nk2_preset_local(config_.mode.key_conversion_nk2_preset) == "source_ln_e_v1" ||
+         normalize_nk2_preset_local(config_.mode.key_conversion_nk2_preset) == "fullfield_taps_eplus_v1")) {
+        // E/E+ are NK2-only; do not split unchanged Krrcream/NK3 records or ghosts.
         config_.mode.key_conversion_nk2_preset = "native";
     }
     key_conversion_version_ = replay_playback_enabled_ ? replay_source_.mode.key_conversion_version : 3;
@@ -791,7 +792,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
             ghost_replay_source_.mode.random != config_.mode.random) {
             ghost_compatible = false;
         }
-        // Original and NK2 E consume no mode seed. A new per-play seed must
+        // Original and NK2 E/E+ consume no mode seed. A new per-play seed must
         // not disable their OFF/Mirror ghosts. Seed-dependent conversion/mods
         // still require matching seeds because both fields share one chart.
         int source_key_lanes = chart_result.chart.lane_count;
@@ -800,7 +801,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
                 chart_result.chart.scratch_lanes.end()) --source_key_lanes;
         const bool seedless_conversion = mode_result.settings.key_mode == gameplay::KeyMode::Auto ||
             (mode_result.settings.key_conversion_algorithm == gameplay::KeyModeConversionAlgorithm::NK2 &&
-             mode_result.settings.key_conversion_nk2_preset == gameplay::Nk2Preset::SourceLnE) ||
+             gameplay::is_source_ln_preset(mode_result.settings.key_conversion_nk2_preset)) ||
             (mode_result.settings.key_conversion_algorithm != gameplay::KeyModeConversionAlgorithm::NK3 &&
              gameplay::to_string(mode_result.settings.key_mode) == std::to_string(source_key_lanes) + "K");
         const bool seed_independent_ghost = seedless_conversion &&
@@ -1049,7 +1050,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
             if (lane >= 1 && lane <= chart_result.chart.lane_count) --source_key_lanes;
         const bool seedless_conversion = mode_result.settings.key_mode == gameplay::KeyMode::Auto ||
             (mode_result.settings.key_conversion_algorithm == gameplay::KeyModeConversionAlgorithm::NK2 &&
-             mode_result.settings.key_conversion_nk2_preset == gameplay::Nk2Preset::SourceLnE) ||
+             gameplay::is_source_ln_preset(mode_result.settings.key_conversion_nk2_preset)) ||
             (mode_result.settings.key_conversion_algorithm != gameplay::KeyModeConversionAlgorithm::NK3 &&
              gameplay::to_string(mode_result.settings.key_mode) == std::to_string(source_key_lanes) + "K");
         const bool seed_independent = seedless_conversion &&

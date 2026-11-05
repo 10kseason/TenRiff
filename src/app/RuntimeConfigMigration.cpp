@@ -232,6 +232,11 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
             config.mode.key_conversion_nk2_preset = "source_ln_e_v1";
             changed = true;
         }
+    } else if (nk2_preset == "e+" || nk2_preset == "eplus" || nk2_preset == "fullfield_taps_eplus_v1") {
+        if (config.mode.key_conversion_nk2_preset != "fullfield_taps_eplus_v1") {
+            config.mode.key_conversion_nk2_preset = "fullfield_taps_eplus_v1";
+            changed = true;
+        }
     } else if (nk2_preset == "transform" || nk2_preset == "transform35") {
         if (config.mode.key_conversion_nk2_preset != "transform") {
             config.mode.key_conversion_nk2_preset = "transform";
