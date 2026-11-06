@@ -607,9 +607,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         return false;
     }
 
+    const auto requested_nk2_preset = gameplay::parse_nk2_preset(config_.mode.key_conversion_nk2_preset);
     if (config_.mode.key_conversion_algorithm != "nk2" &&
-        (normalize_nk2_preset_local(config_.mode.key_conversion_nk2_preset) == "source_ln_e_v1" ||
-         normalize_nk2_preset_local(config_.mode.key_conversion_nk2_preset) == "fullfield_taps_eplus_v1")) {
+        requested_nk2_preset && gameplay::is_source_ln_preset(*requested_nk2_preset)) {
         // E/E+ are NK2-only; do not split unchanged Krrcream/NK3 records or ghosts.
         config_.mode.key_conversion_nk2_preset = "native";
     }
@@ -624,6 +624,12 @@ bool GameSession::initialize(const CommandLineOptions& options) {
                      chart_result.base_bpm,
                      sample_rate_,
                      static_cast<LongNoteMixVersion>(long_note_mix_version_), key_conversion_version_);
+    if (!replay_playback_enabled_ && config_.mode.key_conversion_algorithm == "nk2" &&
+        requested_nk2_preset == gameplay::Nk2Preset::FullFieldTapsEPlusV2) {
+        // Keep compatible records on v1 and record the actual preset used.
+        config_.mode.key_conversion_nk2_preset =
+            gameplay::to_string(mode_result.settings.key_conversion_nk2_preset);
+    }
     if (replay_playback_enabled_) {
         const auto base_judge = is_supported_canonical_replay_ruleset(replay_source_.ruleset_id)
                                     ? config::JudgeConfig{} : config_.judge;

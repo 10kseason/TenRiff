@@ -32,7 +32,7 @@
 - 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용이며 예전 osu 토글은 더 이상 제공하거나 저장하지 않음
 - `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
 - `key_conversion_algorithm`: `krrcream | nk2 | nk3` (기본 `krrcream`; Krrcream은 원본 노트만 재배치하고 nK2는 안전한 보조 노트를 생성하며, NK3는 번들된 P64와 host beam32를 항상 사용하고 10K가 아닌 원본을 10K로 변환할 때만 일반화 MLP를 추가)
-- `key_conversion_nk2_preset`: `native | transform | remaster` (기본 `native`; nK2 선택 시 `Native (12%)`, `Transform (35%)`, `Remaster (65%)`, Krrcream 선택 시 행 잠금)
+- `key_conversion_nk2_preset`의 기본값은 `source_ln_e_v1` (E)입니다. **E+ - Full-field + taps** (`fullfield_taps_eplus_v2`)는 7·8·10키에서 선택하며 같은 키 수의 채보도 재배치합니다. 다른 키 수에서는 E를 적용하고 E+ 선택을 기억합니다.
 - `gauge`: `normal | hard | ex_hard | easy | shift`
 - `random`: `off | mirror | rr | frns | sr` (`fr`은 기존 설정 호환 alias)
 - `random_seed`: RR/SR, 강제 key-mode 변환, Note Add, LN Mix 대상 선택의 고정 시드 (0도 고정 값으로 취급). 일반 Random(`fr`/`frns`)은 플레이를 시작할 때마다 새 세션 seed를 만들고 replay에는 실제 seed를 기록

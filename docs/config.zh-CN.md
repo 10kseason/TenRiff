@@ -242,8 +242,8 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
   - nK2 在扩展键数时不会先向原始 pattern 加 note，而是在转换过程中直接向目标 layout 生成安全的辅助 note
   - NK3 始终使用 P64 与 host beam safety solver，仅在非 10K 源谱面转换为 10K 时加入 generalized MLP；通过 `TENRIFF_NK3_BACKEND=AUTO|VULKAN|NCNN_CPU|OPENVINO` 选择后端，`AUTO` 会优先尝试 ncnn Vulkan；多块 Vulkan GPU 可用 `TENRIFF_NK3_VULKAN_DEVICE=<index>` 选择
 - `key_conversion_nk2_preset` (string)
-  - `native | transform | remaster`；默认值为 `native`
-  - 选择 nK2 的 `Native (12%)`、`Transform (35%)` 或 `Remaster (65%)`；Krrcream 下锁定该设置行
+  - `source_ln_e_v1 | fullfield_taps_eplus_v2 | native | transform | remaster`。默认值为 `source_ln_e_v1`（E）。
+  - nK2 的 **E+ - Full-field + taps** 支持 7K、8K 和 10K，同键数的谱面也会重新分配。其他键数应用 E 并保留已保存的 E+ 选项。
   - `Remaster` 在提高预算的同时保留原曲排布，并用等长长条填充 LN 区间的辅助 note
   - 三者均为上限，实际增加量会因原谱密度与安全窗口而更低
 - `gauge` (string)

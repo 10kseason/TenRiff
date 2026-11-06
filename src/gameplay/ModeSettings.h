@@ -19,11 +19,16 @@ enum class Nk2Preset {
     // 65% support budget aimed at keeping the source placement readable.
     Remaster,
     SourceLnE,  // KeyWeaver 1.3.0 E, isolated from historical presets.
-    FullFieldTapsEPlus,  // KeyWeaver 1.4.0 E+, explicit 8K/10K only.
+    FullFieldTapsEPlus,  // Historical E+ replay identity for 8K/10K.
+    FullFieldTapsEPlusV2,
 };
 
+constexpr bool is_nk2_eplus_preset(Nk2Preset preset) {
+    return preset == Nk2Preset::FullFieldTapsEPlus || preset == Nk2Preset::FullFieldTapsEPlusV2;
+}
+
 constexpr bool is_source_ln_preset(Nk2Preset preset) {
-    return preset == Nk2Preset::SourceLnE || preset == Nk2Preset::FullFieldTapsEPlus;
+    return preset == Nk2Preset::SourceLnE || is_nk2_eplus_preset(preset);
 }
 
 enum class KeyMode {
@@ -39,6 +44,10 @@ enum class KeyMode {
     Keys14,
     Keys16,
 };
+
+constexpr bool supports_nk2_eplus_target(KeyMode mode) {
+    return mode == KeyMode::Keys7 || mode == KeyMode::Keys8 || mode == KeyMode::Keys10;
+}
 
 enum class GaugeMode {
     ExHard,

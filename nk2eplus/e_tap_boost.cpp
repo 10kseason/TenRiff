@@ -1,4 +1,5 @@
 #include "e_tap_boost.hpp"
+#include "e_fullfield.hpp"
 #include "safety_audit.hpp"
 
 #include <array>
@@ -15,7 +16,7 @@ namespace keyweaver_eplus::nk2 {
 EFullFieldTapBoostStats addEFullFieldTaps(const Chart& source, Chart& chart, int targetKeyCount) {
     EFullFieldTapBoostStats stats;
     stats.inputNotes = static_cast<std::int64_t>(chart.notes.size());
-    if ((targetKeyCount != 8 && targetKeyCount != 10) ||
+    if (!supportsEFullFieldTarget(targetKeyCount) ||
         !auditSafety(source, chart, targetKeyCount, 500, true).passed()) {
         stats.reverted = true;
         return stats;

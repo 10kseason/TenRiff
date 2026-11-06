@@ -389,23 +389,19 @@ inline std::string cycle_key_conversion_algorithm(std::string_view current) {
 }
 
 inline std::string normalize_key_conversion_nk2_preset(std::string value) {
-    value = to_lower_ascii(std::move(value));
-    if (value == "e" || value == "source_ln_e_v1") return "source_ln_e_v1";
-    if (value == "e+" || value == "eplus" || value == "fullfield_taps_eplus_v1")
-        return "fullfield_taps_eplus_v1";
-    if (value == "transform" || value == "transform35") {
-        return "transform";
-    }
-    if (value == "remaster" || value == "remaster65" || value == "rm") {
-        return "remaster";
-    }
-    return "native";
+    return gameplay::to_string(
+        gameplay::parse_nk2_preset(value).value_or(gameplay::Nk2Preset::Native));
 }
 
-inline std::string cycle_key_conversion_nk2_preset(std::string_view current, bool allow_eplus = false) {
+inline bool nk2_eplus_available(std::string_view key_mode) {
+    return gameplay::supports_nk2_eplus_target(
+        gameplay::parse_key_mode(key_mode).value_or(gameplay::KeyMode::Auto));
+}
+
+inline std::string cycle_key_conversion_nk2_preset(std::string_view current, bool allow_eplus) {
     const std::string normalized = normalize_key_conversion_nk2_preset(std::string(current));
-    if (normalized == "source_ln_e_v1") return allow_eplus ? "fullfield_taps_eplus_v1" : "native";
-    if (normalized == "fullfield_taps_eplus_v1") return "native";
+    if (normalized == "source_ln_e_v1") return allow_eplus ? "fullfield_taps_eplus_v2" : "native";
+    if (normalized == "fullfield_taps_eplus_v1" || normalized == "fullfield_taps_eplus_v2") return "native";
     if (normalized == "remaster") return "source_ln_e_v1";
     if (normalized == "native") {
         return "transform";

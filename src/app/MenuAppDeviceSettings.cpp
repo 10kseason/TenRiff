@@ -1,6 +1,5 @@
 #include "ui/FunctionKeyLabels.h"
 #include "app/NativeFileDialog.h"
-#include "app/MenuAudioFileDialog.h"
 #include "app/MenuApp.h"
 
 #include <filesystem>
@@ -31,10 +30,10 @@ namespace tenriff::app {
 namespace {
 
 #ifdef _WIN32
-MenuAudioFileChoice pick_common_bga_dialog_utf8() {
+NativeFileChoice pick_common_bga_dialog_utf8() {
     // Menu audio owns an MTA apartment; reuse the request-scoped STA picker.
-    return run_menu_audio_picker_sta([] {
-        MenuAudioFileChoice result;
+    return run_native_file_dialog_sta([] {
+        NativeFileChoice result;
         const auto failed = [&](HRESULT error) {
             result.error = "Video file dialog failed (HRESULT " +
                 std::to_string(static_cast<unsigned long>(error)) + ").";

@@ -566,7 +566,7 @@ ModeApplyResult apply_mode_settings(const GameplayChart& chart,
         const bool nk3_remaster =
             settings.key_conversion_algorithm == KeyModeConversionAlgorithm::NK3;
         const bool nk2_eplus = settings.key_conversion_algorithm == KeyModeConversionAlgorithm::NK2 &&
-            settings.key_conversion_nk2_preset == Nk2Preset::FullFieldTapsEPlus;
+            is_nk2_eplus_preset(settings.key_conversion_nk2_preset);
         if (target_count == conversion_source->lane_count && !nk3_remaster && !nk2_eplus) {
             result.chart = *conversion_source;
             conversion_succeeded = true;
@@ -605,6 +605,7 @@ ModeApplyResult apply_mode_settings(const GameplayChart& chart,
                 if (converted.converted) {
                     result.chart = std::move(converted.chart);
                     result.chart.lane_group_size = 0;
+                    result.replay_nk2_preset = converted.replay_nk2_preset;
                     conversion_succeeded = true;
                 }
             }

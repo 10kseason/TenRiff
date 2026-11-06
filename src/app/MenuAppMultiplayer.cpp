@@ -156,7 +156,7 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
     }
     std::string chat_value;
     if (!global_chat.configured) {
-        chat_value = ui_text("F10 LOGIN REQUIRED", "F10 로그인 필요");
+        chat_value = ui_text("OFFLINE", "오프라인");
     } else if (multiplayer_menu_.chat_input.empty()) {
         chat_value = ui_text("ENTER TO CHAT", "ENTER로 채팅");
     } else {
@@ -384,17 +384,13 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
         const auto& chat = global_chat.messages[i];
         std::string sender_name = chat.username;
         if (chat.role == "admin") sender_name += ui_text(" [ADMIN]", " [관리자]");
-        if (chat.username == ranked_account_signed_in_username_) {
-            sender_name += ui_text(" [YOU]", " [나]");
-        }
         render.generic.footer_notes.push_back(sender_name + ": " + chat.text);
     }
     if (global_chat.messages.empty()) {
         render.generic.footer_notes.push_back(
             global_chat.configured
                 ? ui_text("No global messages yet.", "아직 글로벌 메시지가 없습니다.")
-                : ui_text("Press F10 to log in before using global chat.",
-                          "글로벌 채팅을 사용하려면 F10으로 로그인하세요."));
+                : ui_text("Global chat is unavailable.", "글로벌 채팅을 사용할 수 없습니다."));
     }
     render.generic.footer_notes.push_back(ui_text(
         "F11 opens chat. Enter sends. Delete clears an edit field. Esc closes editing or leaves Multiplayer.",
@@ -437,8 +433,7 @@ bool MenuApp::handle_multiplayer_chat_overlay_input(uint32_t keycode) {
     const bool authenticated = global_chat_service_.snapshot().configured;
     if (!authenticated) {
         multiplayer_status_message_ =
-            ui_text("Press F10 and log in before using global chat.",
-                    "글로벌 채팅을 사용하려면 F10으로 로그인하세요.");
+            ui_text("Global chat is unavailable.", "글로벌 채팅을 사용할 수 없습니다.");
         publish_snapshot();
         return true;
     }
@@ -471,8 +466,7 @@ bool MenuApp::send_multiplayer_chat_input() {
     }
     if (!global_chat_service_.send(message)) {
         multiplayer_status_message_ = ui_text(
-            "Global chat is unavailable. Press F10 to sign in again.",
-            "글로벌 채팅을 사용할 수 없습니다. F10으로 다시 로그인하세요.");
+            "Global chat is unavailable.", "글로벌 채팅을 사용할 수 없습니다.");
         return false;
     }
     multiplayer_menu_.chat_input.clear();
@@ -508,7 +502,7 @@ void MenuApp::populate_multiplayer_chat_overlay(render::ChatOverlayData& target)
     target.connected = chat.configured;
     target.title = ui_text("GLOBAL CHAT", "글로벌 채팅");
     target.status = !chat.configured
-                        ? ui_text("F10 LOGIN REQUIRED", "F10 로그인 필요")
+                        ? ui_text("OFFLINE", "오프라인")
                         : (chat.online ? ui_text("ONLINE", "온라인")
                                        : ui_text("SYNCING", "동기화 중"));
     if (!chat.error.empty()) {
@@ -516,8 +510,7 @@ void MenuApp::populate_multiplayer_chat_overlay(render::ChatOverlayData& target)
     }
     target.input = target.connected
                        ? multiplayer_menu_.chat_input + " _"
-                       : ui_text("Press F10 to log in or register",
-                                 "F10으로 로그인 또는 회원가입");
+                       : ui_text("Global chat is unavailable.", "글로벌 채팅을 사용할 수 없습니다.");
     target.hint = ui_text("/np now playing   ENTER send   ESC/F11 close",
                           "/np 현재 곡   ENTER 전송   ESC/F11 닫기");
 
@@ -529,9 +522,6 @@ void MenuApp::populate_multiplayer_chat_overlay(render::ChatOverlayData& target)
         const auto& message = chat.messages[i];
         std::string sender_name = message.username;
         if (message.role == "admin") sender_name += ui_text(" [ADMIN]", " [관리자]");
-        if (message.username == ranked_account_signed_in_username_) {
-            sender_name += ui_text(" [YOU]", " [나]");
-        }
         target.messages.push_back(sender_name + ": " + message.text);
         const auto url = first_chat_web_url(message.text);
         chat_overlay_message_urls_.push_back(url.value_or(std::string{}));
@@ -540,7 +530,7 @@ void MenuApp::populate_multiplayer_chat_overlay(render::ChatOverlayData& target)
         target.messages.push_back(
             chat.configured
                 ? ui_text("No global messages yet.", "아직 글로벌 메시지가 없습니다.")
-                : ui_text("Global chat requires an account.", "글로벌 채팅은 로그인이 필요합니다."));
+                : ui_text("Global chat is unavailable.", "글로벌 채팅을 사용할 수 없습니다."));
         chat_overlay_message_urls_.push_back({});
     }
     target.message_urls = chat_overlay_message_urls_;
@@ -624,7 +614,6 @@ void MenuApp::drain_gameplay_chat_input() {
         if (!text.has_value()) break;
         handle_text_input(*text);
     }
-    service_ranked_account_request();
     if (chat_overlay_visible_) {
         const auto chat = global_chat_service_.snapshot();
         std::string signature = std::to_string(chat.revision);
@@ -1024,8 +1013,7 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
     if (row == MultiplayerMenuRow::Chat) {
         if (!global_chat_service_.snapshot().configured) {
             multiplayer_status_message_ =
-                ui_text("Press F10 and log in before using global chat.",
-                        "글로벌 채팅을 사용하려면 F10으로 로그인하세요.");
+                ui_text("Global chat is unavailable.", "글로벌 채팅을 사용할 수 없습니다.");
         } else {
             set_multiplayer_chat_overlay(true);
             multiplayer_status_message_.clear();

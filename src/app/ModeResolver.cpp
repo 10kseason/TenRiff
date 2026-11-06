@@ -26,6 +26,11 @@ ModeResolveResult resolve_mode_settings(const config::ModeConfig& config) {
         result.warnings.push_back(
             "mode.key_conversion_nk2_preset not recognized; using NATIVE.");
     }
+    if (result.settings.key_conversion_nk2_preset == gameplay::Nk2Preset::FullFieldTapsEPlusV2 &&
+        !gameplay::supports_nk2_eplus_target(result.settings.key_mode)) {
+        // The profile can remember E+ while a different key count is selected.
+        result.settings.key_conversion_nk2_preset = gameplay::Nk2Preset::SourceLnE;
+    }
 
     if (auto parsed = gameplay::parse_gauge_mode(config.gauge)) {
         result.settings.gauge = parsed.value();

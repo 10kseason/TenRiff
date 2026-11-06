@@ -65,7 +65,7 @@ EFullFieldStats spreadEFullField(const Chart& source, Chart& completedE, int tar
     EFullFieldStats stats;
     // A remix is never a repair for a failed E chart. The original-source audit
     // also retains generated-note provenance rather than treating E as source.
-    if ((targetKeyCount != 8 && targetKeyCount != 10) ||
+    if (!supportsEFullFieldTarget(targetKeyCount) ||
         !auditSafety(source, completedE, targetKeyCount, 500, true).passed()) {
         stats.reverted = true;
         return stats;

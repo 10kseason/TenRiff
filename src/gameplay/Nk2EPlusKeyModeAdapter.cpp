@@ -28,9 +28,13 @@ KeyModeConverterResult convert_key_mode_chart_nk2_eplus(
     int source_keys = chart.lane_count;
     for (const auto& note : chart.notes) source_keys = std::max(source_keys, note.lane);
     if (chart.notes.empty()) return result;
+    const bool legacy = options.nk2_preset == Nk2Preset::FullFieldTapsEPlus;
+    bool needs_v2 = options.target_lane_count == 7;
     if (source_keys < 1 || source_keys > 18 ||
-        (options.target_lane_count != 8 && options.target_lane_count != 10)) {
-        result.warnings.push_back("NK2 E+ Full-field + taps requires an 8K or 10K target and 1-18 source lanes.");
+        !keyweaver_eplus::nk2::supportsEFullFieldTarget(options.target_lane_count) || (legacy && needs_v2)) {
+        result.warnings.push_back(legacy
+            ? "NK2 E+ Full-field + taps requires an 8K or 10K target and 1-18 source lanes."
+            : "NK2 E+ Full-field + taps requires a 7K, 8K or 10K target and 1-18 source lanes.");
         return result;
     }
     const int rate = options.sample_rate > 0 ? options.sample_rate : 44100;
@@ -76,14 +80,19 @@ KeyModeConverterResult convert_key_mode_chart_nk2_eplus(
         if (!converted.report.chartMutated || converted.chart.notes.empty())
             throw std::runtime_error("conversion produced no playable notes");
 
-        // A generated tap must use a retained source head, including its sub-ms
-        // sample precision. Choosing the first retained head is deterministic if
-        // distinct source samples quantize to the same upstream millisecond.
+        // Prefer the original head mapping for v1-compatible output. The base E
+        // support pass can also accent a retained LN tail with no head there.
         std::map<int, int64_t> retained_heads;
+        std::map<int, int64_t> retained_tails;
         for (const auto& note : converted.chart.notes) {
             const auto original = originals.find(note.id);
-            if (original != originals.end())
-                retained_heads.emplace(note.time, chart.notes[original->second].start_sample);
+            if (original != originals.end()) {
+                const auto& authored = chart.notes[original->second];
+                retained_heads.emplace(note.time, authored.start_sample);
+                if (!legacy && note.endTime && authored.end_sample) {
+                    retained_tails.emplace(*note.endTime, *authored.end_sample);
+                }
+            }
         }
 
         auto rebuilt = chart;
@@ -104,9 +113,14 @@ KeyModeConverterResult convert_key_mode_chart_nk2_eplus(
                 mapped.note_id = generated_id++;
                 mapped.start_sample = samples(note.time, rate);
                 if (note.type == keyweaver_eplus::NoteType::Tap) {
-                    const auto anchor = retained_heads.find(note.time);
-                    if (anchor == retained_heads.end()) throw std::runtime_error("generated tap has no retained source head");
-                    mapped.start_sample = anchor->second;
+                    if (const auto head = retained_heads.find(note.time); head != retained_heads.end()) {
+                        mapped.start_sample = head->second;
+                    } else if (const auto tail = retained_tails.find(note.time); tail != retained_tails.end()) {
+                        mapped.start_sample = tail->second;
+                        needs_v2 = true;
+                    } else {
+                        throw std::runtime_error("generated tap has no retained source timing");
+                    }
                 }
                 if (note.type == keyweaver_eplus::NoteType::Hold && note.endTime) {
                     mapped.end_sample = samples(*note.endTime, rate);
@@ -144,6 +158,9 @@ KeyModeConverterResult convert_key_mode_chart_nk2_eplus(
         }
         result.chart = std::move(rebuilt);
         result.converted = true;
+        if (!legacy && !needs_v2) {
+            result.replay_nk2_preset = Nk2Preset::FullFieldTapsEPlus;
+        }
         result.warnings.push_back("NK2 E+ Full-field + taps remapped " + std::to_string(source_keys) + "K to " +
             std::to_string(options.target_lane_count) + "K (added=" + std::to_string(converted.report.addedNotes) +
             ", added_LN=" + std::to_string(converted.report.addedHoldNotes) + ", dropped=" +

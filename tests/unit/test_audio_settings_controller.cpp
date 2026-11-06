@@ -18,7 +18,7 @@
 #include "app/menu/settings/AudioSettingsController.h"
 #include "app/menu/settings/AudioSettingsView.h"
 #include "app/MenuMusicController.h"
-#include "app/MenuAudioFileDialog.h"
+#include "app/NativeFileDialog.h"
 #ifdef _WIN32
 #include <wrl/client.h>
 #endif
@@ -100,7 +100,7 @@ TEST_CASE("audio file picker uses a real STA shell apartment while its audio cal
     HRESULT mta = E_FAIL, old_picker = E_FAIL, created = E_FAIL;
     APTTYPE caller_type = APTTYPE_CURRENT, worker_type = APTTYPE_CURRENT;
     APTTYPEQUALIFIER caller_qualifier{}, worker_qualifier{};
-    MenuAudioFileChoice result;
+    NativeFileChoice result;
     int input_resets = 0;
     bool reset_on_caller = false;
     std::thread caller([&] {
@@ -118,12 +118,12 @@ TEST_CASE("audio file picker uses a real STA shell apartment while its audio cal
             const NativeFileDialogApartment old_same_thread_picker;
             old_picker = old_same_thread_picker.result();
         }
-        result = run_menu_audio_picker_sta([&] {
+        result = run_native_file_dialog_sta([&] {
             (void)CoGetApartmentType(&worker_type, &worker_qualifier);
             Microsoft::WRL::ComPtr<IFileOpenDialog> dialog;
             created = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER,
                                        IID_PPV_ARGS(&dialog));
-            return MenuAudioFileChoice{{}, {}, true}; // No shell UI or audio is played by this regression.
+            return NativeFileChoice{{}, {}, true}; // No shell UI or audio is played by this regression.
         });
         (void)CoGetApartmentType(&caller_type, &caller_qualifier);
         CoUninitialize();
@@ -147,18 +147,18 @@ TEST_CASE("audio STA picker propagates selected Unicode paths cancellation and e
     const NativeFileDialogInputScope input_scope(&input_resets, [](void* count) {
         ++*static_cast<int*>(count);
     });
-    const auto chosen = run_menu_audio_picker_sta([] {
-        return MenuAudioFileChoice{"audio/선택한 음악.flac", {}, false};
+    const auto chosen = run_native_file_dialog_sta([] {
+        return NativeFileChoice{"audio/선택한 음악.flac", {}, false};
     });
     CHECK(chosen.path == "audio/선택한 음악.flac");
     CHECK_FALSE(chosen.cancelled);
     CHECK(chosen.error.empty());
-    const auto cancelled = run_menu_audio_picker_sta([] {
-        return MenuAudioFileChoice{{}, {}, true};
+    const auto cancelled = run_native_file_dialog_sta([] {
+        return NativeFileChoice{{}, {}, true};
     });
     CHECK(cancelled.cancelled);
     CHECK(cancelled.path.empty());
-    const auto failed = run_menu_audio_picker_sta([]() -> MenuAudioFileChoice {
+    const auto failed = run_native_file_dialog_sta([]() -> NativeFileChoice {
         throw std::runtime_error("picker failure fixture");
     });
     CHECK_FALSE(failed.error.empty());
@@ -601,9 +601,9 @@ struct MenuAppRepeatTestAccess {
         menu->push_screen(MenuApp::Screen::SettingsSkins);
         CHECK(menu->song_select_repeat_key_ == 0);
 
-        const std::array<bool MenuApp::*, 8> editing_flags{
+        const std::array editing_flags{
             &MenuApp::help_overlay_visible_, &MenuApp::profile_nickname_edit_active_,
-            &MenuApp::difficulty_table_url_editing_, &MenuApp::online_records_url_editing_,
+            &MenuApp::difficulty_table_url_editing_,
             &MenuApp::song_select_search_active_, &MenuApp::chat_overlay_visible_,
             &MenuApp::ranked_account_overlay_visible_, &MenuApp::chat_url_warning_visible_};
         menu->reset_screen(MenuApp::Screen::SettingsAudio);

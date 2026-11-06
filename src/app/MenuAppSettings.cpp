@@ -7,7 +7,6 @@
 #include <optional>
 #include <iostream>
 #include "app/NativeFileDialog.h"
-#include "app/MenuAudioFileDialog.h"
 #include "util/Utf8Compat.h"
 #ifdef _WIN32
 #include <wrl/client.h>
@@ -23,10 +22,10 @@
 namespace tenriff::app {
 
 namespace {
-MenuAudioFileChoice pick_menu_audio_file() {
+NativeFileChoice pick_menu_audio_file() {
 #ifdef _WIN32
-    return run_menu_audio_picker_sta([] {
-        MenuAudioFileChoice result;
+    return run_native_file_dialog_sta([] {
+        NativeFileChoice result;
         const auto failed = [&](HRESULT error) {
             result.error = "Audio file dialog failed (HRESULT " +
                 std::to_string(static_cast<unsigned long>(error)) + ").";

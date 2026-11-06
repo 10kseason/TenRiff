@@ -32,7 +32,7 @@ This document summarizes the implemented mode system, lane-transform/random rule
 - Chart input is limited to BMS-family files (`.bms/.bme/.bml/.pms`); the former osu toggle is no longer exposed or persisted
 - `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
 - `key_conversion_algorithm`: `krrcream | nk2 | nk3` (defaults to `krrcream`; Krrcream only remaps source notes, nK2 creates safe support notes, and NK3 always combines bundled P64 with host beam32 while adding the generalized MLP only for non-10K sources converted to 10K)
-- `key_conversion_nk2_preset`: `native | transform | remaster` (defaults to `native`; choose `Native (12%)`, `Transform (35%)` or `Remaster (65%)` with nK2; the row is locked with Krrcream)
+- `key_conversion_nk2_preset` defaults to `source_ln_e_v1` (E). Choose **E+ - Full-field + taps** (`fullfield_taps_eplus_v2`) for 7K, 8K or 10K, including equal-key remix. Other key counts use E and retain the saved E+ selection.
 - `gauge`: `normal | hard | ex_hard | easy | shift`
 - `random`: `off | mirror | rr | fr | sr`
 - `random`: `off | mirror | rr | frns | sr` (`fr` remains a legacy alias)

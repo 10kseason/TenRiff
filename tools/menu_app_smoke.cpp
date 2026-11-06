@@ -272,7 +272,13 @@ struct MenuAppVisualTestAccess {
         report.check("playmode.guest_enter_closes", !app.ranked_account_overlay_visible_ && !app.online_play_mode_);
         key(app, "F10"); key(app, "Right"); key(app, "Enter");
         report.check("playmode.online_opens_connection", app.online_play_mode_ &&
-            app.ranked_account_overlay_visible_ && !app.account_mode_selection_ && app.ranked_account_sites_mode_);
+            app.ranked_account_overlay_visible_ && !app.account_mode_selection_);
+        render::RankedAccountOverlayData connection;
+        app.handle_menu_click({Kind::AccountServer, 0, Part::Activate}); // A stale legacy hit is ignored.
+        app.populate_ranked_account_overlay(connection);
+        report.check("playmode.tenriff_leaderboard_is_the_only_account_route",
+            connection.visible && connection.sites_url == kSitesLeaderboardUrl &&
+            !app.global_chat_service_.snapshot().configured);
         app.active_recording_permission_ = std::make_shared<std::atomic_bool>(true);
         app.handle_menu_click({Kind::AccountPlayMode, 2, Part::Activate});
         app.handle_menu_click({Kind::AccountPlayMode, 0, Part::Activate});
@@ -284,6 +290,91 @@ struct MenuAppVisualTestAccess {
             !app.active_recording_permission_->load());
         app.choose_play_mode(false);
         app.active_recording_permission_.reset();
+    }
+
+    static void check_records_routing(MenuApp& app, Report& report) {
+        const auto original_view = app.song_select_view_;
+        const auto original_server = app.config_.ui.online_records_server_url;
+        app.song_select_view_ = MenuApp::SongSelectView::Records;
+        app.online_records_view_ = false;
+        app.config_.ui.online_records_server_url = "https://192.0.2.1:27303";
+        key(app, "Tab");
+        report.check("records.saved_server_still_opens_tenriff_leaderboard", app.online_records_view_);
+        key(app, "Tab");
+        report.check("records.saved_server_still_returns_to_local", !app.online_records_view_);
+        app.config_.ui.online_records_server_url = original_server;
+        app.song_select_view_ = original_view;
+        app.publish_snapshot();
+    }
+
+    static void check_startup_folder_pickers(MenuApp& app, Report& report) {
+        const HRESULT initialized = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+        report.check("folder_picker.startup_caller_mta", SUCCEEDED(initialized));
+        if (FAILED(initialized)) return;
+        struct ComBalance { ~ComBalance() { CoUninitialize(); } } com;
+        const auto saved_holds = app.native_dialog_held_keys_;
+        const auto saved_path = app.songs_path_;
+        const auto verify = [&](const char* name, auto activate) {
+            const HWND game = owned_menu_window();
+            if (game) SetForegroundWindow(game);
+            std::atomic_bool done{false}, owned{false};
+            HWND picker = nullptr;
+            std::thread observer([&] {
+                const auto deadline = Clock::now() + std::chrono::seconds(10);
+                HWND observed = nullptr;
+                while (!done.load() && Clock::now() < deadline) {
+                    HWND found = nullptr;
+                    EnumWindows([](HWND window, LPARAM parameter) -> BOOL {
+                        DWORD pid = 0;
+                        GetWindowThreadProcessId(window, &pid);
+                        wchar_t type[64]{};
+                        GetClassNameW(window, type, 64);
+                        if (pid == GetCurrentProcessId() && IsWindowVisible(window) &&
+                            lstrcmpW(type, L"#32770") == 0) {
+                            *reinterpret_cast<HWND*>(parameter) = window;
+                            return FALSE;
+                        }
+                        return TRUE;
+                    }, reinterpret_cast<LPARAM>(&found));
+                    if (found) observed = found;
+                    if (found && !picker && game && !IsWindowEnabled(game)) {
+                        picker = found;
+                        owned = game && GetWindow(picker, GW_OWNER) == game && !IsWindowEnabled(game);
+                        PostMessageW(picker, WM_COMMAND, IDCANCEL, 0);
+                    }
+                    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+                }
+                if (!done.load() && observed) PostMessageW(observed, WM_COMMAND, IDCANCEL, 0);
+            });
+            const auto before = app.native_dialog_closed_ns_;
+            try { activate(); }
+            catch (...) { done = true; observer.join(); throw; }
+            done = true;
+            observer.join();
+            const bool fenced = app.native_dialog_closed_ns_ > before;
+            const bool unchanged = app.songs_path_ == saved_path;
+            report.check(name, owned && game && IsWindowEnabled(game) && !IsWindow(picker) &&
+                fenced && unchanged,
+                "opened=" + std::to_string(picker != nullptr) +
+                " owned=" + std::to_string(owned.load()) +
+                " input_fenced=" + std::to_string(fenced) +
+                " source_unchanged=" + std::to_string(unchanged) +
+                " shortcut=" + config::KeycodeMap::to_name(app.key_f2_));
+            app.native_dialog_held_keys_ = saved_holds;
+        };
+
+        auto visible = std::move(app.visible_song_indices_);
+        app.visible_song_indices_.clear();
+        verify("folder_picker.empty_title_button_before_options", [&] { click(app, Kind::TitleButton, 0); });
+        app.visible_song_indices_ = std::move(visible);
+        app.native_dialog_held_keys_.erase(app.key_f2_);
+        const auto shortcut = config::KeycodeMap::to_name(app.key_f2_);
+        verify("folder_picker.title_shortcut_before_options", [&] { key(app, shortcut.c_str()); });
+        click(app, Kind::TitleButton, 0);
+        report.check("folder_picker.enter_song_select_before_options", screen(app) == Screen::SongSelect);
+        verify("folder_picker.song_select_button_before_options", [&] { click(app, Kind::SongSourceAdd, 0); });
+        app.reset_screen(Screen::Title);
+        app.publish_snapshot();
     }
 
     static void check_import_loading(MenuApp& app, Report& report) {
@@ -405,6 +496,19 @@ struct MenuAppVisualTestAccess {
         click(app, Kind::SettingsRow, 0);
         report.check("filter.sort_value_click_changes_order", app.song_sort_mode_ == MenuApp::SongSortMode::TitleAsc &&
             app.visible_song_entry(0)->title == "Alpha");
+        app.config_.ui.language = "ko";
+        for (const auto& [sort, expected] : std::array{
+                std::pair{MenuApp::SongSortMode::TitleAsc, "A-Z"},
+                std::pair{MenuApp::SongSortMode::TitleDesc, "Z-A"},
+                std::pair{MenuApp::SongSortMode::ArtistAsc, "아티스트 A-Z"},
+                std::pair{MenuApp::SongSortMode::ArtistDesc, "아티스트 Z-A"}}) {
+            app.apply_song_sort(sort);
+            app.publish_snapshot();
+            std::lock_guard<std::mutex> lock(app.snapshot_mutex_);
+            report.check(std::string("filter.korean_sort_label.") + expected,
+                         app.snapshot_.render.generic.rows.front().value == expected);
+        }
+        app.config_.ui.language = saved_ui.language;
         app.song_group_mode_ = MenuApp::SongGroupMode::Level;
         app.apply_song_sort(MenuApp::SongSortMode::DifficultyDesc);
         report.check("filter.grouped_desc_missing_lv_last", levels() == std::vector<int>({30, 10, 2, 0}));
@@ -413,7 +517,7 @@ struct MenuAppVisualTestAccess {
         render::MenuRenderData view;
         app.populate_song_browser_render_data(view);
         const auto range = std::find_if(view.generic.rows.begin(), view.generic.rows.end(), [](const auto& row) { return row.row_index == 3; });
-        report.check("filter.range_is_one_row_two_endpoints", view.generic.rows.size() == 11 &&
+        report.check("filter.range_is_one_row_two_endpoints", view.generic.rows.size() == 10 &&
             range != view.generic.rows.end() && range->secondary_row_index == 4 && !range->secondary_value.empty());
         // Reproduce the one-edge suppression explicitly, without depending on
         // which desktop key happened to be held during the native picker test.
@@ -807,14 +911,10 @@ struct MenuAppVisualTestAccess {
         // This fixture owns synthetic key edges. Desktop modifiers must not
         // leak into them; real OS fallback behavior has separate unit probes.
         app.physical_modifier_probe_ = [](int) { return false; };
-        // ConfigLoader restores default URLs when reading empty strings. Clear
-        // live URLs after initialization too; never open account/online routes.
+        // Keep fixtures offline, including any archived addresses from seeded profiles.
         app.config_.ui.online_records_server_url.clear();
         app.config_.ui.tenriff_main_server_url.clear();
         app.config_.ui.private_server_url.clear();
-        app.ranked_account_main_server_url_.clear();
-        app.ranked_account_private_server_url_.clear();
-        app.ranked_account_active_server_url_.clear();
         app.global_chat_service_.clear();
         app.global_chat_service_.shutdown();
         app.online_records_service_.shutdown();
@@ -827,7 +927,6 @@ struct MenuAppVisualTestAccess {
         return app.config_.ui.online_records_server_url.empty() &&
                app.config_.ui.tenriff_main_server_url.empty() &&
                app.config_.ui.private_server_url.empty() &&
-               app.ranked_account_signed_in_username_.empty() &&
                !app.sites_connection_saved_ && app.bms_editor_practice_start_seconds_.has_value();
     }
     static bool poll_library(MenuApp& app) {
@@ -1951,8 +2050,7 @@ struct MenuAppVisualTestAccess {
                 "; account=" + std::to_string(app.ranked_account_overlay_visible_) +
                 "; warning=" + std::to_string(app.chat_url_warning_visible_) +
                 "; nickname=" + std::to_string(app.profile_nickname_edit_active_) +
-                "; table_url=" + std::to_string(app.difficulty_table_url_editing_) +
-                "; records_url=" + std::to_string(app.online_records_url_editing_);
+                "; table_url=" + std::to_string(app.difficulty_table_url_editing_);
             state += "; held=";
             for (const auto key : app.pressed_keys_) state += config::KeycodeMap::to_name(key) + ",";
             state += "; owners=";
@@ -2513,6 +2611,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     report.check("library.indexed_exactly_one_synthetic_chart", indexed);
     if (!indexed) throw std::runtime_error("Synthetic library did not index");
+    Access::check_startup_folder_pickers(app, report);
     Access::check_home_navigation(app, report);
     Access::check_home_language_cycle(app, report);
     Access::check_import_loading(app, report);
@@ -2608,6 +2707,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
     Access::check_table_input_and_filter(app, report);
     Access::check_level_search_input(app, report);
     Access::check_browser_sort_and_range(app, report);
+    Access::check_records_routing(app, report);
     Access::check_lobby_feedback(app, report);
     Access::check_loading_pacing(app, report);
     Access::check_hud_feedback_followup(app, report);
@@ -3159,8 +3259,9 @@ void separate_timing_flow(tenriff::app::CommandLineOptions options, Report& repo
         ghost->shutdown();
     }
     const auto original_mode = config.mode;
-    for (const auto& [target, preset] : std::array<std::pair<int,const char*>,3>{{
-            {16,"source_ln_e_v1"}, {8,"fullfield_taps_eplus_v1"}, {10,"fullfield_taps_eplus_v1"}}}) {
+    for (const auto& [target, preset] : std::array<std::pair<int,const char*>,4>{{
+            {16,"source_ln_e_v1"}, {7,"fullfield_taps_eplus_v2"},
+            {8,"fullfield_taps_eplus_v1"}, {10,"fullfield_taps_eplus_v1"}}}) {
     config.mode.key_mode = std::to_string(target) + "K";
     config.mode.key_conversion_algorithm = "nk2";
     config.mode.key_conversion_nk2_preset = preset;

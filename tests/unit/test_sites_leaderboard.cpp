@@ -872,14 +872,17 @@ TEST_CASE("Sites payload rejects malformed detailed metrics instead of uploading
     CHECK_FALSE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
 }
 
-TEST_CASE("Sites connection accepts only an HTTPS Site origin and header-safe upload key") {
+TEST_CASE("Sites connection accepts only the official TenRiff origin and header-safe upload key") {
     app::SitesLeaderboardConnection connection;
     std::string error;
     const std::string token = "tr_" + std::string(64, 'a');
     const auto config = [&](const std::string& origin) {
         return "{\"schema_version\":1,\"site_url\":\"" + origin + "\",\"upload_token\":\"" + token + "\"}";
     };
-    CHECK(app::parse_sites_leaderboard_connection(config("https://tenriff.test.chatgpt.site"), connection, error));
+    CHECK(app::parse_sites_leaderboard_connection(config(app::kSitesLeaderboardUrl), connection, error));
+    CHECK(app::parse_sites_leaderboard_connection(config(std::string(app::kSitesLeaderboardUrl) + "/"), connection, error));
+    CHECK_FALSE(app::parse_sites_leaderboard_connection(config("https://tenriff.test.chatgpt.site"), connection, error));
+    CHECK_FALSE(app::parse_sites_leaderboard_connection(config("https://192.0.2.1:27303"), connection, error));
     CHECK_FALSE(app::parse_sites_leaderboard_connection(config("http://tenriff.test.chatgpt.site"), connection, error));
     CHECK_FALSE(app::parse_sites_leaderboard_connection(config("https://tenriff.test.chatgpt.site.evil.test"), connection, error));
     CHECK_FALSE(app::parse_sites_leaderboard_connection(config("https://tenriff.test.chatgpt.site/path"), connection, error));
@@ -933,7 +936,8 @@ TEST_CASE("Sites in-game import protects keys and keeps a valid connection after
     std::filesystem::create_directories(directory);
     const std::string first_key = "tr_" + std::string(64, 'a');
     const std::string second_key = "tr_" + std::string(64, 'b');
-    const std::string json = "{\"schema_version\":1,\"site_url\":\"https://tenriff.test.chatgpt.site\",\"upload_token\":\"" + first_key + "\"}";
+    const std::string json = "{\"schema_version\":1,\"site_url\":\"" + std::string(app::kSitesLeaderboardUrl) +
+        "\",\"upload_token\":\"" + first_key + "\"}";
     std::ofstream(directory / "sites-leaderboard.json") << json;
     app::SitesLeaderboardConnection connection;
     std::string error;
@@ -967,7 +971,8 @@ TEST_CASE("Sites damaged protected connection never falls back to an older plain
     std::filesystem::create_directories(directory);
     std::ofstream(directory / "sites-leaderboard.dpapi", std::ios::binary) << "damaged";
     std::ofstream(directory / "sites-leaderboard.json") <<
-        "{\"schema_version\":1,\"site_url\":\"https://test.chatgpt.site\",\"upload_token\":\"tr_" + std::string(64, 'c') + "\"}";
+        "{\"schema_version\":1,\"site_url\":\"" + std::string(app::kSitesLeaderboardUrl) +
+        "\",\"upload_token\":\"tr_" + std::string(64, 'c') + "\"}";
     app::SitesLeaderboardConnection connection;
     std::string error;
     bool missing = false;

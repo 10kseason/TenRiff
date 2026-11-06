@@ -16,7 +16,7 @@ struct EFullFieldTapBoostStats {
     std::int64_t candidates = 0;
     std::int64_t rejectedBySafety = 0;
     std::int64_t rejectedByBudget = 0;
-    // Capacity for 8K/10K; cells above the requested output count stay zero.
+    // Capacity for all supported fields. Cells above the requested count stay zero.
     std::array<std::int64_t, 10> addedLaneCounts{};
     int minTapGuardMs = 0;
     int maxTapGuardMs = 0;

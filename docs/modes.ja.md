@@ -32,7 +32,7 @@
 - chart input は BMS family（`.bms/.bme/.bml/.pms`）専用で、旧 osu toggle は表示・保存しない
 - `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
 - `key_conversion_algorithm`: `krrcream | nk2 | nk3`（既定値は `krrcream`。Krrcream は元 note の再配置のみ、nK2 は安全な support note を生成し、NK3 は同梱 P64 と host beam32 を常に使い、10K 以外の source を 10K に変換するときだけ generalized MLP を追加する）
-- `key_conversion_nk2_preset`: `native | transform | remaster`（既定は `native`。nK2 選択時は `Native (12%)` / `Transform (35%)` / `Remaster (65%)`、Krrcream 選択時は row を lock）
+- `key_conversion_nk2_preset` の既定値は `source_ln_e_v1`（E）です。**E+ - Full-field + taps**（`fullfield_taps_eplus_v2`）は 7K・8K・10K で選択でき、同じキー数の譜面も再配置します。他のキー数では E を適用し、E+ の選択を保持します。
 - `gauge`: `normal | hard | ex_hard | easy | shift`
 - `random`: `off | mirror | rr | fr | sr`
 - `random`: `off | mirror | rr | frns | sr`（`fr` は旧設定互換 alias）

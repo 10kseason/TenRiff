@@ -2,6 +2,7 @@
 #include "gameplay/KeyModeConverter.h"
 #include "gameplay/ModeApplier.h"
 #include "app/ModeManager.h"
+#include "app/ModeResolver.h"
 #include "app/ChartLoader.h"
 #include "app/ChartFileHash.h"
 #include <cstdlib>
@@ -45,6 +46,20 @@ GameplayChart eplus_fixture(int keys, bool holds = true) {
     return chart;
 }
 
+GameplayChart eplus_tail_fixture() {
+    auto chart = eplus_fixture(7);
+    chart.notes.resize(3);
+    for (std::size_t i = 0; i < chart.notes.size(); ++i) {
+        auto& note = chart.notes[i];
+        note.start_sample = 13 + static_cast<int64_t>(i) * 66150;
+        if (i < 2) {
+            note.end_sample = note.start_sample + 33075;
+            note.release_required = true;
+        }
+    }
+    return chart;
+}
+
 auto signature(const GameplayChart& chart) {
     std::vector<std::tuple<int,int64_t,std::optional<int64_t>,std::size_t,bool,std::size_t>> out;
     for (const auto& n : chart.notes)
@@ -85,7 +100,8 @@ void check_eplus_contract(const GameplayChart& source, const GameplayChart& outp
             CHECK(note_audio_asset_count(n) == 0);
             if (!n.end_sample) {
                 CHECK(std::any_of(output.notes.begin(), output.notes.end(), [&](const auto& retained) {
-                    return original.count(retained.note_id) && retained.start_sample == n.start_sample;
+                    return original.count(retained.note_id) &&
+                        (retained.start_sample == n.start_sample || retained.end_sample == n.start_sample);
                 }));
             }
             if (n.end_sample) {
@@ -135,32 +151,56 @@ TEST_CASE("NK2 E+ 8K and 10K preserve exact samples LN semantics keysounds and d
 }
 
 TEST_CASE("NK2 E+ keeps full field for grouped charts and applies explicit equal-key remix") {
-    for (int target : {8,10}) {
+    for (int target : {7,8,10}) {
         auto chart = eplus_fixture(target, false);
         chart.lane_group_size = target / 2;
         ModeSettings settings;
         settings.key_mode = *parse_key_mode(std::to_string(target)+"k");
         settings.key_conversion_algorithm = KeyModeConversionAlgorithm::NK2;
-        settings.key_conversion_nk2_preset = Nk2Preset::FullFieldTapsEPlus;
+        settings.key_conversion_nk2_preset = Nk2Preset::FullFieldTapsEPlusV2;
         const auto applied = apply_mode_settings(chart, settings, {120,44100,3});
         REQUIRE(applied.chart.lane_count == target);
         CHECK(applied.chart.notes.size() > chart.notes.size());
         CHECK(applied.chart.lane_group_size == 0);
+        if (target == 7) CHECK_FALSE(applied.replay_nk2_preset.has_value());
+        else CHECK(applied.replay_nk2_preset == Nk2Preset::FullFieldTapsEPlus);
         check_eplus_contract(chart, applied.chart);
         settings.key_mode = KeyMode::Auto;
         CHECK(signature(apply_mode_settings(chart,settings,{120,44100,3}).chart) == signature(chart));
     }
 }
 
+TEST_CASE("NK2 E+ maps an LN-tail accent to its exact sample and preserves v1 fallback") {
+    const auto source = eplus_tail_fixture();
+    for (int target : {8, 10}) {
+        auto options = eplus_options(target);
+        const auto legacy = convert_key_mode_chart(source, options);
+        CHECK_FALSE(legacy.converted);
+        CHECK(signature(legacy.chart) == signature(source));
+        options.nk2_preset = Nk2Preset::FullFieldTapsEPlusV2;
+        const auto fixed = convert_key_mode_chart(source, options);
+        REQUIRE(fixed.converted);
+        CHECK(fixed.chart.lane_count == target);
+        CHECK_FALSE(fixed.replay_nk2_preset.has_value());
+        CHECK(std::any_of(fixed.chart.notes.begin(), fixed.chart.notes.end(), [&](const auto& note) {
+            return !note.end_sample && note_audio_asset_count(note) == 0 &&
+                std::any_of(source.notes.begin(), source.notes.end(), [&](const auto& original) {
+                    return original.end_sample == note.start_sample;
+                });
+        }));
+        check_eplus_contract(source, fixed.chart);
+    }
+}
+
 TEST_CASE("NK2 E+ excludes BMS scratches and keeps their exact autoplay keysounds") {
-    for (int source_keys : {8,16}) for (int target : {8,10}) {
+    for (int source_keys : {8,16}) for (int target : {7,8,10}) {
         auto chart=eplus_fixture(source_keys,false);
         chart.scratch_lanes=source_keys==8 ? std::vector<int>{1} : std::vector<int>{8,16};
         chart.lane_group_size=source_keys==16 ? 8 : 0;
         ModeSettings settings;
         settings.key_mode=*parse_key_mode(std::to_string(target)+"k");
         settings.key_conversion_algorithm=KeyModeConversionAlgorithm::NK2;
-        settings.key_conversion_nk2_preset=Nk2Preset::FullFieldTapsEPlus;
+        settings.key_conversion_nk2_preset=Nk2Preset::FullFieldTapsEPlusV2;
         const auto result=apply_mode_settings(chart,settings,{120,44100,3});
         REQUIRE(result.chart.lane_count==target);
         CHECK(result.chart.scratch_lanes.empty());
@@ -199,28 +239,37 @@ TEST_CASE("NK2 E+ rejects unsupported targets and unrepresentable holds without 
     for(int target : {8,10}) CHECK_FALSE(convert_key_mode_chart(source,eplus_options(target)).converted);
 }
 
-TEST_CASE("NK2 E+ selection is available only in 8K and 10K without changing the default E") {
+TEST_CASE("NK2 E+ selection persists across 7K, 8K and 10K without changing the default E") {
     using namespace tenriff;
     using namespace app::menu;
     using namespace app::menu::settings;
     CHECK(config::RuntimeConfig{}.mode.key_conversion_nk2_preset=="source_ln_e_v1");
-    CHECK(parse_nk2_preset("E+")==Nk2Preset::FullFieldTapsEPlus);
+    CHECK(parse_nk2_preset("E+")==Nk2Preset::FullFieldTapsEPlusV2);
     CHECK(parse_nk2_preset("fullfield_taps_eplus_v1")==Nk2Preset::FullFieldTapsEPlus);
-    CHECK(to_string(Nk2Preset::FullFieldTapsEPlus)=="fullfield_taps_eplus_v1");
+    CHECK(parse_nk2_preset("fullfield_taps_eplus_v2")==Nk2Preset::FullFieldTapsEPlusV2);
+    CHECK(to_string(Nk2Preset::FullFieldTapsEPlusV2)=="fullfield_taps_eplus_v2");
     for (auto mode : {"none","4k","7k","8k","9k","10k","12k","14k","16k"}) {
         config::RuntimeConfig runtime;
         runtime.mode.key_mode=mode;
         runtime.mode.key_conversion_algorithm="nk2";
         ModeSettingsController controller;
         controller.handle(MenuAction::adjust(1),runtime,ModeSettingId::Nk2Preset);
-        const bool supported=std::string(mode)=="8k" || std::string(mode)=="10k";
-        CHECK(runtime.mode.key_conversion_nk2_preset==(supported?"fullfield_taps_eplus_v1":"native"));
-        if (supported) {
-            controller.handle(MenuAction::adjust(1),runtime,ModeSettingId::KeyMode);
-            CHECK(runtime.mode.key_conversion_nk2_preset=="source_ln_e_v1");
-        }
+        const std::string_view key_mode(mode);
+        const bool supported = key_mode == "7k" || key_mode == "8k" || key_mode == "10k";
+        CHECK(runtime.mode.key_conversion_nk2_preset==(supported?"fullfield_taps_eplus_v2":"native"));
     }
-    CHECK(app::normalize_key_conversion_nk2_preset("E+")=="fullfield_taps_eplus_v1");
+    config::RuntimeConfig runtime;
+    runtime.mode.key_mode = "7k";
+    runtime.mode.key_conversion_algorithm = "nk2";
+    ModeSettingsController controller;
+    controller.handle(MenuAction::adjust(1), runtime, ModeSettingId::Nk2Preset);
+    for (const std::string_view target : {"8k", "9k", "10k"}) {
+        controller.handle(MenuAction::adjust(1), runtime, ModeSettingId::KeyMode);
+        CHECK(runtime.mode.key_mode == target);
+        CHECK(runtime.mode.key_conversion_nk2_preset == "fullfield_taps_eplus_v2");
+        const auto effective = app::resolve_mode_settings(runtime.mode).settings.key_conversion_nk2_preset;
+        CHECK(effective == (target == "9k" ? Nk2Preset::SourceLnE : Nk2Preset::FullFieldTapsEPlusV2));
+    }
 }
 
 TEST_CASE("NK2 E+ honors nondefault sample rates without duplicated generated keysounds") {
@@ -234,19 +283,19 @@ TEST_CASE("NK2 E+ honors nondefault sample rates without duplicated generated ke
         check_eplus_contract(chart,converted.chart);
     }
 }
-TEST_CASE("NK2 E+ R13 and R14 saved replays verify and serialize Sites identity for 8K and 10K") {
+TEST_CASE("NK2 E+ R13 and R14 saved replays verify historical and repaired layouts") {
     using namespace tenriff;
     using input::InputState;
-    auto source = eplus_fixture(7);
-    source.bms_rank = 2;
     const auto directory = std::filesystem::temp_directory_path() /
         ("tenriff-nk2-eplus-replay-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     REQUIRE(std::filesystem::create_directory(directory));
-    for (int target : {8,10}) for (bool ex : {false,true}) {
+    for (int target : {7, 8, 10}) for (bool ex : {false, true}) for (bool tail : {false, true}) {
+        auto source = tail ? eplus_tail_fixture() : eplus_fixture(7);
+        source.bms_rank = 2;
         config::ModeConfig mode;
         mode.key_mode = std::to_string(target) + "k";
         mode.key_conversion_algorithm = "nk2";
-        mode.key_conversion_nk2_preset = "fullfield_taps_eplus_v1";
+        mode.key_conversion_nk2_preset = "fullfield_taps_eplus_v2";
         mode.random = "off";
         mode.gauge = "normal";
         if (ex) mode.mods = {"judge_ex"};
@@ -265,7 +314,9 @@ TEST_CASE("NK2 E+ R13 and R14 saved replays verify and serialize Sites identity 
         replay.mods = managed.active_mods;
         replay.mode.key_mode = mode.key_mode;
         replay.mode.key_conversion_algorithm = mode.key_conversion_algorithm;
-        replay.mode.key_conversion_nk2_preset = mode.key_conversion_nk2_preset;
+        replay.mode.key_conversion_nk2_preset = to_string(managed.settings.key_conversion_nk2_preset);
+        const std::string expected = (target == 7 || tail) ? "fullfield_taps_eplus_v2" : "fullfield_taps_eplus_v1";
+        REQUIRE(replay.mode.key_conversion_nk2_preset == expected);
         replay.mode.key_conversion_version = 3;
         replay.mode.bms_gauge_version = 2;
         replay.mode.gauge = "normal";
@@ -294,11 +345,12 @@ TEST_CASE("NK2 E+ R13 and R14 saved replays verify and serialize Sites identity 
         replay.trace = engine.replay();
         replay.stats = engine.stats();
         replay.final_score = scale_native_score(replay.stats.raw_score, replay.score_multiplier);
-        const auto path = directory / (std::to_string(target) + (ex ? "-r14.json" : "-r13.json"));
+        const auto filename = std::to_string(target) + (tail ? "-tail" : "") + (ex ? "-r14.json" : "-r13.json");
+        const auto path = directory / filename;
         REQUIRE(save_replay_json(path.u8string(), replay).success());
         const auto loaded = load_replay_json(path.u8string());
         REQUIRE(loaded.success());
-        CHECK(loaded.replay->mode.key_conversion_nk2_preset == "fullfield_taps_eplus_v1");
+        CHECK(loaded.replay->mode.key_conversion_nk2_preset == expected);
         const auto verified = app::verify_replay_against_chart(*loaded.replay, source, app::ChartFormat::Bms, 120);
         if (!verified.verified() || !verified.claims_match) std::cerr << "NK2 E+ replay " << target << ": " << verified.detail << '\n';
         REQUIRE(verified.verified());
@@ -310,12 +362,12 @@ TEST_CASE("NK2 E+ R13 and R14 saved replays verify and serialize Sites identity 
         const bool serialized = app::build_sites_score_json(*loaded.replay, replay_hash.sha256, "NK2 E+ QA", verified.clear_status, payload, error);
         if (!serialized) std::cerr << "NK2 E+ Sites " << target << ": " << error << '\n';
         REQUIRE(serialized);
-        CHECK(payload.find("nk2:fullfield_taps_eplus_v1") != std::string::npos);
+        CHECK(payload.find("nk2:" + expected) != std::string::npos);
         // Optional local evidence export: no production request or user account.
         if (const char* out = std::getenv("TENRIFF_NK2_EPLUS_PAYLOAD_DIR"); out && *out) {
             const auto output = std::filesystem::path(out);
             std::filesystem::create_directories(output);
-            std::ofstream file(output / (std::to_string(target) + (ex ? "-r14.json" : "-r13.json")));
+            std::ofstream file(output / filename);
             file << payload << '\n';
             REQUIRE(file.good());
         }
@@ -330,17 +382,17 @@ TEST_CASE("NK2 E+ profile roundtrip and migration retain its own identity") {
         ("tenriff-nk2-eplus-profile-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     REQUIRE(std::filesystem::create_directory(dir));
     config::RuntimeConfig config;
-    config.mode.key_mode="8k";
+    config.mode.key_mode="9k";
     config.mode.key_conversion_algorithm="nk2";
-    config.mode.key_conversion_nk2_preset="E+";
+    config.mode.key_conversion_nk2_preset="fullfield_taps_eplus_v1";
     CHECK(app::migrate_bms_first_runtime_config(config));
-    CHECK(config.mode.key_conversion_nk2_preset=="fullfield_taps_eplus_v1");
+    CHECK(config.mode.key_conversion_nk2_preset=="fullfield_taps_eplus_v2");
     config::ConfigLoader loader;
     std::string error;
     REQUIRE(loader.save_profile(dir.u8string(),config,&error));
     const auto loaded=loader.load_profile(dir.u8string());
     REQUIRE(loaded.success());
-    CHECK(loaded.config.mode.key_mode=="8k");
-    CHECK(loaded.config.mode.key_conversion_nk2_preset=="fullfield_taps_eplus_v1");
+    CHECK(loaded.config.mode.key_mode=="9k");
+    CHECK(loaded.config.mode.key_conversion_nk2_preset=="fullfield_taps_eplus_v2");
     std::filesystem::remove_all(dir);
 }

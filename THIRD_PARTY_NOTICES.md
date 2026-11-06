@@ -266,5 +266,5 @@ Key Note Overlay integration (`third_party/key_note_overlay/`)
 - Upstream: https://github.com/10kseason/key-weaver
 - Commit: `fb15fb2e44c3c14450e36877d4df96a865bb5553` (tag `1.4.0`)
 - License: MIT; see `nk2eplus/LICENSE` in source or `third_party/keyweaver-eplus/LICENSE` in the binary package.
-- Adaptation: namespace/include paths only, with LF normalization; source/import hashes are in `nk2eplus/provenance.json`.
+- Adaptations cover namespace/include paths, LF normalization, 7K output and fewer state copies during phrase search. Hashes are in `nk2eplus/provenance.json`.
 - Historical NK2 and E engines remain separate to preserve existing conversion/replay behavior.

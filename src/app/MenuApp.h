@@ -44,7 +44,6 @@
 #include "app/menu/settings/SkinSettingsController.h"
 #include "app/MultiplayerChartSearch.h"
 #include "app/OnlineRecordsClient.h"
-#include "app/RankedRecordsClient.h"
 #include "app/SitesLeaderboardClient.h"
 #include "app/SessionMix.h"
 #include "app/SongSelectState.h"
@@ -334,9 +333,6 @@ private:
     void set_ranked_account_overlay(bool visible);
     [[nodiscard]] bool handle_ranked_account_overlay_input(uint32_t keycode);
     void populate_ranked_account_overlay(render::RankedAccountOverlayData& target) const;
-    void begin_ranked_account_request();
-    void service_ranked_account_request();
-    void logout_ranked_account();
     void refresh_sites_leaderboard_connection();
     void handle_sites_leaderboard_action(render::SitesLeaderboardAction action);
     void show_chat_url_warning(std::string url);
@@ -874,7 +870,6 @@ private:
     SongGroupMode song_group_mode_ = SongGroupMode::None;
     SongSelectView song_select_view_ = SongSelectView::Songs;
     bool online_records_view_ = false;
-    bool sites_records_view_ = false;
     int sites_records_board_ = 0;
     void request_record_leaderboard(bool force_refresh = false);
     int song_select_nav_cursor_ = 0;
@@ -957,34 +952,11 @@ private:
     bool account_mode_choice_online_ = false;
     std::shared_ptr<std::atomic_bool> active_recording_permission_{};
     bool ranked_account_overlay_visible_ = false;
-    bool ranked_account_register_mode_ = false;
-    bool ranked_account_sites_mode_ = true;
     bool sites_connection_saved_ = false;
-    std::string sites_connection_url_{};
     std::string sites_connection_status_{};
     std::string sites_last_upload_status_{};
     std::string sites_result_replay_sha256_{};
     std::string sites_result_upload_status_{};
-    bool ranked_account_use_private_server_ = false;
-    int ranked_account_focused_field_ = 1;
-    std::string ranked_account_main_server_url_{};
-    std::string ranked_account_private_server_url_{};
-    std::string ranked_account_active_server_url_{};
-    std::string ranked_account_username_{};
-    std::string ranked_account_password_{};
-    std::string ranked_account_signed_in_username_{};
-    std::string ranked_account_role_{};
-    std::string ranked_account_status_{};
-    std::atomic_bool ranked_account_request_busy_{false};
-    struct RankedAccountRequestResult {
-        bool available = false;
-        bool success = false;
-        RankedAccountSession session{};
-        std::string error;
-    };
-    std::mutex ranked_account_result_mutex_{};
-    RankedAccountRequestResult ranked_account_result_{};
-    std::thread ranked_account_thread_{};
     bool chat_url_warning_visible_ = false;
     std::string chat_url_warning_target_{};
     MenuSnapshot snapshot_{};
@@ -1025,8 +997,6 @@ private:
     std::vector<int> table_level_counts_;
     std::string active_table_level_;
     int selected_table_level_ = 0;
-    bool online_records_url_editing_ = false;
-    std::string online_records_url_input_{};
     std::string song_browser_status_message_{};
     // Session-only failure notice; clear only after a successful audio/session retry.
     bool gameplay_audio_failed_ = false;

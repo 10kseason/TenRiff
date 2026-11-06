@@ -56,7 +56,6 @@
 #include "app/PersistedRuntimeConfig.h"
 #include "app/PeerBattleRuntimeRules.h"
 #include "app/MultiplayerPresentation.h"
-#include "app/RankedRecordsClient.h"
 #include "app/ReplayVerifier.h"
 #include "app/ProfileSetupFlow.h"
 #include "ui/FunctionKeyLabels.h"
@@ -89,7 +88,7 @@ using menu_song_select::song_title_for_ui;
 
 constexpr int kSnapshotSongCount = 10;
 constexpr int kSongSelectNavLastIndex = 6;
-constexpr int kSongBrowserRowCount = 12;
+constexpr int kSongBrowserRowCount = 11;
 constexpr int64_t kSongSelectRepeatInitialDelayNs = 250'000'000LL;
 constexpr int64_t kSongSelectRepeatIntervalNs = 45'000'000LL;
 constexpr std::size_t kRecentSongSourceLimit = 12;
@@ -264,59 +263,42 @@ SongIndexLoadResult load_song_index_from_available_cache(const std::string& prim
 
 #ifdef _WIN32
 std::string browse_for_folder(const std::string& title) {
-    std::string result;
-
-    HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-    if (FAILED(hr)) {
-        return result;
-    }
-
-    IFileDialog* pFileDialog = nullptr;
-    hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_ALL,
-                          IID_IFileDialog, reinterpret_cast<void**>(&pFileDialog));
-    if (SUCCEEDED(hr)) {
+    const auto choice = run_native_file_dialog_sta([&] {
+        NativeFileChoice result;
+        const auto failure = [&](HRESULT status) {
+            result.error = "Song folder picker failed (HRESULT " +
+                std::to_string(static_cast<unsigned long>(status)) + ").";
+            return result;
+        };
+        Microsoft::WRL::ComPtr<IFileOpenDialog> dialog;
+        HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER,
+                                      IID_PPV_ARGS(&dialog));
+        if (FAILED(hr)) return failure(hr);
         DWORD options = 0;
-        pFileDialog->GetOptions(&options);
-        pFileDialog->SetOptions(options | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
-
-        std::wstring wide_title;
-        if (!title.empty()) {
-            int count = MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, nullptr, 0);
-            if (count > 0) {
-                wide_title.resize(static_cast<size_t>(count));
-                MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, wide_title.data(), count);
-            }
+        hr = dialog->GetOptions(&options);
+        if (FAILED(hr)) return failure(hr);
+        hr = dialog->SetOptions(options | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM |
+                                FOS_PATHMUSTEXIST | FOS_NOCHANGEDIR);
+        if (FAILED(hr)) return failure(hr);
+        hr = dialog->SetTitle(util::wide_from_utf8_lossy(title).c_str());
+        if (FAILED(hr)) return failure(hr);
+        hr = show_native_file_dialog(dialog.Get());
+        if (hr == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
+            result.cancelled = true;
+            return result;
         }
-        if (!wide_title.empty()) {
-            pFileDialog->SetTitle(wide_title.c_str());
-        }
-
-        hr = show_native_file_dialog(pFileDialog);
-        if (SUCCEEDED(hr)) {
-            IShellItem* pItem = nullptr;
-            hr = pFileDialog->GetResult(&pItem);
-            if (SUCCEEDED(hr)) {
-                PWSTR pszPath = nullptr;
-                hr = pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszPath);
-                if (SUCCEEDED(hr) && pszPath) {
-                    int len = WideCharToMultiByte(CP_UTF8, 0, pszPath, -1, nullptr, 0, nullptr, nullptr);
-                    if (len > 0) {
-                        result.resize(static_cast<size_t>(len));
-                        WideCharToMultiByte(CP_UTF8, 0, pszPath, -1, result.data(), len, nullptr, nullptr);
-                        if (!result.empty() && result.back() == '\0') {
-                            result.pop_back();
-                        }
-                    }
-                    CoTaskMemFree(pszPath);
-                }
-                pItem->Release();
-            }
-        }
-        pFileDialog->Release();
-    }
-
-    CoUninitialize();
-    return result;
+        if (FAILED(hr)) return failure(hr);
+        Microsoft::WRL::ComPtr<IShellItem> item;
+        hr = dialog->GetResult(&item);
+        if (FAILED(hr) || !item) return failure(FAILED(hr) ? hr : E_FAIL);
+        struct ShellPath { PWSTR value = nullptr; ~ShellPath() { CoTaskMemFree(value); } } raw;
+        hr = item->GetDisplayName(SIGDN_FILESYSPATH, &raw.value);
+        if (FAILED(hr) || !raw.value) return failure(FAILED(hr) ? hr : E_FAIL);
+        result.path = util::utf8_from_wide_lossy(raw.value);
+        return result;
+    });
+    if (!choice.error.empty()) std::cerr << "[warn] " << choice.error << '\n';
+    return choice.path;
 }
 
 std::string browse_for_image_file(const std::string& title) {
@@ -922,7 +904,9 @@ std::string MenuApp::ui_key_conversion_algorithm_label(std::string_view token) c
 std::string MenuApp::ui_key_conversion_nk2_preset_label(std::string_view token) const {
     const std::string normalized = normalize_key_conversion_nk2_preset(std::string(token));
     if (normalized == "source_ln_e_v1") return "E - Source LN";
-    if (normalized == "fullfield_taps_eplus_v1") return "E+ - Full-field + taps";
+    if (normalized == "fullfield_taps_eplus_v1" || normalized == "fullfield_taps_eplus_v2") {
+        return nk2_eplus_available(config_.mode.key_mode) ? "E+ - Full-field + taps" : "E - Source LN";
+    }
     if (normalized == "transform") {
         return "Transform (35%)";
     }
@@ -1236,19 +1220,6 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
         return false;
     }
     config_ = config_result.config;
-    ranked_account_main_server_url_ = config_.ui.tenriff_main_server_url;
-    if (ranked_account_main_server_url_.empty()) {
-        ranked_account_main_server_url_ = config_.ui.online_records_server_url;
-    }
-    ranked_account_private_server_url_ = config_.ui.private_server_url;
-    ranked_account_use_private_server_ = config_.ui.account_server_mode == "private";
-    ranked_account_focused_field_ = ranked_account_use_private_server_ ? 0 : 1;
-    std::string saved_account_error;
-    if (!saved_ranked_account_username(
-            profile_dir, ranked_account_username_, saved_account_error)) {
-        ranked_account_status_ = safe_ui_text(
-            saved_account_error, "Could not read the protected ranked account.");
-    }
     song_key_filter_ = config_.ui.song_key_filter;
     song_level_min_filter_ = config_.ui.song_level_min_filter;
     song_level_max_filter_ = config_.ui.song_level_max_filter;
@@ -1449,7 +1420,6 @@ void MenuApp::run() {
             handle_text_input(text.value());
         }
         service_multiplayer();
-        service_ranked_account_request();
         const auto sites_messages = sites_leaderboard_service_.take_messages();
         if (!sites_messages.empty()) {
             for (const auto& message : sites_messages) {
@@ -1537,7 +1507,6 @@ void MenuApp::shutdown() {
     online_records_service_.shutdown();
     sites_leaderboard_service_.shutdown();
     global_chat_service_.shutdown();
-    if (ranked_account_thread_.joinable()) ranked_account_thread_.join();
     stop_menu_threads();
     song_indexer_.stop();
 }
@@ -2646,33 +2615,9 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
             else if (!account_mode_selection_ && event.index == 3) { set_ranked_account_overlay(false); publish_snapshot(); }
             return;
         }
-        if (account_mode_selection_) return;
-        const bool busy = ranked_account_request_busy_.load(std::memory_order_acquire);
-        if (event.kind == render::MenuHitTargetKind::SitesLeaderboardAction && ranked_account_sites_mode_ && !busy) {
-            if (event.index >= 0 && event.index <= static_cast<int>(render::SitesLeaderboardAction::Disconnect))
-                handle_sites_leaderboard_action(static_cast<render::SitesLeaderboardAction>(event.index));
-        } else if (event.kind == render::MenuHitTargetKind::AccountServer && !busy) {
-            ranked_account_sites_mode_ = event.index == 2;
-            if (ranked_account_sites_mode_) {
-                refresh_sites_leaderboard_connection();
-            } else if (ranked_account_signed_in_username_.empty()) {
-                ranked_account_use_private_server_ = event.index == 1;
-                ranked_account_focused_field_ = ranked_account_use_private_server_ ? 0 : 1;
-            }
-            ranked_account_status_.clear();
-            publish_snapshot();
-        } else if (event.kind == render::MenuHitTargetKind::AccountTab &&
-                   !busy && ranked_account_signed_in_username_.empty()) {
-            ranked_account_register_mode_ = event.index == 1;
-            ranked_account_status_.clear();
-            publish_snapshot();
-        } else if (event.kind == render::MenuHitTargetKind::AccountField &&
-                   !busy && ranked_account_signed_in_username_.empty()) {
-            ranked_account_focused_field_ = std::clamp(event.index, 0, 2);
-            publish_snapshot();
-        } else if (event.kind == render::MenuHitTargetKind::AccountAction && !busy) {
-            if (event.index == 1) logout_ranked_account();
-            else begin_ranked_account_request();
+        if (!account_mode_selection_ && event.kind == render::MenuHitTargetKind::SitesLeaderboardAction &&
+            event.index >= 0 && event.index <= static_cast<int>(render::SitesLeaderboardAction::Disconnect)) {
+            handle_sites_leaderboard_action(static_cast<render::SitesLeaderboardAction>(event.index));
         }
         return;
     }
@@ -3148,7 +3093,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
             handle_options_hub_input(key_enter_);
             return;
         case render::MenuHitTargetKind::SongSourceAdd:
-            if (current_screen() == Screen::SongSelect && song_select_view_ == SongSelectView::Sources)
+            if (current_screen() == Screen::SongSelect && event.part == render::MenuHitPart::Activate)
                 add_song_source_from_dialog();
             return;
         case render::MenuHitTargetKind::SongSourceRemove:
@@ -3790,11 +3735,7 @@ void MenuApp::handle_title_input(uint32_t keycode) {
     }
 #ifdef _WIN32
     if (keycode == key_f2_) {
-        std::string new_path = browse_for_folder(ui_text("Select Songs Folder", "곡 폴더 선택"));
-        if (!new_path.empty()) {
-            switch_song_source(new_path, false);
-            publish_snapshot();
-        }
+        add_song_source_from_dialog();
         return;
     }
 #endif
@@ -3817,11 +3758,7 @@ void MenuApp::handle_title_input(uint32_t keycode) {
         if (title_cursor_ == 0) {
 #ifdef _WIN32
             if (visible_song_count() == 0) {
-                std::string new_path = browse_for_folder(ui_text("Select Songs Folder", "곡 폴더 선택"));
-                if (!new_path.empty()) {
-                    switch_song_source(new_path, false);
-                    publish_snapshot();
-                }
+                add_song_source_from_dialog();
                 return;
             }
 #endif
@@ -3858,37 +3795,7 @@ void MenuApp::handle_text_input(std::string_view text) {
         return;
     }
     if (profile_control_key_capture_active_) return;
-    if (ranked_account_overlay_visible_ && (account_mode_selection_ || ranked_account_sites_mode_)) return;
-    if (ranked_account_overlay_visible_ &&
-        ranked_account_signed_in_username_.empty() &&
-        !ranked_account_request_busy_.load(std::memory_order_acquire) &&
-        !text.empty()) {
-        const std::string utf8 = util::ensure_utf8_text(text);
-        if (ranked_account_focused_field_ == 0 && ranked_account_use_private_server_) {
-            for (const unsigned char ch : utf8) {
-                if (ch > 0x20u && ch < 0x7fu &&
-                    ranked_account_private_server_url_.size() < 2048) {
-                    ranked_account_private_server_url_.push_back(static_cast<char>(ch));
-                }
-            }
-        } else if (ranked_account_focused_field_ == 1) {
-            for (const unsigned char ch : utf8) {
-                if ((std::isalnum(ch) != 0 || ch == '_' || ch == '-' || ch == '.') &&
-                    ranked_account_username_.size() < 32) {
-                    ranked_account_username_.push_back(static_cast<char>(ch));
-                }
-            }
-        } else if (ranked_account_focused_field_ == 2) {
-            for (const unsigned char ch : utf8) {
-                if (ch >= 0x20u && ch != 0x7fu &&
-                    ranked_account_password_.size() < 128) {
-                    ranked_account_password_.push_back(static_cast<char>(ch));
-                }
-            }
-        }
-        publish_snapshot();
-        return;
-    }
+    if (ranked_account_overlay_visible_) return;
     if (chat_overlay_visible_ &&
         global_chat_service_.snapshot().configured &&
         multiplayer_menu_.edit_field == MultiplayerEditField::Chat &&
@@ -3914,12 +3821,10 @@ void MenuApp::handle_text_input(std::string_view text) {
         return;
     }
 
-    if ((difficulty_table_url_editing_ || online_records_url_editing_) && !text.empty()) {
-        if (difficulty_table_url_editing_) reset_song_select_repeat();
-        std::string& target = online_records_url_editing_
-                                  ? online_records_url_input_
-                                  : difficulty_table_url_input_;
-        const std::size_t maximum = online_records_url_editing_ ? 2048u : 512u;
+    if (difficulty_table_url_editing_ && !text.empty()) {
+        reset_song_select_repeat();
+        std::string& target = difficulty_table_url_input_;
+        constexpr std::size_t maximum = 512;
         const std::string utf8 = util::ensure_utf8_text(text);
         std::string filtered;
         filtered.reserve(utf8.size());
@@ -4111,11 +4016,7 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
 
 #ifdef _WIN32
     if ((keycode == key_enter_ && settings_cursor_ == profile_setup::kSongsFolderRow) || keycode == key_f2_) {
-        std::string new_path = browse_for_folder(ui_text("Select Songs Folder", "곡 폴더 선택"));
-        if (!new_path.empty()) {
-            switch_song_source(new_path, false);
-            publish_snapshot();
-        }
+        add_song_source_from_dialog();
         return;
     }
 #endif
@@ -4618,20 +4519,17 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
     }
     if (key_tab_ != 0 && keycode == key_tab_ &&
         song_select_view_ == SongSelectView::Records) {
-        // Local -> public Sites leaderboard -> legacy verified server -> local.
-        if (!online_records_view_) { online_records_view_ = true; sites_records_view_ = true; }
-        else if (sites_records_view_) sites_records_view_ = false;
-        else online_records_view_ = false;
+        online_records_view_ = !online_records_view_;
         sites_records_board_ = 0;
         selected_record_ = 0;
         selected_online_record_ = 0;
         publish_snapshot();
         return;
     }
-    if (song_select_view_ == SongSelectView::Records && online_records_view_ && sites_records_view_ &&
+    if (song_select_view_ == SongSelectView::Records && online_records_view_ &&
         (keycode == key_left_ || keycode == key_right_)) {
         const auto snapshot = online_records_service_.snapshot();
-        if (snapshot.sites && snapshot.state == OnlineRecordsState::Ready && !snapshot.boards.empty()) {
+        if (snapshot.state == OnlineRecordsState::Ready && !snapshot.boards.empty()) {
             sites_records_board_ = std::clamp(snapshot.board_index + (keycode == key_left_ ? -1 : 1),
                                             0, static_cast<int>(snapshot.boards.size()) - 1);
             selected_online_record_ = 0;
@@ -4838,13 +4736,14 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
 
 void MenuApp::add_song_source_from_dialog() {
 #ifdef _WIN32
-    const bool return_to_sources = song_select_view_ == SongSelectView::Sources;
+    const bool in_song_select = current_screen() == Screen::SongSelect;
+    const bool return_to_sources = in_song_select && song_select_view_ == SongSelectView::Sources;
     const std::string path = browse_for_folder(ui_text("Select Songs Folder", "곡 폴더 선택"));
     if (path.empty()) return;
     song_select_search_active_ = false;
     switch_song_source(path, false);
     if (return_to_sources) song_select_view_ = SongSelectView::Sources;
-    song_select_focus_ = SongSelectFocus::SongList;
+    if (in_song_select) song_select_focus_ = SongSelectFocus::SongList;
     publish_snapshot();
 #endif
 }
@@ -5066,7 +4965,7 @@ void MenuApp::handle_difficulty_table_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_song_browser_input(uint32_t keycode) {
-    if (!difficulty_table_url_editing_ && !online_records_url_editing_ &&
+    if (!difficulty_table_url_editing_ &&
         settings_cursor_ == 5 && (keycode == key_enter_ || keycode == key_left_ || keycode == key_right_)) {
         handle_difficulty_table_input(keycode);
         return;
@@ -5074,61 +4973,6 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
     const int item_count = kSongBrowserRowCount;
     if (difficulty_table_url_editing_) {
         handle_difficulty_table_input(keycode);
-        return;
-    }
-    if (online_records_url_editing_) {
-        if (keycode == key_escape_) {
-            online_records_url_editing_ = false;
-            song_browser_status_message_.clear();
-            publish_snapshot();
-            return;
-        }
-        if (keycode == key_backspace_) {
-            if (!online_records_url_input_.empty()) online_records_url_input_.pop_back();
-            publish_snapshot();
-            return;
-        }
-        if (keycode == key_delete_) {
-            online_records_url_input_.clear();
-            publish_snapshot();
-            return;
-        }
-        if (keycode == key_v_ && control_modifier_pressed()) {
-            if (const auto clipboard = clipboard_text_utf8(); clipboard.has_value()) {
-                const std::string normalized =
-                    config::normalize_online_records_server_url(*clipboard);
-                if (!normalized.empty()) {
-                    online_records_url_input_ = normalized;
-                    song_browser_status_message_.clear();
-                } else {
-                    song_browser_status_message_ = ui_text(
-                        "Use an http(s) server URL without a query or fragment.",
-                        "쿼리나 프래그먼트가 없는 http(s) 서버 URL을 사용하세요.");
-                }
-            }
-            publish_snapshot();
-            return;
-        }
-        if (keycode == key_enter_) {
-            const std::string normalized =
-                config::normalize_online_records_server_url(online_records_url_input_);
-            if (normalized.empty()) {
-                song_browser_status_message_ = ui_text(
-                    "Invalid online-records server URL.",
-                    "인랭 기록 서버 URL이 올바르지 않습니다.");
-                publish_snapshot();
-                return;
-            }
-            online_records_url_editing_ = false;
-            config_.ui.online_records_server_url = normalized;
-            online_records_service_.shutdown();
-            ++online_records_revision_;
-            song_browser_status_message_ = ui_text(
-                "Online-records server saved.", "인랭 기록 서버를 저장했습니다.");
-            persist_runtime_config();
-            publish_snapshot();
-            return;
-        }
         return;
     }
     if (keycode == key_up_) {
@@ -5196,20 +5040,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
         return;
     }
 
-    if (settings_cursor_ == 6 && keycode == key_enter_) {
-        online_records_url_editing_ = true;
-        online_records_url_input_ = config_.ui.online_records_server_url;
-        if (const auto clipboard = clipboard_text_utf8(); clipboard.has_value()) {
-            const std::string normalized =
-                config::normalize_online_records_server_url(*clipboard);
-            if (!normalized.empty()) online_records_url_input_ = normalized;
-        }
-        song_browser_status_message_.clear();
-        publish_snapshot();
-        return;
-    }
-
-    if (settings_cursor_ == 7 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 6 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         cycle_song_collection_filter(direction);
         persist_runtime_config();
@@ -5218,7 +5049,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
     }
 
     if (keycode == key_enter_) {
-        if (settings_cursor_ == 8) {
+        if (settings_cursor_ == 7) {
             const std::string named_collection = current_named_song_collection();
             bool changed = false;
             if (!named_collection.empty()) {
@@ -5237,13 +5068,13 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
             }
             return;
         }
-        if (settings_cursor_ == 9) {
+        if (settings_cursor_ == 8) {
             create_next_song_collection();
             persist_runtime_config();
             apply_filter_refresh();
             return;
         }
-        if (settings_cursor_ == 10) {
+        if (settings_cursor_ == 9) {
             song_key_filter_ = 0;
             song_level_min_filter_ = 0;
             song_level_max_filter_ = 0;
@@ -5255,7 +5086,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
             apply_filter_refresh();
             return;
         }
-        if (settings_cursor_ == 11) {
+        if (settings_cursor_ == 10) {
             if (!pop_screen()) {
                 reset_screen(Screen::SongSelect);
             }

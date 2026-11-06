@@ -10,6 +10,7 @@
 
 #include "config/SimpleJson.h"
 #include "app/MainApiTlsPin.h"
+#include "app/ReplayVerifier.h"
 #include "app/SitesLeaderboardConnection.h"
 #include "util/Utf8Compat.h"
 
@@ -399,17 +400,17 @@ bool parse_sites_record_boards(std::string_view json, std::string_view title,
         board.rate_milli = static_cast<int>(rate);
         board.id = lower_ascii(board.id);
         board.chart_sha256 = lower_ascii(board.chart_sha256);
-        const std::string ruleset_label = board.ruleset_id == "tenriff-native-score-v2-ruleset-8" ? "RULESET 8" :
-                                          board.ruleset_id == "tenriff-native-score-v2-ruleset-7" ? "RULESET 7" :
-                                          board.ruleset_id == "tenriff-native-score-v2-ruleset-6" ? "RULESET 6" :
-                                          board.ruleset_id == "tenriff-native-score-v2-ruleset-5" ? "RULESET 5" :
-                                          board.ruleset_id == "tenriff-native-score-v2-ruleset-4" ? "RULESET 4" :
-                                          board.ruleset_id == "tenriff-native-score-v2-ruleset-3" ? "RULESET 3" :
-                                          board.ruleset_id == "tenriff-native-score-v2-ruleset-2" ? "RULESET 2" :
-            board.ruleset_id == "tenriff-native-score-v2-ruleset-1" ? "RULESET 1" : board.ruleset_id;
+        constexpr std::string_view ruleset_prefix = "tenriff-native-score-v2-ruleset-";
+        const bool canonical_ruleset = is_supported_canonical_replay_ruleset(board.ruleset_id);
+        const std::string ruleset_label = canonical_ruleset
+            ? "RULESET " + board.ruleset_id.substr(ruleset_prefix.size()) : board.ruleset_id;
         board.conditions_label = board.key_mode + " / " + std::to_string(rate / 1000) + "." +
             (rate % 1000 < 100 ? "0" : "") + std::to_string((rate % 1000) / 10) +
             "x / " + ruleset_label + " / " + timing_label + " / " + gauge + " / " + random;
+        if (const auto* conversion = find_field(*condition, "conversion"); conversion && conversion->is_string()) {
+            if (conversion->as_string() == "nk2:fullfield_taps_eplus_v1") board.conditions_label += " / NK2 E+ v1";
+            else if (conversion->as_string() == "nk2:fullfield_taps_eplus_v2") board.conditions_label += " / NK2 E+ v2";
+        }
         const bool has_bms_policy = find_field(*condition, "bms_timing_version") ||
             find_field(*condition, "bms_gauge_version") || find_field(*condition, "bms_control_flow_version");
         const auto* branch_field = find_field(*condition, "bms_branch_sha256");
@@ -419,10 +420,9 @@ bool parse_sites_record_boards(std::string_view json, std::string_view title,
                 !required_integer(*condition, "bms_gauge_version", 1, 2, gauge_version) ||
                 !required_integer(*condition, "bms_control_flow_version", 1, 2, control) ||
                 timing_label.compare(0, 4, "BMS ") != 0 ||
-                (board.ruleset_id != "tenriff-native-score-v2-ruleset-5" &&
-                 board.ruleset_id != "tenriff-native-score-v2-ruleset-6" &&
-                 board.ruleset_id != "tenriff-native-score-v2-ruleset-7" &&
-                 board.ruleset_id != "tenriff-native-score-v2-ruleset-8")) return fail();
+                !canonical_ruleset || board.ruleset_id == kLegacyReplayRulesetId ||
+                board.ruleset_id == kPreviousReplayRulesetId || board.ruleset_id == kRuleset3ReplayRulesetId ||
+                board.ruleset_id == kRuleset4ReplayRulesetId) return fail();
             // These are community comparison conditions, not server replay verification.
             board.conditions_label += gauge_version == 2 ? " / BMS TOTAL" : " / GAUGE v1";
             board.conditions_label += " / STOP v" + std::to_string(timing);
@@ -534,10 +534,8 @@ struct OnlineRecordsService::Impl {
     bool stopping = false;
     bool pending = false;
     std::uint64_t request_id = 0;
-    std::string pending_url;
     std::string pending_hash;
     OnlineRecordsSnapshot current;
-    bool pending_sites = false;
     std::string pending_title;
     int pending_board = 0;
 
@@ -545,29 +543,23 @@ struct OnlineRecordsService::Impl {
 
     void run() {
         for (;;) {
-            std::string url;
             std::string hash;
             std::string title;
             int board = 0;
-            bool sites = false;
             std::uint64_t active_request = 0;
             {
                 std::unique_lock lock(mutex);
                 wake.wait(lock, [this] { return stopping || pending; });
                 if (stopping) return;
                 pending = false;
-                url = pending_url;
                 hash = pending_hash;
                 title = pending_title;
                 board = pending_board;
-                sites = pending_sites;
                 active_request = request_id;
             }
             OnlineRecordsResponse response;
             std::string error;
-            const bool ok = sites
-                ? fetch_sites_records_once(hash, title, board, response, error)
-                : fetch_online_records_once(url, hash, response, error);
+            const bool ok = fetch_sites_records_once(hash, title, board, response, error);
             {
                 std::lock_guard lock(mutex);
                 if (stopping) return;
@@ -575,7 +567,6 @@ struct OnlineRecordsService::Impl {
                 current.state = ok ? OnlineRecordsState::Ready
                                    : OnlineRecordsState::Error;
                 current.chart_sha256 = hash;
-                current.sites = sites;
                 current.boards = std::move(response.boards);
                 current.board_index = response.board_index;
                 current.records = ok ? std::move(response.records)
@@ -590,33 +581,6 @@ struct OnlineRecordsService::Impl {
 OnlineRecordsService::OnlineRecordsService() : impl_(std::make_unique<Impl>()) {}
 OnlineRecordsService::~OnlineRecordsService() { shutdown(); }
 
-void OnlineRecordsService::request(std::string base_url,
-                                   std::string chart_sha256,
-                                   bool force_refresh) {
-    if (!impl_) return;
-    chart_sha256 = lower_ascii(std::move(chart_sha256));
-    std::lock_guard lock(impl_->mutex);
-    if (impl_->stopping) return;
-    if (!force_refresh && !impl_->pending_sites && impl_->current.chart_sha256 == chart_sha256 &&
-        impl_->pending_url == base_url &&
-        impl_->current.state != OnlineRecordsState::Idle) {
-        return;
-    }
-    ++impl_->request_id;
-    impl_->pending = true;
-    impl_->pending_sites = false;
-    impl_->current.sites = false;
-    impl_->current.boards.clear();
-    impl_->pending_url = std::move(base_url);
-    impl_->pending_hash = chart_sha256;
-    impl_->current.state = OnlineRecordsState::Loading;
-    impl_->current.chart_sha256 = std::move(chart_sha256);
-    impl_->current.records.clear();
-    impl_->current.error.clear();
-    ++impl_->current.revision;
-    impl_->wake.notify_one();
-}
-
 void OnlineRecordsService::request_sites(std::string hash, std::string title,
                                           int board, bool force_refresh) {
     if (!impl_) return;
@@ -624,19 +588,17 @@ void OnlineRecordsService::request_sites(std::string hash, std::string title,
     board = std::max(0, board);
     std::lock_guard lock(impl_->mutex);
     if (impl_->stopping) return;
-    if (!force_refresh && impl_->pending_sites && impl_->pending_hash == hash &&
+    if (!force_refresh && impl_->pending_hash == hash &&
         impl_->pending_title == title && impl_->pending_board == board &&
         impl_->current.state != OnlineRecordsState::Idle) return;
     ++impl_->request_id;
     impl_->pending = true;
-    impl_->pending_sites = true;
     impl_->pending_hash = hash;
     impl_->pending_title = std::move(title);
     impl_->pending_board = board;
     const auto revision = impl_->current.revision + 1;
     impl_->current = {};
     impl_->current.chart_sha256 = std::move(hash);
-    impl_->current.sites = true;
     impl_->current.state = OnlineRecordsState::Loading;
     impl_->current.revision = revision;
     impl_->wake.notify_one();

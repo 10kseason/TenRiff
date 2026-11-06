@@ -965,6 +965,11 @@ bool BmsParseResult::success() const {
 }
 
 BmsParseResult BmsParser::parse(std::string_view content, const BmsParserOptions& options) const {
+    return parse(content, options, {});
+}
+
+BmsParseResult BmsParser::parse(std::string_view content, const BmsParserOptions& options,
+                                std::string_view source_extension) const {
     BmsParseResult result;
     std::string cleaned = remove_bom(normalize_bms_text(content));
     cleaned = preprocess_bms_control_flow(cleaned, options.random_seed, options.control_flow_version,
@@ -1176,7 +1181,9 @@ BmsParseResult BmsParser::parse(std::string_view content, const BmsParserOptions
         }
     }
 
-    const DeclaredLayout declared_layout = detect_declared_layout(result.chart, {}, options.preserve_empty_sp_scratch);
+    const auto extension = lower_extension(std::string(source_extension));
+    const DeclaredLayout declared_layout =
+        detect_declared_layout(result.chart, extension, options.preserve_empty_sp_scratch);
     result.chart.declared_key_count = declared_layout.key_count;
     result.chart.layout_label = declared_layout.layout_label;
     if (result.chart.declared_key_count > 0) {
@@ -1205,15 +1212,7 @@ BmsParseResult BmsParser::parseFile(const std::string& path, const BmsParserOpti
     }
     std::ostringstream buffer;
     buffer << file.rdbuf();
-    BmsParseResult result = parse(buffer.str(), options);
-    const std::string extension = lower_extension(std::filesystem::path(std::filesystem::u8path(path)).extension().u8string());
-    const DeclaredLayout declared_layout = detect_declared_layout(result.chart, extension, options.preserve_empty_sp_scratch);
-    result.chart.declared_key_count = declared_layout.key_count;
-    result.chart.layout_label = declared_layout.layout_label;
-    if (result.chart.declared_key_count > 0) {
-        result.chart.lane_mapping = build_lane_mapping(result.chart, declared_layout);
-    }
-    return result;
+    return parse(buffer.str(), options, std::filesystem::u8path(path).extension().u8string());
 }
 
 }  // namespace tenriff::chart

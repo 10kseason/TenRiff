@@ -5,9 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
-#include <iomanip>
 #include <limits>
-#include <sstream>
 #include <utility>
 
 namespace tenriff::app {
@@ -285,12 +283,13 @@ private:
 
 template <std::size_t Size>
 std::string to_hex(const std::array<std::uint8_t, Size>& bytes) {
-    std::ostringstream out;
-    out << std::hex << std::nouppercase << std::setfill('0');
-    for (const std::uint8_t byte : bytes) {
-        out << std::setw(2) << static_cast<unsigned int>(byte);
+    constexpr std::string_view digits = "0123456789abcdef";
+    std::string out(Size * 2, '\0');
+    for (std::size_t i = 0; i < Size; ++i) {
+        out[i * 2] = digits[bytes[i] >> 4];
+        out[i * 2 + 1] = digits[bytes[i] & 0x0f];
     }
-    return out.str();
+    return out;
 }
 
 void set_error(std::string* error, std::string message) {
@@ -305,6 +304,15 @@ std::string sha256_bytes(std::string_view bytes) {
     Sha256Digest digest;
     digest.update(reinterpret_cast<const std::uint8_t*>(bytes.data()), bytes.size());
     return to_hex(digest.finish());
+}
+
+ChartFileHashes hash_chart_bytes(std::string_view bytes) {
+    Md5Digest md5;
+    Sha256Digest sha256;
+    const auto* data = reinterpret_cast<const std::uint8_t*>(bytes.data());
+    md5.update(data, bytes.size());
+    sha256.update(data, bytes.size());
+    return {to_hex(md5.finish()), to_hex(sha256.finish()), bytes.size()};
 }
 
 ChartFileHashes hash_chart_file(const std::filesystem::path& path, std::string* error) {

@@ -242,8 +242,10 @@
             }
             const auto& item = data.song_select.left_nav[static_cast<std::size_t>(source_index)];
             const float x0 = nav_left + static_cast<float>(i) * nav_width;
-            const D2D1_RECT_F tab =
+            const D2D1_RECT_F slot =
                 native_rect("songselect.rect.010", D2D1::RectF(x0, nav_bar.top, x0 + nav_width - 8.0f, nav_bar.bottom));
+            auto tab = slot;
+            if (source_index == 1) tab.bottom -= std::min(44.0f, (slot.bottom - slot.top) * 0.40f);
             const bool route_active =
                 (source_index == 0 && !data.song_select.showing_sources &&
                  !data.song_select.showing_records) ||
@@ -279,6 +281,17 @@
                                    route_active && d2d_->accent_brush
                                        ? static_cast<ID2D1Brush*>(d2d_->accent_brush.Get())
                                        : static_cast<ID2D1Brush*>(d2d_->text_brush.Get()), true);
+            }
+            if (source_index == 1) {
+                const auto add = D2D1::RectF(tab.left + 4, tab.bottom, tab.right - 4, slot.bottom - 2);
+                register_hit(add, MenuHitTargetKind::SongSourceAdd, 0);
+                draw_glass_panel(add, 5, 0.78f, route_active ? 0.90f : 0.55f, route_active, 2.0f);
+                auto* format = add.right - add.left >= 150.0f && add.bottom - add.top >= 26.0f
+                    ? d2d_->body_format.Get() : d2d_->hud_format.Get();
+                if (format && d2d_->text_brush) {
+                    draw_centered_text(wloc("ADD FOLDER", "곡 폴더 추가"), format, add,
+                        route_active && d2d_->accent_brush ? d2d_->accent_brush.Get() : d2d_->text_brush.Get(), true);
+                }
             }
         }
 
@@ -379,7 +392,7 @@
                     ? wloc("LIBRARIES", "곡 라이브러리")
                     : (data.song_select.showing_records
                            ? (data.song_select.online_records
-                                  ? (data.song_select.sites_records ? wloc("WEB RECORDS", "웹 기록") : wloc("LEGACY SERVER RECORDS", "기존 서버 기록"))
+                                  ? wloc("WEB RECORDS", "웹 기록")
                                   : wloc("LOCAL RECORDS", "로컬 기록"))
                            : (data.song_select.showing_level_folders ? wloc("LEVEL FOLDERS", "레벨 폴더")
                                                                     : wloc("SONG LIBRARY", "곡 라이브러리")));
@@ -1320,7 +1333,7 @@
                            std::to_string(data.song_select.max_combo) + " COMBO");
             if (d2d_->hud_format && d2d_->accent_brush) {
                 const std::string detail_line = data.song_select.online_records
-                    ? (data.song_select.sites_records ? loc("GPT SITES LEADERBOARD", "GPT 사이트 리더보드") : loc("LEGACY SERVER LEADERBOARD", "기존 서버 리더보드"))
+                    ? loc("TENRIFF LEADERBOARD", "텐리프 리더보드")
                     : loc("DETAIL SCORE ", "상세 점수 ") +
                           std::to_string(data.song_select.detail_score) + " / " +
                           (data.song_select.max_detail_score > 0
@@ -1335,9 +1348,7 @@
             if (d2d_->body_format && d2d_->muted_brush) {
                 const std::string replay =
                     data.song_select.online_records
-                        ? (data.song_select.sites_records
-                            ? loc("PUBLIC WEB SCORES / GROUPED BY TITLE AND CONDITIONS", "공개 웹 기록 / 제목·플레이 조건별 묶음")
-                            : loc("SERVER VERIFIED / CLIENT REPLAY NOT PROVIDED", "서버 검증 / 클라이언트 리플레이 미제공"))
+                        ? loc("PUBLIC WEB SCORES / GROUPED BY TITLE AND CONDITIONS", "공개 웹 기록 / 제목·플레이 조건별 묶음")
                     : data.song_select.selected_record_replay_file.empty()
                         ? loc("RESULT ONLY", "결과만 저장됨")
                         : loc("REPLAY ", "리플레이 ") +

@@ -621,6 +621,51 @@ TEST_CASE("song scan hashes BMS and applies a local difficulty table with SHA-25
     CHECK(entry.difficulty_table_order == 1);
 }
 
+TEST_CASE("Safe song scan hashes the raw PMS bytes and F5 refreshes an equal-size replacement") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto path = temp.path / "buffered.PMS";
+    std::string bytes = "\xEF\xBB\xBF#TITLE Safe A\r\n#PLAYER 1\r\n#BPM 120\r\n#00111:01\r\n";
+    // Cross the streaming hash reader's chunk boundary with valid chart text.
+    bytes += '*' + std::string(64 * 1024, 'x') + "\r\n";
+    write_file(path, bytes);
+    const auto original_time = std::filesystem::last_write_time(path);
+
+    std::vector<std::string> warnings;
+    const auto original = scan_songs(temp.path.u8string(), nullptr, warnings);
+    REQUIRE(warnings.empty());
+    REQUIRE(original.entries.size() == 1u);
+    const auto& entry = original.entries.front();
+    const auto hashes = tenriff::app::hash_chart_file(path);
+    REQUIRE(hashes.valid());
+    CHECK(entry.title == "Safe A");
+    CHECK(entry.layout_label == "PMS 9K");
+    CHECK(entry.key_count == 9);
+    CHECK(entry.note_count == 1);
+    CHECK(entry.file_size == bytes.size());
+    CHECK(entry.md5 == hashes.md5);
+    CHECK(entry.sha256 == hashes.sha256);
+
+    bytes.replace(bytes.find("Safe A"), 6, "Safe B");
+    write_file(path, bytes);
+    std::filesystem::last_write_time(path, original_time);
+    SongIndexOptions force;
+    force.reuse_cached_metadata = false;
+    const auto refreshed = scan_songs(temp.path.u8string(), &original, warnings, {}, force);
+    REQUIRE(warnings.empty());
+    REQUIRE(refreshed.entries.size() == 1u);
+    const auto& updated = refreshed.entries.front();
+    const auto replacement_hashes = tenriff::app::hash_chart_file(path);
+    CHECK(updated.title == "Safe B");
+    CHECK(updated.mtime == entry.mtime);
+    CHECK(updated.file_size == entry.file_size);
+    CHECK(updated.md5 == replacement_hashes.md5);
+    CHECK(updated.sha256 == replacement_hashes.sha256);
+    CHECK(updated.sha256 != entry.sha256);
+}
+
 TEST_CASE("schema 13 cache persists hashes and reapplies the current local difficulty table") {
     TempDirGuard temp;
     temp.path = make_temp_dir();

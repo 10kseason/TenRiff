@@ -174,6 +174,7 @@ convert_key_mode_chart_nk2(const GameplayChart &chart,
     nk2_options.nativeWeight = 0.8;
     nk2_options.remixWeight = 0.2;
     break;
+  case Nk2Preset::FullFieldTapsEPlusV2:
   case Nk2Preset::FullFieldTapsEPlus:
   case Nk2Preset::SourceLnE: // Routed to separate adapters by KeyModeConverter.
   case Nk2Preset::Native:

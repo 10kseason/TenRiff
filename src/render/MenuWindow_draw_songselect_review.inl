@@ -38,7 +38,9 @@
             ctx->DrawRoundedRectangle(D2D1::RoundedRect(rect, 6, 6),
                 semantic_color(active ? 0xECECEF : 0x36363D), 1.0f);
             const auto text_rect = D2D1::RectF(rect.left + 8, rect.top + 6, rect.right - 8, rect.bottom - 4);
-            review_text(label, primary ? d2d_->header_format.Get() : d2d_->hud_format.Get(), text_rect,
+            auto* format = primary ? d2d_->header_format.Get() : d2d_->hud_format.Get();
+            if (kind == MenuHitTargetKind::SongSourceAdd) format = d2d_->song_record_detail_format.Get();
+            review_text(label, format, text_rect,
                 primary && enabled ? 0x000000 : enabled ? 0xECECEF : 0x62626B, DWRITE_TEXT_ALIGNMENT_CENTER);
         };
         const auto review_bitmap = [&](ID2D1Bitmap* bitmap, const D2D1_RECT_F& rect) {
@@ -75,6 +77,7 @@
         review_line(0, 72, 1920);
         review_text(L"TENRIFF", d2d_->song_logo_format.Get(), D2D1::RectF(48, 18, 252, 54), 0xFFFFFF);
         constexpr std::array<int, 5> review_nav{0, 1, 4, 5, 6};
+        float folder_title_right = 612.0f;
         for (std::size_t i = 0; i < review_nav.size(); ++i) {
             const int route = review_nav[i];
             if (route >= static_cast<int>(review.left_nav.size())) continue;
@@ -87,6 +90,13 @@
             review_text(to_wide(item.label), d2d_->song_nav_format.Get(), D2D1::RectF(left, 24, left + 154, 52),
                         active ? 0xFFFFFF : 0x8F8F98);
             if (active) ctx->FillRectangle(D2D1::RectF(left, 70, left + 154, 72), semantic_color(0xFFFFFF));
+            if (route == 1) {
+                // Share the Library tab's right edge and keep long folder names clear of the button.
+                const auto add_folder = D2D1::RectF(rect.right - 196, rect.bottom + 4, rect.right, rect.bottom + 46);
+                folder_title_right = add_folder.left - 12;
+                review_button(add_folder,
+                    wloc("ADD FOLDER", "곡 폴더 추가"), MenuHitTargetKind::SongSourceAdd, 0, true, active);
+            }
         }
         const auto profile = D2D1::RectF(1530, 12, 1872, 60);
         register_hit(profile, MenuHitTargetKind::SongProfilePanel, 0);
@@ -108,7 +118,7 @@
         const std::string folder_title = review.showing_sources ? loc("LIBRARY", "라이브러리") :
             review.showing_records ? (review.online_records ? loc("ONLINE RECORDS", "온라인 기록") : loc("RECORDS", "기록")) :
             !review.difficulty_table_name.empty() && review.difficulty_table_active ? review.difficulty_table_name : review.current_source_name;
-        review_text(to_wide(folder_title), d2d_->song_title_format.Get(), D2D1::RectF(48, 102, 612, 142), 0xFFFFFF);
+        review_text(to_wide(folder_title), d2d_->song_title_format.Get(), D2D1::RectF(48, 102, folder_title_right, 142), 0xFFFFFF);
         review_button(D2D1::RectF(630, 104, 800, 144), wloc("SORT / FILTER", "정렬 / 필터"), MenuHitTargetKind::SongNavButton, 3);
         std::wstring search = to_wide(review.search_query);
         if (search.empty()) search = wloc("SEARCH", "검색");

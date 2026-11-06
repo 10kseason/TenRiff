@@ -2111,7 +2111,17 @@ struct PhraseState {
     double score = 0.0;
 };
 
-bool betterPhraseState(const PhraseState& lhs, const PhraseState& rhs) {
+struct PhraseBranch {
+    const PhraseState* parent;
+    int lane;
+    MotifKind motif;
+    bool fastSingle;
+    int dropped;
+    int droppedHolds;
+    double score;
+};
+
+bool betterPhraseBranch(const PhraseBranch& lhs, const PhraseBranch& rhs) {
     // Retention outranks style; preserve LNs when equal-sized solutions exist.
     if (lhs.dropped != rhs.dropped) return lhs.dropped < rhs.dropped;
     if (lhs.droppedHolds != rhs.droppedHolds) return lhs.droppedHolds < rhs.droppedHolds;
@@ -2178,11 +2188,15 @@ void convertWithPhraseSearch(const Chart& source, const NK2Options& options,
         committed.droppedHolds = 0;
         committed.score = 0.0;
         std::vector<PhraseState> beam{committed};
+        std::vector<PhraseState> next;
+        beam.reserve(kPhraseBeamWidth);
+        next.reserve(kPhraseBeamWidth);
+        std::vector<PhraseBranch> branches;
+        branches.reserve(kPhraseBeamWidth * static_cast<std::size_t>(options.targetKeyCount + 1));
         for (const auto& [index, single] : window) {
             const auto& note = source.notes[index];
             const int sourceLane = sourceLaneOf(note);
-            std::vector<PhraseState> next;
-            next.reserve(beam.size() * static_cast<std::size_t>(options.targetKeyCount + 1));
+            branches.clear();
             for (const auto& state : beam) {
                 std::vector<PlacedNote> recent;
                 for (const auto& last : state.lastByTarget) {
@@ -2201,42 +2215,50 @@ void convertWithPhraseSearch(const Chart& source, const NK2Options& options,
                     fastSingle ? std::optional<int>(state.singles.back().sourceLane) : std::nullopt,
                     fastSingle ? std::optional<int>(state.singles.back().targetLane) : std::nullopt,
                     continuation, motif, blocked);
+                const auto lastSource = lastPlacedForSource(state.lastBySource, sourceLane);
                 for (const auto& candidate : ranked) {
                     if (hasSameTimeCollision(blocked, candidate.lane)) continue;
-                    auto branch = state;
-                    branch.choices.push_back(candidate.lane);
-                    branch.motifs.push_back(motif);
-                    branch.score += candidate.score;
-                    const auto lastSource = lastPlacedForSource(state.lastBySource, sourceLane);
+                    double score = state.score + candidate.score;
                     if (lastSource && static_cast<long long>(note.time) - lastSource->time <= 500) {
-                        branch.score += lastSource->lane == candidate.lane ? 1.0 : -0.5;
+                        score += lastSource->lane == candidate.lane ? 1.0 : -0.5;
                     }
-                    const PlacedNote placedNote{note.time, candidate.lane, sourceLane, note.type, note.endTime};
-                    branch.lastByTarget[static_cast<std::size_t>(candidate.lane)] = placedNote;
-                    rememberLastBySource(branch.lastBySource, sourceLane, placedNote);
-                    ++branch.laneUse[static_cast<std::size_t>(candidate.lane)];
-                    if (!fastSingle) branch.singles.clear();
-                    if (single) {
-                        branch.singles.push_back({note.time, sourceLane, candidate.lane});
-                        if (branch.singles.size() > 6) branch.singles.erase(branch.singles.begin());
-                    }
-                    next.push_back(std::move(branch));
-                    ++result.report.phraseSearchCandidates;
+                    branches.push_back({&state, candidate.lane, motif, fastSingle,
+                                        state.dropped, state.droppedHolds, score});
                 }
                 // Explicit omission is a candidate, never an unreported repair.
                 // No retiming is permitted in this first phrase-search mode.
-                auto dropped = state;
-                dropped.choices.push_back(-1);
-                dropped.motifs.push_back(motif);
-                dropped.singles.clear();
-                ++dropped.dropped;
-                if (note.type == NoteType::Hold) ++dropped.droppedHolds;
-                next.push_back(std::move(dropped));
-                ++result.report.phraseSearchCandidates;
+                branches.push_back({&state, -1, motif, false, state.dropped + 1,
+                                    state.droppedHolds + (note.type == NoteType::Hold), state.score});
             }
-            std::stable_sort(next.begin(), next.end(), betterPhraseState);
-            if (next.size() > kPhraseBeamWidth) next.resize(kPhraseBeamWidth);
-            beam = std::move(next);
+            result.report.phraseSearchCandidates += static_cast<int>(branches.size());
+            // Keep the original rank and tie order while copying full histories
+            // only for branches that survive the beam cutoff.
+            std::stable_sort(branches.begin(), branches.end(), betterPhraseBranch);
+            next.clear();
+            const auto kept = std::min(kPhraseBeamWidth, branches.size());
+            for (std::size_t i = 0; i < kept; ++i) {
+                const auto& choice = branches[i];
+                auto state = *choice.parent;
+                state.choices.push_back(choice.lane);
+                state.motifs.push_back(choice.motif);
+                state.dropped = choice.dropped;
+                state.droppedHolds = choice.droppedHolds;
+                state.score = choice.score;
+                if (!choice.fastSingle) state.singles.clear();
+                if (choice.lane >= 0) {
+                    const auto lane = static_cast<std::size_t>(choice.lane);
+                    const PlacedNote placedNote{note.time, choice.lane, sourceLane, note.type, note.endTime};
+                    state.lastByTarget[lane] = placedNote;
+                    rememberLastBySource(state.lastBySource, sourceLane, placedNote);
+                    ++state.laneUse[lane];
+                    if (single) {
+                        state.singles.push_back({note.time, sourceLane, choice.lane});
+                        if (state.singles.size() > 6) state.singles.erase(state.singles.begin());
+                    }
+                }
+                next.push_back(std::move(state));
+            }
+            beam.swap(next);
         }
         const auto& best = beam.front();
         for (std::size_t offset = 0; offset < window.size(); ++offset) {
@@ -2599,10 +2621,10 @@ NK2ConversionResult convertChart(const Chart& chart, const NK2Options& options) 
         throw std::runtime_error("NK2 E+ tap boost requires E+ full-field");
     const bool phrasePair = options.sourceKeyCount >= 1 && options.sourceKeyCount <= kMaxKeyCount &&
         options.targetKeyCount >= 1 && options.targetKeyCount <= kMaxKeyCount;
-    if (options.eFullField && (!phrasePair || (options.targetKeyCount != 8 && options.targetKeyCount != 10) ||
+    if (options.eFullField && (!phrasePair || !supportsEFullFieldTarget(options.targetKeyCount) ||
         options.mode != Mode::Faithful || !options.phraseSearch || !options.phraseSupport ||
         !options.phraseDenseLn || !options.phraseSourceLn || options.phraseSourceLnBoost || options.superSymmetry)) {
-        throw std::runtime_error("NK2 E+ requires preset E, target 8 or 10, without F boost or super-symmetry");
+        throw std::runtime_error("NK2 E+ requires preset E, target 7, 8 or 10, without F boost or super-symmetry");
     }
     if (options.phraseSourceLnBoost && (!options.phraseSourceLn || !phrasePair)) {
         throw std::runtime_error("NK2 source LN boost requires 1K..18K source LN support");

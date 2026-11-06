@@ -809,15 +809,9 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.ui.online_records_server_url =
             normalize_online_records_server_url(get_string(
                 *ui, "online_records_server_url", config.ui.online_records_server_url));
-        if (config.ui.online_records_server_url.empty()) {
-            config.ui.online_records_server_url = std::string{kTenRiffMainApiUrl};
-        }
         config.ui.tenriff_main_server_url = normalize_online_records_server_url(
             get_string(*ui, "tenriff_main_server_url",
-                       config.ui.online_records_server_url));
-        if (config.ui.tenriff_main_server_url.empty()) {
-            config.ui.tenriff_main_server_url = std::string{kTenRiffMainApiUrl};
-        }
+                       config.ui.tenriff_main_server_url));
         config.ui.private_server_url = normalize_online_records_server_url(
             get_string(*ui, "private_server_url", config.ui.private_server_url));
         const std::string account_server_mode = to_lower_ascii(get_string(
@@ -2223,8 +2217,6 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.ui.song_level_max_filter = 0;
     config.ui.difficulty_table_path.clear();
     config.ui.difficulty_table_url.clear();
-    config.ui.online_records_server_url = std::string{kTenRiffMainApiUrl};
-    config.ui.tenriff_main_server_url = std::string{kTenRiffMainApiUrl};
     config.ui.private_server_url.clear();
     config.ui.account_server_mode = "main";
 

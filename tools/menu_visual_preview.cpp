@@ -144,7 +144,7 @@ struct MenuAppVisualTestAccess {
         app->indexed_songs_.push_back(entry);
         app->visible_song_indices_.push_back(0);
         app->song_select_view_ = MenuApp::SongSelectView::Records;
-        app->online_records_view_ = app->sites_records_view_ = true;
+        app->online_records_view_ = true;
         app->request_record_leaderboard();
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
         while (app->online_records_service_.snapshot().state == OnlineRecordsState::Loading &&
@@ -159,7 +159,7 @@ struct MenuAppVisualTestAccess {
         app->populate_song_select_render_data(source, title, {}, nullptr);
         std::cout << "Sites production snapshot: boards=" << snapshot.boards.size()
                   << " records=" << source.song_select.record_count << '\n';
-        return source.song_select.sites_records && source.song_select.record_count > 0;
+        return source.song_select.online_records && source.song_select.record_count > 0;
     }
     static void populate_skin_rows(render::MenuRenderData& source,
                                    const TenRiffSkinDefinition* imported,
@@ -897,7 +897,7 @@ struct MenuWindowVisualTestAccess {
                 const bool song_control = (mix_fixture && (region.kind == MenuHitTargetKind::SongCard ||
                     region.kind == MenuHitTargetKind::SessionMixStagePage || region.kind == MenuHitTargetKind::SettingsRow)) || song_fixture &&
                     (region.kind == MenuHitTargetKind::SongCard || region.kind == MenuHitTargetKind::SongNavButton ||
-                     region.kind == MenuHitTargetKind::SongDifficultyTable);
+                     region.kind == MenuHitTargetKind::SongDifficultyTable || region.kind == MenuHitTargetKind::SongSourceAdd);
                 const bool preview_button = region.kind == MenuHitTargetKind::SkinPreviewButton ||
                     region.kind == MenuHitTargetKind::SkinPreviewLane;
                 const bool skin_header = region.kind == MenuHitTargetKind::KeymapModeTab ||
@@ -1821,7 +1821,6 @@ int main(int argc, char** argv) {
     data.account_overlay.mode_selection = mode_selection;
     data.account_overlay.mode_choice_online = mode_choice_online;
     data.account_overlay.online_mode = sites_connected;
-    data.account_overlay.sites_mode = sites_account;
     data.account_overlay.sites_connected = sites_connected;
     data.account_overlay.sites_url = "https://tenriff-leaderboard.lastestarcorp.chatgpt.site";
     data.account_overlay.sites_status = sites_connected
