@@ -1,4 +1,4 @@
-> **2026-11-05 · 1.9.9.9-hotfix2:** [NK2 E+ preset for 8K and 10K](docs/release-1.9.9.9-hotfix2.en.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
+> **2026-11-06 · 1.9.9.9-hotfix3:** [NK2 E+, Safe indexing, song folders and leaderboard](docs/release-1.9.9.9-hotfix3.en.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 
 > **2026-11-04 · 1.9.9.9-hotfix1:** [OGG security, Common BGA and skin editor](docs/release-1.9.9.9-hotfix1.en.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 

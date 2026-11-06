@@ -916,6 +916,9 @@ ModeManagerResult manage_modes(const gameplay::GameplayChart& chart,
     const auto applied = gameplay::apply_mode_settings(result.chart, result.settings, {base_bpm, sample_rate, key_conversion_version});
     result.chart = applied.chart;
     result.warnings.insert(result.warnings.end(), applied.warnings.begin(), applied.warnings.end());
+    if (applied.replay_nk2_preset) {
+        result.settings.key_conversion_nk2_preset = *applied.replay_nk2_preset;
+    }
 
     // Generic Note Add remains a separate post-conversion mod. nK2 owns support-note
     // generation inside its target-layout conversion instead of pre-expanding the source chart.

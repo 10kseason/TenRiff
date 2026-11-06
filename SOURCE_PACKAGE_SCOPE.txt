@@ -1,8 +1,8 @@
-TenRiff 1.9.9.9-hotfix1 source package — 2026-11-04
+TenRiff 1.9.9.9-hotfix3 source package — 2026-11-06
 
-Current scope: scoped stb_vorbis header/cleanup security fixes, optional Common BGA and the bundled offline skin editor update. See docs/release-1.9.9.9-hotfix1.en.md and docs/release-1.9.9.9-hotfix1-gate.md. Fixed baseline remains 1.9.6; existing R13/R14 compatibility is preserved.
+Build inputs match the release commit. The scope covers NK2 E+ for 7K, 8K and 10K, Safe indexing, Song Select and TenRiff Leaderboard integration. See docs/release-1.9.9.9-hotfix3.en.md and docs/release-1.9.9.9-hotfix3-gate.md. The fixed baseline is 1.9.6.
 
-The earlier release-specific descriptions below are historical. The inclusion/privacy rules remain applicable; this package adds synthetic OGG regression fixtures and no user media, profiles, logs or external BGA model weights.
+Earlier version descriptions below are historical. The inclusion and privacy rules apply to this package.
 
 TenRiff 1.9.8.5 source scope
 

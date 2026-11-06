@@ -21,10 +21,10 @@ namespace {
 std::string song_sort_detail_label(MenuApp::SongSortMode mode, ui::Language language) {
     switch (mode) {
         case MenuApp::SongSortMode::DifficultyDesc: return ui::text(language, "LV DESC", "LV 내림");
-        case MenuApp::SongSortMode::TitleAsc: return ui::text(language, "A-Z", "가-힣");
-        case MenuApp::SongSortMode::TitleDesc: return ui::text(language, "Z-A", "힣-가");
-        case MenuApp::SongSortMode::ArtistAsc: return ui::text(language, "ART A-Z", "아티스트 가-힣");
-        case MenuApp::SongSortMode::ArtistDesc: return ui::text(language, "ART Z-A", "아티스트 힣-가");
+        case MenuApp::SongSortMode::TitleAsc: return ui::text(language, "A-Z", "A-Z");
+        case MenuApp::SongSortMode::TitleDesc: return ui::text(language, "Z-A", "Z-A");
+        case MenuApp::SongSortMode::ArtistAsc: return ui::text(language, "ART A-Z", "아티스트 A-Z");
+        case MenuApp::SongSortMode::ArtistDesc: return ui::text(language, "ART Z-A", "아티스트 Z-A");
         case MenuApp::SongSortMode::DifficultyAsc:
         default: return ui::text(language, "LV ASC", "LV 오름");
     }
@@ -95,8 +95,7 @@ void MenuApp::request_record_leaderboard(bool force_refresh) {
         ? visible_song_entry(static_cast<std::size_t>(selected_song_)) : nullptr;
     if (!entry) return;
     const auto hash = normalize_multiplayer_chart_sha256(entry->sha256);
-    if (sites_records_view_) online_records_service_.request_sites(hash, entry->title, sites_records_board_, force_refresh);
-    else if (!hash.empty()) online_records_service_.request(config_.ui.online_records_server_url, hash, force_refresh);
+    online_records_service_.request_sites(hash, entry->title, sites_records_board_, force_refresh);
 }
 
 void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
@@ -143,7 +142,6 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
     render.song_select.showing_records = (song_select_view_ == SongSelectView::Records);
     render.song_select.online_records =
         render.song_select.showing_records && online_records_view_;
-    render.song_select.sites_records = render.song_select.online_records && sites_records_view_;
     OnlineRecordsSnapshot online_snapshot;
     const OnlineRecordEntry* selected_online_record = nullptr;
     if (render.song_select.online_records) {
@@ -155,15 +153,10 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                                              ? normalize_multiplayer_chart_sha256(
                                                    selected_entry->sha256)
                                              : std::string{};
-        if (!selected_entry || (chart_sha256.empty() && !sites_records_view_)) {
-            online_snapshot.state = OnlineRecordsState::Error;
-            online_snapshot.error = ui_text(
-                "This chart has no indexed SHA-256. Press F5 to reindex it.",
-                "이 차트의 SHA-256이 없습니다. F5로 다시 인덱싱하세요.");
-        } else {
+        if (selected_entry) {
             request_record_leaderboard();
             online_snapshot = online_records_service_.snapshot();
-            if (online_snapshot.chart_sha256 != chart_sha256 || online_snapshot.sites != sites_records_view_) {
+            if (online_snapshot.chart_sha256 != chart_sha256) {
                 online_snapshot = {};
                 online_snapshot.state = OnlineRecordsState::Loading;
                 online_snapshot.chart_sha256 = chart_sha256;
@@ -172,7 +165,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         render.song_select.online_records_loading =
             online_snapshot.state == OnlineRecordsState::Loading;
         render.song_select.online_records_message = online_snapshot.error;
-        if (sites_records_view_ && !online_snapshot.boards.empty()) {
+        if (!online_snapshot.boards.empty()) {
             const auto& board = online_snapshot.boards[static_cast<std::size_t>(online_snapshot.board_index)];
             render.song_select.sites_board_label = std::to_string(online_snapshot.board_index + 1) + "/" +
                 std::to_string(online_snapshot.boards.size()) + "  " + board.conditions_label;
@@ -316,9 +309,9 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
 
     if (render.song_select.showing_records && !gameplay_audio_failed_) {
         render.song_select.primary_hint = online_records_view_
-            ? ui_text("UP/DOWN  RANKS     TAB  LOCAL / WEB / SERVER     F5  REFRESH", "위/아래  순위 선택     TAB  로컬 / 웹 / 서버     F5  새로고침")
+            ? ui_text("UP/DOWN  RANKS     TAB  LOCAL / WEB     F5  REFRESH", "위/아래  순위 선택     TAB  로컬 / 웹     F5  새로고침")
             : ui_text("UP/DOWN  MOVE     ENTER  RESULT     TAB  WEB LEADERBOARD", "위/아래  이동     ENTER  결과     TAB  웹 리더보드");
-        if (sites_records_view_ && online_records_view_) {
+        if (online_records_view_) {
             render.song_select.secondary_hint = render.song_select.sites_board_label.empty()
                 ? ui_text("LEFT/RIGHT  BOARD CONDITIONS     BACKSPACE  BACK", "좌/우  순위표 조건 선택     BACKSPACE  뒤로")
                 : ui_text("LEFT/RIGHT  ", "좌/우  ") + render.song_select.sites_board_label;
@@ -513,7 +506,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                                   ui_text("SCORE ", "점수 ") +
                                   format_int_with_commas(record.score) + "  " +
                                   format_decimal(record.accuracy) + "%";
-                    card.detail = (sites_records_view_ ? ui_text("WEB / ", "웹 / ") : ui_text("ONLINE VERIFIED / ", "온라인 검증 / ")) +
+                    card.detail = ui_text("WEB / ", "웹 / ") +
                                   safe_ui_text(record.ruleset_id, "--") + " / " +
                                   menu_records::compact_timestamp_label(
                                       record.verified_at_utc);
@@ -550,22 +543,22 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         if (total == 0) {
             if (render.song_select.online_records_loading) {
                 render.song_select.empty_title =
-                    (sites_records_view_ ? ui_text("LOADING WEB LEADERBOARD", "웹 리더보드 불러오는 중") : ui_text("LOADING LEGACY SERVER RECORDS", "기존 서버 기록 불러오는 중"));
+                    ui_text("LOADING WEB LEADERBOARD", "웹 리더보드 불러오는 중");
                 render.song_select.empty_message =
                     ui_text("The records server is being queried in the background.",
                             "백그라운드에서 기록 서버를 조회하고 있습니다.");
             } else if (!render.song_select.online_records_message.empty()) {
                 render.song_select.empty_title =
-                    (sites_records_view_ ? ui_text("WEB LEADERBOARD UNAVAILABLE", "웹 리더보드 연결 불가") : ui_text("LEGACY SERVER UNAVAILABLE", "기존 서버 연결 불가"));
+                    ui_text("WEB LEADERBOARD UNAVAILABLE", "웹 리더보드 연결 불가");
                 render.song_select.empty_message =
                     safe_ui_text(render.song_select.online_records_message,
                                  ui_text("Could not query the records server.",
                                          "기록 서버를 조회하지 못했습니다."));
             } else if (render.song_select.online_records) {
                 render.song_select.empty_title =
-                    (sites_records_view_ ? ui_text("NO WEB RECORDS", "웹 기록 없음") : ui_text("NO LEGACY SERVER RECORDS", "기존 서버 기록 없음"));
+                    ui_text("NO WEB RECORDS", "웹 기록 없음");
                 render.song_select.empty_message =
-                    (sites_records_view_ ? ui_text("No public leaderboard matches this chart title. F5 refreshes the list.", "이 차트 제목에 맞는 공개 리더보드가 없습니다. F5로 새로고침할 수 있습니다.") : ui_text("No server-verified BMS records exist for this exact chart hash.", "이 차트 해시에 서버 검증된 BMS 기록이 없습니다."));
+                    ui_text("No public leaderboard matches this chart title. F5 refreshes the list.", "이 차트 제목에 맞는 공개 리더보드가 없습니다. F5로 새로고침할 수 있습니다.");
             } else {
                 render.song_select.empty_title = ui_text("NO LOCAL RECORDS", "로컬 기록 없음");
                 render.song_select.empty_message =
@@ -747,7 +740,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             render.song_select.max_score = gameplay::kNativeScoreMaximum;
             render.song_select.max_combo = selected_online_record->max_combo;
             render.song_select.accuracy = selected_online_record->accuracy;
-            render.song_select.detailed_accuracy = sites_records_view_ ? selected_online_record->detailed_accuracy : selected_online_record->accuracy;
+            render.song_select.detailed_accuracy = selected_online_record->detailed_accuracy;
             render.song_select.detail_score = selected_online_record->detail_score;
             render.song_select.online_detail_score_available = selected_online_record->detail_score_available;
             render.song_select.online_detailed_accuracy_available = selected_online_record->detailed_accuracy_available;
@@ -757,10 +750,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             render.song_select.selected_record_status =
                 selected_online_record->player_name + " / " +
                 render::song_select_lamp_presentation(selected_online_record->clear_status).label +
-                (sites_records_view_ ? " / WEB" : " / ONLINE VERIFIED");
-            render.song_select.selected_record_replay_detail =
-                sites_records_view_ ? render.song_select.sites_board_label :
-                ui_text("Ruleset ", "룰셋 ") + selected_online_record->ruleset_id;
+                " / WEB";
+            render.song_select.selected_record_replay_detail = render.song_select.sites_board_label;
         } else if (!render.song_select.online_records && selected_record) {
             render.song_select.rank = selected_record->rank;
             render.song_select.best_score = selected_record->score;
@@ -883,22 +874,11 @@ void MenuApp::populate_song_browser_render_data(render::MenuRenderData& render) 
                     false,
                     true);
     append_menu_row(render.generic,
-                    ui_text("Online Records Server", "인랭 기록 서버"),
-                    online_records_url_editing_
-                        ? safe_ui_text(online_records_url_input_, "URL") + "|"
-                        : safe_ui_text(config_.ui.online_records_server_url,
-                                       std::string(config::kTenRiffMainApiUrl)),
+                    ui_text("Collection Filter", "컬렉션 필터"),
+                    song_collection_filter_label(),
                     settings_cursor_ == 6,
                     render::MenuHitTargetKind::SettingsRow,
                     6,
-                    false,
-                    true);
-    append_menu_row(render.generic,
-                    ui_text("Collection Filter", "컬렉션 필터"),
-                    song_collection_filter_label(),
-                    settings_cursor_ == 7,
-                    render::MenuHitTargetKind::SettingsRow,
-                    7,
                     false,
                     true);
     const std::string named_collection = current_named_song_collection();
@@ -911,33 +891,33 @@ void MenuApp::populate_song_browser_render_data(render::MenuRenderData& render) 
                                   selected_song_is_in_collection(named_collection) ? "컬렉션에 포함됨" : "컬렉션에 없음")
                         : ui_text(selected_song_is_favorite() ? "Favorite" : "Not Favorite",
                                   selected_song_is_favorite() ? "페이보릿" : "페이보릿 아님"),
+                    settings_cursor_ == 7,
+                    render::MenuHitTargetKind::SettingsRow,
+                    7,
+                    true,
+                    false);
+    append_menu_row(render.generic,
+                    ui_text("New Collection", "새 컬렉션"),
+                    current_named_song_collection().empty() ? ui_text("Create", "생성") : current_named_song_collection(),
                     settings_cursor_ == 8,
                     render::MenuHitTargetKind::SettingsRow,
                     8,
                     true,
                     false);
     append_menu_row(render.generic,
-                    ui_text("New Collection", "새 컬렉션"),
-                    current_named_song_collection().empty() ? ui_text("Create", "생성") : current_named_song_collection(),
+                    ui_text("Clear Filters", "필터 지우기"),
+                    "",
                     settings_cursor_ == 9,
                     render::MenuHitTargetKind::SettingsRow,
                     9,
                     true,
                     false);
     append_menu_row(render.generic,
-                    ui_text("Clear Filters", "필터 지우기"),
+                    ui_text("Back", "뒤로"),
                     "",
                     settings_cursor_ == 10,
                     render::MenuHitTargetKind::SettingsRow,
                     10,
-                    true,
-                    false);
-    append_menu_row(render.generic,
-                    ui_text("Back", "뒤로"),
-                    "",
-                    settings_cursor_ == 11,
-                    render::MenuHitTargetKind::SettingsRow,
-                    11,
                     true,
                     false);
 
@@ -960,9 +940,6 @@ void MenuApp::populate_song_browser_render_data(render::MenuRenderData& render) 
     render.generic.notes.push_back(ui_text(
         "Table Min/Max uses the displayed numeric level: 12, st12 and 12+ count as 12. Non-numeric labels are hidden while a limit is active. Native LV uses the built-in level.",
         "표 선택 중 최소/최대는 표시 레벨의 숫자를 사용합니다: 12, st12, 12+는 12입니다. 제한이 있으면 비숫자 표기는 숨기며, 기본 LV는 내장 레벨을 사용합니다."));
-    render.generic.notes.push_back(ui_text(
-        "Online Records Server: Enter imports a copied http(s) address; Ctrl+V replaces it while editing.",
-        "인랭 기록 서버: 주소를 복사하고 Enter를 누르거나, 편집 중 Ctrl+V로 교체하세요."));
     if (!song_browser_status_message_.empty()) {
         render.generic.notes.push_back(song_browser_status_message_);
     }

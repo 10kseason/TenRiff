@@ -1,12 +1,15 @@
 #pragma once
 #include "input/ModalInputFence.h"
 
+#include <string>
+
 #ifdef _WIN32
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
 #include <windows.h>
 #include <shobjidl.h>
+#include <thread>
 #endif
 
 namespace tenriff::app {
@@ -31,6 +34,12 @@ private:
     Reset reset_;
 };
 
+struct NativeFileChoice {
+    std::string path;
+    std::string error;
+    bool cancelled = false;
+};
+
 #ifdef _WIN32
 // Declare before shell interfaces so every early return releases them first.
 class NativeFileDialogApartment {
@@ -44,6 +53,34 @@ public:
 private:
     HRESULT result_;
 };
+
+// WASAPI may keep the caller in MTA while menu music plays. All shell
+// interfaces stay on this request-scoped STA, including reading the selection.
+template<class Choose>
+NativeFileChoice run_native_file_dialog_sta(Choose&& choose) {
+    NativeFileChoice result;
+    try {
+        std::thread picker([&] {
+            try {
+                const NativeFileDialogApartment apartment;
+                if (FAILED(apartment.result())) {
+                    result.error = "File picker COM initialization failed.";
+                    return;
+                }
+                result = choose();
+            } catch (...) {
+                result.error = "File selection failed.";
+            }
+        });
+        picker.join();
+    } catch (...) {
+        result.error = "File picker thread could not start.";
+    }
+    // The input scope is thread-local and belongs to the menu dispatcher.
+    input::native_modal_input_fence.close(GetTickCount64());
+    NativeFileDialogInputScope::discard_modal_input();
+    return result;
+}
 
 inline HWND native_file_dialog_owner() {
     HWND owner = nullptr;

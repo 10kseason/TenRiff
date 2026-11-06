@@ -75,7 +75,6 @@ struct OnlineRecordsSnapshot {
     std::vector<OnlineRecordEntry> records;
     std::string error;
     std::uint64_t revision = 0;
-    bool sites = false;
     std::vector<SitesRecordBoard> boards;
     int board_index = 0;
 };
@@ -90,9 +89,6 @@ public:
     OnlineRecordsService(const OnlineRecordsService&) = delete;
     OnlineRecordsService& operator=(const OnlineRecordsService&) = delete;
 
-    void request(std::string base_url,
-                 std::string chart_sha256,
-                 bool force_refresh = false);
     void request_sites(std::string chart_sha256, std::string title, int board_index,
                        bool force_refresh = false);
     [[nodiscard]] OnlineRecordsSnapshot snapshot() const;

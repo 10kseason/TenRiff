@@ -218,7 +218,6 @@ struct SongSelectData {
     bool showing_records = false;
     bool native_list_layout = true;
     bool online_records = false;
-    bool sites_records = false;
     bool online_detail_score_available = false;
     bool online_detailed_accuracy_available = false;
     std::string sites_board_label;
@@ -907,22 +906,9 @@ struct RankedAccountOverlayData {
     bool mode_selection = false;
     bool online_mode = false;
     bool mode_choice_online = false;
-    bool register_mode = false;
-    bool busy = false;
-    bool signed_in = false;
-    bool private_server = false;
-    bool sites_mode = false;
     bool sites_connected = false;
     std::string sites_url;
     std::string sites_status;
-    int focused_field = 0;
-    std::string username;
-    std::string server_url;
-    std::string main_server_url;
-    std::string password_mask;
-    std::string signed_in_as;
-    std::string role;
-    std::string status;
 };
 
 struct UrlWarningOverlayData {

@@ -27,8 +27,7 @@ using tenriff::app::is_valid_multiplayer_address_text;
 using tenriff::app::kMultiplayerAddressMaxLength;
 using tenriff::app::kMultiplayerChatInputMaxBytes;
 using tenriff::app::kMultiplayerMenuRowCount;
-using tenriff::app::kTenRiffMainMultiplayerAddress;
-using tenriff::app::kTenRiffMainMultiplayerPort;
+using tenriff::app::kDefaultMultiplayerPort;
 using tenriff::app::move_multiplayer_menu_cursor;
 using tenriff::app::multiplayer_chart_fingerprints_match;
 using tenriff::app::multiplayer_chart_candidate_name_matches;
@@ -251,10 +250,10 @@ TEST_CASE("multiplayer chat input keeps UTF-8 boundaries and byte cap") {
     CHECK_FALSE(try_append_multiplayer_chat_text(capped, "z"));
 }
 
-TEST_CASE("multiplayer menu defaults to the TenRiff main coordinator") {
+TEST_CASE("multiplayer menu starts without a remote coordinator address") {
     const MultiplayerMenuState state;
-    CHECK(state.address == kTenRiffMainMultiplayerAddress);
-    CHECK(state.port_text == kTenRiffMainMultiplayerPort);
+    CHECK(state.address.empty());
+    CHECK(state.port_text == kDefaultMultiplayerPort);
     CHECK(parse_multiplayer_port(state.port_text) == 27301);
 }
 

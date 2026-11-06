@@ -2241,7 +2241,6 @@ bool MenuApp::is_song_select_repeat_key(uint32_t keycode) {
     if (current_screen() == Screen::SettingsSkins && (skin_search_active_ || skin_mode_tabs_focused_)) return false;
     if (help_overlay_visible_ || profile_nickname_edit_active_ ||
         (song_select_search_active_ && current_screen() != Screen::SongSelect) ||
-        online_records_url_editing_ ||
         chat_overlay_visible_ || ranked_account_overlay_visible_ || chat_url_warning_visible_ ||
         (current_screen() == Screen::Multiplayer && multiplayer_menu_.edit_field != MultiplayerEditField::None) ||
         (current_screen() == Screen::Keymap &&
@@ -2622,42 +2621,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     play_options.online_recording_permission = active_recording_permission_;
     play_options.chart_path = chart_path;
     play_options.replay_path = replay_path;
-    RankedPlayAuthorization ranked_authorization;
-    std::string ranked_chart_sha256;
-    std::string ranked_prepare_error;
-    if (online_play_mode_ && !peer_battle && !session_mix_active_ && replay_path.empty() &&
-        !mode_mod_auto_scratch(config_.mode.mods) &&
-        !bms_editor_practice_start_seconds_.has_value()) {
-        std::string extension = path_from_utf8(chart_path).extension().string();
-        std::transform(extension.begin(), extension.end(), extension.begin(),
-                       [](unsigned char byte) {
-                           return static_cast<char>(std::tolower(byte));
-                       });
-        const bool bms_family = extension == ".bms" || extension == ".bme" ||
-                                extension == ".bml" || extension == ".pms";
-        if (bms_family) {
-            std::string hash_error;
-            const ChartFileHashes hashes = hash_chart_file_utf8(chart_path, &hash_error);
-            if (hashes.valid()) {
-                ranked_chart_sha256 = hashes.sha256;
-                (void)prepare_ranked_play(
-                    config_.ui.online_records_server_url,
-                    path_from_utf8(profile_dir_), profile_display_name(),
-                    hashes.sha256, ranked_authorization, ranked_prepare_error);
-            } else {
-                ranked_prepare_error = hash_error.empty()
-                                           ? "Could not hash the BMS for online ranking."
-                                           : std::move(hash_error);
-            }
-        }
-    }
-    if (ranked_authorization.valid()) {
-        play_options.ranked_challenge_id = ranked_authorization.challenge_id;
-        play_options.ranked_challenge_nonce = ranked_authorization.challenge_nonce;
-    } else {
-        play_options.ranked_challenge_id.clear();
-        play_options.ranked_challenge_nonce.clear();
-    }
+    play_options.ranked_challenge_id.clear();
+    play_options.ranked_challenge_nonce.clear();
     if (!peer_battle && !session_mix_active_ && replay_path.empty() &&
         !bms_editor_practice_start_seconds_.has_value() &&
         (config_.mode.ghost_battle_enabled || config_.skin.score_comparison_enabled)) {
@@ -2865,28 +2830,6 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
                 ? ui_text("Web not connected; record saved locally. Connect via F10.", "웹 미연결 · 기록은 로컬에 저장 · F10에서 연결")
                 : ui_text("Web upload queue unavailable; record saved locally.", "웹 전송 대기열 사용 불가 · 로컬 저장");
     }
-    std::string ranked_result_message;
-    if (online_record_allowed && result.has_value && !session_aborted && ranked_authorization.valid() &&
-        !bms_editor_practice_start_seconds_.has_value() &&
-        !result.replay_path.empty()) {
-        std::string receipt;
-        std::string upload_error;
-        if (submit_ranked_replay(config_.ui.online_records_server_url,
-                                 ranked_authorization,
-                                 path_from_utf8(result.replay_path),
-                                 receipt, upload_error)) {
-            ranked_result_message = "Online ranking verified for " +
-                                    ranked_authorization.username + ".";
-            online_records_service_.request(
-                config_.ui.online_records_server_url,
-                ranked_chart_sha256, true);
-        } else {
-            ranked_result_message = "Online ranking upload failed: " + upload_error;
-        }
-    } else if (online_record_allowed && !ranked_prepare_error.empty() && !peer_battle &&
-               !session_mix_active_ && !replay_playback) {
-        ranked_result_message = "Online ranking unavailable: " + ranked_prepare_error;
-    }
     if (peer_battle) {
         network::PeerScore final_score;
         final_score.finished = true;
@@ -2950,9 +2893,6 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         last_replay_path_ = result.replay_path;
         last_result_path_ = (!result.result_path.empty() || !replay_playback) ? result.result_path : preserved_result_path;
         last_export_warnings_ = result.export_warnings;
-        if (!ranked_result_message.empty()) {
-            last_export_warnings_.push_back(std::move(ranked_result_message));
-        }
         last_session_replay_playback_ = replay_playback;
         if (!replay_playback) {
             cache_current_session_result(chart_path,

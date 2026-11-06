@@ -8,25 +8,29 @@
       "upstream": "src/nk2/e_fullfield.cpp",
       "file": "e_fullfield.cpp",
       "upstream_sha256": "c633ab08777aae780b344046f4011baa404b87e2b137eeeaa28f74a451b9be36",
-      "imported_sha256": "aa70e2fb1adf723a8556376ef68720ea6c17186b5f36ac875c6e661809f0c371"
+      "imported_sha256": "aa70e2fb1adf723a8556376ef68720ea6c17186b5f36ac875c6e661809f0c371",
+      "local_sha256": "911a9b1a82fad7e0603378848d43398ea86d92a32a166cc14888d59abf5003fe"
     },
     {
       "upstream": "src/nk2/e_fullfield.hpp",
       "file": "e_fullfield.hpp",
       "upstream_sha256": "403ce4630716cd087519acedb870517dc9bfc5f347c3cf299bf7873e412ce69a",
-      "imported_sha256": "007cff0de3e43fc8652c192b486c5bad5532d45acf6c99fcb25e36412c809125"
+      "imported_sha256": "007cff0de3e43fc8652c192b486c5bad5532d45acf6c99fcb25e36412c809125",
+      "local_sha256": "305cbd470b27a1ca6794d2b0b449c79311240f771bc830a17a8635e423d81480"
     },
     {
       "upstream": "src/nk2/e_tap_boost.cpp",
       "file": "e_tap_boost.cpp",
       "upstream_sha256": "8fff5e3943e357b74625d1298bff807cb0eda41103b9eaea6886e1334507b349",
-      "imported_sha256": "2e22a20ef4b38d52d0d4ea4099b4228470f3d541efd67ccb84b14ffad99e2c24"
+      "imported_sha256": "2e22a20ef4b38d52d0d4ea4099b4228470f3d541efd67ccb84b14ffad99e2c24",
+      "local_sha256": "dc16bdc1b518de1d660df2ced6770cf51cf804cb77ac71d1b873f9116a79fda3"
     },
     {
       "upstream": "src/nk2/e_tap_boost.hpp",
       "file": "e_tap_boost.hpp",
       "upstream_sha256": "c66c0994a0c9c209551d728cc13378ad357990f4d36210325e12d6b35e95abb1",
-      "imported_sha256": "a96fa41b903a3da0d8827a5dd15fa1a53ba3fc8f2b51b6811ab33889bffcdbbd"
+      "imported_sha256": "a96fa41b903a3da0d8827a5dd15fa1a53ba3fc8f2b51b6811ab33889bffcdbbd",
+      "local_sha256": "1ede493d8385995083cc2279ad5c1bc92b8377030e773922d05bb440f3a01726"
     },
     {
       "upstream": "src/nk2/intent_graph.cpp",
@@ -56,7 +60,8 @@
       "upstream": "src/nk2/nk2_convert.cpp",
       "file": "nk2_convert.cpp",
       "upstream_sha256": "daa334e1bf54685591f57b9819ccb2be9bc3e3a5fa2e640b6aa1a8b92ce08fc3",
-      "imported_sha256": "0226229098462893f5108ca4f367ff82e9b242055878faaf31677cface7d924f"
+      "imported_sha256": "0226229098462893f5108ca4f367ff82e9b242055878faaf31677cface7d924f",
+      "local_sha256": "46ce6ccb057601a1baedfe8c204c600f0bc1df12679f66af3c1e679fbdab038a"
     },
     {
       "upstream": "src/nk2/nk2_convert.hpp",
@@ -112,5 +117,6 @@
       "upstream_sha256": "0f34803c21871a40570b17a2c6bc924e486a72ab6b4d43eae740ca3dee032941",
       "imported_sha256": "0f34803c21871a40570b17a2c6bc924e486a72ab6b4d43eae740ca3dee032941"
     }
-  ]
+  ],
+  "local_adaptation": "Enable 7K output and defer phrase-search state copies until the ranked beam cutoff."
 }

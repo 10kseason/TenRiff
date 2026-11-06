@@ -1,4 +1,4 @@
-> **2026-11-05 · 1.9.9.9-hotfix2:** [8K·10K NK2 E+ 프리셋](release-1.9.9.9-hotfix2.ko.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
+> **2026-11-06 · 1.9.9.9-hotfix3:** [NK2 E+, Safe 인덱싱, 곡 폴더와 리더보드](release-1.9.9.9-hotfix3.ko.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 
 > **2026-11-04 · 1.9.9.9-hotfix1:** [OGG 보안 수정·범용 BGA·스킨 에디터](release-1.9.9.9-hotfix1.ko.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 

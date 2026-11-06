@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -27,6 +28,7 @@ struct KeyModeConverterResult {
   GameplayChart chart;
   bool converted = false;
   std::vector<std::string> warnings;
+  std::optional<Nk2Preset> replay_nk2_preset = std::nullopt;
 };
 
 [[nodiscard]] KeyModeConverterResult

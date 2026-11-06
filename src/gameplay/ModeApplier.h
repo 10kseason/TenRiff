@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -17,6 +18,7 @@ struct ModeApplyContext {
 struct ModeApplyResult {
     GameplayChart chart;
     std::vector<std::string> warnings;
+    std::optional<Nk2Preset> replay_nk2_preset;
 };
 
 ModeApplyResult apply_mode_settings(const GameplayChart& chart,

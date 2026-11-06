@@ -88,6 +88,8 @@ struct BmsParseResult {
 class BmsParser {
 public:
     BmsParseResult parse(std::string_view content, const BmsParserOptions& options = {}) const;
+    BmsParseResult parse(std::string_view content, const BmsParserOptions& options,
+                         std::string_view source_extension) const;
     BmsParseResult parseFile(const std::string& path, const BmsParserOptions& options = {}) const;
 };
 

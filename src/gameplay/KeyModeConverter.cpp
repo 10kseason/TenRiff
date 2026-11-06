@@ -1332,7 +1332,7 @@ struct OverlapResolutionStats {
 }  // namespace
 
 static KeyModeConverterResult convert_key_mode_chart_impl(const GameplayChart& chart, const KeyModeConverterOptions& options) {
-    if (options.algorithm == KeyModeConversionAlgorithm::NK2 && options.nk2_preset == Nk2Preset::FullFieldTapsEPlus)
+    if (options.algorithm == KeyModeConversionAlgorithm::NK2 && is_nk2_eplus_preset(options.nk2_preset))
         return convert_key_mode_chart_nk2_eplus(chart, options);
     if (options.algorithm == KeyModeConversionAlgorithm::NK2 && options.nk2_preset == Nk2Preset::SourceLnE) {
         return convert_key_mode_chart_nk2_e(chart, options);

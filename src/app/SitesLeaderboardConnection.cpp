@@ -19,16 +19,6 @@ bool is_key(std::string_view value) {
             return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
         });
 }
-bool is_site_origin(std::string_view url) {
-    constexpr std::string_view prefix = "https://", suffix = ".chatgpt.site";
-    if (url.substr(0, prefix.size()) != prefix || url.size() > 253) return false;
-    const auto host = url.substr(prefix.size());
-    if (host.size() <= suffix.size() || host.substr(host.size() - suffix.size()) != suffix ||
-        host.front() == '.' || host.front() == '-' || host.find("..") != std::string_view::npos) return false;
-    return std::all_of(host.begin(), host.end(), [](char c) {
-        return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == '-';
-    });
-}
 void erase_secret(std::string& value) {
 #ifdef _WIN32
     if (!value.empty()) SecureZeroMemory(value.data(), value.size());
@@ -76,8 +66,8 @@ bool parse_sites_leaderboard_connection(std::string_view json,
     auto site_url = url->second.as_string();
     if (!site_url.empty() && site_url.back() == '/') site_url.pop_back();
     const auto upload_token = token->second.as_string();
-    if (!is_site_origin(site_url) || !is_key(upload_token)) {
-        error = "Use a ChatGPT Site HTTPS origin and a valid upload key."; return false;
+    if (site_url != kSitesLeaderboardUrl || !is_key(upload_token)) {
+        error = "Use connection information from the official TenRiff leaderboard."; return false;
     }
     connection = {std::move(site_url), upload_token};
     return true;

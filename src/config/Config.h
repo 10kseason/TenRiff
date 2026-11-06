@@ -13,8 +13,6 @@
 
 namespace tenriff::config {
 
-inline constexpr std::string_view kTenRiffMainApiUrl =
-    "https://121.174.18.181:27303";
 inline constexpr double kJudgementLinePositionMin = 0.01;
 inline constexpr double kJudgementLinePositionMax = 1.00;
 inline constexpr double kJudgementLinePositionDefault = 0.82;
@@ -183,8 +181,9 @@ struct UiConfig {
     int song_level_max_filter = 0;
     std::string difficulty_table_path;
     std::string difficulty_table_url;
-    std::string online_records_server_url{kTenRiffMainApiUrl};
-    std::string tenriff_main_server_url{kTenRiffMainApiUrl};
+    // Keep legacy profile fields round-trippable. The menu uses Sites only.
+    std::string online_records_server_url;
+    std::string tenriff_main_server_url;
     std::string private_server_url;
     std::string account_server_mode = "main";
 };

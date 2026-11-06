@@ -106,14 +106,25 @@ TEST_CASE("Sites BMS boards display isolated gauge timing and selected branch po
         if (expected) {
             REQUIRE(boards.size() == 1);
             CHECK(boards[0].conditions_label.find("BMS TOTAL / STOP v2 / BRANCH cccccccc") != std::string::npos);
+            if (const auto conversion = value.find("conversion"); conversion != value.end()) {
+                const auto& token = conversion->second.as_string();
+                CHECK(boards[0].conditions_label.find(token == "nk2:fullfield_taps_eplus_v1"
+                    ? "NK2 E+ v1" : "NK2 E+ v2") != std::string::npos);
+            }
         } else CHECK(boards.empty());
     };
     check(condition, true);
-    for (const auto ruleset : {"tenriff-native-score-v2-ruleset-7", "tenriff-native-score-v2-ruleset-8"}) {
+    for (int ruleset = 5; ruleset <= 14; ++ruleset) {
         auto current = condition;
-        current["ruleset"] = config::JsonValue{ruleset};
+        current["ruleset"] = config::JsonValue{"tenriff-native-score-v2-ruleset-" + std::to_string(ruleset)};
+        current["conversion"] = config::JsonValue{"nk2:fullfield_taps_eplus_v1"};
+        check(current, true);
+        current["conversion"] = config::JsonValue{"nk2:fullfield_taps_eplus_v2"};
         check(current, true);
     }
+    auto old = condition;
+    old["ruleset"] = config::JsonValue{"tenriff-native-score-v2-ruleset-4"};
+    check(old, false);
     for (const auto* key : {"bms_timing_version", "bms_gauge_version", "bms_control_flow_version", "bms_branch_sha256"}) {
         auto missing = condition;
         missing.erase(key);

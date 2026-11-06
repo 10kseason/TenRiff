@@ -227,17 +227,26 @@ bool ensure_metadata_chart_size_supported(const std::filesystem::path& path, std
     return false;
 }
 
-std::string read_text_file(const std::filesystem::path& path, std::string* error = nullptr) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file) {
-        if (error) {
-            *error = "Failed to open file.";
-        }
-        return {};
+std::optional<std::string> read_index_chart(const std::filesystem::path& path, std::string& error) {
+    // Measure the open file, then use the same bounded bytes for parsing and hashing.
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    const auto length = static_cast<std::streamoff>(file.tellg());
+    if (length < 0) {
+        error = "Failed to parse BMS";
+        return std::nullopt;
     }
-    std::ostringstream buffer;
-    buffer << file.rdbuf();
-    return buffer.str();
+    if (static_cast<std::uintmax_t>(length) > kMaxMetadataChartFileBytes) {
+        error = "Skipped oversized metadata chart file (" + std::to_string(length) + " bytes)";
+        return std::nullopt;
+    }
+    file.seekg(0);
+    std::string bytes(static_cast<std::size_t>(length), '\0');
+    file.read(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+    if (!file || file.peek() != std::char_traits<char>::eof() || file.bad()) {
+        error = "Failed to read complete BMS";
+        return std::nullopt;
+    }
+    return bytes;
 }
 void to_upper_ascii(std::string& value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
@@ -329,27 +338,16 @@ std::string relative_path_string(const std::filesystem::path& root, const std::f
     return relative.generic_u8string();
 }
 
-std::optional<chart::OsuDifficultyMetrics> calculate_bms_difficulty(const chart::BmsChart& parsed_chart) {
+std::optional<chart::OsuDifficultyMetrics> calculate_bms_difficulty(const chart::BmsChart& parsed_chart,
+                                                                    const chart::BmsTimeline& timeline) {
     const int key_count = parsed_chart.declared_key_count > 0 ? parsed_chart.declared_key_count : 10;
     if (key_count < 4 || (key_count > 10 && key_count != 16)) {
         return std::nullopt;
     }
 
-    chart::BmsChartNormalizer normalizer;
-    auto normalized = normalizer.normalize(parsed_chart);
-    if (!normalized.success()) {
-        return std::nullopt;
-    }
-
-    chart::BmsTimelineBuilder timeline_builder;
-    auto timeline = timeline_builder.build(normalized.chart, 1000);
-    if (!timeline.success()) {
-        return std::nullopt;
-    }
-
     chart::OsuManiaChart difficulty_chart;
     difficulty_chart.key_count = key_count;
-    difficulty_chart.base_bpm = timeline.timeline.reference_bpm;
+    difficulty_chart.base_bpm = timeline.reference_bpm;
     difficulty_chart.overall_difficulty = 8.0;
 
     struct PendingLongNote {
@@ -369,8 +367,8 @@ std::optional<chart::OsuDifficultyMetrics> calculate_bms_difficulty(const chart:
 
     std::unordered_map<int, PendingLongNote> pending_long_notes;
     std::unordered_map<int, std::size_t> last_normal_note_by_column;
-    difficulty_chart.notes.reserve(timeline.timeline.events.size());
-    for (const auto& scheduled : timeline.timeline.events) {
+    difficulty_chart.notes.reserve(timeline.events.size());
+    for (const auto& scheduled : timeline.events) {
         if (scheduled.event.type != chart::BmsNormalizedEventType::Note) {
             continue;
         }
@@ -621,9 +619,13 @@ bool bms_has_running_tempo_changes(const chart::BmsNormalizedChart& chart) {
            different_running_tempo();
 }
 
-std::optional<BmsNpsStats> calculate_bms_nps_stats(const chart::BmsChart& parsed_chart,
-                                                 bool build_profile = false,
-                                                 const SongIndexCancelCallback& cancel = {}) {
+struct BmsIndexTiming {
+    chart::BmsTimeline timeline;
+    bool has_bpm_changes;
+};
+
+std::optional<BmsIndexTiming> build_bms_index_timing(const chart::BmsChart& parsed_chart,
+                                                     const SongIndexCancelCallback& cancel = {}) {
     if (cancel_requested(cancel)) return std::nullopt;
     chart::BmsChartNormalizer normalizer;
     auto normalized = normalizer.normalize(parsed_chart);
@@ -637,8 +639,17 @@ std::optional<BmsNpsStats> calculate_bms_nps_stats(const chart::BmsChart& parsed
     if (!timeline.success() || cancel_requested(cancel)) {
         return std::nullopt;
     }
-    if (build_profile && (timeline.timeline.duration_samples < 0 ||
-        std::any_of(timeline.timeline.events.begin(), timeline.timeline.events.end(),
+    return BmsIndexTiming{std::move(timeline.timeline), bms_has_running_tempo_changes(normalized.chart)};
+}
+
+std::optional<BmsNpsStats> calculate_bms_nps_stats(const chart::BmsChart& parsed_chart,
+                                                 const BmsIndexTiming& timing,
+                                                 bool build_profile = false,
+                                                 const SongIndexCancelCallback& cancel = {}) {
+    if (cancel_requested(cancel)) return std::nullopt;
+    const auto& timeline = timing.timeline;
+    if (build_profile && (timeline.duration_samples < 0 ||
+        std::any_of(timeline.events.begin(), timeline.events.end(),
                     [](const chart::BmsScheduledEvent& event) { return event.time_samples < 0; }))) {
         // Extremely small BPM values can exceed the timeline's sample range.
         // A preview must not turn an invalid negative schedule into a bin at 0.
@@ -646,9 +657,9 @@ std::optional<BmsNpsStats> calculate_bms_nps_stats(const chart::BmsChart& parsed
     }
 
     BmsNpsStats stats;
-    stats.reference_bpm = timeline.timeline.reference_bpm;
-    stats.has_bpm_changes = bms_has_running_tempo_changes(normalized.chart);
-    const auto gameplay = build_bms_gameplay_chart(timeline.timeline, parsed_chart, 1.0);
+    stats.reference_bpm = timeline.reference_bpm;
+    stats.has_bpm_changes = timing.has_bpm_changes;
+    const auto gameplay = build_bms_gameplay_chart(timeline, parsed_chart, 1.0);
     if (cancel_requested(cancel)) return std::nullopt;
     if (gameplay.chart.notes.empty()) {
         return stats;
@@ -723,23 +734,18 @@ SongEntry build_bms_entry(std::string relative_path,
     entry.mtime = mtime;
     entry.file_size = file_size;
 
-    std::string size_error;
-    if (!ensure_metadata_chart_size_supported(full_path, &size_error)) {
-        warnings.push_back(size_error + ": " + entry.path);
+    std::string read_error;
+    auto bytes = read_index_chart(full_path, read_error);
+    if (!bytes) {
+        warnings.push_back(read_error + ": " + entry.path);
         entry.title = fallback_title(full_path);
         return entry;
     }
-
-    chart::BmsParser parser;
     chart::BmsParserOptions parser_options;
     parser_options.retain_wav_bmp = !minimal_metadata;
     parser_options.retain_unknown_headers = false;
     parser_options.retain_nonessential_commands = false;
-    // Fast indexing still needs timing and note tokens for NPS statistics. It
-    // remains lightweight by excluding media maps, unknown headers, hashes,
-    // previews and native difficulty calculation.
-    parser_options.metadata_only = false;
-    auto parsed = parser.parseFile(full_path.u8string(), parser_options);
+    const auto parsed = chart::BmsParser{}.parse(*bytes, parser_options, full_path.extension().u8string());
     if (!parsed.success()) {
         warnings.push_back("Failed to parse BMS: " + entry.path);
         entry.title = fallback_title(full_path);
@@ -747,16 +753,12 @@ SongEntry build_bms_entry(std::string relative_path,
     }
 
     if (!minimal_metadata) {
-        std::string hash_error;
-        const ChartFileHashes hashes = hash_chart_file(full_path, &hash_error);
-        if (hashes.valid()) {
-            entry.md5 = hashes.md5;
-            entry.sha256 = hashes.sha256;
-            entry.file_size = hashes.size;
-        } else {
-            warnings.push_back("Failed to hash BMS: " + entry.path + ": " + hash_error);
-        }
+        auto hashes = hash_chart_bytes(*bytes);
+        entry.md5 = std::move(hashes.md5);
+        entry.sha256 = std::move(hashes.sha256);
+        entry.file_size = hashes.size;
     }
+    bytes.reset();
 
     entry.key_count = parsed.chart.declared_key_count > 0 ? parsed.chart.declared_key_count : 10;
     entry.layout_label = util::sanitize_ui_text(parsed.chart.layout_label);
@@ -785,26 +787,28 @@ SongEntry build_bms_entry(std::string relative_path,
     }
 
     entry.bpm = parsed.chart.base_bpm;
-    if (const auto nps = calculate_bms_nps_stats(parsed.chart); nps.has_value()) {
-        entry.bpm = nps->reference_bpm;
-        entry.has_bpm_changes = nps->has_bpm_changes;
-        entry.nps_min = nps->minimum;
-        entry.nps_median = nps->median;
-        entry.nps_max = nps->maximum;
-        entry.note_count = nps->note_count;
+    if (const auto timing = build_bms_index_timing(parsed.chart)) {
+        if (const auto nps = calculate_bms_nps_stats(parsed.chart, *timing)) {
+            entry.bpm = nps->reference_bpm;
+            entry.has_bpm_changes = nps->has_bpm_changes;
+            entry.nps_min = nps->minimum;
+            entry.nps_median = nps->median;
+            entry.nps_max = nps->maximum;
+            entry.note_count = nps->note_count;
+        }
+        if (calculate_difficulty && !minimal_metadata) {
+            const auto difficulty = calculate_bms_difficulty(parsed.chart, timing->timeline);
+            if (difficulty && difficulty->note_count > 0) {
+                entry.level = difficulty->revive_level;
+                entry.rating = difficulty->circus_rating;
+            }
+        }
     }
     if (!minimal_metadata) {
         entry.background_preview_path =
             menu_songs::resolve_bms_background_preview_path(full_path, parsed.chart);
         entry.audio_preview_path =
             menu_songs::resolve_bms_audio_preview_path(full_path, parsed.chart);
-    }
-    if (calculate_difficulty && !minimal_metadata) {
-        auto difficulty = calculate_bms_difficulty(parsed.chart);
-        if (difficulty.has_value() && difficulty->note_count > 0) {
-            entry.level = difficulty->revive_level;
-            entry.rating = difficulty->circus_rating;
-        }
     }
     entry.native_level = entry.level;
     return entry;
@@ -1151,7 +1155,15 @@ void process_song_index_batch(std::vector<SongIndexCandidate>& batch,
         valid_count += (valid != 0u) ? 1u : 0u;
     }
     if (valid_count > 0) {
-        result.entries.reserve(result.entries.size() + valid_count);
+        const auto required = result.entries.size() + valid_count;
+        if (required > result.entries.capacity()) {
+            // Exact growth at every batch moves the entire accumulated library.
+            // Grow in steps without reserving the full candidate count up front.
+            const auto growth = result.entries.capacity() + result.entries.capacity() / 2;
+            const auto estimate = static_cast<std::size_t>(total_hint);
+            const auto reserve = estimate >= required ? std::min(growth, estimate) : growth;
+            result.entries.reserve(std::max(required, reserve));
+        }
         for (std::size_t i = 0; i < batch_size; ++i) {
             if (batch_valid[i] != 0u) {
                 result.entries.push_back(std::move(batch_entries[i]));
@@ -1758,7 +1770,9 @@ SongNpsProfile load_song_nps_profile(const std::string& chart_path, SongIndexCan
     // No audio/media decoding or gameplay session is needed for an unplayed song.
     const auto parsed = chart::BmsParser{}.parseFile(chart_path, options);
     if (!parsed.success() || cancel_requested(cancel)) return {};
-    const auto stats = calculate_bms_nps_stats(parsed.chart, true, cancel);
+    const auto timing = build_bms_index_timing(parsed.chart, cancel);
+    if (!timing) return {};
+    const auto stats = calculate_bms_nps_stats(parsed.chart, *timing, true, cancel);
     return stats && !cancel_requested(cancel) ? stats->profile : SongNpsProfile{};
 }
 

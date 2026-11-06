@@ -1,3 +1,11 @@
+# 1.9.9.9-hotfix3 — 2026-11-06
+
+- Fix NK2 E+ preset restoration and long-note tail accent timing, and support 7K alongside 8K and 10K. Keep historical v1 replay behavior and assign a separate v2 identity to new layouts.
+- Speed up Safe indexing by sharing chart reads, hashing the same bytes and reusing the calculated timeline.
+- Add a larger Add Songs Folder button below Library, open the Windows picker directly from Song Select, and use A-Z/Z-A for title and artist sort labels.
+- Route game leaderboard lookup and submission through the official TenRiff Sites service. Show R13/R14 and separate E+ v1/v2 boards in the game.
+- [Usage](docs/release-1.9.9.9-hotfix3.en.md) · [Validation](docs/release-1.9.9.9-hotfix3-gate.md) · Fixed baseline 1.9.6.
+
 # 1.9.9.9-hotfix2 — 2026-11-05
 
 - Add explicit NK2 **E+ - Full-field + taps** for 8K/10K, including equal-key remix, using isolated KeyWeaver 1.4.0 code.

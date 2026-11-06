@@ -485,7 +485,7 @@ void MenuApp::select_skin_preview_lane(int visual_lane) {
     if (current_screen() != Screen::SettingsSkins || skin_preview_fullscreen_ ||
         help_overlay_visible_ || chat_overlay_visible_ || ranked_account_overlay_visible_ ||
         chat_url_warning_visible_ || profile_nickname_edit_active_ || difficulty_table_url_editing_ ||
-        online_records_url_editing_ || keymap_settings_controller_.capture_active()) return;
+        keymap_settings_controller_.capture_active()) return;
     const int lane_count = lane_count_for_skin_mode(std::string(skin_settings_controller_.edit_mode()));
     if (visual_lane < 1 || visual_lane > lane_count) return;
     const bool seven_plus_one = skin_settings_controller_.edit_mode() == "7+1";
@@ -603,7 +603,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         if (current_screen() != Screen::SettingsSkins || skin_preview_fullscreen_ ||
             help_overlay_visible_ || chat_overlay_visible_ || ranked_account_overlay_visible_ ||
             chat_url_warning_visible_ || profile_nickname_edit_active_ || difficulty_table_url_editing_ ||
-            online_records_url_editing_ || keymap_settings_controller_.capture_active()) return;
+            keymap_settings_controller_.capture_active()) return;
         const auto held = [this](int key) {
             return pressed_keys_.count(static_cast<uint32_t>(key)) != 0 ||
                    physical_modifier_pressed(key);

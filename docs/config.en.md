@@ -240,8 +240,8 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
   - when expanding the key count, nK2 creates safe support notes directly in the target layout during conversion instead of pre-adding notes to the source
   - NK3 always uses P64 and the host beam safety solver, adding the generalized MLP only for non-10K sources converted to 10K; select `TENRIFF_NK3_BACKEND=AUTO|VULKAN|NCNN_CPU|OPENVINO`, where `AUTO` tries ncnn Vulkan first, and use `TENRIFF_NK3_VULKAN_DEVICE=<index>` when selecting among multiple Vulkan GPUs
 - `key_conversion_nk2_preset` (string)
-  - `native | transform | remaster`; defaults to `native`
-  - selects nK2 `Native (12%)`, `Transform (35%)` or `Remaster (65%)`; the setting row is locked for Krrcream
+  - `source_ln_e_v1 | fullfield_taps_eplus_v2 | native | transform | remaster`. Defaults to `source_ln_e_v1` (E).
+  - NK2 **E+ - Full-field + taps** supports 7K, 8K and 10K, including equal-key charts. Other key counts use E and retain the saved E+ selection.
   - `Remaster` raises the budget while keeping the source placement, and fills LN sections with holds of the same length
   - all three are caps; how much actually lands depends on the source density and the safety windows
 - `gauge` (string)

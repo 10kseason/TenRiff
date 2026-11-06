@@ -250,8 +250,8 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
   - nK2는 키 수 확장 시 원본에 먼저 노트를 붙이지 않고, 변환 중 목표 레이아웃에 안전한 보조 노트를 직접 생성
   - NK3는 P64와 host beam 안전 솔버를 항상 사용하고, 10K가 아닌 원본을 10K로 변환할 때만 일반화 MLP를 추가한다. `TENRIFF_NK3_BACKEND=AUTO|VULKAN|NCNN_CPU|OPENVINO`로 백엔드를 고르며 `AUTO`는 ncnn Vulkan을 먼저 시도한다. 여러 Vulkan GPU가 있으면 `TENRIFF_NK3_VULKAN_DEVICE=<index>`로 선택
 - `key_conversion_nk2_preset` (string)
-  - `native | transform | remaster`; 기본값은 `native`
-  - nK2에서 `Native (12%)`, `Transform (35%)`, `Remaster (65%)`를 선택하며, Krrcream에서는 설정 행이 잠김
+  - `source_ln_e_v1 | fullfield_taps_eplus_v2 | native | transform | remaster`. 기본값은 `source_ln_e_v1` (E).
+  - nK2의 **E+ - Full-field + taps**는 7·8·10키에서 사용할 수 있으며 원본과 키 수가 같아도 재배치합니다. 그 외 키 수에서는 E를 적용하고 E+ 선택을 기억합니다.
   - `Remaster`는 예산을 올리면서도 원곡 배치를 유지하고, 롱노트 구간의 보조 노트를 같은 길이의 롱노트로 채움
   - 세 값은 모두 상한이며, 실제 추가량은 원본 밀도와 안전창에 따라 더 낮게 나옴
 - `gauge` (string)
