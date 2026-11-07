@@ -400,6 +400,8 @@ TEST_CASE("portable profile round trip preserves keys skin settings and backs up
     config.ui.active_song_source = "private-source-do-not-export";
     config.ui.private_server_url = "https://private.example.test";
     config.ui.profile_avatar_path = "private-avatar-do-not-export";
+    config.ui.hit_burst_image_path = "private-hit-burst-image-do-not-export.png";
+    config.skin.hit_burst_palette = "oil";
     config.graphics.background_upscale_model_path = "private-model-do-not-export";
     auto keys = manager.default_keymap();
     keys.mode_bindings["7k"]["lane1"] = "A";
@@ -413,6 +415,7 @@ TEST_CASE("portable profile round trip preserves keys skin settings and backs up
     CHECK(bytes.find("private-source-do-not-export") == std::string::npos);
     CHECK(bytes.find("private.example.test") == std::string::npos);
     CHECK(bytes.find("private-avatar-do-not-export") == std::string::npos);
+    CHECK(bytes.find("private-hit-burst-image-do-not-export.png") == std::string::npos);
     CHECK(bytes.find("private-model-do-not-export") == std::string::npos);
     CHECK(bytes.find("private-endpoint-id") == std::string::npos);
     auto current = loader.defaults();
@@ -421,6 +424,7 @@ TEST_CASE("portable profile round trip preserves keys skin settings and backs up
     current.ui.private_server_url = "https://keep-current.example.test";
     current.graphics.background_upscale_model_path = "keep-local.onnx";
     current.graphics.background_upscale_output_mode = "image";
+    current.ui.hit_burst_image_path = "keep-local-hit.png";
     const auto profile = dir.path / fs::u8path(u8"새 버전") / "profiles" / "default";
     REQUIRE(loader.save_profile(profile.u8string(), current));
     REQUIRE(manager.save_profile(profile.u8string(), manager.default_keymap()));
@@ -431,6 +435,8 @@ TEST_CASE("portable profile round trip preserves keys skin settings and backs up
     CHECK(read_preset_test_file(fs::u8path(imported.backup_path) / "config.json") == before);
     CHECK(imported.config.ui.active_song_source == current.ui.active_song_source);
     CHECK(imported.config.ui.private_server_url == current.ui.private_server_url);
+    CHECK(imported.config.ui.hit_burst_image_path == "keep-local-hit.png");
+    CHECK(imported.config.skin.hit_burst_palette == "oil");
     CHECK(imported.config.graphics.background_upscale_model_path == "keep-local.onnx");
     CHECK(imported.config.graphics.background_upscale_output_mode == "image");
     const auto reloaded = loader.load_profile(profile.u8string());

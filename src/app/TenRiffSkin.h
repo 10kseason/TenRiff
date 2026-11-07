@@ -12,6 +12,8 @@
 #include "app/ImportedGameplaySkin.h"
 #include "app/NativeMenuSkin.h"
 
+namespace tenriff::config { struct SkinConfig; }
+
 namespace tenriff::app {
 
 inline constexpr int kTenRiffSkinFormatVersion = 1;
@@ -92,6 +94,14 @@ struct TenRiffSkinGameplayStyle {
     std::optional<std::string> note_shape;
     std::vector<std::uint32_t> lane_colors;
 };
+
+struct ResolvedSkinHitBurst {
+    std::string style;
+    float brightness = 0.0f;
+};
+
+[[nodiscard]] ResolvedSkinHitBurst resolve_skin_hit_burst(
+    const config::SkinConfig& skin, const TenRiffSkinGameplayStyle* authored);
 
 struct TenRiffSkinDefinition {
     bool found = false;

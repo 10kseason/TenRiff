@@ -98,6 +98,11 @@
     const line=clamp(style.judgement_line_position??.82,.01,1)*bottom;
     const opacity=clamp(style.visual_opacity??1,.2,1),tick=now/1000,beat=animate?Math.floor(tick*2):0;
     const phase=animate?(tick*2)%1:0,hit=pressedLane>=0?pressedLane:beat%count;
+    const grade = animate ? Math.floor(tick / 3) % 5 : 0;
+    const hitLife = animate && grade < 3 ? 1 - phase : 0;
+    const trailOpacity = hitLife ** 2;
+    const impact = hitLife > 0 ? Math.max(0, 1 - phase * 500 / 105) ** 2 : 0;
+    const brightness = style.key_pulse === false ? 0 : clamp(style.key_pulse_brightness ?? .7, 0, 1);
     const dt=state.mode===mode?(now-state.last)/1000:1;state.mode=mode;state.last=now;
     const height=clamp(bottom-m.key_bottom_gap-line-12,Math.min(m.key_min_height,m.key_max_height),Math.max(m.key_min_height,m.key_max_height));
     const keyTop=bottom-m.key_bottom_gap-height;
@@ -129,11 +134,73 @@
       const travel=state.travel[lane],depth=motion.press_depth*travel;
       const backdrop=backdropOpacity(style,isDown);
       if(backdrop>0&&backdropTop(style,0,bottom)<bottom)box([x+1,backdropTop(style,0,bottom),x+width-1,bottom],backdropColor(color,style),backdrop*opacity);
-      const light=clamp((travel*motion.pressed_light+(lane===hit?Math.max(0,1-phase*3):0)*motion.hit_light)*(style.key_pulse_brightness??.7),0,1);
+      const light=clamp((travel*motion.pressed_light+(lane===hit?trailOpacity:0)*motion.hit_light)*brightness,0,1);
       box([x+inset,keyTop,x+width-inset,bottom-m.key_bottom_gap],c.key_well,opacity);
       const face=[x+inset,keyTop+depth,x+width-inset,Math.max(keyTop+1,bottom-m.key_bottom_gap-m.key_face_gap+depth)];
       sprite('key_idle',lane,face);if(light>0)sprite('key_pressed',lane,face,light*opacity);
       if(light>0)box([x+inset+5,bottom-5,x+inset+5+(width-2*inset-10)*light,bottom-3],blend(color,c.key_led,.35),opacity);
+      if (lane === hit && trailOpacity > 0 && brightness > 0) {
+        const center = x + width / 2;
+        const spread = 1 - hitLife ** 3;
+        const rise = motion.burst_rise * (.25 + 1.75 * spread);
+        const up = line >= 48 ? 1 : -1;
+        const alpha = brightness * opacity;
+        const glowHeight = 4 + motion.burst_height * impact;
+        box([center - width * .34, line - glowHeight, center + width * .34, line + glowHeight],
+          color, alpha * (.16 * trailOpacity + .25 * impact));
+        box([center - width * .3, line - 2 - 5 * impact, center + width * .3, line + 2 + 5 * impact],
+          blend(color, c.burst_core, .82), alpha * (.30 * trailOpacity + .60 * impact));
+        ctx.save();
+        ctx.globalAlpha = alpha * trailOpacity;
+        ctx.strokeStyle = blend(color, c.burst_trail, .48);
+        ctx.lineWidth = 1.3 + 2.6 * trailOpacity;
+        ctx.beginPath();
+        if (style.hit_burst_style === 'ring') {
+          ctx.ellipse(center, line - rise * .11 * up, width * (.16 + .30 * spread),
+            6 + motion.burst_height * .20 + rise * .53, 0, 0, Math.PI * 2);
+        } else if (style.hit_burst_style === 'shockwave') {
+          for (const progress of [spread, spread * .57]) {
+            const radius = width * (.18 + .28 * progress);
+            const y = line - 8 * progress * up;
+            ctx.moveTo(center + radius, y);
+            ctx.ellipse(center, y, radius, 4 + 11 * progress, 0, 0, Math.PI * 2);
+          }
+        } else if (style.hit_burst_style === 'shards') {
+          const angles = [-.84, -.48, .12, .51, .83];
+          const heights = [.56, 1.14, .94, 1.26, .73];
+          for (let i = 0; i < angles.length; i++) {
+            const x = center + angles[i] * width * (.13 + .30 * spread);
+            const y = line - (10 + rise * heights[i]) * up;
+            const length = 3 + (7 + i * 1.5) * trailOpacity;
+            const tilt = angles[i] * (1.5 - .9 * spread) * length;
+            ctx.moveTo(x - tilt, y + length * up);
+            ctx.lineTo(x + tilt, y - length * up);
+          }
+        } else if (style.hit_burst_style === 'pixels') {
+          const step = Math.floor(spread * 6) / 6;
+          for (let i = 0; i < 6; i++) {
+            const x = center + (i - 2.5) * width * (.06 + .095 * step);
+            const y = line - (9 + motion.burst_rise * step * (.48 + (i % 3) * .33)) * up;
+            const half = 1.8 + (2.2 + (i % 2)) * trailOpacity;
+            box([x - half, y - half, x + half, y + half],
+              i % 2 === 0 ? c.burst_trail : c.burst_core, alpha * trailOpacity);
+          }
+        } else {
+          const spark = style.hit_burst_style === 'spark';
+          const edge = width * (.10 + .29 * spread);
+          const tail = 4 + (8 + motion.burst_height) * trailOpacity;
+          for (const side of [-1, 1]) {
+            const tipY = line - (7 + rise * (spark ? .78 : 1)) * up;
+            ctx.moveTo(center + side * edge * .62, tipY + tail * up);
+            ctx.lineTo(center + side * edge, tipY);
+            const innerY = line - (7 + rise * (spark ? 1.16 : .62)) * up;
+            ctx.moveTo(center + side * edge * .25, innerY + tail * .64 * up);
+            ctx.lineTo(center + side * edge * .52, innerY);
+          }
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
       const nwidth=Math.max(4,(width-12)*(style.note_width_ratio??1)),nh=32*(style.note_height_ratio??1);
       for(let n=0;n<2;n++){
         const y=90+((lane*127+n*337+(animate?tick*120:0))%Math.max(120,line-180));
@@ -158,22 +225,29 @@
       const thickness=judgementLineWidth(m.judgement_line_width,style.note_height_ratio??1);
       box([left,line-thickness/2,right,line+thickness/2],c.judgement_line,opacity);
     }
-    if(animate&&phase<.55){const x=left+(hit+.5)*width,life=1-phase/.55;
-      box([x-width*.35,line-motion.burst_height*life,x+width*.35,line+3],colors[hit%colors.length],life*.28);
-      box([x-1,line-motion.burst_rise*(1-life),x+1,line],c.burst_trail,life);
-      box([x-width*.38,line-2,x+width*.38,line+1],c.burst_core,life);
-    }
     ctx.restore();
     label('title','LUMA KEYS / '+mode.toUpperCase(),[84,48,458,92]);
     label('artist','TenRiff · Digital instrument',[84,95,458,127],'body');
     label('speed','RATE ×1.00 / HS 10.0',[84,130,458,159],'body');
+    ctx.save();
+    ctx.translate(1870, 72 - 2 * trailOpacity);
+    ctx.scale(1 + .055 * trailOpacity, 1 + .055 * trailOpacity);
+    ctx.translate(-1870, -72);
     label('score','SCORE  950,000',[1540,48,1870,96]);
+    ctx.restore();
     label('stats','PG 260  GR 12  BAD 0',[1510,105,1870,140],'body');
     const progress=adjusted([84,16,454,36],native.rects.progress);box(progress,'#1D2735');box([progress[0],progress[1],progress[0]+(progress[2]-progress[0])*.38,progress[3]],c.combo,.75);
     const gauge=adjusted([1512,210,1554,906],native.rects.gauge);box(gauge,'#142332');box([gauge[0]+4,gauge[1]+(gauge[3]-gauge[1])*.25,gauge[2]-4,gauge[3]-4],c.gauge_normal);
-    const grades=['pg','gr','gd','bd','pr'],grade=animate?Math.floor(tick/3)%grades.length:0;
-    const judgementAlpha=animate?clamp(1-phase*500/motion.judgement_duration_ms,0,1):1;
-    label('judgement',['P GREAT','GREAT','GOOD','BAD','POOR'][grade],[858,192,1150,260],'judgement',c['judgement_'+grades[grade]],judgementAlpha);
+    const grades = ['pg', 'gr', 'gd', 'bd', 'pr'];
+    const judgementLife = hitLife > 0 ? clamp(1 - phase * 500 / motion.judgement_duration_ms, 0, 1) ** 2 : 0;
+    const judgementScale = 1 + ([.22, .16, .11][grade] ?? 0) * judgementLife;
+    ctx.save();
+    ctx.translate(1004, 226 - ([8, 6, 4][grade] ?? 0) * judgementLife);
+    ctx.scale(judgementScale, judgementScale);
+    ctx.translate(-1004, -226);
+    label('judgement', ['P GREAT','GREAT','GOOD','BAD','POOR'][grade], [858,192,1150,260],
+      'judgement', c['judgement_' + grades[grade]], 1 - .12 * judgementLife);
+    ctx.restore();
     const life=animate?Math.max(0,1-phase*500/motion.combo_duration_ms):0,comboScale=1+(motion.combo_scale-1)*life;
     ctx.save();ctx.translate(960,324);ctx.scale(comboScale,comboScale);ctx.translate(-960,-324);
     label('combo','147',[920,290+motion.combo_lift*life,1080,348+motion.combo_lift*life]);ctx.restore();

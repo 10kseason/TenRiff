@@ -81,7 +81,7 @@
         "combo_duration_ms": 150,
         "combo_scale": 1.16,
         "combo_lift": -5,
-        "judgement_duration_ms": 220
+        "judgement_duration_ms": 500
       },
       "rects": {
         "title": [

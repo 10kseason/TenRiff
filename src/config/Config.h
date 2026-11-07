@@ -152,6 +152,8 @@ struct AudioUiConfig {
 struct UiConfig {
     std::string profile_nickname;
     std::string profile_avatar_path;
+    // Machine-local image selection. Portable settings carry the shape token.
+    std::string hit_burst_image_path;
     std::string language = "en";
     std::string menu_font_size = "normal";
     double result_tail_ms = 500.0;
@@ -231,6 +233,7 @@ struct SkinConfig {
     double note_divider_gap_px = kNoteDividerGapPxDefault;
     bool show_judgement_line = true;
     int judgement_line_type = 1;
+    std::string judgement_line_type2_color = "off";
     bool show_gear_boundary_line = false;
     bool show_timing_feedback = true;
     bool show_timing_bar = true;
@@ -259,8 +262,10 @@ struct SkinConfig {
     double key_backdrop_opacity = 0.25;
     double key_backdrop_brightness = kSkinKeyBackdropBrightnessDefault;
     double key_backdrop_height = kSkinKeyBackdropHeightDefault;
-    // Built-in hit-burst material: prism | ring | spark.
     std::string hit_burst_style = "prism";
+    std::string hit_burst_size = "normal";
+    std::string hit_burst_palette = "soft";
+    bool hit_burst_override = false;
     // Native/LR2 solo HUD layout. Missing legacy-profile keys also select studio.
     std::string hud_layout = "studio";
     std::string gauge_width = "normal";  // normal | wide | large (100/125/150%)
@@ -395,7 +400,7 @@ public:
 [[nodiscard]] std::string normalize_song_index_profile_token(std::string_view token);
 [[nodiscard]] std::string normalize_pacemaker_mode_token(std::string_view token);
 [[nodiscard]] std::string normalize_profile_nickname(std::string_view value);
-[[nodiscard]] std::string normalize_profile_avatar_path(std::string_view value);
+[[nodiscard]] std::string normalize_profile_image_path(std::string_view value);
 [[nodiscard]] std::string normalize_background_upscale_mode(std::string_view token);
 [[nodiscard]] std::string normalize_background_upscale_output_mode(std::string_view token);
 [[nodiscard]] std::vector<std::string> supported_skin_mode_tokens();
@@ -408,8 +413,15 @@ public:
 void apply_skin_visual_preset(SkinConfig& skin, std::string_view token);
 [[nodiscard]] std::string normalize_skin_key_label_position_token(std::string_view token);
 [[nodiscard]] std::string skin_key_label_position_label(std::string_view token);
+inline constexpr std::array<std::string_view, 7> kSkinHitBurstStyles{
+    "prism", "ring", "spark", "shockwave", "shards", "pixels", "image"};
+inline constexpr std::array<std::string_view, 3> kSkinHitBurstSizes{"normal", "large", "larger"};
+inline constexpr std::array<std::string_view, 5> kSkinHitBurstPalettes{"soft", "pastel", "oil", "mono", "cyberpunk"};
 [[nodiscard]] std::string normalize_skin_hit_burst_style_token(std::string_view token);
 [[nodiscard]] std::string skin_hit_burst_style_label(std::string_view token);
+[[nodiscard]] std::string normalize_skin_hit_burst_size_token(std::string_view token);
+[[nodiscard]] float skin_hit_burst_size_scale(std::string_view token);
+[[nodiscard]] std::string normalize_skin_hit_burst_palette_token(std::string_view token);
 [[nodiscard]] std::string normalize_skin_hud_layout_token(std::string_view token);
 [[nodiscard]] std::string normalize_skin_gauge_width_token(std::string_view token);
 [[nodiscard]] double skin_gauge_width_scale(std::string_view token);

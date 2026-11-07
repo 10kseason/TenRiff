@@ -19,6 +19,7 @@
 #include <optional>
 #include <sstream>
 #include <string_view>
+#include <system_error>
 #include <thread>
 #include <unordered_map>
 
@@ -900,20 +901,6 @@ int64_t get_int64(const config::JsonObject& root, std::string_view key, int64_t 
     return static_cast<int64_t>(value->as_number(static_cast<double>(fallback)));
 }
 
-SongIndexMemorySnapshot query_song_index_memory_snapshot() {
-    SongIndexMemorySnapshot snapshot;
-#ifdef _WIN32
-    MEMORYSTATUSEX status{};
-    status.dwLength = sizeof(status);
-    if (GlobalMemoryStatusEx(&status) != 0) {
-        snapshot.available_bytes =
-            (std::min)(static_cast<std::uint64_t>(status.ullAvailPhys), static_cast<std::uint64_t>(status.ullAvailPageFile));
-        snapshot.total_bytes = static_cast<std::uint64_t>(status.ullTotalPhys);
-    }
-#endif
-    return snapshot;
-}
-
 void trim_song_index_process_memory() {
     process_memory_reclamation().request();
 }
@@ -1135,7 +1122,13 @@ void process_song_index_batch(std::vector<SongIndexCandidate>& batch,
     std::vector<std::thread> workers;
     workers.reserve(worker_count > 0 ? worker_count - 1 : 0);
     for (std::size_t i = 1; i < worker_count; ++i) {
-        workers.emplace_back(worker, i);
+        try {
+            workers.emplace_back(worker, i);
+        } catch (const std::system_error& error) {
+            // Already-started workers and this caller can drain the same queue.
+            warnings.push_back(std::string("Song scan using fewer workers: ") + error.what());
+            break;
+        }
     }
     worker(0);
     for (auto& th : workers) {
@@ -1180,7 +1173,8 @@ void write_json_string(std::ostream& out, std::string_view value) {
 
 class SongIndexStreamReader {
 public:
-    explicit SongIndexStreamReader(std::istream& stream) : stream_(stream) {}
+    explicit SongIndexStreamReader(std::istream& stream, SongIndexProfile profile = SongIndexProfile::Safe)
+        : stream_(stream), profile_(profile) {}
 
     [[nodiscard]] const std::string& error() const { return error_; }
     [[nodiscard]] int version() const { return version_; }
@@ -1259,6 +1253,7 @@ public:
 
 private:
     std::istream& stream_;
+    SongIndexProfile profile_;
     std::string error_;
     int version_ = 0;
     // Caches without this field predate optional native difficulty calculation.
@@ -1517,38 +1512,104 @@ private:
         }
     }
 
-    bool parse_entries_array() {
-        if (!expect('[', "Song index entries must be an array.")) {
-            return false;
-        }
-        skip_ws();
-        if (consume_if(']')) {
-            return true;
-        }
+    void append_entry(SongEntry entry) {
+        if (entry.native_level == 0 && entry.level != 0) entry.native_level = entry.level;
+        if (!entry.path.empty() && is_menu_song_entry(entry)) entries_.push_back(std::move(entry));
+    }
 
-        while (good()) {
-            SongEntry entry;
-            if (!parse_entry_object(entry)) {
+    bool parse_entry_batch(std::vector<std::string>& batch) {
+        if (batch.empty()) return true;
+        const auto budget = choose_song_index_work_budget(
+            profile_, std::thread::hardware_concurrency(), batch.size(), query_song_index_memory_snapshot());
+        std::vector<SongEntry> parsed(batch.size());
+        std::vector<std::string> errors(batch.size());
+        run_song_index_workers(budget.worker_count, batch.size(), [&](std::size_t item) {
+            std::istringstream input(batch[item]);
+            SongIndexStreamReader reader(input, profile_);
+            if (!reader.parse_entry_object(parsed[item]))
+                errors[item] = reader.error().empty() ? "Failed to parse song index." : reader.error();
+        });
+        for (std::size_t i = 0; i < batch.size(); ++i) {
+            if (!errors[i].empty()) {
+                set_error(std::move(errors[i]));
                 return false;
             }
-            if (entry.native_level == 0 && entry.level != 0) {
-                entry.native_level = entry.level;
-            }
-            if (!entry.path.empty() && is_menu_song_entry(entry)) {
-                entries_.push_back(std::move(entry));
-            }
+            append_entry(std::move(parsed[i]));
+        }
+        batch.clear();
+        return true;
+    }
 
-            skip_ws();
-            if (consume_if(',')) {
-                continue;
+    bool read_entry_text(std::string& text, bool& oversized) {
+        skip_ws();
+        const auto start = stream_.tellg();
+        if (!expect('{', "Song index entry must be an object.")) return false;
+        text.push_back('{');
+        std::size_t depth = 1;
+        bool quoted = false;
+        bool escaped = false;
+        auto* buffer = stream_.rdbuf();
+        while (depth > 0) {
+            const int raw = buffer->sbumpc();
+            if (raw == EOF) {
+                set_error("Unexpected end of input while parsing song entry object.");
+                return false;
             }
-            if (consume_if(']')) {
+            const char ch = static_cast<char>(raw);
+            text.push_back(ch);
+            if (quoted) {
+                if (escaped) escaped = false;
+                else if (ch == '\\') escaped = true;
+                else if (ch == '"') quoted = false;
+            } else if (ch == '"') quoted = true;
+            else if (ch == '{') ++depth;
+            else if (ch == '}') --depth;
+            if (text.size() >= 1024u * 1024u && depth > 0) {
+                // Preserve large historical entries through the streaming parser.
+                // Normal batches hold at most 8 MiB of raw cache text.
+                stream_.seekg(start);
+                if (!good()) {
+                    set_error("Failed to seek song index entry.");
+                    return false;
+                }
+                oversized = true;
                 return true;
             }
+        }
+        return true;
+    }
+
+    bool parse_entries_array() {
+        if (!expect('[', "Song index entries must be an array.")) return false;
+        if (consume_if(']')) return true;
+        const auto budget = choose_song_index_work_budget(
+            profile_, std::thread::hardware_concurrency(), 1024, query_song_index_memory_snapshot());
+        std::vector<std::string> batch;
+        batch.reserve(budget.batch_size);
+        std::size_t bytes = 0;
+        while (good()) {
+            std::string text;
+            bool oversized = false;
+            if (!read_entry_text(text, oversized)) return false;
+            if (oversized) {
+                if (!parse_entry_batch(batch)) return false;
+                bytes = 0;
+                SongEntry entry;
+                if (!parse_entry_object(entry)) return false;
+                append_entry(std::move(entry));
+            } else {
+                bytes += text.size();
+                batch.push_back(std::move(text));
+                if (batch.size() >= budget.batch_size || bytes >= 8u * 1024u * 1024u) {
+                    if (!parse_entry_batch(batch)) return false;
+                    bytes = 0;
+                }
+            }
+            if (consume_if(',')) continue;
+            if (consume_if(']')) return parse_entry_batch(batch);
             set_error("Expected ',' or ']' after song index entry.");
             return false;
         }
-
         set_error("Unexpected end of input while parsing song index entries.");
         return false;
     }
@@ -1758,6 +1819,20 @@ private:
 
 }  // namespace
 
+SongIndexMemorySnapshot query_song_index_memory_snapshot() {
+    SongIndexMemorySnapshot snapshot;
+#ifdef _WIN32
+    MEMORYSTATUSEX status{};
+    status.dwLength = sizeof(status);
+    if (GlobalMemoryStatusEx(&status) != 0) {
+        snapshot.available_bytes =
+            (std::min)(static_cast<std::uint64_t>(status.ullAvailPhys), static_cast<std::uint64_t>(status.ullAvailPageFile));
+        snapshot.total_bytes = static_cast<std::uint64_t>(status.ullTotalPhys);
+    }
+#endif
+    return snapshot;
+}
+
 SongNpsProfile load_song_nps_profile(const std::string& chart_path, SongIndexCancelCallback cancel) {
     if (chart_path.empty() || cancel_requested(cancel)) return {};
     const auto path = path_from_utf8(chart_path);
@@ -1811,7 +1886,7 @@ SongIndexLoadResult load_song_index(const std::string& path, const SongIndexOpti
         return result;
     }
 
-    SongIndexStreamReader reader(file);
+    SongIndexStreamReader reader(file, options.profile);
     if (!reader.parse()) {
         result.error = reader.error().empty() ? "Failed to parse song index." : reader.error();
         return result;
@@ -1832,9 +1907,11 @@ SongIndexLoadResult load_song_index(const std::string& path, const SongIndexOpti
     if (!uses_minimal_metadata(options)) {
         const auto difficulty_table = load_selected_difficulty_table(options, result.warnings);
         const DifficultyTable* selected_table = difficulty_table.has_value() ? &difficulty_table.value() : nullptr;
-        for (auto& entry : result.index.entries) {
-            apply_difficulty_table(entry, selected_table);
-        }
+        const auto budget = choose_song_index_work_budget(options.profile, std::thread::hardware_concurrency(),
+            result.index.entries.size(), query_song_index_memory_snapshot());
+        run_song_index_workers(budget.worker_count, result.index.entries.size(), [&](std::size_t item) {
+            apply_difficulty_table(result.index.entries[item], selected_table);
+        });
     }
     return result;
 }
@@ -2030,7 +2107,7 @@ SongIndex scan_songs(const std::string& root_path,
             hc,
             (total_candidates > 0) ? total_candidates : 1u,
             query_song_index_memory_snapshot());
-        std::size_t batch_limit = std::clamp<std::size_t>(initial_budget.batch_size, initial_budget.worker_count, 64u);
+        std::size_t batch_limit = initial_budget.batch_size;
         std::vector<SongIndexCandidate> batch;
         batch.reserve(batch_limit);
 
@@ -2056,7 +2133,7 @@ SongIndex scan_songs(const std::string& root_path,
                         static_cast<std::size_t>((std::min)(
                             remaining_u64, static_cast<std::uint64_t>((std::numeric_limits<std::size_t>::max)()))),
                         query_song_index_memory_snapshot());
-                    batch_limit = std::clamp<std::size_t>(next_budget.batch_size, next_budget.worker_count, 64u);
+                    batch_limit = next_budget.batch_size;
                     if (batch.capacity() < batch_limit) {
                         batch.reserve(batch_limit);
                     }

@@ -465,7 +465,7 @@ TEST_CASE("profile nickname normalization is UI-safe and UTF-8 bounded") {
 }
 
 TEST_CASE("profile avatar path normalization is UI-safe") {
-    CHECK(tenriff::config::normalize_profile_avatar_path("  D:/avatars/luna.png\n") ==
+    CHECK(tenriff::config::normalize_profile_image_path("  D:/avatars/luna.png\n") ==
           "D:/avatars/luna.png");
 }
 
@@ -1320,6 +1320,40 @@ TEST_CASE("skin HUD layout survives profile roundtrips and upgrades missing lega
     CHECK(legacy.config.skin.hud_layout == "studio");
     CHECK(legacy.config.skin.hud_riff_map_visible);
     CHECK(legacy.config.skin.hit_burst_style == "spark");
+    CHECK(legacy.config.skin.hit_burst_size == "normal");
+    CHECK(legacy.config.skin.hit_burst_palette == "soft");
+    CHECK_FALSE(legacy.config.skin.hit_burst_override);
+    CHECK(legacy.config.skin.judgement_line_type2_color == "off");
+    CHECK(legacy.config.ui.hit_burst_image_path.empty());
+}
+
+TEST_CASE("hit burst appearance and local image survive a profile round trip") {
+    using namespace tenriff::config;
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE_FALSE(temp.path.empty());
+    const auto profile = (temp.path / "profile").u8string();
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.skin.hit_burst_style = "IMAGE";
+    config.skin.hit_burst_size = "LARGER";
+    config.skin.hit_burst_palette = "CYBERPUNK";
+    config.skin.hit_burst_override = true;
+    config.skin.judgement_line_type = 2;
+    config.skin.judgement_line_type2_color = "ice";
+    config.ui.hit_burst_image_path = u8"D:/fixture/타격 이미지.png";
+    REQUIRE(loader.save_profile(profile, config));
+    const auto saved = loader.load_profile(profile);
+    REQUIRE(saved.success());
+    CHECK(saved.config.skin.hit_burst_style == "image");
+    CHECK(saved.config.skin.hit_burst_size == "larger");
+    CHECK(skin_hit_burst_size_scale(saved.config.skin.hit_burst_size) == doctest::Approx(1.65));
+    CHECK(saved.config.skin.hit_burst_palette == "cyberpunk");
+    CHECK(saved.config.skin.hit_burst_override);
+    CHECK(saved.config.skin.judgement_line_type2_color == "ice");
+    CHECK(saved.config.ui.hit_burst_image_path == config.ui.hit_burst_image_path);
+    CHECK(normalize_skin_hit_burst_style_token("circle") == "ring");
+    CHECK(normalize_skin_hit_burst_size_token("unknown") == "normal");
+    CHECK(normalize_skin_hit_burst_palette_token("unknown") == "soft");
 }
 
 TEST_CASE("config save and load preserve hit burst brightness") {

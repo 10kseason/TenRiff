@@ -9,5 +9,6 @@ inline constexpr std::size_t kGameplayHudMaxMeasureLines = 64;
 inline constexpr std::size_t kGameplayHudMaxLanes = 16;
 inline constexpr std::size_t kGameplayTimingHistoryMaxEntries = 100;
 inline constexpr std::size_t kGameplayRiffMapBins = 64;
+inline constexpr double kGameplayHitMotionMs = 500.0;
 
 }  // namespace tenriff

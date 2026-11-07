@@ -103,6 +103,7 @@ inline bool timing_text_feedback_visible(const LiveJudgementFeedback& feedback,
 struct ActiveHoldView {
     int lane = 0;
     int64_t end_sample = 0;
+    game::Judgement head_judgement = game::Judgement::PG;
 };
 
 struct MineTrigger {

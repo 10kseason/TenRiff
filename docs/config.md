@@ -298,6 +298,8 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
   - `safe | fast`
   - 기본 `safe`(안전). 해시와 미리보기 메타데이터를 준비하며 난이도표도 이 방식을 사용합니다. 자체 LV/CR 계산 여부는 아래 별도 설정을 따릅니다.
   - 저장된 선택은 유지합니다. 선택 가능한 `fast`(빠름·최소)는 해시·미리보기·난이도 계산을 생략합니다.
+  - 두 모드 모두 폴더 인덱싱에서 사용 가능한 논리 코어를 활용합니다. 남은 파일 수와 여유 RAM을 기준으로 동시 작업 수를 조절합니다.
+  - 기존 캐시의 JSON 해석과 전체 곡 보기의 캐시 경로 확인도 병렬 처리합니다.
 - `calculate_song_index_difficulty` (bool)
   - 기본값은 `false`
   - `false`면 BMS `#PLAYLEVEL`을 메뉴 LV로 유지하고 CPU 비용이 큰 자체 LV/CR 계산을 건너뜀
@@ -318,6 +320,7 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | --- | --- | --- |
 | `profile_nickname` | string; UTF-8 ≤48 bytes | 표시 이름. 비면 프로필 ID를 사용하며 공백·제어문자를 정리. |
 | `profile_avatar_path` | string; UTF-8 ≤2048 bytes | 로컬 PNG/JPG 아바타 경로. |
+| `hit_burst_image_path` | string; UTF-8 ≤2048 bytes | 키밤 이미지 선택에서 고른 PNG/JPEG의 경로. 이 값은 현재 기기의 프로필에 저장됩니다. |
 | `language` | `en`, `ko`, `ja`, `zh-CN`; `en` | UI 언어. 다른 값은 en으로 정규화. |
 | `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | 프로필/첫 실행에서 보통·크게·더 크게 선택. 메뉴 글자 100%·115%·130%, 게임플레이 스킨 글자는 별도 유지. |
 | `skip_start_countdown` | bool; `false` | 단독 플레이의 초기 `3 / 2 / 1` 표시 생략. 일반 곡 시작과 메뉴 재시작·결과 재시도에 적용. |
@@ -380,7 +383,11 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `judgement_line_glow_enabled` | bool; `true` | 판정선 주변 빛 표시. |
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst 밝기. 0이면 끔. |
 | `key_pulse_enabled` | bool; `true` | 구버전 ON/OFF 호환. false 또는 밝기 0이면 끔. |
-| `hit_burst_style` | `prism`, `ring`, `spark`; `prism` | 내장 Hit Burst 모양. |
+| `hit_burst_style` | `prism`, `ring`, `spark`, `shockwave`, `shards`, `pixels`, `image`; `prism` | 성공 타격에서 퍼지는 모양. 이미지 모드는 선택한 파일의 원본 색과 투명도를 사용합니다. |
+| `hit_burst_size` | `normal`, `large`, `larger`; `normal` | 키밤 크기 100/130/165%. |
+| `hit_burst_palette` | `soft`, `pastel`, `oil`, `mono`, `cyberpunk`; `soft` | 내장 키밤의 부드러운 기본, 파스텔, 유화, 단색, 사이버펑크 팔레트. |
+| `hit_burst_override` | bool; `false` | 켜면 프로필의 키밤 모양과 밝기를 우선 적용합니다. |
+| `judgement_line_type2_color` | color token; `off` | 타입 2 판정선 띠를 지정한 단색으로 채웁니다. `off`는 기본 초록 테두리입니다. |
 | `hud_layout` | `classic`, `studio`; `studio` | Native·가져온 LR2 스킨의 단독 플레이 HUD 스타일. LR2 노트·건반·기어 이미지와 비율은 유지함. 키가 없는 기존 프로필도 기본값 `studio`를 사용하며 Options › Skins에서 Classic으로 변경. 1.8.9는 오른쪽 위 정보·왼쪽 아래 점수·오른쪽 아래 가로 맵을 배치하며 좁은 여백에서는 축소·반대쪽 이동. 극단 필드와 Performance HUD가 양쪽 상단을 막으면 정보 카드만 숨김. 다른 이미지 스킨·고스트·멀티는 Classic 유지. 알 수 없는 값은 `studio`. [배치와 검증 범위](release-1.8.9-gate.md). |
 | `hud_riff_map_visible` | bool; `true` | Studio Deck의 64구간 가로 노트 밀도 맵과 경과/전체 시간 표시. 기본 위치는 오른쪽 아래이며 여백에 따라 이동·축소하고 아주 좁으면 시간 글자를 생략함. Options › Skins › 그래프 맵에서 변경하며 프로필·스킨 프리셋에 저장됨. 꺼도 다른 카드 위치와 Classic HUD는 유지. |
 | `indicator_background_visible` | bool; `false` | 이전 프로필·프리셋 호환용 필드. 1.8.9.3부터 네이티브 판정·FAST/SLOW·타이밍 배경은 값과 무관하게 표시하지 않으며 설정 행도 제거됨. 글자·눈금·오차 마커는 유지. `skin.json` 필드가 아님. |

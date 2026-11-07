@@ -1,5 +1,7 @@
 #include "doctest/doctest.h"
 
+#include <atomic>
+#include <stdexcept>
 #include <filesystem>
 #include <fstream>
 #include <tuple>
@@ -1051,34 +1053,173 @@ TEST_CASE("cached song index sanitizes control heavy metadata on load") {
 }
 
 TEST_CASE("song index budget leaves RAM reserve under low memory") {
-    const auto budget = tenriff::app::choose_song_index_work_budget(
-        tenriff::app::SongIndexProfile::Safe,
-        16,
-        5000,
-        tenriff::app::SongIndexMemorySnapshot{
-            1ull * 1024ull * 1024ull * 1024ull,
-            16ull * 1024ull * 1024ull * 1024ull});
-
-    CHECK(budget.reserve_bytes >= 768ull * 1024ull * 1024ull);
-    CHECK(budget.headroom_bytes < 512ull * 1024ull * 1024ull);
-    CHECK(budget.worker_count < 16u);
-    CHECK(budget.worker_count <= 2u);
-    CHECK(budget.batch_size >= budget.worker_count);
-    CHECK(budget.batch_size <= 64u);
+    for (const auto profile : {tenriff::app::SongIndexProfile::Safe, tenriff::app::SongIndexProfile::Fast}) {
+        const auto budget = tenriff::app::choose_song_index_work_budget(
+            profile, 16, 5000, tenriff::app::SongIndexMemorySnapshot{
+                1ull * 1024ull * 1024ull * 1024ull, 16ull * 1024ull * 1024ull * 1024ull});
+        CHECK(budget.reserve_bytes >= 1536ull * 1024ull * 1024ull);
+        CHECK(budget.headroom_bytes == 0u);
+        CHECK(budget.worker_count == 1u);
+        CHECK(budget.batch_size == 1u);
+    }
 }
 
-TEST_CASE("song index fast profile allows more work than safe profile when memory is plentiful") {
+TEST_CASE("both song index profiles use all CPU threads when memory is plentiful") {
     const tenriff::app::SongIndexMemorySnapshot memory{
-        24ull * 1024ull * 1024ull * 1024ull,
-        32ull * 1024ull * 1024ull * 1024ull};
-    const auto safe_budget = tenriff::app::choose_song_index_work_budget(
-        tenriff::app::SongIndexProfile::Safe, 16, 50000, memory);
-    const auto fast_budget = tenriff::app::choose_song_index_work_budget(
-        tenriff::app::SongIndexProfile::Fast, 16, 50000, memory);
+        96ull * 1024ull * 1024ull * 1024ull, 128ull * 1024ull * 1024ull * 1024ull};
+    for (const auto profile : {tenriff::app::SongIndexProfile::Safe, tenriff::app::SongIndexProfile::Fast}) {
+        for (const unsigned threads : {1u, 2u, 4u, 8u, 16u, 64u, 128u}) {
+            for (const std::size_t items : {std::size_t{2000}, std::size_t{50000}}) {
+                const auto budget = tenriff::app::choose_song_index_work_budget(profile, threads, items, memory);
+                CHECK(budget.worker_count == threads);
+                CHECK(budget.batch_size >= budget.worker_count);
+                CHECK(budget.batch_size <= items);
+            }
+        }
+    }
+}
 
-    CHECK(fast_budget.worker_count >= safe_budget.worker_count);
-    CHECK(fast_budget.batch_size >= safe_budget.batch_size);
-    CHECK(fast_budget.reserve_bytes <= safe_budget.reserve_bytes);
+TEST_CASE("song index budget handles short queues and unavailable memory or CPU reports") {
+    for (const auto profile : {tenriff::app::SongIndexProfile::Safe, tenriff::app::SongIndexProfile::Fast}) {
+        for (const std::size_t items : {std::size_t{1}, std::size_t{3}, std::size_t{17}}) {
+            const auto budget = tenriff::app::choose_song_index_work_budget(profile, 64, items, {});
+            CHECK(budget.worker_count == items);
+            CHECK(budget.batch_size == items);
+        }
+        const auto fallback = tenriff::app::choose_song_index_work_budget(profile, 0, 1000, {});
+        CHECK(fallback.worker_count == 4u);
+        CHECK(fallback.batch_size >= fallback.worker_count);
+        const auto full = tenriff::app::choose_song_index_work_budget(profile, 128, 50000, {});
+        CHECK(full.worker_count == 128u);
+        CHECK(full.batch_size >= full.worker_count);
+        const auto exhausted = tenriff::app::choose_song_index_work_budget(
+            profile, 16, 1000, {0, 16ull * 1024ull * 1024ull * 1024ull});
+        CHECK(exhausted.worker_count == 1u);
+        CHECK(exhausted.batch_size == 1u);
+    }
+}
+
+TEST_CASE("song scan can cancel parallel metadata and restart with a complete index") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    std::unordered_map<std::string, std::string> expected;
+    for (int item = 0; item < 257; ++item) {
+        const auto filename = "chart-" + std::to_string(item) + ".bms";
+        const auto title = "Parallel " + std::to_string(item);
+        write_file(temp.path / filename, minimal_bms_chart(title, 10));
+        expected.emplace(filename, title);
+    }
+    for (const auto profile : {tenriff::app::SongIndexProfile::Safe, tenriff::app::SongIndexProfile::Fast}) {
+        SongIndexOptions options;
+        options.profile = profile;
+        std::atomic<bool> cancelled{false};
+        std::vector<std::string> warnings;
+        const auto partial = scan_songs(temp.path.u8string(), nullptr, warnings,
+            [&](const SongIndexProgress& update) {
+                if (update.stage == SongIndexProgressStage::BuildingMetadata && update.processed >= 32)
+                    cancelled.store(true, std::memory_order_relaxed);
+            }, options, [&] { return cancelled.load(std::memory_order_relaxed); });
+        CHECK(cancelled.load());
+        CHECK_FALSE(partial.entries.empty());
+        CHECK(partial.entries.size() <= expected.size());
+        CHECK(warnings.empty());
+
+        const auto complete = scan_songs(temp.path.u8string(), nullptr, warnings, {}, options);
+        REQUIRE(complete.entries.size() == expected.size());
+        std::unordered_map<std::string, bool> seen;
+        for (const auto& entry : complete.entries) {
+            REQUIRE(expected.count(entry.path) == 1u);
+            CHECK(entry.title == expected.at(entry.path));
+            CHECK(seen.emplace(entry.path, true).second);
+        }
+        CHECK(warnings.empty());
+    }
+}
+
+TEST_CASE("parallel song cache batches preserve ordering and escaped metadata in both profiles") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    SongIndex index;
+    for (int i = 0; i < 1537; ++i) {
+        tenriff::app::SongEntry entry;
+        entry.path = u8"곡/{part}/chart-" + std::to_string(i) + ".bms";
+        entry.title = u8"제목 { [ \\ \" " + std::to_string(i);
+        entry.artist = u8"작곡가";
+        entry.format = "bms";
+        entry.key_count = 10;
+        entry.level = 7;
+        entry.native_level = 7;
+        entry.bms_rank = i % 5;
+        index.entries.push_back(std::move(entry));
+    }
+    for (const auto profile : {tenriff::app::SongIndexProfile::Safe, tenriff::app::SongIndexProfile::Fast}) {
+        SongIndexOptions options;
+        options.profile = profile;
+        const auto path = temp.path / "cache.json";
+        REQUIRE(save_song_index(path.u8string(), index, options));
+        const auto loaded = load_song_index(path.u8string(), options);
+        REQUIRE(loaded.success());
+        REQUIRE(loaded.loaded_from_file);
+        REQUIRE(loaded.index.entries.size() == index.entries.size());
+        for (std::size_t i = 0; i < index.entries.size(); ++i) {
+            CHECK(loaded.index.entries[i].path == index.entries[i].path);
+            CHECK(loaded.index.entries[i].title == index.entries[i].title);
+            CHECK(loaded.index.entries[i].bms_rank == index.entries[i].bms_rank);
+            CHECK(loaded.index.entries[i].native_level == 7);
+        }
+    }
+}
+
+TEST_CASE("parallel song cache rejects a malformed late batch without returning partial entries") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    std::string bytes = R"({"version":21,"calculate_difficulty":false,"minimal_metadata":false,"entries":[)";
+    for (int i = 0; i < 1025; ++i)
+        bytes += R"({"path":"ok.bms","format":"bms","key_count":10},)";
+    bytes += R"({"path":"bad.bms","title":"\uQQQQ","format":"bms","key_count":10}]})";
+    const auto path = temp.path / "cache.json";
+    write_file(path, bytes);
+    const auto loaded = load_song_index(path.u8string());
+    CHECK_FALSE(loaded.success());
+    CHECK_FALSE(loaded.loaded_from_file);
+    CHECK(loaded.index.entries.empty());
+}
+
+TEST_CASE("parallel song cache streams an oversized historical entry between buffered batches") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    std::string bytes = R"({"version":21,"calculate_difficulty":false,"entries":[{"path":"early.bms","format":"bms","key_count":10},{"path":"large.bms","format":"bms","key_count":10,"level":12,"unknown":")";
+    bytes.append(2u * 1024u * 1024u, 'x');
+    bytes += R"("},{"path":"last.bms","format":"bms","key_count":10}]})";
+    const auto path = temp.path / "cache.json";
+    write_file(path, bytes);
+    const auto loaded = load_song_index(path.u8string());
+    REQUIRE(loaded.success());
+    REQUIRE(loaded.loaded_from_file);
+    REQUIRE(loaded.index.entries.size() == 3u);
+    CHECK(loaded.index.entries[0].path == "early.bms");
+    CHECK(loaded.index.entries[1].path == "large.bms");
+    CHECK(loaded.index.entries[1].native_level == 12);
+    CHECK(loaded.index.entries[2].path == "last.bms");
+}
+
+TEST_CASE("song index workers join all tasks before propagating a task failure") {
+    std::atomic<int> completed{0};
+    bool caught = false;
+    try {
+        tenriff::app::run_song_index_workers(16, 129, [&](std::size_t item) {
+            ++completed;
+            if (item == 67) throw std::runtime_error("fixture failure");
+        });
+    } catch (const std::runtime_error& error) {
+        caught = std::string(error.what()) == "fixture failure";
+    }
+    CHECK(caught);
+    CHECK(completed.load() == 129);
 }
 
 TEST_CASE("song scan progress reports scanning and metadata stages") {

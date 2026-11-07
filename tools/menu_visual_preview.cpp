@@ -1307,6 +1307,8 @@ int main(int argc, char** argv) {
     int judgement_line_type = 1;
     double fixture_judge_position = -1;
     bool timing_sequence = false;
+    bool hit_motion_sequence = false;
+    bool falling_note_sequence = false;
     std::string bms_rank_fixture;
     std::string artist_fixture;
     double timing_text_x = 0, timing_text_y = 0, timing_bar_x = 0, timing_bar_y = 0;
@@ -1317,6 +1319,8 @@ int main(int argc, char** argv) {
     bool fullscreen_skin_preview = false;
     bool seven_plus_one = false, scratch_right = false;
     std::string preview_note_shape, preview_hit_burst;
+    std::string preview_burst_size = "normal", preview_burst_palette = "soft", preview_burst_image;
+    std::string preview_type2_color = "off";
     double fade_in = 0.0, fade_out = 0.0;
     double field_offset = 0;
     std::string song_title_file;
@@ -1521,6 +1525,26 @@ int main(int argc, char** argv) {
         if (arg == "--remapped-functions") { remapped_functions = true; continue; }
         if (arg == "--judge-line-position" && i + 1 < argc) { fixture_judge_position = std::clamp(std::stod(argv[++i]), 0.0, 1.0); continue; }
         if (arg == "--timing-sequence") { timing_sequence = gameplay = true; continue; }
+        if (arg == "--hit-burst-size" && i + 1 < argc) { preview_burst_size = argv[++i]; continue; }
+        if (arg == "--hit-burst-palette" && i + 1 < argc) { preview_burst_palette = argv[++i]; continue; }
+        if (arg == "--hit-burst-image" && i + 1 < argc) {
+            preview_burst_image = argv[++i];
+            preview_hit_burst = "image";
+            continue;
+        }
+        if (arg == "--type2-line-color" && i + 1 < argc) { preview_type2_color = argv[++i]; continue; }
+        if (arg == "--hit-motion-sequence") {
+            hit_motion_sequence = gameplay = fixture_idle = true;
+            fixture_seconds = 0.0;
+            preview_fps = 60;
+            continue;
+        }
+        if (arg == "--falling-note-sequence") {
+            falling_note_sequence = gameplay = fixture_idle = no_feedback = true;
+            fixture_seconds = 0.0;
+            preview_fps = 60;
+            continue;
+        }
         if (arg == "--judge-line-type" && i + 1 < argc) {
             judgement_line_type = std::stoi(argv[++i]);
             if (judgement_line_type != 1 && judgement_line_type != 2) return 2;
@@ -2510,7 +2534,19 @@ int main(int argc, char** argv) {
     if (fixture_combo_position >= 0)
         data.gameplay.combo_position = data.generic.skin_preview.combo_position = fixture_combo_position;
     if (!preview_note_shape.empty()) data.gameplay.note_shape = data.generic.skin_preview.note_shape = preview_note_shape;
-    if (!preview_hit_burst.empty()) data.gameplay.hit_burst_style = data.generic.skin_preview.hit_burst_style = preview_hit_burst;
+    if (preview_hit_burst == "off") {
+        data.gameplay.key_pulse_brightness = data.generic.skin_preview.key_pulse_brightness = 0.0f;
+    } else if (!preview_hit_burst.empty()) {
+        data.gameplay.hit_burst_style = data.generic.skin_preview.hit_burst_style = preview_hit_burst;
+    }
+    data.gameplay.hit_burst_scale = data.generic.skin_preview.hit_burst_scale =
+        tenriff::config::skin_hit_burst_size_scale(preview_burst_size);
+    data.gameplay.hit_burst_palette = data.generic.skin_preview.hit_burst_palette = preview_burst_palette;
+    data.gameplay.hit_burst_image_path = data.generic.skin_preview.hit_burst_image_path = preview_burst_image;
+    if (preview_type2_color != "off") {
+        data.gameplay.judgement_line_type2_rgb = data.generic.skin_preview.judgement_line_type2_rgb =
+            tenriff::config::skin_color_rgb(preview_type2_color);
+    }
     data.gameplay.key_overlay_enabled = data.generic.skin_preview.key_overlay_enabled = key_overlay_fixture;
     data.gameplay.key_overlay_x = data.generic.skin_preview.key_overlay_x = key_overlay_x;
     data.gameplay.key_overlay_y = data.generic.skin_preview.key_overlay_y = key_overlay_y;
@@ -2795,8 +2831,14 @@ int main(int argc, char** argv) {
                 hud.activity_publish_time_ns = 0;
             }
             hud.lane_activity.fill(0.0f);
+            hud.lane_hit_time_ns.fill(0);
             hud.lane_pressed.fill(0);
             const int struck_lane = hit % preview_keys;
+            if (!fixture_idle) {
+                const auto age_ns = static_cast<int64_t>(std::fmod(seconds, 0.5) * 1'000'000'000.0);
+                hud.lane_hit_time_ns[static_cast<std::size_t>(struck_lane)] =
+                    tenriff::timing::HighResClock::now_ns() - age_ns;
+            }
             hud.lane_activity[static_cast<std::size_t>(struck_lane)] = fixture_idle ? 0.0f
                 : static_cast<float>(std::max(0.0, 1.0 - std::fmod(seconds, 0.5) * 5.0));
             hud.lane_pressed[static_cast<std::size_t>(struck_lane)] = !fixture_idle && std::fmod(seconds, 0.5) < 0.18;
@@ -2860,8 +2902,51 @@ int main(int argc, char** argv) {
                 note.visual_position = note.start_sample / 48000.0;
                 note.tail_visual_position = note.tail_sample / 48000.0;
                 hud.lane_activity.fill(0.0f);
+                hud.lane_hit_time_ns.fill(0);
                 hud.lane_pressed.fill(0);
                 if (!note.released) hud.lane_pressed[1] = 1;
+            }
+            if (hit_motion_sequence) {
+                // Static notes, an empty keypress, a two-lane chord and a quick
+                // repeat on its first lane. Use fixed 60 Hz ages for captures.
+                constexpr int chord_frame = 5;
+                constexpr int repeat_frame = 12;
+                const auto now_ns = tenriff::timing::HighResClock::now_ns();
+                const auto hit_time = [&](int frame) {
+                    return rendered_frames < frame ? int64_t{0}
+                        : now_ns - (rendered_frames - frame) * 1'000'000'000LL / 60;
+                };
+                hud.lane_pressed[1] = rendered_frames >= 1 && rendered_frames < chord_frame;
+                hud.lane_activity[1] = hud.lane_pressed[1] ? 1.0f : 0.0f;
+                const bool repeat = rendered_frames >= repeat_frame;
+                const bool chord = rendered_frames >= chord_frame;
+                hud.lane_hit_time_ns[0] = hit_time(repeat ? repeat_frame : chord_frame);
+                hud.lane_hit_time_ns[2] = hit_time(chord_frame);
+                hud.combo = (chord ? 2 : 0) + (repeat ? 1 : 0);
+                hud.score = hud.combo * 100;
+                hud.gr = hud.combo;
+                hud.pg = 0;
+                hud.has_feedback = chord && rendered_frames < repeat_frame + 30;
+                hud.feedback = "GR";
+                hud.text_revision = static_cast<uint64_t>(hud.combo + 1);
+            }
+            if (falling_note_sequence) {
+                // Both notes reach the timing line during a frozen chart
+                // position. The visible drop continues past the chart length.
+                constexpr int64_t final_sample = 48000;
+                hud.current_sample = final_sample + (rendered_frames - 4) * 800;
+                hud.duration_samples = final_sample;
+                hud.finished = true;
+                hud.current_visual_position = 1.0;
+                hud.visual_velocity = 0.0;
+                hud.past_samples = 8640;
+                hud.note_count = 2;
+                hud.notes[0] = GameplayNoteData{1, final_sample, final_sample};
+                hud.notes[1] = GameplayNoteData{3, final_sample - 4800, final_sample, true};
+                for (std::size_t index = 0; index < hud.note_count; ++index) {
+                    hud.notes[index].visual_position = 1.0;
+                    hud.notes[index].tail_visual_position = 1.0;
+                }
             }
             if (ghost) {
                 // Identical note/key activity makes visual parity measurable;
@@ -2871,10 +2956,10 @@ int main(int argc, char** argv) {
                 hud.ghost_max_combo = hud.max_combo;
                 hud.ghost_accuracy = hud.accuracy;
                 hud.ghost_detailed_accuracy = hud.detailed_accuracy;
-                hud.ghost_pg = hud.pg; hud.ghost_gr = 23456;
+                hud.ghost_pg = hud.pg; hud.ghost_gr = 23456 + (hit_motion_sequence ? hud.gr : 0);
                 hud.ghost_gd = 3456; hud.ghost_bd = 456; hud.ghost_pr = 56;
                 hud.ghost_gauge = hud.gauge; hud.ghost_gauge_label = hud.gauge_label;
-                hud.ghost_has_feedback = !no_feedback;
+                hud.ghost_has_feedback = !no_feedback && (!hit_motion_sequence || hud.has_feedback);
                 hud.ghost_feedback = hud.feedback;
                 hud.ghost_feedback_delta_ms = hud.feedback_delta_ms;
                 hud.ghost_has_non_pg_feedback = hud.has_non_pg_feedback;
@@ -2887,6 +2972,7 @@ int main(int argc, char** argv) {
                 hud.ghost_timing_maximum_window_ms = hud.timing_maximum_window_ms;
                 hud.ghost_lane_activity_count = hud.lane_activity_count;
                 hud.ghost_lane_activity = hud.lane_activity;
+                hud.ghost_lane_hit_time_ns = hud.lane_hit_time_ns;
                 hud.ghost_lane_pressed_count = hud.lane_pressed_count;
                 hud.ghost_lane_pressed = hud.lane_pressed;
                 hud.ghost_note_count = hud.note_count;

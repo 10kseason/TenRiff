@@ -1,4 +1,4 @@
-> **2026-11-06 · 1.9.9.9-hotfix3:** [NK2 E+、Safe 索引、歌曲文件夹与排行榜](release-1.9.9.9-hotfix3.zh-CN.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
+> **2026-11-07 · 1.9.9.9-hotfix4:** [多核缓存加载与击打特效设置](release-1.9.9.9-hotfix4.zh-CN.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 
 > **2026-11-04 · 1.9.9.9-hotfix1:** [OGG 安全修复、通用 BGA 与皮肤编辑器](release-1.9.9.9-hotfix1.zh-CN.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 

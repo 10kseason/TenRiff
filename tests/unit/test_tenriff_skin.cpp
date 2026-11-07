@@ -619,7 +619,7 @@ TEST_CASE("Skin settings retain stable IDs while grouping lane selection with no
     using namespace tenriff::app;
     for (const bool lr2 : {false, true}) {
         const SkinSettingsRows rows{lr2};
-        CHECK(rows.count() == (lr2 ? 56 : 54));
+        CHECK(rows.count() == (lr2 ? 61 : 59));
         CHECK(rows.index_of(SkinSettingsRowId::Lr2Resolution) == (lr2 ? 4 : -1));
         CHECK(rows.index_of(SkinSettingsRowId::TargetGap) == -1);
         CHECK(rows.index_of(SkinSettingsRowId::VisualPreset) == -1);
@@ -635,6 +635,11 @@ TEST_CASE("Skin settings retain stable IDs while grouping lane selection with no
         CHECK(rows.index_of(SkinSettingsRowId::TimingBarX) + 1 == rows.index_of(SkinSettingsRowId::TimingBarY));
         CHECK(rows.index_of(SkinSettingsRowId::JudgementX) + 1 == rows.index_of(SkinSettingsRowId::JudgementY));
         CHECK(rows.index_of(SkinSettingsRowId::ComboX) + 1 == rows.index_of(SkinSettingsRowId::ComboY));
+        CHECK(rows.index_of(SkinSettingsRowId::HitBurstStyle) + 1 == rows.index_of(SkinSettingsRowId::HitBurstSize));
+        CHECK(rows.index_of(SkinSettingsRowId::HitBurstSize) + 1 == rows.index_of(SkinSettingsRowId::HitBurstPalette));
+        CHECK(rows.index_of(SkinSettingsRowId::HitBurstPalette) + 1 == rows.index_of(SkinSettingsRowId::HitBurstImage));
+        CHECK(rows.index_of(SkinSettingsRowId::HitBurstImage) + 1 == rows.index_of(SkinSettingsRowId::ClearHitBurstImage));
+        CHECK(rows.index_of(SkinSettingsRowId::JudgementLineType) + 1 == rows.index_of(SkinSettingsRowId::JudgementLineType2Color));
         CHECK(skin_settings_category(SkinSettingsRowId::TargetLane) == SkinSettingsCategory::Notes);
         CHECK(rows.index_of(SkinSettingsRowId::Back) == rows.count() - 1);
         for (const auto id : kSkinSettingsRowOrder) {

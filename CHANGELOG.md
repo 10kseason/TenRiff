@@ -1,3 +1,11 @@
+# 1.9.9.9-hotfix4 — 2026-11-07
+
+- Use available logical CPU threads for Safe and Fast folder indexing, existing-cache parsing and ALL SONG cached-path validation, with bounded batches and RAM-aware concurrency.
+- Add 0.5-second successful-hit motion to judgement, score and key bursts. Hide tap and long-note heads immediately on PG, GR and GOOD, and let failed or missed notes continue below the line.
+- Add 100/130/165% burst sizes, PNG/JPEG image selection, Shockwave/Shards/Pixels and Soft Default/Pastel/Oil Paint/Monochrome/Cyberpunk palettes.
+- Add solid colors for the Type 2 judgement band and simplify Korean hit-burst option labels.
+- [Usage](docs/release-1.9.9.9-hotfix4.en.md) · [Validation](docs/release-1.9.9.9-hotfix4-gate.md) · Fixed baseline 1.9.6.
+
 # 1.9.9.9-hotfix3 — 2026-11-06
 
 - Fix NK2 E+ preset restoration and long-note tail accent timing, and support 7K alongside 8K and 10K. Keep historical v1 replay behavior and assign a separate v2 identity to new layouts.

@@ -137,6 +137,7 @@ public:
 
         std::size_t lane_activity_count = 0;
         std::array<float, kGameplayHudMaxLanes> lane_activity{};
+        std::array<int64_t, kGameplayHudMaxLanes> lane_hit_time_ns{};
         app::KeyOverlaySnapshot key_overlay;
         std::size_t lane_pressed_count = 0;
         std::array<uint8_t, kGameplayHudMaxLanes> lane_pressed{};
@@ -170,6 +171,7 @@ public:
         bool ghost_game_over = false;
         std::size_t ghost_lane_activity_count = 0;
         std::array<float, kGameplayHudMaxLanes> ghost_lane_activity{};
+        std::array<int64_t, kGameplayHudMaxLanes> ghost_lane_hit_time_ns{};
         std::size_t ghost_lane_pressed_count = 0;
         std::array<uint8_t, kGameplayHudMaxLanes> ghost_lane_pressed{};
         std::size_t ghost_note_count = 0;
@@ -712,6 +714,9 @@ private:
     bool audio_timing_diagnostics_logged_ = false;
     std::vector<float> lane_activity_;
     std::vector<float> ghost_lane_activity_;
+    std::array<int64_t, kGameplayHudMaxLanes> lane_hit_time_ns_{};
+    std::array<int64_t, kGameplayHudMaxLanes> ghost_lane_hit_time_ns_{};
+    int64_t hit_effect_clock_ns_ = 0;
     KeyNoteOverlay key_overlay_;
     std::vector<uint8_t> lane_pressed_;
     std::vector<uint8_t> ghost_lane_pressed_;

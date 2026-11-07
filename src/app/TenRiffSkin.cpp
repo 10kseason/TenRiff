@@ -26,6 +26,20 @@
 
 namespace tenriff::app {
 
+ResolvedSkinHitBurst resolve_skin_hit_burst(
+    const config::SkinConfig& skin, const TenRiffSkinGameplayStyle* authored) {
+    const bool inherited = authored && !skin.hit_burst_override;
+    const bool enabled = inherited ? authored->key_pulse_enabled.value_or(skin.key_pulse_enabled)
+                                   : skin.key_pulse_enabled;
+    const float profile_brightness = static_cast<float>(skin.key_pulse_brightness);
+    const float brightness = inherited ? authored->key_pulse_brightness.value_or(profile_brightness)
+                                       : profile_brightness;
+    const auto& style = inherited && authored->hit_burst_style ? *authored->hit_burst_style
+                                                               : skin.hit_burst_style;
+    return {config::normalize_skin_hit_burst_style_token(style),
+            enabled ? std::clamp(brightness, 0.0f, 1.0f) : 0.0f};
+}
+
 namespace {
 
 namespace fs = std::filesystem;
@@ -847,7 +861,8 @@ void parse_gameplay_style(const config::JsonObject& gameplay,
                                                  definition, "gameplay.");
     style.hold_body_opacity = optional_number(gameplay, "hold_body_opacity", 0.0f, 1.0f,
                                               definition, "gameplay.");
-    style.hit_burst_style = optional_enum(gameplay, "hit_burst_style", {"prism", "ring", "spark"},
+    style.hit_burst_style = optional_enum(gameplay, "hit_burst_style",
+        {"prism", "ring", "spark", "shockwave", "shards", "pixels"},
                                           definition, "gameplay.");
     style.key_label_position = optional_enum(gameplay, "key_label_position", {"off", "top", "bottom"},
                                              definition, "gameplay.");

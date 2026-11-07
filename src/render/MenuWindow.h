@@ -572,6 +572,7 @@ struct GameplayHudData {
     double note_divider_gap_px = kGameplayNoteDividerGapPxDefault;
     bool show_judgement_line = true;
     int judgement_line_type = 1;
+    std::optional<uint32_t> judgement_line_type2_rgb;
     bool show_gear_boundary_line = false;
     bool show_timing_feedback = true;
     bool show_timing_bar = true;
@@ -597,6 +598,9 @@ struct GameplayHudData {
     double key_backdrop_brightness = 1.0;
     double key_backdrop_height = 1.0;
     std::string hit_burst_style = "prism";
+    float hit_burst_scale = 1.0f;
+    std::string hit_burst_palette = "soft";
+    std::string hit_burst_image_path;
     std::string hud_layout = "studio";
     double gauge_width_scale = 1.0;
     bool hud_riff_map_visible = true;
@@ -694,6 +698,7 @@ struct GameplayHudData {
 
     std::size_t lane_activity_count = 0;
     std::array<float, kGameplayHudMaxLanes> lane_activity{};
+    std::array<int64_t, kGameplayHudMaxLanes> lane_hit_time_ns{};
     app::KeyOverlaySnapshot key_overlay;
     std::size_t lane_pressed_count = 0;
     std::array<uint8_t, kGameplayHudMaxLanes> lane_pressed{};
@@ -735,6 +740,7 @@ struct GameplayHudData {
     bool ghost_game_over = false;
     std::size_t ghost_lane_activity_count = 0;
     std::array<float, kGameplayHudMaxLanes> ghost_lane_activity{};
+    std::array<int64_t, kGameplayHudMaxLanes> ghost_lane_hit_time_ns{};
     std::size_t ghost_lane_pressed_count = 0;
     std::array<uint8_t, kGameplayHudMaxLanes> ghost_lane_pressed{};
     std::size_t ghost_note_count = 0;
@@ -812,6 +818,7 @@ struct SkinPreviewData {
     double note_divider_gap_px = kGameplayNoteDividerGapPxDefault;
     bool show_judgement_line = true;
     int judgement_line_type = 1;
+    std::optional<uint32_t> judgement_line_type2_rgb;
     bool show_gear_boundary_line = false;
     bool show_hold_tail = false;
     bool hold_tail_taper_enabled = false;
@@ -823,6 +830,9 @@ struct SkinPreviewData {
     double key_backdrop_brightness = 1.0;
     double key_backdrop_height = 1.0;
     std::string hit_burst_style = "prism";
+    float hit_burst_scale = 1.0f;
+    std::string hit_burst_palette = "soft";
+    std::string hit_burst_image_path;
     std::string hud_layout = "studio";
     double gauge_width_scale = 1.0;
     bool hud_riff_map_visible = true;
@@ -1327,6 +1337,7 @@ private:
         double note_divider_gap_px = kGameplayNoteDividerGapPxDefault;
         bool show_judgement_line = true;
         int judgement_line_type = 1;
+        std::optional<uint32_t> judgement_line_type2_rgb;
         bool show_gear_boundary_line = false;
         bool judgement_line_glow_enabled = true;
         double lane_background_opacity = 0.18;

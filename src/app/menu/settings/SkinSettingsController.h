@@ -20,6 +20,7 @@ enum class SkinBoundaryAction {
     ImportPreset,
     ExportPreset,
     OpenSkinEditor,
+    PickHitBurstImage,
 };
 
 struct SkinSettingsEffects {
@@ -53,6 +54,8 @@ public:
     void set_backdrop_defaults(std::optional<bool> enabled, std::optional<float> opacity,
                                std::optional<float> brightness = std::nullopt,
                                std::optional<float> height = std::nullopt) noexcept;
+    void set_hit_burst_defaults(ResolvedSkinHitBurst appearance);
+    [[nodiscard]] SkinSettingsEffects set_hit_burst_image(config::RuntimeConfig& runtime, std::string path);
     [[nodiscard]] SkinSettingsEffects select(
         SkinSettingsRowId target,
         bool lr2_source, bool original_key_mode = true, bool tenriff_source = false) noexcept;
@@ -81,6 +84,7 @@ private:
     [[nodiscard]] SkinSettingsEffects leave_screen() noexcept;
     [[nodiscard]] SkinSettingsEffects mark_changed() noexcept;
     void clamp_edit_targets() noexcept;
+    void begin_hit_burst_override(config::SkinConfig& skin) const;
 
     SkinSettingsRowId selected_id_ = SkinSettingsRowId::SkinSource;
     std::string edit_mode_ = "4k";
@@ -96,6 +100,7 @@ private:
     std::optional<float> backdrop_default_opacity_;
     std::optional<float> backdrop_default_brightness_;
     std::optional<float> backdrop_default_height_;
+    std::optional<ResolvedSkinHitBurst> hit_burst_default_;
 };
 
 }  // namespace tenriff::app::menu::settings

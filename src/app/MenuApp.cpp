@@ -30,6 +30,7 @@
 #include <windows.h>
 #include <shlobj.h>
 #include <shobjidl.h>
+#include <wincodec.h>
 #include <wrl/client.h>
 #endif
 
@@ -301,65 +302,45 @@ std::string browse_for_folder(const std::string& title) {
     return choice.path;
 }
 
-std::string browse_for_image_file(const std::string& title) {
-    std::string result;
-
-    const HRESULT init_hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-    if (FAILED(init_hr)) {
-        return result;
-    }
-
-    IFileOpenDialog* dialog = nullptr;
-    HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_ALL,
-                                  IID_IFileOpenDialog, reinterpret_cast<void**>(&dialog));
-    if (SUCCEEDED(hr)) {
+NativeFileChoice browse_for_image_file(const std::string& title) {
+    return run_native_file_dialog_sta([&]() -> NativeFileChoice {
+        const NativeFileChoice failure{{}, "Could not open a PNG or JPEG image.", false};
+        Microsoft::WRL::ComPtr<IFileOpenDialog> dialog;
+        if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER,
+                                    IID_PPV_ARGS(&dialog)))) return failure;
         DWORD options = 0;
-        dialog->GetOptions(&options);
-        dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST);
-
         const COMDLG_FILTERSPEC filters[] = {
-            {L"Profile images (*.png;*.jpg;*.jpeg)", L"*.png;*.jpg;*.jpeg"},
-            {L"PNG images (*.png)", L"*.png"},
-            {L"JPEG images (*.jpg;*.jpeg)", L"*.jpg;*.jpeg"},
+            {L"PNG and JPEG images", L"*.png;*.jpg;*.jpeg"},
+            {L"PNG images", L"*.png"},
+            {L"JPEG images", L"*.jpg;*.jpeg"},
         };
-        dialog->SetFileTypes(static_cast<UINT>(std::size(filters)), filters);
-        dialog->SetFileTypeIndex(1);
+        const auto wide_title = util::wide_from_multibyte(title, CP_UTF8, MB_ERR_INVALID_CHARS);
+        if (FAILED(dialog->GetOptions(&options)) ||
+            FAILED(dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST)) ||
+            FAILED(dialog->SetFileTypes(static_cast<UINT>(std::size(filters)), filters)) ||
+            (!wide_title.empty() && FAILED(dialog->SetTitle(wide_title.c_str())))) return failure;
+        const auto show = show_native_file_dialog(dialog.Get());
+        if (show == HRESULT_FROM_WIN32(ERROR_CANCELLED)) return {{}, {}, true};
+        if (FAILED(show)) return failure;
 
-        std::wstring wide_title;
-        if (!title.empty()) {
-            const int count = MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, nullptr, 0);
-            if (count > 0) {
-                wide_title.resize(static_cast<std::size_t>(count));
-                MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, wide_title.data(), count);
-            }
-        }
-        if (!wide_title.empty()) {
-            dialog->SetTitle(wide_title.c_str());
-        }
-
-        if (SUCCEEDED(show_native_file_dialog(dialog))) {
-            IShellItem* item = nullptr;
-            if (SUCCEEDED(dialog->GetResult(&item)) && item) {
-                PWSTR path = nullptr;
-                if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &path)) && path) {
-                    const int length = WideCharToMultiByte(CP_UTF8, 0, path, -1, nullptr, 0, nullptr, nullptr);
-                    if (length > 0) {
-                        result.resize(static_cast<std::size_t>(length));
-                        WideCharToMultiByte(CP_UTF8, 0, path, -1, result.data(), length, nullptr, nullptr);
-                        if (!result.empty() && result.back() == '\0') {
-                            result.pop_back();
-                        }
-                    }
-                    CoTaskMemFree(path);
-                }
-                item->Release();
-            }
-        }
-        dialog->Release();
-    }
-
-    CoUninitialize();
-    return result;
+        Microsoft::WRL::ComPtr<IShellItem> item;
+        PWSTR raw_path = nullptr;
+        if (FAILED(dialog->GetResult(&item)) || FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, &raw_path)))
+            return failure;
+        const std::unique_ptr<wchar_t, decltype(&CoTaskMemFree)> file(raw_path, &CoTaskMemFree);
+        Microsoft::WRL::ComPtr<IWICImagingFactory> wic;
+        Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
+        Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
+        GUID format{};
+        UINT width = 0, height = 0;
+        if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&wic))) ||
+            FAILED(wic->CreateDecoderFromFilename(file.get(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &decoder)) ||
+            FAILED(decoder->GetContainerFormat(&format)) ||
+            (!IsEqualGUID(format, GUID_ContainerFormatPng) && !IsEqualGUID(format, GUID_ContainerFormatJpeg)) ||
+            FAILED(decoder->GetFrame(0, &frame)) || FAILED(frame->GetSize(&width, &height)) ||
+            width == 0 || height == 0) return failure;
+        return {util::utf8_from_wide_lossy(file.get()), {}, false};
+    });
 }
 std::string browse_for_json_file(const std::string& title) {
     std::string result;
@@ -707,6 +688,19 @@ std::string format_signed_ms(double value) {
 
 }  // namespace
 
+std::string MenuApp::pick_hit_burst_image() {
+#ifdef _WIN32
+    auto choice = browse_for_image_file(ui_text("Select Hit Burst Image", "키밤 이미지 선택"));
+    if (!choice.path.empty()) {
+        skin_status_messages_.clear();
+        return choice.path;
+    }
+    if (!choice.cancelled)
+        skin_status_messages_ = {ui_text("Could not open a PNG or JPEG image.", "PNG 또는 JPEG 이미지를 열 수 없습니다.")};
+#endif
+    return {};
+}
+
 void MenuApp::reset_screen(Screen screen) noexcept {
     if (current_screen() == Screen::Title && screen == Screen::SongSelect) {
         scene_transition_start_ns_ = timing::HighResClock::now_ns();
@@ -1045,6 +1039,7 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
                 input.timing_history_delta_ms.begin());
     input.lane_activity_count = state.lane_activity_count;
     std::copy_n(state.lane_activity.begin(), state.lane_activity_count, input.lane_activity.begin());
+    input.lane_hit_time_ns = state.lane_hit_time_ns;
     input.lane_pressed_count = state.lane_pressed_count;
     std::copy_n(state.lane_pressed.begin(), state.lane_pressed_count, input.lane_pressed.begin());
     input.note_count = state.note_count;
@@ -1090,6 +1085,7 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
     std::copy_n(state.ghost_lane_activity.begin(),
                 state.ghost_lane_activity_count,
                 input.ghost_lane_activity.begin());
+    input.ghost_lane_hit_time_ns = state.ghost_lane_hit_time_ns;
     input.ghost_lane_pressed_count = state.ghost_lane_pressed_count;
     std::copy_n(state.ghost_lane_pressed.begin(),
                 state.ghost_lane_pressed_count,
@@ -4023,11 +4019,11 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
 
 #ifdef _WIN32
     if (keycode == key_enter_ && settings_cursor_ == profile_setup::kAvatarRow) {
-        const std::string avatar_path = browse_for_image_file(
-            ui_text("Select Profile Image", "프로필 사진 선택"));
+        const auto avatar = browse_for_image_file(ui_text("Select Profile Image", "프로필 사진 선택"));
+        const auto& avatar_path = avatar.path;
         if (!avatar_path.empty()) {
             config_.ui.profile_avatar_path =
-                config::normalize_profile_avatar_path(avatar_path);
+                config::normalize_profile_image_path(avatar_path);
             ++profile_avatar_revision_;
             persist_runtime_config();
         }

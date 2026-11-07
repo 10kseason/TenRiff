@@ -60,6 +60,7 @@ inline GameplayHudData make_skin_gameplay_preview(const SkinPreviewData& preview
     hud.timing_bar_always_visible = preview.timing_bar_always_visible;
     hud.timing_marker_style = preview.timing_marker_style;
     hud.judgement_line_type = preview.judgement_line_type;
+    hud.judgement_line_type2_rgb = preview.judgement_line_type2_rgb;
     hud.note_fade_in = preview.note_fade_in;
     hud.note_fade_out = preview.note_fade_out;
     hud.timing_text_offset_x = preview.timing_text_offset_x;
@@ -102,6 +103,9 @@ inline GameplayHudData make_skin_gameplay_preview(const SkinPreviewData& preview
     hud.key_backdrop_brightness = preview.key_backdrop_brightness;
     hud.key_backdrop_height = preview.key_backdrop_height;
     hud.hit_burst_style = preview.hit_burst_style;
+    hud.hit_burst_scale = preview.hit_burst_scale;
+    hud.hit_burst_palette = preview.hit_burst_palette;
+    hud.hit_burst_image_path = preview.hit_burst_image_path;
     hud.hud_layout = preview.hud_layout;
     hud.gauge_width_scale = preview.gauge_width_scale;
     hud.hud_riff_map_visible = preview.hud_riff_map_visible;
@@ -144,8 +148,10 @@ inline GameplayHudData make_skin_gameplay_preview(const SkinPreviewData& preview
     if (preview.selected_lane > 0 && preview.selected_lane <= hud.lane_count) {
         // A synthetic tap every 900ms uses the real hit-burst path, including the
         // selected prism/ring/spark style, opacity and imported lane positions.
-        const double phase = static_cast<double>(std::max<int64_t>(0, now_ns) % 900'000'000LL) / 1e9;
+        const int64_t phase_ns = std::max<int64_t>(0, now_ns) % 900'000'000LL;
+        const double phase = static_cast<double>(phase_ns) / 1e9;
         const auto lane = static_cast<std::size_t>(preview.selected_lane - 1);
+        hud.lane_hit_time_ns[lane] = now_ns - phase_ns;
         hud.lane_activity[lane] = static_cast<float>(std::max(0.0, 1.0 - phase / 0.32));
         hud.lane_pressed[lane] = phase < 0.12 ? 1 : 0;
     }

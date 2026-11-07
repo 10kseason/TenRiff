@@ -1107,13 +1107,21 @@ struct MenuAppVisualTestAccess {
     }
     static void check_start_controls(MenuApp& app, Report& report) {
         const auto saved_dialog_holds = app.native_dialog_held_keys_;
-        const auto image_path = std::filesystem::absolute("dialog-fixture.png");
+        const auto saved_skin = app.config_.skin;
+        const auto saved_burst_image = app.config_.ui.hit_burst_image_path;
+        const auto image_path = std::filesystem::absolute(std::filesystem::u8path(u8"타격 이미지.png"));
         { // Valid 1x1 PNG owned by this disposable smoke sandbox.
             const unsigned char png[] = {137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,1,0,0,0,1,8,4,0,0,0,181,28,12,2,0,0,0,11,73,68,65,84,120,218,99,100,248,15,0,1,5,1,1,39,24,227,102,0,0,0,0,73,69,78,68,174,66,96,130};
             std::ofstream image(image_path,std::ios::binary);
             image.write(reinterpret_cast<const char*>(png),sizeof(png));
         }
-        for (int attempt = 0; attempt < 4; ++attempt) {
+        for (int attempt = 0; attempt < 6; ++attempt) {
+            const bool burst = attempt >= 4;
+            if (attempt == 4) {
+                app.push_screen(Screen::SettingsSkins);
+                app.skin_settings_controller_.reset(app.config_.mode.key_mode);
+                app.publish_snapshot();
+            }
             HWND game = nullptr;
             EnumWindows([](HWND hwnd, LPARAM data) -> BOOL {
                 DWORD pid = 0; GetWindowThreadProcessId(hwnd, &pid);
@@ -1126,7 +1134,7 @@ struct MenuAppVisualTestAccess {
             if (game) SetForegroundWindow(game);
             std::atomic<bool> done{false}, observed{false}, owned{false};
             HWND acted_picker = nullptr;
-            const bool accept = attempt == 0 || attempt == 2;
+            const bool accept = attempt % 2 == 0;
             std::thread dismiss([&]() {
                 const auto deadline = Clock::now() + std::chrono::seconds(10);
                 while (!done.load() && Clock::now() < deadline) {
@@ -1170,21 +1178,33 @@ struct MenuAppVisualTestAccess {
                 if (!done.load() && acted_picker) PostMessageW(acted_picker,WM_COMMAND,IDCANCEL,0);
             });
             const auto closed_before = app.native_dialog_closed_ns_;
-            const auto revision_before = app.profile_avatar_revision_;
+            const auto revision_before = burst ? app.tenriff_skin_revision_ : app.profile_avatar_revision_;
+            const auto path_before = burst ? app.config_.ui.hit_burst_image_path : app.config_.ui.profile_avatar_path;
             APTTYPE apartment{}; APTTYPEQUALIFIER qualifier{};
             const auto apartment_hr = CoGetApartmentType(&apartment, &qualifier);
-            click(app, Kind::SettingsRow, profile_setup::kAvatarRow);
+            const int row = burst ? static_cast<int>(SkinSettingsRowId::HitBurstImage) : profile_setup::kAvatarRow;
+            click(app, Kind::SettingsRow, row);
             done = true; dismiss.join();
-            report.check("dialog.native_avatar_reopen_" + std::to_string(attempt),
+            const auto revision_after = burst ? app.tenriff_skin_revision_ : app.profile_avatar_revision_;
+            const auto& selected_path = burst ? app.config_.ui.hit_burst_image_path : app.config_.ui.profile_avatar_path;
+            report.check(std::string(burst ? "dialog.native_hit_burst_" : "dialog.native_avatar_reopen_") + std::to_string(attempt),
                 observed && owned && app.native_dialog_closed_ns_ > closed_before &&
-                (!accept || app.config_.ui.profile_avatar_path == config::normalize_profile_avatar_path(image_path.u8string())) &&
-                app.profile_avatar_revision_ == revision_before + (accept ? 1 : 0) &&
+                selected_path == (accept ? config::normalize_profile_image_path(image_path.u8string()) : path_before) &&
+                (!burst || app.config_.skin.hit_burst_style == "image") &&
+                revision_after == revision_before + (accept ? 1 : 0) &&
                 game && IsWindowEnabled(game) && !IsWindow(acted_picker) && !app.menu_window_.poll_click_event(),
                 "observed=" + std::to_string(observed.load()) + "; owned=" + std::to_string(owned.load()) +
                 "; input_reset=" + std::to_string(app.native_dialog_closed_ns_ > closed_before) +
-                "; revision_delta=" + std::to_string(app.profile_avatar_revision_-revision_before) +
+                "; revision_delta=" + std::to_string(revision_after-revision_before) +
                 "; apartment_hr=" + std::to_string(apartment_hr) + "; apartment=" + std::to_string(apartment));
         }
+        key(app, "Esc");
+        const auto saved_burst = config::ConfigLoader{}.load_profile(app.profile_dir_);
+        report.check("skin.hit_burst_image_persisted",
+            saved_burst.success() && saved_burst.config.skin.hit_burst_style == "image" &&
+            saved_burst.config.ui.hit_burst_image_path == image_path.u8string());
+        app.config_.skin = saved_skin;
+        app.config_.ui.hit_burst_image_path = saved_burst_image;
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
         unsigned remaining_pickers = 0;
         EnumWindows([](HWND hwnd,LPARAM data)->BOOL {
@@ -2178,6 +2198,18 @@ struct MenuAppVisualTestAccess {
         report.check("skin.search_escape_exits_focus", !app.skin_search_active_ && app.skin_search_query_ == u8"콤");
         key(app, "Esc");
         report.check("skin.search_escape_clears_filter", screen(app) == Screen::SettingsSkins && app.skin_search_query_.empty());
+        data = view();
+        const auto has_label = [&](SkinSettingsRowId id, std::string_view label) {
+            return std::any_of(data.rows.begin(), data.rows.end(), [&](const auto& row) {
+                return row.row_index == static_cast<int>(id) && row.label == label;
+            });
+        };
+        report.check("skin.hit_burst_korean_labels",
+            has_label(SkinSettingsRowId::HitBurstStyle, u8"키밤 모양") &&
+            has_label(SkinSettingsRowId::KeyPulse, u8"키밤 밝기") &&
+            has_label(SkinSettingsRowId::HitBurstSize, u8"키밤 크기") &&
+            has_label(SkinSettingsRowId::HitBurstPalette, u8"키밤 색 팔레트") &&
+            has_label(SkinSettingsRowId::HitBurstImage, u8"키밤 이미지 선택"));
         app.config_.ui.language = "en";
         for (const std::string source : {"native", "lr2", "tenriff"}) {
             app.config_.skin.source = source;
@@ -2871,6 +2903,7 @@ void separate_restart_flow(tenriff::app::CommandLineOptions options, Report& rep
         session->set_instant_restart_start(attempt == 1);
         if (attempt == 1) session->set_practice_start_seconds(4.0);
         bool countdown = false, held_guard = false, first_hit = false, timed_out = false;
+        bool hit_effect = false;
         int phase = 0;
         const auto deadline = Clock::now() + std::chrono::seconds(15);
         session->set_hud_callback([&](const Session::HudSnapshot& hud) {
@@ -2885,6 +2918,8 @@ void separate_restart_flow(tenriff::app::CommandLineOptions options, Report& rep
             }
             if (phase == 1 && hud.current_sample > original_first_note + hud.sample_rate / 5) {
                 first_hit = SessionAccess::first_note_hit(*session);
+                hit_effect = std::any_of(hud.lane_hit_time_ns.begin(), hud.lane_hit_time_ns.end(),
+                    [](int64_t time_ns) { return time_ns > 0; });
                 SessionAccess::restart_edge(*session, false);
                 SessionAccess::restart_edge(*session, true);
                 phase = 2;
@@ -2905,6 +2940,7 @@ void separate_restart_flow(tenriff::app::CommandLineOptions options, Report& rep
             report.check(name + ".started_without_countdown", session->did_start_gameplay() && !countdown);
             report.check(name + ".held_key_requires_release", held_guard);
             report.check(name + ".first_note_hit", first_hit);
+            report.check(name + ".first_note_publishes_hit_effect", hit_effect);
             report.check(name + ".instant_requested", phase == 2 && session->was_instant_restart_requested() &&
                 session->was_restart_requested() && session->was_user_aborted() && !session->was_exit_requested());
             report.check(name + ".audio_and_deadline", !timed_out && session->audio_error().empty(), session->audio_error());

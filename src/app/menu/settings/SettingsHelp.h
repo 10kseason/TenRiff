@@ -121,8 +121,8 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Adjust the strength of note outlines.", "노트 테두리가 얼마나 진하게 보일지 조절합니다.", "ノート輪郭の濃さを調整します。"},
         {"Adjust long-note body opacity independently of its head.", "롱노트 머리와 별도로 몸통의 불투명도를 조절합니다.", "ロングノートの胴体の不透明度を頭とは別に調整します。"},
         {"Adjust the glow at the judgement line when a lane is active.", "레인이 활성화될 때 판정선에 나타나는 빛의 강도를 조절합니다.", "入力時の判定線の発光を調整します。"},
-        {"Choose the effect displayed when a note is hit.", "노트를 처리할 때 나타나는 키 키밤 효과의 모양을 고릅니다.", "ノートを叩いた際のエフェクトを選びます。"},
-        {"Toggle the visual pulse on pressed keys.", "키를 누를 때 나타나는 맥동 효과를 켜거나 끕니다.", "キー入力時のパルス表示を切り替えます。"},
+        {"Choose the effect displayed when a note is hit.", "노트를 맞힐 때 나타나는 키밤 모양을 고릅니다.", "ノートを叩いた際のエフェクトを選びます。"},
+        {"Adjust hit burst brightness. At 0%, the effect is off.", "키밤 밝기를 조절합니다. 0%에서는 효과가 꺼집니다.", "ヒットエフェクトの明るさを調整します。0%でオフになります。"},
         {"Show a background panel behind the key area.", "키를 누를 때 키 빔을 표시합니다.", "キー表示の後ろに背景パネルを表示します。"},
         {"Adjust the key background's opacity.", "키 빔의 농도를 조절합니다.", "キー背景の不透明度を調整します。"},
         {"Move key labels above or below the key area.", "키 표시 위치를 키 영역 위나 아래로 옮깁니다.", "キー名をキー領域の上か下に配置します。"},
@@ -177,6 +177,11 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Show live BEST score differences and S to S+++ accuracy margins. Default Off. A compatible replay is required for BEST.", "실시간 BEST 점수 차이와 S~S+++ 정확도 차이를 표시합니다. 기본 OFF이며 BEST에는 호환 리플레이가 필요합니다.", "BESTとの差とS～S+++の精度差を表示。既定はオフ。BESTには互換リプレイが必要です。"},
         {"Move the score comparison panel horizontally. The full panel remains within the screen.", "점수 비교기의 가로 위치를 옮깁니다. 패널 전체를 화면 안에 유지합니다.", "スコア比較パネルを左右に移動。パネル全体が画面内に収まります。"},
         {"Move the score comparison panel vertically. Position is saved with skin presets and profiles.", "점수 비교기의 세로 위치를 옮깁니다. 위치는 스킨 프리셋과 프로필에 저장됩니다.", "スコア比較パネルを上下に移動。位置はスキンプリセットとプロフィールに保存します。"},
+        {"Choose a hit burst size of 100%, 130% or 165%.", "키밤 크기를 노말(100%), 크게(130%), 더 크게(165%)로 고릅니다.", "ヒットエフェクトの大きさを100%、130%、165%から選びます。"},
+        {"Choose a palette for built-in hit bursts. Selected images use their original colors.", "내장 키밤의 팔레트를 고릅니다. 이미지 모드에서는 원본 색을 사용합니다.", "内蔵ヒットエフェクトの配色を選びます。画像モードでは元の色を使います。"},
+        {"Choose a local PNG or JPEG to use as the hit burst.", "키밤에 사용할 로컬 PNG 또는 JPEG 이미지를 고릅니다.", "ヒットエフェクトに使うローカルのPNGまたはJPEGを選びます。"},
+        {"Clear the selected image and return to a built-in hit burst.", "선택한 이미지를 해제하고 내장 키밤으로 돌아갑니다.", "画像の選択を解除し、内蔵ヒットエフェクトに戻します。"},
+        {"Choose the default green outline or a solid fill color for the Type 2 band.", "타입 2 판정선에 기본 초록 테두리나 단색 채우기를 선택합니다.", "タイプ2の判定帯に標準の緑枠または単色の塗りを選びます。"},
     };
     static constexpr SettingsHelpText profile[] = {
         {"Choose the interface language. The change is applied and saved immediately.", "화면 언어를 선택합니다. 변경 즉시 적용하고 저장합니다.", "表示言語を選びます。すぐに適用・保存されます。"},
