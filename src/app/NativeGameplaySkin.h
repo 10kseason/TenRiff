@@ -5,6 +5,8 @@
 #include <string_view>
 #include <unordered_map>
 #include <vector>
+
+#include "GameplayHudLimits.h"
 namespace tenriff::app {
 struct NativeGameplayLayer { float x=0,y=0,width=0,height=0; std::uint32_t color=0xFFFFFF; float mix=1,alpha=1,radius=0; };
 // Presentation only. Never consulted by the engine, audio thread or judgement logic.
@@ -50,7 +52,7 @@ inline constexpr std::array<NativeGameplayNumberSlot,11> kNativeGameplayMotion{{
  {"combo_duration_ms",150.0f,1.0f,2000.0f},
  {"combo_scale",1.16f,1.0f,2.0f},
  {"combo_lift",-5.0f,-100.0f,100.0f},
- {"judgement_duration_ms",220.0f,1.0f,2000.0f},
+ {"judgement_duration_ms",static_cast<float>(kGameplayHitMotionMs),1.0f,2000.0f},
 }};
 inline constexpr std::array<std::string_view,28> kNativeGameplayColors{{"key_well","key_led","chassis","judgement_line","judgement_glow","hold_edge","hold_core","hold_shadow","burst_core","burst_trail","title","score","body","combo","judgement","timing","key_label","gauge_hard","gauge_normal","gauge_easy","judgement_pg","judgement_gr","judgement_gd","judgement_bd","judgement_pr","timing_fast","timing_slow","gauge_ex_hard"}};
 inline constexpr std::array<std::string_view,12> kNativeGameplayRects{{"title","artist","speed","score","stats","combo","judgement","timing","timing_label","gauge","progress","key_label"}};

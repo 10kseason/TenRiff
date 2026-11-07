@@ -1527,7 +1527,7 @@ bool load_bitmap_from_utf8_path(IWICImagingFactory* wic_factory,
                                 Microsoft::WRL::ComPtr<ID2D1Bitmap>& out_bitmap,
                                 D2D1_RECT_F* out_source_rect = nullptr,
                                 bool trim_transparent_alpha = false,
-                                bool detached_avatar = false,
+                                bool detached_thumbnail = false,
                                 BYTE trim_alpha_cutoff = 0) {
     if (!wic_factory || !d2d_context || path.empty()) {
         return false;
@@ -1558,8 +1558,8 @@ bool load_bitmap_from_utf8_path(IWICImagingFactory* wic_factory,
         return false;
     }
 
-    if (detached_avatar) {
-        // Avatar files are editable while the menu remains open. Decode a
+    if (detached_thumbnail) {
+        // User-selected files are editable while the menu remains open. Decode a
         // bounded thumbnail, then upload owned pixels below so Direct2D cannot
         // retain a WIC decoder/stream that keeps the original file locked.
         UINT source_width = 0, source_height = 0;
@@ -1603,7 +1603,7 @@ bool load_bitmap_from_utf8_path(IWICImagingFactory* wic_factory,
     const D2D1_BITMAP_PROPERTIES properties = D2D1::BitmapProperties(
         D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
     HRESULT bitmap_hr = E_FAIL;
-    if (detached_avatar) {
+    if (detached_thumbnail) {
         if (width == 0 || height == 0 || width > 512 || height > 512) return false;
         const UINT stride = width * 4;
         std::vector<std::uint8_t> pixels(static_cast<std::size_t>(stride) * height);
@@ -2411,6 +2411,9 @@ void configure_low_latency_presentation(IDXGIDevice* dxgi_device, IDXGISwapChain
 }  // namespace
 
 struct MenuWindow::D2DResources {
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> hit_burst_image;
+    std::string hit_burst_image_path;
+    uint64_t hit_burst_image_revision = 0;
     // One menu-only decoder and one reused GPU bitmap; no gameplay upscaler,
     // frame history or audio stream is attached to the decorative loop.
     std::unique_ptr<BgaVideoDecoder> menu_motion_decoder;
@@ -4051,6 +4054,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
         ? std::clamp(data.lane_divider_brightness, 0.0, 1.0) : 1.0;
     desired.show_judgement_line = data.show_judgement_line;
     desired.judgement_line_type = data.judgement_line_type;
+    desired.judgement_line_type2_rgb = data.judgement_line_type == 2 ? data.judgement_line_type2_rgb : std::nullopt;
     desired.note_divider_gap_px = data.note_divider_gap_px;
     desired.show_gear_boundary_line = data.show_gear_boundary_line;
     desired.judgement_line_glow_enabled = data.judgement_line_glow_enabled;
@@ -4100,6 +4104,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
         gameplay_static_cache_.lane_divider_brightness == desired.lane_divider_brightness &&
         gameplay_static_cache_.show_judgement_line == desired.show_judgement_line &&
         gameplay_static_cache_.judgement_line_type == desired.judgement_line_type &&
+         gameplay_static_cache_.judgement_line_type2_rgb == desired.judgement_line_type2_rgb &&
         gameplay_static_cache_.note_divider_gap_px == desired.note_divider_gap_px &&
         gameplay_static_cache_.show_gear_boundary_line == desired.show_gear_boundary_line &&
         gameplay_static_cache_.judgement_line_glow_enabled == desired.judgement_line_glow_enabled &&
@@ -4367,10 +4372,13 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
             d2d_->d2d_context->PushAxisAlignedClip(D2D1::RectF(field_layout.left, field_layout.top,
                 field_layout.right, field_layout.bottom), D2D1_ANTIALIAS_MODE_ALIASED);
             const float opacity = static_cast<float>(desired.visual_opacity);
-            brush->SetColor(color_from_rgb(0x20B85A, 0.08f * opacity));
+            brush->SetColor(color_from_rgb(desired.judgement_line_type2_rgb.value_or(0x20B85A),
+                                            desired.judgement_line_type2_rgb ? opacity : 0.08f * opacity));
             d2d_->d2d_context->FillRectangle(band, brush);
-            brush->SetColor(color_from_rgb(0x20B85A, opacity));
-            d2d_->d2d_context->DrawRectangle(band, brush, 2.0f);
+            if (!desired.judgement_line_type2_rgb) {
+                brush->SetColor(color_from_rgb(0x20B85A, opacity));
+                d2d_->d2d_context->DrawRectangle(band, brush, 2.0f);
+            }
             d2d_->d2d_context->PopAxisAlignedClip();
             brush->SetColor(saved);
         }

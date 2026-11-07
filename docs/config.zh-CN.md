@@ -290,6 +290,8 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
   - `safe | fast`
   - 默认`safe`（安全），准备哈希和试听信息并支持难度表。原生LV/CR计算遵循下方的独立设置。
   - 保留已保存的选择。可选的`fast`（最小）跳过哈希、试听和难度计算。
+  - 两种模式均使用可用的逻辑CPU线程建立文件夹索引，并根据剩余文件数和空闲RAM调整并发数量。
+  - 现有缓存解析和ALL SONG中的缓存路径检查也采用并行处理。
 - `calculate_song_index_difficulty` (bool)
   - 默认值为 `false`
   - `false` 保留 BMS `#PLAYLEVEL` 作为菜单 LV，并跳过 CPU 开销较高的原生 LV/CR 计算
@@ -310,6 +312,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | --- | --- | --- |
 | `profile_nickname` | string; UTF-8 ≤48 bytes | 显示名称；为空时使用配置 ID，并规范化空白与控制字符。 |
 | `profile_avatar_path` | string; UTF-8 ≤2048 bytes | 本地 PNG/JPG 头像路径。 |
+| `hit_burst_image_path` | string; UTF-8 ≤2048 bytes | 为击打特效选择的本地 PNG/JPEG 路径。便携设置不会携带此路径。 |
 | `language` | `en`, `ko`, `ja`, `zh-CN`; `en` | UI 语言；无效值规范化为 en。 |
 | `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | 配置档和首次设置中的菜单字号：100%、115%、130%。游戏内字体继续由皮肤控制。 |
 | `skip_start_countdown` | bool; `false` | 跳过单人游玩开始时的 `3 / 2 / 1` 显示；适用于正常开始、菜单重新开始及结果页重试。 |
@@ -372,7 +375,11 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `judgement_line_glow_enabled` | bool; `true` | 判定线周围发光。 |
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst 亮度；0 为关闭。 |
 | `key_pulse_enabled` | bool; `true` | 旧版开关兼容；false 或亮度为 0 时关闭。 |
-| `hit_burst_style` | `prism`, `ring`, `spark`; `prism` | 内置 Hit Burst 样式。 |
+| `hit_burst_style` | `prism`, `ring`, `spark`, `shockwave`, `shards`, `pixels`, `image`; `prism` | 成功击中时扩散的形状。图像模式保留原色与透明度。 |
+| `hit_burst_size` | `normal`, `large`, `larger`; `normal` | 击打特效大小为 100/130/165%。 |
+| `hit_burst_palette` | `soft`, `pastel`, `oil`, `mono`, `cyberpunk`; `soft` | 内置特效可选柔和默认、粉彩、油画、单色或赛博朋克。 |
+| `hit_burst_override` | bool; `false` | 启用时，配置文件中的样式和亮度优先于皮肤默认值。 |
+| `judgement_line_type2_color` | color token; `off` | 用指定的纯色填充类型 2 判定带。`off` 使用原有的绿色描边。 |
 | `hud_layout` | `classic`, `studio`; `studio` | Native／LR2单人HUD，保留LR2音符、按键、边框素材和比例。缺失或未知值使用`studio`，可在Options › Skins选择Classic。1.8.9采用右上信息、左下分数、右下横向地图，较窄外侧空间会触发整体缩放或移至另一侧。极端场地与Performance HUD占满两侧上方时只隐藏信息卡。其他图像皮肤、幽灵与多人保留Classic。[布局与验证范围](release-1.8.9-gate.md)。 |
 | `hud_riff_map_visible` | bool; `true` | 显示Studio Deck的64段横向密度图和已用／总时间。默认在右下，外侧空间不足时移动或缩小，极窄时省略时间文字。在Options › Skins › Studio Riff Map中修改并保存到配置和皮肤预设。隐藏后保留其他卡片位置和Classic HUD。 |
 | `ui_font` | `default`, `malgun`, `bahnschrift`, `consolas`; `default` | 菜单字体；default 为 Segoe UI，标志、等级与连击保留专用字体。 |

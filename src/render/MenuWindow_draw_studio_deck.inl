@@ -106,8 +106,12 @@
             static const std::wstring score_label = L"SCORE";
             studio_text(score_label, studio_fonts.studio_numbers[1].Get(), D2D1::RectF(x, 0, right, 20), muted, DWRITE_TEXT_ALIGNMENT_LEADING, 3);
             const auto score_rect = D2D1::RectF(x, 22, right, 92);
+            D2D1_MATRIX_3X2_F deck_transform{};
+            ctx->GetTransform(&deck_transform);
+            ctx->SetTransform(score_pop_transform(score_rect) * deck_transform);
             studio_text(c.studio_score_padded, studio_fonts.studio_score.Get(), score_rect, D2D1::ColorF(0x232A35), DWRITE_TEXT_ALIGNMENT_TRAILING);
             studio_text(c.studio_score_significant, studio_fonts.studio_score.Get(), score_rect, ng_color("score", D2D1::ColorF(0xF4F7FB)), DWRITE_TEXT_ALIGNMENT_TRAILING);
+            ctx->SetTransform(deck_transform);
             float y = 100;
             if (data.gameplay.pacemaker_mode != "off" && !data.gameplay.pacemaker_mode.empty()) {
                 studio_text(c.studio_pace, studio_fonts.studio_numbers[3].Get(), D2D1::RectF(x, y, right, y + 27),

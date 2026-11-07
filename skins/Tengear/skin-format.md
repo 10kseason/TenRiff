@@ -151,6 +151,11 @@ MySkin/
 누락한 값만 플레이어 설정을 사용한다. 허용 값과 범위는
 [`tenriff-skin.schema.json`](tenriff-skin.schema.json)에 정의돼 있다.
 
+스킨의 `hit_burst_style`에는 `prism`, `ring`, `spark`, `shockwave`, `shards`,
+`pixels`를 지정할 수 있다. 플레이어가 키밤 모양·밝기를 조절하거나 이미지를
+선택하면 프로필의 키밤 모양과 밝기를 우선 적용한다. 크기, 팔레트와 로컬 이미지
+경로도 프로필에서 관리한다.
+
 ## 이미지 슬롯
 
 | 섹션 | 키 | 동작 |

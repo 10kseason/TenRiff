@@ -806,6 +806,12 @@ void MenuApp::apply_skin_settings_effects(
         }
 #endif
             break;
+        case menu::settings::SkinBoundaryAction::PickHitBurstImage: {
+            auto image_effects = skin_settings_controller_.set_hit_burst_image(config_, pick_hit_burst_image());
+            if (image_effects.increment_skin_revision) ++tenriff_skin_revision_;
+            effects.merge(image_effects);
+            break;
+        }
         case menu::settings::SkinBoundaryAction::None:
             break;
     }
@@ -878,6 +884,8 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
             : nullptr;
     const TenRiffSkinGameplayStyle* manifest_style =
         preview_definition ? &preview_definition->gameplay_style : nullptr;
+    const auto hit_burst = resolve_skin_hit_burst(config_.skin, manifest_style);
+    skin_settings_controller_.set_hit_burst_defaults(hit_burst);
     auto style_bool = [&](const std::optional<bool>& value, bool fallback) {
         return manifest_style && value.has_value() ? *value : fallback;
     };
@@ -1010,6 +1018,11 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     append_menu_row(render.generic, ui_text("Judgement Line Type", "판정선 타입"),
                     config_.skin.judgement_line_type == 2 ? ui_text("Type 2", "타입 2") : ui_text("Type 1", "타입 1"),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::JudgementLineType), false, true);
+    const auto type2_color = config::normalize_skin_single_color_token(config_.skin.judgement_line_type2_color);
+    append_menu_row(render.generic, ui_text("Type 2 Judgement Line Color", "타입 2 판정선 색상"),
+                    type2_color == "off" ? ui_text("Default Outline", "기본 초록 테두리") : config::skin_color_label(type2_color),
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::JudgementLineType2Color),
+                    false, config_.skin.judgement_line_type == 2);
     append_menu_row(render.generic, ui_text("Gear Boundary", "기어 경계선"), ui_on_off(config_.skin.show_gear_boundary_line),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::GearBoundary), false, true);
 
@@ -1017,9 +1030,39 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
 
     append_menu_row(render.generic, ui_text("Judge Glow", "판정선 글로우"), ui_on_off(config_.skin.judgement_line_glow_enabled),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::JudgementLineGlow), false, true);
-    append_menu_row(render.generic, ui_text("Hit Burst Style", "키 키밤 모양"),
-                    config::skin_hit_burst_style_label(config_.skin.hit_burst_style),
+    const std::string burst_style_label = config::skin_hit_burst_style_label(hit_burst.style);
+    std::string_view burst_style_ko = burst_style_label;
+    if (hit_burst.style == "shockwave") burst_style_ko = "충격파";
+    if (hit_burst.style == "shards") burst_style_ko = "파편";
+    if (hit_burst.style == "pixels") burst_style_ko = "픽셀";
+    if (hit_burst.style == "image") burst_style_ko = "이미지";
+    append_menu_row(render.generic, ui_text("Hit Burst Style", "키밤 모양"),
+                    ui_text(burst_style_label, burst_style_ko),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::HitBurstStyle), false, true);
+    const auto burst_size = config::normalize_skin_hit_burst_size_token(config_.skin.hit_burst_size);
+    const auto burst_size_label = burst_size == "larger" ? ui_text("Larger", "더 크게")
+        : burst_size == "large" ? ui_text("Large", "크게") : ui_text("Normal", "노말");
+    append_menu_row(render.generic, ui_text("Hit Burst Size", "키밤 크기"), burst_size_label,
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::HitBurstSize), false, true);
+    const auto burst_palette = config::normalize_skin_hit_burst_palette_token(config_.skin.hit_burst_palette);
+    std::string burst_palette_label = ui_text("Soft Default", "부드러운 기본");
+    if (burst_palette == "pastel") burst_palette_label = ui_text("Pastel", "파스텔");
+    if (burst_palette == "oil") burst_palette_label = ui_text("Oil Paint", "유화");
+    if (burst_palette == "mono") burst_palette_label = ui_text("Monochrome", "단색");
+    if (burst_palette == "cyberpunk") burst_palette_label = ui_text("Cyberpunk", "사이버펑크");
+    append_menu_row(render.generic, ui_text("Hit Burst Palette", "키밤 색 팔레트"),
+                    hit_burst.style == "image" ? ui_text("Original Image Colors", "이미지 원본 색") : burst_palette_label,
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::HitBurstPalette),
+                    false, hit_burst.style != "image");
+    const bool has_burst_image = !config_.ui.hit_burst_image_path.empty();
+    append_menu_row(render.generic, ui_text("Select Hit Burst Image", "키밤 이미지 선택"),
+                    has_burst_image ? path_from_utf8(config_.ui.hit_burst_image_path).filename().u8string()
+                                    : ui_text("Choose PNG or JPEG", "PNG 또는 JPEG 선택"),
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::HitBurstImage), true, false);
+    append_menu_row(render.generic, ui_text("Clear Hit Burst Image", "키밤 이미지 해제"),
+                    has_burst_image ? ui_text("Clear", "해제") : ui_text("Off", "꺼짐"),
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::ClearHitBurstImage),
+                    has_burst_image, false);
     const auto gauge_width = config::normalize_skin_gauge_width_token(config_.skin.gauge_width);
     append_menu_row(render.generic, ui_text("Gauge Bar Width", "게이지 바 가로 크기"),
                     gauge_width == "large" ? ui_text("Large", "크게") : gauge_width == "wide"
@@ -1048,8 +1091,8 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     append_slider_menu_row(render.generic, ui_text("Comparison Y", "비교기 Y"), format_percent(config_.skin.score_comparison_y),
                     config_.skin.score_comparison_y, false, render::MenuHitTargetKind::SettingsRow,
                     static_cast<int>(SkinSettingsRowId::ScoreComparisonY));
-    append_menu_row(render.generic, ui_text("Hit Burst Brightness", "키 키밤 밝기"),
-                    format_percent(config_.skin.key_pulse_brightness),
+    append_menu_row(render.generic, ui_text("Hit Burst Brightness", "키밤 밝기"),
+                    format_percent(hit_burst.brightness),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::KeyPulse), false, true);
     append_menu_row(render.generic, ui_text("Judge Line", "판정선 위치"), format_percent(config_.skin.judgement_line_position),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::JudgeLinePosition), false, true);
@@ -1239,6 +1282,8 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.skin_preview.timing_bar_always_visible = timing_visibility.always_visible;
     render.generic.skin_preview.timing_marker_style = config_.skin.timing_marker_style;
     render.generic.skin_preview.judgement_line_type = config_.skin.judgement_line_type;
+    render.generic.skin_preview.judgement_line_type2_rgb = type2_color != "off"
+        ? std::make_optional(config::skin_color_rgb(type2_color)) : std::nullopt;
     render.generic.skin_preview.note_fade_in = config_.skin.note_fade_in;
     render.generic.skin_preview.note_fade_out = config_.skin.note_fade_out;
     render.generic.skin_preview.timing_text_offset_x = config_.skin.timing_text_offset_x;
@@ -1298,21 +1343,17 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.skin_preview.judgement_line_glow_enabled = style_bool(
         manifest_style ? manifest_style->judgement_line_glow_enabled : std::optional<bool>{},
         config_.skin.judgement_line_glow_enabled);
-    render.generic.skin_preview.key_pulse_enabled = style_bool(
-        manifest_style ? manifest_style->key_pulse_enabled : std::optional<bool>{},
-        config_.skin.key_pulse_enabled);
-    render.generic.skin_preview.key_pulse_brightness = static_cast<float>(style_number(
-        manifest_style ? manifest_style->key_pulse_brightness : std::optional<float>{},
-        config_.skin.key_pulse_brightness));
+    render.generic.skin_preview.key_pulse_enabled = hit_burst.brightness > 0.0f;
+    render.generic.skin_preview.key_pulse_brightness = hit_burst.brightness;
     // Player controls remain effective when imported art supplies its own pressed keys.
     render.generic.skin_preview.key_backdrop_enabled = backdrop_enabled;
     render.generic.skin_preview.key_backdrop_opacity = backdrop_opacity;
     render.generic.skin_preview.key_backdrop_brightness = backdrop_brightness;
     render.generic.skin_preview.key_backdrop_height = backdrop_height;
-    render.generic.skin_preview.hit_burst_style =
-        manifest_style && manifest_style->hit_burst_style.has_value()
-            ? *manifest_style->hit_burst_style
-            : config::normalize_skin_hit_burst_style_token(config_.skin.hit_burst_style);
+    render.generic.skin_preview.hit_burst_style = hit_burst.style;
+    render.generic.skin_preview.hit_burst_scale = config::skin_hit_burst_size_scale(burst_size);
+    render.generic.skin_preview.hit_burst_palette = burst_palette;
+    render.generic.skin_preview.hit_burst_image_path = config_.ui.hit_burst_image_path;
     render.generic.skin_preview.key_label_position =
         manifest_style && manifest_style->key_label_position.has_value()
             ? *manifest_style->key_label_position
@@ -1382,7 +1423,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
         "미리보기 번호 버튼을 클릭하거나 1-9, 0=10, Shift+1-6=11-16으로 레인을 선택합니다."));
     render.generic.notes.push_back(ui_text(
         "Key backdrop has separate On/Off, opacity, brightness (0-200%) and maximum height (0-100%, from the field bottom). Hit-burst brightness is separate.",
-        "키 빔은 켬/OFF, 농도, 밝기(0~200%), 최대 높이(필드 아래부터 0~100%)를 따로 조절합니다. 키 키밤 밝기는 별도입니다."));
+        "키 빔은 켬/OFF, 농도, 밝기(0~200%), 최대 높이(필드 아래부터 0~100%)를 따로 조절합니다. 키밤 밝기는 별도로 조절합니다."));
     render.generic.notes.push_back(ui_text(
         "Judgement line thickness scales with Note Height; the preview uses the gameplay renderer.",
         "판정선 두께는 노트 높이 비율을 따릅니다. 미리보기는 실제 게임 렌더러를 사용합니다."));

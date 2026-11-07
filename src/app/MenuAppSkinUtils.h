@@ -9,6 +9,7 @@
 
 #include "config/Config.h"
 #include "app/TimingFeedbackSettings.h"
+#include "app/TenRiffSkin.h"
 #include "render/MenuWindow.h"
 
 namespace tenriff::app {
@@ -97,11 +98,16 @@ enum class SkinSettingsRowId {
     ScoreComparisonEnabled,
     ScoreComparisonX,
     ScoreComparisonY,
+    HitBurstSize,
+    HitBurstPalette,
+    HitBurstImage,
+    ClearHitBurstImage,
+    JudgementLineType2Color,
 };
 
 // The same order drives keyboard navigation, rendered rows and mouse hit targets.
 // Keep related controls adjacent instead of deriving positions from row labels.
-inline constexpr std::array<SkinSettingsRowId, 59> kSkinSettingsRowOrder = {
+inline constexpr std::array<SkinSettingsRowId, 64> kSkinSettingsRowOrder = {
     SkinSettingsRowId::ScratchPosition,
     SkinSettingsRowId::SkinSource,
     SkinSettingsRowId::ImportedSkin,
@@ -129,6 +135,10 @@ inline constexpr std::array<SkinSettingsRowId, 59> kSkinSettingsRowOrder = {
     SkinSettingsRowId::KeyBackdropHeight,
     SkinSettingsRowId::JudgementLineGlow,
     SkinSettingsRowId::HitBurstStyle,
+    SkinSettingsRowId::HitBurstSize,
+    SkinSettingsRowId::HitBurstPalette,
+    SkinSettingsRowId::HitBurstImage,
+    SkinSettingsRowId::ClearHitBurstImage,
     SkinSettingsRowId::KeyPulse,
     SkinSettingsRowId::HudLayout,
     SkinSettingsRowId::GaugeWidth,
@@ -143,6 +153,7 @@ inline constexpr std::array<SkinSettingsRowId, 59> kSkinSettingsRowOrder = {
     SkinSettingsRowId::LaneDividerBrightness,
     SkinSettingsRowId::JudgementLine,
     SkinSettingsRowId::JudgementLineType,
+    SkinSettingsRowId::JudgementLineType2Color,
     SkinSettingsRowId::TimingFeedback,
     SkinSettingsRowId::TimingBar,
     SkinSettingsRowId::TimingBarMode,
@@ -198,6 +209,8 @@ enum class SkinSettingsCategory { Source, Geometry, Notes, LongNotes, Effects, H
         case SkinSettingsRowId::KeyBackdropOpacity: case SkinSettingsRowId::KeyBackdropBrightness:
         case SkinSettingsRowId::KeyBackdropHeight: case SkinSettingsRowId::JudgementLineGlow:
         case SkinSettingsRowId::HitBurstStyle: case SkinSettingsRowId::KeyPulse:
+        case SkinSettingsRowId::HitBurstSize: case SkinSettingsRowId::HitBurstPalette:
+        case SkinSettingsRowId::HitBurstImage: case SkinSettingsRowId::ClearHitBurstImage:
             return SkinSettingsCategory::Effects;
         case SkinSettingsRowId::HudLayout:
         case SkinSettingsRowId::GaugeWidth:
@@ -209,6 +222,7 @@ enum class SkinSettingsCategory { Source, Geometry, Notes, LongNotes, Effects, H
         case SkinSettingsRowId::ScoreComparisonY:
         case SkinSettingsRowId::HudRiffMapVisible:
         case SkinSettingsRowId::JudgementLineType:
+        case SkinSettingsRowId::JudgementLineType2Color:
         case SkinSettingsRowId::LaneDividers: case SkinSettingsRowId::JudgementLine:
         case SkinSettingsRowId::LaneDividerBrightness:
         case SkinSettingsRowId::GearBoundary: case SkinSettingsRowId::KeyLabelPosition:

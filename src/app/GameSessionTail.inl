@@ -250,6 +250,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     chart_base_bpm_ = 0.0;
     lane_activity_.clear();
     ghost_lane_activity_.clear();
+    lane_hit_time_ns_.fill(0);
+    ghost_lane_hit_time_ns_.fill(0);
     lane_pressed_.clear();
     ghost_lane_pressed_.clear();
     pending_input_events_.reserve(64);
@@ -1416,10 +1418,13 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         snapshot.gauge_type = gauge_state.type;
 
         const auto& feedback = engine_->live_feedback();
-        const int64_t feedback_display_samples = ms_to_samples(kHudFeedbackDisplayMs, sample_rate_);
-        const int64_t feedback_age_samples =
-            feedback.has_value ? std::max<int64_t>(0, snapshot.current_sample - feedback.sample) : 0;
-        snapshot.has_feedback = feedback.has_value && feedback_age_samples <= feedback_display_samples;
+        const auto feedback_visible = [&](const gameplay::LiveJudgementFeedback& event) {
+            const double duration_ms = is_successful_hit(event.judgement)
+                ? kGameplayHitMotionMs : kHudFeedbackDisplayMs;
+            return event.has_value && snapshot.current_sample - event.sample <=
+                ms_to_samples(duration_ms, sample_rate_);
+        };
+        snapshot.has_feedback = feedback_visible(feedback);
         snapshot.feedback_judgement = feedback.judgement;
         snapshot.feedback_delta_ms = snapshot.has_feedback ? feedback.delta_ms : 0.0;
         const auto& timing = engine_->timing_text_feedback();
@@ -1440,6 +1445,7 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         snapshot.lane_activity.fill(0.0f);
         snapshot.lane_activity_count = std::min<std::size_t>(lane_activity_.size(), kGameplayHudMaxLanes);
         std::copy_n(lane_activity_.begin(), snapshot.lane_activity_count, snapshot.lane_activity.begin());
+        snapshot.lane_hit_time_ns = lane_hit_time_ns_;
         snapshot.lane_pressed.fill(0);
         snapshot.lane_pressed_count = std::min<std::size_t>(lane_pressed_.size(), kGameplayHudMaxLanes);
         std::copy_n(lane_pressed_.begin(), snapshot.lane_pressed_count, snapshot.lane_pressed.begin());
@@ -1469,10 +1475,7 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             snapshot.ghost_gauge_type = ghost_gauge_state.type;
 
             const auto& ghost_feedback = ghost_engine_->live_feedback();
-            const int64_t ghost_feedback_age_samples =
-                ghost_feedback.has_value ? std::max<int64_t>(0, snapshot.current_sample - ghost_feedback.sample) : 0;
-            snapshot.ghost_has_feedback =
-                ghost_feedback.has_value && ghost_feedback_age_samples <= feedback_display_samples;
+            snapshot.ghost_has_feedback = feedback_visible(ghost_feedback);
             snapshot.ghost_feedback_judgement = ghost_feedback.judgement;
             snapshot.ghost_feedback_delta_ms =
                 snapshot.ghost_has_feedback ? ghost_feedback.delta_ms : 0.0;
@@ -1494,6 +1497,7 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             std::copy_n(ghost_lane_activity_.begin(),
                         snapshot.ghost_lane_activity_count,
                         snapshot.ghost_lane_activity.begin());
+            snapshot.ghost_lane_hit_time_ns = ghost_lane_hit_time_ns_;
             snapshot.ghost_lane_pressed.fill(0);
             snapshot.ghost_lane_pressed_count =
                 std::min<std::size_t>(ghost_lane_pressed_.size(), kGameplayHudMaxLanes);
@@ -1583,7 +1587,7 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         if (snapshot.note_count >= kGameplayHudMaxNotes) {
             break;
         }
-        if (hold.lane <= 0 || hold.lane > snapshot.lane_count) {
+        if (!is_successful_hit(hold.head_judgement) || hold.lane <= 0 || hold.lane > snapshot.lane_count) {
             continue;
         }
         if (hold.end_sample < snapshot.current_sample - expanded_window.past_samples) {
@@ -1609,7 +1613,8 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         // pending judgement, or the active-hold highlight.
         const bool released = hit && note.end_sample.has_value() &&
             std::none_of(active_holds_buffer_.begin(), active_holds_buffer_.end(), [&](const auto& hold) {
-                return hold.lane == note.lane && hold.end_sample == *note.end_sample;
+                return is_successful_hit(hold.head_judgement) &&
+                       hold.lane == note.lane && hold.end_sample == *note.end_sample;
             });
         if (hit && !released) {
             return;
@@ -1673,7 +1678,7 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             if (snapshot.ghost_note_count >= kGameplayHudMaxNotes) {
                 break;
             }
-            if (hold.lane <= 0 || hold.lane > snapshot.lane_count) {
+            if (!is_successful_hit(hold.head_judgement) || hold.lane <= 0 || hold.lane > snapshot.lane_count) {
                 continue;
             }
             if (hold.end_sample < snapshot.current_sample - expanded_window.past_samples) {
@@ -1696,7 +1701,8 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             const bool hit = note.note_id < ghost_hidden_hit_note_ids_.size() && ghost_hidden_hit_note_ids_[note.note_id] != 0;
             const bool released = hit && note.end_sample.has_value() &&
                 std::none_of(ghost_active_holds_buffer_.begin(), ghost_active_holds_buffer_.end(), [&](const auto& hold) {
-                    return hold.lane == note.lane && hold.end_sample == *note.end_sample;
+                    return is_successful_hit(hold.head_judgement) &&
+                           hold.lane == note.lane && hold.end_sample == *note.end_sample;
                 });
             if (hit && !released) {
                 return;
@@ -2792,10 +2798,12 @@ void GameSession::shutdown() {
     pacemaker_mode_ = "off";
     gauge_shift_enabled_ = false;
     lane_activity_.clear();
+    lane_hit_time_ns_.fill(0);
     lane_pressed_.clear();
     hidden_hit_note_ids_.clear();
     active_holds_buffer_.clear();
     ghost_lane_activity_.clear();
+    ghost_lane_hit_time_ns_.fill(0);
     ghost_lane_pressed_.clear();
     ghost_hidden_hit_note_ids_.clear();
     ghost_active_holds_buffer_.clear();
@@ -2844,6 +2852,8 @@ void GameSession::audio_callback(float* output,
         engine_active = true;
 
         const int64_t now_ns = callback_time_ns;
+        // Use the existing callback clock for visual events in this batch.
+        hit_effect_clock_ns_ = now_ns;
         if (paused_.load(std::memory_order_acquire)) {
             if (!pause_anchor_valid_) {
                 pause_physical_start_sample_ = physical_buffer_start_samples;
@@ -3018,23 +3028,24 @@ void GameSession::audio_callback(float* output,
                     if (!result_transition_pending_) {
                         const int64_t tail_samples =
                             ms_to_samples(std::max(0.0, config_.ui.result_tail_ms), sample_rate_);
-                        // Releasing the final LN completes judgement before its
-                        // original tail. Let that display-only body leave the
-                        // field before automatic results, even with outro audio
-                        // disabled. Explicit skip/abort/game-over paths stay above.
-                        int64_t visible_hold_end = 0;
+                        // Automatic results wait for missed notes to exit the
+                        // field and for a released hold to reach its original tail.
+                        const int64_t note_fall_samples = ms_to_samples(kHudPastMs, sample_rate_);
+                        int64_t visible_note_end = 0;
                         for (const auto& note : chart_.notes) {
-                            if (note.end_sample && note.note_id < hidden_hit_note_ids_.size() &&
-                                hidden_hit_note_ids_[note.note_id] != 0) {
-                                visible_hold_end = std::max(visible_hold_end, *note.end_sample);
+                            const bool successful = note.note_id < hidden_hit_note_ids_.size() &&
+                                                    hidden_hit_note_ids_[note.note_id] != 0;
+                            if (!successful || note.end_sample.has_value()) {
+                                const auto end = note_visible_end_sample(note) + (successful ? 0 : note_fall_samples);
+                                visible_note_end = std::max(visible_note_end, end);
                             }
                         }
-                        if (visible_hold_end > 0) {
-                            visible_hold_end += ms_to_samples(
+                        if (visible_note_end > 0) {
+                            visible_note_end += ms_to_samples(
                                 std::max(0.0, -config_.visual_offset_ms), sample_rate_);
                         }
                         result_transition_sample_ = gameplay_result_transition_sample(
-                            buffer_end_samples, visible_hold_end, tail_samples);
+                            buffer_end_samples, visible_note_end, tail_samples);
                         result_transition_pending_ = true;
                     }
                 } else {
@@ -3172,6 +3183,8 @@ void GameSession::process_paused_input_queue() {
     service_control_repeats(timing::HighResClock::now_ns(), process_owns_foreground_window());
     std::fill(lane_activity_.begin(), lane_activity_.end(), 0.0f);
     std::fill(ghost_lane_activity_.begin(), ghost_lane_activity_.end(), 0.0f);
+    lane_hit_time_ns_.fill(0);
+    ghost_lane_hit_time_ns_.fill(0);
     std::fill(lane_pressed_.begin(), lane_pressed_.end(), 0);
     std::fill(ghost_lane_pressed_.begin(), ghost_lane_pressed_.end(), 0);
 }
@@ -3465,8 +3478,13 @@ void GameSession::dispatch_lane_input(int lane,
     auto hit_note = engine_->handle_input(lane, state, sample);
     if (state == input::InputState::Pressed && hit_note.has_value()) {
         trigger_lane_hit_effect(lane);
-        if (hit_note->note_id < hidden_hit_note_ids_.size()) {
-            hidden_hit_note_ids_[hit_note->note_id] = 1;
+        if (is_successful_hit(engine_->live_feedback().judgement)) {
+            if (lane > 0 && lane <= static_cast<int>(lane_hit_time_ns_.size())) {
+                lane_hit_time_ns_[static_cast<std::size_t>(lane - 1)] = hit_effect_clock_ns_;
+            }
+            if (hit_note->note_id < hidden_hit_note_ids_.size()) {
+                hidden_hit_note_ids_[hit_note->note_id] = 1;
+            }
         }
         if (emit_audio) schedule_note_keysound(hit_note.value(), audible_sample);
     }
@@ -3806,18 +3824,20 @@ void GameSession::dispatch_ghost_lane_input(int lane, input::InputState state, i
     if (pressed_lane_index >= 0 && pressed_lane_index < static_cast<int>(ghost_lane_pressed_.size())) {
         ghost_lane_pressed_[static_cast<std::size_t>(pressed_lane_index)] =
             state == input::InputState::Pressed ? 1 : 0;
-    }
-    if (state == input::InputState::Pressed) {
-        const int lane_index = lane - 1;
-        if (lane_index >= 0 && lane_index < static_cast<int>(ghost_lane_activity_.size())) {
-            ghost_lane_activity_[static_cast<std::size_t>(lane_index)] = 1.0f;
+        if (state == input::InputState::Pressed) {
+            ghost_lane_activity_[static_cast<std::size_t>(pressed_lane_index)] = 1.0f;
         }
     }
 
     auto hit_note = ghost_engine_->handle_input(lane, state, sample);
     if (state == input::InputState::Pressed && hit_note.has_value() &&
-        hit_note->note_id < ghost_hidden_hit_note_ids_.size()) {
-        ghost_hidden_hit_note_ids_[hit_note->note_id] = 1;
+        is_successful_hit(ghost_engine_->live_feedback().judgement)) {
+        if (pressed_lane_index >= 0 && pressed_lane_index < static_cast<int>(ghost_lane_hit_time_ns_.size())) {
+            ghost_lane_hit_time_ns_[static_cast<std::size_t>(pressed_lane_index)] = hit_effect_clock_ns_;
+        }
+        if (hit_note->note_id < ghost_hidden_hit_note_ids_.size()) {
+            ghost_hidden_hit_note_ids_[hit_note->note_id] = 1;
+        }
     }
 }
 

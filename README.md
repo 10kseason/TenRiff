@@ -1,4 +1,4 @@
-> **2026-11-06 · 1.9.9.9-hotfix3:** [NK2 E+, Safe 인덱싱, 곡 폴더와 리더보드](docs/release-1.9.9.9-hotfix3.ko.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
+> **2026-11-07 · 1.9.9.9-hotfix4:** [멀티코어 캐시 로딩과 타격 모션·키밤 옵션](docs/release-1.9.9.9-hotfix4.ko.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 
 > **2026-11-04 · 1.9.9.9-hotfix1:** [OGG 보안 수정·범용 BGA·스킨 에디터](docs/release-1.9.9.9-hotfix1.ko.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 

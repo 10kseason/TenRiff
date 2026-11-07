@@ -92,6 +92,7 @@ struct GameplayHudRevisionInput {
 
     std::size_t lane_activity_count = 0;
     std::array<float, kGameplayHudMaxLanes> lane_activity{};
+    std::array<int64_t, kGameplayHudMaxLanes> lane_hit_time_ns{};
     std::size_t lane_pressed_count = 0;
     std::array<uint8_t, kGameplayHudMaxLanes> lane_pressed{};
     std::size_t note_count = 0;
@@ -120,6 +121,7 @@ struct GameplayHudRevisionInput {
     bool ghost_game_over = false;
     std::size_t ghost_lane_activity_count = 0;
     std::array<float, kGameplayHudMaxLanes> ghost_lane_activity{};
+    std::array<int64_t, kGameplayHudMaxLanes> ghost_lane_hit_time_ns{};
     std::size_t ghost_lane_pressed_count = 0;
     std::array<uint8_t, kGameplayHudMaxLanes> ghost_lane_pressed{};
     std::size_t ghost_note_count = 0;
@@ -341,6 +343,7 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.timing_feedback_delta_ms != next.timing_feedback_delta_ms ||
         !gameplay_hud_timing_history_equal(previous, next) ||
         !gameplay_hud_lane_activity_equal(previous, next) ||
+        previous.lane_hit_time_ns != next.lane_hit_time_ns ||
         !gameplay_hud_lane_pressed_equal(previous, next) ||
         !gameplay_hud_notes_equal(previous, next) ||
         previous.ghost_finished != next.ghost_finished ||
@@ -352,6 +355,7 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.ghost_timing_feedback_delta_ms != next.ghost_timing_feedback_delta_ms ||
         !gameplay_hud_ghost_timing_history_equal(previous, next) ||
         !gameplay_hud_ghost_lane_activity_equal(previous, next) ||
+        previous.ghost_lane_hit_time_ns != next.ghost_lane_hit_time_ns ||
         !gameplay_hud_ghost_lane_pressed_equal(previous, next) ||
         !gameplay_hud_ghost_notes_equal(previous, next);
 

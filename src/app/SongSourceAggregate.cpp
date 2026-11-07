@@ -9,6 +9,7 @@
 #include <utility>
 
 #include "app/MenuSongUtils.h"
+#include "app/SongIndexBudget.h"
 #include "util/Utf8Compat.h"
 
 namespace tenriff::app {
@@ -221,36 +222,57 @@ SongSourceAggregateResult aggregate_song_sources(const std::vector<std::string>&
             std::unordered_set<std::string> source_charts;
             source_charts.reserve(index.entries.size());
             std::size_t missing_charts = 0;
-            for (std::size_t entry_index = 0; entry_index < index.entries.size(); ++entry_index) {
+            struct ResolvedChart {
+                std::string key;
+                bool missing = false;
+            };
+            std::size_t batch_start = 0;
+            while (batch_start < index.entries.size()) {
                 if (is_cancelled(cancel)) return finish_cancelled();
-                // Cached roots need progress too: resolving a large cache can
-                // take time even though no filesystem scan is required.
-                if (entry_index % 64 == 0) {
-                    report({SongIndexProgressStage::BuildingMetadata, count_as_int(entry_index),
+                if (batch_start % 64 == 0) {
+                    report({SongIndexProgressStage::BuildingMetadata, count_as_int(batch_start),
                             count_as_int(index.entries.size())});
                     if (is_cancelled(cancel)) return finish_cancelled();
                 }
-                auto& entry = index.entries[entry_index];
-                if (entry.path.empty()) continue;
-                const auto path = util::path_from_utf8_lossy(entry.path);
-                const auto chart_path = path.is_absolute() ? path : root / path;
-                ec.clear();
-                // A valid cache can outlive a chart or an entire subfolder.
-                // Skip unavailable entries without rescanning or rewriting
-                // the cache, and keep processing later charts and sources.
-                if (!fs::is_regular_file(chart_path, ec)) {
-                    ++missing_charts;
-                    continue;
+                const auto budget = choose_song_index_work_budget(options.profile, std::thread::hardware_concurrency(),
+                    index.entries.size() - batch_start, query_song_index_memory_snapshot());
+                const auto count = budget.batch_size;
+                std::vector<ResolvedChart> resolved(count);
+                run_song_index_workers(budget.worker_count, count, [&](std::size_t item) {
+                    if (is_cancelled(cancel)) return;
+                    auto& entry = index.entries[batch_start + item];
+                    if (entry.path.empty()) return;
+                    const auto path = util::path_from_utf8_lossy(entry.path);
+                    const auto chart_path = path.is_absolute() ? path : root / path;
+                    std::error_code file_error;
+                    if (!fs::is_regular_file(chart_path, file_error)) {
+                        resolved[item].missing = true;
+                        return;
+                    }
+                    const auto absolute = canonical_absolute(chart_path);
+                    if (absolute.empty()) return;
+                    resolved[item].key = chart_key(absolute);
+                    entry.path = util::path_to_utf8_lossy(absolute);
+                    entry.background_preview_path = absolute_preview(entry.background_preview_path, root);
+                    entry.audio_preview_path = absolute_preview(entry.audio_preview_path, root);
+                });
+                // Commit in cache order so overlapping sources keep the same first winner.
+                for (std::size_t item = 0; item < count; ++item) {
+                    if (is_cancelled(cancel)) return finish_cancelled();
+                    const auto entry_index = batch_start + item;
+                    if (entry_index != batch_start && entry_index % 64 == 0) {
+                        report({SongIndexProgressStage::BuildingMetadata, count_as_int(entry_index),
+                                count_as_int(index.entries.size())});
+                        if (is_cancelled(cancel)) return finish_cancelled();
+                    }
+                    const auto& chart = resolved[item];
+                    if (chart.missing) ++missing_charts;
+                    if (chart.key.empty()) continue;
+                    if (!source_charts.insert(chart.key).second) continue;
+                    if (!seen_charts.insert(chart.key).second) continue;
+                    result.index.entries.push_back(std::move(index.entries[entry_index]));
                 }
-                const auto absolute = canonical_absolute(chart_path);
-                if (absolute.empty()) continue;
-                const auto key = chart_key(absolute);
-                if (!source_charts.insert(key).second) continue;
-                if (!seen_charts.insert(key).second) continue;
-                entry.path = util::path_to_utf8_lossy(absolute);
-                entry.background_preview_path = absolute_preview(entry.background_preview_path, root);
-                entry.audio_preview_path = absolute_preview(entry.audio_preview_path, root);
-                result.index.entries.push_back(std::move(entry));
+                batch_start += count;
             }
             if (missing_charts > 0) {
                 result.warnings.push_back(source + ": Skipped " + std::to_string(missing_charts) +

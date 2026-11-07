@@ -250,6 +250,7 @@ private:
 
         std::size_t lane_activity_count = 0;
         std::array<float, kGameplayHudMaxLanes> lane_activity{};
+        std::array<int64_t, kGameplayHudMaxLanes> lane_hit_time_ns{};
         app::KeyOverlaySnapshot key_overlay;
         std::size_t lane_pressed_count = 0;
         std::array<uint8_t, kGameplayHudMaxLanes> lane_pressed{};
@@ -283,6 +284,7 @@ private:
         bool ghost_game_over = false;
         std::size_t ghost_lane_activity_count = 0;
         std::array<float, kGameplayHudMaxLanes> ghost_lane_activity{};
+        std::array<int64_t, kGameplayHudMaxLanes> ghost_lane_hit_time_ns{};
         std::size_t ghost_lane_pressed_count = 0;
         std::array<uint8_t, kGameplayHudMaxLanes> ghost_lane_pressed{};
         std::size_t ghost_note_count = 0;
@@ -363,6 +365,7 @@ private:
     void handle_skins_settings_input(uint32_t keycode);
     void select_skin_preview_lane(int visual_lane);
     void choose_profile_ui_font();
+    std::string pick_hit_burst_image();
     void apply_skin_settings_effects(
         const menu::settings::SkinSettingsEffects& effects);
     void handle_input_settings_input(uint32_t keycode);

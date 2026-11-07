@@ -612,36 +612,27 @@ TEST_CASE("gameplay note y mapping eases notes in from slightly above the field"
     }
 }
 
-TEST_CASE("gameplay rendering keeps a hold body continuous across the active-hold handoff") {
-    constexpr int64_t handoff_grace_samples = 32;
-    CHECK(tenriff::render::gameplay_hold_handoff_grace_samples(1000, 24) == handoff_grace_samples);
-    CHECK(tenriff::render::gameplay_hold_handoff_grace_samples(1000, 1000) == 64);
+TEST_CASE("unaccepted taps and holds remain visible past the judgement line") {
+    using namespace tenriff::render;
+    constexpr int64_t past_samples = 180;
+    constexpr int64_t sample = 1000;
+    for (int64_t elapsed : {0, 90, 179, 180, 181}) {
+        const auto cutoff = sample + elapsed - past_samples;
+        CHECK(should_render_gameplay_note(sample, sample, false, true, cutoff) == (elapsed <= past_samples));
+        CHECK(should_render_gameplay_note_head(sample, true, cutoff) == (elapsed <= past_samples));
+        CHECK_FALSE(should_render_gameplay_note_head(sample, false, cutoff));
+    }
+    CHECK(gameplay_note_exit_fraction(sample, sample, past_samples) == 0.0f);
+    CHECK(gameplay_note_exit_fraction(sample, sample + 90, past_samples) == doctest::Approx(0.5));
+    CHECK(gameplay_note_exit_fraction(sample, sample + 180, past_samples) == 1.0f);
 
-    CHECK(tenriff::render::should_render_gameplay_note(1000, 1000, false, true, false, 1000, 1000,
-                                                       handoff_grace_samples));
-    CHECK_FALSE(tenriff::render::should_render_gameplay_note(999, 999, false, true, false, 999, 1000,
-                                                             handoff_grace_samples));
-
-    CHECK(tenriff::render::should_render_gameplay_note(1000, 1600, true, true, false, 999, 1032,
-                                                       handoff_grace_samples));
-    CHECK(tenriff::render::should_render_gameplay_note(1000, 1600, true, false, false, 1032, 1032,
-                                                       handoff_grace_samples));
-    CHECK_FALSE(tenriff::render::should_render_gameplay_note(1000, 1600, true, true, false, 999, 1033,
-                                                             handoff_grace_samples));
-    CHECK(tenriff::render::should_render_gameplay_note(1000, 1600, true, true, true, 1001, 1001,
-                                                       handoff_grace_samples));
-    CHECK_FALSE(tenriff::render::should_render_gameplay_note(1000, 1600, true, true, false, 1001, 1001,
-                                                             handoff_grace_samples));
-    CHECK_FALSE(tenriff::render::should_render_gameplay_note(999, 999, true, true, true, 999, 1000,
-                                                             handoff_grace_samples));
-    CHECK(tenriff::render::should_render_gameplay_note(999, 1600, true, false, false, 1600, 1600,
-                                                       handoff_grace_samples));
-    CHECK_FALSE(tenriff::render::should_render_gameplay_note(999, 1600, true, false, false, 1601, 1601,
-                                                             handoff_grace_samples));
-
-    CHECK(tenriff::render::should_render_gameplay_note_head(1000, true, 1000));
-    CHECK_FALSE(tenriff::render::should_render_gameplay_note_head(999, true, 1000));
-    CHECK_FALSE(tenriff::render::should_render_gameplay_note_head(1000, false, 1000));
+    constexpr int64_t tail = 1600;
+    CHECK(should_render_gameplay_note(sample, tail, true, true, 1300));
+    CHECK_FALSE(should_render_gameplay_note_head(sample, true, 1300));
+    CHECK(should_render_gameplay_note(sample, tail, true, true, tail));
+    CHECK_FALSE(should_render_gameplay_note(sample, tail, true, true, tail + 1));
+    CHECK(should_render_gameplay_note(sample, tail, true, false, tail));
+    CHECK_FALSE(should_render_gameplay_note(sample, tail, true, false, tail + 1));
 }
 
 TEST_CASE("active hold synthetic notes stay anchored to the judgement line") {
@@ -1366,9 +1357,9 @@ TEST_CASE("key beam decay follows elapsed time at both 60 and 144 frames per sec
     CHECK(gameplay_interpolated_activity(1.0f, start, start + 200000000) == 0.0f);
 }
 
-TEST_CASE("only P GREAT animates and GOOD uses solid gray") {
+TEST_CASE("successful judgements pop for the hit motion duration without changing grade colors") {
     using namespace tenriff::render;
-    for (const auto* judgement : {"GR", "G", "BAD", "POOR"}) {
+    for (const auto* judgement : {"BAD", "POOR"}) {
         for (double age : {0.0, 50.0, 150.0, 300.0}) {
             const auto motion = gameplay_judgement_animation(judgement, age);
             CHECK(motion.scale == 1.0f);
@@ -1376,13 +1367,45 @@ TEST_CASE("only P GREAT animates and GOOD uses solid gray") {
             CHECK(motion.opacity == 1.0f);
         }
     }
-    CHECK(gameplay_judgement_animation("PG", 0).scale > 1.0f);
-    CHECK(gameplay_judgement_animation("PG", 220).scale == 1.0f);
+    for (const auto* judgement : {"PG", "GR", "G"}) {
+        const auto start = gameplay_judgement_animation(judgement, 0.0);
+        const auto half = gameplay_judgement_animation(judgement, 250.0);
+        CHECK(start.scale > half.scale);
+        CHECK(half.scale > 1.0f);
+        CHECK(start.offset_y < half.offset_y);
+        CHECK(gameplay_judgement_animation(judgement, 500.0).scale == 1.0f);
+    }
+    CHECK(gameplay_judgement_animation("PG", 0).scale > gameplay_judgement_animation("GR", 0).scale);
+    CHECK(gameplay_judgement_animation("GR", 0).scale > gameplay_judgement_animation("G", 0).scale);
+    CHECK(gameplay_judgement_animation("PG", 220, 220).scale == 1.0f);
     CHECK(gameplay_judgement_rgb("PG") == 0xFFE18A);
     CHECK(gameplay_judgement_rgb("GR") == 0x6EE7F2);
     CHECK(gameplay_judgement_rgb("G") == 0xAEB5BF);
     CHECK(gameplay_timing_feedback_text(-28, "GR") == L"FAST -28.0 ms");
     CHECK(gameplay_timing_feedback_text(28, "GR") == L"SLOW +28.0 ms");
+}
+
+TEST_CASE("hit burst expands, trails off at 500 ms and restarts on the next hit") {
+    using tenriff::render::gameplay_hit_burst_motion;
+    constexpr int64_t hit = 1'000'000'000;
+    CHECK(gameplay_hit_burst_motion(0, hit).opacity == 0.0f);
+    CHECK(gameplay_hit_burst_motion(hit, hit).impact == 1.0f);
+    CHECK(gameplay_hit_burst_motion(hit, hit + 105'000'000).impact == 0.0f);
+    for (int hz : {60, 144}) {
+        auto previous = gameplay_hit_burst_motion(hit, hit);
+        for (int frame = 1; frame < hz / 2; ++frame) {
+            const auto now = hit + (frame * 1'000'000'000LL) / hz;
+            const auto next = gameplay_hit_burst_motion(hit, now);
+            CHECK(next.travel > previous.travel);
+            CHECK(next.opacity < previous.opacity);
+            CHECK(next.opacity > 0.0f);
+            previous = next;
+        }
+    }
+    CHECK(gameplay_hit_burst_motion(hit, hit + 500'000'000).opacity == 0.0f);
+    constexpr int64_t next_hit = hit + 120'000'000;
+    CHECK(gameplay_hit_burst_motion(hit, next_hit).impact == 0.0f);
+    CHECK(gameplay_hit_burst_motion(next_hit, next_hit).impact == 1.0f);
 }
 
 TEST_CASE("Native gameplay edited key geometry and response remain bounded") {
@@ -1513,6 +1536,10 @@ TEST_CASE("skin preview drives real lane activity for each hit burst style") {
         CHECK(decay.lane_activity[7] == doctest::Approx(0.5));
         CHECK(idle.lane_activity[7] == 0.0f);
         CHECK(hit.lane_activity[0] == 0.0f);
+        CHECK(hit.lane_hit_time_ns[7] == 900'000'000LL);
+        CHECK(decay.lane_hit_time_ns[7] == hit.lane_hit_time_ns[7]);
+        CHECK(idle.lane_hit_time_ns[7] == hit.lane_hit_time_ns[7]);
+        CHECK(hit.lane_hit_time_ns[0] == 0);
         CHECK(hit.activity_publish_time_ns == 900'000'000LL);
         CHECK(hit.lane_pressed[7] == 1);
         CHECK(idle.lane_pressed[7] == 0);

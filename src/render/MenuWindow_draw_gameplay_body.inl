@@ -236,120 +236,176 @@
                 ? gameplay_note_sprite_cache_.imported_note_aspect
                 : data.gameplay.note_image_aspect;
         // Hit-burst brightness, 0% turns the explosion off entirely.
-        const float key_pulse_brightness =
-            std::clamp(data.gameplay.key_pulse_brightness, 0.0f, 1.0f);
-        const std::string hit_burst_style =
+        const float key_pulse_brightness = data.gameplay.key_pulse_enabled
+            ? std::clamp(data.gameplay.key_pulse_brightness, 0.0f, 1.0f) : 0.0f;
+        std::string hit_burst_style =
             config::normalize_skin_hit_burst_style_token(data.gameplay.hit_burst_style);
-        // The hit burst is stacked from a wide outer bloom, a lane-coloured beam, a
-        // bright glow slab and a white-hot core at the judgement line. Player and
-        // ghost fields draw the identical stack so both read the same.
-        auto draw_gameplay_hit_burst = [&](ID2D1DeviceContext* burst_ctx,
-                                           float lane_center,
-                                           float burst_note_width,
-                                           float burst_hit_line_y,
-                                           float burst_field_top,
-                                           float burst_field_bottom,
-                                           float pulse,
-                                           uint32_t pulse_color,
-                                           float burst_opacity,
-                                           bool sustained_hold) {
-            if (!burst_ctx || !d2d_->note_fill_brush || burst_opacity <= 0.0f) {
-                return;
+        const float hit_burst_scale = std::isfinite(data.gameplay.hit_burst_scale)
+            ? std::clamp(data.gameplay.hit_burst_scale, 1.0f, 1.65f) : 1.0f;
+        const auto hit_burst_palette = config::normalize_skin_hit_burst_palette_token(data.gameplay.hit_burst_palette);
+        const auto& image_path = data.gameplay.hit_burst_image_path;
+        ID2D1Bitmap* hit_burst_bitmap = nullptr;
+        if (image_path.empty() && !d2d_->hit_burst_image_path.empty()) {
+            d2d_->hit_burst_image_path.clear();
+            d2d_->hit_burst_image.Reset();
+        }
+        if (hit_burst_style == "image" && key_pulse_brightness > 0.0f && !image_path.empty()) {
+            if (d2d_->hit_burst_image_path != image_path ||
+                d2d_->hit_burst_image_revision != data.gameplay.skin_revision) {
+                d2d_->hit_burst_image_path = image_path;
+                d2d_->hit_burst_image_revision = data.gameplay.skin_revision;
+                d2d_->hit_burst_image.Reset();
+                // Own a single thumbnail so the selection stays replaceable on disk.
+                load_bitmap_from_utf8_path(d2d_->wic_factory.Get(), ctx, image_path, d2d_->hit_burst_image,
+                                           nullptr, false, true);
             }
-            const float top_limit = burst_field_top + 2.0f;
-            const float bottom_limit = burst_field_bottom - 2.0f;
-            auto fill_band = [&](float half_width, float half_height, float radius,
-                                 uint32_t color, float alpha) {
-                if (alpha <= 0.002f) {
-                    return;
-                }
-                const D2D1_RECT_F rect =
-                    D2D1::RectF(lane_center - half_width,
-                                std::max(top_limit, burst_hit_line_y - half_height),
-                                lane_center + half_width,
-                                std::min(bottom_limit, burst_hit_line_y + half_height));
-                d2d_->note_fill_brush->SetColor(
-                    color_from_rgb(color, std::min(1.0f, alpha) * burst_opacity));
-                burst_ctx->FillRoundedRectangle(D2D1::RoundedRect(rect, radius, radius),
-                                                d2d_->note_fill_brush.Get());
+            hit_burst_bitmap = d2d_->hit_burst_image.Get();
+        }
+        if (hit_burst_style == "image" && !hit_burst_bitmap) hit_burst_style = "prism";
+        const float burst_height = ng_motion("burst_height");
+        const float burst_rise = ng_motion("burst_rise");
+        const uint32_t burst_core_rgb = ng_rgb("burst_core", 0xFFFFFF);
+        const uint32_t burst_trail_rgb = ng_rgb("burst_trail", 0xD5FFF4);
+        const float burst_core_alpha = ng_alpha("burst_core");
+        const float burst_trail_alpha = ng_alpha("burst_trail");
+        auto draw_gameplay_hit_burst = [&](float x, float y, float half_width, float up,
+                                           const GameplayHitBurstMotion& motion,
+                                           uint32_t lane_color, std::size_t lane, float opacity, float hold_light) {
+            auto* brush = d2d_->note_fill_brush.Get();
+            const auto saved_color = brush->GetColor();
+            auto set_color = [&](uint32_t rgb, float alpha) {
+                brush->SetColor(color_from_rgb(rgb, alpha * opacity));
+            };
+            auto band = [&](float width, float height, uint32_t rgb, float alpha) {
+                set_color(rgb, alpha);
+                const auto rect = D2D1::RectF(x - width, y - height, x + width, y + height);
+                const float radius = std::min(9.0f, height);
+                ctx->FillRoundedRectangle(D2D1::RoundedRect(rect, radius, radius), brush);
             };
 
-            const float half_w = burst_note_width * (0.52f + 0.18f * pulse);
-            if (!use_imported_metrics && hit_burst_style == "prism") {
-                // Native signal packets rise only a short distance above the contact line.
-                // Their lane-bounded width keeps adjacent dense notes unobstructed.
-                fill_band(half_w * 0.92f, sustained_hold ? 30.0f : 12.0f + ng_motion("burst_height") * pulse,
-                          4.0f, pulse_color, 0.12f + 0.16f * pulse);
-                fill_band(half_w * 0.88f, 2.0f + 3.0f * pulse, 2.0f,
-                          blend_rgb(pulse_color, ng_rgb("burst_core",0xFFFFFF), 0.80f), (0.38f + 0.50f * pulse)*ng_alpha("burst_core"));
-                if (!sustained_hold) {
-                    const float y = std::max(top_limit, burst_hit_line_y - 12.0f - (1.0f - pulse) * ng_motion("burst_rise"));
-                    d2d_->note_fill_brush->SetColor(color_from_rgb(
-                        blend_rgb(pulse_color, ng_rgb("burst_trail",0xD5FFF4), 0.55f), pulse * 0.65f * burst_opacity*ng_alpha("burst_trail")));
-                    const float width = half_w * 0.65f;
-                    burst_ctx->FillRectangle(D2D1::RectF(lane_center - width, y, lane_center + width,
-                                                         std::min(bottom_limit, y + 2.0f)), d2d_->note_fill_brush.Get());
+            uint32_t core = blend_rgb(lane_color, burst_core_rgb, 0.82f);
+            uint32_t trail = blend_rgb(lane_color, burst_trail_rgb, 0.48f);
+            if (hit_burst_palette == "pastel") {
+                constexpr std::array<uint32_t, 6> colors{0xFDAFCE, 0xA6C8FF, 0xAFE9D2, 0xE0C0FA, 0xFFDBA9, 0xBAEEF2};
+                lane_color = colors[lane % colors.size()];
+                core = blend_rgb(lane_color, 0xFFFAF6, 0.62f);
+                trail = blend_rgb(lane_color, 0xEEF3FF, 0.26f);
+            } else if (hit_burst_palette == "oil") {
+                constexpr std::array<uint32_t, 5> colors{0xDA6947, 0xC49A4D, 0x5C9074, 0xAB694A, 0x707FA6};
+                lane_color = colors[lane % colors.size()];
+                core = blend_rgb(lane_color, 0xFFE0A3, 0.34f);
+                trail = blend_rgb(lane_color, 0x3D2520, 0.14f);
+            } else if (hit_burst_palette == "mono") {
+                lane_color = core = trail = 0xE8EFF5;
+            } else if (hit_burst_palette == "cyberpunk") {
+                constexpr std::array<uint32_t, 5> colors{0x24ECFF, 0xFF38C4, 0xA878FF, 0x46FF7B, 0xFFE048};
+                lane_color = colors[lane % colors.size()];
+                core = blend_rgb(lane_color, 0xF3FAFF, 0.42f);
+                trail = colors[(lane + 1) % colors.size()];
+            }
+            if (hold_light > 0.0f) {
+                // A hold keeps a soft contact light between its head and release.
+                band(half_width * 0.76f, 16.0f + 8.0f * hold_light, lane_color, 0.13f * hold_light);
+                band(half_width * 0.65f, 2.0f + 2.0f * hold_light, core, 0.45f * hold_light * burst_core_alpha);
+            }
+            if (motion.opacity > 0.0f) {
+                const float spread = motion.travel;
+                const float life = motion.opacity;
+                const float rise = burst_rise * (0.25f + 1.75f * spread);
+                if (hit_burst_bitmap) {
+                    const float width = half_width * (0.64f + 0.35f * spread);
+                    const float height = 35.0f + 56.0f * spread;
+                    const float center_y = y - 0.45f * rise * up;
+                    const auto rect = fit_rect_preserve_aspect(
+                        D2D1::RectF(x - width, center_y - height, x + width, center_y + height),
+                        hit_burst_bitmap->GetSize());
+                    ctx->DrawBitmap(hit_burst_bitmap, rect, life * opacity, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+                    brush->SetColor(saved_color);
+                    return;
                 }
-                return;
-            }
-            if (sustained_hold) {
-                // A held LN gets a stable vertical flame instead of repeatedly
-                // replaying the single-note flash. The small pulse keeps it alive
-                // without masking the judgement line.
-                fill_band(half_w * 0.72f, 48.0f + 16.0f * pulse, 12.0f,
-                          blend_rgb(pulse_color, 0x76E8FF, 0.32f), 0.16f + 0.18f * pulse);
-                fill_band(half_w * 0.92f, 6.0f + 4.0f * pulse, 6.0f,
-                          blend_rgb(pulse_color, 0xFFFFFF, 0.66f), 0.30f + 0.28f * pulse);
-            }
+                band(half_width * (0.62f + 0.30f * spread),
+                     4.0f + burst_height * motion.impact, lane_color, 0.16f * life + 0.25f * motion.impact);
+                band(half_width * (0.44f + 0.33f * spread), 1.8f + 5.0f * motion.impact,
+                     core, (0.30f * life + 0.60f * motion.impact) * burst_core_alpha);
 
-            if (hit_burst_style == "ring") {
-                const float radius_x = half_w * (sustained_hold ? 0.92f : 1.18f + 0.22f * pulse);
-                const float radius_y = sustained_hold ? 14.0f + 5.0f * pulse : 18.0f + 34.0f * pulse;
-                d2d_->note_fill_brush->SetColor(color_from_rgb(
-                    blend_rgb(pulse_color, 0xFFFFFF, 0.55f),
-                    (sustained_hold ? 0.46f : 0.28f + 0.54f * pulse) * burst_opacity));
-                burst_ctx->DrawEllipse(D2D1::Ellipse(D2D1::Point2F(lane_center, burst_hit_line_y),
-                                                     radius_x, radius_y),
-                                       d2d_->note_fill_brush.Get(),
-                                       sustained_hold ? 4.0f : 3.0f + 4.0f * pulse);
-                fill_band(half_w * 0.58f, 3.0f + 4.0f * pulse, 4.0f,
-                          blend_rgb(pulse_color, 0xFFFFFF, 0.82f), 0.36f + 0.42f * pulse);
-                return;
+                if (hit_burst_style == "ring") {
+                    const float radius_x = half_width * (0.35f + 0.60f * spread);
+                    const float radius_y = 6.0f + burst_height * 0.20f + rise * 0.53f;
+                    const auto ring = D2D1::Ellipse(D2D1::Point2F(x, y - rise * 0.11f * up),
+                                                    radius_x, radius_y);
+                    set_color(lane_color, 0.22f * life * burst_trail_alpha);
+                    ctx->DrawEllipse(ring, brush, 5.0f * life + 1.0f);
+                    set_color(trail, 0.83f * life * burst_trail_alpha);
+                    ctx->DrawEllipse(ring, brush, 1.2f + 2.2f * life);
+                } else if (hit_burst_style == "shockwave") {
+                    // Two low ripples sweep across the lane at different speeds.
+                    const auto ripple = [&](float expansion, uint32_t color, float alpha) {
+                        set_color(color, alpha * life * burst_trail_alpha);
+                        ctx->DrawEllipse(D2D1::Ellipse(D2D1::Point2F(x, y - 8.0f * expansion * up),
+                            half_width * (0.38f + 0.58f * expansion), 4.0f + 11.0f * expansion),
+                            brush, 1.2f + 2.6f * life);
+                    };
+                    ripple(spread, trail, 0.86f);
+                    ripple(spread * 0.57f, core, 0.52f);
+                } else if (hit_burst_style == "shards") {
+                    constexpr std::array<float, 5> angles{-0.84f, -0.48f, 0.12f, 0.51f, 0.83f};
+                    constexpr std::array<float, 5> heights{0.56f, 1.14f, 0.94f, 1.26f, 0.73f};
+                    for (std::size_t i = 0; i < angles.size(); ++i) {
+                        const float center_x = x + angles[i] * half_width * (0.30f + 0.65f * spread);
+                        const float center_y = y - (10.0f + rise * heights[i]) * up;
+                        const float length = 3.0f + (7.0f + i * 1.5f) * life;
+                        const float tilt = angles[i] * (1.5f - 0.9f * spread) * length;
+                        set_color(i % 2 == 0 ? trail : core, 0.94f * life * burst_trail_alpha);
+                        ctx->DrawLine(D2D1::Point2F(center_x - tilt, center_y + length * up),
+                                      D2D1::Point2F(center_x + tilt, center_y - length * up),
+                                      brush, 1.8f + 3.0f * life);
+                    }
+                } else if (hit_burst_style == "pixels") {
+                    constexpr std::array<float, 6> positions{-0.82f, -0.46f, -0.17f, 0.21f, 0.50f, 0.84f};
+                    const float step = std::floor(spread * 6.0f) / 6.0f;
+                    for (std::size_t i = 0; i < positions.size(); ++i) {
+                        const float center_x = x + positions[i] * half_width * (0.34f + 0.66f * step);
+                        const float center_y = y - (9.0f + burst_rise * step * (0.48f + (i % 3) * 0.33f)) * up;
+                        const float half = 1.8f + (2.2f + (i % 2)) * life;
+                        set_color(i % 2 == 0 ? trail : core, 0.92f * life * burst_trail_alpha);
+                        ctx->FillRectangle(D2D1::RectF(center_x - half, center_y - half,
+                                                      center_x + half, center_y + half), brush);
+                    }
+                } else {
+                    auto streak = [&](float dx, float dy, float tail_x, float tail_y, float alpha) {
+                        const auto tip = D2D1::Point2F(x + dx, y - dy * up);
+                        const auto tail = D2D1::Point2F(tip.x - tail_x, tip.y + tail_y * up);
+                        set_color(lane_color, alpha * 0.32f * life * burst_trail_alpha);
+                        ctx->DrawLine(tail, tip, brush, 2.0f + 6.0f * life);
+                        set_color(trail, alpha * life * burst_trail_alpha);
+                        ctx->DrawLine(tail, tip, brush, 1.3f + 2.6f * life);
+                    };
+                    if (hit_burst_style == "spark") {
+                        const float edge = half_width * (0.30f + 0.60f * spread);
+                        const float ray = 4.0f + (6.0f + burst_height) * life;
+                        streak(0.0f, 6.0f + rise * 1.16f, 0.0f, ray, 0.96f);
+                        for (float side : {-1.0f, 1.0f}) {
+                            streak(side * edge, 5.0f + rise * 0.78f,
+                                   side * edge * 0.29f, ray * 0.72f, 0.90f);
+                            streak(side * edge * 0.98f, rise * 0.25f - 4.0f,
+                                   side * edge * 0.42f, ray * 0.16f, 0.64f);
+                        }
+                    } else {
+                        const float edge = half_width * (0.22f + 0.53f * spread);
+                        const float ribbon = 4.0f + (8.0f + burst_height) * life;
+                        set_color(trail, 0.52f * life * (1.0f - spread) * burst_trail_alpha);
+                        ctx->DrawEllipse(D2D1::Ellipse(D2D1::Point2F(x, y),
+                            half_width * (0.58f + 0.38f * spread), 4.0f + 12.0f * spread),
+                            brush, 1.6f + 1.8f * motion.impact);
+                        for (float side : {-1.0f, 1.0f}) {
+                            streak(side * edge, 7.0f + rise, side * half_width * 0.19f, ribbon, 0.91f);
+                            streak(side * edge * 0.52f, 7.0f + rise * 0.62f,
+                                   side * half_width * 0.13f, ribbon * 0.64f, 0.65f);
+                        }
+                    }
+                }
             }
-
-            if (hit_burst_style == "spark") {
-                const float ray_x = half_w * (sustained_hold ? 0.82f : 1.30f + 0.42f * pulse);
-                const float ray_y = sustained_hold ? 35.0f + 9.0f * pulse : 38.0f + 70.0f * pulse;
-                d2d_->note_fill_brush->SetColor(color_from_rgb(
-                    blend_rgb(pulse_color, 0xFFFFFF, 0.70f),
-                    (sustained_hold ? 0.34f : 0.25f + 0.60f * pulse) * burst_opacity));
-                const float stroke = sustained_hold ? 2.5f : 2.0f + 4.0f * pulse;
-                burst_ctx->DrawLine(D2D1::Point2F(lane_center - ray_x, burst_hit_line_y),
-                                    D2D1::Point2F(lane_center + ray_x, burst_hit_line_y),
-                                    d2d_->note_fill_brush.Get(), stroke);
-                burst_ctx->DrawLine(D2D1::Point2F(lane_center, std::max(top_limit, burst_hit_line_y - ray_y)),
-                                    D2D1::Point2F(lane_center, std::min(bottom_limit, burst_hit_line_y + ray_y)),
-                                    d2d_->note_fill_brush.Get(), stroke);
-                burst_ctx->DrawLine(D2D1::Point2F(lane_center - ray_x * 0.68f, burst_hit_line_y - ray_y * 0.55f),
-                                    D2D1::Point2F(lane_center + ray_x * 0.68f, burst_hit_line_y + ray_y * 0.55f),
-                                    d2d_->note_fill_brush.Get(), stroke * 0.72f);
-                burst_ctx->DrawLine(D2D1::Point2F(lane_center + ray_x * 0.68f, burst_hit_line_y - ray_y * 0.55f),
-                                    D2D1::Point2F(lane_center - ray_x * 0.68f, burst_hit_line_y + ray_y * 0.55f),
-                                    d2d_->note_fill_brush.Get(), stroke * 0.72f);
-                fill_band(half_w * 0.54f, 4.0f + 5.0f * pulse, 4.0f,
-                          blend_rgb(pulse_color, 0xFFFFFF, 0.90f), 0.42f + 0.46f * pulse);
-                return;
-            }
-
-            // Prism: the original layered bloom, retained as the default.
-            fill_band(half_w * 1.42f, (sustained_hold ? 20.0f : 34.0f) + 62.0f * pulse, 14.0f,
-                      blend_rgb(pulse_color, 0x6EE7F2, 0.30f), 0.07f + 0.22f * pulse);
-            fill_band(half_w * 0.86f, (sustained_hold ? 16.0f : 24.0f) + 46.0f * pulse, 10.0f,
-                      blend_rgb(pulse_color, 0x9AF2FF, 0.34f), 0.14f + 0.44f * pulse);
-            fill_band(half_w, 7.0f + 13.0f * pulse, 7.0f,
-                      blend_rgb(pulse_color, 0xFFFFFF, 0.46f), 0.30f + 0.60f * pulse);
-            fill_band(half_w * 0.62f, 3.0f + 6.0f * pulse, 4.0f,
-                      blend_rgb(pulse_color, 0xFFFFFF, 0.86f), 0.40f + 0.60f * pulse);
+            brush->SetColor(saved_color);
         };
         const std::string note_shape = normalize_gameplay_note_shape(data.gameplay.note_shape);
         // Procedural shapes use flat lane-colored holds; the original rect material
@@ -383,6 +439,11 @@
         if (scene_hud_cache.display_chart != data.gameplay.visual_scroll_segments) {
             scene_hud_cache.display_sample.reset();
             scene_hud_cache.display_chart = data.gameplay.visual_scroll_segments;
+            scene_hud_cache.animation_initialized = false;
+            scene_hud_cache.combo_animation_started_ns = 0;
+            scene_hud_cache.judgement_animation_started_ns = 0;
+            scene_hud_cache.ghost_combo_animation_started_ns = 0;
+            scene_hud_cache.ghost_judgement_animation_started_ns = 0;
         }
         // Preview loops intentionally seek; gameplay alone carries the last
         // rendered audio sample across delayed HUD publication.
@@ -404,9 +465,15 @@
             }
             return false;
         };
-        const int64_t hold_handoff_grace_samples = gameplay_hold_handoff_grace_samples(
-            data.gameplay.sample_rate,
-            motion_diagnostics.extrapolation_limit_samples);
+        int64_t note_exit_sample = display_sample;
+        if (data.gameplay.finished && motion_state.sample_rate > 0 && std::isfinite(motion_state.visual_offset_ms)) {
+            // The progress clock is capped at chart length, but the last missed
+            // note can still move during the lead-out before results.
+            const auto offset_samples = static_cast<int64_t>(std::llround(
+                motion_state.visual_offset_ms * motion_state.sample_rate / 1000.0));
+            note_exit_sample = std::max(display_sample, motion_state.current_sample + offset_samples);
+        }
+        const int64_t note_past_samples = std::max<int64_t>(0, data.gameplay.past_samples);
         const double kGameplayTimingIndicatorRangeMs = ng_metric("timing_range_ms");
         const float kGameplayTimingIndicatorHalfWidth = ng_metric("timing_half_width");
         const float kGameplayTimingIndicatorHeight = ng_metric("timing_height");
@@ -424,6 +491,28 @@
                 data.gameplay.future_visual_span,
                 data.gameplay.past_visual_span,
                 judgement_line_position));
+        };
+        const auto scrolls_past_line = [](const GameplayNoteData& note) {
+            return note.head_visible && !note.released && !note.mine;
+        };
+        auto position_falling_note = [&](int64_t sample, float hit_y, float field_bottom,
+                                         bool bitmap, float rotation, float& y,
+                                         D2D1_RECT_F& rect, D2D1_RECT_F& art_rect) {
+            if (sample >= note_exit_sample || note_past_samples == 0) return;
+            const float width = art_rect.right - art_rect.left;
+            const float height = art_rect.bottom - art_rect.top;
+            const float half_height = bitmap
+                ? gameplay_rotated_note_half_height(width, height, rotation)
+                : gameplay_note_shape_extents(width, height, note_shape).half_height;
+            const float exit_y = field_bottom + half_height + 2.0f;
+            const float progress = gameplay_note_exit_fraction(sample, note_exit_sample, note_past_samples);
+            const float next_y = hit_y + (exit_y - hit_y) * progress;
+            const float shift = next_y - y;
+            y = next_y;
+            rect.top += shift;
+            rect.bottom += shift;
+            art_rect.top += shift;
+            art_rect.bottom += shift;
         };
         // The loading and countdown cards draw the header before the note pass,
         // so the field geometry is resolved once up front for every branch.
@@ -832,6 +921,29 @@
                 d2d_->text_brush->SetOpacity(saved);
             }
         };
+        const auto animation_age_ms = [render_now_ns](int64_t started_ns, double duration_ms) {
+            if (started_ns <= 0) return duration_ms;
+            return std::clamp(
+                static_cast<double>(render_now_ns - started_ns) / 1'000'000.0,
+                0.0, duration_ms);
+        };
+        const int64_t preview_hit_time_ns = is_skin_preview
+            ? *std::max_element(data.gameplay.lane_hit_time_ns.begin(), data.gameplay.lane_hit_time_ns.end()) : 0;
+        const auto judgement_started_ns = [&](bool ghost = false) {
+            if (!data.gameplay.active || data.gameplay.paused || data.gameplay.countdown_active) return int64_t{0};
+            if (is_skin_preview) return preview_hit_time_ns;
+            return ghost ? scene_hud_cache.ghost_judgement_animation_started_ns
+                         : scene_hud_cache.judgement_animation_started_ns;
+        };
+        const auto score_pop_transform = [&](D2D1_RECT_F rect, bool ghost = false) {
+            const auto& judgement = ghost ? data.gameplay.ghost_feedback : data.gameplay.feedback;
+            const auto pop = gameplay_judgement_animation(judgement,
+                animation_age_ms(judgement_started_ns(ghost), kGameplayHitMotionMs));
+            const float scale = 1.0f + (pop.scale - 1.0f) * 0.26f;
+            const auto anchor = D2D1::Point2F(rect.right, (rect.top + rect.bottom) * 0.5f);
+            return D2D1::Matrix3x2F::Scale(scale, scale, anchor) *
+                D2D1::Matrix3x2F::Translation(0.0f, pop.offset_y * 0.32f);
+        };
 #include "MenuWindow_draw_studio_deck.inl"
         auto draw_gameplay_header = [&](const GameplayProgressTrackLayout* battle_column = nullptr) {
             if (studio) draw_studio_header();
@@ -893,11 +1005,15 @@
                                 header_top,
                                 header_safe_right,
                                 header_top + 52.0f));
+                D2D1_MATRIX_3X2_F saved_transform{};
+                ctx->GetTransform(&saved_transform);
+                ctx->SetTransform(score_pop_transform(score_rect) * saved_transform);
                 draw_readable_text_aligned(scene_hud_cache.score_text,
                                           ng_font("score",scene_title_format.Get()),
                                           score_rect,
                                           d2d_->text_brush.Get(),
                                           DWRITE_TEXT_ALIGNMENT_TRAILING);
+                ctx->SetTransform(saved_transform);
             }
             if ((!studio || !studio_deck.score_visible) && !data.gameplay.ghost_visible && scene_body_format && d2d_->text_brush) {
                 const D2D1_RECT_F combo_rect =
@@ -1123,33 +1239,25 @@
             scene_hud_cache.studio_text_revision = data.gameplay.text_revision;
         }
 
-        const double kComboAnimationDurationMs = ng_motion("combo_duration_ms");
-        const double kJudgementAnimationDurationMs = ng_motion("judgement_duration_ms");
-        const auto animation_age_ms = [render_now_ns](int64_t started_ns, double duration_ms) {
-            if (started_ns <= 0) return duration_ms;
-            return std::clamp(
-                static_cast<double>(render_now_ns - started_ns) / 1'000'000.0,
-                0.0,
-                duration_ms);
-        };
+        const double combo_duration_ms = ng_motion("combo_duration_ms");
+        const double judgement_duration_ms = ng_motion("judgement_duration_ms");
         const GameplayTextPopAnimation combo_text_animation =
             compute_gameplay_text_pop_animation(
-                animation_age_ms(scene_hud_cache.combo_animation_started_ns,
-                                 kComboAnimationDurationMs),
-                kComboAnimationDurationMs,
+                animation_age_ms(is_skin_preview ? preview_hit_time_ns : scene_hud_cache.combo_animation_started_ns,
+                                 combo_duration_ms),
+                combo_duration_ms,
                 ng_motion("combo_scale"),
                 ng_motion("combo_lift"));
         const GameplayTextPopAnimation judgement_text_animation = gameplay_judgement_animation(
-            data.gameplay.feedback, animation_age_ms(scene_hud_cache.judgement_animation_started_ns,
-                                                     kJudgementAnimationDurationMs) * 220.0 / kJudgementAnimationDurationMs);
+            data.gameplay.feedback, animation_age_ms(judgement_started_ns(), judgement_duration_ms),
+            judgement_duration_ms);
 
         const GameplayTextPopAnimation ghost_combo_text_animation = compute_gameplay_text_pop_animation(
-            animation_age_ms(scene_hud_cache.ghost_combo_animation_started_ns, kComboAnimationDurationMs),
-            kComboAnimationDurationMs, ng_motion("combo_scale"), ng_motion("combo_lift"));
+            animation_age_ms(scene_hud_cache.ghost_combo_animation_started_ns, combo_duration_ms),
+            combo_duration_ms, ng_motion("combo_scale"), ng_motion("combo_lift"));
         const GameplayTextPopAnimation ghost_judgement_text_animation = gameplay_judgement_animation(
             data.gameplay.ghost_feedback,
-            animation_age_ms(scene_hud_cache.ghost_judgement_animation_started_ns,
-                             kJudgementAnimationDurationMs) * 220.0 / kJudgementAnimationDurationMs);
+            animation_age_ms(judgement_started_ns(true), judgement_duration_ms), judgement_duration_ms);
 
         if (data.gameplay.loading && !data.gameplay.active) {
             draw_gameplay_header();
@@ -1623,7 +1731,10 @@
             if (bounds.right <= bounds.left || height <= 0.0f) return;
             auto& travel = ghost ? native_ghost_key_travel_[lane_index] : native_key_travel_[lane_index];
             travel = advance_native_key_travel(travel, pressed, native_key_delta_seconds, ng_motion("press_response"),ng_motion("release_response"));
-            const float pulse = gameplay_interpolated_activity(activity, data.gameplay.activity_publish_time_ns, render_now_ns);
+            const auto& hit_times = ghost ? data.gameplay.ghost_lane_hit_time_ns : data.gameplay.lane_hit_time_ns;
+            const float pulse = std::max(
+                gameplay_interpolated_activity(activity, data.gameplay.activity_publish_time_ns, render_now_ns),
+                gameplay_hit_burst_motion(hit_times[lane_index], render_now_ns).opacity);
             const float light = std::clamp((travel * ng_motion("pressed_light") + pulse * ng_motion("hit_light")) * key_pulse_brightness, 0.0f, 1.0f);
             const float depth = std::min(std::max(height * 0.065f,2.0f),ng_motion("press_depth")) * travel;
             const uint32_t color = lane_index < data.gameplay.lane_color_count ? data.gameplay.lane_colors[lane_index]
@@ -1868,6 +1979,53 @@
         if (!use_imported_metrics) {
             draw_key_labels(field_layout);
         }
+        auto draw_lane_hit_bursts = [&](const GameplayFieldLayout& field, float hit_y,
+                                         const auto& alignment, bool ghost = false) {
+            if (key_pulse_brightness <= 0.0f || !d2d_->note_fill_brush || data.gameplay.paused) return;
+            const auto& hit_times = ghost ? data.gameplay.ghost_lane_hit_time_ns : data.gameplay.lane_hit_time_ns;
+            const auto& pressed = ghost ? data.gameplay.ghost_lane_pressed : data.gameplay.lane_pressed;
+            const auto pressed_count = ghost ? data.gameplay.ghost_lane_pressed_count : data.gameplay.lane_pressed_count;
+            const auto& notes = ghost ? data.gameplay.ghost_notes : data.gameplay.notes;
+            const auto note_count = ghost ? data.gameplay.ghost_note_count : data.gameplay.note_count;
+            const auto antialias = ctx->GetAntialiasMode();
+            ctx->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+            for (int lane = 0; lane < lane_count; ++lane) {
+                const auto index = static_cast<std::size_t>(lane);
+                if (lane_hidden(index)) continue;
+                const auto motion = gameplay_hit_burst_motion(hit_times[index], render_now_ns);
+                const bool holding = index < pressed_count && pressed[index] &&
+                    lane_has_active_hold(notes, note_count, index);
+                if (motion.opacity <= 0.0f && !holding) continue;
+
+                const float left = gameplay_lane_left(field, lane);
+                const float right = gameplay_lane_right(field, lane);
+                const float lane_width = right - left;
+                // Reserve width for all three image sizes inside the lane.
+                const float half_width = hit_burst_bitmap ? lane_width * 0.29f
+                    : std::min(gameplay_note_width(field, lane) * 0.55f, lane_width * 0.5f / hit_burst_scale);
+                const float x = gameplay_lane_center(field, lane);
+                const float y = hit_y + (holding ? alignment.hold_offsets[index] : alignment.note_offsets[index]);
+                const float up = y - field.top >= 48.0f ? 1.0f : -1.0f;
+                const auto lane_color = index < data.gameplay.lane_color_count ? data.gameplay.lane_colors[index] : 0x6EE7F2;
+                const float hold_light = holding ? 0.75f + 0.12f * static_cast<float>(
+                    std::sin(static_cast<double>(render_now_ns) / 180'000'000.0 + lane * 0.7)) : 0.0f;
+
+                // Draw behind the notes and clip to the struck lane, including in narrow battle fields.
+                ctx->PushAxisAlignedClip(D2D1::RectF(left, field.top, right, field.bottom), D2D1_ANTIALIAS_MODE_ALIASED);
+                D2D1_MATRIX_3X2_F saved_transform{};
+                if (hit_burst_scale != 1.0f) {
+                    ctx->GetTransform(&saved_transform);
+                    ctx->SetTransform(D2D1::Matrix3x2F::Scale(
+                        hit_burst_scale, hit_burst_scale, D2D1::Point2F(x, y)) * saved_transform);
+                }
+                draw_gameplay_hit_burst(x, y, half_width, up, motion,
+                                        lane_color, index, visual_opacity * key_pulse_brightness, hold_light);
+                if (hit_burst_scale != 1.0f) ctx->SetTransform(saved_transform);
+                ctx->PopAxisAlignedClip();
+            }
+            ctx->SetAntialiasMode(antialias);
+        };
+        draw_lane_hit_bursts(field_layout, hit_line_y, note_alignment);
         // Queue in note-array order. Every procedural primitive below flushes
         // first, preserving translucent LN body/tail/head overlap across lanes.
         auto flush_note_sprites = [&]() {
@@ -1896,19 +2054,14 @@
         };
         for (std::size_t note_index = 0; note_index < data.gameplay.note_count; ++note_index) {
             const auto& note = data.gameplay.notes[note_index];
+            const bool falling = scrolls_past_line(note);
+            const int64_t cutoff_sample = falling ? note_exit_sample - note_past_samples : display_sample;
             if (!should_render_gameplay_note(
-                    note.start_sample,
-                    note.tail_sample,
-                    note.hold,
-                    note.head_visible,
-                    note.pending,
-                    data.gameplay.current_sample,
-                    display_sample,
-                    hold_handoff_grace_samples, note.released)) {
+                    note.start_sample, note.tail_sample, note.hold, note.head_visible, cutoff_sample)) {
                 continue;
             }
-            const bool render_head =
-                should_render_gameplay_note_head(note.start_sample, note.head_visible, display_sample, note.released);
+            const bool render_head = should_render_gameplay_note_head(
+                note.start_sample, note.head_visible, cutoff_sample, note.released);
             const int lane = std::clamp(note.lane, 1, lane_count);
             if (lane_hidden(static_cast<std::size_t>(lane - 1))) continue;
             const std::size_t lane_index = static_cast<std::size_t>(lane - 1);
@@ -1922,8 +2075,8 @@
                     : note.visual_position;
             const float note_alignment_offset = note.hold
                 ? note_alignment.hold_offsets[lane_index] : note_alignment.note_offsets[lane_index];
-            const float y = gameplay_field_y(field_top, field_height, visual_to_y(render_visual_position)) + note_alignment_offset;
-            const float tail_y =
+            float y = gameplay_field_y(field_top, field_height, visual_to_y(render_visual_position)) + note_alignment_offset;
+            float tail_y =
                 gameplay_field_y(field_top, field_height, visual_to_y(note.tail_visual_position)) + note_alignment_offset;
             const float head_half_h = gameplay_note_head_half_height(note_height_scale);
             const float tail_half_h = gameplay_note_tail_half_height(note_height_scale);
@@ -1961,14 +2114,14 @@
                 d2d_->lane_note_hold_body_bitmaps[lane_index].Get();
             ID2D1Bitmap* note_hold_tail_bitmap =
                 d2d_->lane_note_tail_bitmaps[lane_index].Get();
-            const D2D1_RECT_F note_rect = D2D1::RectF(x0, y - head_half_h, x1, y + head_half_h);
+            D2D1_RECT_F note_rect = D2D1::RectF(x0, y - head_half_h, x1, y + head_half_h);
             const bool using_hold_head_bitmap = note.hold && note_hold_head_bitmap;
             ID2D1Bitmap* head_bitmap = using_hold_head_bitmap ? note_hold_head_bitmap : note_head_bitmap;
             const D2D1_RECT_F* head_source_rect =
                 using_hold_head_bitmap
                     ? bitmap_source_rect_or_null(d2d_->lane_note_hold_head_source_rects[lane_index])
                     : bitmap_source_rect_or_null(d2d_->lane_note_head_source_rects[lane_index]);
-            const D2D1_RECT_F head_visual_rect =
+            D2D1_RECT_F head_visual_rect =
                 head_bitmap
                     ? gameplay_note_bitmap_dest_rect(note_rect,
                                                      head_bitmap,
@@ -1976,11 +2129,11 @@
                                                      note_shape,
                                                      note_image_aspect)
                     : note_rect;
-            const D2D1_RECT_F tail_rect =
+            D2D1_RECT_F tail_rect =
                 D2D1::RectF(x0, tail_y - tail_half_h, x1, tail_y + tail_half_h);
             const D2D1_RECT_F* tail_source_rect =
                 bitmap_source_rect_or_null(d2d_->lane_note_tail_source_rects[lane_index]);
-            const D2D1_RECT_F tail_visual_rect =
+            D2D1_RECT_F tail_visual_rect =
                 note_hold_tail_bitmap
                     ? gameplay_note_bitmap_dest_rect(tail_rect,
                                                      note_hold_tail_bitmap,
@@ -1989,6 +2142,17 @@
                                                      note_image_aspect)
                     : tail_rect;
 
+            if (falling && note.start_sample < note_exit_sample) {
+                const float rotation = gameplay_lane_sprite_rotation(gameplay_note_sprite_cache_.note_rotations,
+                    gameplay_note_sprite_cache_.note_rotation_count, lane_index);
+                const float contact_y = hit_line_y + note_alignment_offset;
+                position_falling_note(note.start_sample, contact_y, field_bottom,
+                                      head_bitmap != nullptr, rotation, y, note_rect, head_visual_rect);
+                if (note.hold) {
+                    position_falling_note(note.tail_sample, contact_y, field_bottom,
+                                          note_hold_tail_bitmap != nullptr, rotation, tail_y, tail_rect, tail_visual_rect);
+                }
+            }
             if (note.mine) {
                 flush_note_sprites();
                 const float mine_half_h = std::max(7.0f, head_half_h * 1.15f);
@@ -2223,7 +2387,7 @@
                               scene_hud_cache.feedback_timing_text, data.gameplay.timing_history_delta_ms,
                               data.gameplay.timing_history_count, data.gameplay.timing_history_maximums,
                               data.gameplay.timing_maximum_window_ms, judgement_text_animation,
-                              scene_hud_cache.judgement_animation_started_ns);
+                              judgement_started_ns());
         draw_field_judgement_counts(field_layout,
             {data.gameplay.pg, data.gameplay.gr, data.gameplay.gd, data.gameplay.bd, data.gameplay.pr});
 
@@ -2422,43 +2586,6 @@
         if (data.gameplay.peer_visible) {
 #include "MenuWindow_draw_gameplay_multiplayer.inl"
         }
-        if (key_pulse_brightness > 0.0f && d2d_->note_fill_brush && data.gameplay.lane_activity_count > 0) {
-            const std::size_t count =
-                std::min(data.gameplay.lane_activity_count, static_cast<std::size_t>(lane_count));
-            for (std::size_t lane = 0; lane < count; ++lane) {
-                if (lane_hidden(lane)) continue;
-                const float activity = gameplay_interpolated_activity(data.gameplay.lane_activity[lane], data.gameplay.activity_publish_time_ns, render_now_ns);
-                const bool sustained_hold =
-                    lane < data.gameplay.lane_pressed_count && data.gameplay.lane_pressed[lane] != 0 &&
-                    lane_has_active_hold(data.gameplay.notes, data.gameplay.note_count, lane);
-                const float hold_wave = 0.55f + 0.08f * static_cast<float>(
-                    std::sin(static_cast<double>(render_now_ns) / 180'000'000.0 +
-                             static_cast<double>(lane) * 0.7));
-                const float pulse = sustained_hold
-                                        ? std::max(activity * activity, hold_wave)
-                                        : activity * activity;
-                if (pulse <= 0.02f) {
-                    continue;
-                }
-                const float lane_center = gameplay_lane_center(field_layout, static_cast<int>(lane));
-                const float note_width = gameplay_note_width(field_layout, static_cast<int>(lane));
-                uint32_t pulse_color = 0x6EE7F2;
-                if (lane < data.gameplay.lane_color_count) {
-                    pulse_color = data.gameplay.lane_colors[lane];
-                }
-                draw_gameplay_hit_burst(ctx,
-                                        lane_center,
-                                        note_width,
-                                        hit_line_y + (sustained_hold ? note_alignment.hold_offsets[lane] : note_alignment.note_offsets[lane]),
-                                        field_top,
-                                        field_bottom,
-                                        pulse,
-                                        pulse_color,
-                                        visual_opacity * key_pulse_brightness,
-                                        sustained_hold);
-            }
-        }
-
         if (studio) draw_studio_rails();
         else draw_vertical_gauge(surface_layout.player_gauge_left,
                             data.gameplay.gauge,
@@ -2570,22 +2697,18 @@
             if (!use_imported_metrics) {
                 draw_key_labels(ghost_field_layout, true);
             }
+            draw_lane_hit_bursts(ghost_field_layout, ghost_hit_line_y, ghost_note_alignment, true);
             batch_note_field = can_batch_note_field(data.gameplay.ghost_notes, data.gameplay.ghost_note_count);
             for (std::size_t note_index = 0; note_index < data.gameplay.ghost_note_count; ++note_index) {
                 const auto& note = data.gameplay.ghost_notes[note_index];
+                const bool falling = scrolls_past_line(note);
+                const int64_t cutoff_sample = falling ? note_exit_sample - note_past_samples : display_sample;
                 if (!should_render_gameplay_note(
-                        note.start_sample,
-                        note.tail_sample,
-                        note.hold,
-                        note.head_visible,
-                        note.pending,
-                        data.gameplay.current_sample,
-                        display_sample,
-                        hold_handoff_grace_samples, note.released)) {
+                        note.start_sample, note.tail_sample, note.hold, note.head_visible, cutoff_sample)) {
                     continue;
                 }
-                const bool render_head =
-                    should_render_gameplay_note_head(note.start_sample, note.head_visible, display_sample, note.released);
+                const bool render_head = should_render_gameplay_note_head(
+                    note.start_sample, note.head_visible, cutoff_sample, note.released);
                 const int lane = std::clamp(note.lane, 1, lane_count);
                 if (lane_hidden(static_cast<std::size_t>(lane - 1))) continue;
                 const std::size_t lane_index = static_cast<std::size_t>(lane - 1);
@@ -2599,9 +2722,9 @@
                         : note.visual_position;
                 const float ghost_note_alignment_offset = note.hold
                     ? ghost_note_alignment.hold_offsets[lane_index] : ghost_note_alignment.note_offsets[lane_index];
-                const float y =
+                float y =
                     gameplay_field_y(ghost_field_top, ghost_field_height, visual_to_y(render_visual_position)) + ghost_note_alignment_offset;
-                const float tail_y = gameplay_field_y(
+                float tail_y = gameplay_field_y(
                     ghost_field_top, ghost_field_height, visual_to_y(note.tail_visual_position)) + ghost_note_alignment_offset;
                 const float head_half_h = gameplay_note_head_half_height(note_height_scale);
                 const float tail_half_h = gameplay_note_tail_half_height(note_height_scale);
@@ -2638,14 +2761,14 @@
                     d2d_->lane_note_hold_body_bitmaps[lane_index].Get();
                 ID2D1Bitmap* note_hold_tail_bitmap =
                     d2d_->lane_note_tail_bitmaps[lane_index].Get();
-                const D2D1_RECT_F note_rect = D2D1::RectF(x0, y - head_half_h, x1, y + head_half_h);
+                D2D1_RECT_F note_rect = D2D1::RectF(x0, y - head_half_h, x1, y + head_half_h);
                 const bool using_hold_head_bitmap = note.hold && note_hold_head_bitmap;
                 ID2D1Bitmap* head_bitmap = using_hold_head_bitmap ? note_hold_head_bitmap : note_head_bitmap;
                 const D2D1_RECT_F* head_source_rect =
                     using_hold_head_bitmap
                         ? bitmap_source_rect_or_null(d2d_->lane_note_hold_head_source_rects[lane_index])
                         : bitmap_source_rect_or_null(d2d_->lane_note_head_source_rects[lane_index]);
-                const D2D1_RECT_F head_visual_rect =
+                D2D1_RECT_F head_visual_rect =
                     head_bitmap
                         ? gameplay_note_bitmap_dest_rect(note_rect,
                                                         head_bitmap,
@@ -2653,11 +2776,11 @@
                                                         note_shape,
                                                         note_image_aspect)
                         : note_rect;
-                const D2D1_RECT_F tail_rect =
+                D2D1_RECT_F tail_rect =
                     D2D1::RectF(x0, tail_y - tail_half_h, x1, tail_y + tail_half_h);
                 const D2D1_RECT_F* tail_source_rect =
                     bitmap_source_rect_or_null(d2d_->lane_note_tail_source_rects[lane_index]);
-                const D2D1_RECT_F tail_visual_rect =
+                D2D1_RECT_F tail_visual_rect =
                     note_hold_tail_bitmap
                         ? gameplay_note_bitmap_dest_rect(tail_rect,
                                                         note_hold_tail_bitmap,
@@ -2666,6 +2789,17 @@
                                                         note_image_aspect)
                         : tail_rect;
 
+                if (falling && note.start_sample < note_exit_sample) {
+                    const float rotation = gameplay_lane_sprite_rotation(gameplay_note_sprite_cache_.note_rotations,
+                        gameplay_note_sprite_cache_.note_rotation_count, lane_index);
+                    const float contact_y = ghost_hit_line_y + ghost_note_alignment_offset;
+                    position_falling_note(note.start_sample, contact_y, ghost_field_bottom,
+                                          head_bitmap != nullptr, rotation, y, note_rect, head_visual_rect);
+                    if (note.hold) {
+                        position_falling_note(note.tail_sample, contact_y, ghost_field_bottom,
+                                              note_hold_tail_bitmap != nullptr, rotation, tail_y, tail_rect, tail_visual_rect);
+                    }
+                }
                 if (note.mine) {
                     flush_note_sprites();
                     const float mine_half_h = std::max(7.0f, head_half_h * 1.15f);
@@ -2780,7 +2914,7 @@
                                   scene_hud_cache.ghost_feedback_text, scene_hud_cache.ghost_feedback_timing_text,
                                   data.gameplay.ghost_timing_history_delta_ms, data.gameplay.ghost_timing_history_count,
                                   data.gameplay.ghost_timing_history_maximums, data.gameplay.ghost_timing_maximum_window_ms,
-                                  ghost_judgement_text_animation, scene_hud_cache.ghost_judgement_animation_started_ns);
+                                  ghost_judgement_text_animation, judgement_started_ns(true));
             draw_field_judgement_counts(ghost_field_layout,
                 {data.gameplay.ghost_pg, data.gameplay.ghost_gr, data.gameplay.ghost_gd,
                  data.gameplay.ghost_bd, data.gameplay.ghost_pr}, true);
@@ -2792,46 +2926,6 @@
                                    combo_anchor_bottom_safe,
                                    60.0f,
                                    ghost_combo_text_animation, true);
-            }
-
-            if (key_pulse_brightness > 0.0f && d2d_->note_fill_brush && data.gameplay.ghost_lane_activity_count > 0) {
-                const std::size_t count =
-                    std::min(data.gameplay.ghost_lane_activity_count, static_cast<std::size_t>(lane_count));
-                for (std::size_t lane = 0; lane < count; ++lane) {
-                    if (lane_hidden(lane)) continue;
-                    const float activity = gameplay_interpolated_activity(data.gameplay.ghost_lane_activity[lane], data.gameplay.activity_publish_time_ns, render_now_ns);
-                    const bool sustained_hold =
-                        lane < data.gameplay.ghost_lane_pressed_count &&
-                        data.gameplay.ghost_lane_pressed[lane] != 0 &&
-                        lane_has_active_hold(data.gameplay.ghost_notes,
-                                             data.gameplay.ghost_note_count,
-                                             lane);
-                    const float hold_wave = 0.55f + 0.08f * static_cast<float>(
-                        std::sin(static_cast<double>(render_now_ns) / 180'000'000.0 +
-                                 static_cast<double>(lane) * 0.7));
-                    const float pulse = sustained_hold
-                                            ? std::max(activity * activity, hold_wave)
-                                            : activity * activity;
-                    if (pulse <= 0.02f) {
-                        continue;
-                    }
-                    const float lane_center = gameplay_lane_center(ghost_field_layout, static_cast<int>(lane));
-                    const float ghost_note_width = gameplay_note_width(ghost_field_layout, static_cast<int>(lane));
-                    uint32_t pulse_color = 0x6EE7F2;
-                    if (lane < data.gameplay.lane_color_count) {
-                        pulse_color = data.gameplay.lane_colors[lane];
-                    }
-                    draw_gameplay_hit_burst(ctx,
-                                            lane_center,
-                                            ghost_note_width,
-                                            ghost_hit_line_y + (sustained_hold ? ghost_note_alignment.hold_offsets[lane] : ghost_note_alignment.note_offsets[lane]),
-                                            ghost_field_top,
-                                            ghost_field_bottom,
-                                            pulse,
-                                            pulse_color,
-                                            visual_opacity * key_pulse_brightness,
-                                            sustained_hold);
-                }
             }
 
             draw_vertical_gauge(surface_layout.ghost_gauge_left,
@@ -2864,7 +2958,7 @@
             auto draw_field_summary = [&](const GameplayBattleSummaryLayout& summary,
                                           const std::wstring& label_text,
                                           const std::wstring& score_text,
-                                          const std::array<std::wstring, 4>& rows, bool embed_metadata) {
+                                          const std::array<std::wstring, 4>& rows, bool embed_metadata, bool ghost) {
                 const auto columns = compute_gameplay_battle_summary_columns(summary, embed_metadata);
                 const auto rect = D2D1::RectF(summary.left, summary.top, summary.right, summary.bottom);
                 if (d2d_->panel_brush) {
@@ -2908,9 +3002,14 @@
                     d2d_->muted_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING);
                 const auto old_color = d2d_->text_brush->GetColor();
                 d2d_->text_brush->SetColor(ng_color("score", old_color));
-                draw_fitted_readable_text(score_text, ng_font("score", scene_title_format.Get()),
-                    D2D1::RectF(columns.stats_left + 118.0f, summary.row_edges[0], rect.right - 14.0f, summary.row_edges[1]),
+                const auto score_rect = D2D1::RectF(columns.stats_left + 118.0f, summary.row_edges[0],
+                                                   rect.right - 14.0f, summary.row_edges[1]);
+                D2D1_MATRIX_3X2_F saved_transform{};
+                ctx->GetTransform(&saved_transform);
+                ctx->SetTransform(score_pop_transform(score_rect, ghost) * saved_transform);
+                draw_fitted_readable_text(score_text, ng_font("score", scene_title_format.Get()), score_rect,
                     d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
+                ctx->SetTransform(saved_transform);
                 d2d_->text_brush->SetColor(old_color);
                 for (std::size_t row = 0; row < rows.size(); ++row) {
                     draw_fitted_readable_text(rows[row], scene_hud_format.Get(),
@@ -2920,9 +3019,9 @@
                 }
             };
             draw_field_summary(player_summary, wloc("LIVE", "실플레이"),
-                               scene_hud_cache.score_text, scene_hud_cache.battle_summary_text, embed_battle_header);
+                               scene_hud_cache.score_text, scene_hud_cache.battle_summary_text, embed_battle_header, false);
             draw_field_summary(ghost_summary, wloc("GHOST", "고스트"),
-                               scene_hud_cache.ghost_score_text, scene_hud_cache.ghost_battle_summary_text, false);
+                               scene_hud_cache.ghost_score_text, scene_hud_cache.ghost_battle_summary_text, false, true);
             if (embed_battle_header) draw_gameplay_progress_bar(progress_track_rect);
         }
         if ((!studio || !studio_deck.score_visible) && data.gameplay.pacemaker_mode != "off" && !data.gameplay.pacemaker_mode.empty()) {

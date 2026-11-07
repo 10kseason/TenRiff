@@ -288,6 +288,8 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
   - `safe | fast`
   - Default `safe`: prepares hashes and preview metadata, and supports difficulty tables. Native LV/CR calculation follows the separate setting below.
   - Saved choices are preserved. Optional `fast` (minimal) skips hashes, previews and difficulty calculation.
+  - Both profiles use the available logical CPU threads for folder indexing. Remaining files and free RAM determine concurrent work.
+  - Existing-cache parsing and ALL SONG cached-path validation also run in parallel.
 - `calculate_song_index_difficulty` (bool)
   - defaults to `false`
   - `false` keeps BMS `#PLAYLEVEL` as the menu LV and skips the CPU-heavy native LV/CR calculation
@@ -308,6 +310,7 @@ These controls do not change Sites submission policy. Long LN Mix v2 exclusion f
 | --- | --- | --- |
 | `profile_nickname` | string; UTF-8 ≤48 bytes | Display name; empty uses profile ID. Whitespace/control characters are normalized. |
 | `profile_avatar_path` | string; UTF-8 ≤2048 bytes | Local PNG/JPG avatar path. |
+| `hit_burst_image_path` | string; UTF-8 ≤2048 bytes | Path of the selected PNG/JPEG, stored in this device's profile. |
 | `language` | `en`, `ko`, `ja`, `zh-CN`; `en` | UI language; invalid values normalize to en. |
 | `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | Profile and first-run menu text at 100%, 115%, or 130%. Gameplay fonts remain skin-controlled. |
 | `skip_start_countdown` | bool; `false` | Skip the initial `3 / 2 / 1` display in solo play, including normal starts, menu restarts and result retries. |
@@ -370,7 +373,11 @@ These are profile `config.json` skin settings. For a skin package's `skin.json` 
 | `judgement_line_glow_enabled` | bool; `true` | Judgement-line glow. |
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst brightness; zero disables it. |
 | `key_pulse_enabled` | bool; `true` | Legacy ON/OFF mirror; false or zero brightness disables the burst. |
-| `hit_burst_style` | `prism`, `ring`, `spark`; `prism` | Built-in Hit Burst material. |
+| `hit_burst_style` | `prism`, `ring`, `spark`, `shockwave`, `shards`, `pixels`, `image`; `prism` | Shape on a successful hit. Image mode uses the selected image's own colors and transparency. |
+| `hit_burst_size` | `normal`, `large`, `larger`; `normal` | Hit burst size at 100/130/165%. |
+| `hit_burst_palette` | `soft`, `pastel`, `oil`, `mono`, `cyberpunk`; `soft` | Soft default, pastel, oil paint, monochrome or cyberpunk for built-in effects. |
+| `hit_burst_override` | bool; `false` | When enabled, profile shape and brightness take precedence over authored skin defaults. |
+| `judgement_line_type2_color` | color token; `off` | Fills the Type 2 band with the chosen solid color. `off` uses the original green outline. |
 | `hud_layout` | `classic`, `studio`; `studio` | HUD style for Native or imported LR2 solo play; LR2 note/key/gear assets and geometry are preserved. Missing/unknown values use `studio`; select Classic in Options › Skins. In 1.8.9, information is upper right, score lower left and the horizontal map lower right; narrow margins scale groups or move them to the opposite side. Extreme fields plus Performance HUD can hide only the information card when neither upper side has room. Other image skins, ghost and multiplayer retain Classic. [Placement and verification scope](release-1.8.9-gate.md). |
 | `hud_riff_map_visible` | bool; `true` | Show Studio Deck's horizontal 64-bin density map and elapsed/total time. The default is lower right; narrow margins move/scale it, and very narrow maps omit time labels. Options › Skins › Studio Riff Map saves this in profiles and skin presets. Hiding it preserves other card positions and Classic HUD. |
 | `ui_font` | `default`, `malgun`, `bahnschrift`, `consolas`; `default` | Menu font; default is Segoe UI. Logo, rank and combo keep their dedicated fonts. |

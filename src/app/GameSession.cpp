@@ -69,6 +69,12 @@ constexpr int64_t kGameplayStartLeadInMs = 3000;
 constexpr int64_t kHudLookaheadMs = 2200;
 constexpr int64_t kHudPastMs = 180;
 constexpr double kHudFeedbackDisplayMs = 240.0;
+
+constexpr bool is_successful_hit(game::Judgement judgement) {
+    return judgement == game::Judgement::PG || judgement == game::Judgement::GR ||
+           judgement == game::Judgement::GD;
+}
+
 constexpr double kHudRenderSlackMs = 24.0;
 constexpr double kGuideToneMs = 28.0;
 constexpr double kHitToneMs = 44.0;

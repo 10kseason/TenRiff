@@ -195,6 +195,9 @@ void sanitize_skin_config(SkinConfig& skin) {
     skin.key_backdrop_height = clamp_finite(skin.key_backdrop_height,
         kSkinKeyBackdropHeightMin, kSkinKeyBackdropHeightMax, kSkinKeyBackdropHeightDefault);
     skin.hit_burst_style = normalize_skin_hit_burst_style_token(skin.hit_burst_style);
+    skin.hit_burst_size = normalize_skin_hit_burst_size_token(skin.hit_burst_size);
+    skin.hit_burst_palette = normalize_skin_hit_burst_palette_token(skin.hit_burst_palette);
+    skin.judgement_line_type2_color = normalize_skin_single_color_token(skin.judgement_line_type2_color);
     skin.hud_layout = normalize_skin_hud_layout_token(skin.hud_layout);
     skin.gauge_width = normalize_skin_gauge_width_token(skin.gauge_width);
     skin.single_color = normalize_skin_single_color_token(skin.single_color);
@@ -742,7 +745,9 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.ui.profile_nickname =
             normalize_profile_nickname(get_string(*ui, "profile_nickname", config.ui.profile_nickname));
         config.ui.profile_avatar_path =
-            normalize_profile_avatar_path(get_string(*ui, "profile_avatar_path", config.ui.profile_avatar_path));
+            normalize_profile_image_path(get_string(*ui, "profile_avatar_path", config.ui.profile_avatar_path));
+        config.ui.hit_burst_image_path =
+            normalize_profile_image_path(get_string(*ui, "hit_burst_image_path", config.ui.hit_burst_image_path));
         config.ui.language = normalize_ui_language(get_string(*ui, "language", config.ui.language));
         config.ui.menu_font_size = normalize_menu_font_size_token(
             get_string(*ui, "menu_font_size", config.ui.menu_font_size));
@@ -864,6 +869,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_bool(*skin, "show_judgement_line", config.skin.show_judgement_line);
         config.skin.judgement_line_type =
             get_number(*skin, "judgement_line_type", config.skin.judgement_line_type) == 2.0 ? 2 : 1;
+        config.skin.judgement_line_type2_color = normalize_skin_single_color_token(
+            get_string(*skin, "judgement_line_type2_color", config.skin.judgement_line_type2_color));
         config.skin.show_gear_boundary_line =
             get_bool(*skin, "show_gear_boundary_line", config.skin.show_gear_boundary_line);
         config.skin.show_timing_feedback =
@@ -909,6 +916,11 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             kSkinKeyPulseBrightnessMin, kSkinKeyPulseBrightnessMax);
         config.skin.hit_burst_style = normalize_skin_hit_burst_style_token(
             get_string(*skin, "hit_burst_style", config.skin.hit_burst_style));
+        config.skin.hit_burst_size = normalize_skin_hit_burst_size_token(
+            get_string(*skin, "hit_burst_size", config.skin.hit_burst_size));
+        config.skin.hit_burst_palette = normalize_skin_hit_burst_palette_token(
+            get_string(*skin, "hit_burst_palette", config.skin.hit_burst_palette));
+        config.skin.hit_burst_override = get_bool(*skin, "hit_burst_override", config.skin.hit_burst_override);
         config.skin.gauge_width = normalize_skin_gauge_width_token(get_string(*skin, "gauge_width", config.skin.gauge_width));
         config.skin.hud_layout = normalize_skin_hud_layout_token(
             get_string(*skin, "hud_layout", config.skin.hud_layout));
@@ -1294,7 +1306,8 @@ JsonValue build_json_root(const RuntimeConfig& config) {
 
     JsonObject ui;
     ui.emplace("profile_nickname", JsonValue{normalize_profile_nickname(config.ui.profile_nickname)});
-    ui.emplace("profile_avatar_path", JsonValue{normalize_profile_avatar_path(config.ui.profile_avatar_path)});
+    ui.emplace("profile_avatar_path", JsonValue{normalize_profile_image_path(config.ui.profile_avatar_path)});
+    ui.emplace("hit_burst_image_path", JsonValue{normalize_profile_image_path(config.ui.hit_burst_image_path)});
     ui.emplace("language", JsonValue{normalize_ui_language(config.ui.language)});
     ui.emplace("menu_font_size", JsonValue{normalize_menu_font_size_token(config.ui.menu_font_size)});
     ui.emplace("all_song_sources", JsonValue{config.ui.all_song_sources});
@@ -1375,6 +1388,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("note_divider_gap_px", JsonValue{config.skin.note_divider_gap_px});
     skin.emplace("show_judgement_line", JsonValue{config.skin.show_judgement_line});
     skin.emplace("judgement_line_type", JsonValue{static_cast<double>(config.skin.judgement_line_type)});
+    skin.emplace("judgement_line_type2_color", JsonValue{normalize_skin_single_color_token(config.skin.judgement_line_type2_color)});
     skin.emplace("show_gear_boundary_line", JsonValue{config.skin.show_gear_boundary_line});
     skin.emplace("show_timing_feedback", JsonValue{config.skin.show_timing_feedback});
     skin.emplace("show_judgement_counts", JsonValue{config.skin.show_judgement_counts});
@@ -1407,6 +1421,9 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("key_backdrop_height", JsonValue{config.skin.key_backdrop_height});
     skin.emplace("hit_burst_style",
                  JsonValue{normalize_skin_hit_burst_style_token(config.skin.hit_burst_style)});
+    skin.emplace("hit_burst_size", JsonValue{normalize_skin_hit_burst_size_token(config.skin.hit_burst_size)});
+    skin.emplace("hit_burst_palette", JsonValue{normalize_skin_hit_burst_palette_token(config.skin.hit_burst_palette)});
+    skin.emplace("hit_burst_override", JsonValue{config.skin.hit_burst_override});
     skin.emplace("hud_layout", JsonValue{normalize_skin_hud_layout_token(config.skin.hud_layout)});
     skin.emplace("gauge_width", JsonValue{normalize_skin_gauge_width_token(config.skin.gauge_width)});
     skin.emplace("key_overlay_enabled", JsonValue{config.skin.key_overlay_enabled});
@@ -1549,14 +1566,14 @@ std::string normalize_profile_nickname(std::string_view value) {
     return nickname;
 }
 
-std::string normalize_profile_avatar_path(std::string_view value) {
-    constexpr std::size_t kMaxAvatarPathBytes = 2048;
+std::string normalize_profile_image_path(std::string_view value) {
+    constexpr std::size_t kMaxImagePathBytes = 2048;
     std::string path = util::sanitize_ui_text(value);
-    if (path.size() <= kMaxAvatarPathBytes) {
+    if (path.size() <= kMaxImagePathBytes) {
         return path;
     }
 
-    std::size_t cut = kMaxAvatarPathBytes;
+    std::size_t cut = kMaxImagePathBytes;
     while (cut > 0 &&
            (static_cast<unsigned char>(path[cut]) & 0xC0u) == 0x80u) {
         --cut;
@@ -1825,25 +1842,35 @@ std::string normalize_skin_hud_layout_token(std::string_view token) {
 }
 
 std::string normalize_skin_hit_burst_style_token(std::string_view token) {
-    const std::string normalized = to_lower_ascii(std::string(token));
-    if (normalized == "ring" || normalized == "circle") {
-        return "ring";
-    }
-    if (normalized == "spark" || normalized == "rays") {
-        return "spark";
-    }
-    return "prism";
+    std::string value = to_lower_ascii(std::string(token));
+    if (value == "circle") return "ring";
+    if (value == "rays") return "spark";
+    return std::find(kSkinHitBurstStyles.begin(), kSkinHitBurstStyles.end(), value) != kSkinHitBurstStyles.end()
+        ? value : "prism";
 }
 
 std::string skin_hit_burst_style_label(std::string_view token) {
-    const std::string normalized = normalize_skin_hit_burst_style_token(token);
-    if (normalized == "ring") {
-        return "Ring";
-    }
-    if (normalized == "spark") {
-        return "Spark";
-    }
-    return "Prism";
+    std::string label = normalize_skin_hit_burst_style_token(token);
+    label.front() = static_cast<char>(std::toupper(static_cast<unsigned char>(label.front())));
+    return label;
+}
+
+std::string normalize_skin_hit_burst_size_token(std::string_view token) {
+    const auto value = to_lower_ascii(std::string(token));
+    return std::find(kSkinHitBurstSizes.begin(), kSkinHitBurstSizes.end(), value) != kSkinHitBurstSizes.end()
+        ? value : "normal";
+}
+
+float skin_hit_burst_size_scale(std::string_view token) {
+    const auto size = normalize_skin_hit_burst_size_token(token);
+    if (size == "larger") return 1.65f;
+    return size == "large" ? 1.30f : 1.0f;
+}
+
+std::string normalize_skin_hit_burst_palette_token(std::string_view token) {
+    const auto value = to_lower_ascii(std::string(token));
+    return std::find(kSkinHitBurstPalettes.begin(), kSkinHitBurstPalettes.end(), value) != kSkinHitBurstPalettes.end()
+        ? value : "soft";
 }
 
 std::string normalize_skin_ui_font_token(std::string_view token) {

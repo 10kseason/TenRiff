@@ -116,15 +116,13 @@ TEST_CASE("display offset expands HUD lookahead so notes do not spawn late") {
 TEST_CASE("released hold body remains until its tail without restoring its head or active anchor") {
     using namespace tenriff::render;
     for (const int64_t sample : {1200, 1500, 1999, 2000}) {
-        CHECK(should_render_gameplay_note(1000, 2000, true, true, false, sample, sample, 32, true));
+        CHECK(should_render_gameplay_note(1000, 2000, true, true, sample));
         CHECK_FALSE(should_render_gameplay_note_head(1000, true, sample, true));
         CHECK(gameplay_note_render_sample(1000, true, true, sample) == 1000);
     }
-    CHECK_FALSE(should_render_gameplay_note(1000, 2000, true, true, false, 2001, 2001, 32, true));
+    CHECK_FALSE(should_render_gameplay_note(1000, 2000, true, true, 2001));
     // A negative visual offset must not resurrect a head already scored.
     CHECK_FALSE(should_render_gameplay_note_head(1000, true, 900, true));
-    // Unhit misses retain the existing render policy.
-    CHECK_FALSE(should_render_gameplay_note(1000, 2000, true, true, false, 1500, 1500, 32));
 }
 
 TEST_CASE("released player and ghost holds invalidate the HUD motion cache") {
@@ -634,4 +632,22 @@ TEST_CASE("retained timing expiry invalidates HUD text independently of unchange
     const auto ghost = tenriff::app::diff_gameplay_hud_revisions(before, after);
     CHECK(ghost.text_changed);
     CHECK(ghost.motion_changed);
+}
+
+TEST_CASE("successive lane hits invalidate gameplay motion independently of key travel") {
+    using namespace tenriff::app;
+    GameplayHudRevisionInput previous;
+    previous.lane_activity_count = previous.ghost_lane_activity_count = 8;
+    previous.lane_hit_time_ns[7] = 1'000'000'000;
+    auto next = previous;
+    next.lane_hit_time_ns[7] += 120'000'000;
+    const auto player = diff_gameplay_hud_revisions(previous, next);
+    CHECK(player.motion_changed);
+    CHECK_FALSE(player.text_changed);
+
+    next = previous;
+    next.ghost_lane_hit_time_ns[2] = 1'120'000'000;
+    const auto ghost = diff_gameplay_hud_revisions(previous, next);
+    CHECK(ghost.motion_changed);
+    CHECK_FALSE(ghost.text_changed);
 }

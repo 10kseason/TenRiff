@@ -348,6 +348,46 @@ TEST_CASE("skin appearance rows mutate through one typed action path") {
     CHECK(runtime.visual_offset_ms == doctest::Approx(old_offset + 1.0));
 }
 
+TEST_CASE("skin hit burst controls cycle, inherit, and replace a local image") {
+    using namespace tenriff::app;
+    tenriff::config::RuntimeConfig runtime;
+    SkinSettingsController controller;
+    controller.reset("10k");
+    TenRiffSkinGameplayStyle authored;
+    authored.hit_burst_style = "ring";
+    authored.key_pulse_brightness = 0.62f;
+    controller.set_hit_burst_defaults(resolve_skin_hit_burst(runtime.skin, &authored));
+    const auto press = [&](SkinSettingsRowId row, const MenuAction& action = MenuAction::activate()) {
+        return controller.handle(action, runtime, kLr2Names, kTenRiffNames, row);
+    };
+    CHECK(press(SkinSettingsRowId::HitBurstSize).menu.render_changed);
+    CHECK(runtime.skin.hit_burst_size == "large");
+    static_cast<void>(press(SkinSettingsRowId::HitBurstSize));
+    CHECK(runtime.skin.hit_burst_size == "larger");
+    static_cast<void>(press(SkinSettingsRowId::HitBurstPalette, MenuAction::adjust(-1)));
+    CHECK(runtime.skin.hit_burst_palette == "cyberpunk");
+    CHECK_FALSE(runtime.skin.hit_burst_override);
+    static_cast<void>(press(SkinSettingsRowId::HitBurstStyle));
+    CHECK(resolve_skin_hit_burst(runtime.skin, &authored).style == "spark");
+    CHECK(runtime.skin.key_pulse_brightness == doctest::Approx(0.62));
+    CHECK(press(SkinSettingsRowId::HitBurstImage).boundary_action == SkinBoundaryAction::PickHitBurstImage);
+    CHECK(controller.set_hit_burst_image(runtime, {}).empty());
+    CHECK(controller.set_hit_burst_image(runtime, u8"D:/fixture/타격.png").increment_skin_revision);
+    CHECK(resolve_skin_hit_burst(runtime.skin, &authored).style == "image");
+    static_cast<void>(press(SkinSettingsRowId::HitBurstPalette));
+    CHECK(runtime.skin.hit_burst_palette == "cyberpunk");
+    static_cast<void>(press(SkinSettingsRowId::ClearHitBurstImage));
+    CHECK(runtime.ui.hit_burst_image_path.empty());
+    CHECK(runtime.skin.hit_burst_style == "prism");
+    static_cast<void>(press(SkinSettingsRowId::JudgementLineType2Color));
+    CHECK(runtime.skin.judgement_line_type2_color == "off");
+    runtime.skin.judgement_line_type = 2;
+    static_cast<void>(press(SkinSettingsRowId::JudgementLineType2Color));
+    CHECK(runtime.skin.judgement_line_type2_color != "off");
+    static_cast<void>(press(SkinSettingsRowId::JudgementLineType2Color, MenuAction::adjust(-1)));
+    CHECK(runtime.skin.judgement_line_type2_color == "off");
+}
+
 TEST_CASE("note and field size controls reach 10 percent without changing other modes") {
     std::vector<std::string> modes{"7+1"};
     for (int keys = 4; keys <= 16; ++keys) modes.push_back(std::to_string(keys) + "k");

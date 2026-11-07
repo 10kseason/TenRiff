@@ -1,6 +1,6 @@
-TenRiff 1.9.9.9-hotfix3 source package — 2026-11-06
+TenRiff 1.9.9.9-hotfix4 source package — 2026-11-07
 
-Build inputs match the release commit. The scope covers NK2 E+ for 7K, 8K and 10K, Safe indexing, Song Select and TenRiff Leaderboard integration. See docs/release-1.9.9.9-hotfix3.en.md and docs/release-1.9.9.9-hotfix3-gate.md. The fixed baseline is 1.9.6.
+Build inputs match the release commit. This release covers multicore folder and cache loading, hit motion, successful-note visibility and hit-burst customization. See docs/release-1.9.9.9-hotfix4.en.md and docs/release-1.9.9.9-hotfix4-gate.md. The fixed baseline is 1.9.6.
 
 Earlier version descriptions below are historical. The inclusion and privacy rules apply to this package.
 

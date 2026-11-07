@@ -344,6 +344,7 @@ void GameplayEngine::collect_active_holds(std::vector<ActiveHoldView>& out) cons
         out.push_back(ActiveHoldView{
             static_cast<int>(lane_index) + 1,
             lane.hold->end_sample,
+            lane.hold->course_head_judgement,
         });
     }
 }

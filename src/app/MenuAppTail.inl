@@ -170,6 +170,9 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.timing_bar_always_visible = timing_visibility.always_visible;
     target.timing_marker_style = config_.skin.timing_marker_style;
     target.judgement_line_type = config_.skin.judgement_line_type;
+    const auto type2_color = config::normalize_skin_single_color_token(config_.skin.judgement_line_type2_color);
+    target.judgement_line_type2_rgb = type2_color != "off"
+        ? std::make_optional(config::skin_color_rgb(type2_color)) : std::nullopt;
     target.note_fade_in = config_.skin.note_fade_in;
     target.note_fade_out = config_.skin.note_fade_out;
     target.timing_text_offset_x = config_.skin.timing_text_offset_x;
@@ -188,12 +191,9 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.judgement_line_glow_enabled = style_bool(
         manifest_style ? manifest_style->judgement_line_glow_enabled : std::optional<bool>{},
         config_.skin.judgement_line_glow_enabled);
-    target.key_pulse_enabled = style_bool(
-        manifest_style ? manifest_style->key_pulse_enabled : std::optional<bool>{},
-        config_.skin.key_pulse_enabled);
-    target.key_pulse_brightness = static_cast<float>(style_number(
-        manifest_style ? manifest_style->key_pulse_brightness : std::optional<float>{},
-        config_.skin.key_pulse_brightness));
+    const auto hit_burst = resolve_skin_hit_burst(config_.skin, manifest_style);
+    target.key_pulse_enabled = hit_burst.brightness > 0.0f;
+    target.key_pulse_brightness = hit_burst.brightness;
     target.key_backdrop_enabled = config_.skin.key_backdrop_override ? config_.skin.key_backdrop_enabled
         : style_bool(manifest_style ? manifest_style->key_backdrop_enabled : std::optional<bool>{}, config_.skin.key_backdrop_enabled);
     target.key_backdrop_opacity = config_.skin.key_backdrop_override ? config_.skin.key_backdrop_opacity
@@ -202,9 +202,10 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         : style_number(manifest_style ? manifest_style->key_backdrop_brightness : std::optional<float>{}, config_.skin.key_backdrop_brightness);
     target.key_backdrop_height = config_.skin.key_backdrop_override ? config_.skin.key_backdrop_height
         : style_number(manifest_style ? manifest_style->key_backdrop_height : std::optional<float>{}, config_.skin.key_backdrop_height);
-    target.hit_burst_style = manifest_style && manifest_style->hit_burst_style.has_value()
-                                 ? *manifest_style->hit_burst_style
-                                 : config::normalize_skin_hit_burst_style_token(config_.skin.hit_burst_style);
+    target.hit_burst_style = hit_burst.style;
+    target.hit_burst_scale = config::skin_hit_burst_size_scale(config_.skin.hit_burst_size);
+    target.hit_burst_palette = config::normalize_skin_hit_burst_palette_token(config_.skin.hit_burst_palette);
+    target.hit_burst_image_path = config_.ui.hit_burst_image_path;
     target.gauge_width_scale = config::skin_gauge_width_scale(config_.skin.gauge_width);
     target.hud_layout = config::normalize_skin_hud_layout_token(config_.skin.hud_layout);
     target.hud_riff_map_visible = config_.skin.hud_riff_map_visible;
@@ -389,12 +390,15 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.activity_publish_time_ns = gameplay_hud_.hud_publish_time_ns;
     target.lane_activity_count = gameplay_hud_.lane_activity_count;
     target.lane_activity.fill(0.0f);
+    target.lane_hit_time_ns.fill(0);
     for (std::size_t source = 0; source < gameplay_hud_.lane_activity_count; ++source) {
         const int visual_lane = lane_layout.visual_lane_for_source(static_cast<int>(source) + 1);
         if (visual_lane > 0 &&
             static_cast<std::size_t>(visual_lane) <= target.lane_activity.size()) {
             target.lane_activity[static_cast<std::size_t>(visual_lane - 1)] =
                 gameplay_hud_.lane_activity[source];
+            target.lane_hit_time_ns[static_cast<std::size_t>(visual_lane - 1)] =
+                gameplay_hud_.lane_hit_time_ns[source];
         }
     }
 
@@ -504,6 +508,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         target.has_timing_feedback = false;
         target.timing_history_count = 0;
         target.lane_activity_count = 0;
+        target.lane_hit_time_ns.fill(0);
         target.lane_pressed_count = 0;
         const int peer_judged_total =
             target.peer_pg + target.peer_gr + target.peer_gd + target.peer_bd;
@@ -552,12 +557,15 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.ghost_game_over = gameplay_hud_.ghost_game_over;
     target.ghost_lane_activity_count = gameplay_hud_.ghost_lane_activity_count;
     target.ghost_lane_activity.fill(0.0f);
+    target.ghost_lane_hit_time_ns.fill(0);
     for (std::size_t source = 0; source < gameplay_hud_.ghost_lane_activity_count; ++source) {
         const int visual_lane = lane_layout.visual_lane_for_source(static_cast<int>(source) + 1);
         if (visual_lane > 0 &&
             static_cast<std::size_t>(visual_lane) <= target.ghost_lane_activity.size()) {
             target.ghost_lane_activity[static_cast<std::size_t>(visual_lane - 1)] =
                 gameplay_hud_.ghost_lane_activity[source];
+            target.ghost_lane_hit_time_ns[static_cast<std::size_t>(visual_lane - 1)] =
+                gameplay_hud_.ghost_lane_hit_time_ns[source];
         }
     }
     target.ghost_lane_pressed_count = gameplay_hud_.ghost_lane_pressed_count;
@@ -1677,7 +1685,7 @@ void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render
             ui_text("Assign gameplay keys and test the current mapping.",
                     "게임 키를 지정하고 현재 키 배치를 테스트합니다."),
             ui_text("Import and tune TenRiff or LR2 skins, notes, LN colour, and hit bursts.",
-                    "TenRiff·LR2 스킨과 노트, 롱노트 색, 키 키밤을 설정합니다."),
+                    "TenRiff·LR2 스킨과 노트, 롱노트 색, 키밤을 설정합니다."),
             ui_text("Set display mode, resolution, frame timing, and background upscaling.",
                     "화면 모드, 해상도, 프레임 타이밍, 배경 업스케일을 설정합니다."),
             ui_text("Set keysound policy, volumes, and audio preset.",
@@ -2513,6 +2521,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.lane_activity_count = hud.lane_activity_count;
         gameplay_hud_.lane_activity.fill(0.0f);
         std::copy_n(hud.lane_activity.begin(), hud.lane_activity_count, gameplay_hud_.lane_activity.begin());
+        gameplay_hud_.lane_hit_time_ns = hud.lane_hit_time_ns;
 
         gameplay_hud_.key_overlay = hud.key_overlay;
         gameplay_hud_.lane_pressed_count = hud.lane_pressed_count;
@@ -2567,6 +2576,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         std::copy_n(hud.ghost_lane_activity.begin(),
                     hud.ghost_lane_activity_count,
                     gameplay_hud_.ghost_lane_activity.begin());
+        gameplay_hud_.ghost_lane_hit_time_ns = hud.ghost_lane_hit_time_ns;
         gameplay_hud_.ghost_lane_pressed_count = hud.ghost_lane_pressed_count;
         gameplay_hud_.ghost_lane_pressed.fill(0);
         std::copy_n(hud.ghost_lane_pressed.begin(),

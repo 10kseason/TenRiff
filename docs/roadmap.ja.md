@@ -1,4 +1,4 @@
-> **2026-11-06 · 1.9.9.9-hotfix3:** [NK2 E+、Safe インデックス、曲フォルダーとランキング](release-1.9.9.9-hotfix3.ja.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
+> **2026-11-07 · 1.9.9.9-hotfix4:** [マルチコアキャッシュ読み込みとヒット演出設定](release-1.9.9.9-hotfix4.ja.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 
 > **2026-11-04 · 1.9.9.9-hotfix1:** [OGG セキュリティ修正・共通 BGA・スキンエディター](release-1.9.9.9-hotfix1.ja.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 

@@ -758,7 +758,10 @@
             "enum": [
               "prism",
               "ring",
-              "spark"
+              "spark",
+              "shockwave",
+              "shards",
+              "pixels"
             ]
           },
           "key_label_position": {
@@ -1336,7 +1339,10 @@
             "enum": [
               "prism",
               "ring",
-              "spark"
+              "spark",
+              "shockwave",
+              "shards",
+              "pixels"
             ]
           },
           "key_label_position": {
@@ -4249,7 +4255,7 @@
           "combo_duration_ms": 150,
           "combo_scale": 1.16,
           "combo_lift": -5,
-          "judgement_duration_ms": 220
+          "judgement_duration_ms": 500
         },
         "rects": {
           "title": [
@@ -5669,7 +5675,7 @@
       },
       "judgement_duration_ms": {
         "label": "Judgement Duration Ms",
-        "default": 220,
+        "default": 500,
         "min": 1,
         "max": 2000,
         "step": 1

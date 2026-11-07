@@ -1,4 +1,4 @@
-> **2026-11-06 · 1.9.9.9-hotfix3:** [NK2 E+, Safe indexing, song folders and leaderboard](release-1.9.9.9-hotfix3.en.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
+> **2026-11-07 · 1.9.9.9-hotfix4:** [Multicore cache loading, hit motion and burst options](release-1.9.9.9-hotfix4.en.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 
 > **2026-11-04 · 1.9.9.9-hotfix1:** [OGG security, Common BGA and skin editor](release-1.9.9.9-hotfix1.en.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 

@@ -319,6 +319,11 @@ MySkin/
 누락한 값만 플레이어 설정을 사용한다. 허용 값과 범위는
 [`tenriff-skin.schema.json`](tenriff-skin.schema.json)에 정의돼 있다.
 
+스킨의 `hit_burst_style`에는 `prism`, `ring`, `spark`, `shockwave`, `shards`,
+`pixels`를 지정할 수 있다. 플레이어가 키밤 모양·밝기를 조절하거나 이미지를
+선택하면 프로필의 키밤 모양과 밝기를 우선 적용한다. 크기, 팔레트와 로컬 이미지
+경로도 프로필에서 관리한다.
+
 `note_shape`는 `rect`, `simple_rect`, `circle`, `triangle`, `pentagon`, `hexagon`, `square`,
 `diamond`, `arrow`를 지원하며 기존 `hex`는 `hexagon`의 호환 별칭이다.
 `simple_rect`(사각형(심플))는 각진 모서리와 단색 면을 사용한다. 기존 `rect`는 그대로 유지되며,

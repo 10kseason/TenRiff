@@ -11,12 +11,14 @@
 #include <iostream>
 #include <memory>
 #include <stdexcept>
+#include <thread>
 
 namespace tenriff::app {
 struct MenuAppSongSourceTestAccess {
     static void run(const std::filesystem::path& output) {
         namespace fs = std::filesystem;
         using Clock = std::chrono::steady_clock;
+        std::cout << "logical_threads=" << std::thread::hardware_concurrency() << std::endl;
         std::ofstream metrics(output / "metrics.csv");
         metrics << "phase,repeat,milliseconds,entries\n";
         const auto measure = [&](const char* name, int repeat, auto&& action) {
@@ -54,6 +56,39 @@ struct MenuAppSongSourceTestAccess {
                 return index.entries.size();
             });
         }
+        std::string error;
+        if (!save_song_index((output / "scan-safe.json").u8string(), index, options, &error))
+            throw std::runtime_error(error);
+        SongIndexOptions fast_options = options;
+        fast_options.profile = SongIndexProfile::Fast;
+        SongIndex fast_index;
+        for (int i = 0; i < 3; ++i) {
+            measure("folder_scan_fast", i, [&] {
+                warnings.clear();
+                fast_index = scan_songs(songs.u8string(), nullptr, warnings, {}, fast_options);
+                if (fast_index.entries.size() != 2000 || !warnings.empty())
+                    throw std::runtime_error("Incomplete Fast scan");
+                return fast_index.entries.size();
+            });
+        }
+        if (!save_song_index((output / "scan-fast.json").u8string(), fast_index, fast_options, &error))
+            throw std::runtime_error(error);
+        for (const auto minimal : {false, true}) {
+            const auto cached_profile = output / (minimal ? "cached-fast" : "cached-safe");
+            const auto& settings = minimal ? fast_options : options;
+            const auto& expected = minimal ? fast_index : index;
+            const auto path = song_index_cache_path_for_source(cached_profile.u8string(), songs.u8string());
+            if (!save_song_index(path, expected, settings, &error)) throw std::runtime_error(error);
+            for (int i = 0; i < 5; ++i) {
+                measure(minimal ? "cached_folder_fast" : "cached_folder_safe", i, [&] {
+                    const auto loaded = aggregate_song_sources({songs.u8string()}, cached_profile.u8string(), settings);
+                    if (loaded.cancelled || loaded.cached_sources != 1 || loaded.scanned_sources != 0 ||
+                        loaded.index.entries.size() != 2000 || !loaded.warnings.empty())
+                        throw std::runtime_error("Invalid cached folder");
+                    return loaded.index.entries.size();
+                });
+            }
+        }
         // A larger warm library exercises parsing and menu table selection without
         // making first-scan file creation dominate the repeatable benchmark.
         const auto original = index.entries;
@@ -67,7 +102,6 @@ struct MenuAppSongSourceTestAccess {
         const auto profile = output / "profile";
         fs::create_directories(profile);
         const auto cache = song_index_cache_path_for_source(profile.u8string(), songs.u8string());
-        std::string error;
         if (!save_song_index(cache, index, options, &error)) throw std::runtime_error(error);
         for (int i = 0; i < 5; ++i) {
             measure("cache_load", i, [&] {
@@ -122,6 +156,31 @@ struct MenuAppSongSourceTestAccess {
                 if (app.indexed_songs_.size() != index.entries.size() ||
                     !app.indexed_songs_.front().difficulty_table_level.empty())
                     throw std::runtime_error("Native labels mismatch");
+                return app.indexed_songs_.size();
+            });
+        }
+        const auto fast_original = fast_index.entries;
+        for (int copy = 1; copy < 5; ++copy) {
+            for (const auto& entry : fast_original) {
+                auto duplicate = entry;
+                duplicate.path = "copy-" + std::to_string(copy) + '/' + entry.path;
+                fast_index.entries.push_back(std::move(duplicate));
+            }
+        }
+        if (!save_song_index(cache, fast_index, fast_options, &error)) throw std::runtime_error(error);
+        app.config_.mode.song_index_profile = "fast";
+        for (int i = 0; i < 5; ++i) {
+            measure("cache_load_fast", i, [&] {
+                const auto loaded = load_song_index(cache, fast_options);
+                if (!loaded.loaded_from_file || loaded.index.entries.size() != 10000)
+                    throw std::runtime_error("Invalid Fast cache");
+                return loaded.index.entries.size();
+            });
+        }
+        for (int i = 0; i < 3; ++i) {
+            measure("folder_open_fast", i, [&] {
+                app.switch_song_source(songs.u8string(), false);
+                if (app.indexed_songs_.size() != 10000) throw std::runtime_error("Invalid Fast folder");
                 return app.indexed_songs_.size();
             });
         }

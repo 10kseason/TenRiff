@@ -290,6 +290,8 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
   - `safe | fast`
   - 既定は`safe`（安全）。ハッシュと試聴情報を用意し、難易度表にも対応します。独自LV/CRの計算は下記の別設定に従います。
   - 保存済みの選択は保持します。任意の`fast`（最小）はハッシュ・試聴・難易度計算を省略します。
+  - 両モードともフォルダーのインデックス作成に利用可能な論理CPUを使用します。残りのファイル数と空きRAMで同時処理数を調整します。
+  - 既存キャッシュの解析とALL SONGのキャッシュパス確認も並列で行います。
 - `calculate_song_index_difficulty` (bool)
   - 既定値は `false`
   - `false` は BMS `#PLAYLEVEL` を menu LV として保持し、CPU 負荷の高い native LV/CR 計算を省略
@@ -310,6 +312,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | --- | --- | --- |
 | `profile_nickname` | string; UTF-8 ≤48 bytes | 表示名。空ならプロファイル ID。空白・制御文字を正規化。 |
 | `profile_avatar_path` | string; UTF-8 ≤2048 bytes | ローカル PNG/JPG アバターのパス。 |
+| `hit_burst_image_path` | string; UTF-8 ≤2048 bytes | 選択したヒット画像のローカル PNG/JPEG パス。ポータブル設定には含まれません。 |
 | `language` | `en`, `ko`, `ja`, `zh-CN`; `en` | UI 言語。不正値は en に正規化。 |
 | `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | プロファイル・初回設定のメニュー文字サイズ（100%・115%・130%）。プレイ中の文字サイズはスキン設定を維持。 |
 | `skip_start_countdown` | bool; `false` | ソロプレイ開始時の `3 / 2 / 1` 表示を省略。通常の開始、メニューからの再開始、結果画面からの再試行に適用。 |
@@ -372,7 +375,11 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | `judgement_line_glow_enabled` | bool; `true` | 判定線周囲の発光。 |
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst の明るさ。0 で無効。 |
 | `key_pulse_enabled` | bool; `true` | 旧版 ON/OFF 互換。false または明るさ 0 で無効。 |
-| `hit_burst_style` | `prism`, `ring`, `spark`; `prism` | 内蔵 Hit Burst の形。 |
+| `hit_burst_style` | `prism`, `ring`, `spark`, `shockwave`, `shards`, `pixels`, `image`; `prism` | 成功時に広がる形。画像は元の色と透明度で表示します。 |
+| `hit_burst_size` | `normal`, `large`, `larger`; `normal` | ヒットエフェクトの大きさは 100/130/165%。 |
+| `hit_burst_palette` | `soft`, `pastel`, `oil`, `mono`, `cyberpunk`; `soft` | 内蔵エフェクトの標準、パステル、油彩、単色、サイバーパンク。 |
+| `hit_burst_override` | bool; `false` | 有効時はスキンの既定値よりプロファイルの形と明るさを優先します。 |
+| `judgement_line_type2_color` | color token; `off` | タイプ 2 の帯を指定色で塗りつぶします。`off` は既定の緑の枠です。 |
 | `hud_layout` | `classic`, `studio`; `studio` | Native・LR2ソロ用HUD。LR2ノート・キー・ギア画像と比率を維持。欠落・不明値は`studio`で、Options › SkinsでClassicへ変更できます。1.8.9は右上情報・左下点数・右下横向きマップを配置し、狭い余白では全体縮小・反対側移動。極端なフィールドとPerformance HUDが両側上部を塞ぐ場合は情報カードだけを非表示。他の画像スキン・ゴースト・マルチはClassic維持。[配置と検証範囲](release-1.8.9-gate.md)。 |
 | `hud_riff_map_visible` | bool; `true` | Studio Deckの64区間の横向き密度マップと経過／全体時間。基本位置は右下で、余白に応じて移動・縮小し、非常に狭い場合は時間文字を省略。Options › Skins › Studio Riff Mapで変更しプロファイル・スキンプリセットに保存。非表示でも他のカード位置とClassic HUDは維持。 |
 | `ui_font` | `default`, `malgun`, `bahnschrift`, `consolas`; `default` | メニューの書体。default は Segoe UI。ロゴ・ランク・コンボ専用書体は維持。 |

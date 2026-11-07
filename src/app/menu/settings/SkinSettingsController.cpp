@@ -31,17 +31,20 @@ std::string cycle_lr2_resolution_mode(std::string_view value, int direction) {
     return std::string(kModes[index]);
 }
 
-std::string cycle_hit_burst_style(std::string_view value, int direction) {
-    static constexpr std::array<std::string_view, 3> kStyles{"prism", "ring", "spark"};
-    const std::string normalized = config::normalize_skin_hit_burst_style_token(value);
-    auto current = std::find(kStyles.begin(), kStyles.end(), normalized);
-    std::size_t index = current == kStyles.end()
-        ? 0
-        : static_cast<std::size_t>(std::distance(kStyles.begin(), current));
-    index = direction < 0
-        ? (index == 0 ? kStyles.size() - 1 : index - 1)
-        : (index + 1) % kStyles.size();
-    return std::string(kStyles[index]);
+template <typename Iterator>
+std::string cycle_skin_choice(Iterator begin, Iterator end, std::string_view value, int direction) {
+    const auto found = std::find(begin, end, value);
+    const auto current = found == end ? begin : found;
+    if (direction < 0) return std::string(current == begin ? *(end - 1) : *(current - 1));
+    return std::string(current + 1 == end ? *begin : *(current + 1));
+}
+
+std::string cycle_optional_skin_color(std::string_view current, int direction) {
+    std::vector<std::string> choices{"off"};
+    const auto palette = config::supported_skin_color_tokens();
+    choices.insert(choices.end(), palette.begin(), palette.end());
+    return cycle_skin_choice(choices.begin(), choices.end(),
+                             config::normalize_skin_single_color_token(current), direction);
 }
 
 bool cycle_selected_name(
@@ -128,6 +131,7 @@ void SkinSettingsController::reset(std::string_view runtime_key_mode) {
     dirty_ = false;
     visible_rows_set_ = false;
     visible_rows_.clear();
+    hit_burst_default_.reset();
     clamp_edit_targets();
 }
 
@@ -235,6 +239,31 @@ SkinSettingsEffects SkinSettingsController::request_reload() const noexcept {
 
 SkinSettingsEffects SkinSettingsController::mark_external_change() noexcept {
     return mark_changed();
+}
+
+void SkinSettingsController::set_hit_burst_defaults(ResolvedSkinHitBurst appearance) {
+    hit_burst_default_ = std::move(appearance);
+}
+
+void SkinSettingsController::begin_hit_burst_override(config::SkinConfig& skin) const {
+    if (skin.hit_burst_override) return;
+    if (hit_burst_default_) {
+        skin.hit_burst_style = hit_burst_default_->style;
+        skin.key_pulse_brightness = hit_burst_default_->brightness;
+        skin.key_pulse_enabled = skin.key_pulse_brightness > 0.0;
+    }
+    skin.hit_burst_override = true;
+}
+
+SkinSettingsEffects SkinSettingsController::set_hit_burst_image(config::RuntimeConfig& runtime, std::string path) {
+    path = config::normalize_profile_image_path(path);
+    if (path.empty()) return {};
+    begin_hit_burst_override(runtime.skin);
+    runtime.ui.hit_burst_image_path = std::move(path);
+    runtime.skin.hit_burst_style = "image";
+    auto effects = mark_changed();
+    effects.increment_skin_revision = true;
+    return effects;
 }
 
 SkinSettingsEffects SkinSettingsController::move_selection(
@@ -355,6 +384,14 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
             case SkinSettingsRowId::OpenSkinEditor:
                 effects.boundary_action = SkinBoundaryAction::OpenSkinEditor;
                 return effects;
+            case SkinSettingsRowId::HitBurstImage:
+                effects.boundary_action = SkinBoundaryAction::PickHitBurstImage;
+                return effects;
+            case SkinSettingsRowId::ClearHitBurstImage:
+                if (runtime.ui.hit_burst_image_path.empty()) return {};
+                runtime.ui.hit_burst_image_path.clear();
+                if (runtime.skin.hit_burst_style == "image") runtime.skin.hit_burst_style = "prism";
+                return mark_changed();
             case SkinSettingsRowId::ReloadSkin:
                 effects.boundary_action = SkinBoundaryAction::ReloadSkin;
                 return effects;
@@ -452,22 +489,9 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
             colors[static_cast<std::size_t>(edit_lane_)] = palette[index];
             return mark_changed();
         }
-        case SkinSettingsRowId::SingleColor: {
-            std::vector<std::string> options{"off"};
-            const auto palette = config::supported_skin_color_tokens();
-            options.insert(options.end(), palette.begin(), palette.end());
-            const std::string current =
-                config::normalize_skin_single_color_token(runtime.skin.single_color);
-            auto found = std::find(options.begin(), options.end(), current);
-            std::size_t index = found == options.end()
-                ? 0
-                : static_cast<std::size_t>(std::distance(options.begin(), found));
-            index = direction < 0
-                ? (index == 0 ? options.size() - 1 : index - 1)
-                : (index + 1) % options.size();
-            runtime.skin.single_color = options[index];
+        case SkinSettingsRowId::SingleColor:
+            runtime.skin.single_color = cycle_optional_skin_color(runtime.skin.single_color, direction);
             return mark_changed();
-        }
         case SkinSettingsRowId::NoteShape: {
             static constexpr std::array<std::string_view, 9> kShapes{
                 "rect", "simple_rect", "square", "circle", "diamond", "arrow", "triangle", "pentagon", "hexagon"};
@@ -500,6 +524,11 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
             return mark_changed();
         case SkinSettingsRowId::JudgementLineType:
             runtime.skin.judgement_line_type = runtime.skin.judgement_line_type == 2 ? 1 : 2;
+            return mark_changed();
+        case SkinSettingsRowId::JudgementLineType2Color:
+            if (runtime.skin.judgement_line_type != 2) return {};
+            runtime.skin.judgement_line_type2_color =
+                cycle_optional_skin_color(runtime.skin.judgement_line_type2_color, direction);
             return mark_changed();
         case SkinSettingsRowId::JudgementLine:
             runtime.skin.show_judgement_line = !runtime.skin.show_judgement_line;
@@ -556,9 +585,25 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
         case SkinSettingsRowId::JudgementLineGlow:
             runtime.skin.judgement_line_glow_enabled = !runtime.skin.judgement_line_glow_enabled;
             return mark_changed();
-        case SkinSettingsRowId::HitBurstStyle:
-            runtime.skin.hit_burst_style = cycle_hit_burst_style(runtime.skin.hit_burst_style, direction);
+        case SkinSettingsRowId::HitBurstStyle: {
+            begin_hit_burst_override(runtime.skin);
+            const auto end = config::kSkinHitBurstStyles.end() - (runtime.ui.hit_burst_image_path.empty() ? 1 : 0);
+            runtime.skin.hit_burst_style = cycle_skin_choice(config::kSkinHitBurstStyles.begin(), end,
+                config::normalize_skin_hit_burst_style_token(runtime.skin.hit_burst_style), direction);
             return mark_changed();
+        }
+        case SkinSettingsRowId::HitBurstSize:
+            runtime.skin.hit_burst_size = cycle_skin_choice(config::kSkinHitBurstSizes.begin(), config::kSkinHitBurstSizes.end(),
+                config::normalize_skin_hit_burst_size_token(runtime.skin.hit_burst_size), direction);
+            return mark_changed();
+        case SkinSettingsRowId::HitBurstPalette: {
+            const auto& style = !runtime.skin.hit_burst_override && hit_burst_default_
+                ? hit_burst_default_->style : runtime.skin.hit_burst_style;
+            if (style == "image") return {};
+            runtime.skin.hit_burst_palette = cycle_skin_choice(config::kSkinHitBurstPalettes.begin(), config::kSkinHitBurstPalettes.end(),
+                config::normalize_skin_hit_burst_palette_token(runtime.skin.hit_burst_palette), direction);
+            return mark_changed();
+        }
         case SkinSettingsRowId::GaugeWidth: {
             const auto value = config::normalize_skin_gauge_width_token(runtime.skin.gauge_width);
             const int current = value == "large" ? 2 : value == "wide" ? 1 : 0;
@@ -595,6 +640,7 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
             runtime.skin.hud_riff_map_visible = !runtime.skin.hud_riff_map_visible;
             return mark_changed();
         case SkinSettingsRowId::KeyPulse:
+            begin_hit_burst_override(runtime.skin);
             runtime.skin.key_pulse_brightness = clamp_step_value(
                 runtime.skin.key_pulse_brightness + direction * kSkinOpacityStep,
                 config::kSkinKeyPulseBrightnessMin,
@@ -787,6 +833,8 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
         case SkinSettingsRowId::CreateSkin:
         case SkinSettingsRowId::OpenSkinFolder:
         case SkinSettingsRowId::OpenSkinEditor:
+        case SkinSettingsRowId::HitBurstImage:
+        case SkinSettingsRowId::ClearHitBurstImage:
         case SkinSettingsRowId::UiFontFile:
         case SkinSettingsRowId::ReloadSkin:
         case SkinSettingsRowId::Back:
