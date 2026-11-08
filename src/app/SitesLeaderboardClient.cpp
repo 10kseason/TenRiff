@@ -1,5 +1,7 @@
 #include "app/SitesLeaderboardClient.h"
 #include "app/ChartFileHash.h"
+#include "app/ChartLoader.h"
+#include <unordered_map>
 #include "app/ModeManager.h"
 #include "app/RankedRecordsClient.h"
 #include "app/ReplayVerifier.h"
@@ -113,10 +115,82 @@ bool prepare_sites_bms_branch_identity(const gameplay::ReplayFile& replay,
     }
 }
 
+bool prepare_sites_keysound_evidence(const gameplay::ReplayFile& replay,
+    InspectKeysoundAudio inspect, SitesKeysoundEvidence& evidence, std::string& error,
+    const std::function<bool()>& cancelled, bool stop_before_random_branch) {
+    evidence = {};
+    error = "Sites upload skipped: keysound scan unavailable.";
+    if ((cancelled && cancelled()) || !inspect || replay.chart_format != "bms" || !valid_bms_policy(replay, error)) return false;
+    try {
+        if (replay.trace.sample_rate <= 0 || replay.trace.sample_rate > 384000 ||
+            !std::isfinite(replay.rate) || replay.rate < 0.5 || replay.rate > 2.0) return false;
+        const auto path = std::filesystem::u8path(replay.chart_path);
+        std::error_code ec;
+        const auto size = std::filesystem::file_size(path, ec);
+        if (ec || size > 32u * 1024u * 1024u) return false;
+        const auto before = hash_chart_file(path);
+        if (!before.valid() || before.sha256 != replay.chart_sha256) return false;
+        // Follow retains every authored playable keysound even when playback
+        // settings ignore/autoplay audio. BGM-only assets are never inspected.
+        const auto loaded = ChartLoader{}.load(replay.chart_path, replay.trace.sample_rate, replay.rate, "follow",
+            gameplay::replay_bms_random_seed(replay.mode), replay.mode.bms_timing_version,
+            replay.mode.bms_control_flow_version,
+            preserve_legacy_empty_sp_scratch(replay.mode.key_mode, replay.trace.lane_count));
+        evidence.authored_random_branch = loaded.chart.bms_has_random;
+        if (stop_before_random_branch && evidence.authored_random_branch) return false;
+        const auto after = hash_chart_file(path);
+        if (!loaded.success() || loaded.unresolved_keysounds != 0 ||
+            !after.valid() || before.sha256 != after.sha256 || loaded.chart.notes.empty()) return false;
+        // Reapply supported note-shape/random mods with the replay's policies;
+        // silence counts describe playable heads after mods, not an authored proxy.
+        const auto key_mode = gameplay::parse_key_mode(replay.mode.key_mode);
+        if (!key_mode || *key_mode != gameplay::KeyMode::Auto) {
+            error = "Sites upload skipped: converted chart is not eligible.";
+            return false;
+        }
+        config::ModeConfig mode;
+        mode.key_mode = "auto";
+        mode.gauge = replay.mode.gauge.empty() ? "normal" : replay.mode.gauge;
+        mode.random = replay.mode.random.empty() ? "off" : replay.mode.random;
+        mode.random_seed = static_cast<uint32_t>(replay.mode.random_seed.value_or(0));
+        mode.mods = replay.mods;
+        const auto managed = manage_modes(loaded.chart, loaded.format, mode, config::JudgeConfig{},
+            replay.rate, loaded.base_bpm, replay.trace.sample_rate,
+            static_cast<LongNoteMixVersion>(replay.mode.long_note_mix_version), replay.mode.key_conversion_version);
+        if (managed.chart.notes.empty() || !equivalent_mode_mod_tokens(managed.active_mods, replay.mods)) return false;
+        std::unordered_map<std::size_t, KeysoundAudioInfo> measured;
+        for (const auto& note : managed.chart.notes) {
+            if (cancelled && cancelled()) return false;
+            ++evidence.playable_note_count;
+            bool audible = false;
+            for (std::size_t i = 0; i < gameplay::note_audio_asset_count(note); ++i) {
+                const auto asset = gameplay::note_audio_asset_at(note, i);
+                auto found = measured.find(asset);
+                if (found == measured.end()) {
+                    const auto* audio_path = managed.chart.audio_asset_path(asset);
+                    if (!audio_path) return false;
+                    const auto info = inspect(*audio_path);
+                    if (!info || !std::isfinite(info->duration_seconds) || info->duration_seconds < 0) return false;
+                    found = measured.emplace(asset, *info).first;
+                }
+                evidence.max_duration_seconds = (std::max)(evidence.max_duration_seconds, found->second.duration_seconds);
+                audible = audible || found->second.audible;
+            }
+            if (!audible || !std::isfinite(note.audio_gain) || note.audio_gain <= 0) ++evidence.silent_note_count;
+        }
+        error.clear();
+        return true;
+    } catch (...) {
+        // Decoder/path diagnostics are never exposed through the upload UI.
+        return false;
+    }
+}
+
 bool build_sites_score_json(const gameplay::ReplayFile& replay,
     std::string_view replay_sha256, std::string_view chart_title,
     std::string_view clear_status, std::string& payload, std::string& error,
-    std::string_view chart_author, std::string_view bms_branch_sha256) {
+    std::string_view chart_author, std::string_view bms_branch_sha256,
+    const SitesKeysoundEvidence* keysounds) {
     payload.clear();
     error.clear();
     if (replay.record_play_mode != "online") {
@@ -239,7 +313,23 @@ bool build_sites_score_json(const gameplay::ReplayFile& replay,
            << ",\"max_combo\":" << replay.stats.max_combo << ",\"clear_status\":" << quoted(clear_status)
            << ",\"played_at\":" << quoted(sites_utc_timestamp(replay.created_utc))
            << ",\"autoplay\":false,\"practice\":false,\"aborted\":false,\"pause_used\":false}";
-    payload = output.str();
+    if (keysounds) {
+        if (!std::isfinite(keysounds->max_duration_seconds) || keysounds->max_duration_seconds < 0 ||
+            keysounds->playable_note_count == 0 || keysounds->playable_note_count > 10'000'000 ||
+            keysounds->silent_note_count > keysounds->playable_note_count) {
+            error = "Sites upload skipped: keysound scan unavailable.";
+            return false;
+        }
+        std::string json = output.str();
+        json.pop_back();
+        std::ostringstream metadata;
+        metadata.imbue(std::locale::classic());
+        metadata << std::setprecision(std::numeric_limits<double>::max_digits10)
+                 << ",\"keysound_max_duration_seconds\":" << keysounds->max_duration_seconds
+                 << ",\"playable_note_count\":" << keysounds->playable_note_count
+                 << ",\"silent_note_count\":" << keysounds->silent_note_count << '}';
+        payload = json + metadata.str();
+    } else payload = output.str();
     return true;
 }
 
@@ -287,6 +377,7 @@ void SitesLeaderboardService::worker_main() {
         std::string message;
         try {
             std::string error, payload, branch_sha256;
+            SitesKeysoundEvidence keysounds;
             bool missing = false;
             SitesLeaderboardConnection connection;
             std::error_code ec;
@@ -306,8 +397,10 @@ void SitesLeaderboardService::worker_main() {
                     message = "Sites upload skipped: older or unsupported judgement timing remains local.";
                 } else if (!prepare_sites_bms_branch_identity(*loaded.replay, branch_sha256, error)) {
                     message = error;
+                } else if (!prepare_sites_keysound_evidence(*loaded.replay, inspect_keysound_, keysounds, error)) {
+                    message = error;
                 } else if (!build_sites_score_json(*loaded.replay, pending.replay_sha256,
-                           pending.chart_title, pending.clear_status, payload, error, pending.chart_author, branch_sha256)) {
+                           pending.chart_title, pending.clear_status, payload, error, pending.chart_author, branch_sha256, &keysounds)) {
                     message = error;
                 } else if (!load_sites_leaderboard_connection("config", connection, missing, error) || missing) {
                     message = error.empty() ? "Sites connection is missing; result saved locally." : error;

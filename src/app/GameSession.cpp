@@ -663,7 +663,7 @@ bool decode_mf_stereo_resampled(const std::string& path,
                                 int target_sample_rate,
                                 std::vector<float>& out,
                                 std::string* error,
-                                std::size_t max_output_frames = 0) {
+                                std::size_t max_output_frames = 0, bool strict = false) {
     if (!ensure_mf_started(error)) {
         return false;
     }
@@ -774,16 +774,19 @@ bool decode_mf_stereo_resampled(const std::string& path,
             }
             return false;
         }
-        if ((flags & MF_SOURCE_READERF_ENDOFSTREAM) != 0) {
-            break;
-        }
+        if (strict && (flags & (MF_SOURCE_READERF_ERROR | MF_SOURCE_READERF_CURRENTMEDIATYPECHANGED |
+                                MF_SOURCE_READERF_NATIVEMEDIATYPECHANGED | MF_SOURCE_READERF_STREAMTICK))) return false;
+        const bool ended = (flags & MF_SOURCE_READERF_ENDOFSTREAM) != 0;
+        if (ended && (!strict || !sample)) break;
         if (!sample) {
+            if (strict) return false;
             continue;
         }
 
         Microsoft::WRL::ComPtr<IMFMediaBuffer> buffer;
         hr = sample->ConvertToContiguousBuffer(&buffer);
         if (FAILED(hr) || !buffer) {
+            if (strict) return false;
             continue;
         }
 
@@ -795,12 +798,14 @@ bool decode_mf_stereo_resampled(const std::string& path,
             if (SUCCEEDED(hr)) {
                 buffer->Unlock();
             }
+            if (strict) return false;
             continue;
         }
 
         const std::size_t frame_stride = bytes_per_sample * static_cast<std::size_t>(channels);
-        if (frame_stride == 0) {
+        if (frame_stride == 0 || (strict && cur_len % frame_stride != 0)) {
             buffer->Unlock();
+            if (strict) return false;
             continue;
         }
         std::size_t frame_count = static_cast<std::size_t>(cur_len) / frame_stride;
@@ -832,7 +837,7 @@ bool decode_mf_stereo_resampled(const std::string& path,
         }
 
         buffer->Unlock();
-        if (max_source_frames > 0 && source.size() / 2u >= max_source_frames) {
+        if (ended || (max_source_frames > 0 && source.size() / 2u >= max_source_frames)) {
             break;
         }
     }
@@ -1299,6 +1304,34 @@ std::string utc_timestamp_compact() {
 }
 
 }  // namespace
+
+std::optional<KeysoundAudioInfo> inspect_keysound_audio(const std::string& path) {
+    // Keep original-rate frame precision at 45s; resampling/ceil milliseconds
+    // could otherwise reject a file one source frame below the boundary.
+    const auto rate = probe_audio_sample_rate(path, nullptr);
+    if (!rate || *rate <= 0 || *rate > 384000) return std::nullopt;
+    std::vector<float> pcm;
+    const auto cap = static_cast<std::size_t>(*rate) * 45u;
+    std::string extension = std::filesystem::u8path(path).extension().u8string();
+    std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    int decoded_rate = 0;
+    const bool decoded = extension == ".ogg"
+        ? audio::decode_ogg_vorbis_stereo(path, &decoded_rate, pcm, nullptr, cap, true) && decoded_rate == *rate
+        : (extension == ".wav" || extension == ".wave")
+            ? decode_wav_stereo_resampled(path, *rate, pcm, nullptr, cap)
+#ifdef _WIN32
+            : decode_mf_stereo_resampled(path, *rate, pcm, nullptr, cap, true);
+#else
+            : false;
+#endif
+    if (!decoded || pcm.empty() || pcm.size() % 2u != 0) return std::nullopt;
+    bool audible = false;
+    for (float sample : pcm) {
+        if (!std::isfinite(sample)) return std::nullopt;
+        audible = audible || sample != 0.0f;
+    }
+    return KeysoundAudioInfo{static_cast<double>(pcm.size() / 2u) / *rate, audible};
+}
 
 bool decode_audio_file_stereo_resampled(const std::string& path,
                                         int target_sample_rate,

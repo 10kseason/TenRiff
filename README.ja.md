@@ -1,3 +1,7 @@
+> **2026-11-08 · 1.9.9.9-final1:** [IR保護と除外表示](docs/release-1.9.9.9-final1.ja.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
+
+**1.9.9.9-hotfix6-ir-local — [IR protection / IR 보호](docs/ir-protection-hotfix6.ja.md)**
+
 > **2026-11-08 · 1.9.9.9-hotfix5:** [元のキーモードとリーダーボードの互換性修正](docs/release-1.9.9.9-hotfix5.ja.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 
 > **2026-11-07 · 1.9.9.9-hotfix4:** [マルチコアキャッシュ読み込みとヒット演出設定](docs/release-1.9.9.9-hotfix4.ja.md). Fixed baseline **1.9.6**. Earlier notices below are historical.

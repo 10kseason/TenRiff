@@ -3,8 +3,17 @@
 #include <cstddef>
 #include <string>
 #include <vector>
+#include <optional>
 
 namespace tenriff::app {
+
+struct KeysoundAudioInfo {
+    // Duration saturates at the IR exclusion boundary. No playback-rate scaling.
+    double duration_seconds = 0.0;
+    bool audible = false;
+};
+using InspectKeysoundAudio = std::optional<KeysoundAudioInfo> (*)(const std::string&);
+[[nodiscard]] std::optional<KeysoundAudioInfo> inspect_keysound_audio(const std::string& path);
 
 // Decode a supported audio file to interleaved stereo float PCM. File I/O and
 // decoding must stay off the realtime audio callback.

@@ -1,3 +1,7 @@
+TenRiff 1.9.9.9-final1 source package — 2026-11-08
+
+Matches the release commit; includes hotfix5, measured IR protection and exclusion labels. See docs/release-1.9.9.9-final1.en.md. Fixed baseline: 1.9.6. Earlier descriptions below are historical; inclusion and privacy rules remain.
+
 TenRiff 1.9.9.9-hotfix5 source package — 2026-11-08
 
 The source matches the release commit. Includes hotfix4 in full and corrects native-key leaderboard markers. See docs/release-1.9.9.9-hotfix5.en.md and docs/release-1.9.9.9-hotfix5-gate.md. Fixed baseline: 1.9.6.

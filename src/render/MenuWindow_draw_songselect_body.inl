@@ -1,3 +1,4 @@
+        if (benchmark_timings_enabled_) benchmark_ir_badges_.clear();
         const float ambient_pulse = static_cast<float>(pulse_wave_01(render_now_ns, 6.4, 0.18));
         auto song_level_text = [&](const std::string& label, bool aery_five_key = false) {
             return to_wide(difficulty_display_label(label, aery_five_key));
@@ -101,6 +102,29 @@
             format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
             draw_text_clipped(text, format, rect, brush);
             format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+        };
+        const auto draw_ir_badge = [&](const char* role, const D2D1_RECT_F& rect) {
+            if (!d2d_->hud_format) return;
+            const auto label = wloc("IR EXCLUDED", "IR 제외");
+            ctx->FillRoundedRectangle(D2D1::RoundedRect(rect, 4, 4), semantic_color(0x302719));
+            ctx->DrawRoundedRectangle(D2D1::RoundedRect(rect, 4, 4), semantic_color(0xC59951), 1.0f);
+            draw_centered_text(label, d2d_->hud_format.Get(), rect, semantic_color(0xF0C77F), true);
+            if (benchmark_timings_enabled_) benchmark_ir_badges_.push_back(
+                {role, loc("IR EXCLUDED", "IR 제외"), {rect.left, rect.top, rect.right, rect.bottom}});
+        };
+        const auto draw_ir_detail = [&](const D2D1_RECT_F& rect) {
+            const auto& song = data.song_select;
+            if (!song.selected_song_ir_excluded && song.selected_song_ir_status.empty()) return;
+            // Cover overlay avoids moving authored metadata or hiding a clear badge.
+            ctx->FillRoundedRectangle(D2D1::RoundedRect(rect, 4, 4), semantic_color(0x151515, 0.96f));
+            float status_top = rect.top + 5;
+            if (song.selected_song_ir_excluded) {
+                draw_ir_badge("detail", D2D1::RectF(rect.left + 8, rect.top + 5, rect.left + 160, rect.top + 31));
+                status_top = rect.top + 34;
+            }
+            if (!song.selected_song_ir_status.empty()) draw_metadata_ellipsis(
+                to_wide(song.selected_song_ir_status), d2d_->hud_format.Get(),
+                D2D1::RectF(rect.left + 8, status_top, rect.right - 8, rect.bottom - 3), semantic_color(0xD8C29B));
         };
         const auto score_paint = song_select_score_paint(data.song_select.score_clear_status);
         const bool tint_score = score_paint.rgb != 0xFFFFFF;
@@ -526,9 +550,16 @@
                                   d2d_->text_brush.Get());
             }
             if (d2d_->hud_format && d2d_->muted_brush) {
+                auto artist_rect = native_rect("songselect.rect.027", D2D1::RectF(text_left, card.top + 38.0f,
+                    value_left - 8.0f, card.top + 61.0f));
+                if (song.ir_excluded) {
+                    const auto ir_rect = D2D1::RectF(std::max(artist_rect.left, artist_rect.right - 152),
+                        artist_rect.top, artist_rect.right, artist_rect.bottom);
+                    draw_ir_badge("row", ir_rect);
+                    artist_rect.right = std::max(artist_rect.left, ir_rect.left - 8);
+                }
                 draw_metadata_ellipsis(to_wide(song.artist), d2d_->hud_format.Get(),
-                                  native_rect("songselect.rect.027", D2D1::RectF(text_left, card.top + 38.0f,
-                                              value_left - 8.0f, card.top + 61.0f)),
+                                  artist_rect,
                                   d2d_->muted_brush.Get());
                 draw_metadata_ellipsis(song_level_text(song.detail), d2d_->hud_format.Get(),
                                   native_rect("songselect.rect.028", D2D1::RectF(text_left, card.top + 60.0f,
@@ -738,6 +769,8 @@
         }
 
         if (has_selected_song) {
+            draw_ir_detail(native_rect("songselect.ir_detail", D2D1::RectF(preview.left + 12, preview.top + 58,
+                preview.right - 12, preview.top + 120)));
             if (!data.song_select.selected_song_bms_rank.empty()) {
                 const auto rank_chip = native_rect("songselect.bms_rank", D2D1::RectF(
                     std::max(preview.left + 12.0f, preview.right - 204.0f), preview.bottom - 40.0f,

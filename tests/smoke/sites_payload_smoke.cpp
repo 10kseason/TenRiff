@@ -70,10 +70,11 @@ int main(int argc, char** argv) {
         std::cerr << "Use --fixture-hard, --fixture-ex or --fixture-converted for offline fixtures.";
         return 2;
     }
+    tenriff::app::SitesKeysoundEvidence keysounds{0.125, 100, 0};
     std::string payload, error;
     const char replay_digest_digit = replay.mode.key_mode == "auto" ? 'b' : 'c';
     if (!tenriff::app::build_sites_score_json(replay, std::string(64, replay_digest_digit),
-         "QA Fixture - TenRiff", "FULLCOMBO", payload, error)) {
+         "QA Fixture - TenRiff", "FULLCOMBO", payload, error, {}, {}, &keysounds)) {
         std::cerr << error; return 1;
     }
     std::cout << payload;

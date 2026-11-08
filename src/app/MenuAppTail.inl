@@ -773,6 +773,47 @@ bool MenuApp::service_song_nps_profile() {
     return song_select_screen_.service_nps_profile(std::move(key), std::move(path), now_ns);
 }
 
+bool MenuApp::service_ir_eligibility() {
+    IrEligibilityRequest request;
+    const SongEntry* entry = current_screen() == Screen::SongSelect &&
+        song_select_view_ != SongSelectView::Sources && !showing_table_level_folders() && selected_song_ >= 0
+        ? visible_song_entry(static_cast<std::size_t>(selected_song_)) : nullptr;
+    if (entry) {
+        request.key = song_ir_profile_key(*entry);
+        if (request.key != ir_eligibility_.request_key()) {
+            request.title = entry->title;
+            auto& replay = request.replay;
+            replay.chart_path = song_absolute_path(*entry);
+            replay.chart_format = entry->format;
+            replay.chart_sha256 = entry->sha256;
+            replay.trace.sample_rate = static_cast<int>(config_.audio.sample_rate);
+            replay.trace.lane_count = entry->key_count;
+            replay.rate = config_.speed.rate;
+            replay.mods = config_.mode.mods;
+            replay.mode.key_mode = config_.mode.key_mode;
+            replay.mode.random = config_.mode.random;
+            replay.mode.random_seed = static_cast<int>(config_.mode.random_seed);
+            replay.mode.gauge = config_.mode.gauge;
+            replay.mode.autoplay_enabled = config_.mode.autoplay_enabled;
+            replay.mode.practice_no_fail_enabled = config_.mode.practice_no_fail_enabled;
+            replay.mode.one_miss_fail_enabled = config_.mode.one_miss_fail_enabled;
+            replay.mode.bms_timing_version = 2;
+            replay.mode.bms_gauge_version = 2;
+            replay.mode.bms_control_flow_version = 2;
+            replay.mode.bms_random_seed = 0;
+            replay.mode.key_conversion_version = 3;
+            replay.mode.long_note_mix_version = 3;
+        }
+    } else if (current_screen() == Screen::Result) {
+        request.key = result_ir_profile_key();
+        request.selection_preview = false;
+        request.title = last_chart_title_;
+        request.replay_path = last_replay_path_;
+        request.replay_sha256 = sites_result_replay_sha256_;
+    }
+    return ir_eligibility_.service(std::move(request), timing::HighResClock::now_ns());
+}
+
 void MenuApp::service_song_preview() {
     constexpr int64_t kPreviewDelayNs = 750'000'000LL;
     const int64_t now_ns = timing::HighResClock::now_ns();
@@ -1442,6 +1483,11 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     render.result.shift_count = static_cast<int>(last_result_.shifts.size());
     render.result.export_warning_count = static_cast<int>(last_export_warnings_.size());
     render.result.web_upload_status = sites_result_upload_status_;
+    const auto result_ir_state = ir_chart_blocked({}, last_chart_title_) ? IrEligibility::Blocked
+        : ir_eligibility_.state_for(result_ir_profile_key());
+    const auto result_ir_text = ir_status_text(result_ir_state);
+    render.result.ir_excluded = ir_is_excluded(result_ir_state);
+    render.result.ir_status = ui_text(result_ir_text.english, result_ir_text.korean);
     render.result.replay_file = filename_only(last_replay_path_);
     render.result.replay_available = false;
     render.result.result_file = filename_only(last_result_path_);
@@ -1756,6 +1802,7 @@ void MenuApp::publish_snapshot() {
         sync_song_select_state();
     }
     static_cast<void>(service_song_nps_profile());
+    static_cast<void>(service_ir_eligibility());
     service_song_preview();
     sync_menu_music();
 
@@ -2328,6 +2375,9 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     }
 
     reset_screen(Screen::Gameplay);
+    // Gameplay blocks the menu loop. Cancel the selected preview before entering
+    // the session; drain its future later without waiting for decoder work here.
+    static_cast<void>(ir_eligibility_.service({}, timing::HighResClock::now_ns()));
     if (!peer_battle && !instant_restart_start) {
         scene_transition_start_ns_ = timing::HighResClock::now_ns();
     }

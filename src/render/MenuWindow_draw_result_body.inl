@@ -1,3 +1,4 @@
+        if (benchmark_timings_enabled_) benchmark_ir_badges_.clear();
         auto draw_panel = [&](const D2D1_RECT_F& rect, bool accent_border = false) {
             const D2D1_ROUNDED_RECT rr = D2D1::RoundedRect(rect, 18.0f, 18.0f);
             if (d2d_->panel_brush) {
@@ -48,10 +49,26 @@
         // Result notes are not part of the visual layout. This explicit footer
         // keeps asynchronous upload outcomes visible on every result page.
         const auto draw_web_upload_status = [&]() {
+            if (data.result.ir_excluded && d2d_->hud_format) {
+                const auto badge = D2D1::RectF(64, 1050, 224, 1078);
+                ctx->FillRoundedRectangle(D2D1::RoundedRect(badge, 4, 4), semantic_color(0x302719));
+                ctx->DrawRoundedRectangle(D2D1::RoundedRect(badge, 4, 4), semantic_color(0xC59951), 1.0f);
+                draw_text_clipped_aligned(wloc("IR EXCLUDED", "IR 제외"), d2d_->hud_format.Get(),
+                    badge, semantic_color(0xF0C77F), DWRITE_TEXT_ALIGNMENT_CENTER);
+                if (benchmark_timings_enabled_) benchmark_ir_badges_.push_back(
+                    {"result", loc("IR EXCLUDED", "IR 제외"), {badge.left, badge.top, badge.right, badge.bottom}});
+            }
+            if (!data.result.ir_status.empty() && d2d_->hud_format) {
+                draw_text_clipped_aligned(to_wide(data.result.ir_status), d2d_->hud_format.Get(),
+                    D2D1::RectF(data.result.ir_excluded ? 240.0f : 64.0f, 1050, 1056, 1078),
+                    semantic_color(0xD8C29B), DWRITE_TEXT_ALIGNMENT_LEADING);
+            }
             if (!data.result.web_upload_status.empty() && d2d_->hud_format && d2d_->muted_brush) {
                 draw_text_clipped_aligned(to_wide(data.result.web_upload_status), d2d_->hud_format.Get(),
-                    D2D1::RectF(64.0f, 1050.0f, 1856.0f, 1078.0f), d2d_->muted_brush.Get(),
-                    DWRITE_TEXT_ALIGNMENT_CENTER);
+                    D2D1::RectF(data.result.ir_excluded || !data.result.ir_status.empty() ? 1080.0f : 64.0f,
+                        1050.0f, 1856.0f, 1078.0f), d2d_->muted_brush.Get(),
+                    data.result.ir_excluded || !data.result.ir_status.empty()
+                        ? DWRITE_TEXT_ALIGNMENT_TRAILING : DWRITE_TEXT_ALIGNMENT_CENTER);
             }
         };
         const int64_t record_elapsed_ns = data.result.presentation_start_ns > 0

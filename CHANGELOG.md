@@ -1,3 +1,12 @@
+# 1.9.9.9-final1 — 2026-11-08
+
+- Include all hotfix5 changes and compatibility with deployed leaderboard v26.
+- Submit original single-keysound duration and actual playable/silent-note counts; reject any keysound >=45 seconds or silent notes >=85%, with incomplete analysis kept local.
+- Show IR exclusion and reasons in the selected song-list row/detail and results, including guest results. Keep scanning asynchronous and tied to the selected pattern or actual replay.
+- Speed of Link is removed from public ranking and blocked on resubmission; stored rows are preserved. Older clients without scan evidence cannot submit new scores.
+- Preserve scoring, judgement, replay format, R13/R14 and fixed baseline1.9.6.
+- [Usage](docs/release-1.9.9.9-final1.en.md) · [Validation](docs/release-1.9.9.9-final1-gate.md).
+
 # 1.9.9.9-hotfix5 — 2026-11-08
 
 - Include all hotfix4 hit feedback, burst options and multicore folder/cache loading changes.
