@@ -1,3 +1,5 @@
+> **2026-11-08 · 1.9.9.9-hotfix5:** [원본 키 리더보드 호환 수정](docs/release-1.9.9.9-hotfix5.ko.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
+
 > **2026-11-07 · 1.9.9.9-hotfix4:** [멀티코어 캐시 로딩과 타격 모션·키밤 옵션](docs/release-1.9.9.9-hotfix4.ko.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 
 > **2026-11-04 · 1.9.9.9-hotfix1:** [OGG 보안 수정·범용 BGA·스킨 에디터](docs/release-1.9.9.9-hotfix1.ko.md). Fixed baseline **1.9.6**. Earlier notices below are historical.

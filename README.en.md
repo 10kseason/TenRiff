@@ -1,3 +1,5 @@
+> **2026-11-08 · 1.9.9.9-hotfix5:** [Native-key leaderboard compatibility fix](docs/release-1.9.9.9-hotfix5.en.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
+
 > **2026-11-07 · 1.9.9.9-hotfix4:** [Multicore cache loading, hit motion and burst options](docs/release-1.9.9.9-hotfix4.en.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 
 > **2026-11-04 · 1.9.9.9-hotfix1:** [OGG security, Common BGA and skin editor](docs/release-1.9.9.9-hotfix1.en.md). Fixed baseline **1.9.6**. Earlier notices below are historical.

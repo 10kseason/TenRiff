@@ -180,6 +180,14 @@ bool build_sites_score_json(const gameplay::ReplayFile& replay,
         error = "Sites upload skipped: invalid score statistics."; return false;
     }
     const auto lanes = replay.trace.lane_count;
+    // The configured algorithm is retained even when key conversion is off.
+    // Use the replay's requested mode, not the remembered algorithm or target
+    // lane count: explicit same-key conversions also remain outside rankings.
+    const auto requested_key_mode = gameplay::parse_key_mode(replay.mode.key_mode);
+    const bool native_key_mode = requested_key_mode && *requested_key_mode == gameplay::KeyMode::Auto;
+    const std::string key_conversion = native_key_mode ? "none" :
+        (replay.mode.key_conversion_algorithm.empty() ? "unknown" : replay.mode.key_conversion_algorithm) +
+        ":" + replay.mode.key_conversion_nk2_preset;
     const double accuracy = replay.stats.accuracy_percent();
     const double detailed_accuracy = replay.stats.detailed_accuracy_percent();
     if (!is_hash(replay.chart_sha256) || !is_hash(replay_sha256) || lanes < 4 || (lanes > 14 && lanes != 16) ||
@@ -216,8 +224,7 @@ bool build_sites_score_json(const gameplay::ReplayFile& replay,
            << ",\"timing_profile\":" << quoted(timing_profile)
            << ",\"gauge\":" << quoted(replay.mode.gauge.empty() ? "normal" : replay.mode.gauge)
            << ",\"random\":" << quoted(replay.mode.random.empty() ? "off" : replay.mode.random)
-           << ",\"key_conversion\":" << quoted(replay.mode.key_conversion_algorithm.empty() ? "none" :
-               replay.mode.key_conversion_algorithm + ":" + replay.mode.key_conversion_nk2_preset)
+           << ",\"key_conversion\":" << quoted(key_conversion)
            << ",\"mods\":[";
     for (std::size_t i = 0; i < replay.mods.size(); ++i) {
         if (i) output << ',';
