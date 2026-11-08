@@ -1476,6 +1476,9 @@ void MenuApp::run() {
         if (service_song_nps_profile()) {
             publish_snapshot();
         }
+        if (service_ir_eligibility()) {
+            publish_snapshot();
+        }
         service_song_preview();
         service_bms_editor_preview();
 
@@ -1502,6 +1505,7 @@ void MenuApp::shutdown() {
     peer_session_.disconnect();
     online_records_service_.shutdown();
     sites_leaderboard_service_.shutdown();
+    ir_eligibility_.shutdown();
     global_chat_service_.shutdown();
     stop_menu_threads();
     song_indexer_.stop();

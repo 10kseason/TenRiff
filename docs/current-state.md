@@ -1,3 +1,5 @@
+> **2026-11-08 · 1.9.9.9-final1:** [IR 보호와 제외 표시](release-1.9.9.9-final1.ko.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
+
 > **2026-11-08 · 1.9.9.9-hotfix5:** [원본 키 리더보드 호환 수정](release-1.9.9.9-hotfix5.ko.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 
 > **2026-11-07 · 1.9.9.9-hotfix4:** [멀티코어 캐시 로딩과 타격 모션·키밤 옵션](release-1.9.9.9-hotfix4.ko.md). Fixed baseline **1.9.6**. Earlier notices below are historical.

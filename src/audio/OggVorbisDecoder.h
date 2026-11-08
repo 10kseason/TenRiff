@@ -17,5 +17,8 @@ bool decode_ogg_vorbis_stereo(const std::string& path,
                               std::vector<float>& out,
                               std::string* error,
                               std::size_t max_frames);
+bool decode_ogg_vorbis_stereo(const std::string& path, int* out_sample_rate,
+                              std::vector<float>& out, std::string* error,
+                              std::size_t max_frames, bool require_complete);
 
 }  // namespace tenriff::audio

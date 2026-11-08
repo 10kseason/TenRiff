@@ -1,3 +1,7 @@
+> **2026-11-08 · 1.9.9.9-final1:** [IR protection and exclusion labels](docs/release-1.9.9.9-final1.en.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
+
+**1.9.9.9-hotfix6-ir-local — [IR protection / IR 보호](docs/ir-protection-hotfix6.en.md)**
+
 > **2026-11-08 · 1.9.9.9-hotfix5:** [Native-key leaderboard compatibility fix](docs/release-1.9.9.9-hotfix5.en.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 
 > **2026-11-07 · 1.9.9.9-hotfix4:** [Multicore cache loading, hit motion and burst options](docs/release-1.9.9.9-hotfix4.en.md). Fixed baseline **1.9.6**. Earlier notices below are historical.

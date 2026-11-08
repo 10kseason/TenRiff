@@ -1,11 +1,14 @@
 #include "app/MenuApp.h"
 #include "app/BmsRankLabel.h"
 #include "app/DifficultyTable.h"
+#include "app/ModeManager.h"
 #include "config/BuiltinDifficultyTables.h"
 
 #include <algorithm>
 #include <cmath>
 #include <utility>
+#include <sstream>
+#include <iomanip>
 
 #include "app/MenuAppSettingsUtils.h"
 #include "app/MenuAppSongSelectUtils.h"
@@ -69,6 +72,32 @@ std::string MenuApp::song_nps_profile_key(const SongEntry& entry) const {
     // F5 and library replacement invalidate even a timestamp-preserving edit.
     return songs_path_ + "\n" + entry.path + "\n" + std::to_string(entry.mtime) + "\n" +
         std::to_string(entry.file_size) + "\n" + std::to_string(song_index_revision_);
+}
+
+std::string MenuApp::song_ir_profile_key(const SongEntry& entry) const {
+    std::ostringstream key;
+    key << "song\n" << song_nps_profile_key(entry) << '\n' << entry.sha256 << '\n'
+        << config_.mode.key_mode << '\n' << config_.mode.random << '\n' << config_.mode.random_seed << '\n'
+        << config_.mode.gauge << '\n' << std::setprecision(17) << config_.speed.rate << '\n'
+        << config_.audio.sample_rate << '\n' << config_.mode.autoplay_enabled
+        << config_.mode.practice_no_fail_enabled << config_.mode.one_miss_fail_enabled;
+    for (const auto& mod : config_.mode.mods) key << '\n' << mod;
+    return key.str();
+}
+
+std::string MenuApp::result_ir_profile_key() const {
+    // The completed replay owns this state, independently of later menu settings.
+    return "result\n" + last_replay_path_ + '\n' + sites_result_replay_sha256_ + '\n' + last_result_path_;
+}
+
+IrEligibility MenuApp::song_ir_state(const SongEntry& entry) const {
+    if (ir_chart_blocked(entry.sha256, entry.title)) return IrEligibility::Blocked;
+    const auto mode = gameplay::parse_key_mode(config_.mode.key_mode);
+    if (!mode || *mode != gameplay::KeyMode::Auto || config_.mode.autoplay_enabled ||
+        config_.mode.practice_no_fail_enabled || config_.mode.one_miss_fail_enabled ||
+        mode_mod_adds_notes(config_.mode.mods) || mode_mod_auto_scratch(config_.mode.mods) ||
+        mode_mod_long_note_mix(config_.mode.mods)) return IrEligibility::PlayExcluded;
+    return ir_eligibility_.state_for(song_ir_profile_key(entry));
 }
 
 std::string MenuApp::difficulty_table_display_name() {
@@ -638,6 +667,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 card.rating = entry->rating;
                 card.song_index = i;
                 card.selected = (i == selected_song_);
+                card.ir_excluded = ir_is_excluded(song_ir_state(*entry));
                 const std::string song_key =
                     menu_songs::normalize_path_key(path_from_utf8(song_absolute_path(*entry)));
                 card.favorite =
@@ -677,6 +707,10 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                                          ? visible_song_entry(static_cast<std::size_t>(selected_song_))
                                          : nullptr) {
             render.song_select.selected_song_title = song_title_for_ui(*entry);
+            const auto ir_state = song_ir_state(*entry);
+            const auto ir_text = ir_status_text(ir_state);
+            render.song_select.selected_song_ir_excluded = ir_is_excluded(ir_state);
+            render.song_select.selected_song_ir_status = ui_text(ir_text.english, ir_text.korean);
             render.song_select.selected_song_artist = song_artist_for_ui(*entry);
             render.song_select.selected_song_chart_author = safe_ui_text(entry->chart_author);
             render.song_select.selected_song_detail = safe_ui_text_or_placeholder(song_detail_label(*entry), "-");

@@ -1,3 +1,7 @@
+> **2026-11-08 · 1.9.9.9-final1:** [IR保护与排除标记](docs/release-1.9.9.9-final1.zh-CN.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
+
+**1.9.9.9-hotfix6-ir-local — [IR protection / IR 보호](docs/ir-protection-hotfix6.zh-CN.md)**
+
 > **2026-11-08 · 1.9.9.9-hotfix5:** [原始键位排行榜兼容性修复](docs/release-1.9.9.9-hotfix5.zh-CN.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 
 > **2026-11-07 · 1.9.9.9-hotfix4:** [多核缓存加载与击打特效设置](docs/release-1.9.9.9-hotfix4.zh-CN.md). Fixed baseline **1.9.6**. Earlier notices below are historical.

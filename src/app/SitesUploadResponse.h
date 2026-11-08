@@ -27,6 +27,13 @@ inline bool parse_sites_upload_response(unsigned status, std::string_view body,
                         error += "The play time is in the future; check the PC clock and time zone.";
                         break;
                     }
+                    if (code != object.end() && code->second.is_string()) {
+                        const auto value = code->second.as_string();
+                        if (value == "keysound_scan_required") { error += "Keysound scan required; update the game and verify chart audio."; break; }
+                        if (value == "keysound_too_long") { error += "A keysound lasts 45 seconds or longer; this chart is excluded from IR."; break; }
+                        if (value == "silent_notes_exceeded") { error += "At least 85 percent of playable notes have no audible keysound; this chart is excluded from IR."; break; }
+                        if (value == "chart_blocked") { error += "This chart is blocked from IR."; break; }
+                    }
                 }
                 error += "The Site rejected the record format, ruleset or play conditions; check game/Site compatibility.";
                 break;
