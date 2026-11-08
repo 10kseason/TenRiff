@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.9.9.9 DESCRIPTION "TenRiff 1.9.9.9 final 1" LANGUAGES C CXX)
+project(TenRiff VERSION 1.9.9.9 DESCRIPTION "TenRiff 1.9.9.9 final 2" LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -336,7 +336,6 @@ if(WIN32)
     )
 
     add_library(tenriff_app
-        src/app/IrEligibility.cpp
         src/app/MenuMusicController.cpp
         src/app/menu/MenuNavigator.cpp
         src/app/menu/MenuScreenDescriptor.cpp
@@ -860,7 +859,6 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_song_index.cpp
         tests/unit/test_song_select_state.cpp
         tests/unit/test_song_select_screen.cpp
-        tests/unit/test_ir_eligibility.cpp
         tests/unit/test_key_note_overlay.cpp
         tests/unit/test_session_mix.cpp
         tests/unit/test_lr2_course.cpp

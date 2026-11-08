@@ -112,6 +112,7 @@ inline GameplayHudData make_skin_gameplay_preview(const SkinPreviewData& preview
     hud.key_overlay_enabled = preview.key_overlay_enabled;
     hud.key_overlay_x = preview.key_overlay_x;
     hud.key_overlay_y = preview.key_overlay_y;
+    hud.key_overlay_scale = preview.key_overlay_scale;
     hud.score_comparison_enabled = preview.score_comparison_enabled;
     hud.score_comparison_x = preview.score_comparison_x;
     hud.score_comparison_y = preview.score_comparison_y;

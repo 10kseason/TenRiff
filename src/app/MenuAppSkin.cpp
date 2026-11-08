@@ -1072,9 +1072,12 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     config::normalize_skin_hud_layout_token(config_.skin.hud_layout) == "classic"
                         ? ui_text("Classic", "클래식") : ui_text("Studio Deck", "스튜디오 덱"),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::HudLayout), false, true);
-    append_menu_row(render.generic, ui_text("Key Overlay Plugin (4/5/7/8/10K)", "키 오버레이 플러그인 (4/5/7/8/10K)"),
+    append_menu_row(render.generic, ui_text("Key Overlay Plugin (4~16K)", "키 오버레이 플러그인 (4~16K)"),
                     ui_on_off(config_.skin.key_overlay_enabled), false, render::MenuHitTargetKind::SettingsRow,
                     static_cast<int>(SkinSettingsRowId::KeyOverlayEnabled), false, true);
+    append_slider_menu_row(render.generic, ui_text("Key Overlay Size", "키 오버레이 크기"),
+                    format_percent(config_.skin.key_overlay_scale), (config_.skin.key_overlay_scale - 0.25) / 0.75,
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::KeyOverlayScale));
     append_menu_row(render.generic, ui_text("Key Overlay X", "키 오버레이 X"), format_percent(config_.skin.key_overlay_x),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::KeyOverlayX), false, true);
     append_menu_row(render.generic, ui_text("Key Overlay Y", "키 오버레이 Y"), format_percent(config_.skin.key_overlay_y),
@@ -1246,6 +1249,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.skin_preview.key_overlay_enabled = config_.skin.key_overlay_enabled;
     render.generic.skin_preview.key_overlay_x = config_.skin.key_overlay_x;
     render.generic.skin_preview.key_overlay_y = config_.skin.key_overlay_y;
+    render.generic.skin_preview.key_overlay_scale = config_.skin.key_overlay_scale;
     render.generic.skin_preview.score_comparison_enabled = config_.skin.score_comparison_enabled;
     render.generic.skin_preview.score_comparison_x = config_.skin.score_comparison_x;
     render.generic.skin_preview.score_comparison_y = config_.skin.score_comparison_y;

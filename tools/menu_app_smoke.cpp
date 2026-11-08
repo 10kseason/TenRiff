@@ -2266,7 +2266,73 @@ struct MenuAppVisualTestAccess {
         app.persist_runtime_config();
         app.publish_snapshot();
     }
+    static void check_key_overlay_followup(MenuApp& app, Report& report) {
+        const auto saved_skin = app.config_.skin;
+        MenuApp::GameplayHudState saved_hud;
+        {
+            std::lock_guard<std::mutex> lock(app.gameplay_hud_mutex_);
+            saved_hud = app.gameplay_hud_;
+        }
+        app.config_.skin.key_overlay_enabled = true;
+        app.config_.skin.key_overlay_scale = 0.25;
+        for (int lanes = 4; lanes <= 16; ++lanes) {
+            {
+                std::lock_guard<std::mutex> lock(app.gameplay_hud_mutex_);
+                app.reset_gameplay_hud_state(app.gameplay_hud_);
+                app.gameplay_hud_.lane_count = lanes;
+                auto& overlay = app.gameplay_hud_.key_overlay;
+                overlay.visible = true;
+                overlay.note_count = static_cast<std::size_t>(lanes);
+                for (int lane = 0; lane < lanes; ++lane) {
+                    overlay.held[lane] = true;
+                    overlay.notes[lane] = {lane, 0.0, -1.0};
+                }
+            }
+            render::GameplayHudData hud;
+            app.populate_gameplay_render_data(hud);
+            bool aligned = true;
+            for (std::size_t i = 0; i < hud.key_overlay.note_count; ++i) {
+                const int lane = hud.key_overlay.notes[i].lane;
+                aligned = aligned && lane >= 0 && lane < lanes && hud.key_overlay.held[lane];
+            }
+            report.check("key_overlay.real_hud_" + std::to_string(lanes) + "k",
+                hud.key_overlay_enabled && hud.key_overlay.visible && hud.key_overlay_scale == 0.25 && aligned &&
+                std::count(hud.key_overlay.held.begin(), hud.key_overlay.held.end(), true) == lanes);
+        }
+        for (int scenario = 0; scenario < 10; ++scenario) {
+            const bool high_lane = scenario < 6;
+            const int source_lane = high_lane ? 10 + scenario : ((scenario - 6) % 2 == 0 ? 0 : 7);
+            const bool right_scratch = !high_lane && scenario >= 8;
+            const int expected = high_lane || !right_scratch ? source_lane : (source_lane == 0 ? 7 : 6);
+            app.config_.skin.scratch_position = right_scratch ? "right" : "left";
+            {
+                std::lock_guard<std::mutex> lock(app.gameplay_hud_mutex_);
+                app.reset_gameplay_hud_state(app.gameplay_hud_);
+                app.gameplay_hud_.lane_count = high_lane ? 16 : 8;
+                app.gameplay_hud_.scratch_lane_count = high_lane ? 0 : 1;
+                app.gameplay_hud_.scratch_lanes[0] = 1;
+                auto& overlay = app.gameplay_hud_.key_overlay;
+                overlay.visible = true;
+                overlay.note_count = 1;
+                overlay.held[source_lane] = true;
+                overlay.notes[0] = {source_lane, 0.0, -1.0};
+            }
+            render::GameplayHudData hud;
+            app.populate_gameplay_render_data(hud);
+            report.check("key_overlay.single_lane_" + std::to_string(scenario),
+                hud.key_overlay.note_count == 1 && hud.key_overlay.notes[0].lane == expected &&
+                hud.key_overlay.held[expected] &&
+                std::count(hud.key_overlay.held.begin(), hud.key_overlay.held.end(), true) == 1);
+        }
+        app.config_.skin = saved_skin;
+        {
+            std::lock_guard<std::mutex> lock(app.gameplay_hud_mutex_);
+            app.gameplay_hud_ = saved_hud;
+        }
+    }
+
     static void check_hud_feedback_followup(MenuApp& app, Report& report) {
+        check_key_overlay_followup(app, report);
         const auto saved_skin = app.config_.skin;
         MenuApp::GameplayHudState saved_hud;
         {

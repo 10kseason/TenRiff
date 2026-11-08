@@ -1,3 +1,10 @@
+# 1.9.9.9-final2 —2026-11-09
+
+- Remove keysound-duration/silence/required-scan/chart-blacklist IR exclusions and selected-song/result badges. Stop eligibility audio scans and omit their metadata from new submissions; retain native-key/ruleset/mod/account gates and original scoring/replay identity.
+- Support every4–16K key-viewer layout and25–100% whole-panel size,1% steps/default100%, saved in settings/profiles/presets and preview. DefaultOFF.
+- Preserve general asynchronous upload feedback and final1's unrelated visual-fixture fixes. Add isolated upper-lane and7+1 scratch-remapping checks.
+- [Usage](docs/release-1.9.9.9-final2.en.md) · [Validation](docs/release-1.9.9.9-final2-gate.md). Fixed baseline1.9.6.
+
 # 1.9.9.9-final1 — 2026-11-08
 
 - Include all hotfix5 changes and compatibility with deployed leaderboard v26.

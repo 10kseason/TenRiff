@@ -140,6 +140,7 @@ void sanitize_skin_config(SkinConfig& skin) {
         std::clamp(skin.note_divider_gap_px, kNoteDividerGapPxMin, kNoteDividerGapPxMax);
     skin.key_overlay_x = clamp_finite(skin.key_overlay_x, 0.0, 1.0, 0.0);
     skin.key_overlay_y = clamp_finite(skin.key_overlay_y, 0.0, 1.0, 0.25);
+    skin.key_overlay_scale = clamp_finite(skin.key_overlay_scale, 0.25, 1.0, 1.0);
     skin.score_comparison_x = clamp_finite(skin.score_comparison_x, 0.0, 1.0, 0.0);
     skin.score_comparison_y = clamp_finite(skin.score_comparison_y, 0.0, 1.0, 0.28);
     skin.lane_divider_brightness = clamp_finite(skin.lane_divider_brightness, 0.0, 1.0, 1.0);
@@ -928,6 +929,7 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.skin.key_overlay_enabled = get_bool(*skin, "key_overlay_enabled", config.skin.key_overlay_enabled);
         config.skin.key_overlay_x = get_number(*skin, "key_overlay_x", config.skin.key_overlay_x);
         config.skin.key_overlay_y = get_number(*skin, "key_overlay_y", config.skin.key_overlay_y);
+        config.skin.key_overlay_scale = get_number(*skin, "key_overlay_scale", config.skin.key_overlay_scale);
         config.skin.score_comparison_enabled = get_bool(*skin, "score_comparison_enabled", config.skin.score_comparison_enabled);
         config.skin.score_comparison_x = get_number(*skin, "score_comparison_x", config.skin.score_comparison_x);
         config.skin.score_comparison_y = get_number(*skin, "score_comparison_y", config.skin.score_comparison_y);
@@ -1429,6 +1431,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("key_overlay_enabled", JsonValue{config.skin.key_overlay_enabled});
     skin.emplace("key_overlay_x", JsonValue{config.skin.key_overlay_x});
     skin.emplace("key_overlay_y", JsonValue{config.skin.key_overlay_y});
+    skin.emplace("key_overlay_scale", JsonValue{config.skin.key_overlay_scale});
     skin.emplace("score_comparison_enabled", JsonValue{config.skin.score_comparison_enabled});
     skin.emplace("score_comparison_x", JsonValue{config.skin.score_comparison_x});
     skin.emplace("score_comparison_y", JsonValue{config.skin.score_comparison_y});

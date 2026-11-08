@@ -7,8 +7,14 @@
             const auto position = [](double value, double fallback) {
                 return static_cast<float>(std::clamp(std::isfinite(value) ? value : fallback, 0.0, 1.0));
             };
-            const float x = margin + position(data.gameplay.key_overlay_x, 0.0) * (1920.0f - width - 2 * margin);
-            const float y = margin + position(data.gameplay.key_overlay_y, 0.25) * (1080.0f - height - 2 * margin);
+            const float scale = static_cast<float>(std::clamp(
+                std::isfinite(data.gameplay.key_overlay_scale) ? data.gameplay.key_overlay_scale : 1.0, 0.25, 1.0));
+            const float x = margin + position(data.gameplay.key_overlay_x, 0.0) * (1920.0f - width * scale - 2 * margin);
+            const float y = margin + position(data.gameplay.key_overlay_y, 0.25) * (1080.0f - height * scale - 2 * margin);
+            D2D1_MATRIX_3X2_F saved_transform;
+            ctx->GetTransform(&saved_transform);
+            // Scale text, key caps and trails together on both gameplay and skin-preview canvases.
+            ctx->SetTransform(D2D1::Matrix3x2F::Scale(scale, scale, D2D1::Point2F(x, y)) * saved_transform);
             const auto saved_color = d2d_->text_brush->GetColor();
             const auto saved_opacity = d2d_->text_brush->GetOpacity();
             auto brush = [&](uint32_t color, float alpha = 1.0f) {
@@ -61,6 +67,7 @@
                 const std::wstring label = data.gameplay.key_labels[lane].empty() ? std::to_wstring(lane + 1) : to_wide(data.gameplay.key_labels[lane]);
                 draw_readable_text_aligned(label, scene_hud_format.Get(), key, brush(0xFFFFFF), DWRITE_TEXT_ALIGNMENT_CENTER);
             }
+            ctx->SetTransform(saved_transform);
             d2d_->text_brush->SetColor(saved_color);
             d2d_->text_brush->SetOpacity(saved_opacity);
         }

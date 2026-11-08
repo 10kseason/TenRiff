@@ -1,3 +1,5 @@
+> **2026-11-09 · 1.9.9.9-final2:** 移除造成误判的键音长度、无键音比例、强制分析、特定曲目IR限制及标记。按键叠加支持所有4～16K布局和25～100%整体大小。生产网站v28使用相同规则。基本排名资格、判定、计分、回放格式及固定基线1.9.6保持原样。 [Release](docs/release-1.9.9.9-final2.zh-CN.md). Earlier descriptions below are historical.
+
 > **2026-11-08 · 1.9.9.9-final1:** [IR保护与排除标记](docs/release-1.9.9.9-final1.zh-CN.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 
 **1.9.9.9-hotfix6-ir-local — [IR protection / IR 보호](docs/ir-protection-hotfix6.zh-CN.md)**

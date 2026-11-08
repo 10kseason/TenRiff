@@ -24,8 +24,6 @@ enum class ChartFormat {
 struct ChartLoadResult {
     gameplay::GameplayChart chart;
     ChartFormat format = ChartFormat::Unknown;
-    // Referenced playable samples that could not be resolved; IR fails closed.
-    std::size_t unresolved_keysounds = 0;
     double base_bpm = 0.0;
     // Display/Hi-Speed reference only; base_bpm preserves replay/conversion input.
     double reference_bpm = 0.0;

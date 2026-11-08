@@ -1,3 +1,5 @@
+> **2026-11-09 · 1.9.9.9-final2:** 誤判定の原因だったキー音の長さ・無音率・必須解析・曲別IR除外と表示を撤去しました。キーオーバーレイは4～16Kの全配置と25～100%のサイズに対応します。運用Web v28も同じ変更です。基本のランキング資格・判定・得点・リプレイ形式と固定基準1.9.6は維持します。 [Release](docs/release-1.9.9.9-final2.ja.md). Earlier descriptions below are historical.
+
 > **2026-11-08 · 1.9.9.9-final1:** [IR保護と除外表示](docs/release-1.9.9.9-final1.ja.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 
 **1.9.9.9-hotfix6-ir-local — [IR protection / IR 보호](docs/ir-protection-hotfix6.ja.md)**

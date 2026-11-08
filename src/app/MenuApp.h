@@ -45,7 +45,6 @@
 #include "app/MultiplayerChartSearch.h"
 #include "app/OnlineRecordsClient.h"
 #include "app/SitesLeaderboardClient.h"
-#include "app/IrEligibility.h"
 #include "app/SessionMix.h"
 #include "app/SongSelectState.h"
 #include "app/SongSelectScreen.h"
@@ -94,7 +93,6 @@ class MenuApp {
     friend struct MenuAppScoreComparisonTestAccess;
     friend struct MenuAppLobbySemanticTestAccess;
     friend struct MenuAppFeedbackTestAccess;
-    friend struct MenuAppIrEligibilityTestAccess;
 public:
     MenuApp();
     ~MenuApp();
@@ -554,9 +552,6 @@ private:
     [[nodiscard]] bool handle_settings_shortcut(uint32_t keycode, Screen return_screen);
     [[nodiscard]] std::string song_absolute_path(const SongEntry& entry) const;
     [[nodiscard]] std::string song_nps_profile_key(const SongEntry& entry) const;
-    [[nodiscard]] std::string song_ir_profile_key(const SongEntry& entry) const;
-    [[nodiscard]] std::string result_ir_profile_key() const;
-    [[nodiscard]] IrEligibility song_ir_state(const SongEntry& entry) const;
     void update_last_chart_metadata(const std::string& chart_path,
                                     const SongEntry* preferred_entry = nullptr);
     [[nodiscard]] std::string profile_display_name() const;
@@ -581,7 +576,6 @@ private:
     bool menu_audio_foreground_ = true;
     void service_song_preview();
     [[nodiscard]] bool service_song_nps_profile();
-    [[nodiscard]] bool service_ir_eligibility();
     void update_title_music_target();
     [[nodiscard]] bool start_song_preview_audio(const SongSelectScreen::PreviewDecodeResult& preview);
     void cancel_song_preview_decode();
@@ -775,8 +769,7 @@ private:
 
     network::PeerSession peer_session_{};
     OnlineRecordsService online_records_service_{};
-    SitesLeaderboardService sites_leaderboard_service_{submit_sites_leaderboard_score, inspect_keysound_audio};
-    IrEligibilityPreview ir_eligibility_{};
+    SitesLeaderboardService sites_leaderboard_service_{};
     GlobalChatService global_chat_service_{};
     network::LanDiscoveryService lan_discovery_{};
     MultiplayerMenuState multiplayer_menu_{};

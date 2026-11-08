@@ -19,14 +19,6 @@ struct SitesUploadStatusText { std::string_view english; std::string_view korean
 inline SitesUploadStatusText sites_upload_status_text(std::string_view message) {
     if (message == "Sites community record uploaded.")
         return {"Web record registered.", "웹 기록 등록 완료"};
-    if (message.find("45 seconds") != std::string_view::npos)
-        return {"IR excluded: a keysound lasts 45 seconds or longer; saved locally.", "IR 제외 · 45초 이상 키음 포함 · 로컬 저장"};
-    if (message.find("85 percent") != std::string_view::npos)
-        return {"IR excluded: at least 85% silent playable notes; saved locally.", "IR 제외 · 무키음 노트 85% 이상 · 로컬 저장"};
-    if (message.find("blocked from IR") != std::string_view::npos)
-        return {"This chart is excluded from IR; saved locally.", "IR 제외 곡 · 로컬 저장"};
-    if (message.find("keysound scan") != std::string_view::npos || message.find("Keysound scan") != std::string_view::npos)
-        return {"IR audio scan unavailable. Check chart audio/update the game; saved locally.", "IR 키음 검사 불가 · 음원 파일/게임 버전 확인 · 로컬 저장"};
     if (message.find("HTTP 400") != std::string_view::npos) {
         if (message.find("PC clock") != std::string_view::npos)
             return {"Web rejected the play time (HTTP 400). Check the PC clock; record saved locally.",

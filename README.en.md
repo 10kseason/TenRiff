@@ -1,3 +1,5 @@
+> **2026-11-09 · 1.9.9.9-final2:** Remove keysound-duration/silence/required-analysis/chart-blacklist IR exclusions and badges that caused false positives. Key overlay supports every4–16K layout and25–100% whole-panel size. Production Site v28 uses the same removal. Existing ranking eligibility, scoring, judgement, replay formats and fixed baseline1.9.6 remain. [Release](docs/release-1.9.9.9-final2.en.md). Earlier descriptions below are historical.
+
 > **2026-11-08 · 1.9.9.9-final1:** [IR protection and exclusion labels](docs/release-1.9.9.9-final1.en.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 
 **1.9.9.9-hotfix6-ir-local — [IR protection / IR 보호](docs/ir-protection-hotfix6.en.md)**

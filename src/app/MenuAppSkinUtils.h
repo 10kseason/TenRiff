@@ -103,11 +103,12 @@ enum class SkinSettingsRowId {
     HitBurstImage,
     ClearHitBurstImage,
     JudgementLineType2Color,
+    KeyOverlayScale,
 };
 
 // The same order drives keyboard navigation, rendered rows and mouse hit targets.
 // Keep related controls adjacent instead of deriving positions from row labels.
-inline constexpr std::array<SkinSettingsRowId, 64> kSkinSettingsRowOrder = {
+inline constexpr std::array<SkinSettingsRowId, 65> kSkinSettingsRowOrder = {
     SkinSettingsRowId::ScratchPosition,
     SkinSettingsRowId::SkinSource,
     SkinSettingsRowId::ImportedSkin,
@@ -144,6 +145,7 @@ inline constexpr std::array<SkinSettingsRowId, 64> kSkinSettingsRowOrder = {
     SkinSettingsRowId::GaugeWidth,
     SkinSettingsRowId::HudRiffMapVisible,
     SkinSettingsRowId::KeyOverlayEnabled,
+    SkinSettingsRowId::KeyOverlayScale,
     SkinSettingsRowId::KeyOverlayX,
     SkinSettingsRowId::KeyOverlayY,
     SkinSettingsRowId::ScoreComparisonEnabled,
@@ -215,6 +217,7 @@ enum class SkinSettingsCategory { Source, Geometry, Notes, LongNotes, Effects, H
         case SkinSettingsRowId::HudLayout:
         case SkinSettingsRowId::GaugeWidth:
         case SkinSettingsRowId::KeyOverlayEnabled:
+        case SkinSettingsRowId::KeyOverlayScale:
         case SkinSettingsRowId::KeyOverlayX:
         case SkinSettingsRowId::KeyOverlayY:
         case SkinSettingsRowId::ScoreComparisonEnabled:

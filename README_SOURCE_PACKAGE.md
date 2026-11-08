@@ -1,3 +1,7 @@
+TenRiff 1.9.9.9-final2 source package —2026-11-09
+
+Matches the release commit. Removes false-positive IR audio scans/exclusions/badges and expands key viewing to4–16K with25–100% scaling. Production Site v28 removes audio/blacklist gates. Fixed baseline1.9.6 remains. Existing inclusion/privacy rules and earlier history below are retained.
+
 TenRiff 1.9.9.9-final1 source package — 2026-11-08
 
 Matches the release commit; includes hotfix5, measured IR protection and exclusion labels. See docs/release-1.9.9.9-final1.en.md. Fixed baseline: 1.9.6. Earlier descriptions below are historical; inclusion and privacy rules remain.

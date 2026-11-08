@@ -27,6 +27,7 @@ TEST_CASE("skin percentage controls change by one percent and sliders retain the
     const std::pair<SkinSettingsRowId, double Skin::*> scalars[] = {
         {SkinSettingsRowId::KeyOverlayX, &Skin::key_overlay_x},
         {SkinSettingsRowId::KeyOverlayY, &Skin::key_overlay_y},
+        {SkinSettingsRowId::KeyOverlayScale, &Skin::key_overlay_scale},
         {SkinSettingsRowId::NoteFadeIn, &Skin::note_fade_in},
         {SkinSettingsRowId::NoteFadeOut, &Skin::note_fade_out},
         {SkinSettingsRowId::KeyPulse, &Skin::key_pulse_brightness},
@@ -1045,7 +1046,7 @@ TEST_CASE("skin mode tabs retain per-mode edits and filtered navigation cannot e
 TEST_CASE("key overlay plugin toggle and position bounds use real skin settings actions") {
     tenriff::config::RuntimeConfig runtime;
     SkinSettingsController controller;
-    controller.reset("6k"); // Unsupported play mode must still retain user settings.
+    controller.reset("6k"); // Newly supported modes use the same persisted settings.
     CHECK_FALSE(runtime.skin.key_overlay_enabled);
     static_cast<void>(controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::KeyOverlayEnabled));
     CHECK(runtime.skin.key_overlay_enabled);
@@ -1057,6 +1058,16 @@ TEST_CASE("key overlay plugin toggle and position bounds use real skin settings 
     CHECK(runtime.skin.key_overlay_y == 0.0);
     static_cast<void>(controller.handle(MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::KeyOverlayEnabled));
     CHECK_FALSE(runtime.skin.key_overlay_enabled);
+    for (const auto [ratio, expected] : {std::pair{-1.0, 0.25}, {0.0, 0.25}, {0.5, 0.63}, {1.0, 1.0}, {2.0, 1.0}}) {
+        static_cast<void>(controller.handle(MenuAction::set_ratio(ratio), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::KeyOverlayScale));
+        CHECK(runtime.skin.key_overlay_scale == doctest::Approx(expected));
+    }
+    runtime.skin.key_overlay_scale = 0.25;
+    static_cast<void>(controller.handle(MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::KeyOverlayScale));
+    CHECK(runtime.skin.key_overlay_scale == 0.25);
+    runtime.skin.key_overlay_scale = 1.0;
+    static_cast<void>(controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::KeyOverlayScale));
+    CHECK(runtime.skin.key_overlay_scale == 1.0);
 }
 
 TEST_CASE("gauge width settings cycle and persist for every skin source") {

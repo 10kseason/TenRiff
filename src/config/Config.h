@@ -273,6 +273,7 @@ struct SkinConfig {
     bool key_overlay_enabled = false;
     double key_overlay_x = 0.0;
     double key_overlay_y = 0.25;
+    double key_overlay_scale = 1.0;
     bool score_comparison_enabled = false;
     double score_comparison_x = 0.0;
     double score_comparison_y = 0.28;

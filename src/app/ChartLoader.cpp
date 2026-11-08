@@ -530,7 +530,6 @@ ChartLoadResult ChartLoader::load(const std::string& path,
                                                         warned_missing_file_ref,
                                                         result.messages);
             if (!resolved_path.has_value()) {
-                ++result.unresolved_keysounds;
                 continue;
             }
 

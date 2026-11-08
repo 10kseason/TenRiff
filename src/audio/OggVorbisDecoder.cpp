@@ -3,8 +3,6 @@
 #include <algorithm>
 #include <cstdio>
 #include <filesystem>
-#include <fstream>
-#include <array>
 #include <memory>
 #include <string_view>
 
@@ -122,43 +120,16 @@ bool decode_ogg_vorbis_stereo(const std::string& path,
     return decode_ogg_vorbis_stereo(path, out_sample_rate, out, error, 0);
 }
 
-bool decode_ogg_vorbis_stereo(const std::string& path, int* rate, std::vector<float>& out,
-                              std::string* error, std::size_t max_frames) {
-    return decode_ogg_vorbis_stereo(path, rate, out, error, max_frames, false);
-}
-
 bool decode_ogg_vorbis_stereo(const std::string& path,
                               int* out_sample_rate,
                               std::vector<float>& out,
                               std::string* error,
-                              std::size_t max_frames, bool require_complete) {
+                              std::size_t max_frames) {
     out.clear();
     if (out_sample_rate) {
         *out_sample_rate = 0;
     }
 
-    if (require_complete) {
-        // A truncated file may still decode a short valid prefix. Require a
-        // complete single-stream Ogg container ending in its authored EOS page.
-        std::ifstream input(std::filesystem::u8path(path), std::ios::binary);
-        std::array<unsigned char, 27> header{};
-        std::array<unsigned char, 255> segments{};
-        std::array<unsigned char, 4> serial{};
-        bool first = true, ended = false;
-        while (input.peek() != std::char_traits<char>::eof()) {
-            if (ended || !input.read(reinterpret_cast<char*>(header.data()), header.size()) ||
-                std::string_view(reinterpret_cast<char*>(header.data()),4) != "OggS" || header[4] != 0) { if(error) *error="Invalid complete Ogg container at byte " + std::to_string(static_cast<long long>(input.tellg())); return false; }
-            if (first) { std::copy_n(header.data()+14,4,serial.data()); first=false; }
-            else if (!std::equal(serial.begin(),serial.end(),header.begin()+14)) { if(error) *error="Invalid complete Ogg container at byte " + std::to_string(static_cast<long long>(input.tellg())); return false; }
-            if (!input.read(reinterpret_cast<char*>(segments.data()),header[26])) { if(error) *error="Invalid complete Ogg container at byte " + std::to_string(static_cast<long long>(input.tellg())); return false; }
-            std::size_t bytes=0;
-            for (unsigned i=0;i<header[26];++i) bytes += segments[i];
-            input.ignore(static_cast<std::streamsize>(bytes));
-            if (input.gcount() != static_cast<std::streamsize>(bytes)) { if(error) *error="Invalid complete Ogg container at byte " + std::to_string(static_cast<long long>(input.tellg())); return false; }
-            ended = (header[5] & 4u) != 0;
-        }
-        if (!ended) { if(error) *error="Invalid complete Ogg container at byte " + std::to_string(static_cast<long long>(input.tellg())); return false; }
-    }
     stb_vorbis* vorbis = nullptr;
     if (!open_vorbis_stream(path, &vorbis, error)) {
         return false;
@@ -223,15 +194,6 @@ bool decode_ogg_vorbis_stereo(const std::string& path,
         }
     }
 
-    if (require_complete && (max_frames == 0 || out.size()/2u < max_frames)) {
-        const int decode_error = stb_vorbis_get_error(vorbis);
-        if (decode_error != VORBIS__no_error || total_samples_per_channel <= 0 ||
-            out.size()/2u != static_cast<std::size_t>(total_samples_per_channel)) {
-            if (error) *error = "Incomplete OGG decode: " + std::to_string(decode_error) + " frames=" + std::to_string(out.size()/2u) + " expected=" + std::to_string(total_samples_per_channel);
-            out.clear();
-            return false;
-        }
-    }
     return true;
 }
 

@@ -10,7 +10,7 @@
 namespace tenriff::app {
 
 inline constexpr bool key_overlay_supports(int lanes) {
-    return lanes == 4 || lanes == 5 || lanes == 7 || lanes == 8 || lanes == 10;
+    return lanes >= 4 && lanes <= 16;
 }
 
 struct KeyOverlayNote {
@@ -26,7 +26,7 @@ struct KeyOverlaySnapshot {
     bool live = false;
     bool preview = false;
     double now_ms = 0.0;
-    std::array<bool, 10> held{};
+    std::array<bool, 16> held{};
     std::array<KeyOverlayNote, MaxNotes> notes{};
     std::size_t note_count = 0;
     double kps = 0.0;
