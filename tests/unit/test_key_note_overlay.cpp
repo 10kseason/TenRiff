@@ -11,14 +11,14 @@ namespace {
 int64_t ns(double ms) { return static_cast<int64_t>(ms * 1e6); }
 }
 
-TEST_CASE("key overlay is opt in and only supports the five requested modes") {
+TEST_CASE("key overlay is opt in and supports every mode from 4 to 16 keys") {
     KeyNoteOverlay overlay;
     for (int lanes = 1; lanes <= 18; ++lanes) {
         overlay.configure(false, lanes);
         overlay.record(0, true, ns(10));
         CHECK_FALSE(overlay.update(ns(20), true).visible);
         overlay.configure(true, lanes);
-        CHECK(overlay.update(ns(20), true).visible == (lanes == 4 || lanes == 5 || lanes == 7 || lanes == 8 || lanes == 10));
+        CHECK(overlay.update(ns(20), true).visible == (lanes >= 4 && lanes <= 16));
     }
 }
 
@@ -42,7 +42,7 @@ TEST_CASE("key overlay preserves taps between frames and aligns only chord visua
 }
 
 TEST_CASE("key overlay KPS uses a rolling second without estimating input difficulty") {
-    for (int lanes : {4, 5, 7, 8, 10}) {
+    for (int lanes = 4; lanes <= 16; ++lanes) {
         KeyNoteOverlay overlay;
         overlay.configure(true, lanes);
         for (int i = 0; i < 120; ++i) {
@@ -147,12 +147,19 @@ TEST_CASE("key overlay skin settings round trip with safe legacy defaults and fi
     CHECK(skin.key_overlay_x == 0.0);
     CHECK(skin.key_overlay_y == doctest::Approx(0.25));
     skin.key_overlay_enabled = true;
+    CHECK(skin.key_overlay_scale == 1.0);
     skin.key_overlay_x = 0.23; skin.key_overlay_y = 0.81;
+    skin.key_overlay_scale = 0.37;
     SkinConfig restored;
     REQUIRE(deserialize_skin_config(serialize_skin_config(skin), restored));
     CHECK(restored.key_overlay_enabled);
     CHECK(restored.key_overlay_x == doctest::Approx(0.23));
     CHECK(restored.key_overlay_y == doctest::Approx(0.81));
+    CHECK(restored.key_overlay_scale == doctest::Approx(0.37));
+    REQUIRE(deserialize_skin_config(R"({"key_overlay_scale":-20})", restored));
+    CHECK(restored.key_overlay_scale == 0.25);
+    REQUIRE(deserialize_skin_config(R"({"key_overlay_scale":99})", restored));
+    CHECK(restored.key_overlay_scale == 1.0);
     REQUIRE(deserialize_skin_config(R"({"key_overlay_x":-20,"key_overlay_y":99})", restored));
     CHECK(restored.key_overlay_x == 0.0);
     CHECK(restored.key_overlay_y == 1.0);
@@ -161,18 +168,44 @@ TEST_CASE("key overlay skin settings round trip with safe legacy defaults and fi
 TEST_CASE("key overlay skin preview shows synthetic key history without live KPS") {
     tenriff::render::SkinPreviewData preview;
     preview.key_overlay_enabled = true;
-    for (int lanes : {4, 5, 6, 7, 8, 9, 10, 16}) {
+    preview.key_overlay_scale = 0.42;
+    for (int lanes = 1; lanes <= 18; ++lanes) {
         preview.lane_count = lanes;
         const auto hud = tenriff::render::make_skin_gameplay_preview(preview, ns(1000));
-        CHECK(hud.key_overlay.visible == tenriff::app::key_overlay_supports(lanes));
+        CHECK(hud.key_overlay.visible == tenriff::app::key_overlay_supports(hud.lane_count));
+        CHECK(hud.key_overlay_scale == doctest::Approx(0.42));
         CHECK(hud.key_overlay.preview);
         CHECK_FALSE(hud.key_overlay.live);
         CHECK(hud.key_overlay.kps == 0.0);
         if (hud.key_overlay.visible) {
-            CHECK(hud.key_overlay.note_count == static_cast<std::size_t>(lanes));
+            CHECK(hud.key_overlay.note_count == static_cast<std::size_t>(hud.lane_count));
             CHECK(hud.key_overlay.held[1]);
         } else {
             CHECK(hud.key_overlay.note_count == 0);
         }
+    }
+}
+
+TEST_CASE("key overlay records and releases every lane in all 4 to 16 key layouts") {
+    for (int lanes = 4; lanes <= 16; ++lanes) {
+        KeyNoteOverlay overlay;
+        overlay.configure(true, lanes);
+        overlay.record(-1, true, ns(5));
+        overlay.record(lanes, true, ns(5));
+        for (int lane = 0; lane < lanes; ++lane) overlay.record(lane, true, ns(10));
+        const auto held = overlay.update(ns(20), true);
+        REQUIRE(held.note_count == static_cast<std::size_t>(lanes));
+        CHECK(held.kps == lanes);
+        for (int lane = 0; lane < lanes; ++lane) {
+            CHECK(held.held[lane]);
+            CHECK(held.notes[lane].lane == lane);
+            overlay.record(lane, false, ns(30));
+        }
+        const auto released = overlay.update(ns(40), true);
+        for (int lane = 0; lane < lanes; ++lane) {
+            CHECK_FALSE(released.held[lane]);
+            CHECK(released.notes[lane].release_ms == 30);
+        }
+        CHECK(overlay.update(ns(1000), true).note_count == 0);
     }
 }

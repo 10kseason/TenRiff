@@ -174,6 +174,7 @@ struct MenuAppVisualTestAccess {
         skin.key_overlay_enabled = preview.key_overlay_enabled;
         skin.key_overlay_x = preview.key_overlay_x;
         skin.key_overlay_y = preview.key_overlay_y;
+        skin.key_overlay_scale = preview.key_overlay_scale;
         skin.score_comparison_enabled = preview.score_comparison_enabled;
         skin.score_comparison_x = preview.score_comparison_x;
         skin.score_comparison_y = preview.score_comparison_y;
@@ -1150,31 +1151,6 @@ struct MenuWindowVisualTestAccess {
                     JsonValue(static_cast<double>(window.offset_x_ + region.right * window.scale_)),
                     JsonValue(static_cast<double>(window.offset_y_ + region.bottom * window.scale_))})}});
         }
-        JsonArray ir_badges;
-        int ir_rows = 0, ir_detail = 0, ir_result = 0;
-        for (const auto& badge : window.benchmark_ir_badges_) {
-            if (badge.role == "row") ++ir_rows;
-            else if (badge.role == "detail") ++ir_detail;
-            else if (badge.role == "result") ++ir_result;
-            const auto& r = badge.rect;
-            if (verify && (r[0] < 0 || r[1] < 0 || r[2] > 1920 || r[3] > 1080 ||
-                           r[2] <= r[0] || r[3] <= r[1]))
-                failures.emplace_back("IR exclusion badge outside design canvas");
-            if (verify && badge.label != ui::text(source.ui_language, "IR EXCLUDED", "IR 제외"))
-                failures.emplace_back("IR exclusion badge lost localized label");
-            ir_badges.emplace_back(JsonObject{{"role", JsonValue(badge.role)}, {"label", JsonValue(badge.label)},
-                {"rect", JsonValue(JsonArray{JsonValue(r[0]), JsonValue(r[1]), JsonValue(r[2]), JsonValue(r[3])})}});
-        }
-        if (verify && song_fixture) {
-            const int expected_rows = static_cast<int>(std::count_if(source.song_select.songs.begin(),
-                source.song_select.songs.end(), [](const SongCardData& card) { return card.ir_excluded; }));
-            const bool expected_detail = source.song_select.selected_song_ir_excluded &&
-                !source.song_select.showing_sources && !source.song_select.showing_level_folders;
-            if (ir_rows != expected_rows || ir_detail != (expected_detail ? 1 : 0))
-                failures.emplace_back("IR exclusion badge missing from song row or selected detail");
-        }
-        if (verify && result_fixture && ir_result != (source.result.ir_excluded ? 1 : 0))
-            failures.emplace_back("IR exclusion badge missing from result");
         JsonArray lamp_labels, lobby_nav;
         for (const auto& card : source.song_select.songs) {
             const auto lamp = song_select_lamp_presentation(card.lamp);
@@ -1212,10 +1188,6 @@ struct MenuWindowVisualTestAccess {
             {"pointer_dispatch_method", JsonValue("MenuWindow::on_mouse_click on the owned foreground window; no desktop pointer or physical click is synthesized.")},
             {"notes", JsonValue(std::move(notes))},
             {"selected_song_difficulty", JsonValue(source.song_select.selected_song_difficulty)},
-            {"ir_badges", JsonValue(std::move(ir_badges))},
-            {"ir_badge_coordinate_space", JsonValue("Actual draw rectangles in 1920x1080 menu design coordinates.")},
-            {"selected_song_ir_status", JsonValue(source.song_select.selected_song_ir_status)},
-            {"result_ir_status", JsonValue(source.result.ir_status)},
             {"result_web_upload_status", JsonValue(source.result.web_upload_status)},
             {"lobby_lamp_formatter", JsonValue(std::move(lamp_labels))},
             {"lobby_nav_labels", JsonValue(std::move(lobby_nav))},
@@ -1382,7 +1354,7 @@ int main(int argc, char** argv) {
     double benchmark_cpu_start = 0;
     int64_t benchmark_wall_start = 0;
     bool key_overlay_fixture = false;
-    double key_overlay_x = 0.0, key_overlay_y = 0.25;
+    double key_overlay_x = 0.0, key_overlay_y = 0.25, key_overlay_scale = 1.0;
     int preview_keys = 10;
     int menu_keys = 7;
     double preview_note_height = 1.8;
@@ -1435,7 +1407,6 @@ int main(int argc, char** argv) {
     bool level_folders_fixture = false;
     bool long_title_fixture = false;
     bool clear_card_fixture = false;
-    bool ir_excluded_fixture = false;
     bool backdrop_off = false;
     double backdrop_opacity = -1.0;
     double backdrop_brightness = -1.0;
@@ -1592,6 +1563,7 @@ int main(int argc, char** argv) {
         if (arg == "--bms-rank" && i + 1 < argc) { bms_rank_fixture = argv[++i]; continue; }
         if (arg == "--artist-text" && i + 1 < argc) { artist_fixture = argv[++i]; continue; }
         if (arg == "--key-overlay") { key_overlay_fixture = true; continue; }
+        if (arg == "--key-overlay-scale" && i + 1 < argc) { key_overlay_scale = std::stod(argv[++i]); continue; }
         if (arg == "--lobby-score-clear" && i + 1 < argc) { lobby_score_clear = argv[++i]; continue; }
         if (arg == "--lobby-full-combo") { lobby_full_combo = true; continue; }
         if (arg == "--score-comparison") { score_comparison_fixture = true; continue; }
@@ -1639,7 +1611,6 @@ int main(int argc, char** argv) {
         if (arg == "--bpm-change") { bpm_change = true; continue; }
         // Keep new fixture switches out of the long legacy else-if chain:
         // MSVC counts those branches against its nested-block limit.
-        if (arg == "--ir-excluded") { ir_excluded_fixture = true; continue; }
         if (arg == "--legacy-song-list") { data.song_select.native_list_layout = false; continue; }
         if (arg == "--analysis-page" && i + 1 < argc) {
             result = true; analysis_page = std::clamp(std::stoi(argv[++i]), 0, 3); continue;
@@ -2584,6 +2555,7 @@ int main(int argc, char** argv) {
     data.gameplay.key_overlay_enabled = data.generic.skin_preview.key_overlay_enabled = key_overlay_fixture;
     data.gameplay.key_overlay_x = data.generic.skin_preview.key_overlay_x = key_overlay_x;
     data.gameplay.key_overlay_y = data.generic.skin_preview.key_overlay_y = key_overlay_y;
+    data.gameplay.key_overlay_scale = data.generic.skin_preview.key_overlay_scale = key_overlay_scale;
     data.gameplay.score_comparison_enabled = data.generic.skin_preview.score_comparison_enabled = score_comparison_fixture;
     data.gameplay.score_comparison_x = data.generic.skin_preview.score_comparison_x = score_comparison_x;
     data.gameplay.score_comparison_y = data.generic.skin_preview.score_comparison_y = score_comparison_y;
@@ -2622,14 +2594,6 @@ int main(int argc, char** argv) {
     }
     if (!sites_records_title.empty() &&
         !tenriff::app::MenuAppVisualTestAccess::populate_sites_records(data, sites_records_title)) return 5;
-    if (ir_excluded_fixture) {
-        for (auto& card : data.song_select.songs) card.ir_excluded = card.selected;
-        data.song_select.selected_song_ir_excluded = true;
-        data.song_select.selected_song_ir_status = loc("A keysound lasts at least 45 seconds", "45초 이상 키음 포함");
-        data.result.ir_excluded = true;
-        data.result.ir_status = loc("A keysound lasts at least 45 seconds", "45초 이상 키음 포함");
-        data.result.web_upload_status = loc("Local result saved", "로컬 결과 저장 완료");
-    }
     if (fullscreen_skin_preview) {
         // Preview scenes do not claim a completed player run.
         data.generic.skin_preview.fullscreen = true;
@@ -3094,6 +3058,7 @@ int main(int argc, char** argv) {
             render_data.gameplay.key_overlay_enabled = true;
             render_data.gameplay.key_overlay_x = key_overlay_x;
             render_data.gameplay.key_overlay_y = key_overlay_y;
+            render_data.gameplay.key_overlay_scale = key_overlay_scale;
         }
         window.render(render_data);
         if (menu_roundtrip) {

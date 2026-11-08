@@ -1,3 +1,5 @@
+> **2026-11-09 · 1.9.9.9-final2:** Remove keysound-duration/silence/required-analysis/chart-blacklist IR exclusions and badges that caused false positives. Key overlay supports every4–16K layout and25–100% whole-panel size. Production Site v28 uses the same removal. Existing ranking eligibility, scoring, judgement, replay formats and fixed baseline1.9.6 remain. [Release](release-1.9.9.9-final2.en.md). Earlier descriptions below are historical.
+
 > **2026-11-08 · 1.9.9.9-final1:** [IR protection and exclusion labels](release-1.9.9.9-final1.en.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 
 > **2026-11-08 · 1.9.9.9-hotfix5:** [Native-key leaderboard compatibility fix](release-1.9.9.9-hotfix5.en.md). Fixed baseline **1.9.6**. Earlier notices below are historical.

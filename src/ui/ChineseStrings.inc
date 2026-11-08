@@ -1425,7 +1425,7 @@
 {"↑↓ / WHEEL SELECT   ENTER / DOUBLE CLICK ENTER   TAB PANEL   ESC BACK", "↑↓ / 滚轮 选择   ENTER / 双击 进入   TAB 切换区域   ESC 返回"},
 
 // Optional integrated key-note-overlay plugin.
-{"Key Overlay Plugin (4/5/7/8/10K)", "按键叠加插件 (4/5/7/8/10K)"},
+{"Key Overlay Plugin (4~16K)", "按键叠加插件 (4~16K)"},
 {"Key Overlay X", "按键叠加 X"},
 {"Key Viewer", "按键显示"},
 {"Key Viewer · Preview", "按键显示 · 预览"},
@@ -1467,3 +1467,5 @@
 {"Common BGA replaces every chart background with the selected silent looping video. Enable it separately; BGA OFF takes priority. An unavailable video shows the default background.", "通用 BGA 用所选的静音循环视频替换所有谱面的背景。需单独开启；BGA OFF 优先。视频不可用时显示默认背景。"},
 
 {"Video selection failed. Try selecting a supported video again.", "视频选择失败。请重新选择受支持的视频。"},
+
+{"Key Overlay Size", "按键叠加大小"},

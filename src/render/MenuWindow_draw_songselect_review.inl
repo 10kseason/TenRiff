@@ -157,9 +157,7 @@
             review_bitmap(find_song_card_preview_bitmap(song.background_path), D2D1::RectF(79, thumb_top, 151, thumb_top + 54));
             review_text(to_wide(song.title), d2d_->song_title_format.Get(), D2D1::RectF(174, top + 10, 814, top + 44),
                         song.selected ? 0xFFFFFF : 0xECECEF);
-            review_text(to_wide(song.artist), d2d_->hud_format.Get(),
-                D2D1::RectF(174, top + 47, song.ir_excluded ? 646 : 814, top + 71), 0x8F8F98);
-            if (song.ir_excluded) draw_ir_badge("row", D2D1::RectF(662, top + 46, 814, top + 72));
+            review_text(to_wide(song.artist), d2d_->hud_format.Get(), D2D1::RectF(174, top + 47, 814, top + 71), 0x8F8F98);
             const auto badge = D2D1::RectF(836, top + 24, 1016, top + 58);
             const auto clear = song_select_lamp_presentation(song.lamp);
             if (song.chart_count >= 0) {
@@ -213,7 +211,6 @@
         const std::string title = review.showing_sources ? review.selected_source_name : !review.selected_song_title.empty()
             ? review.selected_song_title : selected_card ? selected_card->title : review.empty_title;
         review_bitmap(folder_view ? nullptr : find_song_card_preview_bitmap(review.selected_song_background_path), D2D1::RectF(1104, 98, 1456, 362));
-        if (!folder_view) draw_ir_detail(D2D1::RectF(1112, 292, 1448, 354));
         review_wrap(to_wide(title), d2d_->song_title_format.Get(), D2D1::RectF(1480, 98, 1872, 228), 0xFFFFFF);
         review_text(to_wide(folder_view ? (selected_card ? selected_card->artist : std::string{}) : review.selected_song_artist),
                     d2d_->body_format.Get(), D2D1::RectF(1480, 237, 1872, 268), 0xBABAC2);

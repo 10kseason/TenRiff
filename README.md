@@ -1,3 +1,5 @@
+> **2026-11-09 · 1.9.9.9-final2:** 오탐을 만들던 키음 길이·무키음·분석 필수·곡별 IR 제외와 표시를 제거했습니다. 키 오버레이는 모든4~16키와25~100% 크기를 지원합니다. 운영 웹v28과 함께 사용하며 기본 랭킹 자격·판정·점수·리플레이 형식과 고정 기준선1.9.6은 유지합니다. [Release](docs/release-1.9.9.9-final2.ko.md). Earlier descriptions below are historical.
+
 > **2026-11-08 · 1.9.9.9-final1:** [IR 보호와 제외 표시](docs/release-1.9.9.9-final1.ko.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 
 **1.9.9.9-hotfix6-ir-local — [IR protection / IR 보호](docs/ir-protection-hotfix6.ko.md)**

@@ -185,7 +185,7 @@
     {"Show PG / GR / G / BAD / PR counts below the timing indicator inside the field. Counts remain visible between hits. Default: Off.", "在轨道内指示器正下方显示PG / GR / G / BAD / PR累计数量，击打间隔仍显示。默认关闭。"},
 
 {"E keeps source LN intervals. E+ - Full-field + taps remixes 7K, 8K and 10K, including equal-key charts. Other key counts use E while keeping the E+ selection.", "E保留原谱长按区间。E+ - Full-field + taps支持7K、8K和10K，同键数也会重新分配。切换至其他键数时应用E并保留E+选项。"},
-{"Show the key viewer and 1-second KPS in 4/5/7/8/10K. Default: Off.", "在4/5/7/8/10K中显示按键可视化和最近1秒的KPS。默认关闭。"},
+{"Show the key viewer and 1-second KPS in every 4-16K mode. Default: Off.", "在4～16K的所有模式中显示按键可视化和最近1秒的KPS。默认关闭。"},
 {"Move the key overlay horizontally in 1% steps. 0% is left and 100% is right; the full panel stays on screen.", "按1%调整叠加面板水平位置。0%为左侧，100%为右侧；整个面板保持在屏幕内。"},
 {"Move the key overlay vertically in 1% steps. 0% is top and 100% is bottom. Enablement and position are saved with the skin settings.", "按1%调整叠加面板垂直位置。0%为顶部，100%为底部。启用状态和位置随皮肤设置保存。"},
 
@@ -193,3 +193,5 @@
 
 {"Replace all chart BGA layers with the selected silent looping video. BGA OFF takes priority.", "将所有谱面的 BGA 层替换为所选静音循环视频。BGA OFF 优先。"},
 {"Select a local video for Common BGA. Selection alone does not enable it; cancelling keeps the current file.", "选择通用 BGA 使用的本地视频。仅选择文件不会开启；取消保留当前文件。"},
+
+{"Scale the whole key overlay from 25% to 100% in 1% steps. Size is saved with skin presets and profiles.", "以1%为单位将整个按键叠加缩放到25%～100%。大小保存在皮肤预设和配置档中。"},

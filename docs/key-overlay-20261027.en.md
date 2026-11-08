@@ -1,3 +1,5 @@
+> **2026-11-09 · 1.9.9.9-final2:** Remove keysound-duration/silence/required-analysis/chart-blacklist IR exclusions and badges that caused false positives. Key overlay supports every4–16K layout and25–100% whole-panel size. Production Site v28 uses the same removal. Existing ranking eligibility, scoring, judgement, replay formats and fixed baseline1.9.6 remain. [Release](release-1.9.9.9-final2.en.md). Earlier descriptions below are historical.
+
 > **1.9.9.3:** Includes accelerated controls, LR2CRS courses, BMS/KPS overlay, clear cards, grade colors and EX rainbow fixes. General fixed baseline: **1.9.6**. Older release and local-candidate entries below are historical; this scope supersedes them. [Release](release-1.9.9.3.en.md).
 
 > Historical implementation below. Live input difficulty and HUD computation are superseded by this follow-up: [Fixed BMS estimate, KPS worker and gauge colors](bms-overlay-20261027.en.md).

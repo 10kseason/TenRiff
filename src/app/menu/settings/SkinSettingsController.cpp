@@ -328,6 +328,10 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
         runtime.skin.key_backdrop_height = backdrop_default_height_.value_or(static_cast<float>(runtime.skin.key_backdrop_height));
         runtime.skin.key_backdrop_override = true;
     }
+    if (action.kind == MenuActionKind::SetRatio && selected_id_ == SkinSettingsRowId::KeyOverlayScale) {
+        runtime.skin.key_overlay_scale = clamp_step_value(0.25 + action.ratio * 0.75, 0.25, 1.0, 0.01);
+        return mark_changed();
+    }
     if (action.kind == MenuActionKind::SetRatio && selected_id_ == SkinSettingsRowId::LaneDividerBrightness) {
         runtime.skin.lane_divider_brightness = clamp_step_value(action.ratio, 0.0, 1.0, 0.01);
         return mark_changed();
@@ -629,6 +633,9 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
             return mark_changed();
         case SkinSettingsRowId::ScoreComparisonY:
             runtime.skin.score_comparison_y = clamp_step_value(runtime.skin.score_comparison_y + direction * 0.01, 0.0, 1.0, 0.01);
+            return mark_changed();
+        case SkinSettingsRowId::KeyOverlayScale:
+            runtime.skin.key_overlay_scale = clamp_step_value(runtime.skin.key_overlay_scale + direction * 0.01, 0.25, 1.0, 0.01);
             return mark_changed();
         case SkinSettingsRowId::KeyOverlayX:
             runtime.skin.key_overlay_x = clamp_step_value(runtime.skin.key_overlay_x + direction * 0.01, 0.0, 1.0, 0.01);

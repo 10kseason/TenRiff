@@ -1424,7 +1424,7 @@
 {"↑↓ / WHEEL SELECT   ENTER / DOUBLE CLICK ENTER   TAB PANEL   ESC BACK", "↑↓ / ホイール 選択   ENTER / ダブルクリック 開始   TAB 領域移動   ESC 戻る"},
 
 // Optional integrated key-note-overlay plugin.
-{"Key Overlay Plugin (4/5/7/8/10K)", "キーオーバーレイ プラグイン (4/5/7/8/10K)"},
+{"Key Overlay Plugin (4~16K)", "キーオーバーレイ プラグイン (4~16K)"},
 {"Key Overlay X", "キーオーバーレイ X"},
 {"Key Viewer", "キービューア"},
 {"Key Viewer · Preview", "キービューア · プレビュー"},
@@ -1457,3 +1457,5 @@
 {"Common BGA replaces every chart background with the selected silent looping video. Enable it separately; BGA OFF takes priority. An unavailable video shows the default background.", "共通BGAは全曲の背景を選択した無音ループ動画に置き換えます。別途有効にしてください。BGA OFFが優先され、動画を利用できない場合は標準背景を表示します。"},
 
 {"Video selection failed. Try selecting a supported video again.", "動画の選択に失敗しました。対応動画をもう一度選択してください。"},
+
+{"Key Overlay Size", "キーオーバーレイ サイズ"},

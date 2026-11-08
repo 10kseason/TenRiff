@@ -172,6 +172,7 @@
     "key_overlay_enabled": false,
     "key_overlay_x": 0.0,
     "key_overlay_y": 0.25,
+    "key_overlay_scale": 1.0,
     "score_comparison_enabled": false,
     "score_comparison_x": 0.0,
     "score_comparison_y": 0.28,

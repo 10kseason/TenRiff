@@ -140,7 +140,7 @@ KeyOverlaySnapshot KeyNoteOverlay::update(int64_t now_ns, bool live) {
             if (state_.note_count == state_.notes.size()) {
                 const auto oldest_released = std::find_if(state_.notes.begin(), state_.notes.end(),
                     [](const KeyOverlayNote& note) { return note.release_ms >= 0; });
-                // At most ten notes are held, so a released entry always exists.
+                // At most sixteen notes are held, so a released entry always exists.
                 std::move(oldest_released + 1, state_.notes.end(), oldest_released);
                 --state_.note_count;
             }

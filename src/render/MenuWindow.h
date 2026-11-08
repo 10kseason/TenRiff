@@ -180,7 +180,6 @@ struct SongCardData {
     int song_index = -1;
     bool selected = false;
     bool favorite = false;
-    bool ir_excluded = false;
 };
 
 struct SessionMixStageData {
@@ -237,8 +236,6 @@ struct SongSelectData {
     std::string selected_song_artist;
     std::string selected_song_chart_author;
     std::string selected_song_detail;
-    bool selected_song_ir_excluded = false;
-    std::string selected_song_ir_status;
     std::string selected_song_layout;
     std::string selected_song_chart_name;
     std::string selected_song_difficulty;
@@ -471,8 +468,6 @@ struct ResultScreenData {
     int shift_count = 0;
     int export_warning_count = 0;
     std::string web_upload_status;
-    bool ir_excluded = false;
-    std::string ir_status;
     bool timing_guidance_visible = false;
     int timing_guidance_direction = 0;
     std::string timing_guidance_title;
@@ -612,6 +607,7 @@ struct GameplayHudData {
     bool key_overlay_enabled = false;
     double key_overlay_x = 0.0;
     double key_overlay_y = 0.25;
+    double key_overlay_scale = 1.0;
     bool score_comparison_enabled = false;
     double score_comparison_x = 0.0;
     double score_comparison_y = 0.28;
@@ -844,6 +840,7 @@ struct SkinPreviewData {
     bool key_overlay_enabled = false;
     double key_overlay_x = 0.0;
     double key_overlay_y = 0.25;
+    double key_overlay_scale = 1.0;
     bool score_comparison_enabled = false;
     double score_comparison_x = 0.0;
     double score_comparison_y = 0.28;
@@ -1174,12 +1171,6 @@ private:
         std::array<float, 4> combo_rect{}, counts_rect{};
     };
     std::array<GameplayComboPlacementMetrics, 2> benchmark_combo_placement_{};
-    struct IrBadgePlacementMetrics {
-        std::string role;
-        std::string label;
-        std::array<float, 4> rect{};
-    };
-    std::vector<IrBadgePlacementMetrics> benchmark_ir_badges_;
     int64_t benchmark_present_started_ns_ = 0;
     int64_t benchmark_present_ended_ns_ = 0;
     bool gameplay_sprite_batch_enabled_ = true;
