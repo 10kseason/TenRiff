@@ -1,3 +1,11 @@
+# 1.9.9.9-hotfix5 — 2026-11-08
+
+- Include all hotfix4 hit feedback, burst options and multicore folder/cache loading changes.
+- Identify native Auto/None/Native plays from the replay's requested key mode, so remembered converter settings no longer mislabel new original-key scores.
+- Keep explicit same-key conversions and missing/unknown modes unranked under website v25's native-only policy. Preserve stored historical records without relabelling or resubmission.
+- Retain scoring, judgement, replay format, R13/R14 rules and fixed baseline 1.9.6.
+- [Usage](docs/release-1.9.9.9-hotfix5.en.md) · [Validation](docs/release-1.9.9.9-hotfix5-gate.md).
+
 # 1.9.9.9-hotfix4 — 2026-11-07
 
 - Use available logical CPU threads for Safe and Fast folder indexing, existing-cache parsing and ALL SONG cached-path validation, with bounded batches and RAM-aware concurrency.

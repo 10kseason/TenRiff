@@ -1,3 +1,5 @@
+> **2026-11-08 · 1.9.9.9-hotfix5:** [元のキーモードとリーダーボードの互換性修正](release-1.9.9.9-hotfix5.ja.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
+
 > **2026-11-07 · 1.9.9.9-hotfix4:** [マルチコアキャッシュ読み込みとヒット演出設定](release-1.9.9.9-hotfix4.ja.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 
 > **2026-11-04 · 1.9.9.9-hotfix1:** [OGG セキュリティ修正・共通 BGA・スキンエディター](release-1.9.9.9-hotfix1.ja.md). Fixed baseline **1.9.6**. Earlier notices below are historical.

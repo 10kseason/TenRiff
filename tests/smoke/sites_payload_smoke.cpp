@@ -42,6 +42,10 @@ int main(int argc, char** argv) {
     replay.chart_sha256 = std::string(64, 'a');
     replay.created_utc = "20260901_000000Z";
     replay.trace.lane_count = 10;
+    // Match GameSession's native mode with a remembered converter selection.
+    replay.mode.key_mode = "auto";
+    replay.mode.key_conversion_algorithm = "krrcream";
+    replay.mode.key_conversion_nk2_preset = "source_ln_e_v1";
     replay.stats.total_notes = 100;
     replay.stats.counts.pg = 98;
     replay.stats.counts.gr = 2;
@@ -59,12 +63,16 @@ int main(int argc, char** argv) {
     } else if (argc == 2 && std::string(argv[1]) == "--fixture-ex") {
         replay.ruleset_id = std::string(tenriff::app::kExReplayRulesetId);
         replay.mods = {"judge_ex"};
+    } else if (argc == 2 && std::string(argv[1]) == "--fixture-converted") {
+        replay.mode.key_mode = "10k";
+        replay.mode.key_conversion_algorithm = "nk2";
     } else if (argc != 1) {
-        std::cerr << "Use --fixture-hard or --fixture-ex for offline fixtures.";
+        std::cerr << "Use --fixture-hard, --fixture-ex or --fixture-converted for offline fixtures.";
         return 2;
     }
     std::string payload, error;
-    if (!tenriff::app::build_sites_score_json(replay, std::string(64, 'b'),
+    const char replay_digest_digit = replay.mode.key_mode == "auto" ? 'b' : 'c';
+    if (!tenriff::app::build_sites_score_json(replay, std::string(64, replay_digest_digit),
          "QA Fixture - TenRiff", "FULLCOMBO", payload, error)) {
         std::cerr << error; return 1;
     }

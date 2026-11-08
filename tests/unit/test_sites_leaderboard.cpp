@@ -118,6 +118,7 @@ gameplay::ReplayFile score_fixture() {
     replay.chart_sha256 = std::string(64, 'b');
     replay.created_utc = "20260913_000000Z";
     replay.trace.lane_count = 10;
+    replay.mode.key_mode = "auto";
     replay.final_score = 9900;
     replay.stats.total_notes = 100;
     replay.stats.counts.pg = 98;
@@ -997,6 +998,7 @@ TEST_CASE("Sites accepts existing 16K while retaining the previous 4K through 14
     for (int lanes : {4,5,6,7,8,9,10,11,12,13,14,16}) {
         auto replay = score_fixture();
         replay.trace.lane_count = lanes;
+        replay.mode.key_mode = std::to_string(lanes) + "k";
         replay.mode.key_conversion_algorithm = "nk2";
         replay.mode.key_conversion_nk2_preset = "source_ln_e_v1";
         std::string payload, error;
@@ -1008,5 +1010,39 @@ TEST_CASE("Sites accepts existing 16K while retaining the previous 4K through 14
         std::string payload, error;
         CHECK_FALSE(app::build_sites_score_json(replay, std::string(64, 'c'), "Invalid", "CLEAR", payload, error));
         CHECK(payload.empty());
+    }
+}
+
+TEST_CASE("Sites identifies original keys from the replay mode despite remembered converter settings") {
+    for (const auto mode : {"auto", "none", "native", "AUTO"}) {
+        for (const auto algorithm : {"krrcream", "nk2", "nk3"}) {
+            for (const int lanes : {4, 7, 8, 10, 16}) {
+                auto replay = score_fixture();
+                replay.trace.lane_count = lanes;
+                replay.mode.key_mode = mode;
+                replay.mode.key_conversion_algorithm = algorithm;
+                replay.mode.key_conversion_nk2_preset = "source_ln_e_v1";
+                std::string payload, error;
+                REQUIRE(app::build_sites_score_json(replay, std::string(64, 'c'), "Native keys", "CLEAR", payload, error));
+                CHECK(payload.find("\"key_conversion\":\"none\"") != std::string::npos);
+                CHECK(payload.find("\"key_mode\":\"" + std::to_string(lanes) + "K\"") != std::string::npos);
+            }
+        }
+    }
+}
+
+TEST_CASE("Sites marks explicit same-key conversions and unknown modes as unranked") {
+    for (const auto mode : {"4k", "7k", "8k", "10k", "16k", "", "invalid"}) {
+        for (const auto algorithm : {"krrcream", "nk2", "nk3", ""}) {
+            auto replay = score_fixture();
+            replay.mode.key_mode = mode;
+            replay.mode.key_conversion_algorithm = algorithm;
+            replay.mode.key_conversion_nk2_preset = "source_ln_e_v1";
+            std::string payload, error;
+            REQUIRE(app::build_sites_score_json(replay, std::string(64, 'c'), "Converted keys", "CLEAR", payload, error));
+            CHECK(payload.find("\"key_conversion\":\"none\"") == std::string::npos);
+            const std::string expected = std::string(algorithm).empty() ? "unknown" : algorithm;
+            CHECK(payload.find("\"key_conversion\":\"" + expected + ":source_ln_e_v1\"") != std::string::npos);
+        }
     }
 }

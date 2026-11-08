@@ -1,3 +1,9 @@
+TenRiff 1.9.9.9-hotfix5 source package — 2026-11-08
+
+The source matches the release commit. Includes hotfix4 in full and corrects native-key leaderboard markers. See docs/release-1.9.9.9-hotfix5.en.md and docs/release-1.9.9.9-hotfix5-gate.md. Fixed baseline: 1.9.6.
+
+Earlier descriptions below are historical. Existing inclusion and privacy rules remain.
+
 TenRiff 1.9.9.9-hotfix4 source package — 2026-11-07
 
 Build inputs match the release commit. This release covers multicore folder and cache loading, hit motion, successful-note visibility and hit-burst customization. See docs/release-1.9.9.9-hotfix4.en.md and docs/release-1.9.9.9-hotfix4-gate.md. The fixed baseline is 1.9.6.
