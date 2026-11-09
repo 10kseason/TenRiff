@@ -1,5 +1,6 @@
 # 1.9.9.9-final3 —2026-11-09
 
+- Preserve non-ASCII Windows command-line song/chart/replay/profile arguments through the wide CRT entrypoint and explicit UTF-8 conversion.
 - Clip committed failed notes below the judgement line so they no longer cover the gear; preserve gameplay processing and replay identity.
 - Add profile judgement-line brightness and optional per-skin/per-mode gain, shared by gameplay and previews. Default100% preserves prior intensity.
 - Redesign twelve bundled skins with common native geometry and theme accents; preserve original manifests/art. Include TenRiff Code / CLI, all1–16K and7+1, with three silent terminal loop videos.

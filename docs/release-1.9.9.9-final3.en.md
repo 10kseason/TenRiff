@@ -2,6 +2,8 @@
 
 Clip failed notes below the judgement line, add a judgement-line dimmer, redesign twelve bundled themes in a common modern style, and include TenRiff Code / CLI with three loop videos. The AI authoring guide, v1 schema and web/offline editors support the new brightness and video fields.
 
+Windows command-line paths and profile names now use the wide CRT entrypoint and explicit UTF-8 conversion, preserving Korean, Japanese, emoji and spaces. The normal relative-path launcher remains compatible.
+
 ## Use
 
 Extract the release ZIP into a new folder and run `launch_win.bat`. In Skin settings, select a bundled TenRiff theme. The profile judgement-line brightness defaults to100%; a skin's optional `gameplay.judgement_line_brightness` multiplies it, including mode overrides and previews. Failed taps and failed LN heads continue falling visually but are clipped below the timing line; their committed judgement and later-note processing do not change.

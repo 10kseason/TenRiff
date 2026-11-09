@@ -1,17 +1,35 @@
 #include <iostream>
+#include <string>
+#include <vector>
 
 #ifdef _WIN32
 #include "app/CommandLine.h"
 #include "app/CrashLogger.h"
 #include "app/MenuApp.h"
+#include "util/Utf8Compat.h"
 #endif
 
+#ifdef _WIN32
+int wmain(int argc, wchar_t** wide_argv) {
+#else
 int main(int argc, char** argv) {
+#endif
 #ifdef _WIN32
     tenriff::app::install_crash_handlers();
 
     try {
-        auto parsed = tenriff::app::CommandLine::parse(argc, argv);
+        // The rest of the application consumes UTF-8. Narrow CRT argv uses the
+        // system ANSI code page and can lose even valid Windows path names.
+        std::vector<std::string> arguments;
+        arguments.reserve(argc);
+        for (int i = 0; i < argc; ++i) {
+            arguments.push_back(tenriff::util::utf8_from_wide_lossy(wide_argv[i]));
+        }
+        std::vector<char*> argv;
+        argv.reserve(arguments.size() + 1);
+        for (auto& argument : arguments) argv.push_back(argument.data());
+        argv.push_back(nullptr);
+        auto parsed = tenriff::app::CommandLine::parse(argc, argv.data());
         for (const auto& warning : parsed.warnings) {
             std::cerr << "[warn] " << warning << std::endl;
         }

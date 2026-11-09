@@ -2,6 +2,8 @@
 
 失敗ノートを判定ラインより下で隠し、判定ラインの明度設定を追加しました。既存12スキンを共通の現代的スタイルに再設計し、3つのループ動画付きTenRiff Code / CLIを同梱します。AI制作ガイド・v1スキーマ・Web/同梱エディターは新しい明度と動画フィールドに対応します。
 
+Windows command-line paths and profile names now use the wide CRT entrypoint and explicit UTF-8 conversion, preserving Korean, Japanese, emoji and spaces. The normal relative-path launcher remains compatible.
+
 ## Use
 
 Extract the release ZIP into a new folder and run `launch_win.bat`. In Skin settings, select a bundled TenRiff theme. The profile judgement-line brightness defaults to100%; a skin's optional `gameplay.judgement_line_brightness` multiplies it, including mode overrides and previews. Failed taps and failed LN heads continue falling visually but are clipped below the timing line; their committed judgement and later-note processing do not change.
