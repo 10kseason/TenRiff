@@ -492,6 +492,9 @@ endif()
 
 if(WIN32)
     target_link_libraries(tenriff PRIVATE tenriff_chart tenriff_game tenriff_runtime tenriff_core tenriff_audio tenriff_app)
+    if(MSVC)
+        target_link_options(tenriff PRIVATE /ENTRY:wmainCRTStartup)
+    endif()
     # Explicit developer target: renders deterministic fixtures through the actual
     # D3D11 menu renderer without audio, accounts, songs, or profile writes.
     add_executable(menu_visual_preview EXCLUDE_FROM_ALL tools/menu_visual_preview.cpp)

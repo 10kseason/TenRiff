@@ -2,6 +2,8 @@
 
 在判定线下方隐藏失败音符，新增判定线亮度设置，以统一现代风格重新设计12个内置主题，并加入带3个循环视频的TenRiff Code / CLI。AI制作指南、v1架构及网页/离线编辑器支持新增亮度与视频字段。
 
+Windows command-line paths and profile names now use the wide CRT entrypoint and explicit UTF-8 conversion, preserving Korean, Japanese, emoji and spaces. The normal relative-path launcher remains compatible.
+
 ## Use
 
 Extract the release ZIP into a new folder and run `launch_win.bat`. In Skin settings, select a bundled TenRiff theme. The profile judgement-line brightness defaults to100%; a skin's optional `gameplay.judgement_line_brightness` multiplies it, including mode overrides and previews. Failed taps and failed LN heads continue falling visually but are clipped below the timing line; their committed judgement and later-note processing do not change.

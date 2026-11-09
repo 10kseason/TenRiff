@@ -2,6 +2,8 @@
 
 실패한 노트가 판정선 아래에서 기어와 겹치지 않도록 가리고, 스킨 설정에 판정선 명도를 추가했습니다. 기존 12개 스킨을 공통 현대 스타일로 정리하고 TenRiff Code / CLI와 반복 영상 3개를 포함합니다. AI 제작 가이드·v1 스키마·웹/동봉 에디터는 새 명도와 영상 필드를 지원합니다.
 
+Windows command-line paths and profile names now use the wide CRT entrypoint and explicit UTF-8 conversion, preserving Korean, Japanese, emoji and spaces. The normal relative-path launcher remains compatible.
+
 ## Use
 
 Extract the release ZIP into a new folder and run `launch_win.bat`. In Skin settings, select a bundled TenRiff theme. The profile judgement-line brightness defaults to100%; a skin's optional `gameplay.judgement_line_brightness` multiplies it, including mode overrides and previews. Failed taps and failed LN heads continue falling visually but are clipped below the timing line; their committed judgement and later-note processing do not change.
