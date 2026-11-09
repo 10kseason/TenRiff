@@ -111,6 +111,47 @@ bool process_owns_foreground_window() {
 #endif
 }
 
+constexpr int64_t kForegroundCacheMaxAgeNs = 50'000'000;
+
+// Priority ceiling for the HUD thread while it holds the lock shared with the
+// audio callback. Without it an ordinary-priority thread can be descheduled
+// for milliseconds while holding that lock. TENRIFF_HUD_LOCK_CEILING=0
+// disables it for A/B measurement.
+class HudLockPriorityCeiling {
+public:
+    HudLockPriorityCeiling() {
+#ifdef _WIN32
+        if (!enabled()) return;
+        thread_ = GetCurrentThread();
+        previous_ = GetThreadPriority(thread_);
+        if (previous_ == THREAD_PRIORITY_ERROR_RETURN || previous_ >= THREAD_PRIORITY_TIME_CRITICAL) return;
+        raised_ = SetThreadPriority(thread_, THREAD_PRIORITY_TIME_CRITICAL) != 0;
+#endif
+    }
+    ~HudLockPriorityCeiling() {
+#ifdef _WIN32
+        if (raised_) SetThreadPriority(thread_, previous_);
+#endif
+    }
+    HudLockPriorityCeiling(const HudLockPriorityCeiling&) = delete;
+    HudLockPriorityCeiling& operator=(const HudLockPriorityCeiling&) = delete;
+
+private:
+#ifdef _WIN32
+    static bool enabled() {
+        static const bool value = [] {
+            wchar_t raw[8]{};
+            const DWORD length = GetEnvironmentVariableW(L"TENRIFF_HUD_LOCK_CEILING", raw, 8);
+            return !(length == 1 && raw[0] == L'0');
+        }();
+        return value;
+    }
+    HANDLE thread_ = nullptr;
+    int previous_ = 0;
+    bool raised_ = false;
+#endif
+};
+
 std::string normalize_runtime_key_mode_local(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
         return static_cast<char>(std::tolower(ch));
@@ -1309,4 +1350,12 @@ bool decode_audio_file_stereo_resampled(const std::string& path,
         path, target_sample_rate, out, error, max_output_frames);
 }
 
-#include "GameSessionTail.inl"
+// One translation unit, split by responsibility; order is significant.
+#include "GameSessionInit.inl"
+#include "GameSessionRun.inl"
+#include "GameSessionTuning.inl"
+#include "GameSessionChartAudio.inl"
+#include "GameSessionShutdown.inl"
+#include "GameSessionAudioCallback.inl"
+#include "GameSessionInput.inl"
+#include "GameSessionPlayback.inl"
