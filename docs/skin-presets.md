@@ -4,6 +4,14 @@
 
 # Portable skin presets
 
+2026-11-09 local candidate: the v1 container is unchanged. The profile's
+`skin.judgement_line_brightness` (0–1, default 1) and key overlay scale
+(0.25–1, default 1; overlay OFF) travel with SkinConfig. Integrated key viewing
+supports 4–16K. An active TenRiff manifest can additionally specify
+`gameplay.judgement_line_brightness`; its gain multiplies the profile dimmer.
+The offline skin editor exports `skin.json`/ZIP, not `.trskin` or `.trprofile`.
+These local authoring changes have not been deployed to the public editor.
+
 For 1.8.8 target-lane number shortcuts and their visual left-to-right order, see [skin lane controls (Korean)](release-feedback-1.8.8.ko.md#스킨의-숫자-레인-선택). These shortcuts select an editing target; the `.trskin` format is unchanged.
 
 In **1.9.2**, `Options > Skins` retains **Import Skin Preset** and removes

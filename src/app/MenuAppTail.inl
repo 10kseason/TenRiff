@@ -150,6 +150,8 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         manifest_style ? manifest_style->show_lane_dividers : std::optional<bool>{},
         config_.skin.show_lane_dividers);
     target.lane_divider_brightness = config_.skin.lane_divider_brightness;
+    target.judgement_line_brightness = resolve_skin_judgement_line_brightness(
+        config_.skin.judgement_line_brightness, manifest_style);
     target.note_divider_gap_px = std::clamp(
         config_.skin.note_divider_gap_px,
         config::kNoteDividerGapPxMin,
@@ -242,6 +244,10 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.skin_background_path =
         (tenriff_manifest_active && gameplay_manifest)
             ? gameplay_manifest->gameplay_background_path
+            : std::string{};
+    target.skin_background_video_path =
+        (tenriff_manifest_active && gameplay_manifest)
+            ? gameplay_manifest->gameplay_background_video_path
             : std::string{};
     target.skin_background_opacity =
         (tenriff_manifest_active && gameplay_manifest)
@@ -1789,6 +1795,17 @@ void MenuApp::publish_snapshot() {
             background_it != active_tenriff_skin_.screen_background_paths.end()
                 ? background_it->second
                 : active_tenriff_skin_.lobby_background_path;
+        // Same screen -> fallback screen -> common order as the still. An
+        // explicit empty screen entry keeps that screen on its still image.
+        auto video_it = active_tenriff_skin_.screen_background_video_paths.find(screen_background_key);
+        if (video_it == active_tenriff_skin_.screen_background_video_paths.end() &&
+            !screen_background_fallback.empty()) {
+            video_it = active_tenriff_skin_.screen_background_video_paths.find(screen_background_fallback);
+        }
+        render.lobby_skin.background_video_path =
+            video_it != active_tenriff_skin_.screen_background_video_paths.end()
+                ? video_it->second
+                : active_tenriff_skin_.lobby_background_video_path;
         render.lobby_skin.logo_path = active_tenriff_skin_.lobby_logo_path;
         auto opacity_it = active_tenriff_skin_.screen_background_opacities.find(
             screen_background_key);

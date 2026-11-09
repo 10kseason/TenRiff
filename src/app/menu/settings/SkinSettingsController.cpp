@@ -332,6 +332,10 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
         runtime.skin.key_overlay_scale = clamp_step_value(0.25 + action.ratio * 0.75, 0.25, 1.0, 0.01);
         return mark_changed();
     }
+    if (action.kind == MenuActionKind::SetRatio && selected_id_ == SkinSettingsRowId::JudgementLineBrightness) {
+        runtime.skin.judgement_line_brightness = clamp_step_value(action.ratio, 0.0, 1.0, 0.01);
+        return mark_changed();
+    }
     if (action.kind == MenuActionKind::SetRatio && selected_id_ == SkinSettingsRowId::LaneDividerBrightness) {
         runtime.skin.lane_divider_brightness = clamp_step_value(action.ratio, 0.0, 1.0, 0.01);
         return mark_changed();
@@ -525,6 +529,10 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
         case SkinSettingsRowId::LaneDividerBrightness:
             runtime.skin.lane_divider_brightness = clamp_step_value(
                 runtime.skin.lane_divider_brightness + direction * 0.01, 0.0, 1.0, 0.01);
+            return mark_changed();
+        case SkinSettingsRowId::JudgementLineBrightness:
+            runtime.skin.judgement_line_brightness = clamp_step_value(
+                runtime.skin.judgement_line_brightness + direction * 0.01, 0.0, 1.0, 0.01);
             return mark_changed();
         case SkinSettingsRowId::JudgementLineType:
             runtime.skin.judgement_line_type = runtime.skin.judgement_line_type == 2 ? 1 : 2;

@@ -2,43 +2,636 @@
   "$schema": "../../docs/tenriff-skin.schema.json",
   "format": "tenriff-skin",
   "version": 1,
-  "name": "TenRiff Studio",
+  "name": "Studio / Modern",
   "author": "TenRiff",
   "lobby": {
     "renderer": "native",
-    "background": "assets/studio-backdrop.png"
+    "background": "modern/background.png",
+    "logo": "",
+    "background_opacity": 0.48,
+    "screen_backgrounds": {
+      "quick_setup": "modern/background.png",
+      "title": "modern/background.png",
+      "options": "modern/background.png",
+      "multiplayer": "modern/background.png",
+      "song_select": "modern/background.png",
+      "session_mix": "modern/background.png",
+      "song_browser": "modern/background.png",
+      "settings": "modern/background.png",
+      "settings_audio": "modern/background.png",
+      "settings_graphics": "modern/background.png",
+      "settings_skins": "modern/background.png",
+      "settings_input": "modern/background.png",
+      "settings_calibration": "modern/background.png",
+      "mode_select": "modern/background.png",
+      "mode_mods": "modern/background.png",
+      "keymap": "modern/background.png",
+      "keymap_confirm": "modern/background.png",
+      "onnx_upscaler_confirm": "modern/background.png",
+      "keymap_test": "modern/background.png",
+      "result": "modern/background.png"
+    },
+    "screen_opacities": {
+      "quick_setup": 0.28,
+      "title": 0.42,
+      "options": 0.28,
+      "multiplayer": 0.28,
+      "song_select": 0.28,
+      "session_mix": 0.28,
+      "song_browser": 0.28,
+      "settings": 0.28,
+      "settings_audio": 0.28,
+      "settings_graphics": 0.28,
+      "settings_skins": 0.28,
+      "settings_input": 0.28,
+      "settings_calibration": 0.28,
+      "mode_select": 0.28,
+      "mode_mods": 0.28,
+      "keymap": 0.28,
+      "keymap_confirm": 0.28,
+      "onnx_upscaler_confirm": 0.28,
+      "keymap_test": 0.28,
+      "result": 0.28
+    }
+  },
+  "theme": {
+    "accent": "#E9C78E",
+    "text": "#EDF3FA",
+    "muted": "#B5C1D0",
+    "card": "#101720F5",
+    "panel": "#0E151FEC",
+    "footer": "#080C13F5",
+    "button": "#15202DEB",
+    "button_selected": "#E9C78E2A",
+    "border": "#344353",
+    "judgement_line": "#E9C78E",
+    "lane_divider": "#C3CFDD",
+    "scene_primary": "#C49B60",
+    "scene_secondary": "#E9C78E",
+    "scene_background": "#080C13"
   },
   "native": {
     "metrics": {
-      "icon.stroke_width": 2.16,
-      "options_grid.tint": 0,
-      "options_grid.selected_tint": 0.018,
-      "options_grid.border_width": 1.5,
-      "options_grid.selected_border_width": 2.25,
-      "options_grid.radius": 12
+      "icon.stroke_width": 2.0,
+      "options_grid.radius": 16,
+      "options_grid.tint": 0.008,
+      "options_grid.selected_tint": 0.045,
+      "options_grid.border_width": 1,
+      "options_grid.selected_border_width": 2,
+      "generic.line_height": 27
     },
-    "colors": {},
-    "assets": {
-      "prism": "assets/prism.png",
-      "chevron": "assets/chevron.png",
-      "spark": "assets/spark.png",
-      "wave": "assets/wave.png",
-      "audio": "assets/audio.png",
-      "display": "assets/display.png",
-      "input": "assets/input.png",
-      "network": "assets/network.png",
-      "sliders": "assets/sliders.png",
-      "folder": "assets/folder.png",
-      "exit": "assets/exit.png",
-      "keys": "assets/keys.png",
-      "keymap": "assets/keymap.png",
-      "skin": "assets/skin.png",
-      "latency": "assets/latency.png",
-      "profile": "assets/profile.png",
-      "keytest": "assets/keytest.png"
+    "colors": {
+      "palette.05090f": "#080C13",
+      "palette.101820": "#101720",
+      "palette.63e9f2": "#E9C78E",
+      "palette.101d32": "#142130",
+      "palette.a4e8f3": "#E9C78E",
+      "title.primary": "#142130",
+      "title.primary_text": "#EDF3FA",
+      "title.primary_detail": "#B5C1D0"
     },
-    "motion": {},
-    "rects": {},
-    "fonts": {}
+    "motion": {
+      "intensity": 0.4,
+      "entry_seconds": 0.24
+    }
+  },
+  "gameplay": {
+    "description": "Modern Common: one responsive instrument, typography and note system; theme colors vary.",
+    "renderer": "native",
+    "background": "",
+    "gear": "",
+    "note": "",
+    "hold_head": "",
+    "hold_body": "",
+    "hold_tail": "",
+    "key_idle": "",
+    "key_pressed": "",
+    "note_shape": "rect",
+    "note_aspect": "stretch",
+    "note_border": false,
+    "black_playfield": true,
+    "lane_background_opacity": 0.025,
+    "show_lane_dividers": true,
+    "show_judgement_line": true,
+    "show_gear_boundary_line": false,
+    "show_hold_tail": true,
+    "hold_tail_taper": false,
+    "judgement_line_glow": true,
+    "key_pulse": true,
+    "key_pulse_brightness": 0.38,
+    "key_label_position": "bottom",
+    "hold_body_opacity": 0.64,
+    "visual_opacity": 1,
+    "note_outline_opacity": 0.52,
+    "native": {
+      "metrics": {
+        "key_min_height": 48,
+        "key_max_height": 126,
+        "key_inset": 2,
+        "key_inset_ratio": 0.055,
+        "key_bottom_gap": 4,
+        "key_face_gap": 5,
+        "judgement_line_width": 1.5,
+        "judgement_glow_height": 6,
+        "lane_divider_opacity": 0.13,
+        "hold_edge_mix": 0.36,
+        "hold_core_mix": 0.48,
+        "timing_half_width": 112,
+        "timing_height": 5,
+        "timing_range_ms": 80,
+        "title_font_size": 28,
+        "score_font_size": 32,
+        "body_font_size": 18,
+        "timing_font_size": 17,
+        "judgement_font_size": 46,
+        "combo_font_size": 40,
+        "key_label_font_size": 14
+      },
+      "colors": {
+        "key_well": "#05080E",
+        "key_led": "#E9C78E",
+        "chassis": "#0B111A",
+        "judgement_line": "#E9C78E",
+        "judgement_glow": "#E9C78E18",
+        "hold_edge": "#DDE7F3",
+        "hold_core": "#14202F",
+        "hold_shadow": "#05080E",
+        "burst_core": "#F7FAFD",
+        "burst_trail": "#E9C78E",
+        "title": "#EDF3FA",
+        "score": "#EDF3FA",
+        "body": "#B5C1D0",
+        "combo": "#E9C78E",
+        "judgement": "#EDF3FA",
+        "timing": "#DCE6F2",
+        "key_label": "#D0DCE9"
+      },
+      "motion": {
+        "press_response": 110,
+        "release_response": 30,
+        "press_depth": 3,
+        "pressed_light": 0.72,
+        "hit_light": 0.22,
+        "burst_rise": 42,
+        "burst_height": 18,
+        "combo_duration_ms": 150,
+        "combo_scale": 1.055,
+        "combo_lift": -2,
+        "judgement_duration_ms": 500
+      },
+      "fonts": {
+        "title": "Segoe UI",
+        "score": "Bahnschrift",
+        "body": "Segoe UI",
+        "combo": "Bahnschrift",
+        "judgement": "Segoe UI",
+        "timing": "Segoe UI",
+        "key_label": "Segoe UI"
+      },
+      "sprites": {
+        "note": [
+          {
+            "x": 0,
+            "y": 2,
+            "width": 128,
+            "height": 28,
+            "color": "#FFFFFF",
+            "mix": 0.18,
+            "alpha": 1.0,
+            "radius": 3
+          },
+          {
+            "x": 1,
+            "y": 3,
+            "width": 126,
+            "height": 26,
+            "color": "#111923",
+            "mix": 0.28,
+            "alpha": 1.0,
+            "radius": 2
+          },
+          {
+            "x": 1,
+            "y": 3,
+            "width": 126,
+            "height": 26,
+            "color": "#FFFFFF",
+            "mix": 0.02,
+            "alpha": 1.0,
+            "radius": 2
+          },
+          {
+            "x": 3,
+            "y": 3,
+            "width": 122,
+            "height": 2,
+            "color": "#FFFFFF",
+            "mix": 0.48,
+            "alpha": 0.72,
+            "radius": 0
+          }
+        ],
+        "hold_head": [
+          {
+            "x": 0,
+            "y": 2,
+            "width": 128,
+            "height": 28,
+            "color": "#FFFFFF",
+            "mix": 0.18,
+            "alpha": 1.0,
+            "radius": 3
+          },
+          {
+            "x": 1,
+            "y": 3,
+            "width": 126,
+            "height": 26,
+            "color": "#111923",
+            "mix": 0.28,
+            "alpha": 1.0,
+            "radius": 2
+          },
+          {
+            "x": 1,
+            "y": 3,
+            "width": 126,
+            "height": 26,
+            "color": "#FFFFFF",
+            "mix": 0.02,
+            "alpha": 1.0,
+            "radius": 2
+          },
+          {
+            "x": 3,
+            "y": 3,
+            "width": 122,
+            "height": 2,
+            "color": "#FFFFFF",
+            "mix": 0.48,
+            "alpha": 0.72,
+            "radius": 0
+          }
+        ],
+        "hold_tail": [
+          {
+            "x": 0,
+            "y": 9,
+            "width": 128,
+            "height": 14,
+            "color": "#FFFFFF",
+            "mix": 0.2,
+            "alpha": 1.0,
+            "radius": 2
+          },
+          {
+            "x": 1,
+            "y": 10,
+            "width": 126,
+            "height": 12,
+            "color": "#111923",
+            "mix": 0.28,
+            "alpha": 1.0,
+            "radius": 1
+          },
+          {
+            "x": 1,
+            "y": 10,
+            "width": 126,
+            "height": 12,
+            "color": "#FFFFFF",
+            "mix": 0.02,
+            "alpha": 1.0,
+            "radius": 1
+          },
+          {
+            "x": 3,
+            "y": 10,
+            "width": 122,
+            "height": 2,
+            "color": "#FFFFFF",
+            "mix": 0.48,
+            "alpha": 0.62,
+            "radius": 0
+          }
+        ],
+        "key_idle": [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 128,
+            "height": 256,
+            "color": "#05080E",
+            "mix": 1.0,
+            "alpha": 1.0,
+            "radius": 7
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "width": 126,
+            "height": 251,
+            "color": "#344252",
+            "mix": 1.0,
+            "alpha": 1.0,
+            "radius": 6
+          },
+          {
+            "x": 2,
+            "y": 3,
+            "width": 124,
+            "height": 247,
+            "color": "#111923",
+            "mix": 1.0,
+            "alpha": 1.0,
+            "radius": 5
+          },
+          {
+            "x": 3,
+            "y": 4,
+            "width": 122,
+            "height": 2,
+            "color": "#9DADBE",
+            "mix": 1.0,
+            "alpha": 0.24,
+            "radius": 0
+          },
+          {
+            "x": 9,
+            "y": 220,
+            "width": 110,
+            "height": 1,
+            "color": "#8094A8",
+            "mix": 1.0,
+            "alpha": 0.18,
+            "radius": 0
+          },
+          {
+            "x": 10,
+            "y": 239,
+            "width": 108,
+            "height": 3,
+            "color": "#FFFFFF",
+            "mix": 0.12,
+            "alpha": 0.54,
+            "radius": 1
+          }
+        ],
+        "key_pressed": [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 128,
+            "height": 256,
+            "color": "#FFFFFF",
+            "mix": 0.1,
+            "alpha": 1.0,
+            "radius": 7
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "width": 126,
+            "height": 251,
+            "color": "#FFFFFF",
+            "mix": 0.14,
+            "alpha": 1.0,
+            "radius": 6
+          },
+          {
+            "x": 2,
+            "y": 3,
+            "width": 124,
+            "height": 247,
+            "color": "#0B1420",
+            "mix": 0.72,
+            "alpha": 1.0,
+            "radius": 5
+          },
+          {
+            "x": 3,
+            "y": 4,
+            "width": 122,
+            "height": 3,
+            "color": "#FFFFFF",
+            "mix": 0.16,
+            "alpha": 0.82,
+            "radius": 0
+          },
+          {
+            "x": 10,
+            "y": 239,
+            "width": 108,
+            "height": 4,
+            "color": "#FFFFFF",
+            "mix": 0.16,
+            "alpha": 0.94,
+            "radius": 1
+          }
+        ]
+      }
+    },
+    "modes": {
+      "1k": {
+        "lane_colors": [
+          "#E9C78E"
+        ]
+      },
+      "2k": {
+        "lane_colors": [
+          "#EAF0F7",
+          "#EAF0F7"
+        ]
+      },
+      "3k": {
+        "lane_colors": [
+          "#EAF0F7",
+          "#E9C78E",
+          "#EAF0F7"
+        ]
+      },
+      "4k": {
+        "lane_colors": [
+          "#EAF0F7",
+          "#C49B60",
+          "#C49B60",
+          "#EAF0F7"
+        ]
+      },
+      "5k": {
+        "lane_colors": [
+          "#EAF0F7",
+          "#C49B60",
+          "#E9C78E",
+          "#C49B60",
+          "#EAF0F7"
+        ]
+      },
+      "6k": {
+        "lane_colors": [
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7"
+        ]
+      },
+      "7k": {
+        "lane_colors": [
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#E9C78E",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7"
+        ]
+      },
+      "8k": {
+        "lane_colors": [
+          "#E9C78E",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#E9C78E"
+        ]
+      },
+      "9k": {
+        "lane_colors": [
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#E9C78E",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7"
+        ]
+      },
+      "10k": {
+        "lane_colors": [
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7"
+        ]
+      },
+      "11k": {
+        "lane_colors": [
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#E9C78E",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7"
+        ]
+      },
+      "12k": {
+        "lane_colors": [
+          "#E9C78E",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#E9C78E"
+        ]
+      },
+      "13k": {
+        "lane_colors": [
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#E9C78E",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7"
+        ]
+      },
+      "14k": {
+        "lane_colors": [
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7"
+        ]
+      },
+      "15k": {
+        "lane_colors": [
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#E9C78E",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7"
+        ]
+      },
+      "16k": {
+        "lane_colors": [
+          "#E9C78E",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#EAF0F7",
+          "#C49B60",
+          "#E9C78E"
+        ]
+      }
+    }
   }
 }

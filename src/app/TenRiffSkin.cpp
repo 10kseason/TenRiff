@@ -40,6 +40,16 @@ ResolvedSkinHitBurst resolve_skin_hit_burst(
             enabled ? std::clamp(brightness, 0.0f, 1.0f) : 0.0f};
 }
 
+double resolve_skin_judgement_line_brightness(
+    double profile_brightness, const TenRiffSkinGameplayStyle* authored) {
+    const double skin_brightness = authored ? authored->judgement_line_brightness.value_or(1.0f) : 1.0;
+    const auto gain = [](double value) {
+        return std::isfinite(value) ? std::clamp(value, 0.0, 1.0) : 1.0;
+    };
+    // Keep the user's dimmer effective even when a skin supplies a base gain.
+    return gain(profile_brightness) * gain(skin_brightness);
+}
+
 namespace {
 
 namespace fs = std::filesystem;
@@ -95,6 +105,13 @@ bool is_supported_image_extension(const fs::path& path) {
     return ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp";
 }
 
+// Matches the containers BgaVideoDecoder opens through Media Foundation or FFmpeg.
+bool is_supported_video_extension(const fs::path& path) {
+    const std::string ext = lower_ascii(path.extension().u8string());
+    return ext == ".mp4" || ext == ".m4v" || ext == ".mpg" || ext == ".mpeg" ||
+           ext == ".wmv" || ext == ".avi" || ext == ".mov" || ext == ".webm" || ext == ".mkv";
+}
+
 bool is_within_root(const fs::path& root, const fs::path& candidate) {
     std::error_code ec;
     const fs::path canonical_root = fs::weakly_canonical(root, ec);
@@ -141,6 +158,37 @@ std::optional<std::string> resolve_asset_path(const fs::path& root,
     if (!fs::is_regular_file(candidate, ec) || ec || !is_supported_image_extension(candidate) ||
         !is_within_root(root, candidate)) {
         warnings.push_back(std::string(field) + " image was not found or is unsupported: " +
+                           std::string(raw));
+        return std::nullopt;
+    }
+    return candidate.u8string();
+}
+
+// Same containment rules as images; only the accepted container list differs.
+std::optional<std::string> resolve_video_path(const fs::path& root,
+                                              std::string_view raw,
+                                              std::vector<std::string>& warnings,
+                                              std::string_view field) {
+    if (raw.empty()) {
+        return std::nullopt;
+    }
+    const fs::path relative = path_from_utf8(raw);
+    if (relative.empty() || relative.is_absolute() || relative.has_root_name() ||
+        relative.has_root_directory()) {
+        warnings.push_back(std::string(field) + " must use a path relative to skin.json.");
+        return std::nullopt;
+    }
+    for (const auto& component : relative) {
+        if (component == "..") {
+            warnings.push_back(std::string(field) + " cannot leave the skin folder.");
+            return std::nullopt;
+        }
+    }
+    const fs::path candidate = root / relative;
+    std::error_code ec;
+    if (!fs::is_regular_file(candidate, ec) || ec || !is_supported_video_extension(candidate) ||
+        !is_within_root(root, candidate)) {
+        warnings.push_back(std::string(field) + " video was not found or is unsupported: " +
                            std::string(raw));
         return std::nullopt;
     }
@@ -804,6 +852,34 @@ void parse_screen_backgrounds(const config::JsonObject& lobby,
             }
         }
     }
+    if (const auto* videos_value = object_value(lobby, "screen_videos")) {
+        const auto* videos = videos_value->as_object();
+        if (!videos) {
+            definition.warnings.push_back("lobby.screen_videos must be an object.");
+        } else {
+            warn_unknown_keys(*videos, kTenRiffSkinScreenIds, "lobby.screen_videos.", definition);
+            for (const auto key : kTenRiffSkinScreenIds) {
+                const auto* value = object_value(*videos, key);
+                if (!value) continue;
+                if (!value->is_string()) {
+                    definition.warnings.push_back("lobby.screen_videos." + std::string(key) +
+                                                  " must be a video path.");
+                    continue;
+                }
+                // An explicit empty string keeps that screen on its still image.
+                if (value->as_string().empty()) {
+                    definition.screen_background_video_paths[std::string(key)].clear();
+                    continue;
+                }
+                if (const auto path = resolve_video_path(
+                        root, value->as_string(), definition.warnings,
+                        "lobby.screen_videos." + std::string(key))) {
+                    definition.screen_background_video_paths[std::string(key)] = *path;
+                    add_reference(definition, *path);
+                }
+            }
+        }
+    }
     const auto* opacities_value = object_value(lobby, "screen_opacities");
     if (!opacities_value) return;
     const auto* opacities = opacities_value->as_object();
@@ -845,6 +921,8 @@ void parse_gameplay_style(const config::JsonObject& gameplay,
     style.key_backdrop_enabled = optional_bool(gameplay, "key_backdrop", definition, "gameplay.");
     style.note_border_enabled = optional_bool(gameplay, "note_border", definition, "gameplay.");
     style.black_playfield_enabled = optional_bool(gameplay, "black_playfield", definition, "gameplay.");
+    style.judgement_line_brightness = optional_number(gameplay, "judgement_line_brightness", 0.0f, 1.0f,
+                                                     definition, "gameplay.");
     style.key_pulse_brightness = optional_number(gameplay, "key_pulse_brightness", 0.0f, 1.0f,
                                                  definition, "gameplay.");
     style.key_backdrop_opacity = optional_number(gameplay, "key_backdrop_opacity", 0.0f, 1.0f,
@@ -934,7 +1012,8 @@ bool has_gameplay_presentation(const TenRiffSkinDefinition& definition) {
                 return !asset.path.empty();
             })) return true;
     }
-    if (!definition.gameplay_background_path.empty() || !gameplay.gear_overlay_image.path.empty() ||
+    if (!definition.gameplay_background_path.empty() || !definition.gameplay_background_video_path.empty() ||
+        !gameplay.gear_overlay_image.path.empty() ||
         gameplay.gear_placement.valid || !gameplay.lane_divider_widths.empty() ||
         !gameplay.column_widths.empty() || !gameplay.column_spacings.empty() ||
         !gameplay.note_rotations.empty() || !gameplay.key_rotations.empty() ||
@@ -950,7 +1029,7 @@ bool has_gameplay_presentation(const TenRiffSkinDefinition& definition) {
         style.key_backdrop_enabled.has_value() || style.key_backdrop_opacity.has_value() ||
         style.key_backdrop_brightness.has_value() || style.key_backdrop_height.has_value() ||
         style.note_border_enabled.has_value() || style.black_playfield_enabled.has_value() ||
-        style.key_pulse_brightness.has_value() || style.lane_background_opacity.has_value() ||
+        style.judgement_line_brightness.has_value() || style.key_pulse_brightness.has_value() || style.lane_background_opacity.has_value() ||
         style.visual_opacity.has_value() || style.note_outline_opacity.has_value() ||
         style.hold_body_opacity.has_value() || style.hit_burst_style.has_value() ||
         style.key_label_position.has_value() || style.note_shape.has_value() || !style.lane_colors.empty();
@@ -1042,8 +1121,9 @@ TenRiffSkinDefinition load_tenriff_skin_folder(std::string_view folder_utf8,
     definition.gameplay.keys = std::clamp(keys, 1, 16);
 
     if (const auto* lobby = child_object(*manifest, "lobby")) {
-        static constexpr std::array<std::string_view, 6> kLobbyKeys = {
-            "background", "logo", "background_opacity", "screen_backgrounds", "screen_opacities", "renderer"
+        static constexpr std::array<std::string_view, 8> kLobbyKeys = {
+            "background", "logo", "background_opacity", "screen_backgrounds", "screen_opacities", "renderer",
+            "background_video", "screen_videos"
         };
         warn_unknown_keys(*lobby, kLobbyKeys, "lobby.", definition);
         if (const auto renderer = optional_enum(*lobby, "renderer", {"legacy", "native"},
@@ -1077,6 +1157,13 @@ TenRiffSkinDefinition load_tenriff_skin_folder(std::string_view folder_utf8,
         if (const auto opacity = optional_number(*lobby, "background_opacity", 0.0f, 1.0f,
                                                  definition, "lobby.")) {
             definition.lobby_background_opacity = *opacity;
+        }
+        if (const auto* value = object_value(*lobby, "background_video"); value && !value->is_string()) {
+            definition.warnings.push_back("lobby.background_video must be a video path.");
+        } else if (const auto path = resolve_video_path(root, string_value(*lobby, "background_video"),
+                                                        definition.warnings, "lobby.background_video")) {
+            definition.lobby_background_video_path = *path;
+            add_reference(definition, *path);
         }
         parse_screen_backgrounds(*lobby, root, definition);
     } else if (object_value(*manifest, "lobby")) {
@@ -1120,14 +1207,14 @@ TenRiffSkinDefinition load_tenriff_skin_folder(std::string_view folder_utf8,
     if (const auto* gameplay_manifest = child_object(*manifest, "gameplay")) {
         config::JsonObject gameplay = effective_gameplay_object(
             *gameplay_manifest, definition.gameplay.keys, gameplay_mode, definition);
-        static constexpr std::array<std::string_view, 48> kGameplayKeys = {
+        static constexpr std::array<std::string_view, 50> kGameplayKeys = {
             "renderer", "native",
-            "background", "background_opacity", "gear", "note", "hold_head", "hold_body",
+            "background", "background_video", "background_opacity", "gear", "note", "hold_head", "hold_body",
             "hold_tail", "key_idle", "key_pressed", "note_width_ratio", "note_height_ratio",
             "note_aspect", "note_rotations", "key_rotations", "judgement_line_position",
             "full_lane_receptors", "column_widths", "column_spacings", "lane_map",
             "show_lane_dividers", "show_judgement_line", "show_timing_feedback", "show_timing_bar", "timing_bar_always_visible",
-            "show_gear_boundary_line", "show_hold_tail", "hold_tail_taper", "judgement_line_glow",
+            "show_gear_boundary_line", "show_hold_tail", "hold_tail_taper", "judgement_line_glow", "judgement_line_brightness",
             "key_pulse", "key_pulse_brightness", "hit_burst_style", "key_label_position",
             "key_backdrop", "key_backdrop_opacity", "key_backdrop_brightness", "key_backdrop_height",
             "note_border", "note_shape", "lane_colors", "lane_background_opacity",
@@ -1177,6 +1264,13 @@ TenRiffSkinDefinition load_tenriff_skin_folder(std::string_view folder_utf8,
         if (const auto path = resolve_asset_path(root, gameplay_background,
                                                  definition.warnings, "gameplay.background")) {
             definition.gameplay_background_path = *path;
+            add_reference(definition, *path);
+        }
+        if (const auto* value = object_value(gameplay, "background_video"); value && !value->is_string()) {
+            definition.warnings.push_back("gameplay.background_video must be a video path.");
+        } else if (const auto path = resolve_video_path(root, string_value(gameplay, "background_video"),
+                                                        definition.warnings, "gameplay.background_video")) {
+            definition.gameplay_background_video_path = *path;
             add_reference(definition, *path);
         }
         if (const auto opacity = optional_number(gameplay, "background_opacity", 0.0f, 1.0f,

@@ -1,3 +1,14 @@
+TenRiff 1.9.9.9-final3 source package —2026-11-09
+
+Matches the release commit, including failed-note clipping, judgement-line gain, modern themes, Code / CLI and video authoring. Existing source inclusion/privacy rules and prior history below remain. Fixed baseline1.9.6.
+
+TenRiff Modern Common / skin authoring LOCAL candidate — 2026-11-09
+
+Based on public final2 plus local failed-note clipping and profile line dimming.
+Includes 12 redesigned themes, preserved legacy art/manifests, updated AI guide/schema,
+and optional skin line gain with the matching loader/offline editor. Not a published
+release or a new fixed baseline. Existing full inclusion/privacy rules below apply.
+
 TenRiff 1.9.9.9-final2 source package —2026-11-09
 
 Matches the release commit. Removes false-positive IR audio scans/exclusions/badges and expands key viewing to4–16K with25–100% scaling. Production Site v28 removes audio/blacklist gates. Fixed baseline1.9.6 remains. Existing inclusion/privacy rules and earlier history below are retained.

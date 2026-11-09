@@ -156,6 +156,12 @@ void MenuWindow::draw(const MenuRenderData& data) {
         for (const auto& path : next_paths) erase_cached_path(path);
         applied_skin_asset_paths_ = std::move(next_paths);
         applied_skin_revision_ = data.lobby_skin.revision;
+        // A reload may replace a video file under the same name: reopen skin
+        // loops and forget their failure latches. Built-in loops keep theirs.
+        d2d_->menu_motion_failed_skin_path.clear();
+        if (d2d_->menu_motion_stats.source == MenuMotionSource::Skin) clear_menu_motion_background();
+        d2d_->gameplay_skin_video_failed_path.clear();
+        clear_gameplay_skin_video();
         d2d_->generic_help_layout.Reset();
         d2d_->native_menu_palette.clear();
         if (data.lobby_skin.enabled && data.lobby_skin.native_menu_renderer) {
@@ -242,7 +248,9 @@ void MenuWindow::draw(const MenuRenderData& data) {
     // background and header rules after the result-only layout rollback.
     const bool flat_library_layout = use_native_menu && data.kind == MenuScreenKind::SongSelect &&
         !data.session_mix.active && data.song_select.native_list_layout;
-    const std::string title_background_path = modern_title_screen && data.lobby_skin.background_path.empty()
+    // A skin video for the title also replaces the built-in title artwork.
+    const std::string title_background_path = modern_title_screen && data.lobby_skin.background_path.empty() &&
+            (!data.lobby_skin.enabled || data.lobby_skin.background_video_path.empty())
         ? built_in_title_background_path() : std::string{};
     if (!title_background_path.empty()) static_cast<void>(load_song_card_preview_bitmap(title_background_path));
     ID2D1Bitmap* title_background = find_song_card_preview_bitmap(title_background_path);
@@ -250,9 +258,29 @@ void MenuWindow::draw(const MenuRenderData& data) {
 #include "MenuWindow_draw_native_motion.inl"
     const bool result_motion_background = use_native_menu && data.kind == MenuScreenKind::ResultScreen &&
         data.lobby_skin.background_path.empty();
-    const auto menu_motion_source = data.lobby_skin.background_path.empty() && flat_library_layout
+    // A skin loop replaces the built-in loops and the skin's own still for that
+    // screen. The fullscreen gameplay preview covers the menu, so it is skipped.
+    const bool skin_motion_background = data.kind != MenuScreenKind::GameplayHud &&
+        data.lobby_skin.enabled && !data.lobby_skin.background_video_path.empty() &&
+        !(data.generic.skin_preview.visible && data.generic.skin_preview.fullscreen);
+    const auto menu_motion_source = skin_motion_background ? MenuMotionSource::Skin
+        : data.lobby_skin.background_path.empty() && flat_library_layout
         ? MenuMotionSource::SongSelect : result_motion_background ? MenuMotionSource::Result : MenuMotionSource::None;
-    update_menu_motion_background(menu_motion_source, !native_menu_motion_.moving(), render_now_ns);
+    // Skin loops also play on legacy-renderer screens, so they read the same
+    // reduced-motion preferences directly instead of the native layer's state.
+    const bool skin_reduced_motion = native_system_reduced_motion_ || config_.reduce_menu_motion ||
+        native_motion_value("enabled", 1, 0, 1) < 0.5f;
+    update_menu_motion_background(menu_motion_source,
+                                  skin_motion_background ? skin_reduced_motion : !native_menu_motion_.moving(),
+                                  render_now_ns,
+                                  skin_motion_background ? std::string_view(data.lobby_skin.background_video_path)
+                                                         : std::string_view{});
+    const bool skin_motion_frame = menu_motion_source == MenuMotionSource::Skin && d2d_->menu_motion_bitmap &&
+        d2d_->menu_motion_stats.has_frame;
+    // The gameplay loop's decoder thread and bitmap live only while gameplay is shown.
+    if (data.kind == MenuScreenKind::GameplayHud)
+        update_gameplay_skin_video(data.gameplay, render_now_ns, skin_reduced_motion);
+    else clear_gameplay_skin_video();
     // Never collect while showing gameplay or its pause/loading overlay.
     // Static BGA retention is per visit to gameplay, not a process-lifetime cache.
     if (data.kind != MenuScreenKind::GameplayHud && !data.generic.skin_preview.visible) {
@@ -411,7 +439,11 @@ void MenuWindow::draw(const MenuRenderData& data) {
         const auto source = centered_bitmap_source_rect(d2d_->menu_motion_bitmap->GetSize(), full_screen_rect);
         // The authored Result video includes text. Keep it behind the unchanged
         // result panels and soften its contrast so scores and labels remain clear.
-        ctx->DrawBitmap(d2d_->menu_motion_bitmap.Get(), full_screen_rect, result_motion_background ? 0.35f : 1.0f,
+        // A skin loop uses the screen's own skin background opacity.
+        const float motion_opacity = menu_motion_source == MenuMotionSource::Skin
+            ? std::clamp(data.lobby_skin.background_opacity, 0.0f, 1.0f)
+            : result_motion_background ? 0.35f : 1.0f;
+        ctx->DrawBitmap(d2d_->menu_motion_bitmap.Get(), full_screen_rect, motion_opacity,
                         D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, &source);
     }
 
@@ -422,7 +454,9 @@ void MenuWindow::draw(const MenuRenderData& data) {
         ctx->DrawBitmap(title_background, full_screen_rect, 1.0f,
                         D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, &source);
     }
-    if (data.kind != MenuScreenKind::GameplayHud && data.lobby_skin.enabled) {
+    // The skin still stays underneath until the loop has a frame, and remains
+    // the fallback under reduced motion before decode or after a failure.
+    if (data.kind != MenuScreenKind::GameplayHud && data.lobby_skin.enabled && !skin_motion_frame) {
         if (ID2D1Bitmap* bitmap = find_song_card_preview_bitmap(data.lobby_skin.background_path)) {
             const D2D1_RECT_F source_rect =
                 centered_bitmap_source_rect(bitmap->GetSize(), full_screen_rect);
@@ -436,20 +470,26 @@ void MenuWindow::draw(const MenuRenderData& data) {
 
 
     if (data.kind == MenuScreenKind::GameplayHud) {
+        const bool skin_video_frame = !data.gameplay.skin_background_video_path.empty() &&
+            d2d_->gameplay_skin_video_bitmap && d2d_->gameplay_skin_video_stats.has_frame;
         if (gameplay_studio_deck_enabled(data.gameplay.hud_layout,
                 normalize_gameplay_skin_source(data.gameplay.skin_source),
                 data.gameplay.ghost_visible, data.gameplay.peer_visible) &&
-            data.gameplay.skin_background_path.empty() && !d2d_->gameplay_background_base_bitmap &&
+            data.gameplay.skin_background_path.empty() && !skin_video_frame &&
+            !d2d_->gameplay_background_base_bitmap &&
             !d2d_->gameplay_background_overlay_bitmap) {
             const auto saved = d2d_->note_fill_brush->GetColor();
             d2d_->note_fill_brush->SetColor(D2D1::ColorF(0x050608));
             ctx->FillRectangle(full_screen_rect, d2d_->note_fill_brush.Get());
             d2d_->note_fill_brush->SetColor(saved);
         }
-        if (ID2D1Bitmap* bitmap = find_song_card_preview_bitmap(data.gameplay.skin_background_path)) {
+        ID2D1Bitmap* skin_background = skin_video_frame
+            ? d2d_->gameplay_skin_video_bitmap.Get()
+            : find_song_card_preview_bitmap(data.gameplay.skin_background_path);
+        if (skin_background) {
             const D2D1_RECT_F source_rect =
-                centered_bitmap_source_rect(bitmap->GetSize(), full_screen_rect);
-            ctx->DrawBitmap(bitmap,
+                centered_bitmap_source_rect(skin_background->GetSize(), full_screen_rect);
+            ctx->DrawBitmap(skin_background,
                             full_screen_rect,
                             std::clamp(data.gameplay.skin_background_opacity, 0.0f, 1.0f),
                             D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,

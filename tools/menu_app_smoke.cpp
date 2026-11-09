@@ -2252,6 +2252,11 @@ struct MenuAppVisualTestAccess {
                 has(view(), SkinSettingsRowId::LaneDividerBrightness) &&
                 std::abs(view().skin_preview.lane_divider_brightness - 0.99) < 0.00001);
             click(app, Kind::SettingsRow, static_cast<int>(SkinSettingsRowId::LaneDividerBrightness), Part::Increment);
+            click(app, Kind::SettingsRow, static_cast<int>(SkinSettingsRowId::JudgementLineBrightness), Part::Decrement);
+            report.check("skin.source." + source + ".judgement_line_brightness_preview",
+                has(view(), SkinSettingsRowId::JudgementLineBrightness) &&
+                std::abs(view().skin_preview.judgement_line_brightness - 0.99) < 0.00001);
+            click(app, Kind::SettingsRow, static_cast<int>(SkinSettingsRowId::JudgementLineBrightness), Part::Increment);
             report.check("skin.source." + source + ".divider_brightness_preserves_other_values",
                 config::serialize_skin_config(app.config_.skin) == before_xy);
         }
@@ -2264,6 +2269,45 @@ struct MenuAppVisualTestAccess {
         app.skin_search_active_ = saved_search;
         app.skin_mode_tabs_focused_ = saved_tabs;
         app.persist_runtime_config();
+        app.publish_snapshot();
+    }
+    static void use_skin_for_launch(MenuApp& app, const config::SkinConfig& skin) {
+        app.config_.skin = skin;
+        app.refresh_available_tenriff_skins();
+        app.publish_snapshot();
+    }
+    static void check_code_cli_screen_videos(MenuApp& app, Report& report) {
+        const auto saved_config = app.config_;
+        const auto saved_screen = app.current_screen();
+        app.config_.skin.source = "tenriff";
+        app.config_.skin.tenriff_skin_name = "TenRiff_Code_CLI";
+        app.refresh_available_tenriff_skins();
+        report.check("skin_video.cli_catalog", app.active_tenriff_skin_.found &&
+            app.active_tenriff_skin_.warnings.empty());
+        const auto snapshot = [&](Screen screen) {
+            app.reset_screen(screen);
+            app.publish_snapshot();
+            std::lock_guard<std::mutex> lock(app.snapshot_mutex_);
+            return app.snapshot_.render.lobby_skin;
+        };
+        const auto title = snapshot(Screen::Title);
+        const auto common = snapshot(Screen::SongSelect);
+        report.check("skin_video.actual_title_override", title.enabled &&
+            title.background_video_path.find("title-loop.mp4") != std::string::npos &&
+            title.background_path.find("title.png") != std::string::npos);
+        report.check("skin_video.actual_common", common.enabled &&
+            common.background_video_path.find("lobby-loop.mp4") != std::string::npos);
+        app.active_tenriff_skin_.screen_background_video_paths["settings"] = title.background_video_path;
+        report.check("skin_video.actual_settings_fallback",
+            snapshot(Screen::SettingsAudio).background_video_path == title.background_video_path);
+        app.active_tenriff_skin_.screen_background_video_paths["settings_audio"] = "";
+        report.check("skin_video.actual_explicit_empty",
+            snapshot(Screen::SettingsAudio).background_video_path.empty());
+        app.config_.skin.source = "native";
+        report.check("skin_video.native_source_isolated", !snapshot(Screen::Title).enabled);
+        app.config_ = saved_config;
+        app.refresh_available_tenriff_skins();
+        app.reset_screen(saved_screen);
         app.publish_snapshot();
     }
     static void check_key_overlay_followup(MenuApp& app, Report& report) {
@@ -2750,6 +2794,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
         } else if (page.index == 2) {
             Access::check_lane_shortcuts(app, report);
             Access::check_skin_tabs_search_and_sources(app, report);
+            Access::check_code_cli_screen_videos(app, report);
         } else if (page.index == 3) {
             Access::check_free_resolution(app, report);
             Access::click(app, Kind::SettingsRow,
@@ -2813,6 +2858,14 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
     Access::check_launch_level_metadata(app, report);
     Access::check_missing_audio_launch(app, report);
 
+    // Exercise the supplied theme through the real launch/session/result flow,
+    // in addition to isolated renderer fixtures and manifest/snapshot checks.
+    const auto saved_launch_skin = Access::config(app).skin;
+    auto cli_launch_skin = saved_launch_skin;
+    cli_launch_skin.source = "tenriff";
+    cli_launch_skin.tenriff_skin_name = "TenRiff_Code_CLI";
+    Access::use_skin_for_launch(app, cli_launch_skin);
+
     std::atomic<bool> observing{true};
     bool loading = false, countdown = false, playing = false, gameplay_present = false;
     bool gameplay_resize_attempted = false, gameplay_resized = false;
@@ -2856,6 +2909,9 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
     expect_screen(app, report, "natural_result", Screen::Result);
     report.check("natural_result.has_stats", Access::result(app));
     report.check("judge.menu_launch_result_retains_hard", Access::last_result_hard_judge(app));
+    report.check("skin_video.cli_real_session_result", Access::result(app) &&
+        Access::config(app).skin.tenriff_skin_name == "TenRiff_Code_CLI");
+    Access::use_skin_for_launch(app, saved_launch_skin);
     Access::key(app, "Space");
     report.check("result.analysis_available", Access::analysis_available(app));
     Access::key(app, "F4");

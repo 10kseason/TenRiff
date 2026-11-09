@@ -1459,3 +1459,5 @@
 {"Video selection failed. Try selecting a supported video again.", "動画の選択に失敗しました。対応動画をもう一度選択してください。"},
 
 {"Key Overlay Size", "キーオーバーレイ サイズ"},
+
+{"Judgement Line Brightness", "判定線の明るさ"},

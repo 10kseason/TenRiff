@@ -510,3 +510,36 @@ TEST_CASE("portable profile carries custom skin assets without overwriting an in
     const auto second_root = profile / "skins" / "tenriff" / fs::u8path(second.config.skin.tenriff_skin_name);
     CHECK(read_preset_test_file(second_root / "scratch.png") == "portable-scratch-bytes");
 }
+
+TEST_CASE("skin preset carries looping background videos referenced by the manifest") {
+    PresetDirectory dir;
+    const auto catalog = dir.path / "catalog";
+    const auto folder = catalog / "Loops";
+    write_preset_test_file(folder / "skin.json", R"({
+      "format":"tenriff-skin", "version":1, "name":"Loop Test",
+      "lobby":{"background":"still.png", "background_video":"loop/menu.mp4"},
+      "gameplay":{"background_video":"loop/play.mp4"}
+    })");
+    write_preset_test_file(folder / "still.png", "still-bytes");
+    write_preset_test_file(folder / "loop" / "menu.mp4", "menu-video-bytes");
+    write_preset_test_file(folder / "loop" / "play.mp4", "play-video-bytes");
+    write_preset_test_file(folder / "loop" / "unused.mp4", "unused-video-bytes");
+    auto skin = tenriff::config::ConfigLoader{}.defaults().skin;
+    skin.source = "tenriff";
+    skin.tenriff_skin_name = "Loops";
+    const auto file = dir.path / "loops.trskin";
+    const auto saved = tenriff::app::export_skin_preset(file.u8string(), skin, catalog.u8string());
+    require_preset_success(saved);
+    CHECK(saved.file_count == 4);  // skin.json, still and two referenced loops only.
+    const auto imported = tenriff::app::import_skin_preset(file.u8string(), (dir.path / "profile").u8string());
+    require_preset_success(imported);
+    const auto installed = fs::u8path(imported.path);
+    CHECK(read_preset_test_file(installed / "loop" / "menu.mp4") == "menu-video-bytes");
+    CHECK(read_preset_test_file(installed / "loop" / "play.mp4") == "play-video-bytes");
+    CHECK_FALSE(fs::exists(installed / "loop" / "unused.mp4"));
+    const auto resolved = tenriff::app::load_tenriff_skin_folder(imported.path, 7);
+    REQUIRE(resolved.found);
+    CHECK(resolved.warnings.empty());
+    CHECK(!resolved.lobby_background_video_path.empty());
+    CHECK(!resolved.gameplay_background_video_path.empty());
+}

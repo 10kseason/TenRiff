@@ -49,6 +49,14 @@
     return !normalized.startsWith('/') && !/[\x00-\x1f:*?"<>|]/.test(normalized) &&
       !normalized.split('/').some(p => p === '..') && /\.(png|jpe?g|bmp)$/i.test(normalized);
   }
+  // Looping background videos follow the image path rules with the client's container list.
+  function safeVideo(path) {
+    if (typeof path !== 'string') return false;
+    if (!path) return true;
+    const normalized = path.replace(/\\/g, '/');
+    return !normalized.startsWith('/') && !/[\x00-\x1f:*?"<>|]/.test(normalized) &&
+      !normalized.split('/').some(p => p === '..') && /\.(mp4|m4v|mpe?g|wmv|avi|mov|webm|mkv)$/i.test(normalized);
+  }
   function normalizeAsset(path) {
     return String(path).replace(/\\/g, '/').split('/').filter(part => part && part !== '.').join('/');
   }
@@ -83,6 +91,7 @@
         if (schema.maxLength !== undefined && value.length > schema.maxLength) add(path, 'maxLength', schema.maxLength);
         if (schema.pattern && !new RegExp(schema.pattern).test(value)) add(path, 'pattern', schema.pattern);
         if (ref === '#/$defs/assetPath' && !safeAsset(value)) add(path, 'assetPath');
+        if (ref === '#/$defs/videoPath' && !safeVideo(value)) add(path, 'videoPath');
         if (path[0] === 'native' && path[1] === 'fonts' && new TextEncoder().encode(value).length > 128) add(path, 'fontBytes', 128);
       }
       if (Array.isArray(value)) {
@@ -156,17 +165,18 @@
     const result = new Set();
     const add = value => { if (typeof value === 'string' && value) result.add(normalizeAsset(value)); };
     const lobby = document.lobby || {};
-    add(lobby.background); add(lobby.logo);
+    add(lobby.background); add(lobby.logo); add(lobby.background_video);
     Object.values(lobby.screen_backgrounds || {}).forEach(add);
+    Object.values(lobby.screen_videos || {}).forEach(add);
     Object.values(get(document, ['native', 'assets']) || {}).forEach(add);
-    const slots = ['background', 'gear', 'note', 'hold_head', 'hold_body', 'hold_tail', 'key_idle', 'key_pressed'];
+    const slots = ['background', 'background_video', 'gear', 'note', 'hold_head', 'hold_body', 'hold_tail', 'key_idle', 'key_pressed'];
     for (let count = 1; count <= 17; ++count) {
       const mode = count === 17 ? '7+1' : `${count}k`, lanes = count === 17 ? 8 : count;
       const style = gameplay(document, mode);
       slots.forEach(slot => {
         const value = style[slot];
         if (!value) return;
-        if (slot === 'background' || slot === 'gear') add(value);
+        if (slot === 'background' || slot === 'background_video' || slot === 'gear') add(value);
         else for (let i = 0; i < lanes; ++i) add(laneAsset(value, i, style.lane_map));
       });
     }
@@ -179,5 +189,5 @@
     dy = Math.max(-8192 - Math.min(rect[1], rect[3]), Math.min(8192 - Math.max(rect[1], rect[3]), round(dy)));
     return [rect[0] + dx, rect[1] + dy, rect[2] + dx, rect[3] + dy];
   }
-  return {own, object, clone, serialize, get, set, parse, resolve, safeAsset, normalizeAsset, validate, createHistory, gameplay, laneAsset, assetReferences, moveRect, nativeTitleLayout};
+  return {own, object, clone, serialize, get, set, parse, resolve, safeAsset, safeVideo, normalizeAsset, validate, createHistory, gameplay, laneAsset, assetReferences, moveRect, nativeTitleLayout};
 });

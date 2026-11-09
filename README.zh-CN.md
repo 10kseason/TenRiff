@@ -1,4 +1,10 @@
+> **2026-11-09 · 1.9.9.9-final3:** 在判定线下方隐藏失败音符，新增判定线亮度设置，以统一现代风格重新设计12个内置主题，并加入带3个循环视频的TenRiff Code / CLI。AI制作指南、v1架构及网页/离线编辑器支持新增亮度与视频字段。 [Release](docs/release-1.9.9.9-final3.zh-CN.md). Earlier candidate/release notices below are historical.
+
 > **2026-11-09 · 1.9.9.9-final2:** 移除造成误判的键音长度、无键音比例、强制分析、特定曲目IR限制及标记。按键叠加支持所有4～16K布局和25～100%整体大小。生产网站v28使用相同规则。基本排名资格、判定、计分、回放格式及固定基线1.9.6保持原样。 [Release](docs/release-1.9.9.9-final2.zh-CN.md). Earlier descriptions below are historical.
+
+本地Modern Common候选版：全部12款内置皮肤统一重新设计为现代菜单和游戏界面。保留原始设计并可恢复。[指南](docs/modern-skins-20261109.ko.md)。
+
+Local authoring update: [AI guide](docs/skin-agent-guide.md) · [v1 format and supported inputs](docs/skin-format.md) · [local schema](docs/tenriff-skin.schema.json). Optional judgement-line gain is supported by this candidate and its offline editor; public deployment is pending.
 
 > **2026-11-08 · 1.9.9.9-final1:** [IR保护与排除标记](docs/release-1.9.9.9-final1.zh-CN.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 

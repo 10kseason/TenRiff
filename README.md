@@ -1,4 +1,10 @@
+> **2026-11-09 · 1.9.9.9-final3:** 실패한 노트가 판정선 아래에서 기어와 겹치지 않도록 가리고, 스킨 설정에 판정선 명도를 추가했습니다. 기존 12개 스킨을 공통 현대 스타일로 정리하고 TenRiff Code / CLI와 반복 영상 3개를 포함합니다. AI 제작 가이드·v1 스키마·웹/동봉 에디터는 새 명도와 영상 필드를 지원합니다. [Release](docs/release-1.9.9.9-final3.ko.md). Earlier candidate/release notices below are historical.
+
 > **2026-11-09 · 1.9.9.9-final2:** 오탐을 만들던 키음 길이·무키음·분석 필수·곡별 IR 제외와 표시를 제거했습니다. 키 오버레이는 모든4~16키와25~100% 크기를 지원합니다. 운영 웹v28과 함께 사용하며 기본 랭킹 자격·판정·점수·리플레이 형식과 고정 기준선1.9.6은 유지합니다. [Release](docs/release-1.9.9.9-final2.ko.md). Earlier descriptions below are historical.
+
+로컬 Modern Common 후보: 내장12개 스킨을 공통 현대 스타일로 전면 재디자인했습니다. 원본과 복원 안내는 [Modern 스킨](docs/modern-skins-20261109.ko.md)을 참조하세요.
+
+Local authoring update: [AI guide](docs/skin-agent-guide.md) · [v1 format and supported inputs](docs/skin-format.md) · [local schema](docs/tenriff-skin.schema.json). Optional judgement-line gain is supported by this candidate and its offline editor; public deployment is pending.
 
 > **2026-11-08 · 1.9.9.9-final1:** [IR 보호와 제외 표시](docs/release-1.9.9.9-final1.ko.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 

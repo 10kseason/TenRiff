@@ -569,6 +569,7 @@ struct GameplayHudData {
     double hold_body_width_scale = 1.00;
     bool show_lane_dividers = true;
     double lane_divider_brightness = 1.0;
+    double judgement_line_brightness = 1.0;
     double note_divider_gap_px = kGameplayNoteDividerGapPxDefault;
     bool show_judgement_line = true;
     int judgement_line_type = 1;
@@ -626,6 +627,9 @@ struct GameplayHudData {
     // filesystem discovery in the frame path. LR2 keeps its legacy resolver.
     std::shared_ptr<const app::ImportedGameplaySkinDefinition> resolved_tenriff_skin;
     std::string skin_background_path;
+    // Optional silent loop drawn in place of skin_background_path while the
+    // chart has no base BGA layer. The still image stays the fallback.
+    std::string skin_background_video_path;
     float skin_background_opacity = 0.66f;
     std::string lr2_resolution_override = "auto";
     double lane_background_opacity = 0.18;
@@ -816,6 +820,7 @@ struct SkinPreviewData {
     double hold_body_width_scale = 1.00;
     bool show_lane_dividers = true;
     double lane_divider_brightness = 1.0;
+    double judgement_line_brightness = 1.0;
     double note_divider_gap_px = kGameplayNoteDividerGapPxDefault;
     bool show_judgement_line = true;
     int judgement_line_type = 1;
@@ -964,6 +969,9 @@ struct LobbySkinData {
     app::NativeMenuSkinStyle native_menu;
     uint64_t revision = 0;
     std::string background_path;
+    // Resolved silent loop for the current screen; replaces background_path
+    // (same opacity) once it decodes. Empty keeps the still image.
+    std::string background_video_path;
     std::string logo_path;
     std::string screen_id;
     std::string screen_fallback_id;
@@ -1099,7 +1107,9 @@ private:
     [[nodiscard]] bool song_select_preview_loading_deferred(int64_t now_ns) const;
     [[nodiscard]] ID2D1Bitmap* find_song_card_preview_bitmap(std::string_view path);
     [[nodiscard]] bool load_song_card_preview_bitmap(std::string_view path);
-    enum class MenuMotionSource { None, SongSelect, Result };
+    // Skin: a TenRiff skin's looping lobby video (lobby.background_video /
+    // screen_videos). Its length is unknown, so the decoder loops at EOF.
+    enum class MenuMotionSource { None, SongSelect, Result, Skin };
     struct MenuMotionDiagnostics {
         MenuMotionSource source = MenuMotionSource::None;
         int64_t duration_ns = 0;
@@ -1110,9 +1120,17 @@ private:
         uint64_t decode_requests = 0, uploaded_frames = 0;
     };
     void update_menu_motion_background(MenuMotionSource source, bool reduced_motion,
-                                       int64_t now_ns);
+                                       int64_t now_ns, std::string_view skin_video_path = {});
     void clear_menu_motion_background();
     MenuMotionDiagnostics menu_motion_background_diagnostics() const;
+    // Skin gameplay loop: decoded only while the chart shows no base BGA layer.
+    struct GameplaySkinVideoDiagnostics {
+        bool active = false, has_frame = false, failed = false;
+        uint64_t decode_requests = 0, uploaded_frames = 0;
+    };
+    void update_gameplay_skin_video(const GameplayHudData& data, int64_t now_ns, bool reduced_motion);
+    void clear_gameplay_skin_video();
+    GameplaySkinVideoDiagnostics gameplay_skin_video_diagnostics() const;
     [[nodiscard]] bool load_selected_song_preview_bitmap(const SongSelectData& data, int64_t now_ns);
     void touch_song_card_preview_lru(std::string_view path);
     void trim_song_card_preview_cache();
@@ -1336,6 +1354,7 @@ private:
         double lane_center_gap_scale = 0.0;
         bool show_lane_dividers = true;
         double lane_divider_brightness = 1.0;
+        double judgement_line_brightness = 1.0;
         double note_divider_gap_px = kGameplayNoteDividerGapPxDefault;
         bool show_judgement_line = true;
         int judgement_line_type = 1;

@@ -1469,3 +1469,5 @@
 {"Video selection failed. Try selecting a supported video again.", "视频选择失败。请重新选择受支持的视频。"},
 
 {"Key Overlay Size", "按键叠加大小"},
+
+{"Judgement Line Brightness", "判定线颜色亮度"},

@@ -619,7 +619,7 @@ TEST_CASE("Skin settings retain stable IDs while grouping lane selection with no
     using namespace tenriff::app;
     for (const bool lr2 : {false, true}) {
         const SkinSettingsRows rows{lr2};
-        CHECK(rows.count() == (lr2 ? 62 : 60));
+        CHECK(rows.count() == (lr2 ? 63 : 61));
         CHECK(rows.index_of(SkinSettingsRowId::Lr2Resolution) == (lr2 ? 4 : -1));
         CHECK(rows.index_of(SkinSettingsRowId::TargetGap) == -1);
         CHECK(rows.index_of(SkinSettingsRowId::VisualPreset) == -1);
@@ -834,25 +834,32 @@ TEST_CASE("key backdrop RGB brightness and bottom anchored height are independen
     CHECK(gameplay_key_backdrop_alpha(true, true, 0.4) == doctest::Approx(0.4f));
 }
 
-TEST_CASE("simple square skin loads without assets for all supported lane counts") {
+TEST_CASE("modern bundled skins share a solid readable native core in every key mode") {
     const auto root = std::filesystem::u8path(tenriff::app::find_bundled_tenriff_skin_root());
     REQUIRE_FALSE(root.empty());
-    for (int lanes = 4; lanes <= 16; ++lanes) {
-        const auto skin = tenriff::app::load_tenriff_skin_folder((root / "TenRiff_SimpleSquare").u8string(), lanes);
+    const char* names[] = {"Tencircle", "Tengear", "Tenmania", "TenRiff_AgentPrism_Universal_1K-16K",
+        "TenRiff_NeonStep_Arcade_Universal_4K-10K", "TenRiff_Pulse_Mania_Universal_4K-10K",
+        "TenRiff_SimpleSquare", "TenRiff_Studio", "TenRiff_VelocityCircuit_DanceGrid_4K-16K",
+        "LUNAR-FRACTURE-Void-Garden-7K", "SunShine-Light-er-Arrow-7K", "TenRiff_NativeEditable"};
+    for (const auto* name : names) for (int lanes = 1; lanes <= 16; ++lanes) {
+        const auto skin = tenriff::app::load_tenriff_skin_folder((root / name).u8string(), lanes);
         REQUIRE(skin.found);
         CHECK(skin.warnings.empty());
+        CHECK(skin.native_menu_renderer);
         CHECK(skin.native_gameplay_fallback);
-        CHECK(skin.referenced_asset_paths.empty());
-        CHECK(skin.gameplay_style.note_shape.value() == "simple_rect");
+        CHECK(skin.referenced_asset_paths.size() == 1);
+        CHECK(skin.gameplay_style.note_shape.value() == "rect");
+        CHECK(skin.gameplay_style.lane_colors.size() == static_cast<std::size_t>(lanes));
+        CHECK(skin.gameplay.gear_overlay_image.path.empty());
+        CHECK(skin.gameplay_background_path.empty());
         const auto& sprite = skin.gameplay.native.sprites.at("note");
-        REQUIRE(sprite.size() == 3);
-        CHECK(sprite[0].alpha == 0);
-        CHECK(sprite[1].alpha == 0);
+        REQUIRE(sprite.size() == 4);
+        // Border opacity only scales layers0/1. The main body must remain opaque.
         CHECK(sprite[2].alpha == 1);
-        CHECK(sprite[2].width == 128);
-        CHECK(sprite[2].height == 32);
-        CHECK(sprite[2].radius == 0);
-        CHECK(sprite[2].mix == 0);
+        CHECK(sprite[2].width >= 120);
+        CHECK(sprite[2].height >= 24);
+        CHECK(skin.gameplay.native.metrics.at("key_max_height") == 126);
+        CHECK(skin.gameplay.native.motion.at("press_depth") == 3);
     }
 }
 
@@ -890,5 +897,192 @@ TEST_CASE("skin timing text and bar overrides load independently including modes
         CHECK(skin.gameplay_style.show_timing_bar.value() == (lanes != 4));
         CHECK(skin.gameplay_style.timing_bar_always_visible.value() == (lanes != 4));
         CHECK(skin.gameplay.native.rects.at("timing_label")[0] == 100);
+    }
+}
+
+TEST_CASE("skin judgement line gain composes with the profile dimmer") {
+    using tenriff::app::resolve_skin_judgement_line_brightness;
+    tenriff::app::TenRiffSkinGameplayStyle authored;
+    CHECK(resolve_skin_judgement_line_brightness(0.5, nullptr) == doctest::Approx(0.5));
+    CHECK(resolve_skin_judgement_line_brightness(0.5, &authored) == doctest::Approx(0.5));
+    for (const float gain : {0.0f, 0.5f, 0.8f, 1.0f}) {
+        authored.judgement_line_brightness = gain;
+        for (const double profile : {0.0, 0.25, 0.5, 1.0})
+            CHECK(resolve_skin_judgement_line_brightness(profile, &authored) == doctest::Approx(profile * gain));
+    }
+    authored.judgement_line_brightness = 0.5f;
+    CHECK(resolve_skin_judgement_line_brightness(2.0, &authored) == doctest::Approx(0.5));
+    CHECK(resolve_skin_judgement_line_brightness(-1.0, &authored) == 0.0);
+    CHECK(resolve_skin_judgement_line_brightness(std::numeric_limits<double>::quiet_NaN(), &authored) == doctest::Approx(0.5));
+    authored.judgement_line_brightness = std::numeric_limits<float>::infinity();
+    CHECK(resolve_skin_judgement_line_brightness(0.5, &authored) == doctest::Approx(0.5));
+}
+
+TEST_CASE("skin judgement line gain loads common and per-mode including scratch layouts") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE_FALSE(temp.path.empty());
+    write_file(temp.path / "skin.json", R"({"format":"tenriff-skin","version":1,"name":"Line Gain",
+      "gameplay":{"renderer":"native","judgement_line_brightness":0.8,
+      "modes":{"4k":{"judgement_line_brightness":0},"8k":{"judgement_line_brightness":1},
+      "7+1":{"judgement_line_brightness":0.25}}}})");
+    for (int lanes : {4, 8, 16}) {
+        const auto skin = tenriff::app::load_tenriff_skin_folder(temp.path.u8string(), lanes);
+        REQUIRE(skin.found);
+        CHECK(skin.warnings.empty());
+        CHECK(skin.native_gameplay_fallback);
+        REQUIRE(skin.gameplay_style.judgement_line_brightness.has_value());
+        CHECK(skin.gameplay_style.judgement_line_brightness.value() == doctest::Approx(lanes == 4 ? 0.0 : lanes == 8 ? 1.0 : 0.8));
+    }
+    const auto scratch = tenriff::app::load_tenriff_skin_folder(temp.path.u8string(), 8, "7+1");
+    CHECK(scratch.warnings.empty());
+    CHECK(scratch.gameplay_style.judgement_line_brightness.value() == doctest::Approx(0.25));
+    for (const std::string value : {"-0.01", "1.01", "\"0.5\"", "null"}) {
+        write_file(temp.path / "skin.json", "{\"format\":\"tenriff-skin\",\"version\":1,\"name\":\"Invalid Gain\","
+            "\"gameplay\":{\"renderer\":\"native\",\"judgement_line_brightness\":" + value + "}}");
+        const auto invalid = tenriff::app::load_tenriff_skin_folder(temp.path.u8string(), 4);
+        REQUIRE(invalid.found);
+        CHECK_FALSE(invalid.warnings.empty());
+        CHECK_FALSE(invalid.gameplay_style.judgement_line_brightness.has_value());
+        CHECK(tenriff::app::resolve_skin_judgement_line_brightness(0.5, &invalid.gameplay_style) == doctest::Approx(0.5));
+    }
+}
+
+TEST_CASE("AI authoring example loads without assets and retains visible note cores") {
+    // The test executable has a copied skin catalog, but examples stay in source.
+    const auto example = std::filesystem::u8path(TENRIFF_SOURCE_DIR) / "examples/skins/TenRiff-Example";
+    for (int lanes = 1; lanes <= 16; ++lanes) {
+        const auto skin = tenriff::app::load_tenriff_skin_folder(example.u8string(), lanes);
+        REQUIRE(skin.found);
+        CHECK(skin.warnings.empty());
+        CHECK(skin.native_menu_renderer);
+        CHECK(skin.native_gameplay_fallback);
+        CHECK(skin.referenced_asset_paths.empty());
+        for (const auto* slot : {"note", "hold_head", "hold_tail"}) {
+            const auto& layers = skin.gameplay.native.sprites.at(slot);
+            REQUIRE(layers.size() >= 3);
+            CHECK(layers[2].alpha == 1);
+            CHECK(layers[2].height >= 24);
+        }
+    }
+}
+
+TEST_CASE("TenRiff skin background videos resolve explicitly, per screen and per mode") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE(!temp.path.empty());
+    const auto skin = temp.path / "Loops";
+    write_file(skin / "cli" / "menu.mp4", "mp4");
+    write_file(skin / "cli" / "title.webm", "webm");
+    write_file(skin / "cli" / "play.MP4", "mp4");
+    write_file(skin / "cli" / "wide.mkv", "mkv");
+    // A conventional-looking file is never picked up without a manifest entry.
+    write_file(skin / "lobby" / "background.mp4", "mp4");
+    write_file(skin / "skin.json",
+               "{\n"
+               "  \"format\": \"tenriff-skin\", \"version\": 1, \"name\": \"Loops\",\n"
+               "  \"lobby\": {\n"
+               "    \"renderer\": \"native\",\n"
+               "    \"background_video\": \"cli/menu.mp4\",\n"
+               "    \"screen_videos\": { \"title\": \"cli/title.webm\", \"result\": \"\" }\n"
+               "  },\n"
+               "  \"gameplay\": {\n"
+               "    \"background_video\": \"cli/play.MP4\",\n"
+               "    \"modes\": { \"16k\": { \"background_video\": \"cli/wide.mkv\" },\n"
+               "               \"4k\": { \"background_video\": \"\" } }\n"
+               "  }\n"
+               "}\n");
+
+    const auto seven = tenriff::app::load_tenriff_skin_folder(skin.u8string(), 7);
+    REQUIRE(seven.found);
+    CHECK(seven.warnings.empty());
+    CHECK(seven.lobby_background_video_path.find("menu.mp4") != std::string::npos);
+    REQUIRE(seven.screen_background_video_paths.count("title") == 1u);
+    CHECK(seven.screen_background_video_paths.at("title").find("title.webm") != std::string::npos);
+    REQUIRE(seven.screen_background_video_paths.count("result") == 1u);
+    CHECK(seven.screen_background_video_paths.at("result").empty());
+    CHECK(seven.lobby_background_path.empty());
+    CHECK(seven.gameplay_background_video_path.find("play.MP4") != std::string::npos);
+    const auto& refs = seven.referenced_asset_paths;
+    CHECK(std::count_if(refs.begin(), refs.end(), [](const std::string& path) {
+              return path.find(".mp4") != std::string::npos || path.find(".MP4") != std::string::npos ||
+                     path.find(".webm") != std::string::npos;
+          }) == 3);
+    // Like a gameplay background image, a gameplay video is gameplay presentation:
+    // a native-menu skin then needs gameplay.renderer=native to keep Luma Keys.
+    CHECK(seven.native_menu_renderer);
+    CHECK_FALSE(seven.native_gameplay_fallback);
+
+    const auto sixteen = tenriff::app::load_tenriff_skin_folder(skin.u8string(), 16);
+    CHECK(sixteen.gameplay_background_video_path.find("wide.mkv") != std::string::npos);
+    const auto four = tenriff::app::load_tenriff_skin_folder(skin.u8string(), 4);
+    CHECK(four.gameplay_background_video_path.empty());
+    CHECK(four.native_gameplay_fallback);
+    CHECK(four.warnings.empty());
+
+    const auto imports = temp.path / "imports";
+    const auto imported = tenriff::app::import_tenriff_skin(skin.u8string(), imports.u8string());
+    REQUIRE(imported.success());
+    for (const auto* name : {"menu.mp4", "title.webm", "play.MP4", "wide.mkv"}) {
+        CHECK(std::filesystem::is_regular_file(imports / imported.skin_name / "cli" / name));
+    }
+    CHECK_FALSE(std::filesystem::exists(imports / imported.skin_name / "lobby" / "background.mp4"));
+}
+
+TEST_CASE("TenRiff skin background videos reject images, escapes, missing files and bad types") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE(!temp.path.empty());
+    const auto skin = temp.path / "BadLoops";
+    write_file(skin / "still.png");
+    write_file(temp.path / "outside.mp4", "mp4");
+    write_file(skin / "skin.json",
+               "{\n"
+               "  \"format\": \"tenriff-skin\", \"version\": 1, \"name\": \"Bad Loops\",\n"
+               "  \"lobby\": {\n"
+               "    \"background_video\": \"still.png\",\n"
+               "    \"screen_videos\": { \"title\": \"../outside.mp4\", \"options\": 3,\n"
+               "                         \"song_select\": \"missing.mp4\", \"gameplay\": \"x.mp4\" }\n"
+               "  },\n"
+               "  \"gameplay\": { \"background_video\": [\"cli/a.mp4\"] }\n"
+               "}\n");
+    const auto loaded = tenriff::app::load_tenriff_skin_folder(skin.u8string(), 7);
+    REQUIRE(loaded.found);
+    CHECK(loaded.lobby_background_video_path.empty());
+    CHECK(loaded.screen_background_video_paths.empty());
+    CHECK(loaded.gameplay_background_video_path.empty());
+    CHECK(loaded.referenced_asset_paths.empty());
+    const auto has = [&](const std::string& text) {
+        return std::any_of(loaded.warnings.begin(), loaded.warnings.end(),
+                           [&](const std::string& warning) { return warning.find(text) != std::string::npos; });
+    };
+    CHECK(has("lobby.background_video video was not found or is unsupported"));
+    CHECK(has("lobby.screen_videos.title cannot leave the skin folder"));
+    CHECK(has("lobby.screen_videos.options must be a video path"));
+    CHECK(has("lobby.screen_videos.song_select video was not found"));
+    CHECK(has("lobby.screen_videos.gameplay is not a supported field"));
+    CHECK(has("gameplay.background_video must be a video path"));
+}
+
+TEST_CASE("bundled TenRiff Code CLI skin loads every key mode with its looping videos") {
+    const auto root = std::filesystem::u8path(tenriff::app::find_bundled_tenriff_skin_root());
+    REQUIRE_FALSE(root.empty());
+    const auto folder = root / "TenRiff_Code_CLI";
+    for (int lanes = 1; lanes <= 17; ++lanes) {
+        const auto skin = lanes == 17
+            ? tenriff::app::load_tenriff_skin_folder(folder.u8string(), 8, "7+1")
+            : tenriff::app::load_tenriff_skin_folder(folder.u8string(), lanes);
+        REQUIRE(skin.found);
+        CHECK(skin.warnings.empty());
+        CHECK(skin.native_menu_renderer);
+        CHECK(skin.gameplay.native_renderer);
+        CHECK(skin.lobby_background_video_path.find("lobby-loop.mp4") != std::string::npos);
+        REQUIRE(skin.screen_background_video_paths.count("title") == 1u);
+        CHECK(skin.screen_background_video_paths.at("title").find("title-loop.mp4") != std::string::npos);
+        CHECK(skin.gameplay_background_video_path.find("gameplay-loop.mp4") != std::string::npos);
+        CHECK(!skin.lobby_background_path.empty());
+        CHECK(!skin.gameplay_background_path.empty());
+        CHECK(skin.gameplay_style.lane_colors.size() == static_cast<std::size_t>(lanes == 17 ? 8 : lanes));
+        const auto& sprite = skin.gameplay.native.sprites.at("note");
+        REQUIRE(sprite.size() >= 3);
+        CHECK(sprite[2].alpha == 1);  // The body survives disabled note borders.
+        CHECK(skin.native_menu.fonts.at("body") == "Cascadia Mono");
     }
 }

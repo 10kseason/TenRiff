@@ -1,4 +1,10 @@
+> **2026-11-09 · 1.9.9.9-final3:** Clip failed notes below the judgement line, add a judgement-line dimmer, redesign twelve bundled themes in a common modern style, and include TenRiff Code / CLI with three loop videos. The AI authoring guide, v1 schema and web/offline editors support the new brightness and video fields. [Release](docs/release-1.9.9.9-final3.en.md). Earlier candidate/release notices below are historical.
+
 > **2026-11-09 · 1.9.9.9-final2:** Remove keysound-duration/silence/required-analysis/chart-blacklist IR exclusions and badges that caused false positives. Key overlay supports every4–16K layout and25–100% whole-panel size. Production Site v28 uses the same removal. Existing ranking eligibility, scoring, judgement, replay formats and fixed baseline1.9.6 remain. [Release](docs/release-1.9.9.9-final2.en.md). Earlier descriptions below are historical.
+
+Local Modern Common candidate: all12 bundled skins use shared modern menu/gameplay components. Original designs remain restorable. See [skin guide](docs/modern-skins-20261109.ko.md).
+
+Local authoring update: [AI guide](docs/skin-agent-guide.md) · [v1 format and supported inputs](docs/skin-format.md) · [local schema](docs/tenriff-skin.schema.json). Optional judgement-line gain is supported by this candidate and its offline editor; public deployment is pending.
 
 > **2026-11-08 · 1.9.9.9-final1:** [IR protection and exclusion labels](docs/release-1.9.9.9-final1.en.md). Fixed baseline **1.9.6**. Earlier notices below are historical.
 

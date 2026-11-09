@@ -1,4 +1,24 @@
-# TenRiff Skin Editor — 1.9.9.9 hot fix 2
+# TenRiff Skin Editor — Modern Common local authoring update (2026-11-09)
+
+동봉 오프라인 편집기는 공통 스타일의 Native 벡터 템플릿과 판정선 색상 명도(0~1)를
+지원합니다. `gameplay.judgement_line_brightness`는 공통/모드별로 저장하며 미리보기는
+프로필 100% 기준입니다. 게임에서는 스킨 명도 × 사용자 명도를 적용하고 알파는 유지합니다.
+노트·LN 머리·꼬리의 레이어 0·1은 외곽선, 2 이후는 본체로 작성하세요.
+새 스킨 템플릿은 외부 이미지 없이 내보낼 수 있습니다. 완성 번들 테마를 복사할 때는
+그 테마의 `modern/background.png`도 함께 가져오세요.
+
+The bundled offline editor supports Modern Common vectors and the common/per-mode
+`judgement_line_brightness` RGB gain. Preview assumes a 100% profile dimmer; the
+game multiplies both gains. Note/head/tail layers 0–1 follow border opacity; put the
+solid body at index 2 or later. New templates export without missing image dependencies.
+
+同梱オフライン版は共通スタイルと判定ラインの明度（0～1）に対応します。
+共通・モード別の明度を保存し、ゲームではプロフィールの明度と乗算します。
+ノート・LN始点・終点の0・1番レイヤーは枠線用、本体は2番以降に置いてください。
+
+This is a local update. The public website and the public final2 client do not
+contain this new field. Validate with the bundled local schema. v1 import/export
+remains compatible; omit the new optional field when targeting older clients.
 
 모든 곡에 같은 BGA를 쓰려면 게임의 옵션 > 그래픽에서 범용 BGA 영상을 선택하고 범용 BGA를 켜세요. BGA 표시도 켜져 있어야 합니다. 이 설정은 게임 프로필에 저장되며 skin.json에는 저장하지 않습니다.
 

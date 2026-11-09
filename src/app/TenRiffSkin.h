@@ -67,6 +67,7 @@ inline constexpr std::array<std::string_view, 24> kTenRiffSkinLayoutSlots = {
 
 // Optional manifest-level gameplay appearance. A missing field preserves the
 // player's configured value; an explicitly supplied field belongs to the skin.
+// Judgement-line brightness is a gain multiplied by the player's dimmer.
 struct TenRiffSkinGameplayStyle {
     std::optional<bool> show_lane_dividers;
     std::optional<bool> show_judgement_line;
@@ -81,6 +82,7 @@ struct TenRiffSkinGameplayStyle {
     std::optional<bool> key_backdrop_enabled;
     std::optional<bool> note_border_enabled;
     std::optional<bool> black_playfield_enabled;
+    std::optional<float> judgement_line_brightness;
     std::optional<float> key_pulse_brightness;
     std::optional<float> key_backdrop_opacity;
     std::optional<float> key_backdrop_brightness;
@@ -103,6 +105,9 @@ struct ResolvedSkinHitBurst {
 [[nodiscard]] ResolvedSkinHitBurst resolve_skin_hit_burst(
     const config::SkinConfig& skin, const TenRiffSkinGameplayStyle* authored);
 
+[[nodiscard]] double resolve_skin_judgement_line_brightness(
+    double profile_brightness, const TenRiffSkinGameplayStyle* authored);
+
 struct TenRiffSkinDefinition {
     bool found = false;
     int format_version = 0;
@@ -122,9 +127,16 @@ struct TenRiffSkinDefinition {
     float lobby_background_opacity = 0.72f;
     std::unordered_map<std::string, std::string> screen_background_paths;
     std::unordered_map<std::string, float> screen_background_opacities;
+    // Optional silent looping videos. A playing video replaces the matching
+    // still background with the same opacity; the still remains the fallback
+    // before the first frame, under reduced motion and after decode failure.
+    // Videos are explicit only: no conventional filename is auto-detected.
+    std::string lobby_background_video_path;
+    std::unordered_map<std::string, std::string> screen_background_video_paths;
     // UI brush name -> normalized RGBA floats.
     std::unordered_map<std::string, std::array<float, 4>> theme_colors;
     std::string gameplay_background_path;
+    std::string gameplay_background_video_path;
     float gameplay_background_opacity = 0.66f;
     std::unordered_map<std::string, SkinLayoutRect> layout_rects;
     ImportedGameplaySkinDefinition gameplay;

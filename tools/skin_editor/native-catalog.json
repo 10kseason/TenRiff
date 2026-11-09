@@ -2170,12 +2170,12 @@
     },
     "rects.native_motion.rect.001": {
       "file": "MenuWindow_draw_native_motion.inl",
-      "line": 177,
+      "line": 181,
       "expression": "rect.left + i * step, rect.bottom - height, rect.left + i * step + step * 0.48f, rect.bottom"
     },
     "rects.native_motion.rect.003": {
       "file": "MenuWindow_draw_native_motion.inl",
-      "line": 215,
+      "line": 219,
       "expression": "0, 0, kBaseWidth, kBaseHeight"
     },
     "rects.options_grid.rect.001": {
