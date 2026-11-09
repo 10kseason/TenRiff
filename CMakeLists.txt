@@ -205,6 +205,8 @@ add_library(tenriff_core
     src/app/ImportedGameplaySkin.cpp
     src/app/KeyNoteOverlay.cpp
     src/app/Lr2Course.cpp
+    src/app/Lr2ScoreDb.cpp
+    src/app/Lr2ClearImport.cpp
     src/app/Lr2Skin.cpp
     src/app/TenRiffSkin.cpp
     src/app/MenuRecordUtils.cpp
@@ -454,6 +456,17 @@ add_executable(tenriff_replay_verifier
 set_target_properties(tenriff_replay_verifier PROPERTIES
     OUTPUT_NAME "tenriff-replay-verifier")
 target_link_libraries(tenriff_replay_verifier PRIVATE tenriff_core)
+
+# Imports LR2 clear lamps into a profile as display-only data.
+add_executable(tenriff_lr2_import
+    src/tenriff_lr2_import_main.cpp
+)
+set_target_properties(tenriff_lr2_import PROPERTIES
+    OUTPUT_NAME "tenriff-lr2-import")
+target_link_libraries(tenriff_lr2_import PRIVATE tenriff_core)
+if(MSVC)
+    target_link_options(tenriff_lr2_import PRIVATE /ENTRY:wmainCRTStartup)
+endif()
 
 set_target_properties(tenriff PROPERTIES OUTPUT_NAME "TenRiff")
 
@@ -834,6 +847,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_bms_timeline.cpp
         tests/unit/test_speed_manager.cpp
         tests/unit/test_gauge_manager.cpp
+        tests/unit/test_lr2_clear_import.cpp
         tests/unit/test_clock_sync.cpp
         tests/unit/test_precise_wait.cpp
         tests/unit/test_key_state_tracker.cpp

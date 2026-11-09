@@ -627,6 +627,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 card.background_path = song_background_preview_path_for_entry(*entry);
                 const BestResultRecord best = best_result_for_song_entry(*entry);
                 card.lamp = best.has_value ? best.clear_status : std::string{};
+                if (const auto* imported = lr2_lamp_to_show(*entry, best)) card.lamp = imported->clear_status;
                 card.has_score = best.has_value;
                 card.score = best.has_value ? best.best_score : 0;
                 card.level_label = song_difficulty_label(*entry);
@@ -719,6 +720,14 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             render.song_select.background_upscale_output_mode = config_.graphics.background_upscale_output_mode;
             render.song_select.selected_song_lamp =
                 current_best.has_value ? current_best.clear_status : ui_text("NO PLAY", "기록 없음");
+            if (const SongEntry* lamp_entry = selected_song_ >= 0
+                    ? visible_song_entry(static_cast<std::size_t>(selected_song_)) : nullptr) {
+                if (const auto* imported = lr2_lamp_to_show(*lamp_entry, current_best)) {
+                    // The prefix marks a lamp earned in LR2, not in TenRiff.
+                    render.song_select.selected_song_lamp =
+                        "LR2 " + imported->clear_status + (imported->full_combo ? " (FC)" : "");
+                }
+            }
             render.song_select.selected_song_favorite = selected_song_is_favorite();
             render.song_select.selected_song_collection_filter = song_collection_filter_label();
             if (!config_.mode.ghost_battle_enabled) {

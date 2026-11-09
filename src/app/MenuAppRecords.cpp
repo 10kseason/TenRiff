@@ -344,6 +344,18 @@ bool MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
     return new_record;
 }
 
+const Lr2ImportedLamp* MenuApp::lr2_lamp_to_show(const SongEntry& entry, const BestResultRecord& best) const {
+    if (lr2_imported_lamps_.empty() || entry.md5.size() != 32) return nullptr;
+    const auto found = lr2_imported_lamps_.find(entry.md5);
+    if (found == lr2_imported_lamps_.end()) return nullptr;
+    if (best.has_value &&
+        menu_records::clear_status_priority(best.clear_status, best.game_over, best.final_gauge) >=
+            menu_records::clear_status_priority(found->second.clear_status, false, {})) {
+        return nullptr;
+    }
+    return &found->second;
+}
+
 void MenuApp::reload_chart_best_results() {
     using namespace menu_song_select;
 
@@ -353,6 +365,8 @@ void MenuApp::reload_chart_best_results() {
     chart_play_record_indices_.clear();
     current_song_record_indices_.clear();
     replay_summary_cache_.clear();
+    // Imported LR2 lamps live beside, never inside, TenRiff results.
+    lr2_imported_lamps_ = load_lr2_imported_lamps(lr2_import_path_for_profile(profile_dir_));
 
     namespace fs = std::filesystem;
     std::error_code ec;

@@ -1,0 +1,41 @@
+# 导入 LR2 通关灯
+
+把 LR2 成绩数据库中的通关灯导入 TenRiff 档案,并显示在选曲界面。仅用于显示:导入的灯不会成为 TenRiff 成绩、BEST 或在线提交对象。
+
+## 用法
+
+```
+tenriff-lr2-import.exe <LR2 成绩 .db> <档案文件夹> [歌曲文件夹 ...]
+```
+
+- LR2 数据库以只读方式打开。
+- 输出为 `<档案文件夹>\lr2_import.json`。删除该文件即可移除导入的灯。再次运行会重新生成。
+
+## 显示规则
+
+| LR2 | TenRiff 灯 |
+|---|---|
+| EASY | EZ CLEAR |
+| NORMAL (GROOVE) | NM CLEAR |
+| HARD、FULL COMBO | HD CLEAR |
+| 通过下述检查的游玩 | EX CLEAR |
+
+- 如果 TenRiff 中已有相同或更高的通关记录,则显示该记录。
+- 显示导入的灯时,所选歌曲的灯文字前会加上 `LR2 `;LR2 全连会加上 `(FC)`。
+- 不导入分数、评级和准确率。
+
+## EX 检查
+
+指定歌曲文件夹后,会把 LR2 的 `ghost`(最高分游玩的逐音符判定顺序)放入 TenRiff 的 EX-HARD 血槽重放。每个 LR2 判定都替换为**该 LR2 判定窗口内 TenRiff Normal 判定可能出现的最差判定**。仍然存活的游玩记为 EX。
+
+- LR2 判定窗口(ms,RANK VERY HARD/HARD/NORMAL/EASY):PGREAT 8/15/18/21,GREAT 27/32/40/60,GOOD 40/60/100/120,BAD 200。PGREAT 与 BAD 在 lr2oraja 的 LR2 判定表和 Lunatic Vibes 中一致,GREAT/GOOD 相差几毫秒,取较宽的值。
+- 血槽与实际游玩使用同一个 `GaugeManager`(基于 BMS TOTAL 的 EX-HARD)。
+
+不检查的情况(只导入 LR2 的灯):歌曲文件夹中找不到谱面、含长条/地雷/`#RANDOM` 的谱面、`#RANK` 缺失或超出范围、音符数与 LR2 记录不同、ghost 缺失、未到结尾或与保存的判定数不一致。
+
+## 限制
+
+- ghost 格式并非来自规范,而是根据一个真实的 LR2 数据库反推得到(5,285 行中有 5,274 行判定数一致)。
+- ghost 属于最高**分数**的那次游玩,可能与获得通关灯的那次不同。
+- 最差情况规则会拒绝一些实际上能够存活的游玩。
+- LR2 与 TenRiff 的血槽规则不同,同名的灯难度并不相同。

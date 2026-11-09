@@ -697,6 +697,46 @@ struct MenuAppVisualTestAccess {
         report.check("lobby.lamp_snapshot_retains_status_and_formats_copy", cards.size() == 1 &&
             cards.front().lamp == "GAUGE SHIFT NORMAL CLEAR" && lamp.label == "NORMAL CLEAR" &&
             lamp.tint_card && lamp.color == render::song_select_gauge_text_color("normal"));
+        {
+            // Imported LR2 lamps are display-only and never replace a TenRiff
+            // record of the same or a better clear.
+            auto& entry = app.indexed_songs_.front();
+            const std::string original_md5 = entry.md5;
+            entry.md5 = std::string(32, 'a');
+            const auto first_card_lamp = [&] {
+                app.publish_snapshot();
+                const auto& view = app.snapshot_.render.song_select;
+                return std::make_pair(view.songs.empty() ? std::string{} : view.songs.front().lamp,
+                                      view.selected_song_lamp);
+            };
+            Lr2ImportedLamp imported;
+            imported.lr2_clear = 4;
+            imported.clear_status = "HARD CLEAR";
+            app.lr2_imported_lamps_[entry.md5] = imported;
+            auto shown = first_card_lamp();
+            report.check("lobby.lr2_lamp_higher_than_native_is_shown_and_marked",
+                shown.first == "HARD CLEAR" && shown.second == "LR2 HARD CLEAR", shown.second);
+            imported.clear_status = "EX-HARD CLEAR";
+            imported.ex_proven = true;
+            imported.full_combo = true;
+            app.lr2_imported_lamps_[entry.md5] = imported;
+            shown = first_card_lamp();
+            report.check("lobby.lr2_proven_ex_lamp_is_shown_with_full_combo",
+                shown.first == "EX-HARD CLEAR" && shown.second == "LR2 EX-HARD CLEAR (FC)", shown.second);
+            imported.clear_status = "EASY CLEAR";
+            app.lr2_imported_lamps_[entry.md5] = imported;
+            shown = first_card_lamp();
+            report.check("lobby.lr2_lamp_lower_than_native_is_ignored",
+                shown.first == "GAUGE SHIFT NORMAL CLEAR" && shown.second == "GAUGE SHIFT NORMAL CLEAR", shown.second);
+            imported.clear_status = "HARD CLEAR";
+            app.lr2_imported_lamps_[std::string(32, 'b')] = imported;
+            app.lr2_imported_lamps_.erase(entry.md5);
+            shown = first_card_lamp();
+            report.check("lobby.lr2_lamp_for_another_chart_is_ignored", shown.first == "GAUGE SHIFT NORMAL CLEAR");
+            app.lr2_imported_lamps_.clear();
+            entry.md5 = original_md5;
+            app.publish_snapshot();
+        }
         app.local_play_records_ = {MenuApp::LocalPlayRecord{}};
         app.local_play_records_.front().clear_status = "GAUGE SHIFT HARD CLEAR";
         app.local_play_records_.front().player_name = "Fixture";
