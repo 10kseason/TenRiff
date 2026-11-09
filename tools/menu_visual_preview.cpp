@@ -163,7 +163,8 @@ struct MenuAppVisualTestAccess {
     }
     static void populate_skin_rows(render::MenuRenderData& source,
                                    const TenRiffSkinDefinition* imported,
-                                   int selected_row, bool backdrop_override, bool scratch_right = false,
+                                   int selected_row, bool backdrop_override, double profile_line_brightness,
+                                   bool scratch_right = false,
                                    const std::string& search_query = {}, bool search_active = false) {
         auto app = std::make_unique<MenuApp>();
         const auto& preview = source.generic.skin_preview;
@@ -212,6 +213,9 @@ struct MenuAppVisualTestAccess {
         skin.timing_bar_scale = preview.timing_bar_scale;
         skin.show_lane_dividers = preview.show_lane_dividers;
         skin.lane_divider_brightness = preview.lane_divider_brightness;
+        // The preview already contains the skin gain. Seed the actual MenuApp
+        // with the profile gain so its normal resolver applies the skin once.
+        skin.judgement_line_brightness = profile_line_brightness;
         skin.note_divider_gap_px = preview.note_divider_gap_px;
         skin.show_judgement_line = preview.show_judgement_line;
         skin.show_gear_boundary_line = preview.show_gear_boundary_line;
@@ -641,7 +645,8 @@ struct MenuWindowVisualTestAccess {
         const auto s = window.menu_motion_background_diagnostics();
         return JsonValue(JsonObject{
             {"source", JsonValue(s.source == MenuWindow::MenuMotionSource::Result ? "result" :
-                s.source == MenuWindow::MenuMotionSource::SongSelect ? "song_select" : "none")},
+                s.source == MenuWindow::MenuMotionSource::SongSelect ? "song_select" :
+                s.source == MenuWindow::MenuMotionSource::Skin ? "skin" : "none")},
             {"duration_ns", JsonValue(static_cast<double>(s.duration_ns))},
             {"frame_rate", JsonValue(static_cast<double>(s.frame_rate))},
             {"active", JsonValue(s.active)}, {"decoder_active", JsonValue(s.decoder_active)},
@@ -1179,6 +1184,7 @@ struct MenuWindowVisualTestAccess {
             {"skin_search_active", JsonValue(source.generic.skin_search_active)},
             {"requested_combo_position", JsonValue(source.generic.skin_preview.visible ? source.generic.skin_preview.combo_position : source.gameplay.combo_position)},
             {"lane_divider_brightness", JsonValue(window.gameplay_static_cache_.lane_divider_brightness)},
+            {"judgement_line_brightness", JsonValue(window.gameplay_static_cache_.judgement_line_brightness)},
             {"gauge_width_scale", JsonValue(window.gameplay_static_cache_.gauge_width_scale)},
             {"field_drag_handle", JsonValue(JsonObject{
                 {"left", JsonValue(static_cast<double>(window.gameplay_field_drag_state_.left))},
@@ -1204,6 +1210,13 @@ struct MenuWindowVisualTestAccess {
             {"width", JsonValue(static_cast<double>(window.width_))}, {"height", JsonValue(static_cast<double>(window.height_))},
             {"scale", JsonValue(static_cast<double>(window.scale_))}, {"foreground", JsonValue(foreground)},
             {"result_text_fit", result_text_stats(window)},
+            {"gameplay_skin_video", [&]() {
+                const auto s = window.gameplay_skin_video_diagnostics();
+                return JsonValue(JsonObject{{"active",JsonValue(s.active)},
+                    {"has_frame",JsonValue(s.has_frame)}, {"failed",JsonValue(s.failed)},
+                    {"decode_requests",JsonValue(static_cast<double>(s.decode_requests))},
+                    {"uploaded_frames",JsonValue(static_cast<double>(s.uploaded_frames))}});
+            }()},
             {"menu_motion", menu_motion_stats(window)},
             {"song_select_motion", menu_motion_stats(window)},
             {"geometry_resolver_verified", JsonValue(verify && checked > 0 && failures.empty())},
@@ -1306,6 +1319,8 @@ int main(int argc, char** argv) {
     bool remapped_functions = false;
     bool measure_lines_fixture = false;
     bool measure_alignment_fixture = false;
+    std::optional<double> next_judgement_line_brightness;
+    double judgement_line_brightness = 1.0;
     int judgement_line_type = 1;
     double fixture_judge_position = -1;
     bool timing_sequence = false;
@@ -1439,6 +1454,7 @@ int main(int argc, char** argv) {
     bool gpu_sprites = true;
     bool capture_requested = false;
     int rendered_frames = 0;
+    int frame_wait_ms = 0;
     int frame_limit = 0;
     int avatar_refresh_frame = 0;
     bool cycle_selection = false;
@@ -1450,6 +1466,10 @@ int main(int argc, char** argv) {
     MenuRenderData data;
     data.ui_language = tenriff::ui::Language::Korean;
     for (int i = 1; i < argc; ++i) {
+        if (std::string_view(argv[i]) == "--frame-wait-ms" && i + 1 < argc) {
+            frame_wait_ms = std::clamp(std::stoi(argv[++i]), 0, 50);
+            continue;
+        }
         if (std::string_view(argv[i]) == "--combo-position" && i + 1 < argc) {
             fixture_combo_position = std::stod(argv[++i]);
             if (!std::isfinite(fixture_combo_position) || fixture_combo_position < 0.10 || fixture_combo_position > 0.78) return 2;
@@ -1541,6 +1561,8 @@ int main(int argc, char** argv) {
             preview_fps = 60;
             continue;
         }
+        if (arg == "--judgement-line-brightness-next" && i + 1 < argc) { next_judgement_line_brightness = std::stod(argv[++i]); continue; }
+        if (arg == "--judgement-line-brightness" && i + 1 < argc) { judgement_line_brightness = std::stod(argv[++i]); continue; }
         if (arg == "--falling-note-sequence") {
             falling_note_sequence = gameplay = fixture_idle = no_feedback = true;
             fixture_seconds = 0.0;
@@ -2464,12 +2486,27 @@ int main(int argc, char** argv) {
         apply_gameplay_skin(data.generic.skin_preview);
         if(skin.gameplay_style.show_timing_feedback) data.gameplay.show_timing_feedback=*skin.gameplay_style.show_timing_feedback;
         data.gameplay.skin_background_path=skin.gameplay_background_path;
+        data.gameplay.skin_background_video_path=skin.gameplay_background_video_path;
         data.gameplay.skin_background_opacity=skin.gameplay_background_opacity;
         data.lobby_skin.enabled = true;
         data.lobby_skin.revision = 1;
         data.lobby_skin.native_menu_renderer = skin.native_menu_renderer;
         data.lobby_skin.native_menu = skin.native_menu;
         data.lobby_skin.background_path = skin.lobby_background_path;
+        data.lobby_skin.background_video_path = skin.lobby_background_video_path;
+        data.lobby_skin.background_opacity = skin.lobby_background_opacity;
+        // Match the real MenuApp's primary-screen selection. This lets the
+        // renderer fixtures use the original manifest without rewritten copies.
+        const char* screen_key = data.kind == MenuScreenKind::TitleMenu ? "title" :
+            data.kind == MenuScreenKind::SongSelect ? "song_select" :
+            data.kind == MenuScreenKind::ResultScreen ? "result" :
+            data.kind == MenuScreenKind::GenericList ? "options" : "";
+        if (const auto it = skin.screen_background_paths.find(screen_key); it != skin.screen_background_paths.end())
+            data.lobby_skin.background_path = it->second;
+        if (const auto it = skin.screen_background_video_paths.find(screen_key); it != skin.screen_background_video_paths.end())
+            data.lobby_skin.background_video_path = it->second;
+        if (const auto it = skin.screen_background_opacities.find(screen_key); it != skin.screen_background_opacities.end())
+            data.lobby_skin.background_opacity = it->second;
         data.lobby_skin.logo_path = skin.lobby_logo_path;
         data.lobby_skin.theme_colors = skin.theme_colors;
         data.lobby_skin.referenced_asset_paths = skin.referenced_asset_paths;
@@ -2528,6 +2565,9 @@ int main(int argc, char** argv) {
     }
     data.gameplay.timing_text_offset_x = data.generic.skin_preview.timing_text_offset_x = timing_text_x;
     data.gameplay.lane_divider_brightness = data.generic.skin_preview.lane_divider_brightness = divider_brightness;
+    data.gameplay.judgement_line_brightness = data.generic.skin_preview.judgement_line_brightness =
+        tenriff::app::resolve_skin_judgement_line_brightness(judgement_line_brightness,
+            fixture_skin ? &fixture_skin->gameplay_style : nullptr);
     data.gameplay.gauge_width_scale = data.generic.skin_preview.gauge_width_scale = gauge_width_scale;
     data.gameplay.timing_text_offset_y = data.generic.skin_preview.timing_text_offset_y = timing_text_y;
     data.gameplay.timing_bar_offset_x = data.generic.skin_preview.timing_bar_offset_x = timing_bar_x;
@@ -2568,7 +2608,7 @@ int main(int argc, char** argv) {
         tenriff::app::MenuAppVisualTestAccess::populate_skin_rows(
             data, fixture_skin ? &*fixture_skin : nullptr, selected_row,
             backdrop_off || backdrop_opacity >= 0.0 || backdrop_brightness >= 0.0 || backdrop_height >= 0.0,
-            scratch_right, search_query, search_active);
+            judgement_line_brightness, scratch_right, search_query, search_active);
     }
     if (session_mix) tenriff::app::MenuAppVisualTestAccess::populate_session_mix(
         data, session_mix_missing, selected_row, session_mix_stage_offset);
@@ -3007,6 +3047,11 @@ int main(int argc, char** argv) {
         if (rendered_frames == 35 && next_divider_brightness) {
             data.gameplay.lane_divider_brightness = data.generic.skin_preview.lane_divider_brightness = *next_divider_brightness;
         }
+        if (rendered_frames == 35 && next_judgement_line_brightness) {
+            data.gameplay.judgement_line_brightness = data.generic.skin_preview.judgement_line_brightness =
+                tenriff::app::resolve_skin_judgement_line_brightness(*next_judgement_line_brightness,
+                    fixture_skin ? &fixture_skin->gameplay_style : nullptr);
+        }
         if (avatar_refresh_frame > 0 && rendered_frames == avatar_refresh_frame) ++data.profile_avatar_revision;
         if (cycle_selection) {
             const int selection = (rendered_frames / 45);
@@ -3115,7 +3160,8 @@ int main(int argc, char** argv) {
         }
         // Give the own-window test driver time to focus a newly created window.
         // Still emit an explicit unverified report after 60 frames if focus fails.
-        if (!menu_roundtrip && !hitmap_written && rendered_frames >= 5 &&
+        if (!menu_roundtrip && !hitmap_written && rendered_frames >=
+            (frame_wait_ms > 0 ? std::max(60, frame_limit - 2) : 5) &&
             (!next_field_layout || rendered_frames >= 40) &&
             (!next_divider_brightness || rendered_frames >= 40) &&
             (!next_gauge_width_scale || rendered_frames >= 40) &&
@@ -3126,6 +3172,7 @@ int main(int argc, char** argv) {
             }
             hitmap_written = true;
         }
+        if (frame_wait_ms > 0) std::this_thread::sleep_for(std::chrono::milliseconds(frame_wait_ms));
         if (frame_limit > 0 && rendered_frames >= frame_limit) break;
         if (capture_once && rendered_frames >= 33) break;
         while (const auto click = window.poll_click_event()) {

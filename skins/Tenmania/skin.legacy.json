@@ -1,0 +1,149 @@
+{
+  "$schema": "https://raw.githubusercontent.com/10kseason/TenRiff/main/docs/tenriff-skin.schema.json",
+  "format": "tenriff-skin",
+  "version": 1,
+  "name": "Tenmania",
+  "author": "",
+  "lobby": {
+    "background": "lobby/background.png",
+    "logo": "lobby/logo.png",
+    "background_opacity": 0.92,
+    "screen_opacities": {
+      "title": 0.98,
+      "song_select": 0.80,
+      "settings": 0.70,
+      "settings_skins": 0.66,
+      "result": 0.88
+    }
+  },
+  "theme": {
+    "accent": "#FF66AB",
+    "text": "#FFF0F7",
+    "muted": "#C79AB3",
+    "card": "#1B0718F0",
+    "panel": "#24092AC8",
+    "footer": "#150614F2",
+    "button": "#2E0F2CE8",
+    "button_selected": "#FF66AB3D",
+    "border": "#7A3560A8",
+    "judgement_line": "#FFEEF7",
+    "lane_divider": "#FFC2DE",
+    "scene_primary": "#FF66AB",
+    "scene_secondary": "#4FA9FF",
+    "scene_background": "#0A0410"
+  },
+  "gameplay": {
+    "description": "osu!mania stage: black playfield, pink rails, white/blue/pink columns.",
+    "background": "gameplay/background.png",
+    "background_opacity": 0.78,
+    "gear": "gameplay/gear.png",
+    "note": "gameplay/note-{lane}.png",
+    "hold_head": "gameplay/hold-head-{lane}.png",
+    "hold_body": "gameplay/hold-body-{lane}.png",
+    "hold_tail": "gameplay/hold-tail-{lane}.png",
+    "key_idle": "gameplay/key-idle-{lane}.png",
+    "key_pressed": "gameplay/key-pressed-{lane}.png",
+    "lane_map": ["white", "blue", "white", "blue", "white", "blue", "white", "blue", "white", "blue", "white", "blue", "white", "blue", "white", "blue"],
+    "lane_colors": ["#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF"],
+    "note_aspect": "stretch",
+    "note_width_ratio": 1.0,
+    "note_height_ratio": 1.0,
+    "judgement_line_position": 0.84,
+    "full_lane_receptors": true,
+    "black_playfield": true,
+    "show_lane_dividers": true,
+    "show_judgement_line": true,
+    "show_gear_boundary_line": true,
+    "show_timing_feedback": true,
+    "show_hold_tail": true,
+    "hold_tail_taper": false,
+    "judgement_line_glow": true,
+    "key_pulse": true,
+    "key_pulse_brightness": 0.62,
+    "hit_burst_style": "ring",
+    "key_label_position": "off",
+    "note_shape": "rect",
+    "note_border": true,
+    "lane_background_opacity": 0.07,
+    "visual_opacity": 1.0,
+    "note_outline_opacity": 0.7,
+    "hold_body_opacity": 0.6,
+    "modes": {
+      "1k": {
+        "description": "Single column: treated as a scratch lane.",
+        "lane_map": ["pink"],
+        "lane_colors": ["#FF66AB"]
+      },
+      "2k": {
+        "lane_map": ["white", "blue"],
+        "lane_colors": ["#FFFFFF", "#4FA9FF"]
+      },
+      "3k": {
+        "lane_map": ["white", "pink", "white"],
+        "lane_colors": ["#FFFFFF", "#FF66AB", "#FFFFFF"]
+      },
+      "4k": {
+        "description": "osu!mania 4K reading \u2014 white outside, blue inside.",
+        "lane_map": ["white", "blue", "blue", "white"],
+        "lane_colors": ["#FFFFFF", "#4FA9FF", "#4FA9FF", "#FFFFFF"]
+      },
+      "5k": {
+        "description": "BMS 5keys.",
+        "lane_map": ["white", "blue", "white", "blue", "white"],
+        "lane_colors": ["#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF"]
+      },
+      "6k": {
+        "description": "BMS 5keys + scratch on the left.",
+        "lane_map": ["pink", "white", "blue", "white", "blue", "white"],
+        "lane_colors": ["#FF66AB", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF"]
+      },
+      "7k": {
+        "description": "BMS 7keys, IIDX piano run.",
+        "lane_map": ["white", "blue", "white", "blue", "white", "blue", "white"],
+        "lane_colors": ["#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF"]
+      },
+      "8k": {
+        "description": "BMS 7keys + scratch on the left.",
+        "lane_map": ["pink", "white", "blue", "white", "blue", "white", "blue", "white"],
+        "lane_colors": ["#FF66AB", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF"]
+      },
+      "9k": {
+        "description": "PMS 9 buttons, pink centre.",
+        "lane_map": ["white", "blue", "white", "blue", "pink", "blue", "white", "blue", "white"],
+        "lane_colors": ["#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FF66AB", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF"]
+      },
+      "10k": {
+        "description": "DP: two 5keys fields.",
+        "lane_map": ["white", "blue", "white", "blue", "white", "white", "blue", "white", "blue", "white"],
+        "lane_colors": ["#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF"]
+      },
+      "11k": {
+        "lane_map": ["white", "blue", "white", "blue", "white", "pink", "white", "blue", "white", "blue", "white"],
+        "lane_colors": ["#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#FF66AB", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF"]
+      },
+      "12k": {
+        "description": "DP: two 5keys fields, scratch on each outer edge.",
+        "lane_map": ["pink", "white", "blue", "white", "blue", "white", "white", "blue", "white", "blue", "white", "pink"],
+        "lane_colors": ["#FF66AB", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#FF66AB"]
+      },
+      "13k": {
+        "lane_map": ["white", "blue", "white", "blue", "white", "blue", "pink", "blue", "white", "blue", "white", "blue", "white"],
+        "lane_colors": ["#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FF66AB", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF"]
+      },
+      "14k": {
+        "description": "DP: two 7keys fields.",
+        "lane_map": ["white", "blue", "white", "blue", "white", "blue", "white", "white", "blue", "white", "blue", "white", "blue", "white"],
+        "lane_colors": ["#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF"]
+      },
+      "15k": {
+        "lane_map": ["white", "blue", "white", "blue", "white", "blue", "white", "pink", "white", "blue", "white", "blue", "white", "blue", "white"],
+        "lane_colors": ["#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#FF66AB", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF"]
+      },
+      "16k": {
+        "description": "DP: two 7keys fields, scratch on each outer edge.",
+        "lane_map": ["pink", "white", "blue", "white", "blue", "white", "blue", "white", "white", "blue", "white", "blue", "white", "blue", "white", "pink"],
+        "lane_colors": ["#FF66AB", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#4FA9FF", "#FFFFFF", "#FF66AB"]
+      }
+    }
+  }
+}

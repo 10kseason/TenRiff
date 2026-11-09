@@ -2753,6 +2753,7 @@ TEST_CASE("timing controls survive profile file save and reload") {
     config.skin.timing_text_scale = 1.75;
     config.skin.timing_bar_scale = 0.65;
     config.skin.lane_divider_brightness = 0.37;
+    config.skin.judgement_line_brightness = 0.42;
     REQUIRE(loader.save_profile("profiles/timing", config));
     auto loaded = loader.load_profile("profiles/timing");
     REQUIRE(loaded.success());
@@ -2767,6 +2768,7 @@ TEST_CASE("timing controls survive profile file save and reload") {
     CHECK(loaded.config.skin.timing_text_scale == doctest::Approx(1.75));
     CHECK(loaded.config.skin.timing_bar_scale == doctest::Approx(0.65));
     CHECK(loaded.config.skin.lane_divider_brightness == doctest::Approx(0.37));
+    CHECK(loaded.config.skin.judgement_line_brightness == doctest::Approx(0.42));
 }
 
 TEST_CASE("note fog and outro choice retain defaults clamp and persist") {
@@ -2993,4 +2995,21 @@ TEST_CASE("gauge width config defaults and profile round trips retain the three 
     CHECK(skin_gauge_width_scale("large") == 1.5);
     write_file("profiles/test/config.json", R"({"skin":{"hud_layout":"classic"}})");
     CHECK(loader.load_profile("profiles/test").config.skin.gauge_width == "normal");
+}
+
+TEST_CASE("judgement line brightness defaults preserve old skins and portable values are finite and bounded") {
+    tenriff::config::SkinConfig skin;
+    REQUIRE(tenriff::config::deserialize_skin_config(R"({"show_lane_dividers":false})", skin));
+    CHECK(skin.judgement_line_brightness == 1.0);
+    REQUIRE(tenriff::config::deserialize_skin_config(R"({"judgement_line_brightness":0.37})", skin));
+    tenriff::config::SkinConfig restored;
+    REQUIRE(tenriff::config::deserialize_skin_config(tenriff::config::serialize_skin_config(skin), restored));
+    CHECK(restored.judgement_line_brightness == doctest::Approx(0.37));
+    REQUIRE(tenriff::config::deserialize_skin_config(R"({"judgement_line_brightness":-2})", restored));
+    CHECK(restored.judgement_line_brightness == 0.0);
+    REQUIRE(tenriff::config::deserialize_skin_config(R"({"judgement_line_brightness":2})", restored));
+    CHECK(restored.judgement_line_brightness == 1.0);
+    restored.judgement_line_brightness = std::numeric_limits<double>::quiet_NaN();
+    REQUIRE(tenriff::config::deserialize_skin_config(tenriff::config::serialize_skin_config(restored), skin));
+    CHECK(skin.judgement_line_brightness == 1.0);
 }

@@ -2420,7 +2420,20 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<ID2D1Bitmap> menu_motion_bitmap;
     MenuMotionDiagnostics menu_motion_stats;
     std::string menu_motion_path;
-    std::array<bool, 3> menu_motion_failed_assets{};
+    std::array<bool, 4> menu_motion_failed_assets{};
+    // Skin loops latch failure per file, so another screen's video still plays.
+    // Cleared whenever the skin revision changes (reload / reselect).
+    std::string menu_motion_failed_skin_path;
+    // Gameplay skin loop: separate decoder so a chart BGA never shares its clock.
+    std::unique_ptr<BgaVideoDecoder> gameplay_skin_video_decoder;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> gameplay_skin_video_bitmap;
+    std::string gameplay_skin_video_path;
+    std::string gameplay_skin_video_failed_path;
+    int64_t gameplay_skin_video_first_request_ns = 0;
+    int64_t gameplay_skin_video_last_ready_ns = 0;
+    int64_t gameplay_skin_video_last_update_ns = 0;
+    int64_t gameplay_skin_video_timestamp_100ns = -1;
+    GameplaySkinVideoDiagnostics gameplay_skin_video_stats;
     int64_t menu_motion_clock_ns = 0;
     int64_t menu_motion_first_request_ns = 0;
     int64_t menu_motion_last_ready_ns = 0;
@@ -4052,6 +4065,8 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
     desired.show_lane_dividers = data.show_lane_dividers;
     desired.lane_divider_brightness = std::isfinite(data.lane_divider_brightness)
         ? std::clamp(data.lane_divider_brightness, 0.0, 1.0) : 1.0;
+    desired.judgement_line_brightness = std::isfinite(data.judgement_line_brightness)
+        ? std::clamp(data.judgement_line_brightness, 0.0, 1.0) : 1.0;
     desired.show_judgement_line = data.show_judgement_line;
     desired.judgement_line_type = data.judgement_line_type;
     desired.judgement_line_type2_rgb = data.judgement_line_type == 2 ? data.judgement_line_type2_rgb : std::nullopt;
@@ -4102,6 +4117,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
         gameplay_static_cache_.lane_center_gap_scale == desired.lane_center_gap_scale &&
         gameplay_static_cache_.show_lane_dividers == desired.show_lane_dividers &&
         gameplay_static_cache_.lane_divider_brightness == desired.lane_divider_brightness &&
+        gameplay_static_cache_.judgement_line_brightness == desired.judgement_line_brightness &&
         gameplay_static_cache_.show_judgement_line == desired.show_judgement_line &&
         gameplay_static_cache_.judgement_line_type == desired.judgement_line_type &&
          gameplay_static_cache_.judgement_line_type2_rgb == desired.judgement_line_type2_rgb &&
@@ -4178,6 +4194,12 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
     if (surface_layout.ghost_visible) {
         build_gauge_grid(1, surface_layout.ghost_gauge_left);
     }
+    // Brightness changes RGB only; retain authored alpha and restore shared brushes.
+    const auto line_color = [&](D2D1_COLOR_F color) {
+        const auto gain = static_cast<float>(desired.judgement_line_brightness);
+        color.r *= gain; color.g *= gain; color.b *= gain;
+        return color;
+    };
     auto draw_field_panel = [&](const GameplayFieldLayout& field_layout) {
         const D2D1_RECT_F field_rect =
             D2D1::RectF(field_layout.left, field_layout.top, field_layout.right, field_layout.bottom);
@@ -4272,10 +4294,10 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
                     // Recorded once into the static layer: a faint light pooling above
                     // the contact line and two edge rails converging on it give the
                     // black field depth without touching notes or per-frame cost.
-                    const D2D1_COLOR_F glow = native_gameplay_d2d_color(native_style, "judgement_glow",
-                        color_from_rgb(0x70EED6, 0.10f * static_cast<float>(desired.visual_opacity)));
-                    const D2D1_COLOR_F line = native_gameplay_d2d_color(native_style, "judgement_line",
-                        color_from_rgb(0xBCFFF0, static_cast<float>(desired.visual_opacity)));
+                    const D2D1_COLOR_F glow = line_color(native_gameplay_d2d_color(native_style, "judgement_glow",
+                        color_from_rgb(0x70EED6, 0.10f * static_cast<float>(desired.visual_opacity))));
+                    const D2D1_COLOR_F line = line_color(native_gameplay_d2d_color(native_style, "judgement_line",
+                        color_from_rgb(0xBCFFF0, static_cast<float>(desired.visual_opacity))));
                     auto fill_vertical_fade = [&](const D2D1_RECT_F& rect, D2D1_COLOR_F color, float peak_alpha) {
                         if (rect.bottom - rect.top < 1.0f || rect.right <= rect.left || peak_alpha <= 0.002f) return;
                         D2D1_COLOR_F clear = color;
@@ -4299,17 +4321,19 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
                     if (!desired.studio) for (const float x : {field_layout.left + 1.0f, field_layout.right - 3.0f}) {
                         fill_vertical_fade(D2D1::RectF(x, rail_top, x + 2.0f, y), line, 0.42f * line.a);
                     }
-                    fill->SetColor(native_gameplay_d2d_color(native_style,"judgement_glow",color_from_rgb(0x70EED6, 0.10f * static_cast<float>(desired.visual_opacity))));
+                    fill->SetColor(line_color(native_gameplay_d2d_color(native_style,"judgement_glow",color_from_rgb(0x70EED6, 0.10f * static_cast<float>(desired.visual_opacity)))));
                     d2d_->d2d_context->FillRectangle(D2D1::RectF(field_layout.left + 3.0f, std::max(field_layout.top, y - native_gameplay_number(native_style,"judgement_glow_height")*.5f),
                         field_layout.right - 3.0f, std::min(field_layout.bottom, y + native_gameplay_number(native_style,"judgement_glow_height")*.5f)), fill);
                 }
-                fill->SetColor(native_gameplay_d2d_color(native_style,"judgement_line",color_from_rgb(0xBCFFF0, static_cast<float>(desired.visual_opacity))));
+                fill->SetColor(line_color(native_gameplay_d2d_color(native_style,"judgement_line",color_from_rgb(0xBCFFF0, static_cast<float>(desired.visual_opacity)))));
                 d2d_->d2d_context->FillRectangle(D2D1::RectF(field_layout.left + 3.0f, y - native_gameplay_judgement_line_width(native_style, desired.note_height_scale)*.5f,
                     field_layout.right - 3.0f, y + native_gameplay_judgement_line_width(native_style, desired.note_height_scale)*.5f), fill);
             }
             fill->SetColor(saved);
         }
         if (!desired.native_instrument && desired.show_judgement_line && desired.judgement_line_type != 2 && d2d_->judgement_line_brush) {
+            const auto saved_line_color = d2d_->judgement_line_brush->GetColor();
+            d2d_->judgement_line_brush->SetColor(line_color(saved_line_color));
             const D2D1_RECT_F line_rect =
                 gameplay_judgement_line_rect(field_layout, hit_line_y, note_height_scale);
             if (desired.judgement_line_glow_enabled) {
@@ -4343,12 +4367,13 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
                                                 field_layout.bottom - 1.5f);
                 const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
                 const float saved_opacity = d2d_->accent_brush->GetOpacity();
+                d2d_->accent_brush->SetColor(line_color(saved_color));
                 d2d_->accent_brush->SetOpacity(static_cast<float>(0.92 * desired.visual_opacity));
                 d2d_->d2d_context->DrawLine(D2D1::Point2F(field_layout.left + 7.0f, core_y),
                                             D2D1::Point2F(field_layout.right - 7.0f, core_y),
                                             d2d_->accent_brush.Get(),
                                             3.0f);
-                d2d_->accent_brush->SetColor(D2D1::ColorF(0xF7FAFD));
+                d2d_->accent_brush->SetColor(line_color(D2D1::ColorF(0xF7FAFD)));
                 d2d_->accent_brush->SetOpacity(static_cast<float>(0.96 * desired.visual_opacity));
                 d2d_->d2d_context->DrawLine(D2D1::Point2F(field_layout.left + 9.0f, core_y),
                                             D2D1::Point2F(field_layout.right - 9.0f, core_y),
@@ -4357,6 +4382,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
                 d2d_->accent_brush->SetColor(saved_color);
                 d2d_->accent_brush->SetOpacity(saved_opacity);
             }
+            d2d_->judgement_line_brush->SetColor(saved_line_color);
         }
         if (desired.show_judgement_line && desired.judgement_line_type == 2 && d2d_->note_fill_brush) {
             auto* brush = d2d_->note_fill_brush.Get();
@@ -4372,11 +4398,11 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
             d2d_->d2d_context->PushAxisAlignedClip(D2D1::RectF(field_layout.left, field_layout.top,
                 field_layout.right, field_layout.bottom), D2D1_ANTIALIAS_MODE_ALIASED);
             const float opacity = static_cast<float>(desired.visual_opacity);
-            brush->SetColor(color_from_rgb(desired.judgement_line_type2_rgb.value_or(0x20B85A),
-                                            desired.judgement_line_type2_rgb ? opacity : 0.08f * opacity));
+            brush->SetColor(line_color(color_from_rgb(desired.judgement_line_type2_rgb.value_or(0x20B85A),
+                                            desired.judgement_line_type2_rgb ? opacity : 0.08f * opacity)));
             d2d_->d2d_context->FillRectangle(band, brush);
             if (!desired.judgement_line_type2_rgb) {
-                brush->SetColor(color_from_rgb(0x20B85A, opacity));
+                brush->SetColor(line_color(color_from_rgb(0x20B85A, opacity)));
                 d2d_->d2d_context->DrawRectangle(band, brush, 2.0f);
             }
             d2d_->d2d_context->PopAxisAlignedClip();

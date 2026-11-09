@@ -20,6 +20,12 @@ payload["menuVectors"] = {name.lower(): shapes for name, shapes in vectors.ASSET
 native = ROOT / "skins/TenRiff_NativeEditable/skin.json"
 if native.exists():
     payload["native"] = json.loads(native.read_text(encoding="utf-8-sig"))
+    # A new offline document has no loaded files. Keep the common vector design
+    # while omitting the bundled theme's background dependency from this template.
+    lobby = payload["native"].get("lobby", {})
+    lobby["background"] = ""
+    lobby["logo"] = ""
+    lobby["screen_backgrounds"] = {}
 gameplay_catalog = ROOT / "assets/native-gameplay/luma-keys/editor-catalog.json"
 if gameplay_catalog.exists():
     payload["gameplayNative"] = json.loads(gameplay_catalog.read_text(encoding="utf-8-sig"))

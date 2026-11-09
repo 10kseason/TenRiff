@@ -1,6 +1,35 @@
 # TenRiff 스킨 포맷 v1
 
-TenRiff 스킨은 한 폴더의 `skin.json`과 PNG/JPG/BMP 이미지로 로비와 인게임 외형을 함께 바꾸는 선택형 포맷이다. 모든 항목은 선택 사항이며, 비어 있거나 누락된 슬롯은 기존 Native 렌더링으로 자동 대체된다.
+2026-11-09 **1.9.9.9-final3** 및 웹/동봉 에디터의 포맷 설명이다.
+기존 v1을 유지하며 판정선 기본 명도와 명시적 배경 영상 경로를 선택 필드로 지원한다.
+final2 이하가 대상이면 새 명도/영상 필드는 생략한다. 같은 버전의 스키마로 검증한다.
+
+1.8.8 스킨 설정의 숫자 레인 단축키와 화면상 왼쪽부터 선택하는 규칙은 [레인 선택 안내](release-feedback-1.8.8.ko.md#스킨의-숫자-레인-선택)를 참고하세요. 편집 대상 선택 기능이며 스킨 포맷 v1은 유지합니다.
+
+TenRiff 스킨은 한 폴더의 `skin.json`, 선택형 PNG/JPG/BMP 이미지·배경 영상과 벡터 도형 설정으로 로비와 인게임 외형을 바꾸는 포맷이다. 시각 항목은 선택 사항이며 누락된 슬롯은 기존 기본값을 쓴다. Native 인게임 스프라이트의 빈 배열 `[]`은 숨김을 뜻한다.
+
+AI 에이전트에게 제작을 맡기려면 [`skin-agent-guide.md`](skin-agent-guide.md)와
+[`스킨 제작 규칙`](../skins/AGENTS.md)을 함께 사용한다. 실제 완성 예제는
+[`Agent Prism Universal`](../skins/TenRiff_AgentPrism_Universal_1K-16K)이다.
+
+공식 배포판은 루트 [`skins/`](../skins/)의 완성 스킨을 `TenRiff.exe` 옆에 포함한다.
+게임은 프로필에 가져온 스킨을 먼저 찾고, 같은 이름이 없을 때 번들 스킨을 사용한다.
+
+## 지원 형식과 범위
+
+| 형식 | 지원 범위 |
+|---|---|
+| Native | 내장 렌더러. TenRiff manifest의 메뉴·게임플레이 `renderer`를 각각 `native`로 지정하면 벡터와 세부 슬롯을 편집 가능 |
+| TenRiff 폴더 / `skin.json` v1 | 이 문서의 메뉴·게임플레이, `1k`~`16k`, 별도 `7+1` 모드 |
+| LR2 폴더 | 기존 LR2 플레이 스킨 로더로 지원되는 노트·LN·건반·기어 사용. LR2 전체 UI/모든 명령 호환을 보장하지 않음 |
+| `.trskin` | 사용자 SkinConfig와 활성 스킨 자산을 담는 기존 v1 컨테이너. [포맷 설명](skin-presets.md) 참고 |
+| `.trprofile` | 전체 프로필 컨테이너 안의 스킨 설정·자산. `skin.json`과 다른 형식 |
+| 에디터 ZIP | 매니페스트와 자산을 포장한 ZIP. 폴더로 푼 뒤 가져오기 |
+
+다른 게임의 `skin.ini` 등은 직접 읽지 않는다. 필요한 경우 사용 허가가 있는 이미지를
+TenRiff 이미지 슬롯에 매핑한다. 이번 변경은 새 외부 스킨 로더나 컨테이너 버전을 추가하지 않는다.
+내장 12개 테마의 [공통 디자인 규칙](modern-skins-20261109.ko.md)과 최소
+[`TenRiff-Example`](../examples/skins/TenRiff-Example)은 현재 v1의 실제 예제다.
 
 ## 빠른 시작
 
@@ -9,7 +38,7 @@ TenRiff 스킨은 한 폴더의 `skin.json`과 PNG/JPG/BMP 이미지로 로비�
 3. 게임으로 돌아와 `F5` 또는 `Reload Skin`을 누른다.
 4. 더 세밀하게 바꾸고 싶으면 `skin.json`을 편집한다.
 
-기존 스킨을 시작점으로 삼으려면 [`examples/skins/TenRiff-Example`](../examples/skins/TenRiff-Example)을
+새 스킨을 시작하려면 [`examples/skins/TenRiff-Example`](../examples/skins/TenRiff-Example)을
 복사한 뒤 `Import Skin`으로 가져와도 된다. `Open Skin Folder`는 현재 선택한 TenRiff 스킨을
 바로 열어 준다.
 
@@ -73,6 +102,12 @@ MySkin/
 `gameplay/key-pressed`는 확장자만 `.png`, `.jpg`, `.jpeg`, `.bmp` 중 하나로 맞추면
 `skin.json`에 경로를 쓰지 않아도 자동 감지한다.
 
+직접 이미지 슬롯에 `""`를 지정하면 그 슬롯의 표준 파일명 자동 탐색을 끈다.
+누락과 빈 문자열은 다르다. 특히 원본 이미지가 남아 있는 폴더에서 Native 렌더링으로
+바꿀 때 `note`, `hold_head/body/tail`, `key_idle/pressed`, `gear`, `background`를 확인한다.
+화면별 배경의 `screen_backgrounds.<id>: ""`는 화면별 자동 탐색을 막지 않는다.
+예전 화면 이미지가 남아 있다면 화면별로 원하는 배경 경로를 지정한다.
+
 ## 화면별 배경과 색상 테마
 
 `lobby/screens/<화면 ID>.png`를 넣으면 그 화면만 다른 배경을 쓴다. 같은 값은
@@ -112,6 +147,200 @@ MySkin/
 
 색은 `#RRGGBB` 또는 `#RRGGBBAA`다. 빠진 항목은 기본 팔레트를 유지한다.
 
+## 움직이는 배경 영상 (2026-11-09 로컬 후보)
+
+정지 배경 대신 소리 없는 반복 영상을 쓸 수 있다. 이 필드는 `claude-code-cli-skin-20261109`
+로컬 후보부터 읽으며, 이전 클라이언트는 "지원하지 않는 필드" 경고를 남기고 정지 배경을 쓴다.
+자세한 동작은 [움직이는 배경 영상 안내](skin-video-background-20261109.ko.md)를 참고한다.
+
+```json
+"lobby": {
+  "background": "cli/lobby.png",
+  "background_video": "cli/lobby-loop.mp4",
+  "screen_videos": { "title": "cli/title-loop.mp4", "result": "" }
+},
+"gameplay": {
+  "background": "cli/gameplay.png",
+  "background_video": "cli/gameplay-loop.mp4",
+  "modes": { "16k": { "background_video": "" } }
+}
+```
+
+| 필드 | 동작 |
+|---|---|
+| `lobby.background_video` | 모든 메뉴 화면의 공통 반복 영상. 내장 곡 선택/결과 영상과 정지 배경을 대신함 |
+| `lobby.screen_videos.<화면 ID>` | 화면별 영상. 화면 → 대체 화면(`settings` 등) → 공통 영상 순서. 빈 문자열은 그 화면을 정지 배경으로 둠 |
+| `gameplay.background_video` | 인게임 영상. 차트에 기본 BGA 레이어가 없을 때만 디코딩·표시. 모드별 덮어쓰기 가능 |
+
+- 지원 형식: `.mp4`, `.m4v`, `.mpg`, `.mpeg`, `.wmv`, `.avi`, `.mov`, `.webm`, `.mkv`. 경로 규칙은 이미지와
+  같다(상대 경로, 폴더 밖 금지). 영상은 **자동 탐색하지 않는다**.
+- 영상은 같은 화면의 배경 불투명도(`background_opacity`, `screen_opacities`)로 정지 배경 자리에 그린다.
+  첫 프레임 전, 시스템 애니메이션 끄기·메뉴 동작 줄이기, 디코딩 실패 때는 정지 배경을 쓴다.
+- 메뉴 영상은 자체 시계로 끝에서 처음으로 반복한다. 인게임 영상은 BGA와 같은 차트 시계를 따라
+  일시정지·배속·재시작에 맞춰 움직이며, 길이와 무관하게 끝에서 처음으로 반복한다.
+- 오디오 트랙은 재생하지 않는다. 1920×1080 30fps H.264 MP4를 권장한다. 가져오기와 `.trskin` 내보내기는
+  참조된 영상 파일도 함께 복사한다(파일당 128MB, 전체 512MB 제한).
+- 정지 배경과 마찬가지로 `gameplay.background_video`도 게임플레이 표현으로 간주한다. Native 메뉴 스킨이
+  Luma Keys 건반을 유지하려면 `gameplay.renderer: native`를 함께 지정한다.
+
+## 현대 Native 메뉴 편집
+
+`lobby.renderer`를 `native`로 지정하면 현대적인 기본 메뉴와 애니메이션을 유지하면서
+`native` 항목으로 외형을 바꿀 수 있다. 이 필드가 없거나 `legacy`이면 기존 v1 스킨의
+메뉴 표시 방식을 유지한다. 기존 스킨을 새로운 레이아웃으로 자동 전환하지 않는다.
+
+동봉된 [`TenRiff_NativeEditable`](../skins/TenRiff_NativeEditable/skin.json)은
+현재 기본 메뉴에서 시작하는 편집용 프리셋이다. 동봉
+[`tools/skin_editor/index.html`](../tools/skin_editor/index.html)을 브라우저로 열어
+한국어·영어·일본어 UI로 수정하고 사본을 저장할 수 있다. 지원 슬롯의 ID와 기본값은
+[`native-catalog.json`](../tools/skin_editor/native-catalog.json)에 정리된다.
+
+```json
+"lobby": { "renderer": "native" },
+"native": {
+  "metrics": {},
+  "colors": {},
+  "rects": {},
+  "assets": {},
+  "motion": {},
+  "fonts": {}
+}
+```
+
+| 항목 | 값 | 의미 |
+|---|---|---|
+| `native.metrics` | 숫자 | 크기, 간격, 테두리 등 슬롯별 시각 수치 |
+| `native.colors` | `#RRGGBB` / `#RRGGBBAA` | 슬롯별 색과 불투명도 |
+| `native.rects` | `[dx, dy, dwidth, dheight]` | 계산된 사각형의 이동·크기 증감 |
+| `native.assets` | 상대 이미지 경로 | 기본 벡터 장식 대신 사용할 PNG/JPG/BMP |
+| `native.motion` | 숫자 | 메뉴 애니메이션 활성화·속도·강도·등장 시간 |
+| `native.fonts` | 글꼴 패밀리 문자열 | 슬롯별 설치된 글꼴 이름 |
+
+`native.rects`의 값은 `1920x1080` 기준 공간의 **증감량**이다. 예를 들어
+`[10, -5, 32, -8]`은 오른쪽으로 10, 위로 5 이동하고 폭은 32 늘리며 높이는 8 줄인다.
+동일 슬롯으로 그리는 반복 행도 원래 위치를 유지한다. 기존 `layout`은 계속
+`[left, top, right, bottom]` 절대 좌표를 사용한다.
+
+슬롯 ID는 소문자로 시작하고 영문 소문자, 숫자, `_`, `.`, `-`를 사용하며 최대 128자다.
+각 맵은 최대 4,096개 항목을 담는다. 수치와 사각형 증감량은 `-8192..8192`, 모션 값은
+`0..120` 범위만 읽는다. 실제 화면에서는 슬롯의 목적에 맞는 범위를 사용해야 한다.
+형식은 맞지만 현재 카탈로그에 없는 ID는 향후 호환성을 위해 읽고 보존할 수 있으며,
+현재 렌더러에는 효과가 없다. 글꼴 이름은 제어 문자를 금지하고 UTF-8 기준 128바이트까지
+지원한다. 설치되지 않은 글꼴은 Windows 글꼴 대체 규칙을 따른다.
+
+누락·잘못된 값은 해당 슬롯의 기본 표시로 대체한다. 이미지 경로는 다른 이미지 필드와
+같은 상대 경로 규칙을 따르고, 가져오기 시 참조 이미지를 함께 복사한다. 최상위 `native`
+항목은 메뉴 표시용이며 게임플레이 설정을 바꾸지 않는다. 인게임 편집은 아래의
+`gameplay.native`를 사용한다. 기본 편집 프리셋에는 메뉴와 Luma Keys 인게임 설정이 함께 들어 있다.
+게임플레이 이미지나 시각 옵션이 없는 Native 메뉴 스킨은 인게임 소스도 Native로
+유지하므로 기본 디지털 키 표시까지 그대로 남는다. 실제 게임플레이 이미지나 옵션을
+추가한 기존 스킨은 해당 모드에서 기존 TenRiff 게임플레이 스킨 경로를 사용한다.
+`gameplay.renderer: native`를 명시한 스킨은 시각 옵션을 추가해도 기본 건반 렌더러를 유지한다.
+
+## Native 인게임 편집
+
+`skin.gauge_width`는 프로필 및 `.trskin`/`.trprofile`의 HUD 사용자 설정입니다. `normal`(100%, 기본), `wide`(125%), `large`(150%)를 지원하고 Classic 게이지와 Studio 양옆 바의 가로 크기만 바꿉니다. 네이티브 `gauge` 사각형이 지정되어 있으면 해당 가로 폭에 배율을 적용합니다. 세로·게이지 계산은 유지하며 스킨 JSON 제작 슬롯에는 추가하지 않습니다.
+
+`gameplay.renderer`가 `native`이면 Luma Keys의 건반, 노트, 레일, 판정선, HUD와
+시각 애니메이션을 `gameplay.native`에서 편집한다. 이 선택은 `lobby.renderer`와
+독립적이다. `gameplay.renderer`가 없거나 `legacy`이면 기존 v1 스킨의 표시 경로를 유지한다.
+게임 시뮬레이션의 판정 시간, 입력, 오디오, 채보 규칙은 이 설정을 읽지 않는다.
+
+`gameplay.native.rects`의 기존 HUD 사각형(title, score, gauge 등)은 클래식 배치에만 적용한다. 프로필의 `skin.hud_layout=studio`는 Native·가져온 LR2 스킨의 단독 플레이에서 스튜디오 덱 배치를 사용한다. LR2 노트·건반·기어 이미지와 비율은 그대로 사용하며, 다른 이미지 스킨·고스트 대전·멀티플레이는 기존 배치를 유지한다. `skin.hud_riff_map_visible`(기본 `true`)는 덱 왼쪽 노트 밀도 그래프와 시계를 함께 켜거나 끈다. 두 값 모두 프로필과 `.trskin`의 사용자 설정이며, 스킨 JSON 스키마와 웹/오프라인 에디터의 제작 슬롯에는 추가하지 않는다.
+
+[웹 스킨 에디터](https://tenriff-skin-editor.lastestarcorp.chatgpt.site/)와 동봉
+`tools/skin_editor/index.html`에서 편집하고 사본을 저장할 수 있다. 전체 기본값은
+[`TenRiff_NativeEditable/skin.json`](../skins/TenRiff_NativeEditable/skin.json),
+지원 슬롯과 범위는 [`editor-catalog.json`](../assets/native-gameplay/luma-keys/editor-catalog.json)에 있다.
+
+```json
+"gameplay": {
+  "renderer": "native",
+  "judgement_line_brightness": 0.8,
+  "native": {
+    "metrics": { "judgement_line_width": 3, "key_max_height": 160 },
+    "colors": { "judgement_line": "#A8FFF0", "key_led": "#66CCFF" },
+    "motion": { "press_depth": 9, "release_response": 18 },
+    "rects": { "combo": [0, -24, 0, 0] },
+    "fonts": { "combo": "Bahnschrift SemiBold" },
+    "sprites": {
+      "note": [
+        { "x": 0, "y": 2, "width": 128, "height": 28,
+          "color": "#10283A", "mix": 0.6, "alpha": 1, "radius": 4 },
+        { "x": 4, "y": 5, "width": 120, "height": 7,
+          "color": "#FFFFFF", "mix": 0.7, "alpha": 0.9, "radius": 1 },
+        { "x": 2, "y": 3, "width": 124, "height": 26,
+          "color": "#FFFFFF", "mix": 0, "alpha": 1, "radius": 2 }
+      ]
+    }
+  },
+  "modes": {
+    "16k": { "native": { "metrics": { "key_inset": 2 } } }
+  }
+}
+```
+
+### 수치, 색상, 위치, 글꼴
+
+| 항목 | 주요 슬롯 | 단위와 동작 |
+|---|---|---|
+| `metrics` | `key_min_height`, `key_max_height`, `key_inset`, `judgement_line_width`, `hold_edge_mix`, `timing_range_ms`, `combo_font_size` | 화면 크기는 1920×1080 기준 논리 픽셀. 비율·불투명도·타이밍 막대 표시 범위는 슬롯별 단위 |
+| `colors` | `key_well`, `key_led`, `chassis`, `judgement_line`, `hold_edge/core/shadow`, `combo`, `judgement_pg/gr/gd/bd/pr`, `timing_fast/slow`, `gauge_ex_hard/hard/normal/easy` | `#RRGGBB` 또는 `#RRGGBBAA` |
+| `motion` | `press_response`, `release_response`, `press_depth`, `pressed_light`, `hit_light`, `burst_rise`, `combo_duration_ms`, `combo_scale`, `combo_lift` | 눌림·복원 응답률은 클수록 빠름. 깊이·이동은 논리 픽셀, `_ms`는 밀리초 |
+| `rects` | `title`, `artist`, `speed`, `score`, `stats`, `combo`, `judgement`, `timing`, `gauge`, `progress`, `key_label` | `[dx, dy, dwidth, dheight]` 증감량, 각 값 `-8192..8192` |
+| `fonts` | `title`, `score`, `body`, `timing`, `judgement`, `combo`, `key_label` | 설치된 글꼴 이름. 제어 문자 금지, UTF-8 기준 최대 128바이트 |
+
+인게임 수치·모션의 허용 범위는 각 슬롯에 따로 정의된다. 메뉴용 `native.motion`의
+`0..120` 제한을 적용하면 안 된다. 예를 들어 `press_response`는 `1..500`,
+`combo_duration_ms`는 `1..2000`, `combo_lift`는 `-100..100`이다.
+`timing_range_ms`는 피드백 막대의 표시 범위이며 실제 판정 윈도우를 바꾸지 않는다.
+카탈로그에 없는 인게임 슬롯 ID는 런타임에서 경고 후 무시한다. JSON 편집 도구는
+알 수 없는 항목을 원본에 보존할 수 있지만 공식 스키마 검증은 오타를 오류로 보고한다.
+
+### 벡터 스프라이트
+
+`sprites`는 `key_idle`, `key_pressed`, `note`, `hold_head`, `hold_tail`을 지원한다.
+각 배열은 최대 128개의 둥근 사각형을 뒤에서 앞으로 겹쳐 그린다. 건반은 **128×256**,
+노트·롱노트 머리·꼬리는 **128×32** 좌표이며 렌더러가 실제 레인 크기에 맞춰 조절한다.
+레인 색과 도형 색을 혼합하므로 공통 도형을 4~16키 전체에 사용할 수 있다.
+
+**노트·머리·꼬리의 인덱스 0·1은 외곽선 레이어**다. 두 레이어의 알파는
+`note_border`와 `note_outline_opacity`에 따라 변한다. 불투명한 노트 본체는 반드시
+**인덱스 2 이후**에 둔다. 두 레이어만 쓰면 테두리를 껐을 때 본체까지 사라질 수 있다.
+건반(`key_idle`, `key_pressed`)에는 이 규칙을 적용하지 않는다.
+
+| 레이어 필드 | 범위 | 의미 |
+|---|---|---|
+| `x`, `y` | `0..128`, `0..캔버스 높이` | 왼쪽 위 위치, 필수 |
+| `width`, `height` | `0..128`, `0..캔버스 높이` | 폭과 높이, 필수. 오른쪽과 아래 끝도 캔버스 안에 있어야 함 |
+| `color` | `#RRGGBB` / `#RRGGBBAA` | 도형 색, 필수 |
+| `mix` | `0..1`, 기본 `1` | `0`은 레인 색, `1`은 도형 색 |
+| `alpha` | `0..1`, 기본 `1` | 레이어 불투명도. `color`의 알파와 곱함 |
+| `radius` | `0..128`, 기본 `0` | 모서리 반경 |
+
+스프라이트 항목을 생략하면 기본 Luma Keys 도형을 쓴다. **빈 배열 `[]`은 해당 도형을
+숨긴다.** 전체 객체 삭제와 빈 배열을 혼동하지 않는다. 잘못된 레이어나 범위 초과가
+있으면 해당 스프라이트 전체가 기본 도형으로 대체되고 경고를 남긴다. 캔버스를 넘는지
+확인하는 `x + width`, `y + height` 검사는 런타임과 에디터가 수행한다. 표준 JSON Schema는
+필드별 범위만 검사하므로 스키마 성공 뒤에도 에디터 경고와 게임 리로드 결과를 확인한다.
+
+명시한 벡터 스프라이트는 `note_shape`와 관계없이 해당 슬롯에 적용된다. 벡터를 지정하지
+않은 노트는 `rect`일 때 Luma Keys 기본 도형을 쓰고 다른 모양에서는 기존 모양을 유지한다.
+기존 `gameplay.note`, `hold_head/body/tail`, `key_idle/pressed` 이미지도 사용할 수 있다.
+읽기에 성공한 교체 이미지가 벡터보다 우선하므로 빈 배열로 숨긴 슬롯도 이미지가 있으면
+이미지를 그린다. 이미지가 없거나 읽지 못하면 벡터 또는 기존 기본값으로 대체된다.
+
+기본 도형을 변경해도 매 프레임 파일을 읽거나 도형 전체를 다시 생성하지 않는다.
+스킨을 읽거나 시각 설정이 바뀌면 필요한 GPU 비트맵을 갱신하고 플레이 중에는 재사용한다.
+
+### 모드별 상속
+
+일반 `gameplay` 필드는 기존처럼 모드 값으로 통째로 대체한다. `gameplay.native`는
+**카테고리 안의 슬롯별로 병합**한다. 위 예시의 16K는 `key_inset`만 바꾸고 공통
+판정선 색·모션·노트 도형을 상속한다. 스프라이트 배열은 레이어 단위로 합치지 않고
+해당 이름의 전체 배열을 대체한다. 예를 들어 `modes.4k.native.sprites.note: []`은
+4K의 일반 노트만 숨긴다. 모드별 객체를 중첩하는 것은 허용하지 않는다.
+
 ## 키 모드 공통화와 패턴 경로
 
 레인별 파일 이름을 전부 배열로 쓰는 대신 문자열 패턴을 쓸 수 있다.
@@ -133,7 +362,7 @@ MySkin/
 - `{lane}`: `lane_map`의 현재 값
 - `{index}`: 1부터 시작하는 레인 번호
 - `{index:02}`: 두 자리 레인 번호 (`01`, `02`, ...)
-- `modes`: `1k`부터 `16k`, 그리고 BMS 7키+스크래치 전용 `7+1`의 얕은 덮어쓰기. 공통 항목을 먼저 쓰고 레이아웃마다 다른 항목만 적는다.
+- `modes`: `1k`부터 `16k`, 그리고 BMS 7키+스크래치 전용 `7+1`의 덮어쓰기. 일반 필드는 얕게 대체하고 `native`의 카테고리 맵은 슬롯별로 병합한다. 공통 항목을 먼저 쓰고 레이아웃마다 다른 항목만 적는다.
 
 가져오기는 현재 선택한 모드뿐 아니라 `1k..16k`와 `7+1`의 모든 참조 자산을 함께 복사한다.
 
@@ -141,20 +370,60 @@ MySkin/
 
 스킨은 이미지뿐 아니라 아래 시각 옵션도 기본값으로 지정할 수 있다.
 
-`show_lane_dividers`, `show_judgement_line`, `show_timing_feedback`,
-`show_gear_boundary_line`, `show_hold_tail`, `hold_tail_taper`, `judgement_line_glow`,
+`show_lane_dividers`, `show_judgement_line`, `show_timing_feedback`, `show_timing_bar`,
+`timing_bar_always_visible`,
+`show_gear_boundary_line`, `show_hold_tail`, `hold_tail_taper`, `judgement_line_glow`, `judgement_line_brightness`,
 `key_pulse`, `key_pulse_brightness`, `hit_burst_style`, `key_label_position`,
+`key_backdrop`, `key_backdrop_opacity`, `key_backdrop_brightness`, `key_backdrop_height`,
 `note_border`, `note_shape`, `lane_colors`, `lane_background_opacity`, `black_playfield`,
 `visual_opacity`, `note_outline_opacity`, `hold_body_opacity`.
 
+`hold_body_opacity`는 0.0–1.0 범위를 그대로 알파에 곱한다. 0%에서는 몸통만
+숨기며 머리와 꼬리는 유지한다. 100%, 50%, 45%를 별도 증폭이나 상한 제한 없이
+표시하고 네이티브, 이미지 스킨, 게임 내 미리보기와 오프라인 편집기가 같은 규칙을 쓴다.
+이미지 자체의 투명도와 `visual_opacity`는 최종 알파에 추가로 곱해진다.
+
+아래의 명도·키밤·키 입력 배경색 등 별도 합성/사용자 우선 규칙을 제외하면,
 매니페스트에 명시한 값은 스킨 제작자의 의도대로 플레이어의 같은 시각 옵션보다 우선하며,
 누락한 값만 플레이어 설정을 사용한다. 허용 값과 범위는
 [`tenriff-skin.schema.json`](tenriff-skin.schema.json)에 정의돼 있다.
+
+### 판정선 명도
+
+`gameplay.judgement_line_brightness`는 `0..1`, 생략 시 `1`이다. 모드별로도 지정할 수 있다.
+`gameplay.modes.16k`의 값은 공통 스킨 명도를 교체한다. 최종 명도는 **스킨 명도 ×
+프로필의 `skin.judgement_line_brightness`**다. 예를 들어 스킨 0.8과 프로필 50%는 40%다.
+RGB만 줄이고 알파·선 두께·판정 위치·판정 시간을 유지한다. 0은 검정이며 숨김이 아니다.
+표시를 끄려면 `show_judgement_line: false`를 사용한다.
+
+이 합성은 Type 1/2와 글로우, 플레이어·고스트와 게임 내 스킨 미리보기에 적용된다.
+Native Type 1의 기본 색은 `gameplay.native.colors.judgement_line` / `judgement_glow`에서
+제작한다. Type 2 선택·색상은 사용자 프로필 설정이다. 동봉 에디터는 프로필 100%를
+기준으로 스킨 명도를 미리 보여준다. 공개 final2에는 이 명도 필드가 없으므로 해당
+클라이언트가 대상이면 필드를 생략한다. 기존 스킨에 필드를 자동 추가할 필요는 없다.
+
+키 오버레이의 `skin.key_overlay_enabled`, `key_overlay_scale`(0.25~1.0, 기본 1),
+X/Y와 HUD 레이아웃·게이지 폭·글자 배율은 사용자 프로필 및 휴대용 프리셋 설정이다.
+통합 키 오버레이는 4~16키를 지원하고 기본 OFF다. 이 프로필 항목들을 `skin.json`
+제작 필드로 추가하지 않는다.
 
 스킨의 `hit_burst_style`에는 `prism`, `ring`, `spark`, `shockwave`, `shards`,
 `pixels`를 지정할 수 있다. 플레이어가 키밤 모양·밝기를 조절하거나 이미지를
 선택하면 프로필의 키밤 모양과 밝기를 우선 적용한다. 크기, 팔레트와 로컬 이미지
 경로도 프로필에서 관리한다.
+
+`note_shape`는 `rect`, `simple_rect`, `circle`, `triangle`, `pentagon`, `hexagon`, `square`,
+`diamond`, `arrow`를 지원하며 기존 `hex`는 `hexagon`의 호환 별칭이다.
+`simple_rect`(사각형(심플))는 각진 모서리와 단색 면을 사용한다. 기존 `rect`는 그대로 유지되며,
+가져온 이미지나 명시한 벡터 스프라이트의 우선순위도 유지된다.
+Native의 `rect`를 제외한 모든 도형은 롱노트 머리·몸통·꼬리를 해당 레인 단색으로 그린다.
+일반 노트 재질·외곽선·몸통 투명도·너비·꼬리 테이퍼와 가져온 이미지·명시한 벡터 스프라이트는
+유지하며, 기본 `rect`의 재질은 바꾸지 않는다.
+삼각형·오각형·육각형·마름모·화살표는 노트 테두리를 켜면 머리와 롱노트 꼬리에
+검은 외곽선을 그린다. 롱노트 몸통은 각 끝부분 중심까지 뒤로 겹쳐 그려,
+도형의 경사면이나 이미지의 투명 여백에서 연결부가 끊기지 않게 한다.
+단색은 재질의 색 변화가 없다는 뜻이다. 전체 투명도가 100% 미만이면 기존 알파 합성에 따라
+머리·꼬리와 몸통이 겹치는 부분이 더 밝아질 수 있다. 연결 형상과 저장된 투명도는 그대로 유지한다.
 
 ## 이미지 슬롯
 
@@ -247,18 +516,23 @@ DDR/StepMania식 화살표 노트는 정사각형에 가까운 이미지를 쓴�
 | `song_select` | `logo` | `[48, 18, 388, 108]` | `lobby.logo` 이미지 슬롯 |
 | `song_select` | `nav` | `[492, 12, 1244, 126]` | 상단 탭 4개 |
 | `song_select` | `profile` | `[1518, 16, 1880, 112]` | 프로필 패널 |
+| `song_select` | `avatar` | 프로필 패널 안 `[1530, 26, 1606, 102]` | 프로필 이미지 위치와 크기 |
 | `song_select` | `left_panel` | `[38, 152, 486, 922]` | 곡 라이브러리 |
 | `song_select` | `center_panel` | `[510, 152, 1266, 922]` | 곡 목록 |
 | `song_select` | `right_panel` | `[1290, 152, 1882, 922]` | 난이도 패널 |
 | `song_select` | `bottom_bar` | `[38, 944, 1882, 1048]` | 하단 바 |
 
-그 밖에도 `generic.content`, `generic.preview`, `result.profile`, `result.song_panel`,
+그 밖에도 `generic.content`, `generic.preview`, `result.profile`, `result.avatar`, `result.song_panel`,
 `result.analysis_panel`, `result.stats_panel`, `result.continue`, `result.replay`,
 `result.retry`를 옮길 수 있다. 목록형 화면 ID에는 `content`와 `preview`를 직접 지정할 수 있다.
 예를 들어 `layout.settings_skins.content`가 있으면 스킨 설정 화면에만 적용하고, 없으면
 `layout.settings.content`, 다시 없으면 `layout.generic.content`를 사용한다.
 
 - 패널 안의 제목, 카드, 버튼은 패널 사각형에서 계산하므로 함께 따라 움직인다.
+- `song_select.avatar`와 `result.avatar`는 프사 크기를 패널과 독립적으로 정한다. 지정하지
+  않으면 기본 정사각형을 쓰며, 프로필 패널 밖으로 나간 부분은 자동으로 잘린다.
+- 스킨이 활성화된 동안 한 줄 UI 문구가 슬롯보다 길면 글자 크기를 자동 축소하고 마지막
+  안전망으로 슬롯 경계에서 클리핑한다.
 - 클릭 판정 영역도 같은 사각형을 쓰므로 마우스 입력이 어긋나지 않는다.
 - `spectrum`과 `nav`는 막대/탭 개수를 유지한 채 사각형에 맞춰 비례 조정된다.
 - `title.footer`를 옮기면 그 위 버튼 스택이 쓰는 세로 공간도 따라 바뀐다.
@@ -268,12 +542,17 @@ DDR/StepMania식 화살표 노트는 정사각형에 가까운 이미지를 쓴�
 
 ## 크기와 좌표
 
+`lobby.renderer = "native"`에서는 타이틀 기본 배치가 다릅니다. 에디터도 같은 기본값을 씁니다:
+`logo=[56,24,418,94]`, `buttons=[1016,260,1824,824]`, `guide=[96,516,932,924]`,
+`footer=[64,972,1856,1048]`, `spectrum=[1430,990,1574,1028]`.
+이 모드에서 버튼 그룹과 푸터는 독립적으로 움직입니다. 세부 도형은 `native.rects`에서 추가 보정합니다.
+
 - 로비/인게임 배경 권장 크기: `1920x1080` 이상, 16:9.
 - 로고는 투명 PNG를 권장하며 원본 종횡비를 유지한다.
 - 노트와 키 이미지는 투명 PNG를 권장한다.
 - `background_opacity`: `0.0..1.0`.
 - `note_width_ratio`: `0.1..4.0`.
-- `note_height_ratio`: `0.5..4.0` (50%~400%), 기본값 `1.0` (100%). 공통값과 키 모드별 값에 같은 범위를 적용합니다.
+- `note_height_ratio`: `0.5..4.0` (50%~400%), 기본값 `1.0` (100%). 공통값과 키 모드별 값에 같은 범위를 적용하며, 게임은 범위 밖 값을 경고 후 기본값으로 처리하고 웹 에디터는 오류가 있는 저장을 막습니다.
 - `judgement_line_position`: 화면 위 `0.0`, 아래 `1.0` 기준이며 허용 범위는 `0.05..0.98`이다.
 - `column_widths`: 레인별 상대 너비 숫자 배열, 최대 16개.
 - `column_spacings`: 레인 사이 상대 간격 숫자 배열, 최대 15개.
@@ -289,3 +568,30 @@ DDR/StepMania식 화살표 노트는 정사각형에 가까운 이미지를 쓴�
 - 렌더 스레드는 매니페스트를 직접 읽지 않는다. `Reload Skin` 때 1K~16K 정의를 다시 만들고
   안전한 스냅샷으로 교체하므로 플레이 중 디스크/JSON 읽기가 끼어들지 않는다.
 - JSON 자동 완성/검증은 [`tenriff-skin.schema.json`](tenriff-skin.schema.json)을 사용할 수 있다.
+
+### Independent FAST/SLOW controls
+
+`gameplay.show_timing_feedback` controls text; `gameplay.show_timing_bar` controls
+the bar. Omitted bar values inherit the old text switch for legacy skins. Both
+remain hidden for PG, centered errors and expired feedback. Explicit game-menu
+visibility changes override these manifest defaults and are saved in the profile.
+Native `gameplay.native.rects.timing_label` moves/resizes text and `rects.timing`
+moves/resizes the bar; both use `[dx, dy, dw, dh]`. Profile X/Y offsets are applied
+after these skin adjustments. The offline editor exposes both rects and switches.
+
+
+### Timing feedback display
+
+`gameplay.timing_bar_always_visible` (also supported per key mode) defaults to `false`.
+When `show_timing_bar` is enabled, `false` shows the scale for 0.75 seconds after any
+non-PG judgement, including BAD/POOR without a measured timing error. `true` keeps
+the scale visible. The last valid non-PG FAST/SLOW text and live error marker each
+remain for 0.75 seconds; a subsequent PG does not erase or refresh them. A new
+non-PG timing error replaces them. Pause freezes the sample-clock lifetime.
+
+Text and bar use separate field-relative anchors and their own X/Y offsets;
+judgement position, size and animation no longer move either element. Native
+`timing_label` and `timing` rect adjustments remain independent of `judgement`.
+The profile's timing display choices override manifest defaults after editing any
+of the timing visibility/mode controls. The standalone offline editor demonstrates
+the same lifetime and supports the new common/per-mode manifest field.

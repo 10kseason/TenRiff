@@ -1,19 +1,35 @@
-> 2026-10-18 local update: [automatic aspect, fixed dividers and preserved legacy fields](skin-overhaul-20261018.en.md). Judgement line: 1–100%.
-
-> 2026-10-18 로컬 후보의 변경은 [UI·검색 후속 안내](feedback-20261018.ko.md)가 우선합니다. 아래 날짜별 내용은 해당 버전의 이력입니다.
-
 # TenRiff 스킨 포맷 v1
+
+2026-11-09 **1.9.9.9-final3** 및 웹/동봉 에디터의 포맷 설명이다.
+기존 v1을 유지하며 판정선 기본 명도와 명시적 배경 영상 경로를 선택 필드로 지원한다.
+final2 이하가 대상이면 새 명도/영상 필드는 생략한다. 같은 버전의 스키마로 검증한다.
 
 1.8.8 스킨 설정의 숫자 레인 단축키와 화면상 왼쪽부터 선택하는 규칙은 [레인 선택 안내](release-feedback-1.8.8.ko.md#스킨의-숫자-레인-선택)를 참고하세요. 편집 대상 선택 기능이며 스킨 포맷 v1은 유지합니다.
 
-TenRiff 스킨은 한 폴더의 `skin.json`, 선택형 PNG/JPG/BMP 이미지와 벡터 도형 설정으로 로비와 인게임 외형을 바꾸는 포맷이다. 시각 항목은 선택 사항이며 누락된 슬롯은 기존 기본값을 쓴다. Native 인게임 스프라이트의 빈 배열 `[]`은 숨김을 뜻한다.
+TenRiff 스킨은 한 폴더의 `skin.json`, 선택형 PNG/JPG/BMP 이미지·배경 영상과 벡터 도형 설정으로 로비와 인게임 외형을 바꾸는 포맷이다. 시각 항목은 선택 사항이며 누락된 슬롯은 기존 기본값을 쓴다. Native 인게임 스프라이트의 빈 배열 `[]`은 숨김을 뜻한다.
 
 AI 에이전트에게 제작을 맡기려면 [`skin-agent-guide.md`](skin-agent-guide.md)와
-[`스킨 제작 가이드`](skin-agent-guide.md)를 함께 사용한다. 실제 완성 예제는
+[`스킨 제작 규칙`](../skins/AGENTS.md)을 함께 사용한다. 실제 완성 예제는
 [`Agent Prism Universal`](../skins/TenRiff_AgentPrism_Universal_1K-16K)이다.
 
 공식 배포판은 루트 [`skins/`](../skins/)의 완성 스킨을 `TenRiff.exe` 옆에 포함한다.
 게임은 프로필에 가져온 스킨을 먼저 찾고, 같은 이름이 없을 때 번들 스킨을 사용한다.
+
+## 지원 형식과 범위
+
+| 형식 | 지원 범위 |
+|---|---|
+| Native | 내장 렌더러. TenRiff manifest의 메뉴·게임플레이 `renderer`를 각각 `native`로 지정하면 벡터와 세부 슬롯을 편집 가능 |
+| TenRiff 폴더 / `skin.json` v1 | 이 문서의 메뉴·게임플레이, `1k`~`16k`, 별도 `7+1` 모드 |
+| LR2 폴더 | 기존 LR2 플레이 스킨 로더로 지원되는 노트·LN·건반·기어 사용. LR2 전체 UI/모든 명령 호환을 보장하지 않음 |
+| `.trskin` | 사용자 SkinConfig와 활성 스킨 자산을 담는 기존 v1 컨테이너. [포맷 설명](skin-presets.md) 참고 |
+| `.trprofile` | 전체 프로필 컨테이너 안의 스킨 설정·자산. `skin.json`과 다른 형식 |
+| 에디터 ZIP | 매니페스트와 자산을 포장한 ZIP. 폴더로 푼 뒤 가져오기 |
+
+다른 게임의 `skin.ini` 등은 직접 읽지 않는다. 필요한 경우 사용 허가가 있는 이미지를
+TenRiff 이미지 슬롯에 매핑한다. 이번 변경은 새 외부 스킨 로더나 컨테이너 버전을 추가하지 않는다.
+내장 12개 테마의 [공통 디자인 규칙](modern-skins-20261109.ko.md)과 최소
+[`TenRiff-Example`](../examples/skins/TenRiff-Example)은 현재 v1의 실제 예제다.
 
 ## 빠른 시작
 
@@ -86,6 +102,12 @@ MySkin/
 `gameplay/key-pressed`는 확장자만 `.png`, `.jpg`, `.jpeg`, `.bmp` 중 하나로 맞추면
 `skin.json`에 경로를 쓰지 않아도 자동 감지한다.
 
+직접 이미지 슬롯에 `""`를 지정하면 그 슬롯의 표준 파일명 자동 탐색을 끈다.
+누락과 빈 문자열은 다르다. 특히 원본 이미지가 남아 있는 폴더에서 Native 렌더링으로
+바꿀 때 `note`, `hold_head/body/tail`, `key_idle/pressed`, `gear`, `background`를 확인한다.
+화면별 배경의 `screen_backgrounds.<id>: ""`는 화면별 자동 탐색을 막지 않는다.
+예전 화면 이미지가 남아 있다면 화면별로 원하는 배경 경로를 지정한다.
+
 ## 화면별 배경과 색상 테마
 
 `lobby/screens/<화면 ID>.png`를 넣으면 그 화면만 다른 배경을 쓴다. 같은 값은
@@ -124,6 +146,42 @@ MySkin/
 ```
 
 색은 `#RRGGBB` 또는 `#RRGGBBAA`다. 빠진 항목은 기본 팔레트를 유지한다.
+
+## 움직이는 배경 영상 (2026-11-09 로컬 후보)
+
+정지 배경 대신 소리 없는 반복 영상을 쓸 수 있다. 이 필드는 `claude-code-cli-skin-20261109`
+로컬 후보부터 읽으며, 이전 클라이언트는 "지원하지 않는 필드" 경고를 남기고 정지 배경을 쓴다.
+자세한 동작은 [움직이는 배경 영상 안내](skin-video-background-20261109.ko.md)를 참고한다.
+
+```json
+"lobby": {
+  "background": "cli/lobby.png",
+  "background_video": "cli/lobby-loop.mp4",
+  "screen_videos": { "title": "cli/title-loop.mp4", "result": "" }
+},
+"gameplay": {
+  "background": "cli/gameplay.png",
+  "background_video": "cli/gameplay-loop.mp4",
+  "modes": { "16k": { "background_video": "" } }
+}
+```
+
+| 필드 | 동작 |
+|---|---|
+| `lobby.background_video` | 모든 메뉴 화면의 공통 반복 영상. 내장 곡 선택/결과 영상과 정지 배경을 대신함 |
+| `lobby.screen_videos.<화면 ID>` | 화면별 영상. 화면 → 대체 화면(`settings` 등) → 공통 영상 순서. 빈 문자열은 그 화면을 정지 배경으로 둠 |
+| `gameplay.background_video` | 인게임 영상. 차트에 기본 BGA 레이어가 없을 때만 디코딩·표시. 모드별 덮어쓰기 가능 |
+
+- 지원 형식: `.mp4`, `.m4v`, `.mpg`, `.mpeg`, `.wmv`, `.avi`, `.mov`, `.webm`, `.mkv`. 경로 규칙은 이미지와
+  같다(상대 경로, 폴더 밖 금지). 영상은 **자동 탐색하지 않는다**.
+- 영상은 같은 화면의 배경 불투명도(`background_opacity`, `screen_opacities`)로 정지 배경 자리에 그린다.
+  첫 프레임 전, 시스템 애니메이션 끄기·메뉴 동작 줄이기, 디코딩 실패 때는 정지 배경을 쓴다.
+- 메뉴 영상은 자체 시계로 끝에서 처음으로 반복한다. 인게임 영상은 BGA와 같은 차트 시계를 따라
+  일시정지·배속·재시작에 맞춰 움직이며, 길이와 무관하게 끝에서 처음으로 반복한다.
+- 오디오 트랙은 재생하지 않는다. 1920×1080 30fps H.264 MP4를 권장한다. 가져오기와 `.trskin` 내보내기는
+  참조된 영상 파일도 함께 복사한다(파일당 128MB, 전체 512MB 제한).
+- 정지 배경과 마찬가지로 `gameplay.background_video`도 게임플레이 표현으로 간주한다. Native 메뉴 스킨이
+  Luma Keys 건반을 유지하려면 `gameplay.renderer: native`를 함께 지정한다.
 
 ## 현대 Native 메뉴 편집
 
@@ -198,6 +256,7 @@ MySkin/
 ```json
 "gameplay": {
   "renderer": "native",
+  "judgement_line_brightness": 0.8,
   "native": {
     "metrics": { "judgement_line_width": 3, "key_max_height": 160 },
     "colors": { "judgement_line": "#A8FFF0", "key_led": "#66CCFF" },
@@ -209,7 +268,9 @@ MySkin/
         { "x": 0, "y": 2, "width": 128, "height": 28,
           "color": "#10283A", "mix": 0.6, "alpha": 1, "radius": 4 },
         { "x": 4, "y": 5, "width": 120, "height": 7,
-          "color": "#FFFFFF", "mix": 0.7, "alpha": 0.9, "radius": 1 }
+          "color": "#FFFFFF", "mix": 0.7, "alpha": 0.9, "radius": 1 },
+        { "x": 2, "y": 3, "width": 124, "height": 26,
+          "color": "#FFFFFF", "mix": 0, "alpha": 1, "radius": 2 }
       ]
     }
   },
@@ -242,6 +303,11 @@ MySkin/
 각 배열은 최대 128개의 둥근 사각형을 뒤에서 앞으로 겹쳐 그린다. 건반은 **128×256**,
 노트·롱노트 머리·꼬리는 **128×32** 좌표이며 렌더러가 실제 레인 크기에 맞춰 조절한다.
 레인 색과 도형 색을 혼합하므로 공통 도형을 4~16키 전체에 사용할 수 있다.
+
+**노트·머리·꼬리의 인덱스 0·1은 외곽선 레이어**다. 두 레이어의 알파는
+`note_border`와 `note_outline_opacity`에 따라 변한다. 불투명한 노트 본체는 반드시
+**인덱스 2 이후**에 둔다. 두 레이어만 쓰면 테두리를 껐을 때 본체까지 사라질 수 있다.
+건반(`key_idle`, `key_pressed`)에는 이 규칙을 적용하지 않는다.
 
 | 레이어 필드 | 범위 | 의미 |
 |---|---|---|
@@ -305,8 +371,10 @@ MySkin/
 스킨은 이미지뿐 아니라 아래 시각 옵션도 기본값으로 지정할 수 있다.
 
 `show_lane_dividers`, `show_judgement_line`, `show_timing_feedback`, `show_timing_bar`,
-`show_gear_boundary_line`, `show_hold_tail`, `hold_tail_taper`, `judgement_line_glow`,
+`timing_bar_always_visible`,
+`show_gear_boundary_line`, `show_hold_tail`, `hold_tail_taper`, `judgement_line_glow`, `judgement_line_brightness`,
 `key_pulse`, `key_pulse_brightness`, `hit_burst_style`, `key_label_position`,
+`key_backdrop`, `key_backdrop_opacity`, `key_backdrop_brightness`, `key_backdrop_height`,
 `note_border`, `note_shape`, `lane_colors`, `lane_background_opacity`, `black_playfield`,
 `visual_opacity`, `note_outline_opacity`, `hold_body_opacity`.
 
@@ -315,9 +383,29 @@ MySkin/
 표시하고 네이티브, 이미지 스킨, 게임 내 미리보기와 오프라인 편집기가 같은 규칙을 쓴다.
 이미지 자체의 투명도와 `visual_opacity`는 최종 알파에 추가로 곱해진다.
 
+아래의 명도·키밤·키 입력 배경색 등 별도 합성/사용자 우선 규칙을 제외하면,
 매니페스트에 명시한 값은 스킨 제작자의 의도대로 플레이어의 같은 시각 옵션보다 우선하며,
 누락한 값만 플레이어 설정을 사용한다. 허용 값과 범위는
 [`tenriff-skin.schema.json`](tenriff-skin.schema.json)에 정의돼 있다.
+
+### 판정선 명도
+
+`gameplay.judgement_line_brightness`는 `0..1`, 생략 시 `1`이다. 모드별로도 지정할 수 있다.
+`gameplay.modes.16k`의 값은 공통 스킨 명도를 교체한다. 최종 명도는 **스킨 명도 ×
+프로필의 `skin.judgement_line_brightness`**다. 예를 들어 스킨 0.8과 프로필 50%는 40%다.
+RGB만 줄이고 알파·선 두께·판정 위치·판정 시간을 유지한다. 0은 검정이며 숨김이 아니다.
+표시를 끄려면 `show_judgement_line: false`를 사용한다.
+
+이 합성은 Type 1/2와 글로우, 플레이어·고스트와 게임 내 스킨 미리보기에 적용된다.
+Native Type 1의 기본 색은 `gameplay.native.colors.judgement_line` / `judgement_glow`에서
+제작한다. Type 2 선택·색상은 사용자 프로필 설정이다. 동봉 에디터는 프로필 100%를
+기준으로 스킨 명도를 미리 보여준다. 공개 final2에는 이 명도 필드가 없으므로 해당
+클라이언트가 대상이면 필드를 생략한다. 기존 스킨에 필드를 자동 추가할 필요는 없다.
+
+키 오버레이의 `skin.key_overlay_enabled`, `key_overlay_scale`(0.25~1.0, 기본 1),
+X/Y와 HUD 레이아웃·게이지 폭·글자 배율은 사용자 프로필 및 휴대용 프리셋 설정이다.
+통합 키 오버레이는 4~16키를 지원하고 기본 OFF다. 이 프로필 항목들을 `skin.json`
+제작 필드로 추가하지 않는다.
 
 스킨의 `hit_burst_style`에는 `prism`, `ring`, `spark`, `shockwave`, `shards`,
 `pixels`를 지정할 수 있다. 플레이어가 키밤 모양·밝기를 조절하거나 이미지를

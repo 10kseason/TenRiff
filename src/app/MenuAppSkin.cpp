@@ -1018,6 +1018,9 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     append_menu_row(render.generic, ui_text("Judgement Line Type", "판정선 타입"),
                     config_.skin.judgement_line_type == 2 ? ui_text("Type 2", "타입 2") : ui_text("Type 1", "타입 1"),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::JudgementLineType), false, true);
+    append_slider_menu_row(render.generic, ui_text("Judgement Line Brightness", "판정선 색상 명도"),
+                    format_percent(config_.skin.judgement_line_brightness), config_.skin.judgement_line_brightness,
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::JudgementLineBrightness));
     const auto type2_color = config::normalize_skin_single_color_token(config_.skin.judgement_line_type2_color);
     append_menu_row(render.generic, ui_text("Type 2 Judgement Line Color", "타입 2 판정선 색상"),
                     type2_color == "off" ? ui_text("Default Outline", "기본 초록 테두리") : config::skin_color_label(type2_color),
@@ -1332,6 +1335,8 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
         config_.skin.show_lane_dividers);
     render.generic.skin_preview.note_divider_gap_px = config_.skin.note_divider_gap_px;
     render.generic.skin_preview.lane_divider_brightness = config_.skin.lane_divider_brightness;
+    render.generic.skin_preview.judgement_line_brightness = resolve_skin_judgement_line_brightness(
+        config_.skin.judgement_line_brightness, manifest_style);
     render.generic.skin_preview.show_judgement_line = style_bool(
         manifest_style ? manifest_style->show_judgement_line : std::optional<bool>{},
         config_.skin.show_judgement_line);

@@ -221,9 +221,9 @@
       if(style.key_label_position!=='off')label('key_label',String(lane+1),[x+6,style.key_label_position==='top'?20:bottom-28,x+width-4,style.key_label_position==='top'?44:bottom-4]);
     }
     if(style.show_judgement_line!==false){
-      if(style.judgement_line_glow!==false)box([left,line-m.judgement_glow_height/2,right,line+m.judgement_glow_height/2],c.judgement_glow,.1*opacity);
+      if(style.judgement_line_glow!==false)box([left,line-m.judgement_glow_height/2,right,line+m.judgement_glow_height/2],judgementLineColor(c.judgement_glow,style),.1*opacity);
       const thickness=judgementLineWidth(m.judgement_line_width,style.note_height_ratio??1);
-      box([left,line-thickness/2,right,line+thickness/2],c.judgement_line,opacity);
+      box([left,line-thickness/2,right,line+thickness/2],judgementLineColor(c.judgement_line,style),opacity);
     }
     ctx.restore();
     label('title','LUMA KEYS / '+mode.toUpperCase(),[84,48,458,92]);
@@ -295,5 +295,12 @@
     const height=style.key_backdrop_height??.5,ratio=Number.isFinite(height)?clamp(height,0,1):.5;
     return bottom-Math.max(0,bottom-top)*ratio;
   }
-  return {autoAspect,groups,settings,blend,advance,adjusted,drawSprite,noteShapeVertices,drawNoteShape,paint,paintText,judgementLineWidth,backdropOpacity,backdropColor,backdropTop,timingFeedback};
+  function judgementLineColor(color, style) {
+    const value=style.judgement_line_brightness??1,gain=Number.isFinite(value)?clamp(value,0,1):1;
+    const match=/^#([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(color);
+    if(!match)return color;
+    const rgb=parseInt(match[1],16),bytes=[16,8,0].map(shift=>Math.round(((rgb>>shift)&255)*gain).toString(16).padStart(2,'0'));
+    return '#'+bytes.join('').toUpperCase()+(match[2]||'');
+  }
+  return {autoAspect,groups,settings,blend,advance,adjusted,drawSprite,noteShapeVertices,drawNoteShape,paint,paintText,judgementLineWidth,judgementLineColor,backdropOpacity,backdropColor,backdropTop,timingFeedback};
 });

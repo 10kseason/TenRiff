@@ -1,3 +1,28 @@
+# 1.9.9.9-final3 —2026-11-09
+
+- Clip committed failed notes below the judgement line so they no longer cover the gear; preserve gameplay processing and replay identity.
+- Add profile judgement-line brightness and optional per-skin/per-mode gain, shared by gameplay and previews. Default100% preserves prior intensity.
+- Redesign twelve bundled skins with common native geometry and theme accents; preserve original manifests/art. Include TenRiff Code / CLI, all1–16K and7+1, with three silent terminal loop videos.
+- Add explicit v1 skin video fields to loader/import/presets/schema/AI guide and web/offline editors. Keep PNG fallbacks, reduced-motion support, chart/Common BGA priority and chart-clock playback.
+- Crop Media Foundation padded frames to their display aperture; recover fresh FFmpeg loop requests beyond EOF and restore still images on skin-video failure.
+- Retain final2 IR exclusion removal,4–16K key overlay scaling, scoring/judgement/input/audio/replay and fixed baseline1.9.6. [Usage](docs/release-1.9.9.9-final3.en.md) · [Validation](docs/release-1.9.9.9-final3-gate.md).
+
+# Local skin background video / TenRiff Code CLI candidate — 2026-11-09 (unpublished)
+
+- Add optional silent looping skin videos: `lobby.background_video`, per-screen `lobby.screen_videos` and per-mode `gameplay.background_video`. Videos replace the matching still at the same opacity; stills remain the fallback (before the first frame, reduced motion, decode failure). Gameplay loops decode only without a base BGA layer and follow the chart clock.
+- Copy referenced videos on folder import and `.trskin` export; update the schema, Tengear schema copy and offline editor (validation, folder open, ZIP export, labels).
+- Fix four green rows under 1080p H.264 menu loops by cropping Media Foundation frames to their display aperture (built-in loops included).
+- Bundle the unofficial `TenRiff_Code_CLI` terminal-session skin with procedural stills, three loops and their generators. [Notes](docs/skin-video-background-20261109.en.md).
+- Includes the whole Modern Common candidate below. No scoring/judgement/input/audio/replay change, publication or deployment.
+
+# Local Modern Common / skin authoring candidate — 2026-11-09 (unpublished)
+
+- Redesign all 12 bundled themes with shared modern components; preserve legacy manifests, README files and original images.
+- Include failed-note clipping below the judgement line and the profile line dimmer.
+- Add optional common/per-mode `gameplay.judgement_line_brightness` (0–1), multiplied by the profile dimmer. Preserve v1, existing defaults and alpha.
+- Synchronize the actual loader, schema, offline editor and asset-free example. Document supported input formats, profile-only controls, border layer indices and local/public compatibility.
+- No new website deployment, release tag, scoring/judgement/replay change or baseline promotion.
+
 # 1.9.9.9-final2 —2026-11-09
 
 - Remove keysound-duration/silence/required-scan/chart-blacklist IR exclusions and selected-song/result badges. Stop eligibility audio scans and omit their metadata from new submissions; retain native-key/ruleset/mod/account gates and original scoring/replay identity.

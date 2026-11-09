@@ -1,0 +1,159 @@
+{
+  "$schema": "https://raw.githubusercontent.com/10kseason/TenRiff/main/docs/tenriff-skin.schema.json",
+  "format": "tenriff-skin",
+  "version": 1,
+  "name": "Velocity Circuit: Dance Grid",
+  "author": "결 (OpenAI Codex)",
+  "lobby": {
+    "background": "lobby/screens/settings.png",
+    "logo": "lobby/logo.png",
+    "background_opacity": 0.82,
+    "screen_backgrounds": {
+      "quick_setup": "lobby/screens/settings.png",
+      "title": "lobby/screens/title.png",
+      "options": "lobby/screens/settings.png",
+      "multiplayer": "lobby/screens/song-select.png",
+      "song_select": "lobby/screens/song-select.png",
+      "session_mix": "lobby/screens/song-select.png",
+      "song_browser": "lobby/screens/song-select.png",
+      "settings": "lobby/screens/settings.png",
+      "settings_audio": "lobby/screens/settings.png",
+      "settings_graphics": "lobby/screens/settings.png",
+      "settings_skins": "lobby/screens/settings.png",
+      "settings_input": "lobby/screens/settings.png",
+      "settings_calibration": "lobby/screens/settings.png",
+      "mode_select": "lobby/screens/settings.png",
+      "mode_mods": "lobby/screens/settings.png",
+      "keymap": "lobby/screens/settings.png",
+      "keymap_confirm": "lobby/screens/settings.png",
+      "onnx_upscaler_confirm": "lobby/screens/settings.png",
+      "keymap_test": "lobby/screens/settings.png",
+      "result": "lobby/screens/result.png"
+    },
+    "screen_opacities": {
+      "title": 0.96,
+      "song_select": 0.86,
+      "song_browser": 0.86,
+      "session_mix": 0.86,
+      "settings": 0.80,
+      "settings_skins": 0.76,
+      "result": 0.94
+    }
+  },
+  "theme": {
+    "accent": "#C8FF3D",
+    "text": "#F8FFF0",
+    "muted": "#9FC2C8",
+    "card": "#081018F2",
+    "panel": "#07121EE8",
+    "footer": "#050A12F5",
+    "button": "#102231EE",
+    "button_selected": "#C8FF3D42",
+    "border": "#33E6FFA8",
+    "judgement_line": "#F8FFF0",
+    "lane_divider": "#5EF2FF",
+    "scene_primary": "#C8FF3D",
+    "scene_secondary": "#FF2E93",
+    "scene_background": "#02060D"
+  },
+  "layout": {
+    "generic": {
+      "content": [90, 146, 1160, 980],
+      "preview": [1190, 146, 1830, 980]
+    },
+    "title": {
+      "spectrum": [112, 92, 786, 172],
+      "logo": [110, 214, 828, 446],
+      "buttons": [1040, 170, 1810, 882],
+      "guide": [110, 590, 830, 892],
+      "footer": [106, 942, 1814, 1044]
+    },
+    "song_select": {
+      "top_bar": [0, 0, 1920, 132],
+      "logo": [52, 18, 404, 116],
+      "nav": [474, 14, 1326, 126],
+      "profile": [1490, 18, 1870, 116],
+      "avatar": [1502, 28, 1580, 106],
+      "left_panel": [48, 164, 420, 926],
+      "center_panel": [448, 164, 1322, 926],
+      "right_panel": [1350, 164, 1872, 926],
+      "bottom_bar": [48, 948, 1872, 1048]
+    },
+    "settings_skins": {
+      "content": [76, 146, 1120, 982],
+      "preview": [1150, 146, 1835, 982]
+    },
+    "result": {
+      "profile": [74, 164, 448, 976],
+      "avatar": [90, 182, 232, 324],
+      "song_panel": [478, 164, 1184, 408],
+      "analysis_panel": [478, 436, 1184, 976],
+      "stats_panel": [1214, 164, 1842, 650],
+      "continue": [1214, 686, 1842, 782],
+      "replay": [1214, 812, 1514, 916],
+      "retry": [1542, 812, 1842, 916]
+    }
+  },
+  "gameplay": {
+    "description": "Original arcade dance-grid stage with rotating arrow notes and a dark readable playfield.",
+    "background": "gameplay/background.png",
+    "background_opacity": 0.74,
+    "note": "gameplay/note-{lane}.png",
+    "hold_head": "gameplay/note-{lane}.png",
+    "hold_body": "gameplay/hold-body-{lane}.png",
+    "hold_tail": "gameplay/note-{lane}.png",
+    "key_idle": "gameplay/key-idle-{lane}.png",
+    "key_pressed": "gameplay/key-pressed-{lane}.png",
+    "lane_map": ["pink", "cyan", "lime", "orange", "pink", "cyan", "lime", "orange", "pink", "cyan", "lime", "orange", "pink", "cyan", "lime", "orange"],
+    "lane_colors": ["#FF2E93", "#33E6FF", "#C8FF3D", "#FF9A3D", "#FF2E93", "#33E6FF", "#C8FF3D", "#FF9A3D", "#FF2E93", "#33E6FF", "#C8FF3D", "#FF9A3D", "#FF2E93", "#33E6FF", "#C8FF3D", "#FF9A3D"],
+    "note_aspect": "width",
+    "note_width_ratio": 0.88,
+    "note_height_ratio": 1.0,
+    "judgement_line_position": 0.81,
+    "full_lane_receptors": true,
+    "black_playfield": true,
+    "show_lane_dividers": true,
+    "show_judgement_line": true,
+    "show_timing_feedback": true,
+    "show_gear_boundary_line": true,
+    "show_hold_tail": true,
+    "hold_tail_taper": false,
+    "judgement_line_glow": true,
+    "key_pulse": true,
+    "key_pulse_brightness": 0.82,
+    "hit_burst_style": "prism",
+    "key_label_position": "off",
+    "note_border": false,
+    "note_shape": "diamond",
+    "lane_background_opacity": 0.10,
+    "visual_opacity": 1.0,
+    "note_outline_opacity": 0.92,
+    "hold_body_opacity": 0.72,
+    "modes": {
+      "4k": {
+        "description": "Classic four-panel left, down, up, right dance layout.",
+        "lane_map": ["pink", "cyan", "lime", "orange"],
+        "lane_colors": ["#FF2E93", "#33E6FF", "#C8FF3D", "#FF9A3D"],
+        "note_rotations": [270, 180, 0, 90]
+      },
+      "7k": {
+        "description": "Symmetric seven-panel extended dance grid.",
+        "lane_map": ["pink", "cyan", "lime", "orange", "lime", "cyan", "pink"],
+        "lane_colors": ["#FF2E93", "#33E6FF", "#C8FF3D", "#FF9A3D", "#C8FF3D", "#33E6FF", "#FF2E93"],
+        "note_rotations": [270, 315, 0, 0, 0, 45, 90]
+      },
+      "10k": {
+        "description": "Twin five-panel dance fields.",
+        "lane_map": ["pink", "cyan", "lime", "orange", "lime", "pink", "cyan", "lime", "orange", "lime"],
+        "lane_colors": ["#FF2E93", "#33E6FF", "#C8FF3D", "#FF9A3D", "#C8FF3D", "#FF2E93", "#33E6FF", "#C8FF3D", "#FF9A3D", "#C8FF3D"],
+        "note_rotations": [270, 180, 0, 90, 0, 270, 180, 0, 90, 0]
+      },
+      "16k": {
+        "description": "Twin radial eight-panel dance fields.",
+        "lane_map": ["pink", "cyan", "lime", "orange", "pink", "cyan", "lime", "orange", "pink", "cyan", "lime", "orange", "pink", "cyan", "lime", "orange"],
+        "lane_colors": ["#FF2E93", "#33E6FF", "#C8FF3D", "#FF9A3D", "#FF2E93", "#33E6FF", "#C8FF3D", "#FF9A3D", "#FF2E93", "#33E6FF", "#C8FF3D", "#FF9A3D", "#FF2E93", "#33E6FF", "#C8FF3D", "#FF9A3D"],
+        "note_rotations": [270, 315, 0, 45, 90, 135, 180, 225, 270, 315, 0, 45, 90, 135, 180, 225]
+      }
+    }
+  }
+}

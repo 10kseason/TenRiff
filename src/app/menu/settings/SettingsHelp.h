@@ -183,6 +183,7 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Clear the selected image and return to a built-in hit burst.", "선택한 이미지를 해제하고 내장 키밤으로 돌아갑니다.", "画像の選択を解除し、内蔵ヒットエフェクトに戻します。"},
         {"Choose the default green outline or a solid fill color for the Type 2 band.", "타입 2 판정선에 기본 초록 테두리나 단색 채우기를 선택합니다.", "タイプ2の判定帯に標準の緑枠または単色の塗りを選びます。"},
         {"Scale the whole key overlay from 25% to 100% in 1% steps. Size is saved with skin presets and profiles.", "키 오버레이 전체 크기를 25~100% 범위에서 1%씩 조절합니다. 스킨 프리셋과 프로필에 저장됩니다.", "キーオーバーレイ全体を25～100%の範囲で1%ずつ調整します。スキンプリセットとプロフィールに保存します。"},
+        {"Dim the judgement line and its glow from 0% (black) to 100% (original color) in 1% steps. Applies to both line types without changing opacity or timing.", "판정선과 글로우의 명도를 0%(검정)~100%(기존 색상)에서 1%씩 조절합니다. 두 타입 모두 적용하며 불투명도와 판정 시점은 유지합니다.", "判定線とグローの明るさを0%（黒）～100%（元の色）で1%ずつ調整します。両タイプに適用し、不透明度と判定時刻は維持します。"},
     };
     static constexpr SettingsHelpText profile[] = {
         {"Choose the interface language. The change is applied and saved immediately.", "화면 언어를 선택합니다. 변경 즉시 적용하고 저장합니다.", "表示言語を選びます。すぐに適用・保存されます。"},

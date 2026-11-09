@@ -22,7 +22,7 @@
   const history = C.createHistory(catalog.native || fallbackNative);
   const defaults = {
     theme: {accent:'#6EE7F2',text:'#F4F7FF',muted:'#9AA3AD',card:'#1F2130E8',panel:'#14141CB8',footer:'#0B101DF2',button:'#242638',button_selected:'#6EE7F238',border:'#31344A',judgement_line:'#FF4D6D',lane_divider:'#F6F8FF',scene_primary:'#61D6FA',scene_secondary:'#8F9EFA',scene_background:'#04081A'},
-    gameplay: {background_opacity:.66,note_width_ratio:1,note_height_ratio:1,judgement_line_position:.82,full_lane_receptors:false,note_aspect:'stretch',show_lane_dividers:true,show_judgement_line:true,show_timing_feedback:true,show_gear_boundary_line:true,show_hold_tail:false,hold_tail_taper:false,judgement_line_glow:true,key_pulse:true,key_pulse_brightness:.7,key_backdrop:true,key_backdrop_opacity:.25,key_backdrop_brightness:1,key_backdrop_height:.5,hit_burst_style:'prism',key_label_position:'bottom',note_border:true,note_shape:'simple_rect',lane_background_opacity:.08,black_playfield:true,visual_opacity:1,note_outline_opacity:1,hold_body_opacity:1}
+    gameplay: {background_opacity:.66,note_width_ratio:1,note_height_ratio:1,judgement_line_position:.82,full_lane_receptors:false,note_aspect:'stretch',show_lane_dividers:true,show_judgement_line:true,show_timing_feedback:true,show_gear_boundary_line:true,show_hold_tail:false,hold_tail_taper:false,judgement_line_glow:true,judgement_line_brightness:1,key_pulse:true,key_pulse_brightness:.7,key_backdrop:true,key_backdrop_opacity:.25,key_backdrop_brightness:1,key_backdrop_height:.5,hit_burst_style:'prism',key_label_position:'bottom',note_border:true,note_shape:'simple_rect',lane_background_opacity:.08,black_playfield:true,visual_opacity:1,note_outline_opacity:1,hold_body_opacity:1}
   };
   const layouts = {
     title: {spectrum:[696,66,1224,150],logo:[670,184,1250,300],buttons:[470,360,1450,940],guide:[1492,386,1834,924],footer:[80,972,1840,1056]},
@@ -121,12 +121,15 @@
         }else update(event.target.value);
       }}}, controls);
       if (asset) input.placeholder = 'folder/image.png';
+      if (sourceDefinition.$ref === '#/$defs/videoPath') input.placeholder = 'folder/loop.mp4';
       if (asset) element('button', {class:'asset-button',text:t('choose'),type:'button',on:{click:()=>{
         if(!canChange())return; imageTarget=path; $('image-input').multiple=false; $('image-input').click();
       }}},controls);
     }
     element('span',{class:'field-status',text:inherited?t('inherited'):t('overridden')},wrap);
     if (asset) element('p',{class:'hint',text:t('pathHint')},wrap);
+    if (sourceDefinition.$ref === '#/$defs/videoPath') element('p',{class:'hint',text:t('videoHint')},wrap);
+    if (key === 'judgement_line_brightness') element('p',{class:'hint',text:t('lineBrightnessHint')},wrap);
     return wrap;
   }
   function renderInspector() {
@@ -144,11 +147,12 @@
     } else if (tab === 'lobby') {
       element('p',{class:'hint',text:t('commonBgaHint')},body);
       const props=schema.properties.lobby.properties;
-      for(const [key,rule] of Object.entries(props)) if(!['screen_backgrounds','screen_opacities'].includes(key)) field(body,['lobby',key],rule,{fallback:key==='background_opacity'?.72:undefined});
+      for(const [key,rule] of Object.entries(props)) if(!['screen_backgrounds','screen_opacities','screen_videos'].includes(key)) field(body,['lobby',key],rule,{fallback:key==='background_opacity'?.72:undefined});
       element('h3',{text:t('screen_backgrounds')},body);
       element('p',{class:'hint',text:t(screen)},body);
       if(screen!=='generic') {
         field(body,['lobby','screen_backgrounds',screen],props.screen_backgrounds.additionalProperties,{label:t('background')});
+        if(props.screen_videos)field(body,['lobby','screen_videos',screen],props.screen_videos.additionalProperties,{label:t('background_video')});
         field(body,['lobby','screen_opacities',screen],props.screen_opacities.additionalProperties,{label:t('background_opacity'),fallback:C.get(doc(),['lobby','background_opacity'])??.72});
       }
     } else if(tab === 'gameplay') {
@@ -304,6 +308,11 @@
     for(const [key,entry]of images){
       const tile=element('div',{class:'asset-tile'},$('asset-list'));
       element('img',{src:entry.url,alt:key,loading:'lazy'},tile);element('span',{text:key,title:key},tile);
+    }
+    for(const [key]of files){
+      if(images.has(key))continue;
+      const tile=element('div',{class:'asset-tile'},$('asset-list'));
+      element('span',{text:'▶ '+key,title:key},tile);
     }
   }
   function render(){
@@ -497,7 +506,7 @@
       }
       if(style.key_label_position!=='off')text(String(i+1),x+laneWidth*.4,line+(style.key_label_position==='top'?-44:52),22,p.muted,laneWidth);
     }
-    if(style.show_judgement_line){const thickness=4*Math.max(.25,Math.min(4,style.note_height_ratio??1));box([left,line-thickness/2,left+width,line+thickness/2],p.judgement_line,null,0);}
+    if(style.show_judgement_line){const thickness=4*Math.max(.25,Math.min(4,style.note_height_ratio??1));box([left,line-thickness/2,left+width,line+thickness/2],G.judgementLineColor(p.judgement_line,style),null,0);}
     art(style.gear||'gameplay/gear.png',[left,50,left+width,1060]);text(previewMode.toUpperCase(),left,24,22,p.accent);
   }
   function draw(time=0){
@@ -555,7 +564,10 @@
     history.load(next);documentGeneration++;rawDirty=false;clearFiles();notice('');render();
   }
   function addFile(path,file){
-    const normalized=C.normalizeAsset(path),key=normalized.toLowerCase();if(!C.safeAsset(normalized))return;
+    const normalized=C.normalizeAsset(path),key=normalized.toLowerCase();
+    // Loop videos travel with the folder and ZIP; the canvas preview shows the still image.
+    if(C.safeVideo(normalized)&&normalized){if(file.size>64*1024*1024)throw new Error(t('tooLarge'));files.set(key,{path:normalized,file});return;}
+    if(!C.safeAsset(normalized))return;
     if(file.size>64*1024*1024)throw new Error(t('tooLarge'));
     if(images.has(key))URL.revokeObjectURL(images.get(key).url);
     files.set(key,{path:normalized,file});const url=URL.createObjectURL(file),image=new Image();
@@ -571,7 +583,7 @@
       const manifests=fileList.filter(file=>/(^|\/)skin\.json$/i.test(file.webkitRelativePath||file.name));
       if(manifests.length!==1)throw new Error(t(manifests.length?'manyManifests':'noManifest'));
       const manifest=manifests[0],value=await readManifest(manifest),base=manifest.webkitRelativePath.slice(0,-manifest.name.length);
-      const assets=fileList.filter(file=>file.webkitRelativePath.startsWith(base)&&C.safeAsset(file.webkitRelativePath.slice(base.length)));
+      const assets=fileList.filter(file=>{if(!file.webkitRelativePath.startsWith(base))return false;const rel=file.webkitRelativePath.slice(base.length);return C.safeAsset(rel)||(rel&&C.safeVideo(rel));});
       if(assets.some(file=>file.size>64*1024*1024))throw new Error(t('tooLarge'));
       if(!confirmDiscard())return;history.load(value);documentGeneration++;rawDirty=false;clearFiles();assets.forEach(file=>addFile(file.webkitRelativePath.slice(base.length),file));notice(t('opened'));render();
     }catch(error){notice(t(error.message),'error');}

@@ -195,3 +195,5 @@
 {"Select a local video for Common BGA. Selection alone does not enable it; cancelling keeps the current file.", "选择通用 BGA 使用的本地视频。仅选择文件不会开启；取消保留当前文件。"},
 
 {"Scale the whole key overlay from 25% to 100% in 1% steps. Size is saved with skin presets and profiles.", "以1%为单位将整个按键叠加缩放到25%～100%。大小保存在皮肤预设和配置档中。"},
+
+{"Dim the judgement line and its glow from 0% (black) to 100% (original color) in 1% steps. Applies to both line types without changing opacity or timing.", "以1%为单位将判定线及辉光亮度调整为0%（黑色）～100%（原色）。适用于两种类型，不改变透明度或判定时刻。"},

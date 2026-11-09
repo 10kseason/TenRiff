@@ -10,6 +10,11 @@
       "type": "string",
       "description": "Path relative to skin.json. Omit the field to auto-detect its standard filename. Empty means use the built-in fallback."
     },
+    "videoPath": {
+      "type": "string",
+      "pattern": "^$|\\.([Mm][Pp]4|[Mm]4[Vv]|[Mm][Pp][Ee]?[Gg]|[Ww][Mm][Vv]|[Aa][Vv][Ii]|[Mm][Oo][Vv]|[Ww][Ee][Bb][Mm]|[Mm][Kk][Vv])$",
+      "description": "Silent looping video relative to skin.json (.mp4, .m4v, .mpg, .mpeg, .wmv, .avi, .mov, .webm or .mkv). Never auto-detected. It replaces the matching still background with the same opacity once it decodes; the still remains the fallback. Empty disables the video."
+    },
     "laneAssets": {
       "oneOf": [
         { "$ref": "#/$defs/assetPath" },
@@ -79,7 +84,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["x", "y", "width", "height", "color"],
-      "description": "One rounded rectangle on a 128x32 sprite canvas. Runtime additionally requires x+width<=128 and y+height<=32. mix=0 uses the lane color; mix=1 uses color. Color alpha multiplies layer alpha.",
+      "description": "One rounded rectangle on a 128x32 sprite canvas. Runtime additionally requires x+width<=128 and y+height<=32. mix=0 uses the lane color; mix=1 uses color. Color alpha multiplies layer alpha. Layer indices 0 and 1 are controlled by note_border/note_outline_opacity; put the visible note body at index 2 or later so disabling borders cannot hide it.",
       "properties": {
         "x": {"type": "number", "minimum": 0, "maximum": 128},
         "y": {"type": "number", "minimum": 0, "maximum": 32},
@@ -227,6 +232,7 @@
         "native": { "$ref": "#/$defs/nativeGameplay" },
         "description": { "type": "string" },
         "background": { "$ref": "#/$defs/assetPath" },
+        "background_video": { "$ref": "#/$defs/videoPath", "description": "Gameplay loop shown in place of background while the chart has no base BGA layer. Follows the chart clock (pause, rate, restart)." },
         "background_opacity": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
         "gear": { "$ref": "#/$defs/assetPath" },
         "note": { "$ref": "#/$defs/laneAssets" },
@@ -252,6 +258,7 @@
         "show_hold_tail": { "type": "boolean" },
         "hold_tail_taper": { "type": "boolean" },
         "judgement_line_glow": { "type": "boolean" },
+        "judgement_line_brightness": { "type": "number", "minimum": 0, "maximum": 1, "description": "Per-mode RGB gain; replaces the common skin gain, then multiplies the profile dimmer. Alpha is unchanged." },
         "key_pulse": { "type": "boolean" },
         "key_pulse_brightness": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
         "key_backdrop": { "type": "boolean", "description": "Allow a lane-colored backdrop behind a pressed key. Player Off always takes precedence." },
@@ -290,6 +297,13 @@
         "background": { "$ref": "#/$defs/assetPath" },
         "logo": { "$ref": "#/$defs/assetPath" },
         "background_opacity": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "background_video": { "$ref": "#/$defs/videoPath", "description": "Common menu loop. Replaces the built-in Song Select/Result loops and the still background for every screen without its own screen_videos entry." },
+        "screen_videos": {
+          "type": "object",
+          "description": "Per-screen loops. Lookup order matches screen_backgrounds: screen, its fallback screen, then background_video. An empty string keeps that screen on its still image.",
+          "propertyNames": { "enum": ["quick_setup", "title", "options", "multiplayer", "song_select", "session_mix", "song_browser", "settings", "settings_audio", "settings_graphics", "settings_skins", "settings_input", "settings_calibration", "mode_select", "mode_mods", "keymap", "keymap_confirm", "onnx_upscaler_confirm", "keymap_test", "result"] },
+          "additionalProperties": { "$ref": "#/$defs/videoPath" }
+        },
         "screen_backgrounds": {
           "type": "object",
           "propertyNames": { "enum": ["quick_setup", "title", "options", "multiplayer", "song_select", "session_mix", "song_browser", "settings", "settings_audio", "settings_graphics", "settings_skins", "settings_input", "settings_calibration", "mode_select", "mode_mods", "keymap", "keymap_confirm", "onnx_upscaler_confirm", "keymap_test", "result"] },
@@ -430,6 +444,7 @@
         "native": { "$ref": "#/$defs/nativeGameplay" },
         "description": { "type": "string" },
         "background": { "$ref": "#/$defs/assetPath" },
+        "background_video": { "$ref": "#/$defs/videoPath", "description": "Gameplay loop shown in place of background while the chart has no base BGA layer. Follows the chart clock (pause, rate, restart)." },
         "background_opacity": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
         "gear": { "$ref": "#/$defs/assetPath" },
         "note": { "$ref": "#/$defs/laneAssets" },
@@ -474,6 +489,7 @@
         "show_hold_tail": { "type": "boolean" },
         "hold_tail_taper": { "type": "boolean" },
         "judgement_line_glow": { "type": "boolean" },
+        "judgement_line_brightness": { "type": "number", "minimum": 0, "maximum": 1, "default": 1, "description": "RGB gain for the judgement line and glow, multiplied by the profile dimmer. Alpha is unchanged. Missing means 1. Available in the 2026-11-09 local authoring candidate and later supporting clients." },
         "key_pulse": { "type": "boolean" },
         "key_pulse_brightness": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
         "key_backdrop": { "type": "boolean", "description": "Allow a lane-colored backdrop behind a pressed key. Player Off always takes precedence." },

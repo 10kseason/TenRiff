@@ -1,3 +1,5 @@
+> **2026-11-09 · 1.9.9.9-final3:** 在判定线下方隐藏失败音符，新增判定线亮度设置，以统一现代风格重新设计12个内置主题，并加入带3个循环视频的TenRiff Code / CLI。AI制作指南、v1架构及网页/离线编辑器支持新增亮度与视频字段。 [Release](release-1.9.9.9-final3.zh-CN.md). Earlier candidate/release notices below are historical.
+
 > **2026-11-09 · 1.9.9.9-final2:** 移除造成误判的键音长度、无键音比例、强制分析、特定曲目IR限制及标记。按键叠加支持所有4～16K布局和25～100%整体大小。生产网站v28使用相同规则。基本排名资格、判定、计分、回放格式及固定基线1.9.6保持原样。 [Release](release-1.9.9.9-final2.zh-CN.md). Earlier descriptions below are historical.
 
 > **2026-11-08 · 1.9.9.9-final1:** [IR保护与排除标记](release-1.9.9.9-final1.zh-CN.md). Fixed baseline **1.9.6**. Earlier notices below are historical.

@@ -105,6 +105,49 @@ bool copy_rgb32_sample(IMFSample* sample,
     return enough_data;
 }
 
+// The visible picture inside a decoded buffer. H.264 1080p decodes into 1088
+// rows; MF reports the authored 1080-row picture as the display aperture, and
+// the padding rows are undefined (usually green). Missing or malformed
+// apertures keep the whole buffer.
+struct VideoAperture {
+    std::uint32_t x = 0, y = 0, width = 0, height = 0;
+};
+
+VideoAperture display_aperture(IMFMediaType* type, std::uint32_t width, std::uint32_t height) {
+    VideoAperture full{0, 0, width, height};
+    if (!type) return full;
+    for (const GUID& key : {MF_MT_MINIMUM_DISPLAY_APERTURE, MF_MT_GEOMETRIC_APERTURE}) {
+        MFVideoArea area{};
+        UINT32 size = 0;
+        if (FAILED(type->GetBlob(key, reinterpret_cast<UINT8*>(&area), sizeof(area), &size)) ||
+            size != sizeof(area)) {
+            continue;
+        }
+        const LONG x = area.OffsetX.value, y = area.OffsetY.value;
+        const LONG cx = area.Area.cx, cy = area.Area.cy;
+        if (x < 0 || y < 0 || cx <= 0 || cy <= 0 ||
+            static_cast<std::uint64_t>(x) + static_cast<std::uint64_t>(cx) > width ||
+            static_cast<std::uint64_t>(y) + static_cast<std::uint64_t>(cy) > height) {
+            continue;
+        }
+        return {static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y),
+                static_cast<std::uint32_t>(cx), static_cast<std::uint32_t>(cy)};
+    }
+    return full;
+}
+
+// Crop a contiguous BGRA frame in place to its aperture.
+void crop_bgra(std::vector<std::uint8_t>& bgra, std::uint32_t width, const VideoAperture& aperture) {
+    const std::size_t source_row = static_cast<std::size_t>(width) * 4;
+    const std::size_t row = static_cast<std::size_t>(aperture.width) * 4;
+    for (std::uint32_t y = 0; y < aperture.height; ++y) {
+        const std::uint8_t* source = bgra.data() + (static_cast<std::size_t>(aperture.y) + y) * source_row +
+                                     static_cast<std::size_t>(aperture.x) * 4;
+        std::copy_n(source, row, bgra.data() + static_cast<std::size_t>(y) * row);
+    }
+    bgra.resize(row * aperture.height);
+}
+
 class MfVideoReader {
 public:
     void close() {
@@ -113,6 +156,7 @@ public:
         width_ = 0;
         height_ = 0;
         stride_ = 0;
+        aperture_ = {};
         last_timestamp_ = -1;
         requested_timestamp_ = -1;
         timestamp_origin_.reset();
@@ -173,6 +217,7 @@ public:
         width_ = width;
         height_ = height;
         stride_ = stride;
+        aperture_ = display_aperture(current_type.Get(), width, height);
         return true;
     }
 
@@ -282,6 +327,7 @@ public:
                     UINT32 stride_value = width * 4;
                     current_type->GetUINT32(MF_MT_DEFAULT_STRIDE, &stride_value);
                     stride_ = static_cast<LONG>(stride_value);
+                    aperture_ = display_aperture(current_type.Get(), width, height);
                 }
             }
             if (!sample) {
@@ -321,6 +367,11 @@ public:
             if (!copy_rgb32_sample(sample.Get(), width_, height_, stride_, frame->bgra)) {
                 return latest;
             }
+            if (aperture_.width != width_ || aperture_.height != height_) {
+                crop_bgra(frame->bgra, width_, aperture_);
+                frame->width = aperture_.width;
+                frame->height = aperture_.height;
+            }
             // Sparse AVI streams can jump from 0 to 1.6 seconds. Keep the
             // previous image through that authored gap instead of presenting
             // its next image early. Require a real gap so ordinary 24/25 fps
@@ -355,6 +406,7 @@ private:
     std::uint32_t width_ = 0;
     std::uint32_t height_ = 0;
     LONG stride_ = 0;
+    VideoAperture aperture_;
     std::int64_t last_timestamp_ = -1;
     std::int64_t requested_timestamp_ = -1;
     std::optional<std::int64_t> timestamp_origin_;
@@ -477,9 +529,10 @@ struct BgaVideoDecoder::Impl {
                               << path << '\n';
                 }
             }
-            if (loop && frame && (reader.path() == path ? reader.ended() : ffmpeg_reader.ended())) {
+            if (loop && (reader.path() == path ? reader.ended() : ffmpeg_reader.ended())) {
                 // EOF is detected by the selected video backend. Restart from the
                 // current visual clock without changing the chart/audio clock.
+                // A first/large seek can reach EOF without yielding any frame.
                 // Paused requests stay deduplicated and cannot repeatedly restart.
                 loop_origin_100ns = timestamp_100ns;
                 if (reader.path() == path) {
@@ -487,6 +540,13 @@ struct BgaVideoDecoder::Impl {
                     if (!frame && reader.open(path)) frame = reader.read_at(0);
                 } else {
                     frame = ffmpeg_reader.read_at(0);
+                }
+                if (!frame || frame->bgra.empty()) {
+                    // A broken loop gets one rewind attempt per generation,
+                    // not a new FFmpeg subprocess for every render request.
+                    failed_path = path;
+                    reader.close();
+                    ffmpeg_reader.close();
                 }
             }
             if (!frame || frame->bgra.empty()) {

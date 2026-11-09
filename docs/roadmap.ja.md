@@ -1,3 +1,5 @@
+> **2026-11-09 · 1.9.9.9-final3:** 失敗ノートを判定ラインより下で隠し、判定ラインの明度設定を追加しました。既存12スキンを共通の現代的スタイルに再設計し、3つのループ動画付きTenRiff Code / CLIを同梱します。AI制作ガイド・v1スキーマ・Web/同梱エディターは新しい明度と動画フィールドに対応します。 [Release](release-1.9.9.9-final3.ja.md). Earlier candidate/release notices below are historical.
+
 > **2026-11-09 · 1.9.9.9-final2:** 誤判定の原因だったキー音の長さ・無音率・必須解析・曲別IR除外と表示を撤去しました。キーオーバーレイは4～16Kの全配置と25～100%のサイズに対応します。運用Web v28も同じ変更です。基本のランキング資格・判定・得点・リプレイ形式と固定基準1.9.6は維持します。 [Release](release-1.9.9.9-final2.ja.md). Earlier descriptions below are historical.
 
 > **2026-11-08 · 1.9.9.9-final1:** [IR保護と除外表示](release-1.9.9.9-final1.ja.md). Fixed baseline **1.9.6**. Earlier notices below are historical.

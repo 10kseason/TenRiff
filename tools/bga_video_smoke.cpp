@@ -85,7 +85,7 @@ bool valid_frame(const std::shared_ptr<const tenriff::render::BgaVideoFrame>& fr
 
 int wmain(int argc, wchar_t** argv) {
     if (argc < 2 || argc > 3) {
-        std::wcerr << L"usage: bga_video_smoke <video> [--timeline|--ffmpeg|--stall-recovery|--stall-eof|--long-gop|--loop]\n"
+        std::wcerr << L"usage: bga_video_smoke <video> [--timeline|--ffmpeg|--stall-recovery|--stall-eof|--long-gop|--loop|--loop-late-start]\n"
                    << L"--stall-recovery requires a native Media Foundation video fixture at least 65 seconds long.\n"
                    << L"--stall-eof requires a native Media Foundation video fixture EXACTLY 65 seconds long.\n";
         return 2;
@@ -153,6 +153,21 @@ int wmain(int argc, wchar_t** argv) {
         std::cout << "{\"common_bga_loop_passed\":" << (ok ? "true" : "false")
                   << ",\"wraps\":" << wraps << "}\n";
         return ok ? 0 : 12;
+    }
+    if (argc == 3 && std::wstring_view(argv[2]) == L"--loop-late-start") {
+        // A skin can become visible after a practice seek or reduced motion.
+        // Its first request may already be well beyond this short video's EOF.
+        decoder.request(path_utf8, 12.0, true);
+        const auto first = wait_for_frame(decoder, std::chrono::seconds(5));
+        bool ok = valid_frame(first);
+        decoder.request(path_utf8, 12.0, true);
+        ok = !wait_for_frame(decoder, std::chrono::milliseconds(80)) && ok;
+        decoder.request(path_utf8, 12.5, true);
+        ok = valid_frame(wait_for_frame(decoder, std::chrono::seconds(5))) && ok;
+        decoder.request(path_utf8, 30.0, true);
+        ok = valid_frame(wait_for_frame(decoder, std::chrono::seconds(5))) && ok;
+        std::cout << "{\"loop_late_start_passed\":" << (ok ? "true" : "false") << "}\n";
+        return ok ? 0 : 13;
     }
     decoder.request(path_utf8, 0.0);
     const auto first = wait_for_frame(decoder, std::chrono::seconds(10));

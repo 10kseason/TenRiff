@@ -1,0 +1,725 @@
+{
+  "$schema": "../../docs/tenriff-skin.schema.json",
+  "format": "tenriff-skin",
+  "version": 1,
+  "name": "TenRiff Code / CLI",
+  "author": "Claude (Claude Code)",
+  "lobby": {
+    "renderer": "native",
+    "background": "cli/lobby.png",
+    "logo": "",
+    "background_opacity": 0.82,
+    "screen_backgrounds": {
+      "quick_setup": "cli/lobby.png",
+      "title": "cli/title.png",
+      "options": "cli/lobby.png",
+      "multiplayer": "cli/lobby.png",
+      "song_select": "cli/lobby.png",
+      "session_mix": "cli/lobby.png",
+      "song_browser": "cli/lobby.png",
+      "settings": "cli/lobby.png",
+      "settings_audio": "cli/lobby.png",
+      "settings_graphics": "cli/lobby.png",
+      "settings_skins": "cli/lobby.png",
+      "settings_input": "cli/lobby.png",
+      "settings_calibration": "cli/lobby.png",
+      "mode_select": "cli/lobby.png",
+      "mode_mods": "cli/lobby.png",
+      "keymap": "cli/lobby.png",
+      "keymap_confirm": "cli/lobby.png",
+      "onnx_upscaler_confirm": "cli/lobby.png",
+      "keymap_test": "cli/lobby.png",
+      "result": "cli/lobby.png"
+    },
+    "screen_opacities": {
+      "quick_setup": 0.82,
+      "title": 0.94,
+      "options": 0.82,
+      "multiplayer": 0.82,
+      "song_select": 0.82,
+      "session_mix": 0.82,
+      "song_browser": 0.82,
+      "settings": 0.82,
+      "settings_audio": 0.82,
+      "settings_graphics": 0.82,
+      "settings_skins": 0.82,
+      "settings_input": 0.82,
+      "settings_calibration": 0.82,
+      "mode_select": 0.82,
+      "mode_mods": 0.82,
+      "keymap": 0.82,
+      "keymap_confirm": 0.82,
+      "onnx_upscaler_confirm": 0.82,
+      "keymap_test": 0.82,
+      "result": 0.82
+    },
+    "background_video": "cli/lobby-loop.mp4",
+    "screen_videos": {
+      "title": "cli/title-loop.mp4"
+    }
+  },
+  "theme": {
+    "accent": "#D77757",
+    "text": "#ECE9E4",
+    "muted": "#9C978F",
+    "card": "#191816F5",
+    "panel": "#151413EE",
+    "footer": "#0B0A09F5",
+    "button": "#1D1B19EB",
+    "button_selected": "#D777572E",
+    "border": "#45413C",
+    "judgement_line": "#D77757",
+    "lane_divider": "#8C857C",
+    "scene_primary": "#D77757",
+    "scene_secondary": "#A9B1F7",
+    "scene_background": "#0E0D0C"
+  },
+  "native": {
+    "metrics": {
+      "icon.stroke_width": 1.8,
+      "options_grid.radius": 6,
+      "options_grid.tint": 0.006,
+      "options_grid.selected_tint": 0.05,
+      "options_grid.border_width": 1,
+      "options_grid.selected_border_width": 2,
+      "generic.line_height": 27,
+      "font.header.size": 46,
+      "font.menu_button.size": 30,
+      "font.song_title.size": 22,
+      "font.song_record_value.size": 40,
+      "font.result_metric.size": 48,
+      "font.result_accuracy.size": 62,
+      "font.result_score.size": 58,
+      "font.title.size": 28,
+      "font.option.size": 20,
+      "font.result_action.size": 26
+    },
+    "colors": {
+      "palette.05090f": "#0B0A09",
+      "palette.101820": "#181614",
+      "palette.63e9f2": "#D77757",
+      "palette.101d32": "#171412",
+      "palette.101421": "#0F0E0D",
+      "palette.211c35": "#1B1512",
+      "palette.a499ff": "#A9B1F7",
+      "palette.a9f5ff": "#EB9A7D",
+      "palette.c5f7ff": "#F3C7B5",
+      "palette.233344": "#2E2A26",
+      "palette.020914": "#0A0908",
+      "palette.0b1620": "#141210",
+      "palette.05070a": "#090807",
+      "palette.a4e8f3": "#D77757",
+      "palette.f4f1ff": "#ECE9E4",
+      "palette.ecf6ff": "#ECE9E4",
+      "palette.f7fafd": "#F7F4F0",
+      "title.primary": "#1E1A17",
+      "title.primary_text": "#ECE9E4",
+      "title.primary_detail": "#9C978F",
+      "options.border": "#33302C",
+      "options.value": "#ECE9E4",
+      "options.icon.key_mode": "#D77757",
+      "options.icon.keymap": "#A9B1F7",
+      "options.icon.skin": "#F26BB5",
+      "options.icon.graphics": "#AF87FF",
+      "options.icon.audio": "#4EBA65",
+      "options.icon.input": "#F2C14E",
+      "options.icon.latency": "#FF6B80",
+      "options.icon.profile": "#5DB3A8",
+      "options.icon.mode": "#EB9A7D",
+      "options.icon.key_test": "#7FB2F0"
+    },
+    "motion": {
+      "intensity": 0.35,
+      "entry_seconds": 0.2
+    },
+    "fonts": {
+      "title": "Cascadia Mono",
+      "option": "Cascadia Mono",
+      "body": "Cascadia Mono",
+      "mono": "Cascadia Mono",
+      "menu_button": "Cascadia Mono",
+      "header": "Cascadia Mono",
+      "song_record_label": "Cascadia Mono",
+      "song_record_value": "Cascadia Mono",
+      "song_record_detail": "Cascadia Mono",
+      "song_title": "Cascadia Mono",
+      "song_artist": "Cascadia Mono",
+      "result_score": "Cascadia Mono",
+      "song_metadata_value": "Cascadia Mono",
+      "result_metric": "Cascadia Mono",
+      "result_judgement": "Cascadia Mono",
+      "result_accuracy": "Cascadia Mono",
+      "result_label": "Cascadia Mono",
+      "result_body": "Cascadia Mono",
+      "result_action": "Cascadia Mono",
+      "hud": "Cascadia Mono",
+      "stats_label": "Cascadia Mono",
+      "stats_value": "Cascadia Mono"
+    }
+  },
+  "gameplay": {
+    "description": "Terminal session look: monospace HUD, block-cursor notes, coral judgement line.",
+    "renderer": "native",
+    "background": "cli/gameplay.png",
+    "background_video": "cli/gameplay-loop.mp4",
+    "background_opacity": 0.9,
+    "gear": "",
+    "note": "",
+    "hold_head": "",
+    "hold_body": "",
+    "hold_tail": "",
+    "key_idle": "",
+    "key_pressed": "",
+    "note_shape": "rect",
+    "note_aspect": "stretch",
+    "note_border": false,
+    "black_playfield": true,
+    "lane_background_opacity": 0.02,
+    "show_lane_dividers": true,
+    "show_judgement_line": true,
+    "show_gear_boundary_line": false,
+    "show_hold_tail": true,
+    "hold_tail_taper": false,
+    "judgement_line_glow": true,
+    "judgement_line_brightness": 1.0,
+    "key_pulse": true,
+    "key_pulse_brightness": 0.42,
+    "hit_burst_style": "pixels",
+    "key_label_position": "bottom",
+    "hold_body_opacity": 0.78,
+    "visual_opacity": 1,
+    "note_outline_opacity": 0.55,
+    "native": {
+      "metrics": {
+        "key_min_height": 44,
+        "key_max_height": 118,
+        "key_inset": 2,
+        "key_inset_ratio": 0.05,
+        "key_bottom_gap": 4,
+        "key_face_gap": 5,
+        "judgement_line_width": 2,
+        "judgement_glow_height": 5,
+        "lane_divider_opacity": 0.1,
+        "hold_edge_mix": 0.0,
+        "hold_core_mix": 0.72,
+        "timing_half_width": 112,
+        "timing_height": 4,
+        "timing_range_ms": 80,
+        "title_font_size": 24,
+        "score_font_size": 30,
+        "body_font_size": 16,
+        "timing_font_size": 16,
+        "judgement_font_size": 40,
+        "combo_font_size": 38,
+        "key_label_font_size": 13
+      },
+      "colors": {
+        "key_well": "#070605",
+        "key_led": "#D77757",
+        "chassis": "#100F0E",
+        "judgement_line": "#D77757",
+        "judgement_glow": "#D7775722",
+        "hold_edge": "#FFFFFF",
+        "hold_core": "#2A2622",
+        "hold_shadow": "#2A2622",
+        "burst_core": "#FFF3EC",
+        "burst_trail": "#D77757",
+        "title": "#ECE9E4",
+        "score": "#ECE9E4",
+        "body": "#9C978F",
+        "combo": "#D77757",
+        "judgement": "#ECE9E4",
+        "timing": "#CFC9C1",
+        "key_label": "#B9B2A9"
+      },
+      "motion": {
+        "press_response": 120,
+        "release_response": 32,
+        "press_depth": 2,
+        "pressed_light": 0.7,
+        "hit_light": 0.2,
+        "burst_rise": 36,
+        "burst_height": 16,
+        "combo_duration_ms": 140,
+        "combo_scale": 1.04,
+        "combo_lift": -2,
+        "judgement_duration_ms": 480
+      },
+      "fonts": {
+        "title": "Cascadia Mono",
+        "score": "Cascadia Mono",
+        "body": "Cascadia Mono",
+        "combo": "Cascadia Mono",
+        "judgement": "Cascadia Mono",
+        "timing": "Cascadia Mono",
+        "key_label": "Cascadia Mono"
+      },
+      "sprites": {
+        "note": [
+          {
+            "x": 0,
+            "y": 3,
+            "width": 128,
+            "height": 26,
+            "color": "#000000",
+            "mix": 1.0,
+            "alpha": 0.85,
+            "radius": 0
+          },
+          {
+            "x": 1,
+            "y": 4,
+            "width": 126,
+            "height": 24,
+            "color": "#FFFFFF",
+            "mix": 0.0,
+            "alpha": 0.35,
+            "radius": 0
+          },
+          {
+            "x": 1,
+            "y": 4,
+            "width": 126,
+            "height": 24,
+            "color": "#FFFFFF",
+            "mix": 0.0,
+            "alpha": 1.0,
+            "radius": 0
+          },
+          {
+            "x": 1,
+            "y": 4,
+            "width": 126,
+            "height": 2,
+            "color": "#FFFFFF",
+            "mix": 0.62,
+            "alpha": 0.7,
+            "radius": 0
+          },
+          {
+            "x": 1,
+            "y": 25,
+            "width": 126,
+            "height": 3,
+            "color": "#000000",
+            "mix": 1.0,
+            "alpha": 0.28,
+            "radius": 0
+          }
+        ],
+        "hold_head": [
+          {
+            "x": 0,
+            "y": 3,
+            "width": 128,
+            "height": 26,
+            "color": "#000000",
+            "mix": 1.0,
+            "alpha": 0.85,
+            "radius": 0
+          },
+          {
+            "x": 1,
+            "y": 4,
+            "width": 126,
+            "height": 24,
+            "color": "#FFFFFF",
+            "mix": 0.0,
+            "alpha": 0.35,
+            "radius": 0
+          },
+          {
+            "x": 1,
+            "y": 4,
+            "width": 126,
+            "height": 24,
+            "color": "#FFFFFF",
+            "mix": 0.0,
+            "alpha": 1.0,
+            "radius": 0
+          },
+          {
+            "x": 1,
+            "y": 4,
+            "width": 126,
+            "height": 2,
+            "color": "#FFFFFF",
+            "mix": 0.62,
+            "alpha": 0.7,
+            "radius": 0
+          },
+          {
+            "x": 1,
+            "y": 25,
+            "width": 126,
+            "height": 3,
+            "color": "#000000",
+            "mix": 1.0,
+            "alpha": 0.28,
+            "radius": 0
+          }
+        ],
+        "hold_tail": [
+          {
+            "x": 0,
+            "y": 10,
+            "width": 128,
+            "height": 13,
+            "color": "#000000",
+            "mix": 1.0,
+            "alpha": 0.85,
+            "radius": 0
+          },
+          {
+            "x": 1,
+            "y": 11,
+            "width": 126,
+            "height": 11,
+            "color": "#FFFFFF",
+            "mix": 0.0,
+            "alpha": 0.35,
+            "radius": 0
+          },
+          {
+            "x": 1,
+            "y": 11,
+            "width": 126,
+            "height": 11,
+            "color": "#FFFFFF",
+            "mix": 0.0,
+            "alpha": 1.0,
+            "radius": 0
+          },
+          {
+            "x": 1,
+            "y": 11,
+            "width": 126,
+            "height": 2,
+            "color": "#FFFFFF",
+            "mix": 0.62,
+            "alpha": 0.62,
+            "radius": 0
+          }
+        ],
+        "key_idle": [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 128,
+            "height": 256,
+            "color": "#070605",
+            "mix": 1.0,
+            "alpha": 1.0,
+            "radius": 4
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "width": 126,
+            "height": 252,
+            "color": "#3B3733",
+            "mix": 1.0,
+            "alpha": 1.0,
+            "radius": 4
+          },
+          {
+            "x": 2,
+            "y": 3,
+            "width": 124,
+            "height": 248,
+            "color": "#171513",
+            "mix": 1.0,
+            "alpha": 1.0,
+            "radius": 3
+          },
+          {
+            "x": 3,
+            "y": 4,
+            "width": 122,
+            "height": 2,
+            "color": "#8C857C",
+            "mix": 1.0,
+            "alpha": 0.22,
+            "radius": 0
+          },
+          {
+            "x": 14,
+            "y": 236,
+            "width": 100,
+            "height": 4,
+            "color": "#FFFFFF",
+            "mix": 0.0,
+            "alpha": 0.55,
+            "radius": 0
+          }
+        ],
+        "key_pressed": [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 128,
+            "height": 256,
+            "color": "#070605",
+            "mix": 1.0,
+            "alpha": 1.0,
+            "radius": 4
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "width": 126,
+            "height": 252,
+            "color": "#FFFFFF",
+            "mix": 0.2,
+            "alpha": 1.0,
+            "radius": 4
+          },
+          {
+            "x": 2,
+            "y": 3,
+            "width": 124,
+            "height": 248,
+            "color": "#1C1815",
+            "mix": 0.8,
+            "alpha": 1.0,
+            "radius": 3
+          },
+          {
+            "x": 3,
+            "y": 4,
+            "width": 122,
+            "height": 3,
+            "color": "#FFFFFF",
+            "mix": 0.3,
+            "alpha": 0.85,
+            "radius": 0
+          },
+          {
+            "x": 10,
+            "y": 226,
+            "width": 108,
+            "height": 18,
+            "color": "#FFFFFF",
+            "mix": 0.0,
+            "alpha": 1.0,
+            "radius": 0
+          }
+        ]
+      }
+    },
+    "modes": {
+      "1k": {
+        "lane_colors": [
+          "#D77757"
+        ]
+      },
+      "2k": {
+        "lane_colors": [
+          "#ECE9E4",
+          "#ECE9E4"
+        ]
+      },
+      "3k": {
+        "lane_colors": [
+          "#ECE9E4",
+          "#D77757",
+          "#ECE9E4"
+        ]
+      },
+      "4k": {
+        "lane_colors": [
+          "#ECE9E4",
+          "#A9B1F7",
+          "#A9B1F7",
+          "#ECE9E4"
+        ]
+      },
+      "5k": {
+        "lane_colors": [
+          "#ECE9E4",
+          "#A9B1F7",
+          "#D77757",
+          "#A9B1F7",
+          "#ECE9E4"
+        ]
+      },
+      "6k": {
+        "lane_colors": [
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4"
+        ]
+      },
+      "7k": {
+        "lane_colors": [
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#D77757",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4"
+        ]
+      },
+      "8k": {
+        "lane_colors": [
+          "#D77757",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#D77757"
+        ]
+      },
+      "9k": {
+        "lane_colors": [
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#D77757",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4"
+        ]
+      },
+      "10k": {
+        "lane_colors": [
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4"
+        ]
+      },
+      "11k": {
+        "lane_colors": [
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#D77757",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4"
+        ]
+      },
+      "12k": {
+        "lane_colors": [
+          "#D77757",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#D77757"
+        ]
+      },
+      "13k": {
+        "lane_colors": [
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#D77757",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4"
+        ]
+      },
+      "14k": {
+        "lane_colors": [
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4"
+        ]
+      },
+      "15k": {
+        "lane_colors": [
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#D77757",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4"
+        ]
+      },
+      "16k": {
+        "lane_colors": [
+          "#D77757",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#D77757"
+        ]
+      },
+      "7+1": {
+        "lane_colors": [
+          "#D77757",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4",
+          "#D77757",
+          "#ECE9E4",
+          "#A9B1F7",
+          "#ECE9E4"
+        ]
+      }
+    }
+  }
+}

@@ -4,7 +4,11 @@
     const int native_screen_key = static_cast<int>(data.kind) * 1009 +
         (data.kind == MenuScreenKind::GenericList
              ? static_cast<int>(std::hash<std::string>{}(data.generic.heading) & 0x3fffffff) : 0);
-    if (native_motion_screen && (!native_animation_preference_checked_ ||
+    // Authored loops also appear on legacy menus and gameplay, where the native
+    // menu layer is disabled. They must still observe the OS animation setting.
+    const bool skin_video_screen = !data.lobby_skin.background_video_path.empty() ||
+        !data.gameplay.skin_background_video_path.empty();
+    if ((native_motion_screen || skin_video_screen) && (!native_animation_preference_checked_ ||
         render_now_ns - native_animation_preference_checked_ns_ > 1'000'000'000LL)) {
         BOOL animations = TRUE;
         if (SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, &animations, 0)) {

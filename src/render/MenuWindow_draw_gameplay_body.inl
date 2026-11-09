@@ -2153,6 +2153,14 @@
                                           note_hold_tail_bitmap != nullptr, rotation, tail_y, tail_rect, tail_visual_rect);
                 }
             }
+            // Keep crossed tap/LN pixels behind the gear; future notes and hit effects keep their full bounds.
+            const bool clip_fallen_note = falling && note.start_sample < note_exit_sample;
+            if (clip_fallen_note) {
+                flush_note_sprites();
+                ctx->PushAxisAlignedClip(D2D1::RectF(field_clip_rect.left, field_clip_rect.top,
+                    field_clip_rect.right, std::clamp(hit_line_y, field_clip_rect.top, field_clip_rect.bottom)),
+                    D2D1_ANTIALIAS_MODE_ALIASED);
+            }
             if (note.mine) {
                 flush_note_sprites();
                 const float mine_half_h = std::max(7.0f, head_half_h * 1.15f);
@@ -2256,6 +2264,10 @@
                                             note_shape, note_border_enabled, note_polygon_geometry);
                     }
                 }
+            }
+            if (clip_fallen_note) {
+                flush_note_sprites();
+                ctx->PopAxisAlignedClip();
             }
         }
         flush_note_sprites();
@@ -2800,6 +2812,13 @@
                                               note_hold_tail_bitmap != nullptr, rotation, tail_y, tail_rect, tail_visual_rect);
                     }
                 }
+                const bool clip_fallen_note = falling && note.start_sample < note_exit_sample;
+                if (clip_fallen_note) {
+                    flush_note_sprites();
+                    ctx->PushAxisAlignedClip(D2D1::RectF(ghost_field_clip_rect.left, ghost_field_clip_rect.top,
+                        ghost_field_clip_rect.right, std::clamp(ghost_hit_line_y, ghost_field_clip_rect.top, ghost_field_clip_rect.bottom)),
+                        D2D1_ANTIALIAS_MODE_ALIASED);
+                }
                 if (note.mine) {
                     flush_note_sprites();
                     const float mine_half_h = std::max(7.0f, head_half_h * 1.15f);
@@ -2901,6 +2920,10 @@
                                             note_polygon_geometry ? 1.5f : 0.85f,
                                             note_shape, note_border_enabled, note_polygon_geometry);
                     }
+                }
+                if (clip_fallen_note) {
+                    flush_note_sprites();
+                    ctx->PopAxisAlignedClip();
                 }
             }
             flush_note_sprites();

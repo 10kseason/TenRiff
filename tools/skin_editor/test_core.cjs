@@ -180,7 +180,8 @@ test('all native gameplay controls and every 4K–16K palette come from client d
   assert.equal(catalog.native.gameplay.renderer,'native');assert.deepEqual(errors(catalog.native),[]);
   for(let count=4;count<=16;count++)assert.equal(catalog.gameplayNative.palettes[count+'k'].length,count);
   const native=G.settings(catalog.native.gameplay,catalog.gameplayNative);
-  assert.equal(native.motion.release_response,24);assert.equal(native.sprites.key_idle.length,source.sprites.key_idle.default.length);
+  const bundled=JSON.parse(fs.readFileSync(path.join(root,'skins/TenRiff_NativeEditable/skin.json'),'utf8')).gameplay.native;
+  assert.deepEqual(native.motion,bundled.motion);assert.deepEqual(native.sprites,bundled.sprites);
   assert.deepEqual(C.assetReferences(catalog.native),[],'vector-only default exports without missing image files');
 });
 test('sprite and motion validation rejects invalid edits before download',()=>{
@@ -198,7 +199,7 @@ test('editable sprites survive JSON and ZIP byte readback without game art depen
 });
 test('preview key response and explicit hidden art are stable across render rates',()=>{
   const G=require('./gameplay.js'),motion=G.settings(catalog.native.gameplay,catalog.gameplayNative).motion;
-  for(const fps of [60,144,300,1000]){let value=1;const frames=Math.round(fps/2);for(let i=0;i<frames;i++)value=G.advance(value,false,.5/frames,motion);assert.ok(Math.abs(value-Math.exp(-12))<1e-10);}
+  for(const fps of [60,144,300,1000]){let value=1;const frames=Math.round(fps/2);for(let i=0;i<frames;i++)value=G.advance(value,false,.5/frames,motion);assert.ok(Math.abs(value-Math.exp(-.5*motion.release_response))<1e-10);}
   assert.deepEqual(G.settings({native:{sprites:{note:[]}}},catalog.gameplayNative).sprites.note,[]);
   assert.equal(G.blend('#112233','#AABBCC',0),'#112233');assert.equal(G.blend('#112233','#AABBCC',1),'#aabbcc');
 });
@@ -372,4 +373,61 @@ test('graphics preview follows native row order with localized profile guidance'
     for(const language of I.languages)assert.ok(I.text(key,language)&&I.text(key,language)!==key);
   assert.match(I.text('commonBgaHint','en'),/profile, not in skin.json/);
   assert.equal(actualSchema.properties.common_bga_enabled,undefined);
+});
+
+test('judgement line brightness validates mode overrides and preserves alpha while dimming RGB',()=>{
+  const G=require('./gameplay.js');
+  for(const gain of [0,.5,1]){
+    const document={...basic(),gameplay:{judgement_line_brightness:.8,modes:{'16k':{judgement_line_brightness:gain}}}};
+    assert.deepEqual(errors(document),[]);
+    assert.equal(C.gameplay(C.parse(C.serialize(document)),'16k').judgement_line_brightness,gain);
+    assert.equal(C.gameplay(document,'4k').judgement_line_brightness,.8);
+  }
+  for(const gain of [-.01,1.01,'0.5',null])
+    assert.ok(errors({...basic(),gameplay:{judgement_line_brightness:gain,modes:{'7+1':{judgement_line_brightness:gain}}}}).length);
+  assert.equal(G.judgementLineColor('#2468ACE4',{judgement_line_brightness:.5}),'#123456E4');
+  assert.equal(G.judgementLineColor('#2468ACE4',{judgement_line_brightness:0}),'#000000E4');
+  assert.equal(G.judgementLineColor('#2468ACE4',{}),'#2468ACE4');
+  for(const language of I.languages)assert.notEqual(I.text('judgement_line_brightness',language),'judgement_line_brightness');
+  const fills=[],ctx=new Proxy({createLinearGradient(){return {addColorStop(){}};},fillRect(){fills.push([this.fillStyle,this.globalAlpha]);}},
+    {get(target,key){return key in target?target[key]:()=>{};}});
+  const style=C.clone(catalog.native.gameplay);style.judgement_line_brightness=.5;style.visual_opacity=1;
+  style.native.colors.judgement_line='#2468AC';style.native.colors.judgement_glow='#204080';
+  G.paint(ctx,style,catalog.gameplayNative,'4k',0,false,()=>false);
+  assert.ok(fills.some(([color,alpha])=>color==='#123456'&&alpha===1));
+  assert.ok(fills.some(([color,alpha])=>color==='#102040'&&alpha===.1));
+});
+
+test('modern and AI example note bodies remain visible with borders disabled',()=>{
+  const G=require('./gameplay.js');
+  for(const document of [catalog.native,catalog.example]){
+    assert.deepEqual(C.assetReferences(document),[]);
+    for(const slot of ['note','hold_head','hold_tail']){
+      const fills=[],ctx=new Proxy({fill(){fills.push(this.globalAlpha);}},
+        {get(target,key){return key in target?target[key]:()=>{};}});
+      G.drawSprite(ctx,document.gameplay.native.sprites[slot],[128,32],[0,0,64,16],'#FFFFFF',1,0);
+      assert.equal(fills[0],0);assert.equal(fills[1],0);assert.equal(fills[2],1);
+    }
+  }
+});
+
+test('looping background videos validate, merge per mode and travel with ZIP references',()=>{
+  const value={...basic(),lobby:{background:'cli/still.png',background_video:'cli/menu.mp4',screen_videos:{title:'cli/title.WEBM',result:''}},
+    gameplay:{background:'cli/play.png',background_video:'cli/play.mp4',modes:{'16k':{background_video:'cli/wide.mkv'},'4k':{background_video:''}}}};
+  assert.deepEqual(errors(value),[]);
+  assert.equal(C.gameplay(value,'16k').background_video,'cli/wide.mkv');
+  assert.equal(C.gameplay(value,'4k').background_video,'');
+  assert.equal(C.gameplay(value,'7k').background_video,'cli/play.mp4');
+  const refs=C.assetReferences(value);
+  for(const path of ['cli/menu.mp4','cli/title.WEBM','cli/play.mp4','cli/wide.mkv','cli/still.png','cli/play.png'])assert.ok(refs.includes(path),path);
+  assert.ok(!refs.includes(''));
+  for(const bad of ['cli/menu.png','../menu.mp4','/abs/menu.mp4','C:/menu.mp4','https://x/menu.mp4']){
+    const issues=errors({...basic(),lobby:{background_video:bad}});
+    assert.ok(issues.length>0,bad);
+  }
+  assert.ok(errors({...basic(),lobby:{screen_videos:{gameplay:'a.mp4'}}}).length>0);
+  assert.equal(C.safeVideo(''),true);assert.equal(C.safeVideo('a/b.mpeg'),true);assert.equal(C.safeVideo('a/b.gif'),false);
+  assert.equal(C.safeAsset('a/b.mp4'),false);
+  const round=C.parse(C.serialize(value));assert.deepEqual(round,value);
+  assert.equal(I.text('background_video','ko'),'배경 영상(반복)');assert.equal(I.text('videoPath','en').includes('MP4'),true);
 });

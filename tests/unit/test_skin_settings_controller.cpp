@@ -28,6 +28,7 @@ TEST_CASE("skin percentage controls change by one percent and sliders retain the
         {SkinSettingsRowId::KeyOverlayX, &Skin::key_overlay_x},
         {SkinSettingsRowId::KeyOverlayY, &Skin::key_overlay_y},
         {SkinSettingsRowId::KeyOverlayScale, &Skin::key_overlay_scale},
+        {SkinSettingsRowId::JudgementLineBrightness, &Skin::judgement_line_brightness},
         {SkinSettingsRowId::NoteFadeIn, &Skin::note_fade_in},
         {SkinSettingsRowId::NoteFadeOut, &Skin::note_fade_out},
         {SkinSettingsRowId::KeyPulse, &Skin::key_pulse_brightness},
@@ -1089,4 +1090,22 @@ TEST_CASE("gauge width settings cycle and persist for every skin source") {
         CHECK(runtime.skin.gauge_width == "normal");
         CHECK(controller.handle(MenuAction::back(), runtime, kLr2Names, kTenRiffNames).menu.persist_config);
     }
+}
+
+TEST_CASE("judgement line brightness refreshes and saves keyboard and slider changes") {
+    tenriff::config::RuntimeConfig runtime;
+    SkinSettingsController controller;
+    controller.reset("4k");
+    auto changed = controller.handle(MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames,
+        SkinSettingsRowId::JudgementLineBrightness);
+    CHECK(changed.menu.render_changed);
+    CHECK(controller.dirty());
+    CHECK(runtime.skin.judgement_line_brightness == doctest::Approx(0.99));
+    for (const auto& pair : {std::pair{-1.0, 0.0}, std::pair{0.375, 0.38}, std::pair{2.0, 1.0}}) {
+        changed = controller.handle(MenuAction::set_ratio(pair.first), runtime, kLr2Names, kTenRiffNames,
+            SkinSettingsRowId::JudgementLineBrightness);
+        CHECK(changed.menu.render_changed);
+        CHECK(runtime.skin.judgement_line_brightness == doctest::Approx(pair.second));
+    }
+    CHECK(controller.dirty());
 }

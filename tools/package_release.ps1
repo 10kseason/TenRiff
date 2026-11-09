@@ -3,7 +3,7 @@ param(
     [string]$BuildReleaseDirectory,
     [Parameter(Mandatory = $true)]
     [string]$OutputDirectory,
-    [string]$Version = "1.9.9.9-final2",
+    [string]$Version = "1.9.9.9-final3",
     [switch]$BinaryOnly
 )
 
@@ -102,7 +102,9 @@ foreach ($relative in @(
     "skins\Tengear\generate.py",
     "skins\Tenmania\generate.py",
     "skins\Tenmania\preview.py",
-    "skins\TenRiff_VelocityCircuit_DanceGrid_4K-16K\generate_assets.py"
+    "skins\TenRiff_VelocityCircuit_DanceGrid_4K-16K\generate_assets.py",
+    "skins\TenRiff_Code_CLI\generate\make_skin.py",
+    "skins\TenRiff_Code_CLI\generate\make_videos.py"
 )) {
     $packagedTool = Join-Path $binaryRoot $relative
     if (Test-Path -LiteralPath $packagedTool -PathType Leaf) {

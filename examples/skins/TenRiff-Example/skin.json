@@ -2,20 +2,13 @@
   "$schema": "https://raw.githubusercontent.com/10kseason/TenRiff/main/docs/tenriff-skin.schema.json",
   "format": "tenriff-skin",
   "version": 1,
-  "name": "TenRiff Example",
+  "name": "TenRiff Modern Example",
   "author": "Your Name",
   "lobby": {
+    "renderer": "native",
     "background": "",
     "logo": "",
-    "background_opacity": 0.72,
-    "screen_backgrounds": {
-      "title": "",
-      "settings_skins": ""
-    },
-    "screen_opacities": {
-      "title": 0.86,
-      "settings_skins": 0.72
-    }
+    "screen_backgrounds": {}
   },
   "theme": {
     "accent": "#6EE7F2",
@@ -24,14 +17,6 @@
     "scene_primary": "#61D6FA",
     "scene_secondary": "#8F9EFA",
     "scene_background": "#04081A"
-  },
-  "layout": {
-    "generic": {
-      "content": [80, 140, 1840, 1008]
-    },
-    "settings_skins": {
-      "preview": [1120, 180, 1780, 940]
-    }
   },
   "gameplay": {
     "background": "",
@@ -45,14 +30,169 @@
     "key_pressed": "",
     "note_width_ratio": 1.0,
     "note_height_ratio": 1.0,
-    "judgement_line_position": 0.82,
     "full_lane_receptors": false,
     "show_lane_dividers": true,
     "judgement_line_glow": true,
     "hit_burst_style": "prism",
     "modes": {
       "4k": {
-        "lane_colors": ["#F4F7FF", "#5C84FF", "#5C84FF", "#F4F7FF"]
+        "lane_colors": [
+          "#F4F7FF",
+          "#5C84FF",
+          "#5C84FF",
+          "#F4F7FF"
+        ]
+      },
+      "16k": {
+        "judgement_line_brightness": 0.6
+      }
+    },
+    "renderer": "native",
+    "note_shape": "rect",
+    "judgement_line_brightness": 0.8,
+    "note_border": false,
+    "visual_opacity": 1,
+    "native": {
+      "metrics": {
+        "key_max_height": 126,
+        "key_min_height": 48,
+        "key_inset": 2,
+        "judgement_line_width": 1.5
+      },
+      "colors": {
+        "judgement_line": "#D8F2FF",
+        "judgement_glow": "#9DD8ED"
+      },
+      "motion": {
+        "press_depth": 3
+      },
+      "sprites": {
+        "note": [
+          {
+            "x": 0,
+            "y": 1,
+            "width": 128,
+            "height": 30,
+            "color": "#000000",
+            "mix": 1,
+            "alpha": 1,
+            "radius": 2
+          },
+          {
+            "x": 1,
+            "y": 2,
+            "width": 126,
+            "height": 28,
+            "color": "#FFFFFF",
+            "mix": 0,
+            "alpha": 0.4,
+            "radius": 1
+          },
+          {
+            "x": 2,
+            "y": 3,
+            "width": 124,
+            "height": 26,
+            "color": "#FFFFFF",
+            "mix": 0,
+            "alpha": 1,
+            "radius": 1
+          },
+          {
+            "x": 3,
+            "y": 4,
+            "width": 122,
+            "height": 2,
+            "color": "#FFFFFF",
+            "mix": 1,
+            "alpha": 0.45,
+            "radius": 0
+          }
+        ],
+        "hold_head": [
+          {
+            "x": 0,
+            "y": 1,
+            "width": 128,
+            "height": 30,
+            "color": "#000000",
+            "mix": 1,
+            "alpha": 1,
+            "radius": 2
+          },
+          {
+            "x": 1,
+            "y": 2,
+            "width": 126,
+            "height": 28,
+            "color": "#FFFFFF",
+            "mix": 0,
+            "alpha": 0.4,
+            "radius": 1
+          },
+          {
+            "x": 2,
+            "y": 3,
+            "width": 124,
+            "height": 26,
+            "color": "#FFFFFF",
+            "mix": 0,
+            "alpha": 1,
+            "radius": 1
+          },
+          {
+            "x": 3,
+            "y": 4,
+            "width": 122,
+            "height": 2,
+            "color": "#FFFFFF",
+            "mix": 1,
+            "alpha": 0.45,
+            "radius": 0
+          }
+        ],
+        "hold_tail": [
+          {
+            "x": 0,
+            "y": 1,
+            "width": 128,
+            "height": 30,
+            "color": "#000000",
+            "mix": 1,
+            "alpha": 1,
+            "radius": 2
+          },
+          {
+            "x": 1,
+            "y": 2,
+            "width": 126,
+            "height": 28,
+            "color": "#FFFFFF",
+            "mix": 0,
+            "alpha": 0.4,
+            "radius": 1
+          },
+          {
+            "x": 2,
+            "y": 3,
+            "width": 124,
+            "height": 26,
+            "color": "#FFFFFF",
+            "mix": 0,
+            "alpha": 1,
+            "radius": 1
+          },
+          {
+            "x": 3,
+            "y": 4,
+            "width": 122,
+            "height": 2,
+            "color": "#FFFFFF",
+            "mix": 1,
+            "alpha": 0.45,
+            "radius": 0
+          }
+        ]
       }
     }
   }
