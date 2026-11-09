@@ -3,7 +3,7 @@ param(
     [string]$BuildReleaseDirectory,
     [Parameter(Mandatory = $true)]
     [string]$OutputDirectory,
-    [string]$Version = "1.9.9.9-final3",
+    [string]$Version = "1.9.9.9-final4",
     [switch]$BinaryOnly
 )
 
@@ -151,7 +151,8 @@ Copy-Item -LiteralPath (Join-Path $repoRoot "launch_skin_editor.bat") -Destinati
 Copy-Item -LiteralPath (Join-Path $buildRoot "TenRiff.exe") -Destination $binaryRoot
 $runtimeFiles = @(
     "ncnn.dll",
-    "tenriff-replay-verifier.exe"
+    "tenriff-replay-verifier.exe",
+    "tenriff-lr2-import.exe"
 )
 foreach ($runtime in $runtimeFiles) {
     $runtimePath = Join-Path $buildRoot $runtime

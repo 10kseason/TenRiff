@@ -1,3 +1,7 @@
+TenRiff 1.9.9.9-final4 source package — 2026-11-10
+
+Matches the release commit, including the display-only LR2 clear lamp import, the audio lock hardening and the GameSession file split. The LR2 fixture under tests/fixtures/lr2 is synthetic; no user score database is included. Existing source inclusion/privacy rules and prior history below remain. Fixed baseline 1.9.9.9-final4.
+
 TenRiff 1.9.9.9-final3 source package —2026-11-09
 
 Matches the release commit, including failed-note clipping, judgement-line gain, modern themes, Code / CLI and video authoring. Existing source inclusion/privacy rules and prior history below remain. Fixed baseline1.9.6.
