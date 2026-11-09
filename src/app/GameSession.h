@@ -37,6 +37,7 @@
 #include "config/KeycodeMap.h"
 #include "GameplayHudLimits.h"
 #include "app/JudgementLoopTiming.h"
+#include "app/RtLockProbe.h"
 #include "gameplay/GameplayEngine.h"
 #include "input/InputThread.h"
 #include "input/LaneBindingState.h"
@@ -281,6 +282,7 @@ public:
         return exit_requested_.load(std::memory_order_acquire);
     }
     [[nodiscard]] const GameSessionResult& result() const { return result_; }
+    [[nodiscard]] const RtLockProbe& rt_lock_probe() const { return rt_probe_; }
     [[nodiscard]] double final_hispeed() const { return config_.speed.hi_speed; }
     [[nodiscard]] double final_judgement_line_position() const {
         return config_.skin.judgement_line_position;
@@ -438,6 +440,12 @@ private:
     void run_judgement_loop(int64_t buffer_start_samples, int64_t buffer_end_samples, int64_t lookahead_samples);
     void process_countdown_input_queue();
     void process_paused_input_queue();
+    // Foreground ownership for the audio callback. The session loop refreshes
+    // the cached answer; the callback only queries the window manager itself
+    // when no fresh answer exists (callbacks driven without the session loop).
+    bool refresh_foreground_cache();
+    [[nodiscard]] bool foreground_for_realtime(int64_t now_ns) const;
+    void flush_audio_timing_diagnostics();
     void rebaseline_gameplay_start_input_state(int64_t sample);
     void process_future_events(int64_t buffer_start_samples,
                                int64_t buffer_end_samples,
@@ -575,6 +583,7 @@ private:
     bool ghost_chronological_judgement_ = false;
     std::shared_ptr<const std::vector<gameplay::ScrollSegment>> visual_scroll_segments_;
     std::mutex engine_mutex_;
+    RtLockProbe rt_probe_;
 
     input::InputThread input_thread_;
     audio::AudioThread audio_thread_;
@@ -712,6 +721,12 @@ private:
     bool chart_audio_steady_state_logged_ = false;
     std::atomic<bool> synthetic_tones_enabled_{true};
     bool audio_timing_diagnostics_logged_ = false;
+    // Written once by the audio callback, printed by the session thread.
+    std::atomic<bool> audio_timing_diagnostics_pending_{false};
+    std::atomic<uint32_t> audio_timing_diagnostics_frames_{0};
+    std::atomic<int64_t> audio_timing_diagnostics_write_ahead_frames_{0};
+    // (QPC ns << 1) | owns-foreground; 0 means no answer yet.
+    std::atomic<int64_t> foreground_cache_{0};
     std::vector<float> lane_activity_;
     std::vector<float> ghost_lane_activity_;
     std::array<int64_t, kGameplayHudMaxLanes> lane_hit_time_ns_{};

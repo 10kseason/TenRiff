@@ -98,7 +98,8 @@ def source_keys(root: Path = ROOT) -> tuple[dict[str, list[str]], list[str]]:
     for name, pattern in (
         ('src/app/BmsEditor.cpp', r'status_\s*=([^;]+);'),
         ('src/app/BmsEditor.cpp', r'set_error\(([^;]+?),err\)'),
-        ('src/app/GameSessionTail.inl', r'report_loading_progress\([^,]+,\s*([^;]+)\);'),
+        ('src/app/GameSessionInit.inl', r'report_loading_progress\([^,]+,\s*([^;]+)\);'),
+        ('src/app/GameSessionRun.inl', r'report_loading_progress\([^,]+,\s*([^;]+)\);'),
         ('src/app/MenuAppTail.inl', r'gameplay_hud_\.loading_stage\s*=([^;]+);'),
     ):
         source = root.joinpath(name).read_text(encoding='utf-8-sig')
