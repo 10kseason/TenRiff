@@ -473,6 +473,14 @@ BmsNormalizationResult BmsChartNormalizer::normalize(const BmsChart& chart) cons
                          return lhs.channel < rhs.channel;
                      });
 
+    int last_content = chart.last_content_measure_index;
+    for (const auto& event : result.chart.events) {
+        last_content = std::max(last_content, event.measure);
+    }
+    result.chart.reference_end_position = last_content >= 0 &&
+        static_cast<std::size_t>(last_content) < result.chart.measures.size()
+        ? result.chart.measures[static_cast<std::size_t>(last_content)].end() : 0.0;
+
     return result;
 }
 

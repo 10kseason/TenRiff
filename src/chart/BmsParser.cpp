@@ -1078,6 +1078,10 @@ BmsParseResult BmsParser::parse(std::string_view content, const BmsParserOptions
                 result.chart.commands.push_back(BmsMeasureCommand{measure_index, channel_token, data});
             }
             result.chart.last_measure_index = (std::max)(result.chart.last_measure_index, measure_index);
+            if (channel_token != "02" && data.find_first_not_of('0') != std::string::npos) {
+                result.chart.last_content_measure_index =
+                    (std::max)(result.chart.last_content_measure_index, measure_index);
+            }
             continue;
         }
 

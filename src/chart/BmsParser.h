@@ -63,6 +63,9 @@ struct BmsChart {
     double base_bpm = 0.0;
     // Preserve the chart extent even when indexing discards BGM/media payloads.
     int last_measure_index = 0;
+    // Display reference only: ignore trailing length-only / all-00 measures.
+    // Retained even when index parsing discards BGM/media payloads.
+    int last_content_measure_index = -1;
     // Includes directives in inactive branches; session setup uses this to keep
     // authored branch randomness independent of the lane-randomization seed.
     bool has_random_directives = false;

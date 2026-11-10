@@ -826,7 +826,7 @@ TEST_CASE("cached song index load drops non-BMS menu entries") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 21,\n"
+               "  \"version\": 22,\n"
                "  \"entries\": [\n"
                "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"chart_name\":\"MX\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
                "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"chart_name\":\"Another\",\"format\":\"bms\",\"layout_label\":\"5+1 SP\",\"key_count\":6,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1},\n"
@@ -861,7 +861,7 @@ TEST_CASE("cached song index filters non-BMS entries") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 21,\n"
+               "  \"version\": 22,\n"
                "  \"entries\": [\n"
                 "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"chart_name\":\"MX\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
                 "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"format\":\"bms\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
@@ -883,7 +883,7 @@ TEST_CASE("streaming song index loader parses compact single-line current caches
 
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
-               "{\"version\":21,\"entries\":["
+               "{\"version\":22,\"entries\":["
                "{\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"Composer\",\"chart_name\":\"Hyper\",\"format\":\"bms\",\"layout_label\":\"7+1 SP\",\"key_count\":8,\"level\":12,\"rating\":7.5,\"bpm\":150,\"mtime\":1},"
                "{\"path\":\"ignored.osu\",\"title\":\"Ignored\",\"artist\":\"Mapper\",\"format\":\"osu\",\"key_count\":10,\"level\":13,\"rating\":8.5,\"bpm\":180,\"mtime\":2}"
                "]}");
@@ -1035,7 +1035,7 @@ TEST_CASE("cached song index sanitizes control heavy metadata on load") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 21,\n"
+               "  \"version\": 22,\n"
                "  \"entries\": [\n"
                 "    {\"path\":\"legacy.bms\",\"title\":\"Bad\\nTitle\",\"artist\":\"Artist\\tName\",\"chart_name\":\"Hyper\\r\",\"format\":\"bms\\r\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
                "  ]\n"
@@ -1176,7 +1176,7 @@ TEST_CASE("parallel song cache rejects a malformed late batch without returning 
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
-    std::string bytes = R"({"version":21,"calculate_difficulty":false,"minimal_metadata":false,"entries":[)";
+    std::string bytes = R"({"version":22,"calculate_difficulty":false,"minimal_metadata":false,"entries":[)";
     for (int i = 0; i < 1025; ++i)
         bytes += R"({"path":"ok.bms","format":"bms","key_count":10},)";
     bytes += R"({"path":"bad.bms","title":"\uQQQQ","format":"bms","key_count":10}]})";
@@ -1192,7 +1192,7 @@ TEST_CASE("parallel song cache streams an oversized historical entry between buf
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
-    std::string bytes = R"({"version":21,"calculate_difficulty":false,"entries":[{"path":"early.bms","format":"bms","key_count":10},{"path":"large.bms","format":"bms","key_count":10,"level":12,"unknown":")";
+    std::string bytes = R"({"version":22,"calculate_difficulty":false,"entries":[{"path":"early.bms","format":"bms","key_count":10},{"path":"large.bms","format":"bms","key_count":10,"level":12,"unknown":")";
     bytes.append(2u * 1024u * 1024u, 'x');
     bytes += R"("},{"path":"last.bms","format":"bms","key_count":10}]})";
     const auto path = temp.path / "cache.json";
@@ -1471,6 +1471,10 @@ TEST_CASE("song index and chart loader agree on duration-based reference BPM") {
                "#BPM 120\n#BPM01 180.5\n#STOP01 4800\n"
                "#00009:01\n#00108:01\n#00203:78\n#00308:01\n"
                "#00351:01\n#00651:01\n#00602:0.5\n");
+    write_file(temp.path / "padding.bms",
+               "#TITLE Empty Tail\n#BPM 165\n#BPM01 0.99\n#00111:01\n"
+               "#00808:01\n#00802:0.015625\n#00901:01\n#00902:0.015625\n"
+               "#99902:0.015625\n#99901:0000\n");
     write_file(temp.path / "media-tail.bms",
                "#TITLE Trailing BGM Extent\n#BPM 120\n"
                "#00103:F0\n#00111:01\n#00301:01\n");
@@ -1483,11 +1487,12 @@ TEST_CASE("song index and chart loader agree on duration-based reference BPM") {
         options.profile = profile;
         std::vector<std::string> warnings;
         const SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings, {}, options);
-        REQUIRE(index.entries.size() == 3u);
+        REQUIRE(index.entries.size() == 4u);
         CHECK(warnings.empty());
         for (const auto& entry : index.entries) {
             const bool repeated = entry.path == "repeated.bms";
-            CHECK(entry.bpm == doctest::Approx(repeated ? 180.5 : 240.0));
+            const bool padding = entry.path == "padding.bms";
+            CHECK(entry.bpm == doctest::Approx(padding ? 165.0 : repeated ? 180.5 : 240.0));
             for (const int sample_rate : {1000, 44100, 48000}) {
                 for (const double rate : {0.75, 1.0, 1.5}) {
                     const auto loaded = tenriff::app::ChartLoader{}.load(
@@ -1495,7 +1500,7 @@ TEST_CASE("song index and chart loader agree on duration-based reference BPM") {
                     REQUIRE(loaded.success());
                     CHECK(loaded.reference_bpm == doctest::Approx(entry.bpm));
                     // Replays and key conversion must still see the initial header.
-                    CHECK(loaded.base_bpm == doctest::Approx(120.0));
+                    CHECK(loaded.base_bpm == doctest::Approx(padding ? 165.0 : 120.0));
                     if (repeated) {
                         REQUIRE(loaded.chart.notes.size() == 1u);
                         CHECK(loaded.chart.notes.front().end_sample.has_value());
@@ -1512,6 +1517,16 @@ TEST_CASE("song index and chart loader agree on duration-based reference BPM") {
             CHECK(cached.index.entries[i].bpm == doctest::Approx(index.entries[i].bpm));
         }
     }
+}
+
+TEST_CASE("reference BPM padding correction invalidates derived version 21 caches") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    const auto path = temp.path / "old-reference.json";
+    write_file(path, "{\"version\":21,\"entries\":[{\"path\":\"padding.bms\",\"bpm\":0.99}]}");
+    const auto loaded = load_song_index(path.u8string());
+    CHECK_FALSE(loaded.loaded_from_file);
+    CHECK(loaded.index.entries.empty());
 }
 
 TEST_CASE("1.8.9.4 metadata extracts explicit OBJ credits with header priority and UTF-8 cache roundtrip") {

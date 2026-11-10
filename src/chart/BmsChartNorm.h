@@ -46,6 +46,8 @@ struct BmsNormalizedChart {
     std::vector<BmsNormalizedEvent> events;
     NoteLaneMapping lane_mapping;
     double base_bpm = 0.0;
+    // Present for parsed charts; does not shorten scheduling or scroll extent.
+    std::optional<double> reference_end_position;
 };
 
 struct BmsNormalizationMessage {
