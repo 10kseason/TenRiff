@@ -1,5 +1,6 @@
 # 1.9.9.9-final4 — 2026-11-10
 
+- Add Options → Profile → Import LR2 Records: a native DB picker, cancellable background import and immediate lamp refresh. Menu and CLI share conversion and atomic saving; failed/cancelled imports keep the previous lamps.
 - Add `tenriff-lr2-import`: copy LR2 clear lamps into a profile as display-only data. EX is recorded only when the LR2 judgement order survives the EX-HARD gauge under worst-case timing. Imported lamps never become results, BEST records or upload candidates, and no user database ships.
 - Song Select shows an imported lamp only when it outranks the TenRiff record and prefixes the selected-song lamp text with `LR2 `.
 - Raise the HUD thread's priority only while it holds the lock shared with the audio callback; keep window-manager queries and console output off the audio callback. Preventive: no audible or latency improvement is claimed.

@@ -42,8 +42,9 @@ inline constexpr int kHispeedDecreaseKeyRow = 18;
 inline constexpr int kHispeedIncreaseKeyRow = 19;
 inline constexpr int kFunctionKeysFirstRow = 20;
 inline constexpr int kFunctionKeysLastRow = 28;
-inline constexpr int kDoneRow = 29;
-inline constexpr int kFirstRunSkipRow = 30;
+inline constexpr int kLr2ImportRow = 29;
+inline constexpr int kDoneRow = 30;
+inline constexpr int kFirstRunSkipRow = 31;
 
 [[nodiscard]] inline constexpr int function_for_row(int row) {
     if (row == kHispeedDecreaseKeyRow) return 5;

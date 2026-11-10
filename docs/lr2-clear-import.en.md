@@ -4,6 +4,14 @@ Imports clear lamps from an LR2 score database into a TenRiff profile and shows 
 
 ## Usage
 
+### Import in game
+
+Close LR2, then open **Options → Profile → Import LR2 Records** and select the score `.db` file. The active profile receives the lamps. Registered song folders and the current folder are checked for EX; basic lamps are imported even without matching songs.
+
+Import runs in the background. Select the same button again to cancel. Completion refreshes Song Select immediately without restarting. Reimport replaces the previous LR2 lamp list. Cancellation, read/write failure or closing the game keeps the existing list. TenRiff records, BEST and online eligibility are unchanged.
+
+### Command line
+
 ```
 tenriff-lr2-import.exe <LR2 score .db> <profile folder> [songs folder ...]
 ```

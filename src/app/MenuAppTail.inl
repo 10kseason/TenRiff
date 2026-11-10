@@ -1221,6 +1221,10 @@ void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
                     settings_cursor_ == profile_setup::kSkipStartCountdownRow, render::MenuHitTargetKind::SettingsRow,
                     profile_setup::kSkipStartCountdownRow, false, true);
     populate_common_key_rows(render);
+    append_menu_row(render.generic, ui_text("Import LR2 Records", "LR2 기록 가져오기"),
+                    lr2_import_future_.valid() ? ui_text("Cancel Import", "가져오기 취소") : ".db",
+                    settings_cursor_ == profile_setup::kLr2ImportRow, render::MenuHitTargetKind::SettingsRow,
+                    profile_setup::kLr2ImportRow, true, false);
     append_menu_row(render.generic,
                     first_run ? ui_text("Continue to Song Select", "곡 선택으로 계속")
                               : ui_text("Done", "완료"),
@@ -1890,6 +1894,9 @@ void MenuApp::publish_snapshot() {
                 render.generic.selected_help += "\n\n" + status;
         if (current_screen() == Screen::QuickSetup && !profile_transfer_status_.empty())
             render.generic.selected_help += "\n\n" + profile_transfer_status_;
+        if (current_screen() == Screen::QuickSetup) {
+            if (!lr2_import_status_.empty()) render.generic.selected_help += "\n\n" + lr2_import_status_;
+        }
     }
 
     if (render.kind == render::MenuScreenKind::GenericList &&

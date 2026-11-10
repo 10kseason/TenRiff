@@ -1461,3 +1461,16 @@
 {"Key Overlay Size", "キーオーバーレイ サイズ"},
 
 {"Judgement Line Brightness", "判定線の明るさ"},
+
+// LR2 display-only record import.
+{"Import LR2 Records", "LR2記録をインポート"},
+{"Cancel Import", "インポートをキャンセル"},
+{"Could not open the LR2 database picker.", "LR2データベースの選択画面を開けませんでした。"},
+{"Importing LR2 lamps. Select again to cancel.", "LR2ランプをインポート中です。もう一度選ぶとキャンセルします。"},
+{"Could not start LR2 import.", "LR2インポートを開始できませんでした。"},
+{"LR2 import cancelled.", "LR2インポートをキャンセルしました。"},
+{"LR2 import failed. Existing lamps were kept.", "LR2インポートに失敗しました。以前のランプは保持されています。"},
+{"LR2 lamps imported: ", "インポートしたLR2ランプ: "},
+{"Some song folders could not be scanned for EX.", "一部の曲フォルダーをEX確認のために読み取れませんでした。"},
+{"Could not save LR2 lamps. Existing lamps were kept.", "LR2ランプを保存できませんでした。以前のランプは保持されています。"},
+{"Choose an LR2 score .db. Replaces this profile's imported lamps; TenRiff scores stay unchanged. Registered song folders are checked for EX. Close LR2 before importing.", "LR2スコアの.dbを選択します。このプロファイルのインポート済みランプを更新し、TenRiffスコアは保持します。登録済み曲フォルダーでEXを確認します。先にLR2を終了してください。"},

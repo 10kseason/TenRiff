@@ -9,10 +9,59 @@
 
 #include "app/Lr2ClearImport.h"
 #include "app/Lr2ScoreDb.h"
+#include "app/Lr2ImportJob.h"
+#include "util/Utf8Compat.h"
 
 using namespace tenriff;
 using app::Lr2ExVerdict;
 using app::Lr2Judgement;
+
+TEST_CASE("LR2 import job shares read-only conversion and atomically saves Unicode profiles") {
+    namespace fs = std::filesystem;
+    const auto fixture = fs::u8path(TENRIFF_SOURCE_DIR) / "tests/fixtures/lr2/score_fixture.db";
+    const auto profile = fs::current_path() / fs::u8path(u8"lr2-프로필-job-test");
+    const bool created = fs::create_directory(profile);
+    REQUIRE(created);
+    if (!created) return;
+    struct Cleanup { fs::path path; ~Cleanup() { std::error_code ec; fs::remove_all(path, ec); } } cleanup{profile};
+    const auto input = profile / fs::u8path(u8"점수.db");
+    fs::copy_file(fixture, input);
+    const auto original_size = fs::file_size(input);
+    const auto original_time = fs::last_write_time(input);
+    const auto result = app::prepare_lr2_import(input, {});
+    REQUIRE(result.success());
+    CHECK(result.rows == 400);
+    CHECK_FALSE(result.lamps.empty());
+    CHECK(result.scanned == 0);
+    CHECK(fs::file_size(input) == original_size);
+    CHECK(fs::last_write_time(input) == original_time);
+    for (const auto& [hash, lamp] : result.lamps) CHECK_FALSE(lamp.ex_proven);
+    std::string error;
+    REQUIRE(app::save_lr2_import(profile, result.lamps, error));
+    CHECK(app::load_lr2_imported_lamps((profile / "lr2_import.json").u8string()).size() == result.lamps.size());
+    auto smaller = result.lamps;
+    smaller.erase(smaller.begin());
+    REQUIRE(app::save_lr2_import(profile, smaller, error));
+    CHECK(app::load_lr2_imported_lamps((profile / "lr2_import.json").u8string()).size() == smaller.size());
+    std::atomic<bool> cancel{true};
+    const auto stopped = app::prepare_lr2_import(input, {}, &cancel);
+    CHECK(stopped.cancelled);
+    CHECK_FALSE(stopped.success());
+    CHECK_FALSE(app::prepare_lr2_import(profile / "missing.db", {}).success());
+    CHECK(app::load_lr2_imported_lamps((profile / "lr2_import.json").u8string()).size() == smaller.size());
+    CHECK_FALSE(app::save_lr2_import(profile / "missing-profile", result.lamps, error));
+    CHECK_FALSE(error.empty());
+    const auto warning = app::prepare_lr2_import(input, {profile / "missing-songs"});
+    CHECK(warning.success());
+    CHECK(warning.skipped_folders == 1);
+    // A blocked destination must not leave a temporary file or touch its contents.
+    const auto blocked = profile / "blocked";
+    fs::create_directories(blocked / "lr2_import.json");
+    std::ofstream(blocked / "lr2_import.json/keep.txt") << "keep";
+    CHECK_FALSE(app::save_lr2_import(blocked, result.lamps, error));
+    CHECK(fs::exists(blocked / "lr2_import.json/keep.txt"));
+    CHECK(std::distance(fs::directory_iterator(blocked), fs::directory_iterator{}) == 1);
+}
 
 namespace {
 

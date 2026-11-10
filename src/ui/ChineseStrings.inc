@@ -1471,3 +1471,16 @@
 {"Key Overlay Size", "按键叠加大小"},
 
 {"Judgement Line Brightness", "判定线颜色亮度"},
+
+// LR2 display-only record import.
+{"Import LR2 Records", "导入 LR2 记录"},
+{"Cancel Import", "取消导入"},
+{"Could not open the LR2 database picker.", "无法打开 LR2 数据库选择窗口。"},
+{"Importing LR2 lamps. Select again to cancel.", "正在导入 LR2 灯。再次选择可取消。"},
+{"Could not start LR2 import.", "无法启动 LR2 导入。"},
+{"LR2 import cancelled.", "已取消 LR2 导入。"},
+{"LR2 import failed. Existing lamps were kept.", "LR2 导入失败。已保留原有灯。"},
+{"LR2 lamps imported: ", "已导入的 LR2 灯："},
+{"Some song folders could not be scanned for EX.", "部分歌曲文件夹无法扫描以验证 EX。"},
+{"Could not save LR2 lamps. Existing lamps were kept.", "无法保存 LR2 灯。已保留原有灯。"},
+{"Choose an LR2 score .db. Replaces this profile's imported lamps; TenRiff scores stay unchanged. Registered song folders are checked for EX. Close LR2 before importing.", "选择 LR2 成绩 .db。替换此档案已导入的灯，保留 TenRiff 成绩。使用已注册歌曲文件夹验证 EX。请先关闭 LR2。"},

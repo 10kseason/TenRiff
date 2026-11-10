@@ -6,7 +6,7 @@
 using namespace tenriff::app::profile_setup;
 
 TEST_CASE("first-run profile setup keeps its original song-select and title exits") {
-    CHECK(row_count(Entry::FirstRun) == 31);
+    CHECK(row_count(Entry::FirstRun) == 32);
     CHECK(kLanguageRow == 0);
     CHECK(kMenuFontSizeRow == 1);
     CHECK(kBackendRow == kNicknameRow - 1);
@@ -18,14 +18,16 @@ TEST_CASE("first-run profile setup keeps its original song-select and title exit
     CHECK(kInstantRestartKeyRow == kHispeedDecreaseKeyRow - 1);
     CHECK(kHispeedDecreaseKeyRow == kHispeedIncreaseKeyRow - 1);
     CHECK(kHispeedIncreaseKeyRow == kFunctionKeysFirstRow - 1);
-    CHECK(kFunctionKeysLastRow == kDoneRow - 1);
+    CHECK(kFunctionKeysLastRow == kLr2ImportRow - 1);
+    CHECK(kLr2ImportRow == kDoneRow - 1);
+    CHECK(enter_destination(Entry::FirstRun, kLr2ImportRow) == Destination::Stay);
     CHECK(enter_destination(Entry::FirstRun, kDoneRow) == Destination::SongSelect);
     CHECK(enter_destination(Entry::FirstRun, kFirstRunSkipRow) == Destination::Title);
     CHECK(cancel_destination(Entry::FirstRun) == Destination::Title);
 }
 
 TEST_CASE("reopened profile setup returns to the options hub") {
-    CHECK(row_count(Entry::Options) == 30);
+    CHECK(row_count(Entry::Options) == 31);
     CHECK(enter_destination(Entry::Options, kDoneRow) == Destination::OptionsHub);
     CHECK(enter_destination(Entry::Options, 2) == Destination::Stay);
     CHECK(cancel_destination(Entry::Options) == Destination::OptionsHub);

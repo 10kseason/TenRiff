@@ -1,4 +1,4 @@
-> **2026-11-10 · 1.9.9.9-final4:** LR2 スコア DB のクリアランプを表示専用で取り込む `tenriff-lr2-import` を追加しました。LR2 の判定順を最悪ケースで EX-HARD ゲージに通し、生存したプレイのみ EX と表示します。オーディオコールバックと HUD スレッドが共有するロックに予防措置を入れました。固定ベースラインを **1.9.9.9-final4** に上げます。 [Release](docs/release-1.9.9.9-final4.ja.md). Earlier candidate/release notices below are historical.
+> **2026-11-10 · 1.9.9.9-final4:** LR2 スコア DB のクリアランプを表示専用で取り込む `tenriff-lr2-import` を追加しました。LR2 の判定順を最悪ケースで EX-HARD ゲージに通し、生存したプレイのみ EX と表示します。オーディオコールバックと HUD スレッドが共有するロックに予防措置を入れました。固定ベースラインを **1.9.9.9-final4** に上げます。 [Release](docs/release-1.9.9.9-final4.ja.md). Earlier candidate/release notices below are historical. **オプション → プロフィール → LR2記録をインポート**からDBを選択できます。
 
 > **2026-11-09 · 1.9.9.9-final3:** 失敗ノートを判定ラインより下で隠し、判定ラインの明度設定を追加しました。既存12スキンを共通の現代的スタイルに再設計し、3つのループ動画付きTenRiff Code / CLIを同梱します。AI制作ガイド・v1スキーマ・Web/同梱エディターは新しい明度と動画フィールドに対応します。 [Release](docs/release-1.9.9.9-final3.ja.md). Earlier candidate/release notices below are historical.
 

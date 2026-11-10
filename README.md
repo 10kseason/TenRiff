@@ -1,4 +1,4 @@
-> **2026-11-10 · 1.9.9.9-final4:** LR2 점수 DB의 클리어 램프를 표시 전용으로 가져오는 `tenriff-lr2-import`를 추가했습니다. LR2 판정 순서를 최악 가정으로 EX-HARD 게이지에 넣어 살아남은 기록만 EX로 표시합니다. 오디오 콜백과 HUD 스레드가 공유하는 잠금에 예방 조치를 넣었습니다. 고정 기준선을 **1.9.9.9-final4**로 올립니다. [Release](docs/release-1.9.9.9-final4.ko.md). Earlier candidate/release notices below are historical.
+> **2026-11-10 · 1.9.9.9-final4:** LR2 점수 DB의 클리어 램프를 표시 전용으로 가져오는 `tenriff-lr2-import`를 추가했습니다. LR2 판정 순서를 최악 가정으로 EX-HARD 게이지에 넣어 살아남은 기록만 EX로 표시합니다. 오디오 콜백과 HUD 스레드가 공유하는 잠금에 예방 조치를 넣었습니다. 고정 기준선을 **1.9.9.9-final4**로 올립니다. [Release](docs/release-1.9.9.9-final4.ko.md). Earlier candidate/release notices below are historical. 옵션 → 프로필의 **LR2 기록 가져오기** 버튼으로 DB를 선택할 수 있습니다.
 
 > **2026-11-09 · 1.9.9.9-final3:** 실패한 노트가 판정선 아래에서 기어와 겹치지 않도록 가리고, 스킨 설정에 판정선 명도를 추가했습니다. 기존 12개 스킨을 공통 현대 스타일로 정리하고 TenRiff Code / CLI와 반복 영상 3개를 포함합니다. AI 제작 가이드·v1 스키마·웹/동봉 에디터는 새 명도와 영상 필드를 지원합니다. [Release](docs/release-1.9.9.9-final3.ko.md). Earlier candidate/release notices below are historical.
 

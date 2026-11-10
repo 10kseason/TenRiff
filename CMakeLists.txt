@@ -207,6 +207,7 @@ add_library(tenriff_core
     src/app/Lr2Course.cpp
     src/app/Lr2ScoreDb.cpp
     src/app/Lr2ClearImport.cpp
+    src/app/Lr2ImportJob.cpp
     src/app/Lr2Skin.cpp
     src/app/TenRiffSkin.cpp
     src/app/MenuRecordUtils.cpp
@@ -364,6 +365,7 @@ if(WIN32)
         src/app/MenuAppDeviceSettings.cpp
         src/app/MenuAppKeymap.cpp
         src/app/MenuAppRecords.cpp
+        src/app/MenuAppLr2Import.cpp
         src/app/MenuAppScoreComparison.cpp
         src/app/MenuAppSessionMix.cpp
         src/app/MenuAppSongSelect.cpp
@@ -515,6 +517,7 @@ if(WIN32)
     # Opt-in integration probe: refuses existing output folders and uses only
     # synthetic charts/profiles. Never packaged as an end-user executable.
     add_executable(menu_app_smoke EXCLUDE_FROM_ALL tools/menu_app_smoke.cpp)
+    target_compile_definitions(menu_app_smoke PRIVATE TENRIFF_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(menu_app_smoke PRIVATE tenriff_app)
     add_executable(library_loading_benchmark EXCLUDE_FROM_ALL tools/library_loading_benchmark.cpp)
     target_link_libraries(library_loading_benchmark PRIVATE tenriff_app)
