@@ -1,3 +1,5 @@
+> **2026-11-11 · 1.9.9.9-final6** 将 7+1 和 8K 的按键绑定分开，转盘默认使用红色。14+2 DP 与 16K 的音符绘制在各自的区域内。 [简体中文](release-1.9.9.9-final6.zh-CN.md)
+
 > **2026-11-10 · 1.9.9.9-final5:** 减少 LR2 记录导入中的哈希与谱面查找开销，修复原始 RANK 缺失或超出范围时错误授予 EX 的问题，并修复 Andro 的空白尾部小节使 BPM 显示为 1 的问题。固定基准线保持 final4。 [Release](release-1.9.9.9-final5.zh-CN.md). Earlier notices below are historical.
 
 > **2026-11-10 · 1.9.9.9-final4:** 新增 `tenriff-lr2-import`,以仅显示的方式导入 LR2 成绩数据库中的通关灯。只有 LR2 判定顺序在最差时序下仍能通过 EX-HARD 血槽的游玩才显示为 EX。为音频回调与 HUD 线程共享的锁加入了预防措施。固定基准线提升为 **1.9.9.9-final4**。 [Release](release-1.9.9.9-final4.zh-CN.md). Earlier candidate/release notices below are historical.

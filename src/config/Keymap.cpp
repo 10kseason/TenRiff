@@ -136,6 +136,7 @@ Keymap KeymapManager::default_keymap() const {
     for (const auto& [mode, keys] : default_mode_bindings()) {
         keymap.mode_bindings.emplace(mode, bindings_from_vector(keys));
     }
+    keymap.mode_bindings.emplace("7+1", keymap.mode_bindings.at("8k"));
     keymap.bindings = keymap.mode_bindings["10k"];
     return keymap;
 }
@@ -173,15 +174,15 @@ std::string KeymapManager::normalize_mode_token(std::string_view key_mode) const
         return "16k";
     }
     if (normalized == "4k" || normalized == "5k" || normalized == "6k" || normalized == "7k" ||
-        normalized == "8k" || normalized == "9k" || normalized == "10k" || normalized == "12k" ||
-        normalized == "14k" || normalized == "16k") {
+        normalized == "7+1" || normalized == "8k" || normalized == "9k" || normalized == "10k" ||
+        normalized == "12k" || normalized == "14k" || normalized == "16k") {
         return normalized;
     }
     return "10k";
 }
 
 std::vector<std::string> KeymapManager::supported_mode_tokens() const {
-    return {"4k", "5k", "6k", "7k", "8k", "9k", "10k", "12k", "14k", "16k"};
+    return {"4k", "5k", "6k", "7k", "7+1", "8k", "9k", "10k", "12k", "14k", "16k"};
 }
 
 std::vector<std::string> KeymapManager::lane_ids_for_mode(std::string_view key_mode) const {
@@ -286,42 +287,56 @@ KeymapLoadResult KeymapManager::load_profile(std::string_view profile_dir) const
 
     result.keymap.layout = get_string(*root, "layout", result.keymap.layout);
 
-    if (auto* modes = get_object(*root, "modes")) {
-        for (const auto& [mode, value] : *modes) {
-            const auto* bindings = value.as_object();
-            if (!bindings) {
-                continue;
+    const auto load_primary = [&](const std::string& mode, const JsonObject& bindings) {
+        auto& target = result.keymap.mode_bindings.at(mode);
+        for (const auto& [lane, key] : bindings) {
+            if (key.is_string()) target[lane] = key.as_string();
+        }
+    };
+    const auto load_secondary = [&](const std::string& mode, const JsonObject& bindings) {
+        const auto lanes = lane_ids_for_mode(mode);
+        for (const auto& [lane, key] : bindings) {
+            if (!key.is_string() || std::find(lanes.begin(), lanes.end(), lane) == lanes.end()) continue;
+            const auto original = key.as_string();
+            if (original.empty()) continue;
+            if (const auto code = KeycodeMap::to_keycode(original); code && !is_escape_key(*code)) {
+                const auto canonical = KeycodeMap::to_name(*code);
+                if (canonical != original) ++result.normalized_binding_count;
+                result.keymap.secondary_mode_bindings[mode][lane] = canonical;
+            } else {
+                ++result.repaired_binding_count;
+                result.warnings.push_back("Invalid secondary keymap binding removed: mode=" +
+                                          mode + " lane=" + lane);
             }
-            auto& target = result.keymap.mode_bindings[normalize_mode_token(mode)];
-            for (const auto& [lane, lane_value] : *bindings) {
-                if (!lane_value.is_string()) {
-                    continue;
-                }
-                target[lane] = lane_value.as_string();
+        }
+    };
+
+    if (const auto* modes = get_object(*root, "modes")) {
+        for (const auto& [mode, value] : *modes) {
+            const auto normalized_mode = normalize_mode_token(mode);
+            if (const auto* bindings = value.as_object(); bindings && normalized_mode != "7+1") {
+                load_primary(normalized_mode, *bindings);
             }
         }
     }
 
     if (const auto* modes = get_object(*root, "secondary_modes")) {
         for (const auto& [mode, value] : *modes) {
-            const auto* bindings = value.as_object();
-            if (!bindings) continue;
             const auto normalized_mode = normalize_mode_token(mode);
-            const auto lanes = lane_ids_for_mode(normalized_mode);
-            for (const auto& [lane, key] : *bindings) {
-                if (!key.is_string() || std::find(lanes.begin(), lanes.end(), lane) == lanes.end()) continue;
-                const auto original = key.as_string();
-                if (original.empty()) continue;
-                if (const auto code = KeycodeMap::to_keycode(original); code && !is_escape_key(*code)) {
-                    const auto canonical = KeycodeMap::to_name(*code);
-                    if (canonical != original) ++result.normalized_binding_count;
-                    result.keymap.secondary_mode_bindings[normalized_mode][lane] = canonical;
-                } else {
-                    ++result.repaired_binding_count;
-                    result.warnings.push_back("Invalid secondary keymap binding removed: mode=" +
-                                              normalized_mode + " lane=" + lane);
-                }
+            if (const auto* bindings = value.as_object(); bindings && normalized_mode != "7+1") {
+                load_secondary(normalized_mode, *bindings);
             }
+        }
+    }
+
+    // Older readers treat unknown entries inside modes/secondary_modes as 10K.
+    const auto* seven_plus_one = get_object(*root, "7+1");
+    if (seven_plus_one) {
+        if (const auto* primary = get_object(*seven_plus_one, "bindings")) {
+            load_primary("7+1", *primary);
+        }
+        if (const auto* secondary = get_object(*seven_plus_one, "secondary_bindings")) {
+            load_secondary("7+1", *secondary);
         }
     }
 
@@ -337,6 +352,14 @@ KeymapLoadResult KeymapManager::load_profile(std::string_view profile_dir) const
 
     for (const auto& mode : supported_mode_tokens()) {
         canonicalize_mode_bindings(*this, result.keymap, mode, result);
+    }
+    if (!seven_plus_one) {
+        // Existing 7+1 play used the logical 8K slots, including empty and secondary bindings.
+        result.keymap.mode_bindings.at("7+1") = result.keymap.mode_bindings.at("8k");
+        if (const auto legacy = result.keymap.secondary_mode_bindings.find("8k");
+            legacy != result.keymap.secondary_mode_bindings.end()) {
+            result.keymap.secondary_mode_bindings.emplace("7+1", legacy->second);
+        }
     }
 
     if (result.keymap.mode_bindings.find("10k") != result.keymap.mode_bindings.end()) {
@@ -368,19 +391,13 @@ bool KeymapManager::save_profile(std::string_view profile_dir, const Keymap& key
     root.emplace("layout", JsonValue{keymap.layout});
 
     JsonObject modes;
+    JsonObject secondary_modes;
     for (const auto& mode : supported_mode_tokens()) {
         JsonObject bindings;
         const auto mode_bindings = bindings_for_mode(keymap, mode);
         for (const auto& [lane, key] : mode_bindings) {
             bindings.emplace(lane, JsonValue{key});
         }
-        modes.emplace(mode, JsonValue{std::move(bindings)});
-    }
-    root.emplace("modes", JsonValue{std::move(modes)});
-
-    // Keep legacy primary strings intact; old clients can ignore this optional object.
-    JsonObject secondary_modes;
-    for (const auto& mode : supported_mode_tokens()) {
         JsonObject secondary;
         const auto lanes = lane_ids_for_mode(mode);
         for (const auto& [lane, key] : secondary_bindings_for_mode(keymap, mode)) {
@@ -389,8 +406,17 @@ bool KeymapManager::save_profile(std::string_view profile_dir, const Keymap& key
                 secondary.emplace(lane, JsonValue{KeycodeMap::to_name(*code)});
             }
         }
-        if (!secondary.empty()) secondary_modes.emplace(mode, JsonValue{std::move(secondary)});
+        if (mode == "7+1") {
+            JsonObject scratch;
+            scratch.emplace("bindings", JsonValue{std::move(bindings)});
+            if (!secondary.empty()) scratch.emplace("secondary_bindings", JsonValue{std::move(secondary)});
+            root.emplace(mode, JsonValue{std::move(scratch)});
+        } else {
+            modes.emplace(mode, JsonValue{std::move(bindings)});
+            if (!secondary.empty()) secondary_modes.emplace(mode, JsonValue{std::move(secondary)});
+        }
     }
+    root.emplace("modes", JsonValue{std::move(modes)});
     if (!secondary_modes.empty()) root.emplace("secondary_modes", JsonValue{std::move(secondary_modes)});
 
     JsonObject bindings;

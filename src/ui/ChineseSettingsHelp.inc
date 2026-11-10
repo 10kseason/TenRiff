@@ -163,7 +163,7 @@
 {"Adjust input, visual and sound offsets separately. Start at 0 ms and change one setting at a time.", "分别调整输入、视觉和声音偏移。建议从0 ms开始，每次只调整一项。"},
 {"Set language, text size, nickname, profile image and songs folder.", "设置语言、文字大小、昵称、头像和曲目文件夹。"},
 {"Change judgement windows and note patterns. Check the score multiplier when enabling a modifier.", "改变判定范围和音符排列。开启修改选项时请确认分数倍率。"},
-{"Hold several keys to check simultaneous input. Left tests fewer keys; Right tests more (4K to 16K).", "同时按住多个键以测试同时输入。左方向键减少测试键数，右方向键增加，范围4K至16K。"},
+{"Hold several keys to check simultaneous input. Use Left/Right to switch layouts.", "同时按住多个键以测试同时输入。用左右方向键切换布局。"},
 {"The displayed mapping is used for this test only. Esc returns.", "显示的键位仅用于本次测试，按Esc返回。"},
 {"Left/Right chooses the layout to edit (4K-16K). Each mode keeps its own mapping.", "用左右方向键选择要编辑的布局（4K–16K）。每种模式分别保存键位。"},
 {"Left/Right selects primary or secondary. Enter starts key capture; press the new key to save. Delete clears a secondary binding.", "用左右方向键选择主按键或辅助按键。按Enter开始录入，再按新键保存。Delete清除辅助绑定。"},

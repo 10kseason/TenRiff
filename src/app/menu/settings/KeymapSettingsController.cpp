@@ -9,19 +9,19 @@
 namespace tenriff::app {
 std::string resolve_keymap_edit_mode_for_menu(
     std::optional<int> selected_chart_key_count,
-    std::string_view runtime_key_mode) {
+    std::string_view selected_chart_layout) {
     config::KeymapManager manager;
     if (selected_chart_key_count.has_value()) {
         const int key_count = *selected_chart_key_count;
+        if (key_count == 8 && selected_chart_layout == "7+1 SP") {
+            return "7+1";
+        }
         if ((key_count >= 4 && key_count <= 10) || key_count == 12 ||
             key_count == 14 || key_count == 16) {
             return manager.normalize_mode_token(std::to_string(key_count) + "k");
         }
     }
 
-    // The editor starts at 4K without altering the saved gameplay conversion mode.
-    // Opening from a chart still selects that chart's actual native key count.
-    static_cast<void>(runtime_key_mode);
     return "4k";
 }
 
@@ -92,9 +92,9 @@ KeymapSettingsEffects KeymapSettingsController::select(int row, bool secondary) 
 
 void KeymapSettingsController::reset(
     std::optional<int> selected_chart_key_count,
-    std::string_view runtime_key_mode) {
+    std::string_view selected_chart_layout) {
     edit_mode_ = resolve_keymap_edit_mode_for_menu(
-        selected_chart_key_count, runtime_key_mode);
+        selected_chart_key_count, selected_chart_layout);
     selected_row_ = 0;
     secondary_selected_ = false;
     capture_active_ = false;

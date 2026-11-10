@@ -1,3 +1,5 @@
+> **2026-11-11 · 1.9.9.9-final6** 7+1과 8K 키 설정을 분리하고 스크래치 기본색을 빨강으로 바꿨습니다. 14+2 DP와 16K에서 노트는 각 블록 안에 그립니다. [한국어](release-1.9.9.9-final6.ko.md)
+
 > **2026-11-10 · 1.9.9.9-final5:** LR2 기록 가져오기의 해시·차트 탐색 비용을 줄이고, 원본 RANK가 없거나 범위 밖일 때 EX를 잘못 인정하던 오류를 수정했습니다. Andro의 빈 꼬리 마디가 대표 BPM을 1로 만들던 문제를 수정했습니다. 고정 기준선은 final4를 유지합니다. [Release](release-1.9.9.9-final5.ko.md). Earlier notices below are historical.
 
 > **2026-11-10 · 1.9.9.9-final4:** LR2 점수 DB의 클리어 램프를 표시 전용으로 가져오는 `tenriff-lr2-import`를 추가했습니다. LR2 판정 순서를 최악 가정으로 EX-HARD 게이지에 넣어 살아남은 기록만 EX로 표시합니다. 오디오 콜백과 HUD 스레드가 공유하는 잠금에 예방 조치를 넣었습니다. 고정 기준선을 **1.9.9.9-final4**로 올립니다. [Release](release-1.9.9.9-final4.ko.md). Earlier candidate/release notices below are historical.

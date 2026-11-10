@@ -1,3 +1,9 @@
+# 1.9.9.9-final6 — 2026-11-11
+
+- Add independent 7+1 and 8K key bindings and NKRO layouts. Existing profiles seed 7+1 from 8K.
+- Use red as the default scratch color and show the assigned 7+1 keys in play and skin previews.
+- Keep taps and holds out of the center gap in 14+2 DP and 16K. [Release notes](docs/release-1.9.9.9-final6.en.md)
+
 # 1.9.9.9-final5 — 2026-11-10
 
 - Reduce LR2 import work: MD5 only, no media lookup, overlapping-root deduplication and stop after all matches. A 512-record / 15,569-chart local synthetic benchmark fell from 91.139s to 9.852s with identical results for that sample.

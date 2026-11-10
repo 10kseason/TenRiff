@@ -401,11 +401,11 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | `lane_spacing_scales` | object: mode → number[]; `0..2` | レーン間隔配列。長さは lane_count - 1。 |
 | `note_height_scale` | double: `0.50..4`; `1.8` | ノート頭部・尾部の高さ倍率。 |
 | `lane_divider_width_scale` | double: `0..2`; `1` | 全モード共通の区切り線幅。取り込んだ LR2 区切り線にも適用。 |
-| `lane_center_gap_scale` | double: `0..2`; `0` | 16K 左右ブロックの中央間隔。 |
+| `lane_center_gap_scale` | double: `0..2`; `1` | 16K・14+2 DP の左右ブロックの中央間隔。ノートとロングノートは各ブロック内に描画します。 |
 | `hold_body_width_scale` | double: `0.50..1.20`; `1` | LN 本体の幅倍率。 |
 | `note_width_scales`, `note_height_scales`, `lane_center_gap_scales` | object: mode → number | 対応する共通値のモード別上書き。同じ範囲に制限。 |
 | `lane_divider_width_scales` | object: mode → number | 旧版互換。現在は共通 `lane_divider_width_scale` を使用。 |
-| `lane_colors` | object: mode → string[] | レーン数と同じ長さの色トークン配列。 |
+| `lane_colors` | object: mode → string[] | レーン数と同じ長さの色トークン配列。スクラッチの既定色は赤（`rose`）です。 |
 | `single_color` | string; `off` | 色トークンで全レーンを上書き。既存の `lane_colors` は保持。 |
 
 モード別配列・上書き: `4k`, `5k`, `6k`, `7k`, `7+1`, `8k`, `9k`, `10k`, `12k`, `14k`, `16k`。色トークン: `ice`, `azure`, `gold`, `mint`, `rose`, `violet`, `orange`, `teal`。`7+1` はスキンパレットであり独立したキーマップモードではありません。旧 `expand_notes_to_dividers=true` は間隔 0 として読み、明示的な `note_divider_gap_px` が優先します。
@@ -434,12 +434,15 @@ Xbox/XInputボタンは既存のキー名欄に保存します: `PadUp`, `PadDow
 - `modes`
   - `4k`, `5k`, `6k`, `7k`, `8k`, `9k`, `10k`, `12k`, `14k`, `16k`
   - 各 mode 内で lane id -> key token
+- `7+1`
+  - BMS 7+1 専用の `bindings` と任意の `secondary_bindings`。`lane1` がスクラッチ、`lane2`〜`lane8` が鍵盤 1〜7 です。
 
 ### Notes
 - 古い single-layout keymap は runtime で 10K map へ移行される。
-- runtime は最終的な chart lane count に応じて relevant mode binding を選ぶ。
+- **オプション → キー設定**と NKRO テストでは **7+1** と **8K** を個別に選べます。スクラッチが残る 7+1 BMS 譜面には 7+1 の割り当てを使います。通常の 8K 譜面と、スクラッチを除いて 8K に変換した譜面には 8K の割り当てを使います。
+- `7+1` がない既存プロファイルでは、現在の 8K の基本キーと補助キーを引き継ぎます。次回保存時に両方の配列を個別に保存します。旧バージョンで再保存すると新しい `7+1` 項目は失われます。
 - key rebinding は成功捕捉後すぐ `keymap.json` へ保存され、別の最終保存手順はない。
-- Song Select から keymap 編集を開いた場合、editor はまず選択譜面の lane count、次に `mode.key_mode`、最後に `10k` を使う。
+- オプションからキー設定を開くと 4K が選ばれます。譜面のコンテキストから開くと、選択譜面の元の配列が選ばれます。
 
 ## Runtime Migration Notes
 - 古い profile は一部値を自動補正される。
@@ -450,7 +453,7 @@ Xbox/XInputボタンは既存のキー名欄に保存します: `PadUp`, `PadDow
 
 新しいプロファイルの `audio.volume` は `0.1` です。保存済みの音量を維持します。`audio.mute_when_inactive` は既定で `false`。有効にすると別のウィンドウの使用中は出力のみミュートし、曲の進行を維持します。ASIO バッファサイズはチャンネル当たりのサンプルで表示します。
 
-キー設定は横並びの Key 1… です。基本キーと補助キーを指定でき、どちらかを押している間は押下状態が続きます。補助キーの × または入力待ち中の Delete で補助設定を解除します。`keymap.json` の任意の `secondary_modes` は既存のモード・レイン構造を使います。オプションの初期編集モードは 4K、譜面から開く場合は実際のキー数です。
+キー設定は横並びの Key 1… です。基本キーと補助キーを指定でき、どちらかを押している間は押下状態が続きます。補助キーの × または入力待ち中の Delete で補助設定を解除します。`keymap.json` の任意の `secondary_modes` は既存のモード・レイン構造を使います。
 
 `skin.key_backdrop_enabled` と `skin.key_backdrop_opacity` (0–1) はキー背景色を制御します。初回編集で `key_backdrop_override=true` を保存し、プロファイルの設定を優先します。ヒットの明るさは別設定です。判定ラインの太さはノート高さに比例します。難易度表の選択中は ALL SONG に表の譜面だけを表示し、Native LV で全譜面に戻ります。画面と BGA は実際の音声再生位置を使い、判定・音声予約の時刻は維持します。速度を変更するとクリック音が鳴ります。
 

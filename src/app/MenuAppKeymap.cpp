@@ -18,14 +18,16 @@ void MenuApp::open_keymap_screen(Screen return_screen) {
     }
     working_keymap_ = keymap_;
     std::optional<int> selected_chart_key_count;
+    std::string_view selected_chart_layout;
     if (return_screen == Screen::SongSelect) {
         if (const SongEntry* entry = (selected_song_ >= 0)
                                          ? visible_song_entry(static_cast<std::size_t>(selected_song_))
                                          : nullptr) {
             selected_chart_key_count = entry->key_count;
+            selected_chart_layout = entry->layout_label;
         }
     }
-    keymap_settings_controller_.reset(selected_chart_key_count, config_.mode.key_mode);
+    keymap_settings_controller_.reset(selected_chart_key_count, selected_chart_layout);
     static_cast<void>(keymap_settings_controller_.select(1));
     keymap_common_tab_ = false;
     keymap_mode_tabs_focused_ = false;
@@ -53,18 +55,20 @@ void MenuApp::populate_keymap_render_data(render::MenuRenderData& render) {
         return;
     }
     std::optional<int> selected_chart_key_count;
+    std::string_view selected_chart_layout;
     if (menu_navigator_.parent().value_or(Screen::Title) == Screen::SongSelect) {
         if (const SongEntry* entry = (selected_song_ >= 0)
                                          ? visible_song_entry(static_cast<std::size_t>(selected_song_))
                                          : nullptr) {
             selected_chart_key_count = entry->key_count;
+            selected_chart_layout = entry->layout_label;
         }
     }
     auto view = menu::settings::KeymapSettingsView::build(
         keymap_settings_controller_,
         working_keymap_,
         selected_chart_key_count,
-        config_.mode.key_mode,
+        selected_chart_layout,
         current_input_backend_status_label(),
         timing::HighResClock::now_ns(),
         ui_language());
@@ -110,6 +114,8 @@ void MenuApp::populate_keymap_confirm_render_data(render::MenuRenderData& render
 }
 
 void MenuApp::populate_keymap_test_render_data(render::MenuRenderData& render) {
+    render.generic.heading = ui_text("NKRO Test", "NKRO Test") + " / " +
+        key_mode_label(std::string(keymap_settings_controller_.edit_mode()));
     auto view = menu::settings::KeymapSettingsView::build_nkro_test(
         keymap_settings_controller_,
         working_keymap_,
@@ -305,7 +311,8 @@ void MenuApp::apply_keymap_capture(uint32_t keycode) {
     working_keymap_ = pending;
     keymap_ = pending;
     apply_keymap_settings_effects(keymap_settings_controller_.finish_capture(
-        ui_text("Saved ", "저장됨: ") + "Key " + lane.substr(4) +
+        ui_text("Saved ", "저장됨: ") + menu::settings::KeymapSettingsView::lane_label(
+            edit_mode, keymap_settings_controller_.selected_row(), ui_language()) +
             (secondary_slot ? ui_text(" secondary = ", " 보조 = ") : " = ") +
             (clear_secondary ? ui_text("Unassigned", "미할당") : key_name),
         timing::HighResClock::now_ns(), !clear_secondary));

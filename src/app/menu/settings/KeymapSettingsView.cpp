@@ -39,11 +39,20 @@ std::string binding_name(
 
 }  // namespace
 
+std::string KeymapSettingsView::lane_label(
+    std::string_view mode, int lane_number, ui::Language language) {
+    if (mode == "7+1") {
+        if (lane_number == 1) return localized(language, "Scratch", "스크래치");
+        --lane_number;
+    }
+    return "Key " + std::to_string(lane_number);
+}
+
 KeymapSettingsViewModel KeymapSettingsView::build(
     const KeymapSettingsController& controller,
     const config::Keymap& working_keymap,
     std::optional<int> selected_chart_key_count,
-    std::string_view runtime_key_mode,
+    std::string_view selected_chart_layout,
     std::string backend_status,
     std::int64_t now_ns,
     ui::Language language) {
@@ -61,7 +70,7 @@ KeymapSettingsViewModel KeymapSettingsView::build(
     view.footer_notes.push_back(std::move(backend_status));
     if (selected_chart_key_count.has_value()) {
         const std::string selected_mode = resolve_keymap_edit_mode_for_menu(
-            selected_chart_key_count, runtime_key_mode);
+            selected_chart_key_count, selected_chart_layout);
         if (selected_mode != controller.edit_mode()) {
             view.footer_notes.push_back(
                 localized(language, "Selected chart uses ", "선택한 차트 키 모드: ") +
@@ -94,7 +103,7 @@ KeymapSettingsViewModel KeymapSettingsView::build(
             static_cast<int>(index) + 1 == controller.selected_row())
             secondary_value += localized(language, " [waiting]", " [대기 중]");
         view.rows.push_back(KeymapViewRow{
-            "Key " + std::to_string(index + 1),
+            lane_label(controller.edit_mode(), static_cast<int>(index) + 1, language),
             std::move(value),
             static_cast<int>(index) + 1 == controller.selected_row(),
             std::nullopt,
@@ -133,8 +142,8 @@ KeymapSettingsViewModel KeymapSettingsView::build(
         "Click a primary or secondary key to bind. Left/Right selects its slot; Enter saves immediately.",
         "기본 키나 보조 키를 클릭해 할당하세요. 좌우로 항목을 고르고 Enter로 입력하면 즉시 저장됩니다."));
     view.footer_notes.push_back(localized(language,
-        "BMS original mode uses the chart's actual key count. Secondary keys work in every layout, including 5K.",
-        "BMS 원본 모드는 차트의 실제 키 수에 맞춥니다. 5K를 포함한 모든 모드에서 보조 키를 지정할 수 있습니다."));
+        "7+1 BMS charts use their own scratch and key bindings. Secondary keys work in every layout.",
+        "7+1 BMS 차트는 전용 스크래치·건반 배치를 사용합니다. 모든 모드에서 보조 키를 지정할 수 있습니다."));
     return view;
 }
 
@@ -153,11 +162,11 @@ KeymapSettingsViewModel KeymapSettingsView::build_nkro_test(
     view.rows.reserve(controller.lane_ids().size() + 1);
     view.footer_notes.push_back(localized(
         language,
-        "Left: fewer keys / Right: more keys (4K-16K). Hold multiple mapped keys to test simultaneous input. Saved bindings stay unchanged.",
-        "← 키 수 줄이기 / → 키 수 늘리기 (4K~16K). 표시된 키를 함께 눌러 동시 입력을 확인하세요. 저장된 키 배치는 유지됩니다."));
+        "Use Left/Right to switch layouts. Hold multiple mapped keys to test simultaneous input.",
+        "좌우 방향키로 키 배치를 바꿉니다. 표시된 키를 함께 눌러 동시 입력을 확인하세요."));
     view.footer_notes.push_back(std::move(backend_status));
 
-    std::size_t index = 0;
+    int lane_number = 0;
     for (const std::string& lane : controller.lane_ids()) {
         const std::string key_name = binding_name(bindings, lane, language);
         bool is_down = false;
@@ -169,7 +178,7 @@ KeymapSettingsViewModel KeymapSettingsView::build_nkro_test(
         if (const auto keycode = config::KeycodeMap::to_keycode(secondary_name))
             is_down = is_down || pressed_keys.find(*keycode) != pressed_keys.end();
         view.rows.push_back(KeymapViewRow{
-            "Key " + std::to_string(++index),
+            lane_label(controller.edit_mode(), ++lane_number, language),
             key_name + (is_down
                 ? localized(language, " [DOWN]", " [눌림]")
                 : ""),

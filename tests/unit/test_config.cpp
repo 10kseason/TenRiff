@@ -1746,6 +1746,28 @@ TEST_CASE("skin note shape normalization supports polygon choices") {
     CHECK(tenriff::config::normalize_skin_note_shape_token("star") == "rect");
 }
 
+TEST_CASE("scratch layouts use red defaults while plain 8K and 16K keep their key palettes") {
+    using namespace tenriff::config;
+    SkinConfig skin;
+    const int sp_scratch = 1;
+    const std::array<int, 2> dp_scratch{6, 14};
+    const auto sp = resolved_skin_lane_colors_for_layout(skin, 8, &sp_scratch, 1);
+    const auto dp = resolved_skin_lane_colors_for_layout(skin, 16, dp_scratch.data(), dp_scratch.size());
+    REQUIRE(sp.size() == 8u);
+    REQUIRE(dp.size() == 16u);
+    CHECK(sp.front() == "rose");
+    CHECK(dp[5] == "rose");
+    CHECK(dp[13] == "rose");
+    CHECK(dp[6] == default_skin_lane_colors("14k")[5]);
+    CHECK(resolved_skin_lane_colors_for_layout(skin, 8, nullptr, 0).front() == "ice");
+    CHECK(resolved_skin_lane_colors_for_layout(skin, 16, nullptr, 0)[5] == "gold");
+
+    skin.lane_colors["7+1"] = {"mint"};
+    CHECK(resolved_skin_lane_colors_for_layout(skin, 8, &sp_scratch, 1).front() == "mint");
+    skin.single_color = "teal";
+    CHECK(resolved_skin_lane_colors_for_layout(skin, 8, &sp_scratch, 1).front() == "teal");
+}
+
 TEST_CASE("10K skin colors map across 10+2 DP key lanes") {
     tenriff::config::SkinConfig skin;
     skin.lane_colors["10k"] = {

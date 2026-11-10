@@ -12,7 +12,7 @@ namespace tenriff::app {
 
 [[nodiscard]] std::string resolve_keymap_edit_mode_for_menu(
     std::optional<int> selected_chart_key_count,
-    std::string_view runtime_key_mode);
+    std::string_view selected_chart_layout = {});
 
 namespace menu::settings {
 
@@ -50,7 +50,7 @@ public:
 
     void reset(
         std::optional<int> selected_chart_key_count,
-        std::string_view runtime_key_mode);
+        std::string_view selected_chart_layout = {});
     [[nodiscard]] KeymapSettingsEffects handle(
         const MenuAction& action,
         std::int64_t now_ns);

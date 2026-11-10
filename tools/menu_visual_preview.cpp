@@ -70,11 +70,12 @@ struct MenuAppVisualTestAccess {
         app->session_mix_stage_offset_=stage_offset;
         app->populate_session_mix_render_data(source);
     }
-    static void populate_keymap(render::MenuRenderData& source, int keys, bool common, int selected) {
+    static void populate_keymap(render::MenuRenderData& source, int keys, std::string_view chart_layout,
+                                bool common, int selected) {
         auto app = std::make_unique<MenuApp>();
         app->config_.ui.language = ui::language_token(source.ui_language);
         app->keymap_ = app->working_keymap_ = config::KeymapManager{}.default_keymap();
-        app->keymap_settings_controller_.reset(keys, std::to_string(keys) + "k");
+        app->keymap_settings_controller_.reset(keys, chart_layout);
         static_cast<void>(app->keymap_settings_controller_.select(1));
         app->keymap_common_tab_ = common;
         app->settings_cursor_ = common ? std::clamp(selected, profile_setup::kInstantRestartKeyRow,
@@ -1937,12 +1938,13 @@ int main(int argc, char** argv) {
             edit_resolution, invalid_resolution, mode_mods_settings, judge_window,
             nk2_eplus ? preview_keys : 0);
     }
+    const std::string_view keymap_chart_layout = seven_plus_one ? "7+1 SP" : "";
     if (keymap_settings) {
         using namespace tenriff::app::menu::settings;
         tenriff::config::KeymapManager manager;
         auto working = manager.default_keymap();
         KeymapSettingsController controller;
-        controller.reset(preview_keys, std::to_string(preview_keys) + "k");
+        controller.reset(preview_keys, keymap_chart_layout);
         // A secondary assignment is synthetic; the view and input labels are real.
         if (!controller.lane_ids().empty())
             working.secondary_mode_bindings[std::string(controller.edit_mode())][controller.lane_ids().front()] = "Space";
@@ -1956,7 +1958,7 @@ int main(int argc, char** argv) {
         }
         auto view = keymap_test
             ? KeymapSettingsView::build_nkro_test(controller, working, pressed, preview_backend, data.ui_language)
-            : KeymapSettingsView::build(controller, working, preview_keys, std::to_string(preview_keys) + "k",
+            : KeymapSettingsView::build(controller, working, preview_keys, keymap_chart_layout,
                                         preview_backend, tenriff::timing::HighResClock::now_ns(), data.ui_language);
         data.kind = MenuScreenKind::GenericList;
         data.generic.heading = keymap_test ? "NKRO Test" : loc("Keymap", "키 설정");
@@ -1982,7 +1984,8 @@ int main(int argc, char** argv) {
 
     }
     if (keymap_settings && !keymap_test)
-        tenriff::app::MenuAppVisualTestAccess::populate_keymap(data, preview_keys, common_keys, selected_row);
+        tenriff::app::MenuAppVisualTestAccess::populate_keymap(
+            data, preview_keys, keymap_chart_layout, common_keys, selected_row);
     if (profile_settings) {
         tenriff::app::MenuAppVisualTestAccess::populate_profile(data, avatar_path, selected_row);
     }

@@ -9,14 +9,13 @@
 
 #include "doctest/doctest.h"
 
+#include "app/menu/settings/KeymapSettingsController.h"
 #include "config/KeycodeMap.h"
 #include "config/Keymap.h"
 #include "input/LaneBindingState.h"
 #include "gameplay/GameplayEngine.h"
 
 namespace tenriff::app {
-std::string resolve_keymap_edit_mode_for_menu(std::optional<int> selected_chart_key_count,
-                                              std::string_view runtime_key_mode);
 std::vector<uint32_t> build_menu_probe_keycodes(const std::vector<uint32_t>& fixed_menu_keys,
                                                 const config::Keymap& working_keymap,
                                                 std::string_view keymap_edit_mode,
@@ -75,10 +74,12 @@ TEST_CASE("default keymap exposes separate mode bindings from 4K through 16K") {
     CHECK(keymap.mode_bindings.count("4k") == 1u);
     CHECK(keymap.mode_bindings.count("5k") == 1u);
     CHECK(keymap.mode_bindings.count("7k") == 1u);
+    CHECK(keymap.mode_bindings.count("7+1") == 1u);
     CHECK(keymap.mode_bindings.count("8k") == 1u);
     CHECK(keymap.mode_bindings.count("10k") == 1u);
     CHECK(keymap.mode_bindings.count("16k") == 1u);
     CHECK(manager.lane_ids_for_mode("4k").size() == 4u);
+    CHECK(manager.lane_ids_for_mode("7+1").size() == 8u);
     CHECK(manager.lane_ids_for_mode("9k").size() == 9u);
     CHECK(manager.lane_ids_for_mode("16k").size() == 16u);
     CHECK(manager.bindings_for_mode(keymap, "4k").at("lane4") == "Semicolon");
@@ -150,14 +151,14 @@ TEST_CASE("keymap save and load preserve arrow-key bindings") {
     CHECK(manager.bindings_for_mode(result.keymap, "7k").at("lane3") == "Right");
 }
 
-TEST_CASE("keymap edit mode resolution prefers selected chart key count") {
-    CHECK(tenriff::app::resolve_keymap_edit_mode_for_menu(7, "4k") == "7k");
-    CHECK(tenriff::app::resolve_keymap_edit_mode_for_menu(8, "10k") == "8k");
-    CHECK(tenriff::app::resolve_keymap_edit_mode_for_menu(std::nullopt, "16k") == "4k");
-    CHECK(tenriff::app::resolve_keymap_edit_mode_for_menu(std::nullopt, "auto") == "4k");
-    CHECK(tenriff::app::resolve_keymap_edit_mode_for_menu(std::nullopt, "") == "4k");
-    CHECK(tenriff::app::resolve_keymap_edit_mode_for_menu(6, "none") == "6k");
-    CHECK(tenriff::app::resolve_keymap_edit_mode_for_menu(8, "none") == "8k");
+TEST_CASE("keymap editor selects the chart layout and distinguishes 7+1 from 8K") {
+    using tenriff::app::resolve_keymap_edit_mode_for_menu;
+    CHECK(resolve_keymap_edit_mode_for_menu(7) == "7k");
+    CHECK(resolve_keymap_edit_mode_for_menu(8, "8K") == "8k");
+    CHECK(resolve_keymap_edit_mode_for_menu(8, "7+1 SP") == "7+1");
+    CHECK(resolve_keymap_edit_mode_for_menu(std::nullopt) == "4k");
+    CHECK(resolve_keymap_edit_mode_for_menu(6) == "6k");
+    CHECK(resolve_keymap_edit_mode_for_menu(8) == "8k");
 }
 
 TEST_CASE("menu probe keycodes only include menu navigation outside keymap screens") {
@@ -355,6 +356,52 @@ TEST_CASE("secondary key bindings round trip for 5K and native BMS layouts witho
     CHECK(manager.secondary_bindings_for_mode(reset, "5k").empty());
     CHECK(manager.bindings_for_mode(reset, "5k").at("lane1") == "D");
     CHECK(manager.secondary_bindings_for_mode(reset, "6k").at("lane6") == "Space");
+}
+
+TEST_CASE("legacy 8K bindings seed separate 7+1 primary and secondary slots") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    const auto profile = temp.path.u8string();
+    write_file(temp.path / "keymap.json",
+               R"({"modes":{"8k":{"lane1":"Space","lane2":""}},)"
+               R"("secondary_modes":{"8k":{"lane1":"LShift"},"10k":{"lane1":"F12"}}})");
+
+    tenriff::config::KeymapManager manager;
+    auto legacy = manager.load_profile(profile);
+    REQUIRE(legacy.success());
+    CHECK_FALSE(legacy.rewritten());
+    auto& keymap = legacy.keymap;
+    const auto primary_8k = manager.bindings_for_mode(keymap, "8k");
+    const auto secondary_8k = manager.secondary_bindings_for_mode(keymap, "8k");
+    CHECK(primary_8k.at("lane1") == "Space");
+    CHECK(primary_8k.at("lane2").empty());
+    CHECK(secondary_8k.at("lane1") == "LShift");
+    CHECK(manager.bindings_for_mode(keymap, "7+1") == primary_8k);
+    CHECK(manager.secondary_bindings_for_mode(keymap, "7+1") == secondary_8k);
+
+    REQUIRE(manager.assign_binding(keymap, "7+1", "lane1", "Z", false));
+    REQUIRE(manager.assign_binding(keymap, "7+1", "lane1", "RShift", true));
+    REQUIRE(manager.save_profile(profile, keymap));
+    auto reloaded = manager.load_profile(profile);
+    REQUIRE(reloaded.success());
+    CHECK_FALSE(reloaded.rewritten());
+    CHECK(manager.bindings_for_mode(reloaded.keymap, "7+1").at("lane1") == "Z");
+    CHECK(manager.bindings_for_mode(reloaded.keymap, "7+1").at("lane2").empty());
+    CHECK(manager.secondary_bindings_for_mode(reloaded.keymap, "7+1").at("lane1") == "RShift");
+    CHECK(manager.bindings_for_mode(reloaded.keymap, "8k") == primary_8k);
+    CHECK(manager.secondary_bindings_for_mode(reloaded.keymap, "8k") == secondary_8k);
+    CHECK(manager.secondary_bindings_for_mode(reloaded.keymap, "10k").at("lane1") == "F12");
+
+    manager.reset_mode_bindings(reloaded.keymap, "7+1");
+    REQUIRE(manager.save_profile(profile, reloaded.keymap));
+    const auto reset = manager.load_profile(profile);
+    REQUIRE(reset.success());
+    CHECK(manager.bindings_for_mode(reset.keymap, "7+1") ==
+          manager.bindings_for_mode(manager.default_keymap(), "7+1"));
+    CHECK(manager.secondary_bindings_for_mode(reset.keymap, "7+1").empty());
+    CHECK(manager.bindings_for_mode(reset.keymap, "8k") == primary_8k);
+    CHECK(manager.secondary_bindings_for_mode(reset.keymap, "8k") == secondary_8k);
 }
 
 TEST_CASE("invalid optional secondary binding is removed instead of becoming a default key") {

@@ -1306,7 +1306,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.skin_preview.judgement_font_scale = config_.skin.judgement_font_scale;
     render.generic.skin_preview.gameplay_field_offset_x = config_.skin.gameplay_field_offset_x;
     config::KeymapManager preview_keymap_manager;
-    const auto preview_bindings = preview_keymap_manager.bindings_for_mode(keymap_, std::to_string(lane_count) + "k");
+    const auto preview_bindings = preview_keymap_manager.bindings_for_mode(keymap_, skin_edit_mode_);
     for (int lane = 0; lane < lane_count; ++lane) {
         const int source_lane = preview_layout.source_lane_for_visual(lane + 1);
         const auto binding = preview_bindings.find("lane" + std::to_string(source_lane));
