@@ -1,0 +1,2 @@
+# The synthetic LR2 database identifies these exact chart bytes by MD5.
+/tests/fixtures/lr2/import/charts/*.bms -text
