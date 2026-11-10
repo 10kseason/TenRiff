@@ -73,6 +73,40 @@ TEST_CASE("keymap controller resolves initial mode and owns dynamic lane selecti
     CHECK(*controller.selected_lane() == "lane7");
 }
 
+TEST_CASE("7+1 keymap and NKRO views distinguish the scratch from seven keys") {
+    tenriff::config::KeymapManager manager;
+    auto keymap = manager.default_keymap();
+    REQUIRE(manager.assign_binding(keymap, "7+1", "lane1", "Space", false));
+    REQUIRE(manager.assign_binding(keymap, "7+1", "lane1", "RShift", true));
+    KeymapSettingsController controller;
+    controller.reset(8, "7+1 SP");
+    const auto view = KeymapSettingsView::build(
+        controller, keymap, 8, "7+1 SP", "RawInput", 0, tenriff::ui::Language::English);
+    REQUIRE(view.rows.size() == 12);
+    CHECK(view.rows[0].value == "7+1");
+    CHECK(view.rows[1].label == "Scratch");
+    CHECK(view.rows[1].value == "Space");
+    CHECK(view.rows[1].secondary_value == "RShift");
+    CHECK(view.rows[2].label == "Key 1");
+    CHECK(view.rows[8].label == "Key 7");
+
+    const auto code = tenriff::config::KeycodeMap::to_keycode("RShift");
+    REQUIRE(code.has_value());
+    const auto scratch_test = KeymapSettingsView::build_nkro_test(
+        controller, keymap, {*code}, "RawInput", tenriff::ui::Language::English);
+    REQUIRE(scratch_test.rows.size() == 9);
+    CHECK(scratch_test.rows.front().label == "Scratch");
+    CHECK(scratch_test.rows.front().selected);
+    REQUIRE(controller.adjust_test_key_count(1).refresh_input_scope);
+    CHECK(controller.edit_mode() == "8k");
+    const auto eight_test = KeymapSettingsView::build_nkro_test(
+        controller, keymap, {*code}, "RawInput", tenriff::ui::Language::English);
+    REQUIRE(eight_test.rows.size() == 9);
+    CHECK(eight_test.rows.front().label == "Key 1");
+    CHECK(eight_test.rows.front().value == "W");
+    CHECK_FALSE(eight_test.rows.front().selected);
+}
+
 TEST_CASE("keymap mode cycling refreshes lanes and polling scope") {
     KeymapSettingsController controller;
     controller.reset(std::nullopt, "4k");

@@ -567,8 +567,8 @@ struct MenuAppVisualTestAccess {
     static void check_keymap_palette(MenuApp& app, Report& report) {
         const auto saved_skin = app.config_.skin;
         const auto saved_controller = app.keymap_settings_controller_;
-        for (const char* mode : {"4k", "5k", "7k", "8k", "10k", "16k"}) {
-            app.keymap_settings_controller_.reset(std::stoi(mode), mode);
+        for (const char* mode : {"4k", "5k", "7k", "7+1", "8k", "10k", "16k"}) {
+            static_cast<void>(app.keymap_settings_controller_.select_mode(mode));
             const auto count = app.keymap_settings_controller_.lane_ids().size();
             auto& palette = app.config_.skin.lane_colors[mode];
             palette.assign(count, "blue");
@@ -580,7 +580,7 @@ struct MenuAppVisualTestAccess {
                 render::MenuRenderData bindings, nkro;
                 app.populate_keymap_render_data(bindings);
                 app.populate_keymap_test_render_data(nkro);
-                bool valid = expected.size() == count && count == static_cast<std::size_t>(std::stoi(mode));
+                bool valid = expected.size() == count && count > 0;
                 for (std::size_t i = 0; i < count; ++i) {
                     const auto rgb = config::skin_color_rgb(expected[i]);
                     valid = valid && bindings.generic.rows[i + 1].key_color == rgb &&
@@ -860,10 +860,20 @@ struct MenuAppVisualTestAccess {
         std::string error;
         report.check("keymap.fixture_restored", manager.save_profile(app.profile_dir_, original, &error), error);
         app.keymap_ = app.working_keymap_ = original;
+        click(app, Kind::KeymapModeTab, 5);
+        report.check("keymap.native_7plus1_tab", app.keymap_settings_controller_.edit_mode() == "7+1" &&
+            app.snapshot_.render.generic.keymap_mode_tabs[5].label == "7+1" &&
+            app.snapshot_.render.generic.keymap_mode_tabs[5].selected &&
+            app.snapshot_.render.generic.rows.front().value == "7+1");
+        key(app, "Right");
+        report.check("keymap.native_8k_tab", app.keymap_settings_controller_.edit_mode() == "8k" &&
+            app.snapshot_.render.generic.keymap_mode_tabs[6].label == "8K" &&
+            app.snapshot_.render.generic.keymap_mode_tabs[6].selected &&
+            app.snapshot_.render.generic.rows.front().value == "8K");
         const auto original_ui = app.config_.ui;
         click(app, Kind::KeymapModeTab, 0);
         report.check("common.native_tab", app.keymap_common_tab_ &&
-            app.snapshot_.render.generic.keymap_mode_tabs.size() == 11 &&
+            app.snapshot_.render.generic.keymap_mode_tabs.size() == 12 &&
             !app.snapshot_.render.generic.keymap_keyboard);
         click(app, Kind::SettingsRow, profile_setup::kInstantRestartKeyRow);
         key(app, "D");
@@ -2731,6 +2741,18 @@ struct MenuAppFeedbackTestAccess {
         hit(1450);check(1451,true,50);check(1799,true,50);check(1800,false,50);
     }
 
+    static bool has_8_lane_keymap(const GameSession& session, bool scratch) {
+        const auto lane_for = [&](const char* key) {
+            const auto code = config::KeycodeMap::to_keycode(key).value();
+            const auto found = session.key_to_lane_.find(code);
+            return found == session.key_to_lane_.end() ? 0 : found->second;
+        };
+        return session.chart_.lane_count == 8 &&
+            session.chart_.scratch_lanes == (scratch ? std::vector<int>{1} : std::vector<int>{}) &&
+            lane_for("Z") == (scratch ? 1 : 0) && lane_for("X") == (scratch ? 1 : 0) &&
+            lane_for("A") == (scratch ? 0 : 1) && lane_for("S") == (scratch ? 0 : 1);
+    }
+
     static void check_gamepad_session(GameSession& session, Report& report) {
         const auto a = config::KeycodeMap::to_keycode("PadA").value();
         const auto lt = config::KeycodeMap::to_keycode("PadLT").value();
@@ -3467,6 +3489,45 @@ void separate_gamepad_flow(tenriff::app::CommandLineOptions options, Report& rep
     session->shutdown();
 }
 
+void separate_keymap_layout_flow(tenriff::app::CommandLineOptions options,
+                                 tenriff::config::RuntimeConfig config, Report& report) {
+    using namespace tenriff;
+    const std::filesystem::path fixture = "keymap-layout-fixture";
+    std::filesystem::create_directory(fixture);
+    write_silent_wave(fixture / "silence.wav");
+    for (const bool scratch : {true, false}) {
+        std::ofstream out(fixture / (scratch ? "scratch.bms" : "eight.bms"), std::ios::binary);
+        out << "#PLAYER 1\n#TITLE Keymap Layout\n#BPM 120\n#WAV01 silence.wav\n"
+            << (scratch ? "#7K\n" : "#8K\n")
+            << "#00111:01\n#00212:01\n#00313:01\n#00414:01\n"
+               "#00515:01\n#00616:01\n#00718:01\n#00819:01\n";
+        if (!out) throw std::runtime_error("Cannot write keymap layout fixture");
+    }
+    options.profile = "keymap-layout-smoke";
+    const std::string profile = "profiles/" + options.profile;
+    config::KeymapManager manager;
+    auto keymap = manager.default_keymap();
+    if (!manager.assign_binding(keymap, "7+1", "lane1", "Z", false) ||
+        !manager.assign_binding(keymap, "7+1", "lane1", "X", true) ||
+        !manager.assign_binding(keymap, "8k", "lane1", "A", false) ||
+        !manager.assign_binding(keymap, "8k", "lane1", "S", true) ||
+        !manager.save_profile(profile, keymap)) {
+        throw std::runtime_error("Cannot seed keymap layout fixture");
+    }
+    for (const std::string_view test : {"native_7plus1", "native_8k", "converted_8k"}) {
+        config.mode.key_mode = test == "converted_8k" ? "8k" : "none";
+        if (!config::ConfigLoader{}.save_profile(profile, config)) {
+            throw std::runtime_error("Cannot save keymap layout fixture");
+        }
+        options.chart_path = (fixture / (test == "native_8k" ? "eight.bms" : "scratch.bms")).u8string();
+        auto session = std::make_unique<app::GameSession>();
+        const bool ready = session->initialize(options);
+        report.check("keymap." + std::string(test) + ".gameplay_bindings", ready &&
+            app::MenuAppFeedbackTestAccess::has_8_lane_keymap(*session, test == "native_7plus1"));
+        session->shutdown();
+    }
+}
+
 void separate_timing_flow(tenriff::app::CommandLineOptions options, Report& report) {
     using namespace tenriff;
     using SessionAccess = app::MenuAppFeedbackTestAccess;
@@ -3816,6 +3877,7 @@ int wmain(int argc, wchar_t** argv) {
         separate_judge_flow(options, report);
         separate_delta_flow(options, report);
         separate_gamepad_flow(options, report);
+        separate_keymap_layout_flow(options, config, report);
         separate_timing_flow(options, report);
         report.check("sandbox.no_account_or_sites_connection",
             !std::filesystem::exists("config/sites-leaderboard.json") &&

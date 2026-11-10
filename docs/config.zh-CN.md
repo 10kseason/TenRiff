@@ -401,11 +401,11 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `lane_spacing_scales` | object: mode → number[]; `0..2` | 轨道间距数组，长度为 lane_count - 1。 |
 | `note_height_scale` | double: `0.50..4`; `1.8` | 音符头尾高度倍率。 |
 | `lane_divider_width_scale` | double: `0..2`; `1` | 所有模式共用的分隔线宽度倍率，也适用于导入的 LR2 分隔线。 |
-| `lane_center_gap_scale` | double: `0..2`; `0` | 16K 左右区域的中央间距。 |
+| `lane_center_gap_scale` | double: `0..2`; `1` | 16K 和 14+2 DP 左右区域的中央间距。单键音符和长按音符绘制在各自区域内。 |
 | `hold_body_width_scale` | double: `0.50..1.20`; `1` | 长条主体宽度倍率。 |
 | `note_width_scales`, `note_height_scales`, `lane_center_gap_scales` | object: mode → number | 对应共用值的各模式覆盖项，使用相同范围限制。 |
 | `lane_divider_width_scales` | object: mode → number | 旧版兼容字段；当前运行时使用共用 `lane_divider_width_scale`。 |
-| `lane_colors` | object: mode → string[] | 每轨一个颜色标记的数组。 |
+| `lane_colors` | object: mode → string[] | 每轨一个颜色标记的数组。转盘默认使用红色（`rose`）。 |
 | `single_color` | string; `off` | 选择颜色标记时覆盖所有轨道，同时保留原 `lane_colors`。 |
 
 各模式数组与覆盖项支持：`4k`, `5k`, `6k`, `7k`, `7+1`, `8k`, `9k`, `10k`, `12k`, `14k`, `16k`。颜色标记：`ice`, `azure`, `gold`, `mint`, `rose`, `violet`, `orange`, `teal`。`7+1` 是皮肤调色板而非独立键位模式。旧 `expand_notes_to_dividers=true` 将间距初始化为 0，显式 `note_divider_gap_px` 优先。
@@ -434,12 +434,15 @@ Xbox/XInput按钮使用现有按键名称字段：`PadUp`, `PadDown`, `PadLeft`,
 - `modes`
   - `4k`, `5k`, `6k`, `7k`, `8k`, `9k`, `10k`, `12k`, `14k`, `16k`
   - 每个 mode 下是 lane id -> key token
+- `7+1`
+  - BMS 7+1 专用的 `bindings` 和可选的 `secondary_bindings`。`lane1` 为转盘，`lane2` 至 `lane8` 为键 1 至键 7。
 
 ### 说明
 - 旧的单布局 keymap 会在运行时迁移到 10K map。
-- 运行时会根据最终谱面的 lane count 选择对应 mode 的 binding。
+- **选项 → 按键设置**和 NKRO 测试可以分别选择 **7+1** 和 **8K**。保留转盘的 7+1 BMS 谱面使用 7+1 绑定。普通 8K 谱面和移除转盘后转换为 8K 的谱面使用 8K 绑定。
+- 没有 `7+1` 项的旧配置会复制当前 8K 的主键和辅助键。下次保存时，两种布局会分别保存。用旧版本重新保存会丢失新的 `7+1` 项。
 - 成功完成按键捕获后会立即写入 `keymap.json`，不再需要单独的最终保存步骤。
-- 从 Song Select 打开 keymap 编辑时，会优先使用当前选中谱面的 lane count，其次回退到 `mode.key_mode`，最后才是 `10k`。
+- 从选项打开按键设置时默认编辑 4K。从谱面上下文打开时使用所选谱面的原始布局。
 
 ## 运行时迁移说明
 - stale profile 的部分值会被自动修正。
@@ -450,7 +453,7 @@ Xbox/XInput按钮使用现有按键名称字段：`PadUp`, `PadDown`, `PadLeft`,
 
 新配置的 `audio.volume` 默认为 `0.1`，已有音量不变。`audio.mute_when_inactive` 默认为 `false`；开启后在其他窗口激活时只静音输出，保留播放位置。ASIO 缓冲区大小显示为每声道采样数，内部 `frames_per_buffer` 名称兼容。
 
-按键设置采用横向 Key 1…，支持主键和辅助键。任一按键按下即可保持逻辑按键状态；× 或绑定时 Delete 可清除辅助键。`keymap.json` 的可选 `secondary_modes` 使用既有模式/轨道结构。选项初次编辑为 4K，从谱面打开时使用实际键数。
+按键设置采用横向 Key 1…，支持主键和辅助键。任一按键按下即可保持逻辑按键状态；× 或绑定时 Delete 可清除辅助键。`keymap.json` 的可选 `secondary_modes` 使用既有模式/轨道结构。
 
 `skin.key_backdrop_enabled` 和 `skin.key_backdrop_opacity` (0–1) 控制按键背景色，与击打特效亮度分开。首次修改保存 `key_backdrop_override=true` 并优先使用用户配置。判定线粗细随音符高度变化。选择难度表时 ALL SONG 只显示表内谱面，Native LV 恢复所有谱面。画面和 BGA 使用实际音频播放位置，判定和音频调度保持原时钟。速度发生变化时播放短点击声。
 

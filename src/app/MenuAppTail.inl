@@ -455,8 +455,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.key_labels.fill(std::string{});
     if (target.key_label_position != "off" || target.key_overlay_enabled) {
         config::KeymapManager keymap_manager;
-        const std::string keymap_mode = std::to_string(target.lane_count) + "k";
-        const auto bindings = keymap_manager.bindings_for_mode(keymap_, keymap_mode);
+        const auto bindings = keymap_manager.bindings_for_mode(keymap_, skin_mode);
         target.key_label_count = static_cast<std::size_t>(target.lane_count);
         for (std::size_t i = 0; i < target.key_label_count && i < target.key_labels.size(); ++i) {
             const int source_lane = lane_layout.source_lane_for_visual(static_cast<int>(i) + 1);

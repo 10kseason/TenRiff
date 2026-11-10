@@ -66,7 +66,10 @@ struct MenuAppSkinPreviewTestAccess {
         menu->reset_screen(MenuApp::Screen::OptionsHub);
         menu->open_keymap_screen(MenuApp::Screen::OptionsHub);
         menu->publish_snapshot();
-        REQUIRE(menu->snapshot_.render.generic.keymap_mode_tabs.size() == 11);
+        const auto& tabs = menu->snapshot_.render.generic.keymap_mode_tabs;
+        REQUIRE(tabs.size() == 12);
+        CHECK(tabs[5].label == "7+1");
+        CHECK(tabs[6].label == "8K");
         CHECK(menu->keymap_settings_controller_.selected_row() == 1);
         const auto modes = config::KeymapManager{}.supported_mode_tokens();
         const auto before = menu->keymap_.mode_bindings;
@@ -238,11 +241,27 @@ struct MenuAppSkinPreviewTestAccess {
 
     static void check_overhaul() {
         auto menu = fixture();
+        const config::KeymapManager keymap_manager;
+        menu->keymap_ = keymap_manager.default_keymap();
+        REQUIRE(keymap_manager.assign_binding(menu->keymap_, "7+1", "lane1", "Z", false));
         for (const char* mode : {"5k", "7+1", "16k"}) {
             menu->skin_settings_controller_.reset(mode);
             menu->config_.skin.scratch_position = "right";
             menu->publish_snapshot();
             const int count = menu->snapshot_.render.generic.skin_preview.lane_count;
+            if (std::string_view(mode) == "7+1") {
+                const auto& preview = menu->snapshot_.render.generic.skin_preview;
+                CHECK(preview.lane_colors[7] == config::skin_color_rgb("rose"));
+                CHECK(preview.key_labels[7] == "Z");
+
+                menu->gameplay_hud_.lane_count = 8;
+                menu->gameplay_hud_.scratch_lane_count = 1;
+                menu->gameplay_hud_.scratch_lanes[0] = 1;
+                auto hud = std::make_unique<render::GameplayHudData>();
+                menu->populate_gameplay_render_data(*hud);
+                CHECK(hud->lane_colors[7] == preview.lane_colors[7]);
+                CHECK(hud->key_labels[7] == preview.key_labels[7]);
+            }
             if (std::string(mode) == "5k") {
                 CHECK(menu->snapshot_.render.generic.skin_preview.lane_colors[2] == 0xF6F8FFu);
             }

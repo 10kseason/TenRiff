@@ -1,3 +1,5 @@
+> **2026-11-11 · 1.9.9.9-final6** 7+1 と 8K のキー設定を分け、スクラッチの既定色を赤にしました。14+2 DP と 16K のノートは左右それぞれのブロック内に描画します。 [日本語](release-1.9.9.9-final6.ja.md)
+
 > **2026-11-10 · 1.9.9.9-final5:** LR2 記録の取り込みでハッシュ計算と譜面探索を軽量化し、元の RANK がない場合や範囲外の場合の誤った EX 認定を修正しました。Andro の空の末尾小節により BPM が 1 になる問題も修正しました。固定ベースラインは final4 のままです。 [Release](release-1.9.9.9-final5.ja.md). Earlier notices below are historical.
 
 > **2026-11-10 · 1.9.9.9-final4:** LR2 スコア DB のクリアランプを表示専用で取り込む `tenriff-lr2-import` を追加しました。LR2 の判定順を最悪ケースで EX-HARD ゲージに通し、生存したプレイのみ EX と表示します。オーディオコールバックと HUD スレッドが共有するロックに予防措置を入れました。固定ベースラインを **1.9.9.9-final4** に上げます。 [Release](release-1.9.9.9-final4.ja.md). Earlier candidate/release notices below are historical.

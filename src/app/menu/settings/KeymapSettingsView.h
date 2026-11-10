@@ -29,11 +29,14 @@ struct KeymapSettingsViewModel {
 
 class KeymapSettingsView {
 public:
+    [[nodiscard]] static std::string lane_label(
+        std::string_view mode, int lane_number, ui::Language language);
+
     [[nodiscard]] static KeymapSettingsViewModel build(
         const KeymapSettingsController& controller,
         const config::Keymap& working_keymap,
         std::optional<int> selected_chart_key_count,
-        std::string_view runtime_key_mode,
+        std::string_view selected_chart_layout,
         std::string backend_status,
         std::int64_t now_ns,
         ui::Language language);

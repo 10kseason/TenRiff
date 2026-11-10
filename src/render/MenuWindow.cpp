@@ -809,7 +809,7 @@ GameplayFieldLayout build_gameplay_field_layout(float bounds_left,
     layout.lane_count = clamped_lane_count;
     layout.center_gap = center_gap_only;
     layout.center_gap_scale = center_gap_scale;
-    layout.split_after_lane = (use_center_gap && center_gap_only > 0.0f) ? 8 : 0;
+    layout.split_after_lane = (use_center_gap && gap_units[7] > 0.0f) ? 8 : 0;
     float cursor = layout.left;
     float total_lane_width = 0.0f;
     float total_note_width = 0.0f;
@@ -818,9 +818,10 @@ GameplayFieldLayout build_gameplay_field_layout(float bounds_left,
         const float lane_width_px = unit_width * lane_units[index];
         layout.lane_lefts[index] = cursor;
         layout.lane_widths[index] = lane_width_px;
-        // The divider line sits at the middle of the gap on either side. Take the
-        // wider neighbouring gap so the note stays centred on its lane and every
-        // lane ends up the same width.
+        // Ordinary spacing reaches to its divider. The split between the two
+        // key blocks is outside the note slots on both sides.
+        const bool at_split = layout.split_after_lane > 0 &&
+            (lane == layout.split_after_lane - 1 || lane == layout.split_after_lane);
         const float gap_before = lane > 0 ? gap_units[static_cast<std::size_t>(lane - 1)] : 0.0f;
         const float gap_after = (lane + 1 < clamped_lane_count) ? gap_units[index] : 0.0f;
         layout.note_widths[index] = compute_gameplay_note_draw_width(
@@ -828,7 +829,8 @@ GameplayFieldLayout build_gameplay_field_layout(float bounds_left,
             note_width_scale,
             note_art_width_ratio,
             note_divider_gap_px,
-            unit_width * std::max(gap_before, gap_after));
+            at_split ? 0.0f : unit_width * std::max(gap_before, gap_after));
+        if (at_split) layout.note_widths[index] = std::min(layout.note_widths[index], lane_width_px);
         total_lane_width += lane_width_px;
         total_note_width += layout.note_widths[index];
         cursor += lane_width_px;

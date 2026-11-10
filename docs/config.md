@@ -410,11 +410,11 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `lane_spacing_scales` | object: mode → number[]; `0..2` | 레인 사이 간격 배열. 길이는 lane_count - 1. |
 | `note_height_scale` | double: `0.50..4`; `1.8` | 노트 머리·꼬리 높이 배율. |
 | `lane_divider_width_scale` | double: `0..2`; `1` | 모든 키 모드 공용 구분선 폭. 가져온 LR2 구분선 폭에도 적용. |
-| `lane_center_gap_scale` | double: `0..2`; `0` | 16K 좌우 블록의 중앙 간격. |
+| `lane_center_gap_scale` | double: `0..2`; `1` | 16K·14+2 DP 좌우 블록의 중앙 간격. 노트와 롱노트는 각 블록 안에 그립니다. |
 | `hold_body_width_scale` | double: `0.50..1.20`; `1` | LN 몸통 폭 배율. |
 | `note_width_scales`, `note_height_scales`, `lane_center_gap_scales` | object: mode → number | 해당 공용 값의 키 모드별 override. 같은 범위로 제한. |
 | `lane_divider_width_scales` | object: mode → number | 레거시 호환 필드. 현재는 공용 lane_divider_width_scale 사용. |
-| `lane_colors` | object: mode → string[] | 레인 수 길이의 색상 토큰 배열. |
+| `lane_colors` | object: mode → string[] | 레인 수 길이의 색상 토큰 배열. 기본 스크래치 색은 빨강(`rose`)입니다. |
 | `single_color` | string; `off` | 색상 토큰을 선택하면 전체 레인에 적용. 기존 lane_colors는 보존. |
 
 모드별 배열·override 지원: `4k`부터 `16k`까지 모든 키 수와 `7+1`. 색상 토큰: `ice`, `azure`, `gold`, `mint`, `rose`, `violet`, `orange`, `teal`. 스킨 키 모드의 `7K` 다음 항목은 `7+1`이며, 바로 아래 스크래치 위치에서 좌우 표시 순서를 바꿉니다. `7+1`은 별도 키맵 모드가 아닙니다. 구버전 `expand_notes_to_dividers=true`는 여백 0으로 읽으며, 명시된 `note_divider_gap_px`가 우선합니다.
@@ -446,15 +446,18 @@ Xbox/XInput 버튼은 기존 키 이름 자리에 저장합니다: `PadUp`, `Pad
 - `modes`
   - `4k`, `5k`, `6k`, `7k`, `8k`, `9k`, `10k`, `12k`, `14k`, `16k`
   - 각 mode 아래 lane id -> key token
+- `7+1`
+  - BMS 7+1 전용 `bindings`와 선택 항목인 `secondary_bindings`. `lane1`은 스크래치, `lane2`~`lane8`은 건반 1~7입니다.
 
 ### Notes
 - old single-layout keymaps는 런타임에서 10K map으로 마이그레이션됩니다.
-- runtime은 최종 차트 lane count 기준으로 해당 mode binding을 선택합니다.
+- **옵션 → 키 설정**과 NKRO 테스트에서 **7+1**과 **8K**를 각각 선택합니다. 플레이에서는 스크래치가 있는 7+1 BMS에 7+1 배치가 적용됩니다. 스크래치를 제거해 8K로 변환한 차트와 일반 8K 차트는 8K 배치를 사용합니다.
+- 기존 키맵에 `7+1` 항목이 없으면 현재 8K 기본·보조 키를 가져옵니다. 이후 키 설정을 저장하면 두 배치가 따로 저장됩니다. 구버전에서 키맵을 다시 저장하면 새 `7+1` 항목은 빠집니다.
 - key rebinding은 성공 즉시 `keymap.json`에 저장되고 별도의 최종 저장 단계를 요구하지 않습니다.
 - 저장 성공 후 같은 기본/보조 슬롯의 다음 키 입력을 바로 기다립니다. 마지막 키에서 종료하며 눌러 둔 키의 반복 입력은 무시합니다. 저장 실패·시간 초과·취소·보조 키 해제는 다음 키로 진행하지 않습니다.
 - 같은 모드에서는 하나의 물리 키를 기본·보조 슬롯 중 한 곳에만 새로 지정합니다. 이미 지정된 키를 입력하면 이전 슬롯은 미할당으로 비우고 선택한 슬롯으로 옮깁니다. 다른 키 모드는 바꾸지 않습니다.
 - 기본 키의 명시적인 빈 문자열은 미할당으로 저장·복원합니다. 재할당으로 비운 슬롯이 재시작 후 기본 키로 돌아오지 않도록 하기 위한 동작입니다. 과거 파일의 빈 문자열도 미할당으로 취급하며, 누락한 항목이나 잘못된 비어 있지 않은 키 이름은 기존처럼 기본값을 사용합니다. `Reset`으로 해당 모드의 기본 배치를 복원할 수 있습니다.
-- Song Select에서 키맵 편집을 열면 현재 선택된 차트의 lane count를 우선 사용하고, 그 다음 `mode.key_mode`, 마지막으로 `10k`를 기본 편집 대상으로 삼습니다.
+- 옵션에서 키 설정을 처음 열면 4K를 편집합니다. 차트 문맥에서 열면 선택한 차트의 원본 키 배치를 편집합니다.
 
 ## Runtime Migration Notes
 - stale profile은 일부 값이 자동 교정됩니다.
@@ -465,7 +468,7 @@ Xbox/XInput 버튼은 기존 키 이름 자리에 저장합니다: `PadUp`, `Pad
 
 새 프로필의 `audio.volume` 기본값은 `0.1`입니다. 기존에 저장한 값은 유지합니다. `audio.mute_when_inactive` 기본값은 `false`이며, 켜면 다른 창이 활성화된 동안 출력만 음소거합니다. 곡 진행과 저장 음량은 유지합니다. ASIO 버퍼 사이즈는 채널당 **샘플** 단위로 표시합니다. 내부 API의 `frames_per_buffer` 이름은 유지합니다.
 
-키 설정은 가로 건반의 `Key 1`, `Key 2` 방식이며 기본·보조 입력을 각각 지정합니다. `keymap.json`의 선택적 `secondary_modes`는 기존 `modes`와 같은 모드/레인 구조입니다. 두 키 중 하나가 눌려 있으면 해당 키는 계속 눌린 상태로 처리합니다. 보조 키의 × 또는 입력 대기 중 Delete로 보조 지정만 해제합니다. 옵션에서 처음 열면 키·스킨 편집 모드는 4K입니다. 곡에서 키 설정을 열면 실제 차트 키 수를 사용합니다.
+키 설정은 가로 건반의 `Key 1`, `Key 2` 방식이며 기본·보조 입력을 각각 지정합니다. `keymap.json`의 선택적 `secondary_modes`는 기존 `modes`와 같은 모드/레인 구조입니다. 두 키 중 하나가 눌려 있으면 해당 키는 계속 눌린 상태로 처리합니다. 보조 키의 × 또는 입력 대기 중 Delete로 보조 지정만 해제합니다. 옵션에서 스킨 편집을 처음 열면 4K입니다.
 
 `skin.key_backdrop_enabled`와 `skin.key_backdrop_opacity`(0–1)는 키를 누를 때 깔리는 색을 제어합니다. 타격 효과 밝기는 기존 `key_pulse_brightness`입니다. 최초 변경 전에는 스킨 기본값을 사용하고, 사용자가 변경하면 `key_backdrop_override=true`로 프로필 값이 우선합니다. 판정선 두께는 노트 높이에 비례합니다.
 

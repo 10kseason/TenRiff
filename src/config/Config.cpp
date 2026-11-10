@@ -67,6 +67,8 @@ int lane_count_for_skin_mode_token(std::string_view key_mode) {
     return 10;
 }
 
+constexpr char kDefaultScratchLaneColor[] = "rose";
+
 const std::unordered_map<std::string, std::vector<std::string>>& default_skin_lane_color_map() {
     static const std::unordered_map<std::string, std::vector<std::string>> kDefaults = {
         {"4k", {"ice", "azure", "azure", "ice"}},
@@ -77,7 +79,7 @@ const std::unordered_map<std::string, std::vector<std::string>>& default_skin_la
         {"5k", {"ice", "azure", "ice", "azure", "ice"}},
         {"6k", {"ice", "azure", "ice", "ice", "azure", "ice"}},
         {"7k", {"ice", "azure", "ice", "gold", "ice", "azure", "ice"}},
-        {"7+1", {"ice", "ice", "azure", "ice", "gold", "ice", "azure", "ice"}},
+        {"7+1", {kDefaultScratchLaneColor, "ice", "azure", "ice", "gold", "ice", "azure", "ice"}},
         {"8k", {"ice", "azure", "ice", "teal", "teal", "ice", "azure", "ice"}},
         {"9k", {"ice", "azure", "ice", "teal", "gold", "teal", "ice", "azure", "ice"}},
         {"10k", {"ice", "azure", "ice", "azure", "ice", "ice", "azure", "ice", "azure", "ice"}},
@@ -2161,9 +2163,15 @@ std::vector<std::string> resolved_skin_lane_colors_for_layout(
 
     resolved.resize(static_cast<std::size_t>(clamped_lane_count), "ice");
     const std::vector<std::string> key_colors = resolved_skin_lane_colors(skin, key_mode);
+    const auto& default_layout_colors = default_skin_lane_color_map().at(layout_mode);
+    const bool use_lane_palette = normalize_skin_single_color_token(skin.single_color) == "off";
     std::size_t key_index = 0;
     for (std::size_t lane = 0; lane < resolved.size(); ++lane) {
         if (scratch_mask[lane]) {
+            // The ordinary key palette supplies overrides for these scratch slots.
+            if (use_lane_palette && resolved[lane] == default_layout_colors[lane]) {
+                resolved[lane] = kDefaultScratchLaneColor;
+            }
             continue;
         }
         if (key_index < key_colors.size()) {

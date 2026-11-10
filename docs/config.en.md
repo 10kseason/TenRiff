@@ -399,11 +399,11 @@ These are profile `config.json` skin settings. For a skin package's `skin.json` 
 | `lane_spacing_scales` | object: mode → number[]; `0..2` | Lane-gap array with lane_count - 1 entries. |
 | `note_height_scale` | double: `0.50..4`; `1.8` | Note head/tail height scale. |
 | `lane_divider_width_scale` | double: `0..2`; `1` | Shared divider-width scale for all modes, including imported LR2 dividers. |
-| `lane_center_gap_scale` | double: `0..2`; `0` | Center gap between the two 16K blocks. |
+| `lane_center_gap_scale` | double: `0..2`; `1` | Center gap between the 16K or 14+2 DP blocks. Taps and holds stay inside their own block. |
 | `hold_body_width_scale` | double: `0.50..1.20`; `1` | LN-body width scale. |
 | `note_width_scales`, `note_height_scales`, `lane_center_gap_scales` | object: mode → number | Per-mode overrides of the corresponding scalar, with the same bounds. |
 | `lane_divider_width_scales` | object: mode → number | Legacy field; runtime uses the shared `lane_divider_width_scale`. |
-| `lane_colors` | object: mode → string[] | Color-token array with one entry per lane. |
+| `lane_colors` | object: mode → string[] | Color-token array with one entry per lane. The default scratch color is red (`rose`). |
 | `single_color` | string; `off` | A color token overrides all lanes while preserving `lane_colors`. |
 
 Per-mode arrays/overrides support `4k`, `5k`, `6k`, `7k`, `7+1`, `8k`, `9k`, `10k`, `12k`, `14k`, `16k`. Color tokens: `ice`, `azure`, `gold`, `mint`, `rose`, `violet`, `orange`, `teal`. `7+1` is a skin palette, not a separate keymap mode. Legacy `expand_notes_to_dividers=true` seeds a zero gap; explicit `note_divider_gap_px` takes precedence.
@@ -433,12 +433,15 @@ Xbox/XInput buttons use existing key-token fields: `PadUp`, `PadDown`, `PadLeft`
 - `modes`
   - `4k`, `5k`, `6k`, `7k`, `8k`, `9k`, `10k`, `12k`, `14k`, `16k`
   - lane id -> key token under each mode
+- `7+1`
+  - BMS 7+1 `bindings` and optional `secondary_bindings`. `lane1` is scratch and `lane2` through `lane8` are keys 1 through 7.
 
 ### Notes
 - Old single-layout keymaps are migrated into the 10K map at runtime.
-- Runtime selects the relevant mode binding based on the final chart lane count.
+- **Options → Keymap** and the NKRO test have separate **7+1** and **8K** layouts. Gameplay uses the 7+1 bindings for BMS charts that retain their 7+1 scratch lane. Native 8K and scratch-free conversions to 8K use the 8K bindings.
+- Profiles without a `7+1` section start with a copy of the current 8K primary and secondary bindings. The next save stores both layouts separately. Re-saving in an older build drops the new `7+1` section.
 - Key rebinding is saved immediately to `keymap.json` after a successful capture; there is no separate final save step.
-- When opening keymap editing from Song Select, the editor should default to the selected chart's lane count first, then fall back to `mode.key_mode`, then `10k`.
+- The keymap editor opens at 4K from Options and uses the selected chart's native layout when opened in a chart context.
 
 ## Runtime Migration Notes
 - Stale profiles are automatically corrected for some values.

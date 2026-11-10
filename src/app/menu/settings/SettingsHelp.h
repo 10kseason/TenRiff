@@ -234,9 +234,9 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Adjust input, visual and sound offsets separately. Start at 0 ms and change one setting at a time.", "입력·화면·소리 시점을 따로 보정합니다. 0ms에서 시작해 한 항목씩 조절하세요.", "入力・表示・音声を個別に補正します。0 msから一つずつ調整してください。"},
         {"Set language, text size, nickname, profile image and songs folder.", "언어, 글자 크기, 닉네임, 프로필 사진, 곡 폴더를 설정합니다.", "言語、文字サイズ、名前、画像、曲フォルダーを設定します。"},
         {"Change judgement windows and note patterns. Check the score multiplier when enabling a modifier.", "판정 범위와 노트 패턴을 바꿉니다. 모드를 켤 때 점수 배율도 확인하세요.", "判定幅とノート配置を変えます。MODを有効にするときはスコア倍率も確認してください。"},
-        {"Hold several keys to check simultaneous input. Left tests fewer keys; Right tests more (4K to 16K).",
-         "여러 키를 함께 눌러 동시 입력을 확인합니다. 테스트에서 ←는 키 수 줄이기, →는 늘리기입니다 (4K~16K).",
-         "複数キーの同時入力を確認します。テスト中は左でキー数を減らし、右で増やせます（4K～16K）。"},
+        {"Hold several keys to check simultaneous input. Use Left/Right to switch layouts.",
+         "여러 키를 함께 눌러 동시 입력을 확인합니다. 좌우 방향키로 테스트할 키 배치를 고릅니다.",
+         "複数キーの同時入力を確認します。左右キーでテストする配列を切り替えます。"},
     };
     const SettingsHelpText* entries = nullptr;
     std::size_t count = 0;

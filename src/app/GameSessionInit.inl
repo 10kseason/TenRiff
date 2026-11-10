@@ -895,8 +895,11 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     build_autoplay_events();
     key_to_lane_.clear();
     config::KeymapManager keymap_manager_runtime;
-    const std::string active_key_mode =
-        keymap_manager_runtime.normalize_mode_token(std::to_string(std::max(1, chart_.lane_count)) + "k");
+    // Use the final chart layout so scratch-free conversions get ordinary key bindings.
+    const bool seven_plus_one = chart_.lane_count == 8 && chart_.scratch_lanes.size() == 1;
+    const std::string active_key_mode = seven_plus_one
+        ? "7+1"
+        : keymap_manager_runtime.normalize_mode_token(std::to_string(std::max(1, chart_.lane_count)) + "k");
     for (const auto& [lane, key] : keymap_manager_runtime.bindings_for_mode(keymap_, active_key_mode)) {
         auto lane_index = parse_lane_index(lane);
         if (!lane_index.has_value() || *lane_index > chart_.lane_count) {

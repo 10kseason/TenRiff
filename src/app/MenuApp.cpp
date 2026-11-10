@@ -1286,7 +1286,7 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     key_minus_ = config::KeycodeMap::to_keycode("Minus").value_or(0);
     key_plus_ = config::KeycodeMap::to_keycode("Plus").value_or(0);
 
-    keymap_settings_controller_.reset(std::nullopt, config_.mode.key_mode);
+    keymap_settings_controller_.reset(std::nullopt);
 
     std::string initial_song_source = songs_path_;
     if (!config_.ui.active_song_source.empty()) {
