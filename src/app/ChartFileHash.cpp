@@ -315,7 +315,8 @@ ChartFileHashes hash_chart_bytes(std::string_view bytes) {
     return {to_hex(md5.finish()), to_hex(sha256.finish()), bytes.size()};
 }
 
-ChartFileHashes hash_chart_file(const std::filesystem::path& path, std::string* error) {
+static ChartFileHashes hash_chart_file_impl(const std::filesystem::path& path, std::string* error,
+                                            bool include_sha256) {
     if (error) {
         error->clear();
     }
@@ -347,7 +348,7 @@ ChartFileHashes hash_chart_file(const std::filesystem::path& path, std::string* 
         }
         const auto* bytes = reinterpret_cast<const std::uint8_t*>(buffer.data());
         md5.update(bytes, static_cast<std::size_t>(count));
-        sha256.update(bytes, static_cast<std::size_t>(count));
+        if (include_sha256) sha256.update(bytes, static_cast<std::size_t>(count));
         total_size += chunk_size;
     }
     if (!stream.eof()) {
@@ -357,9 +358,17 @@ ChartFileHashes hash_chart_file(const std::filesystem::path& path, std::string* 
 
     ChartFileHashes result;
     result.md5 = to_hex(md5.finish());
-    result.sha256 = to_hex(sha256.finish());
+    if (include_sha256) result.sha256 = to_hex(sha256.finish());
     result.size = total_size;
     return result;
+}
+
+ChartFileHashes hash_chart_file(const std::filesystem::path& path, std::string* error) {
+    return hash_chart_file_impl(path, error, true);
+}
+
+std::string md5_chart_file(const std::filesystem::path& path) {
+    return hash_chart_file_impl(path, nullptr, false).md5;
 }
 
 ChartFileHashes hash_chart_file_utf8(std::string_view path, std::string* error) {

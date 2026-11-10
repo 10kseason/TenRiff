@@ -2,6 +2,8 @@
 
 Imports clear lamps from an LR2 score database into a TenRiff profile and shows them in Song Select. Display only: an imported lamp is never a TenRiff result, a BEST record or an upload candidate.
 
+EX checking reads chart notes, RANK, TOTAL, LN, mines and RANDOM metadata without resolving audio or background files. Import computes only the MD5 needed by LR2, avoids traversing overlapping folders twice, and stops once all target charts are found. Lamp mapping and conservative EX criteria are unchanged. Missing charts still require searching the remaining folders, so large libraries can take time. Import also fixes the old EASY fallback that could award EX when the authored RANK was absent or outside 0–3; those charts retain only their base LR2 lamp.
+
 ## Usage
 
 ### Import in game

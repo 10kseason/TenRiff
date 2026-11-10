@@ -10,11 +10,54 @@
 #include "app/Lr2ClearImport.h"
 #include "app/Lr2ScoreDb.h"
 #include "app/Lr2ImportJob.h"
+#include "app/ChartFileHash.h"
 #include "util/Utf8Compat.h"
 
 using namespace tenriff;
 using app::Lr2ExVerdict;
 using app::Lr2Judgement;
+
+TEST_CASE("LR2 import skips media lookup with identical conservative EX results") {
+    const auto fixture = std::filesystem::u8path(TENRIFF_SOURCE_DIR) / "tests/fixtures/lr2/import";
+    const auto db = app::read_lr2_score_db(fixture / "score.db");
+    REQUIRE(db.success());
+    REQUIRE(db.rows.size() == 9);
+    const auto result = app::prepare_lr2_import(fixture / "score.db",
+        {fixture / "charts", fixture / "missing-after-all-matches"});
+    REQUIRE(result.success());
+    CHECK(result.lamps.size() == 9);
+    CHECK(result.scanned == 9);
+    CHECK(result.skipped_folders == 0);
+    for (const auto& file : std::filesystem::directory_iterator(fixture / "charts")) {
+        const auto hash = app::hash_chart_file(file.path()).md5;
+        CHECK(app::md5_chart_file(file.path()) == hash);
+        const auto row = std::find_if(db.rows.begin(), db.rows.end(),
+            [&](const auto& value) { return value.hash == hash; });
+        REQUIRE(row != db.rows.end());
+        if (row == db.rows.end()) continue;
+        const auto loaded = app::ChartLoader{}.load(file.path().u8string(), 44100, 1.0);
+        app::Lr2ExEvaluation evaluation;
+        if (loaded.success()) evaluation = app::evaluate_lr2_ex_worst_case(*row, loaded.chart, loaded.format);
+        else evaluation.reason = "chart_load_failed";
+        auto expected = *app::lr2_base_lamp(*row);
+        app::apply_lr2_ex_evaluation(expected, evaluation);
+        const auto& actual = result.lamps.at(hash);
+        if (file.path().stem() == "rank" || file.path().stem() == "rank_missing") {
+            // The old full loader incorrectly inferred EASY and proved EX.
+            CHECK(expected.ex_proven);
+            CHECK_FALSE(actual.ex_proven);
+            CHECK(actual.ex_note == "rank_unsupported");
+            CHECK(actual.clear_status == "HARD CLEAR");
+            continue;
+        }
+        CHECK(actual.ex_note == expected.ex_note);
+        CHECK(actual.clear_status == expected.clear_status);
+        CHECK(actual.ex_proven == expected.ex_proven);
+        CHECK(actual.full_combo == expected.full_combo);
+        if (file.path().stem() == "proven") CHECK(actual.ex_proven);
+        if (file.path().stem() == "failed") CHECK(actual.ex_note == "failed");
+    }
+}
 
 TEST_CASE("LR2 import job shares read-only conversion and atomically saves Unicode profiles") {
     namespace fs = std::filesystem;
@@ -54,6 +97,21 @@ TEST_CASE("LR2 import job shares read-only conversion and atomically saves Unico
     const auto warning = app::prepare_lr2_import(input, {profile / "missing-songs"});
     CHECK(warning.success());
     CHECK(warning.skipped_folders == 1);
+    const auto songs = profile / "songs";
+    fs::create_directories(songs / "child");
+    std::ofstream(songs / "other.bms") << "#BPM 120\n#00111:01\n";
+    std::ofstream(songs / "child/other.bms") << "#BPM 165\n#00111:01\n";
+    // The score fixture has no matching chart hashes, so both roots must be
+    // fully searched. Overlapping roots must not re-hash either chart.
+    for (const auto& roots : {std::vector<fs::path>{songs, songs / "child", songs / "."},
+                              std::vector<fs::path>{songs / "child", songs}}) {
+        const auto overlap = app::prepare_lr2_import(input, roots);
+        CHECK(overlap.success());
+        CHECK(overlap.scanned == 2);
+        CHECK(app::serialize_lr2_imported_lamps(overlap.lamps) ==
+              app::serialize_lr2_imported_lamps(result.lamps));
+    }
+    CHECK(app::md5_chart_file(songs / "absent.bms").empty());
     // A blocked destination must not leave a temporary file or touch its contents.
     const auto blocked = profile / "blocked";
     fs::create_directories(blocked / "lr2_import.json");

@@ -21,6 +21,8 @@ struct ChartFileHashes {
 
 [[nodiscard]] ChartFileHashes hash_chart_file(const std::filesystem::path& path,
                                               std::string* error = nullptr);
+// LR2 identifies charts only by MD5; avoid computing an unused SHA-256.
+[[nodiscard]] std::string md5_chart_file(const std::filesystem::path& path);
 [[nodiscard]] ChartFileHashes hash_chart_file_utf8(std::string_view path,
                                                    std::string* error = nullptr);
 // Exact bytes, including embedded NULs; used for an already bounded chart read.

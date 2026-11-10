@@ -1,3 +1,10 @@
+# 1.9.9.9-final5 — 2026-11-10
+
+- Reduce LR2 import work: MD5 only, no media lookup, overlapping-root deduplication and stop after all matches. A 512-record / 15,569-chart local synthetic benchmark fell from 91.139s to 9.852s with identical results for that sample.
+- Reject EX when the authored RANK is missing or outside 0–3, instead of accepting gameplay's EASY fallback. Base LR2 lamps and atomic/cancellable display-only saving remain intact.
+- Exclude empty trailing measure padding from reference BPM, fixing Andro's displayed 1 BPM to 165. Preserve note schedules, duration and historical replay timing; refresh derived index metadata through cache v22.
+- No judgement, gauge, record/upload policy, website deployment or fixed-baseline change. The baseline remains final4. [Details](docs/release-1.9.9.9-final5.en.md) · [Release gates](docs/release-1.9.9.9-final5-gate.md).
+
 # 1.9.9.9-final4 — 2026-11-10
 
 - Add Options → Profile → Import LR2 Records: a native DB picker, cancellable background import and immediate lamp refresh. Menu and CLI share conversion and atomic saving; failed/cancelled imports keep the previous lamps.

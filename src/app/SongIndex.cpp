@@ -39,9 +39,9 @@ namespace tenriff::app {
 
 namespace {
 
-// v20 reserves a scratch lane on scratch-free SP charts. Rebuild these derived
-// caches once so library key counts agree with new native play; retain records.
-constexpr int kSongIndexVersion = 21;
+// v21 can weight empty trailing measures as the reference BPM. Rebuild only
+// derived metadata once so existing libraries receive the corrected display.
+constexpr int kSongIndexVersion = 22;
 constexpr std::uintmax_t kMaxMetadataChartFileBytes = 8u * 1024u * 1024u;
 
 bool cancel_requested(const SongIndexCancelCallback& cancel) {

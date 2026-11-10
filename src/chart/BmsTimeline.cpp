@@ -238,7 +238,12 @@ BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart, int
                         "Cannot determine chart duration because BPM is not positive.");
         } else {
             double delta_time_seconds = seconds_from_position_delta(remaining, current_bpm);
-            record_running_time(current_bpm, delta_time_seconds);
+            // Editors can leave hundreds of empty length-only measures after
+            // an outro tempo (e.g. 0.99 BPM). They must not dominate Hi-Speed.
+            // Scheduling still includes them, preserving historical replays.
+            const double reference_end = chart.reference_end_position.value_or(chart_end_position);
+            record_running_time(current_bpm, seconds_from_position_delta(
+                std::min(chart_end_position, reference_end) - current_position, current_bpm));
             const double segment_start_sample = current_time_samples;
             const double segment_start_position = current_visual_position;
             current_time_samples += delta_time_seconds * sample_rate;

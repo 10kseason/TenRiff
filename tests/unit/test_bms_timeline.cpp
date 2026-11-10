@@ -505,3 +505,48 @@ TEST_CASE("reference BPM has deterministic empty-chart and invalid-domain fallba
     CHECK_FALSE(invalid_bpm.success());
     CHECK(invalid_bpm.timeline.reference_bpm == 0.0);
 }
+
+TEST_CASE("reference BPM excludes empty editor padding without changing replay schedules") {
+    std::string text = "#BPM 165\n#BPM01 0.99\n#00011:01\n#00808:01\n#00811:01\n#00901:01\n";
+    for (int measure = 8; measure <= 999; ++measure) {
+        std::string number = std::to_string(measure);
+        number.insert(0, 3 - number.size(), '0');
+        text += "#" + number + "02:0.015625\n";
+    }
+    text += "#99901:0000\n";
+    for (bool index_parse : {false, true}) {
+        tenriff::chart::BmsParserOptions options;
+        options.retain_nonessential_commands = !index_parse;
+        options.retain_wav_bmp = !index_parse;
+        const auto parsed = tenriff::chart::BmsParser{}.parse(text, options);
+        REQUIRE(parsed.success());
+        CHECK(parsed.chart.last_measure_index == 999);
+        CHECK(parsed.chart.last_content_measure_index == 9);
+        const auto normalized = BmsChartNormalizer{}.normalize(parsed.chart);
+        REQUIRE(normalized.success());
+        auto historical = normalized.chart;
+        historical.reference_end_position.reset();
+        for (int version : {1, 2}) for (int rate : {1000, 44100, 48000, 96000}) {
+            const auto fixed = BmsTimelineBuilder{}.build(normalized.chart, rate, version);
+            const auto old = BmsTimelineBuilder{}.build(historical, rate, version);
+            REQUIRE(fixed.success());
+            REQUIRE(old.success());
+            CHECK(old.timeline.reference_bpm == doctest::Approx(0.99));
+            CHECK(fixed.timeline.reference_bpm == doctest::Approx(165.0));
+            CHECK(fixed.timeline.duration_samples == old.timeline.duration_samples);
+            CHECK(fixed.timeline.measure_samples == old.timeline.measure_samples);
+            REQUIRE(fixed.timeline.events.size() == old.timeline.events.size());
+            for (std::size_t i = 0; i < fixed.timeline.events.size(); ++i)
+                CHECK(fixed.timeline.events[i].time_samples == old.timeline.events[i].time_samples);
+            REQUIRE(fixed.timeline.scroll_segments.size() == old.timeline.scroll_segments.size());
+            for (std::size_t i = 0; i < fixed.timeline.scroll_segments.size(); ++i) {
+                const auto& a = fixed.timeline.scroll_segments[i];
+                const auto& b = old.timeline.scroll_segments[i];
+                CHECK(a.start_sample == b.start_sample);
+                CHECK(a.end_sample == b.end_sample);
+                CHECK(a.start_position == b.start_position);
+                CHECK(a.end_position == b.end_position);
+            }
+        }
+    }
+}
