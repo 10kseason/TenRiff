@@ -23,6 +23,8 @@
 
 #include "app/CommandLine.h"
 #include "app/BmsEditor.h"
+#include "app/Lr2ClearImport.h"
+#include "app/Lr2ImportJob.h"
 #include "app/BmsEditorPreview.h"
 #include "app/DifficultyTableLink.h"
 #include "app/GameplayHudRevisions.h"
@@ -562,6 +564,10 @@ private:
     [[nodiscard]] bool selected_song_is_in_collection(std::string_view name) const;
     [[nodiscard]] bool song_entry_matches_collection_filter(const SongEntry& entry) const;
     [[nodiscard]] BestResultRecord best_result_for_song_entry(const SongEntry& entry) const;
+    // Display-only LR2 lamp for this chart, or null when none was imported or
+    // a TenRiff record of the same or a better clear exists.
+    [[nodiscard]] const Lr2ImportedLamp* lr2_lamp_to_show(const SongEntry& entry,
+                                                          const BestResultRecord& best) const;
     [[nodiscard]] std::string current_named_song_collection() const;
     [[nodiscard]] std::string song_collection_filter_label() const;
     void cycle_song_collection_filter(int direction);
@@ -808,6 +814,13 @@ private:
     uint64_t song_index_revision_ = 0;
     std::vector<std::size_t> visible_song_indices_{};
     std::unordered_map<std::string, BestResultRecord> chart_best_results_{};
+    Lr2ImportedLamps lr2_imported_lamps_{};
+    std::future<Lr2ImportResult> lr2_import_future_{};
+    std::shared_ptr<std::atomic<bool>> lr2_import_cancel_;
+    std::string lr2_import_status_;
+    void choose_lr2_score_database();
+    void start_lr2_import(const std::string& database);
+    void service_lr2_import();
     // Rebuilt from eligible history; contains actual replay-backed score records.
     std::unordered_map<std::string, ScoreHighWaterRecord> chart_score_high_water_{};
     std::unordered_set<std::string> favorite_song_keys_{};

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.9.9.9 DESCRIPTION "TenRiff 1.9.9.9 final 3" LANGUAGES C CXX)
+project(TenRiff VERSION 1.9.9.9 DESCRIPTION "TenRiff 1.9.9.9 final 4" LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -205,6 +205,9 @@ add_library(tenriff_core
     src/app/ImportedGameplaySkin.cpp
     src/app/KeyNoteOverlay.cpp
     src/app/Lr2Course.cpp
+    src/app/Lr2ScoreDb.cpp
+    src/app/Lr2ClearImport.cpp
+    src/app/Lr2ImportJob.cpp
     src/app/Lr2Skin.cpp
     src/app/TenRiffSkin.cpp
     src/app/MenuRecordUtils.cpp
@@ -362,6 +365,7 @@ if(WIN32)
         src/app/MenuAppDeviceSettings.cpp
         src/app/MenuAppKeymap.cpp
         src/app/MenuAppRecords.cpp
+        src/app/MenuAppLr2Import.cpp
         src/app/MenuAppScoreComparison.cpp
         src/app/MenuAppSessionMix.cpp
         src/app/MenuAppSongSelect.cpp
@@ -455,6 +459,17 @@ set_target_properties(tenriff_replay_verifier PROPERTIES
     OUTPUT_NAME "tenriff-replay-verifier")
 target_link_libraries(tenriff_replay_verifier PRIVATE tenriff_core)
 
+# Imports LR2 clear lamps into a profile as display-only data.
+add_executable(tenriff_lr2_import
+    src/tenriff_lr2_import_main.cpp
+)
+set_target_properties(tenriff_lr2_import PROPERTIES
+    OUTPUT_NAME "tenriff-lr2-import")
+target_link_libraries(tenriff_lr2_import PRIVATE tenriff_core)
+if(MSVC)
+    target_link_options(tenriff_lr2_import PRIVATE /ENTRY:wmainCRTStartup)
+endif()
+
 set_target_properties(tenriff PROPERTIES OUTPUT_NAME "TenRiff")
 
 add_custom_command(TARGET tenriff POST_BUILD
@@ -502,6 +517,7 @@ if(WIN32)
     # Opt-in integration probe: refuses existing output folders and uses only
     # synthetic charts/profiles. Never packaged as an end-user executable.
     add_executable(menu_app_smoke EXCLUDE_FROM_ALL tools/menu_app_smoke.cpp)
+    target_compile_definitions(menu_app_smoke PRIVATE TENRIFF_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(menu_app_smoke PRIVATE tenriff_app)
     add_executable(library_loading_benchmark EXCLUDE_FROM_ALL tools/library_loading_benchmark.cpp)
     target_link_libraries(library_loading_benchmark PRIVATE tenriff_app)
@@ -834,6 +850,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_bms_timeline.cpp
         tests/unit/test_speed_manager.cpp
         tests/unit/test_gauge_manager.cpp
+        tests/unit/test_lr2_clear_import.cpp
         tests/unit/test_clock_sync.cpp
         tests/unit/test_precise_wait.cpp
         tests/unit/test_key_state_tracker.cpp

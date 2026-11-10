@@ -1394,6 +1394,7 @@ void MenuApp::run() {
                 sync_menu_music();
         }
         service_input_backend_health();
+        service_lr2_import();
         while (true) {
             auto event = input_thread_.queue().pop();
             if (!event.has_value()) {
@@ -1496,6 +1497,8 @@ void MenuApp::run() {
 }
 
 void MenuApp::shutdown() {
+    if (lr2_import_cancel_) lr2_import_cancel_->store(true, std::memory_order_relaxed);
+    if (lr2_import_future_.valid()) lr2_import_future_.wait();
     exit_requested_.store(true, std::memory_order_release);
     stop_bms_editor_preview();
     cleanup_bms_editor_practice_file();
@@ -4031,6 +4034,10 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
         return;
     }
 #endif
+    if (keycode == key_enter_ && settings_cursor_ == profile_setup::kLr2ImportRow) {
+        choose_lr2_score_database();
+        return;
+    }
     if (keycode == key_enter_ && (settings_cursor_ == profile_setup::kExportSettingsRow ||
                                   settings_cursor_ == profile_setup::kImportSettingsRow)) {
         const bool exporting = settings_cursor_ == profile_setup::kExportSettingsRow;

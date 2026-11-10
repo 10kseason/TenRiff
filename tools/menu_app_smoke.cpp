@@ -697,6 +697,46 @@ struct MenuAppVisualTestAccess {
         report.check("lobby.lamp_snapshot_retains_status_and_formats_copy", cards.size() == 1 &&
             cards.front().lamp == "GAUGE SHIFT NORMAL CLEAR" && lamp.label == "NORMAL CLEAR" &&
             lamp.tint_card && lamp.color == render::song_select_gauge_text_color("normal"));
+        {
+            // Imported LR2 lamps are display-only and never replace a TenRiff
+            // record of the same or a better clear.
+            auto& entry = app.indexed_songs_.front();
+            const std::string original_md5 = entry.md5;
+            entry.md5 = std::string(32, 'a');
+            const auto first_card_lamp = [&] {
+                app.publish_snapshot();
+                const auto& view = app.snapshot_.render.song_select;
+                return std::make_pair(view.songs.empty() ? std::string{} : view.songs.front().lamp,
+                                      view.selected_song_lamp);
+            };
+            Lr2ImportedLamp imported;
+            imported.lr2_clear = 4;
+            imported.clear_status = "HARD CLEAR";
+            app.lr2_imported_lamps_[entry.md5] = imported;
+            auto shown = first_card_lamp();
+            report.check("lobby.lr2_lamp_higher_than_native_is_shown_and_marked",
+                shown.first == "HARD CLEAR" && shown.second == "LR2 HARD CLEAR", shown.second);
+            imported.clear_status = "EX-HARD CLEAR";
+            imported.ex_proven = true;
+            imported.full_combo = true;
+            app.lr2_imported_lamps_[entry.md5] = imported;
+            shown = first_card_lamp();
+            report.check("lobby.lr2_proven_ex_lamp_is_shown_with_full_combo",
+                shown.first == "EX-HARD CLEAR" && shown.second == "LR2 EX-HARD CLEAR (FC)", shown.second);
+            imported.clear_status = "EASY CLEAR";
+            app.lr2_imported_lamps_[entry.md5] = imported;
+            shown = first_card_lamp();
+            report.check("lobby.lr2_lamp_lower_than_native_is_ignored",
+                shown.first == "GAUGE SHIFT NORMAL CLEAR" && shown.second == "GAUGE SHIFT NORMAL CLEAR", shown.second);
+            imported.clear_status = "HARD CLEAR";
+            app.lr2_imported_lamps_[std::string(32, 'b')] = imported;
+            app.lr2_imported_lamps_.erase(entry.md5);
+            shown = first_card_lamp();
+            report.check("lobby.lr2_lamp_for_another_chart_is_ignored", shown.first == "GAUGE SHIFT NORMAL CLEAR");
+            app.lr2_imported_lamps_.clear();
+            entry.md5 = original_md5;
+            app.publish_snapshot();
+        }
         app.local_play_records_ = {MenuApp::LocalPlayRecord{}};
         app.local_play_records_.front().clear_status = "GAUGE SHIFT HARD CLEAR";
         app.local_play_records_.front().player_name = "Fixture";
@@ -1328,6 +1368,110 @@ struct MenuAppVisualTestAccess {
         // The modal probes above observe real desktop holds. Do not export
         // that environment-dependent state into later synthetic key fixtures.
         app.native_dialog_held_keys_ = saved_dialog_holds;
+    }
+    static void check_lr2_import_ui(MenuApp& app, Report& report) {
+        namespace fs = std::filesystem;
+        const auto saved_holds = app.native_dialog_held_keys_;
+        const auto saved_language = app.config_.ui.language;
+        const auto saved_lamps = app.lr2_imported_lamps_;
+        const auto best_count = app.chart_best_results_.size();
+        const auto record_count = app.local_play_records_.size();
+        const auto db = fs::absolute(fs::u8path(u8"LR2 점수.db"));
+        fs::copy_file(fs::u8path(TENRIFF_SOURCE_DIR) / "tests/fixtures/lr2/score_fixture.db", db);
+        const auto expected = prepare_lr2_import(db, {});
+        const auto original_time = fs::last_write_time(db);
+        app.replace_screen(Screen::QuickSetup);
+        app.first_run_profile_ = false;
+        const auto drain = [&] {
+            const auto deadline = Clock::now() + std::chrono::seconds(10);
+            while (app.lr2_import_future_.valid() && Clock::now() < deadline) {
+                app.service_lr2_import();
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            }
+            return !app.lr2_import_future_.valid();
+        };
+        for (int attempt = 0; attempt < 2; ++attempt) {
+            const bool accept = attempt == 0;
+            std::atomic<bool> done{false}, owned{false};
+            std::thread picker_driver([&] {
+                HWND acted = nullptr;
+                const auto deadline = Clock::now() + std::chrono::seconds(10);
+                while (!done && Clock::now() < deadline) {
+                    HWND picker = nullptr;
+                    EnumWindows([](HWND window, LPARAM data) -> BOOL {
+                        DWORD pid = 0; GetWindowThreadProcessId(window, &pid);
+                        wchar_t type[64]{}; GetClassNameW(window, type, 64);
+                        if (pid == GetCurrentProcessId() && IsWindowVisible(window) &&
+                            lstrcmpW(type, L"#32770") == 0) {
+                            *reinterpret_cast<HWND*>(data) = window; return FALSE;
+                        }
+                        return TRUE;
+                    }, reinterpret_cast<LPARAM>(&picker));
+                    if (picker && !acted) {
+                        acted = picker;
+                        const auto game = owned_menu_window();
+                        owned = game && GetWindow(picker, GW_OWNER) == game && !IsWindowEnabled(game);
+                        if (accept) {
+                            HWND filename = nullptr;
+                            EnumChildWindows(picker, [](HWND child, LPARAM data) -> BOOL {
+                                wchar_t type[64]{}; GetClassNameW(child, type, 64);
+                                if (lstrcmpW(type, L"Edit") == 0)
+                                    for (HWND parent = child; parent; parent = GetParent(parent))
+                                        if (GetDlgCtrlID(parent) == 1148) {
+                                            *reinterpret_cast<HWND*>(data) = child; return FALSE;
+                                        }
+                                return TRUE;
+                            }, reinterpret_cast<LPARAM>(&filename));
+                            if (filename) SetWindowTextW(filename, db.c_str());
+                        }
+                        PostMessageW(picker, WM_COMMAND, accept ? IDOK : IDCANCEL, 0);
+                    }
+                    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+                }
+                if (!done && acted) PostMessageW(acted, WM_COMMAND, IDCANCEL, 0);
+            });
+            click(app, Kind::SettingsRow, profile_setup::kLr2ImportRow);
+            done = true;
+            picker_driver.join();
+            const bool finished = drain();
+            report.check(accept ? "lr2_ui.picker_import_unicode" : "lr2_ui.picker_cancel_keeps_lamps",
+                owned && finished && app.lr2_imported_lamps_.size() == expected.lamps.size() &&
+                load_lr2_imported_lamps(lr2_import_path_for_profile(app.profile_dir_)).size() == expected.lamps.size());
+        }
+        app.start_lr2_import("missing-lr2.db");
+        report.check("lr2_ui.failure_keeps_lamps", drain() &&
+            app.lr2_imported_lamps_.size() == expected.lamps.size() &&
+            app.lr2_import_status_ == app.ui_text("LR2 import failed. Existing lamps were kept.",
+                "LR2 가져오기에 실패했습니다. 기존 램프를 유지합니다."));
+        app.start_lr2_import(db.u8string());
+        // Cancels even if the worker finished before the UI polls it.
+        click(app, Kind::SettingsRow, profile_setup::kLr2ImportRow);
+        report.check("lr2_ui.worker_cancel_keeps_lamps", drain() &&
+            app.lr2_imported_lamps_.size() == expected.lamps.size() &&
+            app.lr2_import_status_ == app.ui_text("LR2 import cancelled.", "LR2 가져오기를 취소했습니다."));
+        app.start_lr2_import(db.u8string());
+        report.check("lr2_ui.repeat_import", drain() && app.lr2_imported_lamps_.size() == expected.lamps.size());
+        for (const auto* language : {"en", "ko", "ja", "zh-CN"}) {
+            app.config_.ui.language = language;
+            app.start_lr2_import(db.u8string());
+            report.check(std::string("lr2_ui.localized_completion_") + language, drain() &&
+                app.lr2_import_status_ == app.ui_text("LR2 lamps imported: ", "가져온 LR2 램프: ") +
+                    std::to_string(expected.lamps.size()));
+            app.settings_cursor_ = profile_setup::kLr2ImportRow;
+            app.publish_snapshot();
+            render::MenuRenderData data;
+            app.populate_quick_setup_render_data(data);
+            report.check(std::string("lr2_ui.localized_row_") + language,
+                data.generic.rows.size() == static_cast<std::size_t>(profile_setup::row_count(profile_setup::Entry::Options)));
+            app.menu_window_.request_screenshot();
+            std::string detail;
+            report.check(std::string("lr2_ui.present_") + language, present(app, detail), detail);
+        }
+        report.check("lr2_ui.read_only_db_and_display_only", fs::last_write_time(db) == original_time &&
+            app.chart_best_results_.size() == best_count && app.local_play_records_.size() == record_count);
+        app.lr2_imported_lamps_ = saved_lamps;
+        app.config_.ui.language = saved_language;
+        app.native_dialog_held_keys_ = saved_holds;
     }
     static HWND owned_menu_window() {
         HWND owned = nullptr;
@@ -2833,6 +2977,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
             report.check("audio.missing_output_no_fallback", missing.initialize(invalid) == tenriff::audio::AudioResult::DeviceNotFound);
         } else if (page.index == 7) {
             Access::check_start_controls(app, report);
+            Access::check_lr2_import_ui(app, report);
         }
         Access::key(app, "Esc");
         expect_screen(app, report, std::string(page.name) + ".back", Screen::OptionsHub);
