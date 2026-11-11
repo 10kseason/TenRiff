@@ -17,4 +17,6 @@
 
 报告者PC的帧率与撕裂、真实个人DB、物理输入、试听和长时间游玩仍需进一步验证。[成绩导入](lr2-clear-import.zh-CN.md)
 
+- 清理8个随包音乐文件中的账户与单曲标识标签，保留Suno AI制作来源、压缩音频及内嵌封面。
+
 [Release verification](release-1.9.9.9-final6-gate.md)

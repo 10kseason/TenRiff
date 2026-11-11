@@ -17,4 +17,6 @@
 
 報告者のPCのFPS・ティアリング、実際の個人DB、物理入力・試聴・長時間プレイは追加確認が必要です。[記録インポート](lr2-clear-import.ja.md)
 
+- 同梱音楽8ファイルのアカウント・曲別識別タグを整理し、SunoのAI制作表記、圧縮音声、埋め込みアートワークを保持します。
+
 [Release verification](release-1.9.9.9-final6-gate.md)

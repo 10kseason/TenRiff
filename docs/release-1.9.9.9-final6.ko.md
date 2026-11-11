@@ -17,4 +17,6 @@
 
 외부 제보 PC의 FPS·티어링, 실제 개인 DB, 물리 입력·청음·장시간 플레이는 추가 확인이 필요합니다. [기록 가져오기](lr2-clear-import.ko.md)
 
+- 배포 음악 8개의 계정·개별 곡 식별 태그를 정리했습니다. Suno AI 제작 출처와 압축 오디오·내장 커버를 보존합니다.
+
 [Release verification](release-1.9.9.9-final6-gate.md)

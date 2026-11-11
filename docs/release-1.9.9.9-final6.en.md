@@ -17,4 +17,6 @@ Separates 7+1/8K bindings, defaults scratch to red and clips notes at 16-lane ga
 
 The reporter's PC frame rate and tearing, real personal databases, physical input, listening and extended play need further verification. [Record import](lr2-clear-import.en.md)
 
+- Remove account and per-track identifiers from eight bundled music files while preserving Suno AI attribution, compressed audio and embedded artwork.
+
 [Release verification](release-1.9.9.9-final6-gate.md)
