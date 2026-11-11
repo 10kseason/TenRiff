@@ -346,6 +346,7 @@ struct ModeConfig {
     double pacemaker_target_accuracy = kPacemakerAccuracyDefault;
     int64_t pacemaker_target_score = kPacemakerScoreDefault;
     std::string song_index_profile = "safe";
+    // Retained for profile compatibility. App indexing uses BMS #PLAYLEVEL.
     bool calculate_song_index_difficulty = false;
 };
 

@@ -1,4 +1,4 @@
-> **2026-11-11 · 1.9.9.9-final6** Separates 7+1 and 8K bindings, uses red as the default scratch color, and keeps 14+2 DP and 16K notes inside their playfield blocks. [English](release-1.9.9.9-final6.en.md)
+> **2026-11-11 · 1.9.9.9-final6** Separates 7+1/8K bindings, defaults scratch to red and clips notes at 16-lane gaps. Adds Unlimited VSync handling, timing-marker caching, LR2oraja score import, authored BMS levels and native high-resolution BGA frames. [English](release-1.9.9.9-final6.en.md)
 
 > **2026-11-10 · 1.9.9.9-final5:** Reduces LR2 import hashing and chart lookup work, rejects EX for absent or unsupported authored RANK, and fixes empty trailing measures making Andro display BPM 1. The fixed baseline remains final4. [Release](release-1.9.9.9-final5.en.md). Earlier notices below are historical.
 
@@ -254,8 +254,8 @@ This is the document that the next agent or any new contributor should read firs
   - NK3 always combines bundled P64 with host beam32. It adds the generalized pattern MLP only when a non-10K source is converted to 10K; 10K-to-10K and every other target use P64 alone. The default `AUTO` backend runs both P64 and the MLP on AMD/NVIDIA GPUs through ncnn Vulkan, retaining the optional OpenVINO compatibility path as fallback. `TENRIFF_NK3_BACKEND` and `TENRIFF_NK3_VULKAN_DEVICE` can force the selection.
   - official 1.9.0.1 builds/Windows archives do not build or ship the standalone BMS key-converter CLI/GUI; its top-level CMake option defaults `OFF` and the source is retained only for development regression
   - `mode.key_mode=none` keeps the chart's original key count and base pattern layout intact
-- Native difficulty:
-  - BMS LV/CR calculation evaluates only LN head/tail miss-ms at 0.5x, so `300ms` is treated as `150ms`; runtime gameplay judgement windows remain unchanged
+- Chart difficulty
+  - In-game indexing and base level labels use the authored BMS `#PLAYLEVEL`.
 - Lane transform:
   - Random supports `Off / Mirror / Random (Scratch Fixed) / SR`; ordinary Random keeps scratch fixed, creates a fresh key-lane permutation per play, and records the actual seed in the replay
   - New `LN Mix 10%-90%` v2 targets 60% long 2/4-beat, 20% medium 1-beat and 20% short 1/4-/1/2-beat holds at base BPM × Rate. It preserves existing holds, original heads/keysounds and 50ms clearance before the next same-lane head, shortening targets when space is limited without merging repeated taps. Legacy replays keep v1; v2 keeps local history/replay but is excluded from legacy BEST and Sites upload. See [added conditions and checks (Korean)](release-1.8.8-gate.md)
@@ -308,15 +308,15 @@ This is the document that the next agent or any new contributor should read firs
   - existing resolution presets plus direct width/height input (320–8192 per axis) and freely resizable window borders; preserve 16:9 content, margins and click mapping, and save the completed drag size. See [controls and recovery behavior](config.en.md#graphics)
   - Single-result summaries, analysis tabs and multiplayer results show a small `F9` PNG / `screenshots/` hint. Files use the current working directory; actual saving in this release is covered separately by the [additional release checks (Korean)](release-1.8.8-gate.md)
   - `refresh_hz` (`-1` = `Match Display`, `0` = `Unlimited`, actual maximum 1500 FPS)
-  - VSync off: Match Display follows monitor Hz; Unlimited caps gameplay at 1500 FPS while keeping the menu cap at `300`
-  - VSync on: present refresh follows the active monitor Hz and render pacing targets `monitor_hz * 2` (`1050` clamp)
+  - Unlimited disables VSync and caps gameplay at 1500 FPS and menus at 300 FPS.
+  - Match Display follows the monitor refresh rate and applies the saved VSync setting. With VSync on, render pacing targets twice the monitor Hz, capped at 1050 FPS.
   - `visual_offset_ms`
   - `performance_overlay` (in-game FPS/frame time uses successful DXGI `Present()` completion intervals; HUD update cadence remains separate gameplay diagnostics)
   - `bga_enabled=false` disables gameplay image/video BGA and decoder/upscaler work while keeping Song Select previews
   - `background_upscale_model_path` only stores the compatible ONNX selected or dropped in Graphics Settings; public packages include no model
   - BGA Upscaler defaults to `off`; the user must explicitly turn it on and acknowledge the high-spec warning, with no automatic benchmark gate
   - current contract is 960x540 RGB residual x2 with automatic FP32/FP16 boundary and float-boundary INT8 QDQ metadata detection; users own model rights/quality/performance, and load, contract, decode, or inference failure keeps native scaling
-  - static image BGA remains asynchronously ONNX-upscaled; video BGA displays native decoded frames so a late older inference result cannot overwrite a newer frame and cause visible shaking
+  - BGA above 480 pixels in height retains native frames. ONNX image processing applies to sources at or below 480 pixels in height.
   - high-performance DirectX GPU is the default. `background_upscale_prefer_npu=true` only requests legacy WinML `DirectXMinPower`; it neither explicitly selects an NPU nor verifies endpoint placement and is not treated as NPU success
 - Gameplay performance:
   - static playfield command-list cache
@@ -349,10 +349,9 @@ This is the document that the next agent or any new contributor should read firs
   - `fast` collects only song-list metadata (title/artist/key count/#PLAYLEVEL/BPM)
   - controlled by the Mode Settings `Indexing` row and `config.mode.song_index_profile`
   - `fast` skips file hashes, background/audio preview resolution, difficulty-table matching, and native LV/CR
-- Difficulty calculation:
-  - controlled by Mode Settings `Index Difficulty` and `config.mode.calculate_song_index_difficulty`
-  - default `off` keeps BMS `#PLAYLEVEL` and skips native LV/CR calculation
-  - `on` calculates Revive LV/Circus Rating in `safe`; `fast` always skips it
+- Difficulty labels
+  - Base chart levels use BMS `#PLAYLEVEL`. Older caches with calculated levels refresh during the next index.
+  - A selected external difficulty table supplies its own labels.
 - Indexing stages:
   - `SCANNING FILES`
   - `BUILDING METADATA`

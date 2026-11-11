@@ -199,9 +199,8 @@ Gauge Shift は常に有効です。`mode.gauge` の `ex_hard / hard / normal / 
 - `refresh_hz` (int)
   - `-1` は `Match Display`、`0` は profile 互換の `Unlimited` 選択値（実際の上限は 1500 FPS）
   - 既定値は `-1`
-  - `vsync=false` のときだけ直接 FPS cap として使われる
-  - `vsync=false` では menu は実効 `300` cap。gameplay は `-1` で monitor Hz に従い、`0` で 1500 FPS の render pacing を適用
-  - `vsync=true` では present refresh は active monitor Hz に従い、render pacing は `monitor_hz * 2` を狙う（`1050` clamp）
+  - `Unlimited` では VSync がオフになり、プレイ中は最大 1500 FPS、メニューは最大 300 FPS で描画します。
+  - `Match Display` は使用中のモニターのリフレッシュレートに従い、保存済みの `vsync` 設定を適用します。VSync がオンのとき、描画の目標はリフレッシュレートの 2 倍で、上限は 1050 FPS です。
 - `performance_overlay` (bool)
   - 既定値は `false`。右上を使うため、同じ角に置いた Discord Voice widget と重なる場合がある
   - gameplay frame pacing は成功した DXGI `Present()` 完了時刻の間隔を測定し、HUD update cadence は FPS sample に使用しない
@@ -209,6 +208,7 @@ Gauge Shift は常に有効です。`mode.gauge` の `ex_hard / hard / normal / 
   - 既定値は `true`。`false` では gameplay の image/video BGA と decoder/upscaler 処理を無効化
   - Song Select の background preview は別機能なので表示を維持
 - `background_upscale_mode` (string)
+  - 高さ480ピクセルを超えるBGAは元のフレーム寸法で再生します。ONNX画像処理は高さ480ピクセル以下の素材に適用します。
   - `onnx | off`、旧`lunasr`は`onnx`に互換、既定`off`。有効化には高性能警告の確認が必要で、自動性能測定なし
   - 元画像 → FFmpeg RGBデブロック → モデル固有x1–x4推論 → 残差合成/完成画像 → 表示調整/クロップ。先に960×540へ縮小しない
   - 動的モデルは元画像全体、固定モデルはパディング・文脈タイル。入力/出力軸上限4096/8192、各インスタンスのキャッシュ3枚/96MiB。動画AIは無効
@@ -288,15 +288,14 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
   - `auto_scratch`: 実際のBMS皿だけを自動入力。スコア倍率0%、ASSIST記録で正式な最高記録・ランキングから除外
 - `song_index_profile` (string)
   - `safe | fast`
-  - 既定は`safe`（安全）。ハッシュと試聴情報を用意し、難易度表にも対応します。独自LV/CRの計算は下記の別設定に従います。
+  - 既定は`safe`（安全）。ハッシュと試聴情報を用意し、難易度表にも対応します。基本レベルにはBMSの`#PLAYLEVEL`を使います。
   - 保存済みの選択は保持します。任意の`fast`（最小）はハッシュ・試聴・難易度計算を省略します。
   - 両モードともフォルダーのインデックス作成に利用可能な論理CPUを使用します。残りのファイル数と空きRAMで同時処理数を調整します。
   - 既存キャッシュの解析とALL SONGのキャッシュパス確認も並列で行います。
 - `calculate_song_index_difficulty` (bool)
   - 既定値は `false`
-  - `false` は BMS `#PLAYLEVEL` を menu LV として保持し、CPU 負荷の高い native LV/CR 計算を省略
-  - `true` は full `safe` index 中に Revive LV/Circus Rating を計算し、`fast` では常に省略
-  - 設定変更時は cache mode を分離し、現在の song source を full reindex
+  - 以前のプロファイルとの互換用です。ゲーム内の索引作成は値にかかわらずBMSの`#PLAYLEVEL`を使います。
+  - 計算済みレベルを含む古いキャッシュは、次の索引作成でBMS表記へ更新されます。
 
 ### `ui`
 
@@ -341,7 +340,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 
 難易度表 header は `name`、`symbol`、ローカル相対 `data_url` を使用し、data 項目は `md5` または `sha256` と `level` で照合します。取得内容はプロファイルの `difficulty_tables` キャッシュへ保存します。
 
-標準 LV は `difficulty_table_path` と `difficulty_table_url` を消去し、有効なキャッシュから表情報のみ除去します。全再走査は不要です。既定は BMS `#PLAYLEVEL`、難易度計算を有効にしたキャッシュでは既存の計算 LV を使用します。
+標準 LV は `difficulty_table_path` と `difficulty_table_url` を消去し、BMS `#PLAYLEVEL` を表示します。計算済みレベルを含む旧キャッシュは次の索引で更新します。
 
 ### `skin`
 

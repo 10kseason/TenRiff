@@ -265,17 +265,8 @@
                 range_segment(cx - maximum_half_width, cx + maximum_half_width, kTimingMaximumColor);
                 range_segment(cx + maximum_half_width, cx + half_width, kTimingLateColor);
                 fill->SetColor(D2D1::ColorF(0xC9CED6)); ctx->FillRectangle(D2D1::RectF(cx - 1, by - 5, cx + 1, by + 7), fill);
-                for (std::size_t i = 0; i < timing_history_count; ++i) {
-                    const double marker_delta = timing_history[i];
-                    auto color = D2D1::ColorF(timing_marker_color(marker_delta, maximum_ms, maximums[i]));
-                    color.a *= 0.3f + 0.7f * static_cast<float>(i + 1) / static_cast<float>(timing_history_count);
-                    fill->SetColor(color);
-                    const float x = cx + static_cast<float>(std::clamp(marker_delta / 80.0, -1.0, 1.0)) * half_width;
-                    if (data.gameplay.timing_marker_style == "barcode")
-                        ctx->FillRectangle(D2D1::RectF(x - 1, by - 8, x + 1, by + 10), fill);
-                    else
-                        ctx->FillEllipse(D2D1::Ellipse(D2D1::Point2F(x, by + 1), 4, 4), fill);
-                }
+                draw_timing_markers(cx, by + 1, half_width, 80.0, timing_history, timing_history_count,
+                    maximums, maximum_ms, fill, false);
                 ctx->SetTransform(saved);
             }
             fill->SetColor(saved_color);

@@ -1367,9 +1367,20 @@
 
         const bool primary_enabled = data.song_select.list_total_count > 0 &&
                                      !data.song_select.online_records;
+        const bool show_imported_score = !data.song_select.showing_sources && !data.song_select.showing_records &&
+            !data.song_select.selected_song_lr2oraja_label.empty();
         const D2D1_RECT_F start_button =
-            native_rect("songselect.rect.091", D2D1::RectF(right_left, right_panel.bottom - 112.0f,
+            native_rect("songselect.rect.091", D2D1::RectF(right_left, right_panel.bottom - (show_imported_score ? 68.0f : 112.0f),
                         right_right, right_panel.bottom - 24.0f));
+        if (show_imported_score && d2d_->hud_format && d2d_->muted_brush) {
+            const float top = right_panel.top + 655.0f;
+            if (top + 46.0f <= start_button.top) {
+                draw_text_clipped(to_wide(data.song_select.selected_song_lr2oraja_label), d2d_->hud_format.Get(),
+                    D2D1::RectF(right_left, top, right_right, top + 23.0f), d2d_->muted_brush.Get());
+                draw_text_clipped(to_wide(data.song_select.selected_song_lr2oraja_score), d2d_->hud_format.Get(),
+                    D2D1::RectF(right_left, top + 23.0f, right_right, top + 46.0f), d2d_->muted_brush.Get());
+            }
+        }
         if (primary_enabled) {
             register_hit(start_button, MenuHitTargetKind::SongStartButton, 0);
         }

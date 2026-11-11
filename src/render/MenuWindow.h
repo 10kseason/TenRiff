@@ -265,6 +265,8 @@ struct SongSelectData {
     std::string background_upscale_output_mode = "auto";
     bool background_upscale_prefer_npu = false;
     std::string selected_song_lamp;
+    std::string selected_song_lr2oraja_label;
+    std::string selected_song_lr2oraja_score;
     bool selected_song_favorite = false;
     std::string selected_song_collection_filter;
     std::string selected_song_ghost_status;
@@ -1175,6 +1177,8 @@ private:
     // Developer preview friend only; disabled in the game, with no extra clock
     // reads unless a synchronous render benchmark explicitly opts in.
     bool benchmark_timings_enabled_ = false;
+    uint64_t benchmark_timing_marker_bitmap_builds_ = 0;
+    uint64_t benchmark_timing_marker_bitmap_draws_ = 0;
     struct SongTitleDiagnostics {
         float left = 0, top = 0, right = 0, bottom = 0;
         float field_left = 0, field_right = 0;

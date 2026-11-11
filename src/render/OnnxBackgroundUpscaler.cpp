@@ -586,7 +586,7 @@ void OnnxBackgroundUpscaler::clear() {
 bool OnnxBackgroundUpscaler::should_upscale(std::uint32_t width,
                                               std::uint32_t height,
                                               std::string_view mode) {
-    return lower_ascii(mode) == "onnx" && onnx_image::valid_size(width, height);
+    return height <= 480 && lower_ascii(mode) == "onnx" && onnx_image::valid_size(width, height);
 }
 
 bool OnnxBackgroundUpscaler::should_upscale_realtime_video(std::string_view) {

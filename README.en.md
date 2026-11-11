@@ -1,4 +1,4 @@
-> **2026-11-11 · 1.9.9.9-final6** Separates 7+1 and 8K bindings, uses red as the default scratch color, and keeps 14+2 DP and 16K notes inside their playfield blocks. [English](docs/release-1.9.9.9-final6.en.md)
+> **2026-11-11 · 1.9.9.9-final6** Separates 7+1/8K bindings, defaults scratch to red and clips notes at 16-lane gaps. Adds Unlimited VSync handling, timing-marker caching, LR2oraja score import, authored BMS levels and native high-resolution BGA frames. [English](docs/release-1.9.9.9-final6.en.md)
 
 > **2026-11-10 · 1.9.9.9-final5:** Reduces LR2 import hashing and chart lookup work, rejects EX for absent or unsupported authored RANK, and fixes empty trailing measures making Andro display BPM 1. The fixed baseline remains final4. [Release](docs/release-1.9.9.9-final5.en.md). Earlier notices below are historical.
 

@@ -73,8 +73,8 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Save timing offsets and return.", "타이밍 보정값을 저장하고 돌아갑니다.", "タイミング補正値を保存して戻ります。"},
     };
     static constexpr SettingsHelpText mode[] = {
-        {"Safe builds hashes, previews and difficulty. Fast indexes basic song metadata only; tables switch it back to Safe.", "안전은 해시·미리보기·난이도를 준비합니다. 빠름은 기본 곡 정보만 읽으며, 난이도표를 선택하면 안전으로 전환됩니다.", "安全はハッシュ・プレビュー・難易度も作成します。高速は基本情報のみで、難易度表選択時は安全に戻ります。"},
-        {"Calculate native LV/CR during Safe indexing. Fast indexing always skips this calculation.", "안전 인덱싱 중 자체 LV/CR을 계산합니다. 빠름 모드에서는 켜도 계산을 건너뜁니다.", "安全スキャンで独自LV/CRを計算します。高速では常に省略します。"},
+        {"Safe prepares hashes and previews. Both modes use BMS #PLAYLEVEL. Selecting a difficulty table switches Fast to Safe.", "안전은 해시와 미리보기를 준비합니다. 두 모드 모두 BMS #PLAYLEVEL을 사용하며, 난이도표를 선택하면 빠름에서 안전으로 전환됩니다.", "安全はハッシュとプレビューを準備します。両モードともBMSの#PLAYLEVELを使い、難易度表を選ぶと高速から安全に切り替わります。"},
+        {},  // Former Index Difficulty row ID.
         {"Compare your play with the best compatible saved replay in a split view.", "호환되는 최고 기록 리플레이를 불러와 분할 화면에서 현재 플레이와 비교합니다.", "対応する最高記録のリプレイと分割画面で比較します。"},
         {"Let the game hit notes automatically. The result is marked ASSIST.", "게임이 노트를 자동으로 처리합니다. 결과에는 ASSIST가 표시됩니다.", "ノートを自動で演奏します。結果はASSIST扱いになります。"},
         {"Continue after gauge failure. Judgements and the final result are still recorded.", "게이지가 소진되어도 끝까지 연습합니다. 판정과 최종 결과는 계속 기록합니다.", "ゲージが尽きても最後まで練習します。判定と結果は記録されます。"},
@@ -211,7 +211,7 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Assign a function shortcut. Enter captures a key, Esc cancels, Delete clears. Duplicate and lane keys are rejected; hints follow the assigned key.", "펑션 단축키를 지정합니다. Enter 지정, Esc 취소, Delete 해제. 중복·레인 키는 지정할 수 없으며 안내에도 지정한 키가 표시됩니다.", "機能キーを設定します。Enterで入力、Escで取消、Deleteで解除。重複・レーンキーは不可。案内も設定したキーに変わります。"},
         {"Assign a function shortcut. Enter captures a key, Esc cancels, Delete clears. Duplicate and lane keys are rejected; hints follow the assigned key.", "펑션 단축키를 지정합니다. Enter 지정, Esc 취소, Delete 해제. 중복·레인 키는 지정할 수 없으며 안내에도 지정한 키가 표시됩니다.", "機能キーを設定します。Enterで入力、Escで取消、Deleteで解除。重複・レーンキーは不可。案内も設定したキーに変わります。"},
         {"Assign a function shortcut. Enter captures a key, Esc cancels, Delete clears. Duplicate and lane keys are rejected; hints follow the assigned key.", "펑션 단축키를 지정합니다. Enter 지정, Esc 취소, Delete 해제. 중복·레인 키는 지정할 수 없으며 안내에도 지정한 키가 표시됩니다.", "機能キーを設定します。Enterで入力、Escで取消、Deleteで解除。重複・レーンキーは不可。案内も設定したキーに変わります。"},
-        {"Choose an LR2 score .db. Replaces this profile's imported lamps; TenRiff scores stay unchanged. Registered song folders are checked for EX. Close LR2 before importing.", "LR2 점수 .db를 선택합니다. 이 프로필의 가져온 램프를 갱신하며 텐리프 점수는 유지합니다. 등록된 곡 폴더에서 EX를 확인합니다. 먼저 LR2를 종료하세요.", "LR2スコアの.dbを選択します。このプロファイルのインポート済みランプを更新し、TenRiffスコアは保持します。登録済み曲フォルダーでEXを確認します。先にLR2を終了してください。"},
+        {"Choose an LR2 score database or LR2oraja score.db. Imported records appear in Song Select. Registered song folders are checked for LR2 EX.", "LR2 점수 DB 또는 LR2oraja score.db를 선택합니다. 가져온 기록은 곡 선택에 표시됩니다. LR2의 EX 확인에는 등록한 곡 폴더를 사용합니다.", "LR2のスコアDBまたはLR2orajaのscore.dbを選択します。インポートした記録は選曲画面に表示されます。LR2のEX確認には登録済みの曲フォルダーを使います。"},
         {"Finish setup and return. Your changes have already been saved.", "설정을 마치고 돌아갑니다. 변경한 값은 이미 저장되어 있습니다.", "設定を終えて戻ります。変更は保存済みです。"},
         {"Go to the title screen. You can reopen these settings from Options.", "타이틀 화면으로 이동합니다. 옵션에서 다시 설정할 수 있습니다.", "タイトルへ移動します。オプションから再度設定できます。"},
     };

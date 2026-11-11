@@ -1,6 +1,6 @@
-// Imports LR2 clear lamps into a TenRiff profile as display-only data.
+// Imports LR2 lamps and LR2oraja scores into a TenRiff profile for display.
 //
-//   tenriff-lr2-import <LR2 score .db> <profile folder> [songs folder ...]
+//   tenriff-lr2-import <score .db> <profile folder> [songs folder ...]
 //
 // Easy/Groove/Hard lamps are copied by chart MD5. For charts found under the
 // given song folders, the LR2 judgement order is also replayed through the
@@ -17,7 +17,7 @@
 namespace {
 int run(const std::vector<std::filesystem::path>& args) {
     if (args.size() < 2) {
-        std::cerr << "Usage: tenriff-lr2-import <LR2 score .db> <profile folder> [songs folder ...]\n";
+        std::cerr << "Usage: tenriff-lr2-import <LR2 or LR2oraja score .db> <profile folder> [songs folder ...]\n";
         return 2;
     }
     const std::vector<std::filesystem::path> folders(args.begin() + 2, args.end());
@@ -27,9 +27,15 @@ int run(const std::vector<std::filesystem::path>& args) {
         return 1;
     }
     std::string error;
-    if (!tenriff::app::save_lr2_import(args[1], imported.lamps, error)) {
+    if (!tenriff::app::save_score_import(args[1], imported, error)) {
         std::cerr << "[error] " << error << '\n';
         return 1;
+    }
+    if (imported.source == tenriff::app::Lr2ScoreDbSource::Lr2oraja) {
+        std::cout << "LR2oraja rows: " << imported.rows << "\nImported charts: " << imported.lr2oraja_scores.size()
+                  << "\nSkipped rows: " << imported.skipped_rows << "\nWritten: "
+                  << (args[1] / tenriff::app::kLr2orajaImportFilename).u8string() << '\n';
+        return 0;
     }
     std::map<std::string, int> summary;
     for (const auto& [hash, lamp] : imported.lamps) {

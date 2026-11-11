@@ -8,6 +8,7 @@
 #include "app/menu/settings/GraphicsSettingsController.h"
 #include "app/menu/settings/InputSettingsController.h"
 #include "app/menu/settings/CalibrationSettingsController.h"
+#include "app/menu/settings/ModeSettingsController.h"
 
 TEST_CASE("Every settings ID has localized contextual help independent of row order") {
     using namespace tenriff::app::menu;
@@ -25,7 +26,8 @@ TEST_CASE("Every settings ID has localized contextual help independent of row or
     check(Screen::SettingsInput, kInputSettingOrder);
     check(Screen::SettingsCalibration, kCalibrationSettingOrder);
     check(Screen::SettingsSkins, tenriff::app::kSkinSettingsRowOrder);
-    for (const auto [screen, count] : {std::pair{Screen::ModeSelect, 19}, {Screen::ModeMods, 7}, {Screen::OptionsHub, 10},
+    check(Screen::ModeSelect, kModeSettingOrder);
+    for (const auto [screen, count] : {std::pair{Screen::ModeMods, 7}, {Screen::OptionsHub, 10},
              {Screen::QuickSetup, tenriff::app::profile_setup::row_count(tenriff::app::profile_setup::Entry::FirstRun)}})
         for (int id = 0; id < count; ++id) {
             CHECK_FALSE(setting_help(screen, id, tenriff::ui::Language::Korean).empty());

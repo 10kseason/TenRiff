@@ -609,6 +609,9 @@ struct MenuWindowVisualTestAccess {
         const auto& stats = window.benchmark_gpu_sprite_stats_;
         return {stats[0], stats[1], stats[2], stats[3], stats[4], window.benchmark_gpu_sprite_submissions_};
     }
+    static std::array<uint64_t, 2> timing_marker_bitmap_stats(const MenuWindow& window) {
+        return {window.benchmark_timing_marker_bitmap_builds_, window.benchmark_timing_marker_bitmap_draws_};
+    }
     static void benchmark(MenuWindow& window, bool enabled) { window.benchmark_timings_enabled_ = enabled; }
     static bool fullscreen(const MenuWindow& window) { return window.fullscreen_; }
     static std::array<bool, 2> studio_hud_flags(const MenuWindow& window) {
@@ -1314,6 +1317,9 @@ int main(int argc, char** argv) {
     bool indicator_background_off = false;
     bool timing_bar_always = false;
     std::string timing_marker_style = "dot";
+    int timing_history_fixture = 0;
+    bool lr2oraja_score_fixture = false;
+    int timing_history_step = 0;
     std::string timing_color_case;
     std::optional<double> timing_delta_fixture;
     double timing_maximum_ms = 21.0;
@@ -1543,6 +1549,20 @@ int main(int argc, char** argv) {
         if (arg == "--timing-marker" && i + 1 < argc) {
             timing_marker_style = argv[++i];
             if (timing_marker_style != "dot" && timing_marker_style != "barcode") return 2;
+            continue;
+        }
+        if (arg == "--timing-history" && i + 1 < argc) {
+            timing_history_fixture = std::clamp(std::stoi(argv[++i]), 1,
+                static_cast<int>(tenriff::kGameplayTimingHistoryMaxEntries));
+            gameplay = true;
+            continue;
+        }
+        if (arg == "--lr2oraja-score") {
+            lr2oraja_score_fixture = true;
+            continue;
+        }
+        if (arg == "--timing-history-step" && i + 1 < argc) {
+            timing_history_step = std::max(1, std::stoi(argv[++i]));
             continue;
         }
         if (arg == "--remapped-functions") { remapped_functions = true; continue; }
@@ -2057,6 +2077,10 @@ int main(int argc, char** argv) {
     songs.selected_song_difficulty_prefix_key_count = table_prefix_keys;
     songs.selected_song_bpm = 180;
     songs.selected_song_note_count = 1824;
+    if (lr2oraja_score_fixture) {
+        songs.selected_song_lr2oraja_label = "LR2oraja LN  HARD CLEAR";
+        songs.selected_song_lr2oraja_score = "EX 3184/3648  COMBO 1732  BP 26";
+    }
     // Synthetic chronological preview bins; actual library bins come from the
     // selected chart worker and are covered by SongSelectScreen tests.
     songs.selected_song_nps_min = 0;
@@ -2848,6 +2872,15 @@ int main(int argc, char** argv) {
                 hud.timing_maximum_window_ms = 22.0;
                 hud.timing_bar_always_visible = true;
             }
+            if (timing_history_fixture > 0) {
+                hud.timing_history_count = static_cast<std::size_t>(timing_history_fixture);
+                const int offset = timing_history_step > 0 ? rendered_frames / timing_history_step : 0;
+                for (int i = 0; i < timing_history_fixture; ++i) {
+                    const double delta = ((i + offset) * 29) % 161 - 80;
+                    hud.timing_history_delta_ms[i] = delta;
+                    hud.timing_history_maximums[i] = std::abs(delta) <= hud.timing_maximum_window_ms;
+                }
+            }
 
             hud.text_revision = timing_sequence ? static_cast<uint64_t>(rendered_frames + 1) : static_cast<uint64_t>(hit + 1);
             hud.motion_revision++;
@@ -3268,6 +3301,10 @@ int main(int argc, char** argv) {
             {"keys", JsonValue(static_cast<double>(preview_keys))}, {"note_width", JsonValue(preview_note_width)},
             {"fixture_time", JsonValue(fixture_seconds)},
             {"hud_style", JsonValue(hud_style)},
+            {"timing_bar", JsonValue(!timing_bar_off)},
+            {"timing_marker", JsonValue(timing_marker_style)},
+            {"timing_history_count", JsonValue(static_cast<double>(data.gameplay.timing_history_count))},
+            {"timing_history_step", JsonValue(static_cast<double>(timing_history_step))},
             {"skin_source", JsonValue(data.gameplay.skin_source)},
             {"studio_hud_active", JsonValue(MenuWindowVisualTestAccess::studio_hud_flags(window)[0])},
             {"riff_map_cached_visible", JsonValue(MenuWindowVisualTestAccess::studio_hud_flags(window)[1])},
@@ -3283,6 +3320,9 @@ int main(int argc, char** argv) {
             {"process_cpu_ms", JsonValue(process_cpu_ms() - benchmark_cpu_start)},
             {"scope", JsonValue("Synthetic synchronous rendering only. pre_present includes EndDraw GPU waits; render_call includes Present. No physical input/audio latency measured.")}};
         const auto sprite_stats = MenuWindowVisualTestAccess::gpu_sprite_stats(window);
+        const auto marker_stats = MenuWindowVisualTestAccess::timing_marker_bitmap_stats(window);
+        report.emplace("timing_marker_bitmap_builds", JsonValue(static_cast<double>(marker_stats[0])));
+        report.emplace("timing_marker_bitmap_draws", JsonValue(static_cast<double>(marker_stats[1])));
         JsonObject sprite_counters;
         constexpr const char* sprite_names[] = {"queued", "draw_calls", "fallback_sprites", "rejected", "cache_bytes", "submissions"};
         for (std::size_t i = 0; i < sprite_stats.size(); ++i)

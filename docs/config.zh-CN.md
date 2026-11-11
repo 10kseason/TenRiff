@@ -199,9 +199,8 @@ Gauge Shift 始终启用。`mode.gauge` 的 `ex_hard / hard / normal / easy` 选
 - `refresh_hz` (int)
   - `-1` 表示 `Match Display`；`0` 是兼容旧 profile 的 `Unlimited` 选项，实际最高 1500 FPS
   - 默认值为 `-1`
-  - 只有在 `vsync=false` 时才充当直接 FPS 上限
-  - `vsync=false` 时，menu 的有效上限为 `300`；gameplay 在 `-1` 时跟随显示器 Hz，在 `0` 时应用 1500 FPS render pacing
-  - `vsync=true` 时，present refresh 以当前活动显示器 Hz 为准，render pacing 的目标是 `monitor_hz * 2`（上限 `1050`）
+  - `Unlimited` 会关闭垂直同步，游玩时的渲染上限为 1500 FPS，菜单为 300 FPS。
+  - `Match Display` 跟随当前显示器的刷新率，并应用已保存的 `vsync` 设置。开启垂直同步时，渲染帧率目标为显示器刷新率的两倍，上限为 1050 FPS。
 - `performance_overlay` (bool)
   - 默认值为 `false`；它位于右上角，可能会与放在同一角落的 Discord Voice widget 重叠
   - gameplay frame pacing 测量成功 DXGI `Present()` 完成时间之间的间隔，不再把 HUD 更新节奏作为 FPS sample
@@ -209,6 +208,7 @@ Gauge Shift 始终启用。`mode.gauge` 的 `ex_hard / hard / normal / easy` 选
   - 默认值为 `true`；设为 `false` 会关闭 gameplay 图片/视频 BGA 及其 decoder/upscaler 工作
   - Song Select 背景预览属于独立功能，因此仍会显示
 - `background_upscale_mode` (string)
+  - 高度超过480像素的BGA保留原始帧尺寸。ONNX图像处理适用于高度不超过480像素的素材。
   - `onnx | off`，旧`lunasr`兼容为`onnx`，默认`off`。启用需确认高配置提示，不自动运行性能测试
   - 原图 → FFmpeg RGB去块 → 模型原生x1–x4推理 → 残差合成/完整图像 → 显示适配/裁剪，不预先缩至960×540
   - 动态模型处理整张原图，固定模型使用填充/上下文分块。输入/输出单轴上限4096/8192，每实例缓存3张/96MiB，视频AI禁用
@@ -288,15 +288,14 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
   - `auto_scratch`：只自动处理实际BMS转盘。分数倍率0%，标为ASSIST，不计入正式最佳记录和排名
 - `song_index_profile` (string)
   - `safe | fast`
-  - 默认`safe`（安全），准备哈希和试听信息并支持难度表。原生LV/CR计算遵循下方的独立设置。
+  - 默认`safe`（安全），准备哈希和试听信息并支持难度表。基本等级使用BMS的`#PLAYLEVEL`。
   - 保留已保存的选择。可选的`fast`（最小）跳过哈希、试听和难度计算。
   - 两种模式均使用可用的逻辑CPU线程建立文件夹索引，并根据剩余文件数和空闲RAM调整并发数量。
   - 现有缓存解析和ALL SONG中的缓存路径检查也采用并行处理。
 - `calculate_song_index_difficulty` (bool)
   - 默认值为 `false`
-  - `false` 保留 BMS `#PLAYLEVEL` 作为菜单 LV，并跳过 CPU 开销较高的原生 LV/CR 计算
-  - `true` 仅在完整 `safe` 索引中计算 Revive LV/Circus Rating；`fast` 始终跳过
-  - 修改设置后会区分缓存模式，并对当前 song source 执行完整重索引
+  - 为旧档案保留的设置。游戏内索引始终使用BMS的`#PLAYLEVEL`。
+  - 含计算等级的旧缓存会在下次建立索引时更新为BMS标注。
 
 ### `ui`
 
@@ -341,7 +340,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 
 难度表 header 使用 `name`、`symbol` 与本地相对 `data_url`；data 项按 `md5` 或 `sha256` 及 `level` 匹配。远程导入保存在配置的 `difficulty_tables` 缓存中。
 
-原生 LV 清空 `difficulty_table_path` 与 `difficulty_table_url`，有有效缓存时仅移除外部表信息，无须完整重扫。默认使用 BMS `#PLAYLEVEL`；开启难度计算的缓存使用原有计算 LV。
+原生 LV 清空 `difficulty_table_path` 与 `difficulty_table_url`，显示 BMS `#PLAYLEVEL`。含计算等级的旧缓存会在下次索引时更新。
 
 ### `skin`
 

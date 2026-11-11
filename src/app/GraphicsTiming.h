@@ -14,13 +14,14 @@ inline constexpr int kGraphicsUnlimitedFpsCap = 1500;
 [[nodiscard]] int clamp_graphics_refresh_hz(int value);
 [[nodiscard]] int normalize_graphics_refresh_hz(int value);
 [[nodiscard]] int cycle_graphics_refresh_hz(int value, int direction);
+[[nodiscard]] bool effective_vsync_enabled(bool configured_vsync, int configured_refresh_hz);
 [[nodiscard]] int effective_configured_refresh_hz(int configured_refresh_hz,
                                                   int detected_monitor_refresh_hz,
                                                   bool gameplay_active);
 [[nodiscard]] int effective_present_refresh_hz(bool vsync_enabled, int configured_refresh_hz,
                                                int detected_monitor_refresh_hz,
                                                bool gameplay_active);
-[[nodiscard]] int effective_render_fps_limit(bool vsync_enabled, int configured_refresh_hz,
+[[nodiscard]] int effective_render_fps_limit(bool configured_vsync, int configured_refresh_hz,
                                              int detected_monitor_refresh_hz,
                                              bool gameplay_active);
 [[nodiscard]] bool should_allow_tearing_present(bool vsync_enabled,

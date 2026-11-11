@@ -1220,7 +1220,7 @@ void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
                     settings_cursor_ == profile_setup::kSkipStartCountdownRow, render::MenuHitTargetKind::SettingsRow,
                     profile_setup::kSkipStartCountdownRow, false, true);
     populate_common_key_rows(render);
-    append_menu_row(render.generic, ui_text("Import LR2 Records", "LR2 기록 가져오기"),
+    append_menu_row(render.generic, ui_text("Import Score Database", "점수 DB 가져오기"),
                     lr2_import_future_.valid() ? ui_text("Cancel Import", "가져오기 취소") : ".db",
                     settings_cursor_ == profile_setup::kLr2ImportRow, render::MenuHitTargetKind::SettingsRow,
                     profile_setup::kLr2ImportRow, true, false);

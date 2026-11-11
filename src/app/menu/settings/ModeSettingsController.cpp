@@ -159,10 +159,6 @@ ModeSettingsEffects ModeSettingsController::apply_selected_action(
             runtime.mode.song_index_profile = cycle_song_index_profile(
                 runtime.mode.song_index_profile, direction);
             return mark_changed(true);
-        case ModeSettingId::IndexDifficulty:
-            runtime.mode.calculate_song_index_difficulty =
-                !runtime.mode.calculate_song_index_difficulty;
-            return mark_changed(true);
         case ModeSettingId::GhostBattle:
             runtime.mode.ghost_battle_enabled = !runtime.mode.ghost_battle_enabled;
             return mark_changed();

@@ -33,6 +33,10 @@ int cycle_graphics_refresh_hz(int value, int direction) {
                : kGraphicsRefreshHzUnlimited;
 }
 
+bool effective_vsync_enabled(bool configured_vsync, int configured_refresh_hz) {
+    return configured_vsync && configured_refresh_hz != kGraphicsRefreshHzUnlimited;
+}
+
 int effective_configured_refresh_hz(int configured_refresh_hz,
                                     int detected_monitor_refresh_hz,
                                     bool gameplay_active) {
@@ -50,12 +54,9 @@ int effective_present_refresh_hz(bool vsync_enabled, int configured_refresh_hz,
     return clamp_graphics_refresh_hz(detected_monitor_refresh_hz);
 }
 
-int effective_render_fps_limit(bool vsync_enabled, int configured_refresh_hz,
+int effective_render_fps_limit(bool configured_vsync, int configured_refresh_hz,
                                int detected_monitor_refresh_hz, bool gameplay_active) {
-    if (!vsync_enabled) {
-        if (configured_refresh_hz == kGraphicsRefreshHzUnlimited) {
-            return gameplay_active ? kGraphicsUnlimitedFpsCap : kGraphicsMenuRefreshHzCap;
-        }
+    if (!effective_vsync_enabled(configured_vsync, configured_refresh_hz)) {
         return effective_configured_refresh_hz(
             configured_refresh_hz, detected_monitor_refresh_hz, gameplay_active);
     }

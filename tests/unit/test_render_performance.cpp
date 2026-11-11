@@ -708,13 +708,15 @@ TEST_CASE("skin preview long-note placement never reverses at extreme judgement 
 }
 
 }  // namespace
-TEST_CASE("external ONNX background policy restores original image sizes in ONNX mode") {
+TEST_CASE("BGA sources above 480p keep their native resolution with ONNX selected") {
     using tenriff::render::OnnxBackgroundUpscaler;
 
     CHECK(OnnxBackgroundUpscaler::should_upscale(640, 480, "onnx"));
-    CHECK(OnnxBackgroundUpscaler::should_upscale(1280, 720, "onnx"));
-    CHECK(OnnxBackgroundUpscaler::should_upscale(1920, 1080, "onnx"));
-    CHECK(OnnxBackgroundUpscaler::should_upscale(3840, 2160, "onnx"));
+    CHECK(OnnxBackgroundUpscaler::should_upscale(854, 480, "onnx"));
+    CHECK_FALSE(OnnxBackgroundUpscaler::should_upscale(854, 481, "onnx"));
+    CHECK_FALSE(OnnxBackgroundUpscaler::should_upscale(1280, 720, "onnx"));
+    CHECK_FALSE(OnnxBackgroundUpscaler::should_upscale(1920, 1080, "onnx"));
+    CHECK_FALSE(OnnxBackgroundUpscaler::should_upscale(3840, 2160, "onnx"));
     CHECK_FALSE(OnnxBackgroundUpscaler::should_upscale(4097, 1080, "onnx"));
     CHECK_FALSE(OnnxBackgroundUpscaler::should_upscale(640, 0, "onnx"));
     CHECK_FALSE(OnnxBackgroundUpscaler::should_upscale(1280, 720, "off"));

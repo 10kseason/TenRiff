@@ -6,6 +6,7 @@ namespace {
 
 using tenriff::app::effective_present_refresh_hz;
 using tenriff::app::effective_render_fps_limit;
+using tenriff::app::effective_vsync_enabled;
 using tenriff::app::cycle_graphics_refresh_hz;
 using tenriff::app::normalize_graphics_refresh_hz;
 using tenriff::app::should_allow_tearing_present;
@@ -32,20 +33,24 @@ TEST_CASE("graphics timing exposes only match display and unlimited") {
     CHECK(normalize_graphics_refresh_hz(5000) == -1);
 }
 
-TEST_CASE("unlimited caps off-vsync gameplay rendering at 1500 fps") {
-    CHECK(effective_present_refresh_hz(false, 0, 144, true) == 144);
-    CHECK(effective_render_fps_limit(false, 0, 144, true) ==
-          tenriff::app::kGraphicsUnlimitedFpsCap);
-    CHECK(effective_render_fps_limit(false, 0, 144, false) == 300);
-    CHECK(effective_present_refresh_hz(true, 0, 144, true) == 144);
-    CHECK(effective_render_fps_limit(true, 0, 144, true) == 288);
+TEST_CASE("unlimited bypasses saved vsync and applies its gameplay and menu caps") {
+    for (bool configured_vsync : {false, true}) {
+        CHECK_FALSE(effective_vsync_enabled(configured_vsync, 0));
+        CHECK(effective_present_refresh_hz(configured_vsync, 0, 60, true) == 60);
+        CHECK(effective_render_fps_limit(configured_vsync, 0, 60, true) ==
+              tenriff::app::kGraphicsUnlimitedFpsCap);
+        CHECK(effective_render_fps_limit(configured_vsync, 0, 60, false) ==
+              tenriff::app::kGraphicsMenuRefreshHzCap);
+    }
 }
 
 TEST_CASE("graphics timing uses the detected monitor refresh when vsync is enabled") {
+    CHECK(effective_vsync_enabled(true, -1));
+    CHECK_FALSE(effective_vsync_enabled(false, -1));
     CHECK(effective_present_refresh_hz(true, -1, 144, false) == 144);
     CHECK(effective_render_fps_limit(true, -1, 144, false) == 288);
-    CHECK(effective_present_refresh_hz(true, 0, 240, true) == 240);
-    CHECK(effective_render_fps_limit(true, 0, 240, true) == 480);
+    CHECK(effective_present_refresh_hz(true, -1, 240, true) == 240);
+    CHECK(effective_render_fps_limit(true, -1, 240, true) == 480);
 }
 
 TEST_CASE("graphics timing clamps doubled vsync fps into the supported max") {

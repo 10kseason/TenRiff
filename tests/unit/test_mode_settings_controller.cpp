@@ -34,6 +34,7 @@ TEST_CASE("mode setting identifiers preserve renderer row values") {
         CHECK(*mode_setting_index(kModeSettingOrder[index]) == index);
     }
     CHECK_FALSE(mode_setting_id_at(kModeSettingOrder.size()).has_value());
+    CHECK_FALSE(mode_setting_index(static_cast<ModeSettingId>(1)).has_value());
 }
 
 TEST_CASE("mode indexing changes defer exactly one library refresh until Back") {

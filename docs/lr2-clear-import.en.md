@@ -1,4 +1,12 @@
-# LR2 clear lamp import
+# LR2 / LR2oraja record import
+
+Select LR2oraja's `player/<profile>/score.db` with the same import button. Chart SHA-256 identifies records. Clear type, EX score, maximum combo and minimum BP are stored per LN/CN/HCN mode in `<profile>/lr2oraja_import.json`. Song Select prefers LN, followed by CN and HCN, and labels the displayed mode. Fast indexing hashes the selected chart once for this lookup.
+
+EX is twice the original PG total plus the GR total. Clear type, combo and minimum BP can represent personal bests from different plays. Restoring a result's millisecond distribution also requires a replay with actual input timestamps. The score DB ghost stores per-note judgement categories. [LR2oraja storage format](https://github.com/wcko87/lr2oraja/blob/lr2oraja/src/bms/player/beatoraja/ScoreData.java)
+
+The source database is read-only. A completed import refreshes records from the same source. Course, special-mode and unrecognized rows are skipped. If the database has pending WAL frames, close the game that owns it and retry.
+
+## LR2 clear lamps
 
 Imports clear lamps from an LR2 score database into a TenRiff profile and shows them in Song Select. Display only: an imported lamp is never a TenRiff result, a BEST record or an upload candidate.
 
@@ -8,7 +16,7 @@ EX checking reads chart notes, RANK, TOTAL, LN, mines and RANDOM metadata withou
 
 ### Import in game
 
-Close LR2, then open **Options → Profile → Import LR2 Records** and select the score `.db` file. The active profile receives the lamps. Registered song folders and the current folder are checked for EX; basic lamps are imported even without matching songs.
+Close LR2, then open **Options → Profile → Import Score Database** and select the score `.db` file. The active profile receives the lamps. Registered song folders and the current folder are checked for EX; basic lamps are imported even without matching songs.
 
 Import runs in the background. Select the same button again to cancel. Completion refreshes Song Select immediately without restarting. Reimport replaces the previous LR2 lamp list. Cancellation, read/write failure or closing the game keeps the existing list. TenRiff records, BEST and online eligibility are unchanged.
 

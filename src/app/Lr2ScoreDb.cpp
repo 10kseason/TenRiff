@@ -287,6 +287,24 @@ int clamp_int(const Value& value) {
 
 }  // namespace
 
+std::int64_t Lr2orajaScore::ex_score() const noexcept {
+    return 2 * (static_cast<std::int64_t>(early[0]) + late[0]) + early[1] + late[1];
+}
+
+bool Lr2orajaScore::valid() const noexcept {
+    const auto nonnegative = [](int value) { return value >= 0; };
+    return clear >= 1 && clear <= 10 && notes > 0 && maxcombo >= 0 && minbp >= 0 &&
+           std::all_of(early.begin(), early.end(), nonnegative) &&
+           std::all_of(late.begin(), late.end(), nonnegative) &&
+           ex_score() <= 2 * static_cast<std::int64_t>(notes);
+}
+
+bool is_lr2oraja_chart_hash(std::string_view hash) noexcept {
+    return hash.size() == 64 && std::all_of(hash.begin(), hash.end(), [](char digit) {
+        return (digit >= '0' && digit <= '9') || (digit >= 'a' && digit <= 'f');
+    });
+}
+
 Lr2ScoreDbResult read_lr2_score_db_bytes(std::string_view bytes) {
     Lr2ScoreDbResult result;
     Reader reader(bytes);
@@ -304,19 +322,13 @@ Lr2ScoreDbResult read_lr2_score_db_bytes(std::string_view bytes) {
     };
     if (!reader.walk_table(1, find_table, result.error)) return result;
     if (root == 0) {
-        result.error = "No LR2 score table in this database.";
+        result.error = "No score table in this database.";
         return result;
     }
 
     const auto names = column_names(sql);
     std::unordered_map<std::string, std::size_t> index;
     for (std::size_t i = 0; i < names.size(); ++i) index.emplace(names[i], i);
-    for (const char* required : {"hash", "clear", "perfect", "great", "good", "bad", "poor", "totalnotes"}) {
-        if (index.find(required) == index.end()) {
-            result.error = std::string("LR2 score table has no '") + required + "' column.";
-            return result;
-        }
-    }
     const auto column = [&](const std::vector<Value>& row, const char* name) -> const Value* {
         const auto it = index.find(name);
         return it != index.end() && it->second < row.size() ? &row[it->second] : nullptr;
@@ -329,6 +341,56 @@ Lr2ScoreDbResult read_lr2_score_db_bytes(std::string_view bytes) {
         const Value* value = column(row, name);
         return value && value->kind == Value::Kind::Text ? value->text : std::string{};
     };
+    if (index.count("sha256")) {
+        result.source = Lr2ScoreDbSource::Lr2oraja;
+        static constexpr std::array<const char*, 6> early{"epg", "egr", "egd", "ebd", "epr", "ems"};
+        static constexpr std::array<const char*, 6> late{"lpg", "lgr", "lgd", "lbd", "lpr", "lms"};
+        for (const char* required : {"sha256", "mode", "clear", "notes", "combo", "minbp",
+                                     "epg", "lpg", "egr", "lgr", "egd", "lgd", "ebd", "lbd",
+                                     "epr", "lpr", "ems", "lms"}) {
+            if (!index.count(required)) {
+                result.error = std::string("LR2oraja score table has no '") + required + "' column.";
+                return result;
+            }
+        }
+        const auto integer = [&](const std::vector<Value>& row, const char* name) {
+            const auto* value = column(row, name);
+            // SQLite's nullable primitive columns load as zero in LR2oraja.
+            if (!value || value->kind == Value::Kind::Null) return 0;
+            return value && value->kind == Value::Kind::Integer && value->integer >= 0 &&
+                value->integer <= (std::numeric_limits<int>::max)()
+                ? static_cast<int>(value->integer) : -1;
+        };
+        const auto read_lr2oraja_row = [&](const std::vector<Value>& values) {
+            if (result.lr2oraja_rows.size() + result.skipped_rows >= kMaxRows) return false;
+            Lr2orajaScoreRow row;
+            row.sha256 = lower_ascii(text(values, "sha256"));
+            row.ln_mode = integer(values, "mode");
+            row.score.clear = integer(values, "clear");
+            row.score.notes = integer(values, "notes");
+            row.score.maxcombo = integer(values, "combo");
+            row.score.minbp = integer(values, "minbp");
+            for (std::size_t i = 0; i < early.size(); ++i) {
+                row.score.early[i] = integer(values, early[i]);
+                row.score.late[i] = integer(values, late[i]);
+            }
+            if (is_lr2oraja_chart_hash(row.sha256) && row.ln_mode >= 0 &&
+                row.ln_mode < kLr2orajaLnModeCount && row.score.valid()) {
+                result.lr2oraja_rows.push_back(std::move(row));
+            } else {
+                ++result.skipped_rows;
+            }
+            return true;
+        };
+        if (!reader.walk_table(root, read_lr2oraja_row, result.error)) result.lr2oraja_rows.clear();
+        return result;
+    }
+    for (const char* required : {"hash", "clear", "perfect", "great", "good", "bad", "poor", "totalnotes"}) {
+        if (!index.count(required)) {
+            result.error = std::string("LR2 score table has no '") + required + "' column.";
+            return result;
+        }
+    }
     const auto read_row = [&](const std::vector<Value>& row) {
         if (result.rows.size() >= kMaxRows) return false;
         Lr2ScoreRow score;
@@ -352,6 +414,17 @@ Lr2ScoreDbResult read_lr2_score_db_bytes(std::string_view bytes) {
 
 Lr2ScoreDbResult read_lr2_score_db(const std::filesystem::path& path) {
     Lr2ScoreDbResult result;
+    auto wal = path;
+    wal += "-wal";
+    const auto has_wal_frames = [&] {
+        std::error_code wal_error;
+        const auto size = std::filesystem::file_size(wal, wal_error);
+        return !wal_error && size > 32;
+    };
+    if (has_wal_frames()) {
+        result.error = "Score database has pending WAL frames.";
+        return result;
+    }
     std::error_code ec;
     const auto size = std::filesystem::file_size(path, ec);
     if (ec) {
@@ -366,6 +439,10 @@ Lr2ScoreDbResult read_lr2_score_db(const std::filesystem::path& path) {
     std::string bytes(static_cast<std::size_t>(size), '\0');
     if (!stream || !stream.read(bytes.data(), static_cast<std::streamsize>(bytes.size()))) {
         result.error = "Cannot read the LR2 score database.";
+        return result;
+    }
+    if (has_wal_frames()) {
+        result.error = "Score database has pending WAL frames.";
         return result;
     }
     return read_lr2_score_db_bytes(bytes);

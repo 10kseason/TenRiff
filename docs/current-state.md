@@ -1,4 +1,4 @@
-> **2026-11-11 · 1.9.9.9-final6** 7+1과 8K 키 설정을 분리하고 스크래치 기본색을 빨강으로 바꿨습니다. 14+2 DP와 16K에서 노트는 각 블록 안에 그립니다. [한국어](release-1.9.9.9-final6.ko.md)
+> **2026-11-11 · 1.9.9.9-final6** 7+1·8K 키 설정 분리와 빨간 스크래치, 16레인 간격 수정에 무제한 VSync 처리와 타이밍 마커 캐시를 더했습니다. LR2oraja 기록을 가져오고 BMS 원본 레벨과 고해상도 BGA 원본 프레임을 사용합니다. [한국어](release-1.9.9.9-final6.ko.md)
 
 > **2026-11-10 · 1.9.9.9-final5:** LR2 기록 가져오기의 해시·차트 탐색 비용을 줄이고, 원본 RANK가 없거나 범위 밖일 때 EX를 잘못 인정하던 오류를 수정했습니다. Andro의 빈 꼬리 마디가 대표 BPM을 1로 만들던 문제를 수정했습니다. 고정 기준선은 final4를 유지합니다. [Release](release-1.9.9.9-final5.ko.md). Earlier notices below are historical.
 
@@ -267,8 +267,8 @@
   - NK3는 번들된 P64를 host beam32에 항상 결합한다. 10K가 아닌 원본을 10K로 변환할 때만 일반화 패턴 MLP를 추가하고, 10→10과 나머지 모든 경로는 P64만 사용한다. 기본 `AUTO` 백엔드는 ncnn Vulkan으로 P64와 MLP를 AMD/NVIDIA GPU에서 실행하고, 선택형 OpenVINO 호환 경로는 폴백으로 유지한다. `TENRIFF_NK3_BACKEND`와 `TENRIFF_NK3_VULKAN_DEVICE`로 강제 선택할 수 있다.
   - 1.9.0.1 공식 빌드/Windows ZIP은 standalone BMS key converter CLI/GUI를 만들거나 포함하지 않으며 top-level CMake 옵션도 기본 `OFF`; 소스는 개발 회귀용으로만 유지
   - `mode.key_mode=none`은 차트의 원래 키 수와 기본 패턴 레이아웃을 그대로 유지
-- Native difficulty:
-  - BMS LV/CR 계산에서 롱노트 Head/Tail의 miss-ms만 0.5배로 평가해 `300ms`를 `150ms`처럼 완화하며, 실제 gameplay 판정창은 그대로 유지
+- 곡 난이도
+  - 게임 내 인덱싱과 기본 레벨 표기는 BMS 작성자가 지정한 `#PLAYLEVEL`을 사용합니다.
 - Lane transform:
   - Random은 `Off / Mirror / Random (Scratch Fixed) / SR`를 지원한다. 일반 Random은 매 플레이 새 seed로 스크래치를 제외한 건반만 섞고 replay에는 실제 seed를 기록하며, Mirror는 key-mode 변환 뒤 최종 레인을 반전한다.
   - `LN Mix 10%~90%`의 새 v2는 base BPM×Rate 기준 긴 2·4박 60% / 중간 1박 20% / 짧은 1/4·1/2박 20%를 목표로 혼합. 기존 LN·원본 head·키음을 보존하고 같은 레인 다음 노트 전 50ms를 남기며 공간 부족 시 길이를 단계적으로 낮춤. 동일 레인 연타를 합치지 않음. 이전 리플레이는 v1로 재현하고 v2는 로컬 기록·리플레이에만 남겨 기존 BEST·Sites 업로드에서 제외. [추가 조건과 검증](release-1.8.8-gate.md) 참고
@@ -325,15 +325,15 @@
   - 기존 해상도 프리셋과 가로/세로 직접 입력(각 320–8192), 창 테두리 자유 크기 조절. 16:9 내용 비율·여백·클릭 좌표를 유지하고 드래그 완료 크기를 저장. [조작과 복구 조건](config.md#graphics) 참고
   - 단독 요약·분석 탭·멀티 결과 하단에 `F9` PNG 저장과 `screenshots/` 위치를 작게 안내. 현재 작업 폴더 아래에 저장하며, 이번 릴리스의 실제 저장 검증은 [추가 릴리스 조건](release-1.8.8-gate.md)을 따름
   - `refresh_hz` (`-1` = `디스플레이에 맞춤`, `0` = `무제한`, 실제 최대 1500 FPS)
-  - VSync off: 디스플레이에 맞춤은 모니터 주사율을 사용하고, 무제한은 gameplay를 1500 FPS로 제한하며 menu cap `300`은 유지
-  - VSync on: present refresh는 active monitor Hz를 따라가고 render pacing은 `monitor_hz * 2`를 목표로 함 (`1050` clamp)
+  - 무제한은 VSync를 끄고 게임플레이 최대 1500 FPS, 메뉴 최대 300 FPS를 적용.
+  - 디스플레이에 맞춤은 모니터 주사율을 따르고 저장된 VSync 값을 적용. VSync가 켜지면 렌더링 목표는 모니터 주사율의 두 배이며 최대 1050 FPS.
   - `visual_offset_ms`
   - `performance_overlay` (인게임 FPS/frame-time은 성공한 DXGI `Present()` 완료 간격 기준; HUD update cadence는 별도 gameplay diagnostics로만 유지)
   - `bga_enabled=false`는 게임플레이 이미지/영상 BGA와 디코더·업스케일러 작업을 끄며 Song Select 미리보기는 유지
   - `background_upscale_model_path`는 Graphics Settings에서 선택하거나 드롭한 호환 ONNX 경로만 저장하며 공개 모델은 포함하지 않음
   - BGA Upscaler는 기본 `off`; 사용자가 명시적으로 켜고 고사양 경고를 확인해야 하며 자동 benchmark gate는 없음
   - 현재 지원 계약은 960x540 RGB residual x2이며 FP32/FP16 입출력과 float 경계 INT8 QDQ metadata를 자동 감지. 모델 권리·품질·성능은 사용자가 확인; 로드·계약·decode·추론 실패 시 native scaling 유지
-  - 정지 이미지 BGA는 비동기 ONNX 업스케일을 유지하고, 영상 BGA는 늦은 과거 추론 프레임이 최신 프레임을 덮어 흔들리지 않도록 native decode 프레임만 표시
+  - 높이 480픽셀 초과 BGA는 원본 프레임으로 재생. ONNX 이미지 처리는 높이 480픽셀 이하에 적용.
   - 기본값은 고성능 DirectX GPU. `background_upscale_prefer_npu=true`는 레거시 WinML `DirectXMinPower` 요청일 뿐 NPU를 명시 선택하거나 endpoint로 검증하지 않으므로 NPU 성공으로 간주하지 않음
 - Gameplay performance:
   - static playfield command-list cache
@@ -372,10 +372,9 @@
   - `fast`는 곡 목록용 최소 메타데이터(제목/아티스트/키 수/#PLAYLEVEL/BPM)만 수집
   - Mode Settings의 `Indexing` row와 `config.mode.song_index_profile`로 제어
   - `fast`는 파일 해시, 배경/오디오 미리보기 탐색, 난이도표 매칭, 자체 LV/CR 계산을 생략
-- difficulty calculation:
-  - Mode Settings의 `Index Difficulty`와 `config.mode.calculate_song_index_difficulty`로 제어
-  - 기본 `off`는 BMS `#PLAYLEVEL`만 유지하고 자체 LV/CR 계산을 생략
-  - `on`은 `safe`에서 Revive LV/Circus Rating을 계산하며, `fast`에서는 항상 생략
+- 난이도 표기
+  - 기본 레벨은 BMS `#PLAYLEVEL`을 사용. 계산된 레벨이 든 이전 캐시는 다음 인덱싱에서 갱신.
+  - 선택한 외부 난이도표는 해당 표의 표기를 사용.
 - 인덱싱 stage:
   - `SCANNING FILES`
   - `BUILDING METADATA`

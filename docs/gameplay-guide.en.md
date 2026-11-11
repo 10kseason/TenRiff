@@ -99,7 +99,7 @@ The 1.8.9 lobby separates large BEST numbers from maximum score, COMBO units and
 - `Audio`
   - Adjust Master, BMS Performance and TenRiff Menu Music volumes, plus the BMS keysound mode
 - `Graphics`
-  - Adjust VSync, Refresh Hz, Performance HUD, BGA visibility, and the external ONNX BGA Upscaler
+  - Adjust Refresh Hz, Performance HUD, BGA visibility, and the external ONNX BGA Upscaler. Unlimited disables VSync
   - Turning `BGA` off disables gameplay image/video backgrounds and their decoder/upscaler work; Song Select previews remain visible
   - Selecting a model is separate from enabling the upscaler and accepting its high-spec warning. Experimental `Low-Power DirectX` only requests DirectXMinPower and does not explicitly select or verify an NPU
 - `Skins`

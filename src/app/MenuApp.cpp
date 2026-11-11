@@ -1924,7 +1924,7 @@ void MenuApp::restart_render_thread() {
 
 render::RenderConfig MenuApp::current_render_config() const {
     render::RenderConfig render_config;
-    render_config.vsync = config_.graphics.vsync;
+    render_config.vsync = effective_vsync_enabled(config_.graphics.vsync, config_.graphics.refresh_hz);
     render_config.fps_limit = effective_render_fps_limit();
     if (current_screen() == Screen::Gameplay) {
         std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
@@ -1971,7 +1971,7 @@ render::MenuWindowConfig MenuApp::current_window_config() const {
     // Preview changes only the live window. The saved display mode is untouched.
     if (skin_preview_fullscreen_ && current_screen() == Screen::SettingsSkins &&
         window_config.display_mode == "windowed") window_config.display_mode = "borderless";
-    window_config.vsync = config_.graphics.vsync;
+    window_config.vsync = effective_vsync_enabled(config_.graphics.vsync, config_.graphics.refresh_hz);
     window_config.refresh_hz = effective_present_refresh_hz();
     window_config.width = width;
     window_config.height = height;
@@ -2174,7 +2174,6 @@ void MenuApp::switch_song_source(const std::string& new_songs_path, bool force_r
     song_indexer_.stop();
     SongIndexOptions index_options;
     index_options.difficulty_table_path = config_.ui.difficulty_table_path;
-    index_options.calculate_difficulty = config_.mode.calculate_song_index_difficulty;
     index_options.reuse_cached_metadata = !force_reindex;
     index_options.profile = (config::normalize_song_index_profile_token(config_.mode.song_index_profile) == "fast")
                                 ? SongIndexProfile::Fast

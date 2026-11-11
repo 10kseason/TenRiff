@@ -14,6 +14,8 @@
 
 #include "app/MenuApp.h"
 #include "app/GameSession.h"
+#include "app/GraphicsTiming.h"
+#include "app/ChartFileHash.h"
 #include "app/ProfileSetupFlow.h"
 #include "config/KeycodeMap.h"
 #include "timing/HighResClock.h"
@@ -388,27 +390,76 @@ struct MenuAppSkinPreviewTestAccess {
     }
     static void check_loading_render_cap() {
         auto menu = std::make_unique<MenuApp>();
-        menu->config_.graphics.refresh_hz = 0;
         for (bool vsync : {false, true}) {
             menu->config_.graphics.vsync = vsync;
+            menu->config_.graphics.refresh_hz = kGraphicsRefreshHzUnlimited;
             menu->reset_screen(MenuApp::Screen::Gameplay);
             menu->gameplay_hud_.loading = false;
             menu->gameplay_hud_.active = true;
             const auto playing = menu->current_render_config();
-            REQUIRE(playing.fps_limit > 60);
+            CHECK(playing.fps_limit == kGraphicsUnlimitedFpsCap);
+            CHECK_FALSE(playing.vsync);
+            CHECK_FALSE(menu->current_window_config().vsync);
             menu->gameplay_hud_.loading = true;
             menu->gameplay_hud_.active = false;
-            CHECK(menu->current_render_config().fps_limit == 60);
-            CHECK(menu->current_render_config().vsync == vsync);
+            const auto loading = menu->current_render_config();
+            CHECK(loading.fps_limit == 60);
+            CHECK_FALSE(loading.vsync);
             menu->gameplay_hud_.loading = false;
             menu->gameplay_hud_.active = true;
             CHECK(menu->current_render_config().fps_limit == playing.fps_limit);
             menu->reset_screen(MenuApp::Screen::SongSelect);
             const auto lobby = menu->current_render_config();
             menu->gameplay_hud_.loading = true;
+            CHECK(lobby.fps_limit == kGraphicsMenuRefreshHzCap);
             CHECK(menu->current_render_config().fps_limit == lobby.fps_limit);
-            CHECK(menu->config_.graphics.refresh_hz == 0);
+            CHECK(menu->config_.graphics.refresh_hz == kGraphicsRefreshHzUnlimited);
+            CHECK(menu->config_.graphics.vsync == vsync);
+
+            menu->config_.graphics.refresh_hz = kGraphicsRefreshHzMatchDisplay;
+            CHECK(menu->current_render_config().vsync == vsync);
+            CHECK(menu->current_window_config().vsync == vsync);
         }
+    }
+
+    static void check_lr2oraja_score_summary() {
+        auto menu = std::make_unique<MenuApp>();
+        menu->reset_screen(MenuApp::Screen::SongSelect);
+        SongEntry entry;
+        entry.path = (std::filesystem::u8path(TENRIFF_SOURCE_DIR) /
+            "tests/fixtures/lr2/import/charts/proven.bms").u8string();
+        entry.format = "bms";
+        entry.key_count = 8;
+        entry.level = entry.native_level = 12;
+        entry.sha256 = hash_chart_file_utf8(entry.path).sha256;
+        REQUIRE(!entry.sha256.empty());
+        menu->indexed_songs_ = {entry};
+        menu->visible_song_indices_ = {0};
+        menu->selected_song_ = 0;
+        menu->song_select_view_ = MenuApp::SongSelectView::Songs;
+        Lr2orajaScore score;
+        score.clear = 6;
+        score.notes = 100;
+        score.early[0] = 78;
+        score.early[1] = 18;
+        score.maxcombo = 72;
+        score.minbp = 6;
+        menu->lr2oraja_imported_scores_[entry.sha256][0] = score;
+        for (bool fast : {false, true}) {
+            menu->indexed_songs_[0].sha256 = fast ? "" : entry.sha256;
+            render::MenuRenderData view;
+            menu->populate_song_select_render_data(view, "", {}, nullptr);
+            CHECK(view.song_select.selected_song_lr2oraja_label == "LR2oraja LN  HARD CLEAR");
+            CHECK(view.song_select.selected_song_lr2oraja_score == "EX 174/200  COMBO 72  BP 6");
+            CHECK(view.song_select.selected_song_difficulty == "LV 12");
+        }
+        menu->lr2oraja_imported_scores_.clear();
+        render::MenuRenderData view;
+        view.song_select.selected_song_lr2oraja_label = "old";
+        menu->populate_song_select_render_data(view, "", {}, nullptr);
+        CHECK(view.song_select.selected_song_lr2oraja_label.empty());
+        CHECK(menu->chart_best_results_.empty());
+        CHECK(menu->local_play_records_.empty());
     }
 
     static std::unique_ptr<MenuApp> fixture(const char* display_mode = "windowed") {
@@ -871,6 +922,9 @@ TEST_CASE("skin overhaul automatic aspect follows configured destination dimensi
 }
 TEST_CASE("chart loading caps rendering without changing gameplay or saved graphics settings") {
     tenriff::app::MenuAppSkinPreviewTestAccess::check_loading_render_cap();
+}
+TEST_CASE("LR2oraja summary matches selected Safe and Fast charts without creating native results") {
+    tenriff::app::MenuAppSkinPreviewTestAccess::check_lr2oraja_score_summary();
 }
 
 TEST_CASE("feedback regression preview gear drag saves embedded and fullscreen offsets without changing skin selection") {

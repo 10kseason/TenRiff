@@ -198,8 +198,8 @@ Grade/Session Mix uses a separate LR2-reference gauge, carried between songs, wi
 - `refresh_hz` (int)
   - `-1` selects `Match Display`; `0` is the profile-compatible `Unlimited` selector with an actual 1500 FPS maximum
   - legacy fixed numeric limits migrate to `-1`
-  - with `vsync=false`, Unlimited paces gameplay at no more than 1500 FPS while menu rendering keeps a 300 FPS cap
-  - when `vsync=true`, the present refresh follows the active monitor Hz and render pacing targets `monitor_hz * 2` (`1050` clamp)
+  - `Unlimited` disables VSync and caps gameplay rendering at 1500 FPS and menus at 300 FPS.
+  - `Match Display` follows the active monitor refresh rate and applies the saved `vsync` setting. With VSync on, render pacing targets twice the monitor Hz, capped at 1050 FPS.
 - `performance_overlay` (bool)
   - defaults to `false`; it occupies the top-right corner and can overlap a Discord Voice widget placed there
   - in-game frame pacing measures intervals between successful DXGI `Present()` completions; HUD update cadence is not used as an FPS sample
@@ -207,6 +207,7 @@ Grade/Session Mix uses a separate LR2-reference gauge, carried between songs, wi
   - defaults to `true`; `false` disables gameplay image/video BGA plus its decoder and upscaler work
   - Song Select background previews remain visible because they are a separate feature
 - `background_upscale_mode` (string)
+  - BGA above 480 pixels in height retains its native frame dimensions. ONNX image processing applies to sources at or below 480 pixels in height.
   - `onnx | off`; legacy `lunasr` maps to `onnx`; default `off`. Enabling requires the high-spec warning, without an automatic performance benchmark
   - original → FFmpeg RGB deblock → model-native x1–x4 inference → residual composition/complete image → display fit/crop; no pre-resizing to 960×540
   - dynamic models use the whole original; fixed models use padding/context tiles. Source/output axis bounds4096/8192; cache3 images/96MiB per instance. Video AI remains disabled
@@ -286,15 +287,14 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
   - `auto_scratch`: automatically plays actual BMS scratches only. Score multiplier 0%, ASSIST record, excluded from official best records and rankings
 - `song_index_profile` (string)
   - `safe | fast`
-  - Default `safe`: prepares hashes and preview metadata, and supports difficulty tables. Native LV/CR calculation follows the separate setting below.
+  - Default `safe` prepares hashes and preview metadata and supports difficulty tables. Base chart levels use BMS `#PLAYLEVEL`.
   - Saved choices are preserved. Optional `fast` (minimal) skips hashes, previews and difficulty calculation.
   - Both profiles use the available logical CPU threads for folder indexing. Remaining files and free RAM determine concurrent work.
   - Existing-cache parsing and ALL SONG cached-path validation also run in parallel.
 - `calculate_song_index_difficulty` (bool)
   - defaults to `false`
-  - `false` keeps BMS `#PLAYLEVEL` as the menu LV and skips the CPU-heavy native LV/CR calculation
-  - `true` calculates Revive LV/Circus Rating during a full `safe` index; `fast` always skips it
-  - changing the setting separates cache modes and triggers a full reindex of the current song source
+  - Retained for older profiles. In-game indexing uses BMS `#PLAYLEVEL` for either value.
+  - Older caches with calculated levels refresh to BMS levels during the next index.
 
 ### `ui`
 
@@ -339,7 +339,7 @@ These controls do not change Sites submission policy. Long LN Mix v2 exclusion f
 
 Difficulty-table headers use `name`, `symbol` and a local relative `data_url`; data entries match `md5` or `sha256` plus `level`. Remote imports are stored in the profile's `difficulty_tables` cache.
 
-Native LV clears `difficulty_table_path` and `difficulty_table_url`; a valid cache removes external table metadata without a full rescan. The default is BMS `#PLAYLEVEL`; with difficulty calculation enabled, the cached calculated LV is retained.
+Native LV clears `difficulty_table_path` and `difficulty_table_url` and displays BMS `#PLAYLEVEL`. Older caches with calculated levels refresh during the next index.
 
 ### `skin`
 

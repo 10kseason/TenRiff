@@ -12,10 +12,71 @@
 #include "app/Lr2ImportJob.h"
 #include "app/ChartFileHash.h"
 #include "util/Utf8Compat.h"
+#include "../fixtures/lr2oraja/ScoreFixture.h"
 
 using namespace tenriff;
 using app::Lr2ExVerdict;
 using app::Lr2Judgement;
+
+TEST_CASE("LR2oraja scores import by chart SHA-256 and keep each LN mode") {
+    namespace fs = std::filesystem;
+    const auto bytes = test::read_lr2oraja_score_fixture();
+    REQUIRE_FALSE(bytes.empty());
+    const auto db = app::read_lr2_score_db_bytes(bytes);
+    REQUIRE(db.success());
+    CHECK(db.source == app::Lr2ScoreDbSource::Lr2oraja);
+    CHECK(db.rows.empty());
+    CHECK(db.lr2oraja_rows.size() == 4);
+    CHECK(db.skipped_rows == 3);
+
+    const auto profile = fs::current_path() / fs::u8path(u8"lr2oraja-프로필-test");
+    REQUIRE(fs::create_directory(profile));
+    struct Cleanup { fs::path path; ~Cleanup() { std::error_code ec; fs::remove_all(path, ec); } } cleanup{profile};
+    const auto input = profile / "score.db";
+    std::ofstream(input, std::ios::binary).write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+    const auto original_time = fs::last_write_time(input);
+    const auto imported = app::prepare_lr2_import(input, {profile / "missing-songs"});
+    REQUIRE(imported.success());
+    CHECK(imported.rows == 7);
+    CHECK(imported.scanned == 0);
+    CHECK(imported.skipped_folders == 0);
+    CHECK(imported.lamps.empty());
+    REQUIRE(imported.lr2oraja_scores.size() == 2);
+    const auto chart = fs::u8path(TENRIFF_SOURCE_DIR) / "tests/fixtures/lr2/import/charts/proven.bms";
+    const auto hash = app::hash_chart_file(chart).sha256;
+    const auto& modes = imported.lr2oraja_scores.at(hash);
+    REQUIRE(modes[0] && modes[1] && modes[2]);
+    CHECK(modes[0]->ex_score() == 174);
+    CHECK(modes[0]->maxcombo == 72);
+    CHECK(modes[0]->minbp == 6);
+    CHECK(modes[0]->early[5] == 3);
+    CHECK(modes[0]->late[5] == 2);
+    CHECK(app::lr2oraja_clear_label(modes[1]->clear) == "EX-HARD CLEAR");
+    CHECK(app::lr2oraja_clear_label(modes[2]->clear) == "FULL COMBO");
+    CHECK(imported.lr2oraja_scores.at(std::string(64, '1'))[0]->clear == 1);
+
+    std::string error;
+    const auto legacy = app::prepare_lr2_import(fs::u8path(TENRIFF_SOURCE_DIR) /
+        "tests/fixtures/lr2/score_fixture.db", {});
+    REQUIRE(legacy.success());
+    REQUIRE(app::save_score_import(profile, legacy, error));
+    REQUIRE(app::save_score_import(profile, imported, error));
+    const auto saved = app::load_lr2oraja_scores(profile);
+    CHECK(app::serialize_lr2oraja_scores(saved) == app::serialize_lr2oraja_scores(imported.lr2oraja_scores));
+    CHECK(app::load_lr2_imported_lamps(app::lr2_import_path_for_profile(profile.u8string())).size() ==
+          legacy.lamps.size());
+    REQUIRE(app::save_score_import(profile, legacy, error));
+    CHECK(app::load_lr2oraja_scores(profile).size() == 2);
+    CHECK(fs::last_write_time(input) == original_time);
+    CHECK(app::hash_chart_file(input).sha256 == app::sha256_bytes(bytes));
+
+    std::ofstream(profile / "score.db-wal", std::ios::binary) << std::string(33, '\0');
+    const auto pending = app::prepare_lr2_import(input, {});
+    CHECK_FALSE(pending.success());
+    CHECK_FALSE(app::save_score_import(profile, pending, error));
+    CHECK(app::serialize_lr2oraja_scores(app::load_lr2oraja_scores(profile)) ==
+          app::serialize_lr2oraja_scores(saved));
+}
 
 TEST_CASE("LR2 import skips media lookup with identical conservative EX results") {
     const auto fixture = std::filesystem::u8path(TENRIFF_SOURCE_DIR) / "tests/fixtures/lr2/import";

@@ -1,5 +1,6 @@
 #include "app/MenuApp.h"
 #include "app/BmsRankLabel.h"
+#include "app/ChartFileHash.h"
 #include "app/DifficultyTable.h"
 #include "config/BuiltinDifficultyTables.h"
 
@@ -104,6 +105,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                                                const MenuApp::LocalPlayRecord* selected_record) {
     using namespace menu_song_select;
     render.song_select.score_clear_status.clear();
+    render.song_select.selected_song_lr2oraja_label.clear();
+    render.song_select.selected_song_lr2oraja_score.clear();
     render.song_select.verified_full_combo = false;
     render.song_select.selected_song_nps_available = false;
     render.song_select.selected_song_nps_average = 0.0;
@@ -678,6 +681,35 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                                          ? visible_song_entry(static_cast<std::size_t>(selected_song_))
                                          : nullptr) {
             render.song_select.selected_song_title = song_title_for_ui(*entry);
+            const auto profile_key = song_nps_profile_key(*entry);
+            const auto* import_hash = &entry->sha256;
+            if (import_hash->empty() && !lr2oraja_imported_scores_.empty()) {
+                // Fast indexing leaves hashes empty. Read the selected chart
+                // once and reuse the lookup until the selection or index changes.
+                if (lr2oraja_selected_hash_cache_.first != profile_key) {
+                    lr2oraja_selected_hash_cache_ = {profile_key, hash_chart_file_utf8(entry->path).sha256};
+                }
+                import_hash = &lr2oraja_selected_hash_cache_.second;
+            }
+            const auto imported_scores = lr2oraja_imported_scores_.find(*import_hash);
+            if (imported_scores != lr2oraja_imported_scores_.end()) {
+                static constexpr std::array<const char*, kLr2orajaLnModeCount> modes{"LN", "CN", "HCN"};
+                for (std::size_t mode = 0; mode < modes.size(); ++mode) {
+                    const auto& score = imported_scores->second[mode];
+                    if (!score) continue;
+                    const auto maximum = 2 * static_cast<std::int64_t>(score->notes);
+                    const std::string minbp = score->minbp == (std::numeric_limits<int>::max)()
+                        ? "--" : std::to_string(score->minbp);
+                    render.song_select.selected_song_lr2oraja_label =
+                        "LR2oraja " + std::string(modes[mode]) + "  " +
+                        std::string(lr2oraja_clear_label(score->clear));
+                    render.song_select.selected_song_lr2oraja_score =
+                        "EX " + std::to_string(score->ex_score()) + "/" + std::to_string(maximum) +
+                        "  COMBO " + std::to_string(score->maxcombo) + "  BP " + minbp;
+                    // Prefer LN, then CN and HCN, and display the chosen source mode.
+                    break;
+                }
+            }
             render.song_select.selected_song_artist = song_artist_for_ui(*entry);
             render.song_select.selected_song_chart_author = safe_ui_text(entry->chart_author);
             render.song_select.selected_song_detail = safe_ui_text_or_placeholder(song_detail_label(*entry), "-");
@@ -699,7 +731,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             render.song_select.selected_song_nps_min = entry->nps_min;
             render.song_select.selected_song_nps_median = entry->nps_median;
             render.song_select.selected_song_nps_max = entry->nps_max;
-            if (const auto* density = song_select_screen_.nps_profile_for(song_nps_profile_key(*entry));
+            if (const auto* density = song_select_screen_.nps_profile_for(profile_key);
                 density && density->available) {
                 render.song_select.selected_song_nps_available = true;
                 render.song_select.selected_song_nps_min = density->minimum;

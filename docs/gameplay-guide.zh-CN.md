@@ -99,7 +99,7 @@ TenRiff 的基础游玩流程如下：
 - `Audio`
   - 调整 Master、BMS Performance、TenRiff Menu Music 音量以及BMS键音模式
 - `Graphics`
-  - 调整 VSync、Refresh Hz、Performance HUD、BGA 显示与外部 ONNX BGA Upscaler
+  - 调整 Refresh Hz、Performance HUD、BGA 显示与外部 ONNX BGA Upscaler。Refresh Hz 设为无限制时会关闭垂直同步
   - 关闭 `BGA` 会禁用 gameplay 图片/视频背景及其 decoder/upscaler 工作；Song Select 预览仍会显示
   - 选择 model 后仍需明确开启 upscaler 并确认高配置警告；实验性 `优先 NPU` 只有在 Windows/driver 实际选择 NPU 时才会使用 NPU
 - `Skins`

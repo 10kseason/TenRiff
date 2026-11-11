@@ -97,7 +97,7 @@ Windows では通常、次のどちらかで起動します。
 - `Audio`
   - Master・BMS Performance・TenRiff Menu Music の音量とBMSキー音モードを調整
 - `Graphics`
-  - VSync、Refresh Hz、Performance HUD、BGA 表示、external ONNX BGA Upscaler を調整
+  - Refresh Hz、Performance HUD、BGA 表示、外部 ONNX BGA Upscaler を調整。Refresh Hz を無制限にすると VSync がオフになります
   - `BGA` を off にすると gameplay image/video background と decoder/upscaler 処理を無効化し、Song Select preview は維持
   - model 選択後に upscaler を明示的に ON にして high-spec 警告を確認する。実験的 `NPU 優先` は Windows/driver が実際に NPU を選択した場合だけ NPU を使う
 - `Skins`

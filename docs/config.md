@@ -206,9 +206,8 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 - `refresh_hz` (int)
   - `-1`은 `디스플레이에 맞춤`, `0`은 프로필 호환용 `무제한` 선택값(실제 최대 1500 FPS)
   - 고정 숫자 제한은 폐기되었으며 로드 시 `-1`로 이전
-  - `vsync=false`의 무제한은 게임플레이를 1500 FPS로 제한하고 메뉴는 300 FPS cap 유지
-  - `vsync=false`면 menu는 effective cap `300`; gameplay는 `-1`일 때 모니터 주사율을 따르고 `0`일 때 1500 FPS render pacing을 적용함
-  - `vsync=true`면 present refresh는 active monitor Hz를 따르고, render pacing은 `monitor_hz * 2`를 목표로 함 (`1050` clamp)
+  - `무제한`에서는 VSync가 꺼지며 게임플레이는 최대 1500 FPS, 메뉴는 최대 300 FPS로 렌더링함.
+  - `디스플레이에 맞춤`은 활성 모니터의 주사율을 따르고 프로필에 저장된 `vsync`를 적용함. VSync가 켜지면 렌더링 목표는 모니터 주사율의 두 배이며 최대 1050 FPS임.
 - `performance_overlay` (bool)
   - 기본값은 `false`; 우상단을 사용하므로 Discord Voice 위젯을 같은 모서리에 두면 겹칠 수 있음
   - 인게임 frame pacing은 성공한 DXGI `Present()` 완료 시각 사이의 간격을 측정하며, HUD 업데이트 주기는 FPS 샘플로 사용하지 않음
@@ -216,6 +215,7 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
   - 기본값은 `true`; `false`면 게임플레이의 이미지/영상 BGA와 관련 디코더·업스케일러 작업을 끔
   - Song Select 배경 미리보기는 별도 기능이므로 계속 표시됨
 - `background_upscale_mode` (string)
+  - 높이 480픽셀 초과 BGA는 원본 프레임 크기로 재생합니다. ONNX 이미지 처리는 높이 480픽셀 이하에 적용합니다.
   - `onnx | off`; 옛 `lunasr`는 `onnx`로 호환하며 기본 `off`. ON은 고사양 경고 확인이 필요하고 자동 성능 검사는 없음
   - 원본 → FFmpeg RGB 디블록 → 모델 고유 x1~x4 추론 → 잔차 합성/완성 이미지 → 표시 맞춤/크롭. 원본을 먼저 960×540 등으로 줄이지 않음
   - 동적 모델은 원본 전체, 고정 모델은 패딩·문맥 타일. 원본 축 최대4096·출력8192, 캐시 인스턴스당3개/96MiB. 영상 AI는 비활성
@@ -296,15 +296,14 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
   - `auto_scratch`: 실제 BMS 스크래치만 자동 입력. 점수 배율 0%, ASSIST 기록이며 공식 최고 기록·랭킹 제외
 - `song_index_profile` (string)
   - `safe | fast`
-  - 기본 `safe`(안전). 해시와 미리보기 메타데이터를 준비하며 난이도표도 이 방식을 사용합니다. 자체 LV/CR 계산 여부는 아래 별도 설정을 따릅니다.
+  - 기본 `safe`(안전). 해시와 미리보기 메타데이터를 준비하며 난이도표도 이 방식을 사용합니다. 기본 난이도는 BMS `#PLAYLEVEL`입니다.
   - 저장된 선택은 유지합니다. 선택 가능한 `fast`(빠름·최소)는 해시·미리보기·난이도 계산을 생략합니다.
   - 두 모드 모두 폴더 인덱싱에서 사용 가능한 논리 코어를 활용합니다. 남은 파일 수와 여유 RAM을 기준으로 동시 작업 수를 조절합니다.
   - 기존 캐시의 JSON 해석과 전체 곡 보기의 캐시 경로 확인도 병렬 처리합니다.
 - `calculate_song_index_difficulty` (bool)
   - 기본값은 `false`
-  - `false`면 BMS `#PLAYLEVEL`을 메뉴 LV로 유지하고 CPU 비용이 큰 자체 LV/CR 계산을 건너뜀
-  - `true`면 `safe` 전체 인덱싱 중 Revive LV/Circus Rating을 계산하며 `fast`에서는 항상 생략
-  - 설정을 바꾸면 캐시 계산 모드를 구분해 현재 song source를 전체 재인덱싱함
+  - 이전 프로필과 호환되는 저장값입니다. 앱 인덱싱은 값과 관계없이 BMS `#PLAYLEVEL`을 사용합니다.
+  - 계산된 레벨이 든 이전 캐시는 다음 인덱싱에서 BMS 표기로 갱신됩니다.
 
 ### `ui`
 
@@ -349,7 +348,7 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 
 난이도표 header는 `name`, `symbol`, 로컬 상대경로 `data_url`을 사용하며 data 항목은 `md5` 또는 `sha256`과 `level`로 매칭합니다. 원격 가져오기는 프로필의 `difficulty_tables` 캐시에 저장합니다.
 
-선택 창의 `F4 기본 LV`는 `difficulty_table_path`와 `difficulty_table_url`을 함께 비웁니다. 기본 LV는 `mode.calculate_song_index_difficulty=false`일 때 BMS `#PLAYLEVEL`, 계산을 켜 둔 캐시에서는 기존 자체 계산 LV입니다. [곡 소스와 표 선택](library-management.md) 참고.
+선택 창의 `F4 기본 LV`는 `difficulty_table_path`와 `difficulty_table_url`을 함께 비우고 BMS `#PLAYLEVEL`로 돌아갑니다. [곡 소스와 표 선택](library-management.md) 참고.
 
 ### `skin`
 

@@ -955,6 +955,12 @@ TEST_CASE("song index save and load support UTF-8 cache paths") {
     CHECK(mode_mismatch.success());
     CHECK_FALSE(mode_mismatch.loaded_from_file);
     CHECK(mode_mismatch.index.entries.empty());
+
+    REQUIRE(save_song_index(index_path.u8string(), index, calculated_options, &error));
+    const auto old_calculated_cache = load_song_index(index_path.u8string());
+    CHECK(old_calculated_cache.success());
+    CHECK_FALSE(old_calculated_cache.loaded_from_file);
+    CHECK(old_calculated_cache.index.entries.empty());
 }
 
 TEST_CASE("song index cache stays profile-local and does not create cache folders in the song source") {

@@ -100,7 +100,7 @@ TenRiff의 기본 플레이 흐름은 아래 순서입니다.
 - `Audio`
   - 마스터·BMS 연주·텐리프 메뉴 음악 볼륨과 BMS 키음 재생 모드 조정
 - `Graphics`
-  - VSync, Refresh Hz, Performance HUD, BGA 표시, 외부 ONNX BGA Upscaler 조정
+  - Refresh Hz, Performance HUD, BGA 표시, 외부 ONNX BGA Upscaler 조정. Refresh Hz를 무제한으로 설정하면 VSync가 꺼짐
   - `BGA`를 끄면 게임플레이 이미지/영상과 관련 디코더·업스케일러 작업이 꺼지며 Song Select 미리보기는 유지됨
   - 모델 선택 후 Upscaler를 직접 켜고 고사양 경고를 확인해야 함. `저전력 DirectX(실험)`은 DirectXMinPower 요청일 뿐 NPU를 명시 선택하거나 검증하지 않음
 - `Skins`

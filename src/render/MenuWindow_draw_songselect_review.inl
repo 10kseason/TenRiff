@@ -331,12 +331,23 @@
             (review.selected_song_favorite ? "  /  " + loc("FAVORITE", "즐겨찾기") : std::string{}) +
             (review.selected_song_ghost_status.empty() ? std::string{} : "  /  GHOST " + review.selected_song_ghost_status);
         review_text(to_wide(state), d2d_->hud_format.Get(), D2D1::RectF(1118, 915, 1858, 931), 0x8F8F98);
+        const bool show_imported_score = !folder_view && !review.showing_records &&
+            !review.selected_song_lr2oraja_label.empty();
+        if (show_imported_score) {
+            // Keep the imported source beside its own score and below session
+            // state, with enough space for the existing start action.
+            review_text(to_wide(review.selected_song_lr2oraja_label), d2d_->hud_format.Get(),
+                D2D1::RectF(1118, 934, 1476, 960), 0xBABAC2);
+            review_text(to_wide(review.selected_song_lr2oraja_score), d2d_->hud_format.Get(),
+                D2D1::RectF(1488, 934, 1858, 960), 0xBABAC2, DWRITE_TEXT_ALIGNMENT_TRAILING);
+        }
         const bool start_enabled = review.showing_sources ? !review.songs.empty() : review.showing_records
             ? review.result_available && !review.online_records : !review.songs.empty();
         const auto action = review.showing_sources ? wloc("OPEN LIBRARY", "라이브러리 열기") : review.showing_records
             ? review.online_records ? wloc("VIEW ONLY", "조회 전용") : wloc("OPEN RESULT", "결과 열기")
             : review.showing_level_folders ? wloc("OPEN LEVEL", "레벨 열기") : wloc("START", "시작");
-        review_button(D2D1::RectF(1104, 936, 1872, 1006), action, MenuHitTargetKind::SongStartButton, 0, start_enabled, false, true);
+        review_button(D2D1::RectF(1104, show_imported_score ? 966.0f : 936.0f, 1872, 1006),
+            action, MenuHitTargetKind::SongStartButton, 0, start_enabled, false, true);
 
         review_line(0, 1024, 1920);
         review_button(D2D1::RectF(48, 1034, 154, 1072), wloc("BACK", "뒤로"), MenuHitTargetKind::SongBackButton, 0);
