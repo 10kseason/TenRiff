@@ -300,9 +300,6 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
     append_menu_row(render.generic, ui_text("Indexing", "인덱싱"),
                     ui_song_index_profile_label(config_.mode.song_index_profile),
                     settings_cursor_ == 0, render::MenuHitTargetKind::SettingsRow, 0, false, true);
-    append_menu_row(render.generic, ui_text("Index Difficulty", "인덱스 난이도"),
-                    ui_on_off(config_.mode.calculate_song_index_difficulty),
-                    settings_cursor_ == 1, render::MenuHitTargetKind::SettingsRow, 1, false, true);
     append_menu_row(render.generic, ui_text("Ghost Battle", "고스트 배틀"), ui_on_off(config_.mode.ghost_battle_enabled),
                     settings_cursor_ == 2, render::MenuHitTargetKind::SettingsRow, 2, false, true);
     append_menu_row(render.generic, ui_text("Autoplay", "오토플레이"), ui_on_off(config_.mode.autoplay_enabled),
@@ -364,12 +361,12 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
     append_menu_row(render.generic, ui_text("Hi-Speed", "하이스피드"), format_decimal(config_.speed.hi_speed), settings_cursor_ == 16,
                     render::MenuHitTargetKind::SettingsRow, 16, false, true);
     append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 17, render::MenuHitTargetKind::SettingsRow, 17, true, false);
-    render.generic.notes.push_back(ui_text("Fast (Minimal) keeps title, artist, key count, level, and BPM only; it skips hashes, previews, difficulty tables, and native LV/CR.",
-                                           "빠름(최소)은 제목, 아티스트, 키 수, 레벨, BPM만 유지하고 해시, 미리보기, 난이도표, 자체 LV/CR을 건너뜁니다."));
+    render.generic.notes.push_back(ui_text("Fast (Minimal) keeps title, artist, key count, BMS level, and BPM. It skips hashes, previews and difficulty tables.",
+                                           "빠름(최소)은 제목, 아티스트, 키 수, BMS 레벨, BPM을 유지하고 해시, 미리보기, 난이도표를 건너뜁니다."));
     render.generic.notes.push_back(ui_text("Choosing a difficulty table automatically switches Fast to Safe so MD5/SHA-256 matches can be applied.",
                                            "난이도표를 선택하면 MD5/SHA-256 매칭을 위해 빠름에서 안전으로 자동 전환합니다."));
-    render.generic.notes.push_back(ui_text("Index Difficulty applies to Safe scans. Fast always skips native LV/CR even when this option is On.",
-                                           "인덱스 난이도는 안전 스캔에 적용되며, 빠름은 이 옵션을 켜도 자체 LV/CR을 항상 건너뜁니다."));
+    render.generic.notes.push_back(ui_text("Base chart levels use BMS #PLAYLEVEL.",
+                                           "기본 곡 난이도는 BMS의 #PLAYLEVEL을 사용합니다."));
     render.generic.notes.push_back(ui_text("Ghost Battle automatically loads the selected chart's best compatible replay into the split ghost comparison view.",
                                            "고스트 배틀은 선택한 차트의 호환되는 최고 리플레이를 자동으로 불러와 분할 비교 화면에 띄웁니다."));
     render.generic.notes.push_back(ui_text("Autoplay injects perfect note hits through the normal gameplay path and marks the result as ASSIST.",
@@ -400,7 +397,7 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
         const auto id = static_cast<menu::settings::ModeSettingId>(row.row_index);
         using Id = menu::settings::ModeSettingId;
         if (id == Id::JudgeWindow) row.category = ui_text("Gauge & Patterns", "게이지·패턴");
-        else if (id <= Id::IndexDifficulty) row.category = ui_text("Library", "라이브러리");
+        else if (id == Id::Indexing) row.category = ui_text("Library", "라이브러리");
         else if (id <= Id::PacemakerTarget) row.category = ui_text("Play & Assistance", "플레이·보조");
         else if (id <= Id::Nk2Preset) row.category = ui_text("Key Layout", "키 배치");
         else if (id <= Id::Mods) row.category = ui_text("Gauge & Patterns", "게이지·패턴");

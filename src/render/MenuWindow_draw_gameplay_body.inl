@@ -589,13 +589,131 @@
             benchmark_song_title_.field_right = surface_layout.player_field.right;
         }
 
+        auto draw_timing_markers = [&](float center_x, float center_y, float half_width, double range_ms,
+                                       const std::array<double, kGameplayTimingHistoryMaxEntries>& history,
+                                       std::size_t count,
+                                       const std::array<bool, kGameplayTimingHistoryMaxEntries>& maximums,
+                                       double maximum_ms, ID2D1SolidColorBrush* brush, bool ghost) {
+            count = std::min(count, history.size());
+            if (count == 0) return;
+
+            const bool barcode = data.gameplay.timing_marker_style == "barcode";
+            const auto draw_marks = [&](ID2D1RenderTarget* target, ID2D1SolidColorBrush* fill,
+                                        float x, float y) {
+                const auto draw_mark = [&](std::size_t i, float radius, float opacity) {
+                    const double delta = history[i];
+                    const float mark_x = x + static_cast<float>(
+                        std::clamp(delta / range_ms, -1.0, 1.0)) * half_width;
+                    fill->SetColor(D2D1::ColorF(timing_marker_color(delta, maximum_ms, maximums[i]), opacity));
+                    if (barcode) {
+                        target->FillRectangle(D2D1::RectF(mark_x - 1, y - 9, mark_x + 1, y + 9), fill);
+                    } else {
+                        target->FillEllipse(D2D1::Ellipse(D2D1::Point2F(mark_x, y), radius, radius), fill);
+                    }
+                };
+                for (std::size_t i = 0; i < count; ++i) {
+                    const float weight = static_cast<float>(i + 1) / static_cast<float>(count);
+                    draw_mark(i, studio ? 4.0f : 1.4f + 2.4f * weight,
+                              studio ? 0.3f + 0.7f * weight : 0.12f + 0.50f * weight * weight);
+                }
+                if (!studio) draw_mark(count - 1, 5.0f, 0.98f);
+            };
+
+            const auto draw_cached = [&]() {
+                // A small number of marks is cheaper to draw directly.
+                if (count < 8 || brush->GetOpacity() != 1.0f) return false;
+                D2D1_MATRIX_3X2_F transform{};
+                ctx->GetTransform(&transform);
+                float dpi_x = 0, dpi_y = 0;
+                ctx->GetDpi(&dpi_x, &dpi_y);
+                if (transform._12 != 0 || transform._21 != 0 ||
+                    !(transform._11 > 0 && transform._22 > 0) ||
+                    dpi_x != 96 || dpi_y != 96) return false;
+
+                // Rasterize at output resolution and preserve the subpixel center.
+                const float x = center_x * transform._11 + transform._31;
+                const float y = center_y * transform._22 + transform._32;
+                const float extent_x = (half_width + 6) * transform._11;
+                const float extent_y = 10 * transform._22;
+                const auto bounds = D2D1::RectF(std::floor(x - extent_x), std::floor(y - extent_y),
+                    std::ceil(x + extent_x), std::ceil(y + extent_y));
+                const float width = bounds.right - bounds.left;
+                const float height = bounds.bottom - bounds.top;
+                if (!(width > 0 && width <= 4096 && height > 0 && height <= 256)) return false;
+
+                const auto pixels = D2D1::SizeU(static_cast<UINT32>(width), static_cast<UINT32>(height));
+                auto& cache = d2d_->timing_marker_bitmaps[(is_skin_preview ? 2u : 0u) + (ghost ? 1u : 0u)];
+                const auto center = D2D1::Point2F(x - bounds.left, y - bounds.top);
+                const auto aa = ctx->GetAntialiasMode();
+                if (cache.count != count || cache.studio != studio || cache.barcode != barcode ||
+                    cache.half_width != half_width || cache.range_ms != range_ms || cache.maximum_ms != maximum_ms ||
+                    cache.center.x != center.x || cache.center.y != center.y || cache.antialias != aa ||
+                    cache.scale.width != transform._11 || cache.scale.height != transform._22 ||
+                    !std::equal(history.begin(), history.begin() + count, cache.deltas.begin()) ||
+                    !std::equal(maximums.begin(), maximums.begin() + count, cache.maximums.begin())) {
+                    cache.unchanged_frames = 0;
+                    cache.count = count;
+                    cache.studio = studio;
+                    cache.barcode = barcode;
+                    cache.half_width = half_width;
+                    cache.range_ms = range_ms;
+                    cache.maximum_ms = maximum_ms;
+                    cache.center = center;
+                    cache.antialias = aa;
+                    cache.scale = D2D1::SizeF(transform._11, transform._22);
+                    std::copy_n(history.begin(), count, cache.deltas.begin());
+                    std::copy_n(maximums.begin(), count, cache.maximums.begin());
+                    return false;
+                }
+
+                // Give rapidly changing histories the direct path and build only
+                // once the same marks have already been drawn on two frames.
+                if (cache.unchanged_frames < 2) {
+                    if (++cache.unchanged_frames < 2) return false;
+                    if (cache.pixels.width != pixels.width || cache.pixels.height != pixels.height) {
+                        cache.bitmap.Reset();
+                        cache.brush.Reset();
+                        cache.target.Reset();
+                        cache.pixels = pixels;
+                        const auto size = D2D1::SizeF(width, height);
+                        const auto format = D2D1::PixelFormat(
+                            DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED);
+                        if (FAILED(ctx->CreateCompatibleRenderTarget(&size, &pixels, &format,
+                            D2D1_COMPATIBLE_RENDER_TARGET_OPTIONS_NONE, cache.target.GetAddressOf())) ||
+                            FAILED(cache.target->CreateSolidColorBrush(D2D1::ColorF(0, 0), cache.brush.GetAddressOf())) ||
+                            FAILED(cache.target->GetBitmap(cache.bitmap.GetAddressOf()))) return false;
+                    }
+                    if (!cache.bitmap) return false;
+
+                    cache.target->SetAntialiasMode(aa);
+                    cache.target->SetTransform(D2D1::Matrix3x2F(transform._11, 0, 0, transform._22, center.x, center.y));
+                    cache.target->BeginDraw();
+                    cache.target->Clear(D2D1::ColorF(0, 0));
+                    draw_marks(cache.target.Get(), cache.brush.Get(), 0, 0);
+                    if (FAILED(cache.target->EndDraw())) {
+                        cache.bitmap.Reset();
+                        return false;
+                    }
+                    if (benchmark_timings_enabled_) ++benchmark_timing_marker_bitmap_builds_;
+                }
+                if (!cache.bitmap) return false;
+
+                ctx->SetTransform(D2D1::Matrix3x2F::Identity());
+                ctx->DrawBitmap(cache.bitmap.Get(), bounds, 1.0f, D2D1_INTERPOLATION_MODE_NEAREST_NEIGHBOR);
+                ctx->SetTransform(transform);
+                if (benchmark_timings_enabled_) ++benchmark_timing_marker_bitmap_draws_;
+                return true;
+            };
+            if (!draw_cached()) draw_marks(ctx, brush, center_x, center_y);
+        };
+
         auto draw_timing_indicator = [&](float indicator_left,
                                          float indicator_right,
                                          float combo_anchor_y,
                                          const std::array<double, kGameplayTimingHistoryMaxEntries>& timing_history,
                                          std::size_t timing_history_count,
                                          const std::array<bool, kGameplayTimingHistoryMaxEntries>& maximums,
-                                         double maximum_ms) {
+                                         double maximum_ms, bool ghost) {
             if (!scene_body_format || !d2d_->text_brush) {
                 return;
             }
@@ -638,48 +756,9 @@
                                            feedback_center_x + 1.0f, indicator_rect.bottom + 3.0f),
                                d2d_->text_brush.Get());
 
-            // Recency changes opacity, not the barcode dimensions.
-            constexpr float barcode_half_width = 1.0f;
-            constexpr float barcode_half_height = 9.0f;
-            for (std::size_t i = 0; i < timing_history_count; ++i) {
-                const double delta_ms = timing_history[i];
-                const float history_weight =
-                    static_cast<float>(i + 1) / static_cast<float>(std::max<std::size_t>(1, timing_history_count));
-                const float marker_center_x =
-                    feedback_center_x +
-                    static_cast<float>(std::clamp(delta_ms / kGameplayTimingIndicatorRangeMs, -1.0, 1.0)) *
-                        kGameplayTimingIndicatorHalfWidth;
-                const float marker_half_height = 1.4f + 2.4f * history_weight;
-                const auto marker_color = D2D1::ColorF(timing_marker_color(delta_ms, maximum_ms, maximums[i]),
-                    0.12f + 0.50f * history_weight * history_weight);
-                d2d_->text_brush->SetColor(marker_color);
-                if (data.gameplay.timing_marker_style == "barcode") {
-                    ctx->FillRectangle(D2D1::RectF(marker_center_x - barcode_half_width, indicator_center_y - barcode_half_height,
-                        marker_center_x + barcode_half_width, indicator_center_y + barcode_half_height), d2d_->text_brush.Get());
-                } else {
-                    ctx->FillEllipse(D2D1::Ellipse(D2D1::Point2F(marker_center_x, indicator_center_y),
-                        marker_half_height, marker_half_height), d2d_->text_brush.Get());
-                }
-            }
-
-            if (timing_history_count > 0) {
-                const double live_feedback_delta_ms = timing_history[timing_history_count - 1];
-                const float live_marker_center_x =
-                    feedback_center_x +
-                    static_cast<float>(std::clamp(live_feedback_delta_ms / kGameplayTimingIndicatorRangeMs,
-                                                  -1.0,
-                                                  1.0)) *
-                        kGameplayTimingIndicatorHalfWidth;
-                d2d_->text_brush->SetColor(D2D1::ColorF(timing_marker_color(
-                    live_feedback_delta_ms, maximum_ms, maximums[timing_history_count - 1]), 0.98f));
-                if (data.gameplay.timing_marker_style == "barcode") {
-                    ctx->FillRectangle(D2D1::RectF(live_marker_center_x - barcode_half_width, indicator_center_y - barcode_half_height,
-                        live_marker_center_x + barcode_half_width, indicator_center_y + barcode_half_height), d2d_->text_brush.Get());
-                } else {
-                    ctx->FillEllipse(D2D1::Ellipse(D2D1::Point2F(live_marker_center_x, indicator_center_y), 5.0f, 5.0f),
-                                     d2d_->text_brush.Get());
-                }
-            }
+            draw_timing_markers(feedback_center_x, indicator_center_y, kGameplayTimingIndicatorHalfWidth,
+                kGameplayTimingIndicatorRangeMs, timing_history, timing_history_count, maximums, maximum_ms,
+                d2d_->text_brush.Get(), ghost);
 
             d2d_->text_brush->SetColor(saved_text_color);
             ctx->SetTransform(timing_transform);
@@ -2315,7 +2394,8 @@
                                          const std::array<bool, kGameplayTimingHistoryMaxEntries>& maximums,
                                          double maximum_ms,
                                          const GameplayTextPopAnimation& feedback_animation,
-                                         int64_t feedback_started_ns) {
+                                         int64_t feedback_started_ns,
+                                         bool ghost = false) {
             if (studio) { draw_studio_feedback(feedback_field, has_feedback, feedback, feedback_delta_ms,
                                                has_non_pg_feedback, has_timing_feedback, feedback_text,
                                                feedback_timing_text, feedback_animation, timing_history, timing_history_count, maximums, maximum_ms); return; }
@@ -2411,7 +2491,7 @@
                                           timing_history,
                                           timing_history_count,
                                           maximums,
-                                          maximum_ms);
+                                          maximum_ms, ghost);
                 }
             }
 
@@ -2963,7 +3043,7 @@
                                   scene_hud_cache.ghost_feedback_text, scene_hud_cache.ghost_feedback_timing_text,
                                   data.gameplay.ghost_timing_history_delta_ms, data.gameplay.ghost_timing_history_count,
                                   data.gameplay.ghost_timing_history_maximums, data.gameplay.ghost_timing_maximum_window_ms,
-                                  ghost_judgement_text_animation, judgement_started_ns(true));
+                                  ghost_judgement_text_animation, judgement_started_ns(true), true);
             draw_field_judgement_counts(ghost_field_layout,
                 {data.gameplay.ghost_pg, data.gameplay.ghost_gr, data.gameplay.ghost_gd,
                  data.gameplay.ghost_bd, data.gameplay.ghost_pr}, true);

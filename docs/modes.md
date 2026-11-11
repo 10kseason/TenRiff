@@ -53,8 +53,8 @@
   - `safe`: large-library RAM high-water를 우선 낮추는 기본값
   - `fast`: 제목/아티스트/키 수/#PLAYLEVEL/BPM만 유지하고 해시·미리보기·난이도표·자체 LV/CR을 생략하는 최소 인덱싱
 - `calculate_song_index_difficulty`: `false | true`
-  - 기본 `false`: BMS `#PLAYLEVEL`을 유지하고 자체 LV/CR 계산 생략
-  - `true`: `safe` 전체 재인덱싱에서 Revive LV/Circus Rating 계산; `fast`는 항상 생략
+  - 이전 프로필 호환용으로 보존하며 기본값은 `false`입니다. 게임 내 인덱싱은 값과 관계없이 BMS `#PLAYLEVEL`을 사용합니다.
+  - 계산 레벨이 있는 이전 캐시는 다음 인덱싱 때 갱신합니다.
 
 `Rate`는 `mode`가 아니라 `speed.rate`에 저장됩니다. Mode Settings에서 조정할 수 있고, Song Select에서는 검색 입력 중이 아닐 때 `-` / `+`로 다음 플레이 값을 바로 바꿀 수 있습니다.
 

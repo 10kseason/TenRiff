@@ -12,7 +12,7 @@ namespace tenriff::app::menu::settings {
 
 enum class ModeSettingId : std::uint8_t {
     Indexing = 0,
-    IndexDifficulty = 1,
+    // Row ID 1 was Index Difficulty.
     GhostBattle = 2,
     Autoplay = 3,
     PracticeNoFail = 4,
@@ -32,9 +32,8 @@ enum class ModeSettingId : std::uint8_t {
     JudgeWindow = 18,
 };
 
-inline constexpr std::array<ModeSettingId, 19> kModeSettingOrder{
+inline constexpr std::array<ModeSettingId, 18> kModeSettingOrder{
     ModeSettingId::Indexing,
-    ModeSettingId::IndexDifficulty,
     ModeSettingId::GhostBattle,
     ModeSettingId::Autoplay,
     ModeSettingId::PracticeNoFail,

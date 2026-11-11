@@ -54,8 +54,8 @@ This document summarizes the implemented mode system, lane-transform/random rule
   - `safe`: the default that prioritizes lowering large-library RAM high-water usage
   - `fast`: minimal indexing that keeps title/artist/key count/#PLAYLEVEL/BPM and skips hashes, previews, difficulty tables, and native LV/CR
 - `calculate_song_index_difficulty`: `false | true`
-  - default `false`: keep BMS `#PLAYLEVEL` and skip native LV/CR calculation
-  - `true`: calculate Revive LV/Circus Rating during a full `safe` reindex; `fast` always skips it
+  - Retained for older profiles, with a default of `false`. In-game indexing uses BMS `#PLAYLEVEL` for either value.
+  - Older caches with calculated levels refresh during the next index.
 
 `Rate` is stored under `speed.rate`, not `mode`. It can be changed in Mode Settings or directly from Song Select with `-` / `+` while search text entry is inactive.
 

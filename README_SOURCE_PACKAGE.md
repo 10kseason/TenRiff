@@ -1,6 +1,6 @@
 # TenRiff 1.9.9.9-final6 source package — 2026-11-11
 
-Includes the separate 7+1 and 8K keymaps, red default scratch color and 16-lane center gap fix. The tracked source tree includes two synthetic LR2 test databases. See docs/release-1.9.9.9-final6.en.md for the current release.
+Includes separate 7+1/8K bindings, red scratch defaults, 16-lane gaps, Unlimited VSync handling, timing-marker caching, LR2oraja score import, authored BMS levels and native high-resolution BGA frames. The source contains two synthetic LR2 databases and one synthetic LR2oraja hex fixture. See docs/release-1.9.9.9-final6.en.md for this release.
 
 ## Earlier source package notes
 

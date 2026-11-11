@@ -54,6 +54,21 @@ Lr2ImportResult prepare_lr2_import(const std::filesystem::path& database,
     try {
         const auto db = read_lr2_score_db(database);
         if (!db.success()) { result.error = db.error; return result; }
+        result.source = db.source;
+        result.skipped_rows = db.skipped_rows;
+        if (db.source == Lr2ScoreDbSource::Lr2oraja) {
+            result.rows = db.lr2oraja_rows.size() + db.skipped_rows;
+            // The song index already has the same SHA-256 keys. No directory
+            // scan or TenRiff gauge evaluation is needed for these scores.
+            for (const auto& row : db.lr2oraja_rows) {
+                if (cancelled()) return result;
+                result.lr2oraja_scores[row.sha256][row.ln_mode] = row.score;
+            }
+            if (result.rows != 0 && result.lr2oraja_scores.empty())
+                result.error = "No usable LR2oraja chart scores.";
+            cancelled();
+            return result;
+        }
         result.rows = db.rows.size();
         std::unordered_map<std::string, const Lr2ScoreRow*> pending;
         for (const auto& row : db.rows) {
@@ -102,27 +117,29 @@ Lr2ImportResult prepare_lr2_import(const std::filesystem::path& database,
         cancelled();
     } catch (const std::exception&) {
         // Do not leak local paths from exception messages into user-facing text.
-        result.error = "Could not read the LR2 database or song folders.";
+        result.error = "Could not read the score database or song folders.";
     }
     return result;
 }
 
-bool save_lr2_import(const std::filesystem::path& profile,
-                     const Lr2ImportedLamps& lamps, std::string& error) {
+namespace {
+template <typename Serialize>
+bool save_import_file(const std::filesystem::path& profile, const std::string& filename,
+                      Serialize serialize, std::string& error) {
     error.clear();
     std::error_code ec;
     if (!std::filesystem::is_directory(profile, ec)) {
         error = "Profile folder does not exist.";
         return false;
     }
-    const auto output = profile / "lr2_import.json";
+    const auto output = profile / filename;
     static std::atomic<unsigned long long> serial{0};
-    const auto temporary = profile / ("lr2_import.json.tmp-" +
+    const auto temporary = profile / (filename + ".tmp-" +
         std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + "-" +
         std::to_string(serial.fetch_add(1)));
     try {
         std::ofstream stream(temporary, std::ios::binary | std::ios::trunc);
-        stream << serialize_lr2_imported_lamps(lamps) << '\n';
+        stream << serialize() << '\n';
         stream.close();
         if (!stream) error = "Cannot write the import file.";
         else {
@@ -134,6 +151,26 @@ bool save_lr2_import(const std::filesystem::path& profile,
     }
     if (!error.empty()) std::filesystem::remove(temporary, ec);
     return error.empty();
+}
+}  // namespace
+
+bool save_lr2_import(const std::filesystem::path& profile,
+                     const Lr2ImportedLamps& lamps, std::string& error) {
+    return save_import_file(profile, "lr2_import.json",
+        [&] { return serialize_lr2_imported_lamps(lamps); }, error);
+}
+
+bool save_score_import(const std::filesystem::path& profile,
+                       const Lr2ImportResult& result, std::string& error) {
+    if (!result.success()) {
+        error = "Score import did not complete.";
+        return false;
+    }
+    if (result.source == Lr2ScoreDbSource::Lr2oraja) {
+        return save_import_file(profile, kLr2orajaImportFilename,
+            [&] { return serialize_lr2oraja_scores(result.lr2oraja_scores); }, error);
+    }
+    return save_lr2_import(profile, result.lamps, error);
 }
 
 }  // namespace tenriff::app

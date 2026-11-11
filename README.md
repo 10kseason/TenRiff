@@ -1,4 +1,4 @@
-> **2026-11-11 · 1.9.9.9-final6** 7+1과 8K 키 설정을 분리하고 스크래치 기본색을 빨강으로 바꿨습니다. 14+2 DP와 16K에서 노트는 각 블록 안에 그립니다. [한국어](docs/release-1.9.9.9-final6.ko.md)
+> **2026-11-11 · 1.9.9.9-final6** 7+1·8K 키 설정 분리와 빨간 스크래치, 16레인 간격 수정에 무제한 VSync 처리와 타이밍 마커 캐시를 더했습니다. LR2oraja 기록을 가져오고 BMS 원본 레벨과 고해상도 BGA 원본 프레임을 사용합니다. [한국어](docs/release-1.9.9.9-final6.ko.md)
 
 > **2026-11-10 · 1.9.9.9-final5:** LR2 기록 가져오기의 해시·차트 탐색 비용을 줄이고, 원본 RANK가 없거나 범위 밖일 때 EX를 잘못 인정하던 오류를 수정했습니다. Andro의 빈 꼬리 마디가 대표 BPM을 1로 만들던 문제를 수정했습니다. 고정 기준선은 final4를 유지합니다. [Release](docs/release-1.9.9.9-final5.ko.md). Earlier notices below are historical.
 

@@ -8,6 +8,7 @@
 // Developer integration smoke. Run only in a newly created sandbox; never point
 // it at an installed game, an account, a real song library, or a user profile.
 #include "app/MenuApp.h"
+#include "../tests/fixtures/lr2oraja/ScoreFixture.h"
 #include "app/MenuAppSettingsUtils.h"
 #include "app/GameSession.h"
 #include "app/MenuRecordUtils.h"
@@ -988,6 +989,12 @@ struct MenuAppVisualTestAccess {
         }
         return app.visible_song_count() == 1;
     }
+    static void check_authored_level(MenuApp& app, Report& report) {
+        const auto* entry = app.visible_song_entry(0);
+        report.check("library.legacy_calculation_flag_uses_authored_level",
+            app.config_.mode.calculate_song_index_difficulty && entry &&
+            entry->level == 1 && entry->native_level == 1 && entry->rating == 0.0);
+    }
     static void check_nps_idle_loop(MenuApp& app, Report& report) {
         isolate(app);
         // This instance is used only by the idle-loop probe and is shut down
@@ -1384,12 +1391,19 @@ struct MenuAppVisualTestAccess {
         const auto saved_holds = app.native_dialog_held_keys_;
         const auto saved_language = app.config_.ui.language;
         const auto saved_lamps = app.lr2_imported_lamps_;
+        const auto saved_lr2oraja_scores = app.lr2oraja_imported_scores_;
         const auto best_count = app.chart_best_results_.size();
         const auto record_count = app.local_play_records_.size();
         const auto db = fs::absolute(fs::u8path(u8"LR2 점수.db"));
         fs::copy_file(fs::u8path(TENRIFF_SOURCE_DIR) / "tests/fixtures/lr2/score_fixture.db", db);
         const auto expected = prepare_lr2_import(db, {});
         const auto original_time = fs::last_write_time(db);
+        const auto lr2oraja_db = fs::absolute(fs::u8path(u8"LR2oraja 점수.db"));
+        const auto lr2oraja_bytes = tenriff::test::read_lr2oraja_score_fixture();
+        std::ofstream(lr2oraja_db, std::ios::binary).write(
+            lr2oraja_bytes.data(), static_cast<std::streamsize>(lr2oraja_bytes.size()));
+        const auto expected_lr2oraja = prepare_lr2_import(lr2oraja_db, {});
+        const auto lr2oraja_time = fs::last_write_time(lr2oraja_db);
         app.replace_screen(Screen::QuickSetup);
         app.first_run_profile_ = false;
         const auto drain = [&] {
@@ -1400,8 +1414,9 @@ struct MenuAppVisualTestAccess {
             }
             return !app.lr2_import_future_.valid();
         };
-        for (int attempt = 0; attempt < 2; ++attempt) {
-            const bool accept = attempt == 0;
+        for (int attempt = 0; attempt < 3; ++attempt) {
+            const bool accept = attempt != 1;
+            const auto& selected_db = attempt == 2 ? lr2oraja_db : db;
             std::atomic<bool> done{false}, owned{false};
             std::thread picker_driver([&] {
                 HWND acted = nullptr;
@@ -1432,7 +1447,7 @@ struct MenuAppVisualTestAccess {
                                         }
                                 return TRUE;
                             }, reinterpret_cast<LPARAM>(&filename));
-                            if (filename) SetWindowTextW(filename, db.c_str());
+                            if (filename) SetWindowTextW(filename, selected_db.c_str());
                         }
                         PostMessageW(picker, WM_COMMAND, accept ? IDOK : IDCANCEL, 0);
                     }
@@ -1444,6 +1459,16 @@ struct MenuAppVisualTestAccess {
             done = true;
             picker_driver.join();
             const bool finished = drain();
+            if (attempt == 2) {
+                report.check("lr2_ui.lr2oraja_picker_and_profile_readback",
+                    owned && finished && expected_lr2oraja.success() &&
+                    expected_lr2oraja.lr2oraja_scores.size() == 2 &&
+                    serialize_lr2oraja_scores(app.lr2oraja_imported_scores_) ==
+                        serialize_lr2oraja_scores(expected_lr2oraja.lr2oraja_scores) &&
+                    load_lr2oraja_scores(fs::u8path(app.profile_dir_)).size() == 2 &&
+                    app.lr2_imported_lamps_.size() == expected.lamps.size());
+                continue;
+            }
             report.check(accept ? "lr2_ui.picker_import_unicode" : "lr2_ui.picker_cancel_keeps_lamps",
                 owned && finished && app.lr2_imported_lamps_.size() == expected.lamps.size() &&
                 load_lr2_imported_lamps(lr2_import_path_for_profile(app.profile_dir_)).size() == expected.lamps.size());
@@ -1451,18 +1476,21 @@ struct MenuAppVisualTestAccess {
         app.start_lr2_import("missing-lr2.db");
         report.check("lr2_ui.failure_keeps_lamps", drain() &&
             app.lr2_imported_lamps_.size() == expected.lamps.size() &&
-            app.lr2_import_status_ == app.ui_text("LR2 import failed. Existing lamps were kept.",
-                "LR2 가져오기에 실패했습니다. 기존 램프를 유지합니다."));
+            app.lr2_import_status_ == app.ui_text("Score import failed. Existing records were kept.",
+                "점수 가져오기에 실패했습니다. 기존 기록을 유지합니다."));
         app.start_lr2_import(db.u8string());
         // Cancels even if the worker finished before the UI polls it.
         click(app, Kind::SettingsRow, profile_setup::kLr2ImportRow);
         report.check("lr2_ui.worker_cancel_keeps_lamps", drain() &&
             app.lr2_imported_lamps_.size() == expected.lamps.size() &&
-            app.lr2_import_status_ == app.ui_text("LR2 import cancelled.", "LR2 가져오기를 취소했습니다."));
+            app.lr2_import_status_ == app.ui_text("Score import cancelled.", "점수 가져오기를 취소했습니다."));
         app.start_lr2_import(db.u8string());
         report.check("lr2_ui.repeat_import", drain() && app.lr2_imported_lamps_.size() == expected.lamps.size());
         for (const auto* language : {"en", "ko", "ja", "zh-CN"}) {
             app.config_.ui.language = language;
+            app.start_lr2_import(lr2oraja_db.u8string());
+            report.check(std::string("lr2_ui.localized_lr2oraja_completion_") + language, drain() &&
+                app.lr2_import_status_ == app.ui_text("LR2oraja charts imported: ", "가져온 LR2oraja 차트: ") + "2");
             app.start_lr2_import(db.u8string());
             report.check(std::string("lr2_ui.localized_completion_") + language, drain() &&
                 app.lr2_import_status_ == app.ui_text("LR2 lamps imported: ", "가져온 LR2 램프: ") +
@@ -1478,8 +1506,10 @@ struct MenuAppVisualTestAccess {
             report.check(std::string("lr2_ui.present_") + language, present(app, detail), detail);
         }
         report.check("lr2_ui.read_only_db_and_display_only", fs::last_write_time(db) == original_time &&
+            fs::last_write_time(lr2oraja_db) == lr2oraja_time &&
             app.chart_best_results_.size() == best_count && app.local_play_records_.size() == record_count);
         app.lr2_imported_lamps_ = saved_lamps;
+        app.lr2oraja_imported_scores_ = saved_lr2oraja_scores;
         app.config_.ui.language = saved_language;
         app.native_dialog_held_keys_ = saved_holds;
     }
@@ -2919,6 +2949,7 @@ void menu_flow(tenriff::app::MenuApp& app, Report& report) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     report.check("library.indexed_exactly_one_synthetic_chart", indexed);
     if (!indexed) throw std::runtime_error("Synthetic library did not index");
+    Access::check_authored_level(app, report);
     Access::check_startup_folder_pickers(app, report);
     Access::check_home_navigation(app, report);
     Access::check_home_language_cycle(app, report);
@@ -3777,6 +3808,8 @@ int wmain(int argc, wchar_t** argv) {
         config.graphics.resolution = "1080p";
         config.graphics.vsync = false;
         config.graphics.refresh_hz = -1;
+        // A legacy profile that enabled native levels must now index BMS levels.
+        config.mode.calculate_song_index_difficulty = true;
         config.graphics.performance_overlay = false;
         config.audio.exclusive_mode = false;
         config.audio_ui.master_volume = 0.0;

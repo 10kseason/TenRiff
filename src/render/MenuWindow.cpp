@@ -2598,6 +2598,26 @@ struct MenuWindow::D2DResources {
         bool attempted = false;
     };
     std::array<PanelGlowBitmap, 6> panel_glow_bitmaps{};
+    struct TimingMarkerBitmap {
+        Microsoft::WRL::ComPtr<ID2D1BitmapRenderTarget> target;
+        Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> brush;
+        Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap;
+        D2D1_SIZE_U pixels{};
+        D2D1_SIZE_F scale{};
+        D2D1_POINT_2F center{};
+        D2D1_ANTIALIAS_MODE antialias = D2D1_ANTIALIAS_MODE_PER_PRIMITIVE;
+        float half_width = 0;
+        double range_ms = 0;
+        double maximum_ms = 0;
+        bool studio = false;
+        bool barcode = false;
+        unsigned unchanged_frames = 0;
+        std::size_t count = 0;
+        std::array<double, kGameplayTimingHistoryMaxEntries> deltas{};
+        std::array<bool, kGameplayTimingHistoryMaxEntries> maximums{};
+    };
+    // Player and ghost each have an independent surface in play and in the skin preview.
+    std::array<TimingMarkerBitmap, 4> timing_marker_bitmaps{};
     std::array<ReadableTextLayout, 2> result_action_layouts{};
     std::array<Microsoft::WRL::ComPtr<ID2D1PathGeometry>, 2> result_action_icons{};
     std::array<bool, 2> result_action_icons_attempted{};

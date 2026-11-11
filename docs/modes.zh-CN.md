@@ -54,8 +54,8 @@
   - `safe`：优先降低 large-library RAM high-water 的默认值
   - `fast`：仅保留 title/artist/key count/#PLAYLEVEL/BPM，并跳过 hash、preview、难度表和原生 LV/CR 的最小索引
 - `calculate_song_index_difficulty`：`false | true`
-  - 默认 `false`：保留 BMS `#PLAYLEVEL`，跳过原生 LV/CR 计算
-  - `true`：在完整 `safe` 重索引中计算 Revive LV/Circus Rating；`fast` 始终跳过
+  - 保留以兼容旧配置，默认值为 `false`。游戏内索引对两种值均使用 BMS `#PLAYLEVEL`。
+  - 含计算等级的旧缓存会在下次索引时更新。
 
 `Rate` 保存在 `speed.rate` 而不是 `mode`。可在 Mode Settings 中调整；未进行搜索文字输入时，也可在 Song Select 中用 `-` / `+` 直接改变下一次游玩的值。
 

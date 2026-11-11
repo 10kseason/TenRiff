@@ -1,4 +1,4 @@
-> **2026-11-11 · 1.9.9.9-final6** 将 7+1 和 8K 的按键绑定分开，转盘默认使用红色。14+2 DP 与 16K 的音符绘制在各自的区域内。 [简体中文](release-1.9.9.9-final6.zh-CN.md)
+> **2026-11-11 · 1.9.9.9-final6** 分开7+1与8K键位、转盘默认红色并修正16轨间隙。新增Unlimited的VSync处理、时序标记缓存和LR2oraja成绩导入，使用BMS作者等级及高分辨率BGA原始帧。 [简体中文](release-1.9.9.9-final6.zh-CN.md)
 
 > **2026-11-10 · 1.9.9.9-final5:** 减少 LR2 记录导入中的哈希与谱面查找开销，修复原始 RANK 缺失或超出范围时错误授予 EX 的问题，并修复 Andro 的空白尾部小节使 BPM 显示为 1 的问题。固定基准线保持 final4。 [Release](release-1.9.9.9-final5.zh-CN.md). Earlier notices below are historical.
 
@@ -254,8 +254,8 @@
   - 1.9.0.1 官方 build/Windows ZIP 不构建或附带 standalone BMS key-converter CLI/GUI；顶层 CMake 选项默认 `OFF`，源码仅保留用于开发回归
   - NK3 始终将随包提供的 P64 与 host beam32 结合。仅当非 10K 源谱面转换为 10K 时才加入 generalized pattern MLP；10K→10K 与其他所有目标仅使用 P64。默认 `AUTO` 后端通过 ncnn Vulkan 在 AMD/NVIDIA GPU 上运行 P64 与 MLP，并保留可选 OpenVINO 兼容路径作为回退；可通过 `TENRIFF_NK3_BACKEND` 和 `TENRIFF_NK3_VULKAN_DEVICE` 强制选择。
   - `mode.key_mode=none` 表示保持谱面的原始键数与基础 pattern 布局不变
-- Native difficulty：
-  - BMS 的 LV/CR 计算仅将 long-note Head/Tail 的 miss-ms 按 0.5倍评估，使 `300ms`按`150ms`处理；实际 gameplay 判定范围保持不变
+- 谱面难度
+  - 游戏内索引与基本等级显示使用 BMS 作者指定的 `#PLAYLEVEL`。
 - Lane transform：
   - Random 支持 `Off / Mirror / Random (Scratch Fixed) / SR`；普通 Random 固定皿键，每次游玩生成新的按键 lane 排列，并把实际 seed 写入 replay
   - 新`LN Mix 10%～90%` v2以基础BPM×Rate为准，目标为长2/4拍60%、中1拍20%、短1/4或1/2拍20%。保留已有LN、原始起点和键音，与同轨道下一起点留50ms间隔，空间不足则逐级缩短，不合并连续单键。旧回放按v1重现；v2只保留本地记录/回放，不计入旧BEST或Sites上传。参见[追加条件和验证（韩语）](release-1.8.8-gate.md)
@@ -308,15 +308,15 @@
   - 保留分辨率预设，增加宽/高直接输入（每轴320–8192）与自由拖动窗口边框；保持16:9内容比例、留边和点击映射，保存拖动结束尺寸。参见[操作与恢复条件](config.zh-CN.md#graphics)
   - 单人结果概要、分析标签页和多人结果底部显示小型 `F9` PNG / `screenshots/` 提示。保存位置在当前工作目录下，本次的实际保存检查见[追加发布验证（韩语）](release-1.8.8-gate.md)
   - `refresh_hz`（`-1` = `Match Display`，`0` = `Unlimited`，实际最高 1500 FPS）
-  - VSync off：Match Display 跟随显示器 Hz；Unlimited 将 gameplay 限制为 1500 FPS，同时保留 menu 上限 `300`
-  - VSync on：present refresh 跟随活动显示器 Hz，render pacing 目标为 `monitor_hz * 2`（上限 `1050`）
+  - Unlimited 会关闭垂直同步，游玩时的渲染上限为 1500 FPS，菜单为 300 FPS。
+  - Match Display 跟随显示器刷新率并应用已保存的垂直同步设置。开启垂直同步时，渲染帧率目标为显示器刷新率的两倍，上限为 1050 FPS。
   - `visual_offset_ms`
   - `performance_overlay`（gameplay FPS/frame time 使用成功 DXGI `Present()` 的完成间隔；HUD 更新节奏仅保留为独立 gameplay diagnostics）
   - `bga_enabled=false` 会禁用 gameplay 图片/视频 BGA 及 decoder/upscaler 工作，同时保留 Song Select 预览
   - `background_upscale_model_path` 只保存从 Graphics Settings 选择或拖入的兼容 ONNX 路径；公开包不包含模型
   - BGA Upscaler 默认为 `off`；用户必须明确开启并确认 high-spec warning，不存在自动 benchmark gate
   - 当前契约为 960x540 RGB residual x2，并自动检测 FP32/FP16 边界与浮点边界 INT8 QDQ metadata；用户负责模型权利、质量和性能，加载、契约、decode 或推理失败时保持 native scaling
-  - 静态 image BGA 保留异步 ONNX upscale；video BGA 只显示 native decode frame，避免迟到的旧推理 frame 覆盖新 frame 并造成画面抖动
+  - 高度超过480像素的BGA使用原始帧。ONNX图像处理适用于高度不超过480像素的素材。
   - 默认使用高性能 DirectX GPU。`background_upscale_prefer_npu=true` 只是 legacy WinML `DirectXMinPower` 请求，不会明确选择 NPU 或验证 endpoint
 - Gameplay performance：
   - static playfield command-list cache
@@ -349,10 +349,9 @@
   - `fast` 仅收集歌曲列表所需的最小 metadata（title/artist/key count/#PLAYLEVEL/BPM）
   - 由 Mode Settings 的 `Indexing` row 和 `config.mode.song_index_profile` 控制
   - `fast` 跳过文件 hash、背景/音频 preview 解析、难度表匹配和原生 LV/CR
-- difficulty calculation：
-  - 由 Mode Settings 的 `Index Difficulty` 和 `config.mode.calculate_song_index_difficulty` 控制
-  - 默认 `off` 保留 BMS `#PLAYLEVEL`，跳过原生 LV/CR 计算
-  - `on` 仅在 `safe` 中计算 Revive LV/Circus Rating；`fast` 始终跳过
+- 难度标注
+  - 基本等级使用BMS的`#PLAYLEVEL`。含计算等级的旧缓存会在下次建立索引时更新。
+  - 选定外部难度表后显示该表的标注。
 - 索引阶段：
   - `SCANNING FILES`
   - `BUILDING METADATA`

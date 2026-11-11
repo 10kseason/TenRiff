@@ -1,4 +1,4 @@
-> **2026-11-11 · 1.9.9.9-final6** 7+1 と 8K のキー設定を分け、スクラッチの既定色を赤にしました。14+2 DP と 16K のノートは左右それぞれのブロック内に描画します。 [日本語](release-1.9.9.9-final6.ja.md)
+> **2026-11-11 · 1.9.9.9-final6** 7+1・8Kのキー設定分離、赤いスクラッチ既定色、16レーン間隔の修正に、UnlimitedのVSync処理とタイミングマーカーのキャッシュを加えました。LR2oraja記録、BMS作者指定レベル、高解像度BGAの元フレームに対応します。 [日本語](release-1.9.9.9-final6.ja.md)
 
 > **2026-11-10 · 1.9.9.9-final5:** LR2 記録の取り込みでハッシュ計算と譜面探索を軽量化し、元の RANK がない場合や範囲外の場合の誤った EX 認定を修正しました。Andro の空の末尾小節により BPM が 1 になる問題も修正しました。固定ベースラインは final4 のままです。 [Release](release-1.9.9.9-final5.ja.md). Earlier notices below are historical.
 
@@ -254,8 +254,8 @@
   - 1.9.0.1 公式 build/Windows ZIP は standalone BMS key-converter CLI/GUI を build・同梱しない。top-level CMake option は既定 `OFF` で、source は開発 regression 用のみ維持
   - NK3 は同梱 P64 と host beam32 を常に組み合わせる。10K 以外の source を 10K に変換するときだけ generalized pattern MLP を追加し、10K→10K とその他すべての target は P64 のみを使う。既定の `AUTO` backend は ncnn Vulkan で P64 と MLP を AMD/NVIDIA GPU 上に実行し、任意の OpenVINO compatibility path を fallback として維持する。`TENRIFF_NK3_BACKEND` と `TENRIFF_NK3_VULKAN_DEVICE` で強制選択できる。
   - `mode.key_mode=none` は元のキー数と基本パターンレイアウトを維持
-- Native difficulty:
-  - BMS の LV/CR 計算では long-note Head/Tail の miss-ms だけを 0.5倍で評価し、`300ms`を`150ms`として緩和する。実際の gameplay 判定 window は変更しない
+- 譜面難易度
+  - ゲーム内の索引と基本レベルの表記には BMS 作者の `#PLAYLEVEL` を使います。
 - Lane transform:
   - Random は `Off / Mirror / Random (Scratch Fixed) / SR` に対応。通常 Random は scratch を固定し、play ごとに新しい key-lane 配置を生成して実際の seed を replay に記録
   - 新しい `LN Mix 10%～90%` v2はbase BPM×Rate基準で長い2・4拍60% / 中間1拍20% / 短い1/4・1/2拍20%を目標に混合。既存LN・元の開始位置とキー音を維持し、同一レーンの次の開始まで50msを確保。空間不足では長さを段階的に下げ、連打は結合しない。旧リプレイはv1で再現し、v2はローカル記録・リプレイのみで従来BEST・Sites送信から除外。[追加条件と検証（韓国語）](release-1.8.8-gate.md)を参照
@@ -308,15 +308,15 @@
   - 従来の解像度プリセット、幅/高さの直接入力（各320–8192）、枠のドラッグによる自由なサイズ変更。16:9の内容比率・余白・クリック座標を維持し、ドラッグ終了サイズを保存。[操作と復帰条件](config.ja.md#graphics)を参照
   - ソロ結果の概要・分析タブ・マルチ結果の下部に小さな `F9` PNG / `screenshots/` 案内を表示。現在の作業フォルダー配下へ保存し、今回の実際の保存確認は[追加リリース検証（韓国語）](release-1.8.8-gate.md)で別途扱う
   - `refresh_hz` (`-1` = `Match Display`、`0` = `Unlimited`、実際の上限は 1500 FPS)
-  - VSync off: Match Display は monitor Hz に従い、Unlimited は gameplay を 1500 FPS に制限しつつ menu cap `300` を維持
-  - VSync on: present refresh は active monitor Hz に追従し、render pacing は `monitor_hz * 2` を目標にする（`1050` clamp）
+  - Unlimited では VSync がオフになり、描画はプレイ中に最大 1500 FPS、メニューで最大 300 FPS。
+  - Match Display はモニターのリフレッシュレートに従い、保存済みの VSync 設定を適用。VSync がオンのときはリフレッシュレートの 2 倍を描画目標とし、上限は 1050 FPS。
   - `visual_offset_ms`
   - `performance_overlay` (gameplay FPS/frame time は成功した DXGI `Present()` 完了間隔を使用し、HUD update cadence は別の gameplay diagnostics として維持)
   - `bga_enabled=false` は gameplay image/video BGA と decoder/upscaler 処理を無効化し、Song Select preview は維持
   - `background_upscale_model_path` は Graphics Settings で選択/drop した互換 ONNX の path だけを保存。公開 model は同梱しない
   - BGA Upscaler は既定 `off`。user が明示的に on にして high-spec warning を確認する必要があり、自動 benchmark gate はない
   - 現在の契約は 960x540 RGB residual x2 で FP32/FP16 boundary と float boundary INT8 QDQ metadata を自動検出。model の権利・品質・性能は user が確認し、load・contract・decode・inference 失敗時は native scaling
-  - 静止 image BGA は非同期 ONNX upscale を維持し、video BGA は遅延した過去の推論 frame が新しい frame を上書きしないよう native decode frame のみ表示
+  - 高さ480ピクセルを超えるBGAは元のフレームで再生。ONNX画像処理は高さ480ピクセル以下に適用。
   - default は high-performance DirectX GPU。`background_upscale_prefer_npu=true` は legacy WinML `DirectXMinPower` request に過ぎず、NPU の明示選択・endpoint 検証は行わない
 - Gameplay performance:
   - static playfield command-list cache
@@ -349,10 +349,9 @@
   - `fast` は song list 用の最小 metadata（title/artist/key count/#PLAYLEVEL/BPM）のみ収集
   - Mode Settings の `Indexing` 行と `config.mode.song_index_profile` で制御
   - `fast` は file hash、背景/音声 preview 解決、difficulty-table matching、native LV/CR を省略
-- Difficulty calculation:
-  - Mode Settings の `Index Difficulty` と `config.mode.calculate_song_index_difficulty` で制御
-  - 既定 `off` は BMS `#PLAYLEVEL` を保持し、native LV/CR 計算を省略
-  - `on` は `safe` で Revive LV/Circus Rating を計算し、`fast` では常に省略
+- 難易度表記
+  - 基本レベルにはBMSの`#PLAYLEVEL`を使用。計算済みの古いキャッシュは次の索引作成で更新。
+  - 選択した外部難易度表は、その表のラベルを表示。
 - Indexing stages:
   - `SCANNING FILES`
   - `BUILDING METADATA`

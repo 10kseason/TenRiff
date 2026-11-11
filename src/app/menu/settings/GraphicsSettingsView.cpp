@@ -244,8 +244,8 @@ GraphicsSettingsViewModel GraphicsSettingsView::build(
         "BGA Behind Notes blocks bright backgrounds only under the playfield while keeping BGA visible outside it.",
         "기어 뒤 BGA를 가리면 바깥 BGA는 유지하면서 노트 영역 아래의 밝은 배경만 차단합니다."));
     view.notes.push_back(localized(language,
-        "Menu rendering stays capped at 300 FPS. Unlimited caps gameplay rendering at 1500 FPS with legacy synchronization off.",
-        "메뉴 렌더링은 300 FPS로 유지됩니다. 무제한은 기존 동기화가 꺼진 게임플레이 렌더링을 1500 FPS로 제한합니다."));
+        "Unlimited disables VSync and caps gameplay at 1500 FPS and menus at 300 FPS.",
+        "무제한에서는 VSync가 꺼지며 게임플레이는 최대 1500 FPS, 메뉴는 최대 300 FPS입니다."));
     view.notes.push_back(localized(language,
         "The ONNX upscaler has no automatic performance benchmark. It is intended for high-spec systems and may cause stutter or heavy accelerator load.",
         "ONNX 업스케일러는 자동 성능 벤치마크 없이 실행됩니다. 고사양 시스템용이며 끊김이나 높은 가속기 부하가 생길 수 있습니다."));

@@ -4,6 +4,13 @@
 - Use red as the default scratch color and show the assigned 7+1 keys in play and skin previews.
 - Keep taps and holds out of the center gap in 14+2 DP and 16K. [Release notes](docs/release-1.9.9.9-final6.en.md)
 
+- Unlimited overrides saved VSync and caches stable Dot/Barcode timing-marker histories.
+- Import LR2oraja score.db records by chart SHA-256 and LN/CN/HCN mode, showing source, clear, EX, combo and BP in Song Select.
+- Use authored BMS #PLAYLEVEL for in-game base levels and refresh older calculated caches.
+- Keep BGA above 480 pixels high at native frame dimensions.
+
+- Remove bundled music account and per-track ID3 identifiers while retaining Suno AI attribution and byte-identical compressed audio.
+
 # 1.9.9.9-final5 — 2026-11-10
 
 - Reduce LR2 import work: MD5 only, no media lookup, overlapping-root deduplication and stop after all matches. A 512-record / 15,569-chart local synthetic benchmark fell from 91.139s to 9.852s with identical results for that sample.

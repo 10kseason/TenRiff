@@ -367,6 +367,7 @@ void MenuApp::reload_chart_best_results() {
     replay_summary_cache_.clear();
     // Imported LR2 lamps live beside, never inside, TenRiff results.
     lr2_imported_lamps_ = load_lr2_imported_lamps(lr2_import_path_for_profile(profile_dir_));
+    lr2oraja_imported_scores_ = load_lr2oraja_scores(path_from_utf8(profile_dir_));
 
     namespace fs = std::filesystem;
     std::error_code ec;

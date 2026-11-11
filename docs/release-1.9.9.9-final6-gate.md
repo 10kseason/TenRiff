@@ -1,9 +1,7 @@
 # Final6 release verification
 
-- Build and test Windows Release from the reviewed tree and from an independent extraction of the exact source ZIP. Run CTest and the native application smoke suite on both builds.
-- Verify separate 7+1 and 8K bindings through save/reload, NKRO and gameplay. Check that a scratch-free 8K conversion uses the 8K bindings.
-- Compare rendered 16-lane previews at the center gap. Verify red scratch defaults, profile color precedence and the ghost field's long-note rendering.
-- Check the packaged offline editor, both ZIP inventories and CRCs, SHA-256 checksums and the exact Git blobs in the source ZIP.
-- Verify the PR and merged-commit CI runs. Read back all three GitHub release assets and compare them to the audited archives and checksum file.
+The release workflow checks the Windows Release build, the independently extracted source ZIP, CTest, the native application smoke suite and the offline skin editor. Publication checks cover the PR and merged commit, all outgoing files, ZIP CRCs, SHA-256 sums and downloaded GitHub assets.
 
-Physical input, extended play and additional PCs require hands-on verification.
+Validation covers separate 7+1/8K bindings, red scratch defaults, 16-lane note gaps, Unlimited VSync, timing-marker rendering, read-only LR2oraja import, older difficulty caches and original BGA frame dimensions. Source fixtures include two synthetic LR2 databases and one synthetic LR2oraja text hex fixture.
+
+Reporter-PC FPS and tearing, physical input, listening, real personal databases, extended play and arbitrary skins or codecs require hands-on verification.

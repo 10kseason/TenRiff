@@ -207,6 +207,7 @@ add_library(tenriff_core
     src/app/Lr2Course.cpp
     src/app/Lr2ScoreDb.cpp
     src/app/Lr2ClearImport.cpp
+    src/app/Lr2orajaScoreImport.cpp
     src/app/Lr2ImportJob.cpp
     src/app/Lr2Skin.cpp
     src/app/TenRiffSkin.cpp
@@ -459,7 +460,7 @@ set_target_properties(tenriff_replay_verifier PROPERTIES
     OUTPUT_NAME "tenriff-replay-verifier")
 target_link_libraries(tenriff_replay_verifier PRIVATE tenriff_core)
 
-# Imports LR2 clear lamps into a profile as display-only data.
+# Imports LR2 lamps and LR2oraja scores into a profile as display-only data.
 add_executable(tenriff_lr2_import
     src/tenriff_lr2_import_main.cpp
 )

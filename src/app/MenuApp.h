@@ -19,6 +19,7 @@
 #include <thread>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "app/CommandLine.h"
@@ -815,6 +816,8 @@ private:
     std::vector<std::size_t> visible_song_indices_{};
     std::unordered_map<std::string, BestResultRecord> chart_best_results_{};
     Lr2ImportedLamps lr2_imported_lamps_{};
+    Lr2orajaImportedScores lr2oraja_imported_scores_{};
+    std::pair<std::string, std::string> lr2oraja_selected_hash_cache_{};
     std::future<Lr2ImportResult> lr2_import_future_{};
     std::shared_ptr<std::atomic<bool>> lr2_import_cancel_;
     std::string lr2_import_status_;

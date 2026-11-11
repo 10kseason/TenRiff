@@ -27,7 +27,6 @@ void MenuApp::switch_all_song_sources(bool force_reindex) {
 
     SongIndexOptions options;
     options.difficulty_table_path = config_.ui.difficulty_table_path;
-    options.calculate_difficulty = config_.mode.calculate_song_index_difficulty;
     options.reuse_cached_metadata = !force_reindex;
     options.profile = config::normalize_song_index_profile_token(config_.mode.song_index_profile) == "fast"
                           ? SongIndexProfile::Fast : SongIndexProfile::Safe;

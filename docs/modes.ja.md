@@ -54,8 +54,8 @@
   - `safe`: 大規模ライブラリでの RAM high-water 抑制を優先する既定値
   - `fast`: title/artist/key count/#PLAYLEVEL/BPM のみ保持し、hash、preview、difficulty table、native LV/CR を省略する最小 indexing
 - `calculate_song_index_difficulty`: `false | true`
-  - 既定 `false`: BMS `#PLAYLEVEL` を保持し、native LV/CR 計算を省略
-  - `true`: full `safe` reindex で Revive LV/Circus Rating を計算し、`fast` では常に省略
+  - 旧プロファイルとの互換用に保持し、既定値は `false` です。ゲーム内の索引は値にかかわらず BMS `#PLAYLEVEL` を使います。
+  - 計算済みレベルを含む旧キャッシュは次の索引で更新します。
 
 `Rate` は `mode` ではなく `speed.rate` に保存されます。Mode Settings で変更でき、検索入力中でなければ Song Select の `-` / `+` でも次の play 値を直接変更できます。
 
