@@ -2811,3 +2811,78 @@ TEST_CASE("consecutive maximum hits refresh FAST SLOW rather than retaining an o
         (void)engine.handle_input(1, InputState::Released, sample+1);
     }
 }
+
+TEST_CASE("an automatic miss publishes HUD feedback at its decision time without moving scoring samples") {
+    using namespace tenriff;
+    for (const bool indirect : {false, true}) {
+        gameplay::GameplayChart chart;
+        chart.lane_count = 2;
+        chart.duration_samples = 5000;
+        chart.notes = {{1, 1000, std::nullopt}, {2, 1300, std::nullopt}, {1, 4000, std::nullopt}};
+        gameplay::GameplayConfig config;
+        config.sample_rate = 1000;
+        config.practice_no_fail_enabled = true;
+        config.judge.indirect_miss_enabled = indirect;
+        gameplay::GameplayEngine engine(chart, config);
+
+        (void)engine.handle_input(2, input::InputState::Pressed, 1300);
+        REQUIRE(engine.live_feedback().judgement == game::Judgement::PG);
+        REQUIRE(engine.live_feedback().sample == 1300);
+        engine.advance(1340);
+        CHECK(engine.live_feedback().judgement == game::Judgement::PG);
+
+        // The untouched lane-1 note is decided one sample after its 340 ms
+        // deadline. Stamping that popup with the 1000 ms note time makes it
+        // older than the HUD lifetime and erases the newer lane-2 judgement.
+        engine.advance(1341);
+        const auto missed = indirect ? game::Judgement::PR : game::Judgement::BD;
+        CHECK((indirect ? engine.stats().counts.pr : engine.stats().counts.bd) == 1);
+        CHECK(engine.live_feedback().judgement == missed);
+        CHECK(engine.live_feedback().sample == 1341);
+        CHECK(engine.non_pg_feedback().judgement == missed);
+        CHECK(engine.non_pg_feedback().sample == 1341);
+        CHECK_FALSE(engine.timing_text_feedback().has_value);
+
+        // Result graphs and gauge timing keep the authored note time.
+        REQUIRE_FALSE(engine.stats().gauge_history.empty());
+        CHECK(engine.stats().gauge_history.back().sample == 1000);
+    }
+}
+
+TEST_CASE("a press that retires an expired note publishes that miss at the press time") {
+    using namespace tenriff;
+    gameplay::GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 5000;
+    chart.notes = {{1, 1000, std::nullopt}, {1, 4000, std::nullopt}};
+    gameplay::GameplayConfig config;
+    config.sample_rate = 1000;
+    config.practice_no_fail_enabled = true;
+    gameplay::GameplayEngine engine(chart, config);
+
+    // 211..340 ms late: outside BAD, before the automatic deadline.
+    CHECK_FALSE(engine.handle_input(1, input::InputState::Pressed, 1300).has_value());
+    CHECK(engine.stats().counts.bd == 1);
+    CHECK(engine.live_feedback().judgement == game::Judgement::BD);
+    CHECK(engine.live_feedback().sample == 1300);
+    REQUIRE_FALSE(engine.stats().gauge_history.empty());
+    CHECK(engine.stats().gauge_history.back().sample == 1000);
+}
+
+TEST_CASE("miss feedback timing is independent of advance granularity and legacy ordering") {
+    using namespace tenriff;
+    for (const bool chronological : {true, false}) {
+        gameplay::GameplayChart chart;
+        chart.lane_count = 1;
+        chart.duration_samples = 5000;
+        chart.notes = {{1, 1000, std::nullopt}, {1, 4000, std::nullopt}};
+        gameplay::GameplayConfig config;
+        config.sample_rate = 1000;
+        config.practice_no_fail_enabled = true;
+        config.chronological_judgement = chronological;
+        gameplay::GameplayEngine engine(chart, config);
+        engine.advance(2500);
+        CHECK(engine.stats().counts.bd == 1);
+        CHECK(engine.live_feedback().sample == 1341);
+    }
+}

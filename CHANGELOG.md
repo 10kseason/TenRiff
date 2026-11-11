@@ -1,3 +1,8 @@
+# 1.9.9.9-final7 — 2026-11-12
+
+- Show a missed note's BAD/POOR when the miss is decided. It no longer blanks the judgement on screen.
+- Scoring, gauge, rulesets and replays are unchanged. [Release notes](docs/release-1.9.9.9-final7.en.md)
+
 # 1.9.9.9-final6 — 2026-11-11
 
 - Add independent 7+1 and 8K key bindings and NKRO layouts. Existing profiles seed 7+1 from 8K.

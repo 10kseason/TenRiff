@@ -1,3 +1,7 @@
+TenRiff 1.9.9.9-final7 source package — 2026-11-12
+
+Shows a missed note's BAD/POOR when the miss is decided, without changing scoring, rulesets or replays. Otherwise identical to 1.9.9.9-final6, including its two synthetic LR2 databases and one synthetic LR2oraja hex fixture. See docs/release-1.9.9.9-final7.en.md for this release.
+
 TenRiff 1.9.9.9-final6 source package — 2026-11-11
 
 Includes separate 7+1/8K bindings, red scratch defaults, 16-lane gaps, Unlimited VSync handling, timing-marker caching, LR2oraja score import, authored BMS levels and native high-resolution BGA frames. The source contains two synthetic LR2 databases and one synthetic LR2oraja hex fixture. See docs/release-1.9.9.9-final6.en.md for this release.

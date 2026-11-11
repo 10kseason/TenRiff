@@ -443,11 +443,15 @@ void GameplayEngine::detonate_mine(const MineEvent& mine, int lane_number) {
 
 void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms, int64_t sample,
                                      double weight, ComboImpact combo_impact, bool osu_miss,
-                                     double gauge_weight) {
+                                     double gauge_weight, std::optional<int64_t> feedback_sample) {
     live_feedback_.has_value = true;
     live_feedback_.judgement = judgement;
     live_feedback_.delta_ms = std::isfinite(delta_ms) ? delta_ms : 0.0;
-    live_feedback_.sample = sample;
+    // A miss is scored at its note but only becomes known at its deadline or
+    // at the press that retires it. The HUD ages feedback from this sample, so
+    // the note time would publish an already-expired popup that also replaces
+    // the judgement currently on screen.
+    live_feedback_.sample = feedback_sample.value_or(sample);
     if (judgement != game::Judgement::PG) {
         non_pg_feedback_ = live_feedback_;
     }
@@ -578,7 +582,7 @@ std::optional<NoteEvent> GameplayEngine::try_hit_note(LaneState& lane, int64_t i
         int64_t delta_samples = input_sample - note.start_sample;
 
         if (delta_samples > windows_.bd) {
-            apply_missed_note(note, note.start_sample);
+            apply_missed_note(note, note.start_sample, input_sample);
             lane.mask_until = std::max(lane.mask_until, note.start_sample + windows_.mask);
             ++lane.next_index;
             if (game_over_) {
@@ -599,7 +603,7 @@ std::optional<NoteEvent> GameplayEngine::try_hit_note(LaneState& lane, int64_t i
             // A wide BAD window must not let one missed note steal every later exact press in a dense stream.
             // Recover only when the immediate next note is unambiguously inside the non-BAD window.
             if (std::abs(next_delta_samples) <= windows_.gd) {
-                apply_missed_note(note, note.start_sample);
+                apply_missed_note(note, note.start_sample, input_sample);
                 lane.mask_until = std::max(lane.mask_until, note.start_sample + windows_.mask);
                 ++lane.next_index;
                 if (game_over_) {
@@ -648,34 +652,38 @@ std::optional<NoteEvent> GameplayEngine::try_hit_note(LaneState& lane, int64_t i
     return std::nullopt;
 }
 
-void GameplayEngine::apply_missed_note(const NoteEvent& note, int64_t sample) {
+void GameplayEngine::apply_missed_note(const NoteEvent& note, int64_t sample, int64_t decided_sample) {
     if (windows_.indirect_miss_enabled) {
-        apply_indirect_miss(note, sample);
+        apply_indirect_miss(note, sample, decided_sample);
     } else {
-        apply_bad_miss(note, sample);
+        apply_bad_miss(note, sample, decided_sample);
     }
 }
 
-void GameplayEngine::apply_bad_miss(const NoteEvent& note, int64_t sample) {
+void GameplayEngine::apply_bad_miss(const NoteEvent& note, int64_t sample, int64_t decided_sample) {
     record_osu_mania_od8_judgement(stats_.osu_od8, OsuManiaJudgement::Miss);
     apply_judgement(game::Judgement::BD,
                     std::numeric_limits<double>::quiet_NaN(),
                     sample,
                     1.0,
                     ComboImpact::Break,
-                    true);
+                    true,
+                    -1.0,
+                    decided_sample);
     stats_.analysis.observe(note.end_sample.has_value() ? TimingEventKind::LnHead : TimingEventKind::Tap,
                             note.lane, note.start_sample, game::Judgement::BD, std::nullopt, 1.0);
 }
 
-void GameplayEngine::apply_indirect_miss(const NoteEvent& note, int64_t sample) {
+void GameplayEngine::apply_indirect_miss(const NoteEvent& note, int64_t sample, int64_t decided_sample) {
     record_osu_mania_od8_judgement(stats_.osu_od8, OsuManiaJudgement::Miss);
     apply_judgement(game::Judgement::PR,
                     std::numeric_limits<double>::quiet_NaN(),
                     sample,
                     1.0,
                     ComboImpact::Break,
-                    true);
+                    true,
+                    -1.0,
+                    decided_sample);
     stats_.analysis.observe(note.end_sample.has_value() ? TimingEventKind::LnHead : TimingEventKind::Tap,
                             note.lane, note.start_sample, game::Judgement::PR, std::nullopt, 1.0);
 }
@@ -712,7 +720,10 @@ void GameplayEngine::update_miss(LaneState& lane, int64_t current_sample) {
         if (current_sample <= note.start_sample + miss_window) {
             break;
         }
-        apply_missed_note(note, note.start_sample);
+        // The first sample past the deadline, independent of how far one
+        // advance() call jumped, so playback and live show it identically.
+        const auto deadline = strict_deadline(note.start_sample, miss_window);
+        apply_missed_note(note, note.start_sample, deadline.value_or(current_sample));
         lane.mask_until = note.start_sample + windows_.mask;
         ++lane.next_index;
         if (game_over_) {
