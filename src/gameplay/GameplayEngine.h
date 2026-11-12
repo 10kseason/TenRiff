@@ -152,14 +152,17 @@ private:
                          double weight,
                          ComboImpact combo_impact,
                          bool osu_miss,
-                         double gauge_weight = -1.0);
+                         double gauge_weight = -1.0,
+                         std::optional<int64_t> feedback_sample = std::nullopt);
     game::GaugeResult apply_gauge_judgement(game::Judgement judgement, int64_t sample,
                                            double weight, bool empty_poor = false);
     void finish_course_hold_gauge(HoldState& hold, int64_t sample, bool early_release);
     [[nodiscard]] std::optional<NoteEvent> try_hit_note(LaneState& lane, int64_t input_sample);
-    void apply_missed_note(const NoteEvent& note, int64_t sample);
-    void apply_bad_miss(const NoteEvent& note, int64_t sample);
-    void apply_indirect_miss(const NoteEvent& note, int64_t sample);
+    // `decided_sample` is when the miss became known. It only times HUD
+    // feedback; scoring, gauge and result graphs keep the note's own sample.
+    void apply_missed_note(const NoteEvent& note, int64_t sample, int64_t decided_sample);
+    void apply_bad_miss(const NoteEvent& note, int64_t sample, int64_t decided_sample);
+    void apply_indirect_miss(const NoteEvent& note, int64_t sample, int64_t decided_sample);
     void apply_empty_poor(int lane, int64_t sample);
     bool process_mines_until(LaneState& lane, int lane_number, int64_t sample);
     void detonate_mine(const MineEvent& mine, int lane_number);

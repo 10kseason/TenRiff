@@ -1,3 +1,5 @@
+> **2026-11-12 · 1.9.9.9-final7** 修复漏掉的音符清除屏幕上判定显示的问题。失误的BAD/POOR现在在确定时显示。分数、血槽、判定范围和回放均未改变。 [简体中文](release-1.9.9.9-final7.zh-CN.md)
+
 > **2026-11-11 · 1.9.9.9-final6** 分开7+1与8K键位、转盘默认红色并修正16轨间隙。新增Unlimited的VSync处理、时序标记缓存和LR2oraja成绩导入，使用BMS作者等级及高分辨率BGA原始帧。 [简体中文](release-1.9.9.9-final6.zh-CN.md)
 
 > **2026-11-10 · 1.9.9.9-final5:** 减少 LR2 记录导入中的哈希与谱面查找开销，修复原始 RANK 缺失或超出范围时错误授予 EX 的问题，并修复 Andro 的空白尾部小节使 BPM 显示为 1 的问题。固定基准线保持 final4。 [Release](release-1.9.9.9-final5.zh-CN.md). Earlier notices below are historical.

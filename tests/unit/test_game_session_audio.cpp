@@ -500,6 +500,67 @@ struct GameSessionAudioTestAccess {
         CHECK(mismatches == 0);
     }
 
+    static void check_late_miss_keeps_judgement_feedback() {
+        constexpr int64_t epoch = 1'000'000'000LL;
+        auto session = shift_lane_fixture(32, false);
+        session->chart_.lane_count = 2;
+        // Lane 1 is never pressed; lane 2 is hit exactly 300 ms later.
+        session->chart_.notes = {{1, 48000, std::nullopt}, {2, 62400, std::nullopt},
+                                 {1, 480000, std::nullopt}};
+        session->chart_.duration_samples = 528000;
+        gameplay::GameplayConfig config;
+        config.sample_rate = 48000;
+        config.practice_no_fail_enabled = true;
+        session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+        session->lane_activity_.assign(2, 0.0f);
+        session->lane_pressed_.assign(2, 0);
+        session->key_to_lane_ = {{32, 1}, {33, 2}};
+        session->lane_binding_state_.configure(session->key_to_lane_);
+        session->audio_timing_diagnostics_logged_ = true;
+        session->config_.audio_ui.mute_when_inactive = false;
+        session->audio_thread_.callback_ = [&](float* out, uint32_t frames, int64_t start, int64_t playback) {
+            session->audio_callback(out, frames, start, playback);
+        };
+        std::vector<float> output(480 * 2);
+        const auto callback = [&](int ms) {
+            session->audio_thread_.invoke_callback(output.data(), 480, ms * 48, ms * 48,
+                                                   epoch + ms * 1'000'000LL);
+        };
+        int ms = 900;
+        for (; ms < 1300; ms += 10) callback(ms);
+        REQUIRE(session->input_thread_.queue().push({33, input::InputState::Pressed, epoch + 1300 * 1'000'000LL}));
+        callback(ms);
+        auto hud = session->hud_snapshot();
+        REQUIRE(session->engine_->stats().counts.pg == 1);
+        REQUIRE(hud.has_feedback);
+        REQUIRE(hud.feedback_judgement == game::Judgement::PG);
+
+        // 30 ms later the popup is still the hit; the lane-1 note is pending.
+        for (ms += 10; ms <= 1330; ms += 10) callback(ms);
+        hud = session->hud_snapshot();
+        CHECK(session->engine_->stats().counts.bd == 0);
+        CHECK(hud.has_feedback);
+        CHECK(hud.feedback_judgement == game::Judgement::PG);
+
+        // The lane-1 note times out at 1340 ms. Its miss must be shown from
+        // that moment; it must not blank the popup the player is looking at.
+        for (; ms <= 1350; ms += 10) callback(ms);
+        hud = session->hud_snapshot();
+        REQUIRE(session->engine_->stats().counts.bd == 1);
+        CHECK(hud.has_feedback);
+        CHECK(hud.feedback_judgement == game::Judgement::BD);
+        CHECK(hud.has_non_pg_feedback);
+
+        // 240 ms miss lifetime measured from the decision, not the note.
+        for (; ms <= 1570; ms += 10) callback(ms);
+        hud = session->hud_snapshot();
+        CHECK(hud.has_feedback);
+        CHECK(hud.feedback_judgement == game::Judgement::BD);
+        for (; ms <= 1600; ms += 10) callback(ms);
+        CHECK_FALSE(session->hud_snapshot().has_feedback);
+        CHECK(session->engine_->stats().gauge_history.back().sample == 48000);
+    }
+
     static void check_r5_calibrated_ln_horizon() {
         constexpr int64_t epoch = 1'000'000'000LL;
         for (const int offset_ms : {-200, -20, 0, 20, 200}) {
@@ -3730,4 +3791,8 @@ TEST_CASE("key overlay session HUD keeps the panel and clears live KPS during pa
 
 TEST_CASE("full combo HUD waits for the last LN tail and excludes partial assisted aborted play") {
     tenriff::app::GameSessionAudioTestAccess::check_full_combo_hud();
+}
+
+TEST_CASE("a timed-out note shows its miss without erasing the visible judgement") {
+    tenriff::app::GameSessionAudioTestAccess::check_late_miss_keeps_judgement_feedback();
 }
