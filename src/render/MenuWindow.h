@@ -157,18 +157,22 @@ struct TitleMenuData {
     std::string profile;
     std::string profile_avatar_path;
     std::string track;
-    int64_t high_score = 0;
+    int64_t high_score = 0; // Legacy compatibility; never displayed.
+    std::optional<int64_t> high_ex_score;
     std::vector<MenuButtonData> buttons;
     std::vector<std::string> guides;
 };
 
 struct SongCardData {
+    std::optional<int64_t> ex_score;
+
     std::string group_label;
     std::string title;
     std::string artist;
     std::string detail;
     std::string background_path;
     std::string lamp;
+    bool verified_full_combo = false; // Existing locally verified result/best metadata only.
     bool has_score = false;
     int64_t score = 0;
     int chart_count = -1; // Folder inventory; never a score or difficulty.
@@ -206,10 +210,14 @@ struct SessionMixSelectionData {
 };
 
 struct SongSelectData {
+    std::optional<int64_t> ex_score;
+    int64_t max_ex_score = 0;
+
     std::string profile;
     std::string profile_avatar_path;
     std::string track;
-    int64_t high_score = 0;
+    int64_t high_score = 0; // Legacy compatibility; never displayed.
+    std::optional<int64_t> high_ex_score;
     int song_count = 0;
     int source_count = 0;
     int record_count = 0;
@@ -402,6 +410,10 @@ struct ResultShiftMarker {
 };
 
 struct ResultScreenData {
+    std::optional<int64_t> ex_score;
+    std::optional<int64_t> previous_ex_score;
+    int64_t max_ex_score = 0;
+
     gameplay::TimingAnalysis analysis;
     int analysis_page = 0;  // 0 summary, 1 lanes, 2 note types, 3 song time.
     int analysis_lane_bank = 0;
@@ -499,6 +511,10 @@ struct GameplayNoteData {
 };
 
 struct GameplayHudData {
+    std::optional<int64_t> ex_score;
+    std::optional<int64_t> peer_ex_score;
+    std::optional<int64_t> ghost_ex_score;
+
     bool auto_scratch_enabled = false;
     bool auto_scratch_hide_lanes = false;
     std::size_t scratch_lane_count = 0;
@@ -1045,6 +1061,7 @@ public:
     void on_mouse_click(int window_x, int window_y, bool double_click);
     void on_mouse_secondary_click(int window_x, int window_y);
     void on_mouse_move(int window_x, int window_y);
+    void on_mouse_leave() { menu_pointer_inside_ = false; menu_sunlight_visible_ = false; }
     void on_mouse_capture_changed();
     void on_mouse_wheel(int wheel_delta);
     void on_file_drop(std::string path);
@@ -1186,6 +1203,36 @@ private:
         uint32_t characters = 0, line_count = 0;
         uint64_t layout_builds = 0;
     } benchmark_song_title_;
+    struct SongClearArtDiagnostics {
+        int song_index = -1, art_index = -1;
+        float left = 0, right = 0, source_width = 0, bitmap_width = 0;
+        float source_height = 0, bitmap_height = 0, saturation = 0;
+    };
+    std::array<SongClearArtDiagnostics, 10> benchmark_song_clear_art_{};
+    std::size_t benchmark_song_clear_art_count_ = 0;
+    struct SongReviewMarqueeDiagnostics {
+        int slot = -1;
+        float offset = 0, overflow = 0, left = 0, top = 0, right = 0, bottom = 0;
+        bool centered = false, reduced = false;
+    };
+    std::array<SongReviewMarqueeDiagnostics, 24> benchmark_song_marquee_{};
+    std::size_t benchmark_song_marquee_count_ = 0;
+    int benchmark_song_marquee_phase_ = -1; // Fixture-only; never enabled by product UI.
+    int benchmark_song_thumbnail_images_ = 0, benchmark_song_thumbnail_fallbacks_ = 0;
+    bool benchmark_song_review_background_drawn_ = false;
+    bool benchmark_song_review_background_unavailable_ = false;
+    bool benchmark_options_galaxy_drawn_ = false;
+    bool benchmark_home_background_drawn_ = false;
+    bool benchmark_home_hero_drawn_ = false;
+    int benchmark_home_help_pages_ = 0;
+    bool benchmark_options_galaxy_adjusted_ = false;
+    unsigned benchmark_options_constellation_cards_ = 0;
+    bool benchmark_song_review_all_combo_ = false;
+    bool benchmark_song_review_combo_light_ = false;
+    bool benchmark_song_review_combo_reduced_ = false;
+    float benchmark_song_review_combo_shimmer_ = 0;
+    float benchmark_song_review_combo_flare_x_ = 0;
+
     SongTitleDiagnostics benchmark_result_title_{};
     std::array<SongTitleDiagnostics, 2> benchmark_result_details_{};
     struct GameplayComboPlacementMetrics {
@@ -1239,6 +1286,9 @@ private:
     };
 
     std::vector<HitRegion> hit_regions_{};
+    int menu_pointer_x_ = 0, menu_pointer_y_ = 0;
+    bool menu_pointer_inside_ = false;
+    bool menu_sunlight_visible_ = false;
     int bms_editor_hover_lane_ = -1;
     int bms_editor_hover_time_bucket_ = -1;
     int bms_editor_hover_bgm_index_ = -1;

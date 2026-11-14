@@ -450,7 +450,7 @@ struct MenuAppSkinPreviewTestAccess {
             render::MenuRenderData view;
             menu->populate_song_select_render_data(view, "", {}, nullptr);
             CHECK(view.song_select.selected_song_lr2oraja_label == "LR2oraja LN  HARD CLEAR");
-            CHECK(view.song_select.selected_song_lr2oraja_score == "EX 174/200  COMBO 72  BP 6");
+            CHECK(view.song_select.selected_song_lr2oraja_score == "EX Score 174/200  COMBO 72  BP 6");
             CHECK(view.song_select.selected_song_difficulty == "LV 12");
         }
         menu->lr2oraja_imported_scores_.clear();

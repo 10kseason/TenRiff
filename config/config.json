@@ -114,7 +114,8 @@
     "pacemaker_mode": "off",
     "auto_scratch_hide_lanes": false,
     "pacemaker_target_accuracy": 90.0,
-    "pacemaker_target_score": 8000,
+    "pacemaker_target_score": 2000,
+    "pacemaker_score_kind": "ex-v1",
     "song_index_profile": "safe",
     "calculate_song_index_difficulty": false
   },

@@ -5,6 +5,16 @@ void MenuWindow::draw(const MenuRenderData& data) {
     }
     benchmark_gpu_sprite_stats_ = {};
     benchmark_gpu_sprite_submissions_ = 0;
+    benchmark_song_clear_art_count_ = 0;
+    benchmark_song_marquee_count_ = 0;
+    benchmark_song_thumbnail_images_ = benchmark_song_thumbnail_fallbacks_ = 0;
+    benchmark_song_review_background_drawn_ = false;
+    benchmark_options_galaxy_drawn_ = benchmark_options_galaxy_adjusted_ = false;
+    benchmark_home_background_drawn_ = benchmark_home_hero_drawn_ = false;
+    benchmark_home_help_pages_ = 0;
+    benchmark_options_constellation_cards_ = 0;
+    benchmark_song_review_all_combo_ = benchmark_song_review_combo_light_ = benchmark_song_review_combo_reduced_ = false;
+    benchmark_song_review_combo_shimmer_ = benchmark_song_review_combo_flare_x_ = 0;
     static int draw_count = 0;
     if (draw_count++ < 5) {
         std::cerr << "[MenuWindow::draw] called, d2d_=" << (d2d_ ? "yes" : "no")
@@ -238,6 +248,27 @@ void MenuWindow::draw(const MenuRenderData& data) {
     set_theme_color(d2d_->lane_divider_brush.Get(), "lane_divider", D2D1::ColorF(0xF6F8FF, 0.85f));
     const bool use_native_menu = !data.lobby_skin.enabled || data.lobby_skin.native_menu_renderer;
     const bool modern_settings_screen = use_native_menu && data.kind == MenuScreenKind::GenericList;
+    const bool default_options_galaxy = modern_settings_screen && data.lobby_skin.background_path.empty() &&
+        (!data.lobby_skin.enabled || data.lobby_skin.background_video_path.empty());
+    if (default_options_galaxy && !d2d_->options_galaxy_attempted) {
+        d2d_->options_galaxy_attempted = true;
+        const auto path = util::path_from_utf8_lossy(built_in_title_background_path()).parent_path() /
+            "options-galaxy-background.png";
+        static_cast<void>(load_bitmap_from_utf8_path(d2d_->wic_factory.Get(), ctx, path.u8string(), d2d_->options_galaxy_background));
+        if (d2d_->options_galaxy_background && SUCCEEDED(ctx->CreateEffect(CLSID_D2D1ColorMatrix, &d2d_->options_galaxy_adjusted))) {
+            const auto values = options_galaxy_color_matrix();
+            D2D1_MATRIX_5X4_F matrix{};
+            for (std::size_t row = 0; row < 5; ++row)
+                for (std::size_t col = 0; col < 4; ++col) matrix.m[row][col] = values[row * 4 + col];
+            auto* effect = d2d_->options_galaxy_adjusted.Get();
+            effect->SetInput(0, d2d_->options_galaxy_background.Get());
+            if (FAILED(effect->SetValue(D2D1_COLORMATRIX_PROP_COLOR_MATRIX, matrix)) ||
+                FAILED(effect->SetValue(D2D1_COLORMATRIX_PROP_ALPHA_MODE, D2D1_COLORMATRIX_ALPHA_MODE_PREMULTIPLIED)) ||
+                FAILED(effect->SetValue(D2D1_COLORMATRIX_PROP_CLAMP_OUTPUT, TRUE))) d2d_->options_galaxy_adjusted.Reset();
+        }
+    }
+    auto* options_background = default_options_galaxy ? d2d_->options_galaxy_background.Get() : nullptr;
+    const bool constellation_settings = options_background != nullptr;
     const bool modern_title_screen = use_native_menu && data.kind == MenuScreenKind::TitleMenu;
     const bool modern_library_screen = use_native_menu &&
         (data.kind == MenuScreenKind::SongSelect ||
@@ -248,13 +279,58 @@ void MenuWindow::draw(const MenuRenderData& data) {
     // background and header rules after the result-only layout rollback.
     const bool flat_library_layout = use_native_menu && data.kind == MenuScreenKind::SongSelect &&
         !data.session_mix.active && data.song_select.native_list_layout;
+    const bool default_song_review_background = flat_library_layout && data.lobby_skin.background_path.empty() &&
+        (!data.lobby_skin.enabled || data.lobby_skin.background_video_path.empty());
+    if (default_song_review_background && !d2d_->song_review_background_attempted) {
+        // Dedicated device-lifetime storage avoids disk access on later frames
+        // and eviction when chart thumbnails fill their separate LRU cache.
+        d2d_->song_review_background_attempted = true;
+        const auto path = util::path_from_utf8_lossy(built_in_title_background_path()).parent_path() /
+            "song-select-constellation-background.png";
+        static_cast<void>(load_bitmap_from_utf8_path(d2d_->wic_factory.Get(), ctx,
+            path.u8string(), d2d_->song_review_background));
+    }
+    // Only the explicit legacy-video probe simulates a missing authored still.
+    auto* song_review_background = default_song_review_background &&
+        !(benchmark_timings_enabled_ && benchmark_song_review_background_unavailable_)
+        ? d2d_->song_review_background.Get() : nullptr;
+    if (flat_library_layout && !d2d_->song_clear_nebula_attempted) {
+        d2d_->song_clear_nebula_attempted = true;
+        const auto directory = util::path_from_utf8_lossy(built_in_title_background_path()).parent_path() / "clear-badges";
+        const auto& files = kSongSelectClearArtFiles;
+        for (std::size_t i = 0; i < d2d_->song_clear_nebula.size(); ++i) {
+            // Retain the authored transparent fade. Dedicated cached bitmaps do
+            // not compete with scrolling song jackets in the thumbnail LRU.
+            static_cast<void>(load_bitmap_from_utf8_path(d2d_->wic_factory.Get(), ctx,
+                (directory / files[i]).u8string(), d2d_->song_clear_nebula[i]));
+            if (d2d_->song_clear_nebula[i] && SUCCEEDED(ctx->CreateEffect(CLSID_D2D1ColorMatrix,
+                    &d2d_->song_clear_nebula_saturated[i]))) {
+                // The Saturation effect clamps its setting to [0,1]. A color
+                // matrix expresses +20% chroma without changing authored alpha.
+                const auto values = song_select_clear_art_color_matrix();
+                D2D1_MATRIX_5X4_F matrix{};
+                for (std::size_t row = 0; row < 5; ++row)
+                    for (std::size_t col = 0; col < 4; ++col) matrix.m[row][col] = values[row * 4 + col];
+                auto* effect = d2d_->song_clear_nebula_saturated[i].Get();
+                effect->SetInput(0, d2d_->song_clear_nebula[i].Get());
+                if (FAILED(effect->SetValue(D2D1_COLORMATRIX_PROP_COLOR_MATRIX, matrix)) ||
+                    FAILED(effect->SetValue(D2D1_COLORMATRIX_PROP_ALPHA_MODE, D2D1_COLORMATRIX_ALPHA_MODE_PREMULTIPLIED)) ||
+                    FAILED(effect->SetValue(D2D1_COLORMATRIX_PROP_CLAMP_OUTPUT, TRUE)))
+                    d2d_->song_clear_nebula_saturated[i].Reset();
+            }
+        }
+    }
     // A skin video for the title also replaces the built-in title artwork.
-    const std::string title_background_path = modern_title_screen && data.lobby_skin.background_path.empty() &&
-            (!data.lobby_skin.enabled || data.lobby_skin.background_video_path.empty())
-        ? built_in_title_background_path() : std::string{};
-    if (!title_background_path.empty()) static_cast<void>(load_song_card_preview_bitmap(title_background_path));
-    ID2D1Bitmap* title_background = find_song_card_preview_bitmap(title_background_path);
+    const bool default_home_background = modern_title_screen && data.lobby_skin.background_path.empty() &&
+        (!data.lobby_skin.enabled || data.lobby_skin.background_video_path.empty());
+    if (default_home_background && !d2d_->home_nebula_attempted) {
+        d2d_->home_nebula_attempted = true;
+        const auto path = util::path_from_utf8_lossy(built_in_title_background_path()).parent_path() / "home-midnight-nebula.png";
+        static_cast<void>(load_bitmap_from_utf8_path(d2d_->wic_factory.Get(), ctx, path.u8string(), d2d_->home_nebula_background));
+    }
+    ID2D1Bitmap* title_background = default_home_background ? d2d_->home_nebula_background.Get() : nullptr;
     const bool has_title_art = title_background != nullptr;
+    const bool midnight_home = has_title_art;
 #include "MenuWindow_draw_native_motion.inl"
     const bool result_motion_background = use_native_menu && data.kind == MenuScreenKind::ResultScreen &&
         data.lobby_skin.background_path.empty();
@@ -264,7 +340,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
         data.lobby_skin.enabled && !data.lobby_skin.background_video_path.empty() &&
         !(data.generic.skin_preview.visible && data.generic.skin_preview.fullscreen);
     const auto menu_motion_source = skin_motion_background ? MenuMotionSource::Skin
-        : data.lobby_skin.background_path.empty() && flat_library_layout
+        : data.lobby_skin.background_path.empty() && flat_library_layout && !song_review_background
         ? MenuMotionSource::SongSelect : result_motion_background ? MenuMotionSource::Result : MenuMotionSource::None;
     // Skin loops also play on legacy-renderer screens, so they read the same
     // reduced-motion preferences directly instead of the native layer's state.
@@ -433,7 +509,33 @@ void MenuWindow::draw(const MenuRenderData& data) {
         D2D1::Matrix3x2F(scale_, 0.0f, 0.0f, scale_, offset_x_, offset_y_);
     ctx->SetTransform(transform);
 
-    if (!flat_library_layout) draw_native_background();
+    if (!flat_library_layout && !constellation_settings && !has_title_art) draw_native_background();
+
+    if (options_background) {
+        const auto source = centered_bitmap_source_rect(options_background->GetSize(), full_screen_rect);
+        if (d2d_->options_galaxy_adjusted) {
+            D2D1_MATRIX_3X2_F saved{};
+            ctx->GetTransform(&saved);
+            ctx->PushAxisAlignedClip(full_screen_rect, D2D1_ANTIALIAS_MODE_ALIASED);
+            ctx->SetTransform(D2D1::Matrix3x2F::Scale((full_screen_rect.right - full_screen_rect.left) / (source.right - source.left),
+                (full_screen_rect.bottom - full_screen_rect.top) / (source.bottom - source.top)) *
+                D2D1::Matrix3x2F::Translation(full_screen_rect.left, full_screen_rect.top) * saved);
+            ctx->DrawImage(d2d_->options_galaxy_adjusted.Get(), D2D1::Point2F(0, 0), source, D2D1_INTERPOLATION_MODE_LINEAR);
+            ctx->SetTransform(saved);
+            ctx->PopAxisAlignedClip();
+            benchmark_options_galaxy_adjusted_ = true;
+        } else ctx->DrawBitmap(options_background, full_screen_rect, 1, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, &source);
+        benchmark_options_galaxy_drawn_ = true;
+    }
+
+    if (song_review_background) {
+        // Use the supplied complete artwork, without the old video/procedural
+        // stars underneath. Custom skin backgrounds retain their existing path.
+        const auto source = centered_bitmap_source_rect(song_review_background->GetSize(), full_screen_rect);
+        ctx->DrawBitmap(song_review_background, full_screen_rect, 1.0f,
+                        D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, &source);
+        benchmark_song_review_background_drawn_ = true;
+    }
 
     if (menu_motion_source != MenuMotionSource::None && d2d_->menu_motion_bitmap) {
         const auto source = centered_bitmap_source_rect(d2d_->menu_motion_bitmap->GetSize(), full_screen_rect);
@@ -445,14 +547,18 @@ void MenuWindow::draw(const MenuRenderData& data) {
             : result_motion_background ? 0.35f : 1.0f;
         ctx->DrawBitmap(d2d_->menu_motion_bitmap.Get(), full_screen_rect, motion_opacity,
                         D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, &source);
+        if (menu_motion_source == MenuMotionSource::SongSelect) {
+#include "MenuWindow_draw_constellations.inl"
+        }
     }
 
     if (title_background) {
         const auto source = centered_bitmap_source_rect(title_background->GetSize(), full_screen_rect);
-        // The Studio artwork is already authored against the menu's contrast
-        // budget. Imported backgrounds still retain their own color and opacity.
+        // Preserve the supplied nebula's colors; explicit skin art/video still
+        // takes priority and keeps its own opacity and presentation rules.
         ctx->DrawBitmap(title_background, full_screen_rect, 1.0f,
                         D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, &source);
+        benchmark_home_background_drawn_ = true;
     }
     // The skin still stays underneath until the loop has a frame, and remains
     // the fallback under reduced motion before decode or after a failure.
@@ -919,7 +1025,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
         }
     };
 
-    auto draw_footer = [&](std::string_view profile, int64_t high_score, std::string_view track, bool song_select_style = false) {
+    auto draw_footer = [&](std::string_view profile, std::optional<int64_t> high_score, std::string_view track, bool song_select_style = false) {
         const float margin = song_select_style ? 26.0f : 80.0f;
         const float bar_height = song_select_style ? 78.0f : 84.0f;
         const float bar_bottom = kBaseHeight - (song_select_style ? 20.0f : 24.0f);
@@ -943,7 +1049,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
         const std::string profile_text = loc("PROFILE: ", "프로필: ") +
                                          (profile.empty() ? std::string("PLAYER01") : std::string(profile));
         const std::string track_text = loc("TRACK: ", "트랙: ") + (track.empty() ? std::string("-") : std::string(track));
-        const std::string score_text = loc("HIGH SCORE  ", "최고 점수  ") + format_int_with_commas(high_score);
+        const std::string score_text = loc("HIGH EX Score  ", "최고 EX Score  ") + (high_score ? format_int_with_commas(*high_score) : "--");
 
         const std::wstring profile_w = to_wide(profile_text);
         const std::wstring track_w = to_wide(track_text);
@@ -1451,7 +1557,10 @@ void MenuWindow::draw(const MenuRenderData& data) {
             ? skin_layout_rect(data, "title.footer", D2D1::RectF(64, 972, 1856, 1048))
             : footer_bar_rect(false);
         const auto rect = native_rect("title.language", D2D1::RectF(footer.right - 320, footer.top - 88, footer.right, footer.top - 24));
-        draw_glass_panel(rect, 12, 0.95f, 0, false, 0);
+        if (midnight_home) {
+            ctx->FillRoundedRectangle(D2D1::RoundedRect(rect, 12, 12), semantic_color(0x10142D, .66f));
+            ctx->DrawRoundedRectangle(D2D1::RoundedRect(rect, 12, 12), semantic_color(0xA2ACD3, .65f), 1.2f);
+        } else draw_glass_panel(rect, 12, 0.95f, 0, false, 0);
         register_hit(rect, MenuHitTargetKind::TitleLanguageButton, 0, MenuHitPart::Activate);
         const std::string label = loc("Language", "언어") + " · " +
             std::string(ui::language_native_label(data.ui_language)) + " ›";
@@ -1578,6 +1687,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
     draw_chat_overlay();
     draw_account_overlay();
     draw_url_warning_overlay();
+
+#include "MenuWindow_draw_sunlight.inl"
 
     if (gpu_sprites_active) {
         const auto stats = gpu_sprites.statistics();

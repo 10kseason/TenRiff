@@ -1,3 +1,17 @@
+TenRiff 2.0.0 source package — 2026-11-14
+
+한국어: EX Score(2×PG + GR), 계정 연동 중앙 서버 멀티플레이, 별자리 홈·곡 선택·옵션, 검증된 ALL COMBO 표시와 방 채팅·라이브러리·Session Mix 수정을 통합합니다.
+
+English: Integrates EX Score (2×PG + GR), account-linked hosted multiplayer, constellation Home/Song Select/Options, verified ALL COMBO presentation, and room-chat, Library and Session Mix fixes.
+
+日本語: EX Score（PG×2 + GR）、アカウント連携の中央サーバー対戦、星座ホーム・選曲・設定、検証済みALL COMBO表示、チャット・ライブラリ・Session Mix修正を統合します。
+
+简体中文: 整合EX Score（PG×2 + GR）、账号关联托管多人游戏、星座主页/选曲/选项、已验证ALL COMBO显示，以及房间聊天、资料库与Session Mix修复。
+
+Compatibility reference: 1.9.9.9-final4. Existing replay/ruleset and direct-TCP compatibility are retained. No BGA upscaler weights are added. Packaging must exclude personal profiles, charts, credentials, runtime logs and caches. Existing synthetic import fixtures remain test data. Archive and publication gates are documented in docs/release-2.0.0-gate.md; final public results accompany the release.
+
+Earlier source-package scope history follows.
+
 TenRiff 1.9.9.9-final7 source package — 2026-11-12
 
 Shows a missed note's BAD/POOR when the miss is decided, without changing scoring, rulesets or replays. Otherwise identical to 1.9.9.9-final6, including its two synthetic LR2 databases and one synthetic LR2oraja hex fixture. See docs/release-1.9.9.9-final7.en.md for this release.

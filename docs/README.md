@@ -1,3 +1,7 @@
+> **2026-11-14 · 2.0.0** EX Score(2×PG + GR), 계정 연동 중앙 서버 멀티플레이, 별자리 홈·곡 선택·옵션, 검증된 ALL COMBO 표시와 방 채팅·라이브러리·Session Mix 수정을 통합합니다. [한국어](release-2.0.0.ko.md)
+
+호환 기준은 **1.9.9.9-final4**를 유지합니다. **2.0.0 이후에는 버그 수정만 진행하며 새 기능은 추가하지 않습니다.** 릴리스 검증·게시 상태는 [검증 게이트](release-2.0.0-gate.md)를 따릅니다. 아래 이전 버전 안내는 당시 이력입니다.
+
 > **2026-11-10 · 1.9.9.9-final4:** LR2 점수 DB의 클리어 램프를 표시 전용으로 가져오는 `tenriff-lr2-import`를 추가했습니다. LR2 판정 순서를 최악 가정으로 EX-HARD 게이지에 넣어 살아남은 기록만 EX로 표시합니다. 오디오 콜백과 HUD 스레드가 공유하는 잠금에 예방 조치를 넣었습니다. 고정 기준선을 **1.9.9.9-final4**로 올립니다. [Release](release-1.9.9.9-final4.ko.md). Earlier candidate/release notices below are historical.
 
 > **2026-11-09 · 1.9.9.9-final3:** 실패한 노트가 판정선 아래에서 기어와 겹치지 않도록 가리고, 스킨 설정에 판정선 명도를 추가했습니다. 기존 12개 스킨을 공통 현대 스타일로 정리하고 TenRiff Code / CLI와 반복 영상 3개를 포함합니다. AI 제작 가이드·v1 스키마·웹/동봉 에디터는 새 명도와 영상 필드를 지원합니다. [Release](release-1.9.9.9-final3.ko.md). Earlier candidate/release notices below are historical.

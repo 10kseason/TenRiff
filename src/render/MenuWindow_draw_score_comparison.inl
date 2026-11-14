@@ -17,7 +17,7 @@
             ctx->DrawRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(x, y, x + width, y + height), 12, 12),
                                       brush(0x80DCE8, 0.42f), 1.0f);
             const auto& comparison = data.gameplay.score_comparison;
-            draw_readable_text(wloc("SCORE / RANK", "점수 / 랭크"), scene_hud_format.Get(),
+            draw_readable_text(wloc("EX Score / RANK", "EX Score / 랭크"), scene_hud_format.Get(),
                 D2D1::RectF(x + 16, y + 10, x + width - 16, y + 37), brush(0xA4B4C8));
             const auto signed_integer = [](int64_t value) {
                 return (value > 0 ? L"+" : L"") + std::to_wstring(value);

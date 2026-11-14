@@ -15,16 +15,17 @@ inline bool pacemaker_mode_active(std::string_view mode) {
     return mode == "accuracy" || mode == "score";
 }
 
-// Score is chart-normalized; compare against the same judged note weight, not
-// elapsed song time (which would penalize quiet intros and breaks). LN halves
-// contribute their actual scoring weight rather than two full note counts.
+// EX target progress follows resolved chart judgement steps, never wall time.
+// Keep categorical-accuracy pacemakers independent of score.
 inline double pacemaker_live_delta(std::string_view mode, const gameplay::ResultStats& stats,
                                   double score_multiplier, double target_accuracy, int64_t target_score) {
     if (stats.accuracy_weight <= 0.0) return 0.0;
     if (mode == "accuracy") return stats.accuracy_percent() - target_accuracy;
     if (mode == "score" && stats.total_notes > 0) {
-        const double progress = std::clamp(stats.accuracy_weight / stats.total_notes, 0.0, 1.0);
-        return static_cast<double>(gameplay::scale_native_score(stats.raw_score, score_multiplier)) -
+        const int64_t resolved = static_cast<int64_t>(stats.counts.pg) + stats.counts.gr + stats.counts.gd + stats.counts.bd;
+        const int steps = stats.total_combo_steps > 0 ? stats.total_combo_steps : stats.total_notes;
+        const double progress = std::clamp(static_cast<double>(resolved) / steps, 0.0, 1.0);
+        return static_cast<double>(gameplay::ex_score_from_counts(stats.counts)) -
                target_score * progress;
     }
     return 0.0;

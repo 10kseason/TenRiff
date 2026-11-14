@@ -102,7 +102,8 @@ public:
         int max_combo = 0;
         bool full_combo = false;
         gameplay::JudgementCounts counts;
-        int64_t score = 0;
+        int64_t score = 0; // Live EX score.
+        int64_t legacy_score = 0; // Direct TCP v9 compatibility only.
         bool auto_scratch_enabled = false;
         bool auto_scratch_hide_lanes = false;
         std::string pacemaker_mode = "off";
@@ -222,7 +223,8 @@ public:
         std::optional<uint32_t> bms_random_seed;
         double rate_multiplier = 1.0;
         double score_multiplier = 1.0;
-        int64_t final_score = 0;
+        int64_t final_score = 0; // Frozen replay verification score.
+        int64_t ex_score = 0;
         bool pause_used = false;
         std::string replay_path;
         std::string replay_sha256;

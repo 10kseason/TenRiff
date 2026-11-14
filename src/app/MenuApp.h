@@ -96,6 +96,7 @@ class MenuApp {
     friend struct MenuAppScoreComparisonTestAccess;
     friend struct MenuAppLobbySemanticTestAccess;
     friend struct MenuAppFeedbackTestAccess;
+    friend struct MenuAppRoomChatTestAccess;
 public:
     MenuApp();
     ~MenuApp();
@@ -468,6 +469,7 @@ private:
     [[nodiscard]] std::string session_mix_phase_label(SessionMixPhase phase) const;
     void select_multiplayer_chart();
     void service_multiplayer();
+    bool ensure_hosted_multiplayer();
     void reset_multiplayer_for_single_player();
     void leave_multiplayer();
     void open_multiplayer_options();
@@ -565,6 +567,7 @@ private:
     [[nodiscard]] bool selected_song_is_in_collection(std::string_view name) const;
     [[nodiscard]] bool song_entry_matches_collection_filter(const SongEntry& entry) const;
     [[nodiscard]] BestResultRecord best_result_for_song_entry(const SongEntry& entry) const;
+    [[nodiscard]] BestResultRecord best_score_result_for_song_entry(const SongEntry& entry) const;
     // Display-only LR2 lamp for this chart, or null when none was imported or
     // a TenRiff record of the same or a better clear exists.
     [[nodiscard]] const Lr2ImportedLamp* lr2_lamp_to_show(const SongEntry& entry,
@@ -634,7 +637,9 @@ private:
         int bms_gauge_version = 1;
         int bms_control_flow_version = 1;
         std::string rank = "--";
-        int64_t best_score = 0;
+        int64_t best_score = 0; // Compatibility evidence, never modern ranking.
+        std::optional<int64_t> ex_score;
+        int64_t max_ex_score = 0;
         int64_t detail_score = 0;
         int total_notes = 0;
         double accuracy = 0.0;
@@ -687,7 +692,9 @@ private:
         std::string verification_detail;
         bool replay_claims_match = false;
         int64_t raw_score = 0;
-        int64_t score = 0;
+        int64_t score = 0; // Compatibility evidence.
+        std::optional<int64_t> ex_score;
+        int64_t max_ex_score = 0;
         int64_t detail_score = 0;
         double accuracy = 0.0;
         double detailed_accuracy = 0.0;
@@ -765,7 +772,8 @@ private:
     std::optional<uint32_t> last_result_bms_random_seed_;
     double last_result_rate_multiplier_ = 1.0;
     double last_result_score_multiplier_ = 1.0;
-    int64_t last_result_final_score_ = 0;
+    int64_t last_result_final_score_ = 0; // Legacy verifier evidence.
+    std::optional<int64_t> last_result_ex_score_;
     bool last_result_new_record_ = false;
     int64_t scene_transition_start_ns_ = 0;
     RecordFeedback last_result_record_feedback_{};
@@ -780,6 +788,7 @@ private:
     GlobalChatService global_chat_service_{};
     network::LanDiscoveryService lan_discovery_{};
     MultiplayerMenuState multiplayer_menu_{};
+    bool multiplayer_account_checked_ = false;
     std::vector<network::LanDiscoveredRoom> multiplayer_lan_rooms_{};
     std::size_t multiplayer_lan_room_index_ = 0;
     std::size_t multiplayer_server_room_index_ = 0;
@@ -798,6 +807,7 @@ private:
     bool multiplayer_remote_library_ready_ = false;
     std::size_t multiplayer_common_chart_count_ = 0;
     network::ChartFingerprint multiplayer_chart_match_target_{};
+    uint64_t multiplayer_chart_ack_settings_revision_ = 0;
     uint64_t multiplayer_chart_match_index_revision_ = 0;
     std::vector<std::string> multiplayer_chart_match_source_inputs_{};
     std::vector<std::string> multiplayer_chart_match_sources_{};

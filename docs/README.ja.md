@@ -1,3 +1,7 @@
+> **2026-11-14 · 2.0.0** EX Score（PG×2 + GR）、アカウント連携の中央サーバー対戦、星座ホーム・選曲・設定、検証済みALL COMBO表示、チャット・ライブラリ・Session Mix修正を統合します。 [日本語](release-2.0.0.ja.md)
+
+互換基準は**1.9.9.9-final4**を維持します。**2.0.0以降は不具合修正のみとし、新機能は追加しません。** 検証・公開状態は[検証ゲート](release-2.0.0-gate.md)を参照してください。以下の旧版案内は当時の履歴です。
+
 > **2026-11-10 · 1.9.9.9-final4:** LR2 スコア DB のクリアランプを表示専用で取り込む `tenriff-lr2-import` を追加しました。LR2 の判定順を最悪ケースで EX-HARD ゲージに通し、生存したプレイのみ EX と表示します。オーディオコールバックと HUD スレッドが共有するロックに予防措置を入れました。固定ベースラインを **1.9.9.9-final4** に上げます。 [Release](release-1.9.9.9-final4.ja.md). Earlier candidate/release notices below are historical.
 
 > **2026-11-09 · 1.9.9.9-final3:** 失敗ノートを判定ラインより下で隠し、判定ラインの明度設定を追加しました。既存12スキンを共通の現代的スタイルに再設計し、3つのループ動画付きTenRiff Code / CLIを同梱します。AI制作ガイド・v1スキーマ・Web/同梱エディターは新しい明度と動画フィールドに対応します。 [Release](release-1.9.9.9-final3.ja.md). Earlier candidate/release notices below are historical.

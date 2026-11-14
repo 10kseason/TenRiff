@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <unordered_set>
@@ -12,6 +13,16 @@
 #include "network/PeerProtocol.h"
 
 namespace tenriff::network {
+
+class HostedPeerSession;
+
+struct HostedRoomInfo {
+    std::string id;
+    std::string name;
+    std::size_t player_count = 0;
+    std::size_t max_players = 8;
+    bool accepting_players = false;
+};
 
 enum class PeerRole : uint8_t {
     None = 0,
@@ -115,6 +126,16 @@ public:
     PeerSession(const PeerSession&) = delete;
     PeerSession& operator=(const PeerSession&) = delete;
 
+    // Explicit hosted mode keeps legacy direct-IP protocol behavior unchanged.
+    // Only the official origin receives credentials. No network I/O in configure.
+    [[nodiscard]] bool configure_hosted(std::string upload_token);
+    [[nodiscard]] bool browse_hosted();
+    [[nodiscard]] bool host_hosted();
+    [[nodiscard]] bool join_hosted(std::string room_id);
+    [[nodiscard]] std::vector<HostedRoomInfo> hosted_rooms() const;
+    [[nodiscard]] bool is_hosted() const;
+    void disable_hosted();
+
     /// Starts listening on all IPv4 interfaces. Port zero requests an ephemeral
     /// port, exposed through snapshot().local_port once Listening is reached.
     [[nodiscard]] bool host(uint16_t port, std::string name);
@@ -171,6 +192,11 @@ public:
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
+    std::shared_ptr<HostedPeerSession> hosted_;
+    std::mutex hosted_configuration_mutex_;
+    std::vector<std::shared_ptr<HostedPeerSession>> retired_hosted_;
+    void collect_retired_hosted();
+    void retire_hosted(std::shared_ptr<HostedPeerSession>);
 };
 
 }  // namespace tenriff::network

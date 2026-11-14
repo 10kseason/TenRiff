@@ -739,6 +739,10 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             static_cast<double>(kPacemakerScoreMin),
             static_cast<double>(kPacemakerScoreMax),
             static_cast<double>(kPacemakerScoreDefault))));
+        if (get_string(*mode, "pacemaker_score_kind", "") != "ex-v1") {
+            if (config.mode.pacemaker_mode == "score") config.mode.pacemaker_mode = "off";
+            config.mode.pacemaker_target_score = kPacemakerScoreDefault;
+        }
         config.mode.song_index_profile =
             normalize_song_index_profile(get_string(*mode, "song_index_profile", config.mode.song_index_profile));
         config.mode.calculate_song_index_difficulty =
@@ -1303,6 +1307,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
         kPacemakerAccuracyMin,
         kPacemakerAccuracyMax,
         kPacemakerAccuracyDefault)});
+    mode.emplace("pacemaker_score_kind", JsonValue{std::string("ex-v1")});
     mode.emplace("pacemaker_target_score", JsonValue{static_cast<double>(std::clamp(
         config.mode.pacemaker_target_score,
         kPacemakerScoreMin,

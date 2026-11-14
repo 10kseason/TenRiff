@@ -316,7 +316,8 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             snapshot.user_aborted || (replay_playback_enabled_ && replay_source_.aborted),
             assisted || partial_chart, stats);
         snapshot.counts = stats.counts;
-        snapshot.score = gameplay::scale_native_score(stats.raw_score, score_multiplier_);
+        snapshot.score = gameplay::ex_score_from_counts(stats.counts);
+        snapshot.legacy_score = gameplay::scale_native_score(stats.raw_score, score_multiplier_);
         snapshot.auto_scratch_enabled = auto_scratch_enabled_;
         snapshot.auto_scratch_hide_lanes = auto_scratch_enabled_ && config_.mode.auto_scratch_hide_lanes;
         snapshot.pacemaker_mode = pacemaker_mode_;
@@ -390,7 +391,7 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
                     ghost_replay_source_.mode.practice_no_fail_enabled,
                 ghost_stats);
             snapshot.ghost_counts = ghost_stats.counts;
-            snapshot.ghost_score = ghost_stats.raw_score;
+            snapshot.ghost_score = gameplay::ex_score_from_counts(ghost_stats.counts);
             snapshot.ghost_accuracy = ghost_stats.accuracy_percent();
             snapshot.ghost_detailed_accuracy = ghost_stats.detailed_accuracy_percent();
             snapshot.ghost_osu_od8_score_available = ghost_stats.osu_od8.available;

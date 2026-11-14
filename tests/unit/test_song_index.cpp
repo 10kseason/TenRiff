@@ -1847,3 +1847,26 @@ TEST_CASE("song index cache rejects Safe and Fast profile mismatches") {
     CHECK_FALSE(safe_loaded.loaded_from_file);
     CHECK(safe_loaded.index.entries.empty());
 }
+
+TEST_CASE("song thumbnail indexing falls back to static BACKBMP and leaves missing or video-only BGI empty") {
+    TempDirGuard temp; temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    write_file(temp.path / "fallback.png", "synthetic static image path fixture");
+    write_file(temp.path / "clip.mp4", "synthetic video path fixture");
+    write_file(temp.path / "backbmp.bms",
+        "#TITLE Static fallback\n#BPM 120\n#STAGEFILE absent.png\n#BACKBMP fallback.png\n#00111:01\n");
+    write_file(temp.path / "video.bms",
+        "#TITLE Video only\n#BPM 120\n#BMP01 clip.mp4\n#00104:01\n#00111:01\n");
+    write_file(temp.path / "missing.bms",
+        "#TITLE Missing image\n#BPM 120\n#STAGEFILE absent.png\n#BACKBMP missing.bmp\n#00111:01\n");
+    std::vector<std::string> warnings;
+    const auto index = scan_songs(temp.path.u8string(), nullptr, warnings);
+    REQUIRE(index.entries.size() == 3);
+    std::unordered_map<std::string, tenriff::app::SongEntry> entries;
+    for (const auto& entry : index.entries) entries.emplace(entry.path, entry);
+    REQUIRE(entries.count("backbmp.bms") == 1);
+    CHECK(std::filesystem::u8path(entries.at("backbmp.bms").background_preview_path).filename() == "fallback.png");
+    CHECK(entries.at("video.bms").background_preview_path.empty());
+    CHECK(entries.at("missing.bms").background_preview_path.empty());
+    // An empty indexed path deliberately selects the renderer's TenRiff mark.
+}

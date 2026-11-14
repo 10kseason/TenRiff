@@ -361,7 +361,9 @@ bool parse_sites_record_boards(std::string_view json, std::string_view title,
     const auto* field = root ? find_field(*root, "boards") : nullptr;
     const auto* boards = field ? field->as_array() : nullptr;
     auto fail = [&] { output.clear(); error = "Invalid web leaderboard board list."; return false; };
-    if (json.size() > kMaximumResponseBytes || !boards || boards->size() > kMaximumRecords) return fail();
+    std::string score_version;
+    if (json.size() > kMaximumResponseBytes || !root || !required_string(*root, "score_version", score_version) ||
+        score_version != "ex-v1" || !boards || boards->size() > kMaximumRecords) return fail();
     const auto safe_string = [](const config::JsonObject& object, const char* key, std::string& value, std::size_t limit) {
         return required_string(object, key, value) && !value.empty() && value.size() <= limit &&
             util::sanitize_ui_text(value) == value;
@@ -462,7 +464,9 @@ bool parse_sites_record_rankings(std::string_view json, const SitesRecordBoard& 
     const auto* rankings = rankings_field ? rankings_field->as_array() : nullptr;
     std::string id;
     auto fail = [&] { output.clear(); error = "Invalid web leaderboard rankings."; return false; };
-    if (json.size() > kMaximumResponseBytes || !returned_board ||
+    std::string score_version;
+    if (json.size() > kMaximumResponseBytes || !root || !required_string(*root, "score_version", score_version) ||
+        score_version != "ex-v1" || !returned_board ||
         !required_string(*returned_board, "id", id) || id != board.id ||
         !rankings || rankings->size() > kMaximumRecords) return fail();
     int previous_rank = 0;
@@ -483,6 +487,16 @@ bool parse_sites_record_rankings(std::string_view json, const SitesRecordBoard& 
             util::sanitize_ui_text(record.player_name) != record.player_name ||
             util::sanitize_ui_text(record.clear_status) != record.clear_status ||
             util::sanitize_ui_text(record.verified_at_utc) != record.verified_at_utc) return fail();
+        std::int64_t perfect=0, great=0, good=0, bad=0, poor=0;
+        std::string row_score_version;
+        if (!required_string(*object, "score_version", row_score_version) || row_score_version != "ex-v1" ||
+            !required_integer(*object, "perfect", 0, 10'000'000, perfect) ||
+            !required_integer(*object, "great", 0, 10'000'000, great) ||
+            !required_integer(*object, "good", 0, 10'000'000, good) ||
+            !required_integer(*object, "bad", 0, 10'000'000, bad) ||
+            !required_integer(*object, "poor", 0, 10'000'000, poor) ||
+            perfect+great+good+bad+poor > 10'000'000 || record.score != 2*perfect+great) return fail();
+        record.ex_score = record.score;
         record.rank = previous_rank = static_cast<int>(rank);
         record.max_combo = static_cast<int>(combo);
         record.accuracy = record.detailed_accuracy = accuracy->as_number();
@@ -515,7 +529,7 @@ bool fetch_sites_records_once(const std::string& hash, const std::string& title,
     }
     std::string body;
     // Public, read-only endpoints: no connection key, profile or upload token.
-    if (!fetch_json_impl(kSitesLeaderboardUrl, "/api/boards?q=" + query, body, error) ||
+    if (!fetch_json_impl(kSitesLeaderboardUrl, "/api/boards?score_version=ex-v1&q=" + query, body, error) ||
         !parse_sites_record_boards(body, title, output.boards, error)) return false;
     std::stable_partition(output.boards.begin(), output.boards.end(), [&](const auto& board) {
         return board.chart_sha256 == lower_ascii(hash);
@@ -523,7 +537,7 @@ bool fetch_sites_records_once(const std::string& hash, const std::string& title,
     if (output.boards.empty()) return true;
     output.board_index = std::clamp(board_index, 0, static_cast<int>(output.boards.size()) - 1);
     const auto& board = output.boards[static_cast<std::size_t>(output.board_index)];
-    return fetch_json_impl(kSitesLeaderboardUrl, "/api/leaderboard?board=" + board.id, body, error) &&
+    return fetch_json_impl(kSitesLeaderboardUrl, "/api/leaderboard?score_version=ex-v1&board=" + board.id, body, error) &&
         parse_sites_record_rankings(body, board, output.records, error);
 }
 

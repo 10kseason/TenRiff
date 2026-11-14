@@ -315,7 +315,7 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
     const std::string pacemaker_mode_label =
         pacemaker_mode == "accuracy"
             ? ui_text("Accuracy", "정확도")
-            : (pacemaker_mode == "score" ? ui_text("Score", "점수") : ui_text("Off", "OFF"));
+            : (pacemaker_mode == "score" ? ui_text("EX Score", "EX Score") : ui_text("Off", "OFF"));
     const std::string pacemaker_target_label =
         pacemaker_mode == "accuracy"
             ? (format_decimal(config_.mode.pacemaker_target_accuracy) + "%")
@@ -342,7 +342,7 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
                         : ui_text("NK2 only", "NK2 전용"),
                     settings_cursor_ == 10, render::MenuHitTargetKind::SettingsRow, 10,
                     false, nk2_selected);
-    append_menu_row(render.generic, ui_text("Gauge Shift Start", "게이지 시프트 시작"), ui_gauge_label(config_.mode.gauge), settings_cursor_ == 11,
+    append_menu_row(render.generic, ui_text("Gauge Shift", "게이지 시프트"), ui_gauge_label(config_.mode.gauge), settings_cursor_ == 11,
                     render::MenuHitTargetKind::SettingsRow, 11, false, true);
     append_menu_row(render.generic, ui_text("Random", "랜덤"), ui_random_label(config_.mode.random), settings_cursor_ == 12,
                     render::MenuHitTargetKind::SettingsRow, 12, false, true);
@@ -358,7 +358,7 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
                     settings_cursor_ == 14, render::MenuHitTargetKind::SettingsRow, 14, true, false);
     append_menu_row(render.generic, "Rate", format_multiplier(config_.speed.rate), settings_cursor_ == 15,
                     render::MenuHitTargetKind::SettingsRow, 15, false, true);
-    append_menu_row(render.generic, ui_text("Hi-Speed", "하이스피드"), format_decimal(config_.speed.hi_speed), settings_cursor_ == 16,
+    append_menu_row(render.generic, ui_text("Note Speed", "노트 속도"), format_decimal(config_.speed.hi_speed), settings_cursor_ == 16,
                     render::MenuHitTargetKind::SettingsRow, 16, false, true);
     append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 17, render::MenuHitTargetKind::SettingsRow, 17, true, false);
     render.generic.notes.push_back(ui_text("Fast (Minimal) keeps title, artist, key count, BMS level, and BPM. It skips hashes, previews and difficulty tables.",

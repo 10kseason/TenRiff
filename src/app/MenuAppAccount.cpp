@@ -88,6 +88,10 @@ void MenuApp::choose_play_mode(bool online) {
     // Once guest mode touches a play, returning online must never promote that record.
     if (!online && active_recording_permission_)
         active_recording_permission_->store(false, std::memory_order_release);
+    if (online != online_play_mode_ || !online) {
+        peer_session_.disable_hosted();
+        multiplayer_account_checked_ = false;
+    }
     sites_leaderboard_service_.set_online_enabled(online);
     online_play_mode_ = online;
     account_mode_choice_online_ = online;
@@ -188,6 +192,8 @@ void MenuApp::handle_sites_leaderboard_action(render::SitesLeaderboardAction act
 #endif
     } else if (action == render::SitesLeaderboardAction::Disconnect) {
         if (clear_sites_leaderboard_connection("config", error)) {
+            peer_session_.disable_hosted();
+            multiplayer_account_checked_ = false;
             sites_leaderboard_service_.cancel_pending();
             sites_last_upload_status_.clear();
             sites_result_replay_sha256_.clear();
@@ -227,6 +233,8 @@ void MenuApp::handle_sites_leaderboard_action(render::SitesLeaderboardAction act
 #endif
         }
         if (error.empty() && install_sites_leaderboard_connection("config", contents, error)) {
+            peer_session_.disable_hosted();
+            multiplayer_account_checked_ = false;
             sites_leaderboard_service_.cancel_pending();
             sites_last_upload_status_.clear();
             sites_result_replay_sha256_.clear();

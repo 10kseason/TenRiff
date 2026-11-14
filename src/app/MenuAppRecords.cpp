@@ -160,6 +160,8 @@ bool MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
     candidate.rank = menu_records::calculate_rank(effective_stats, effective_game_over,
                                                    effective_clear_status, parsed.aborted);
     candidate.best_score = effective_score;
+    candidate.ex_score = replay_verified ? std::optional<int64_t>{gameplay::ex_score_from_counts(effective_stats.counts)} : parsed.ex_score;
+    candidate.max_ex_score = candidate.ex_score ? gameplay::maximum_ex_score(effective_stats) : 0;
     candidate.detail_score = menu_records::calculate_detail_score(effective_stats);
     candidate.total_notes = effective_stats.total_notes;
     candidate.accuracy = menu_records::calculate_accuracy(effective_stats);
@@ -183,7 +185,7 @@ bool MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
                                             effective_final_gauge);
 
     const auto chart_keys = menu_songs::build_chart_path_keys(parsed.chart_path, songs_path_);
-    const bool official_eligible = !mode_mod_adds_notes(parsed.mods) &&
+    const bool official_eligible = candidate.ex_score.has_value() && !mode_mod_adds_notes(parsed.mods) &&
         parsed.key_conversion_note_add_mode != "add_25_plus" && !mode_mod_auto_scratch(parsed.mods) &&
         (!mode_mod_long_note_mix(parsed.mods) || parsed.long_note_mix_version == 1) &&
         !parsed.autoplay_enabled && !parsed.practice_no_fail_enabled && verification.official_eligible;
@@ -207,7 +209,7 @@ bool MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
             if (candidate_policy < prior_policy) current_policy = false;
             if (candidate_policy != prior_policy) continue;
             previous.has_previous = true;
-            previous.previous_score = std::max(previous.previous_score, best.best_score);
+            previous.previous_score = std::max(previous.previous_score, best.ex_score.value_or(0));
             if (record_rank_priority(prior->second.highest_rank) > record_rank_priority(previous.previous_rank))
                 previous.previous_rank = prior->second.highest_rank;
         }
@@ -227,14 +229,14 @@ bool MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
                     prior->second = ScoreHighWaterRecord{candidate, candidate.rank};
                     continue;
                 }
-                if (candidate.best_score > best.best_score) best = candidate;
+                if (candidate.ex_score > best.ex_score) best = candidate;
                 if (record_rank_priority(candidate.rank) > record_rank_priority(prior->second.highest_rank))
                     prior->second.highest_rank = candidate.rank;
             }
         }
     }
     if (feedback) *feedback = official_eligible && current_policy ? previous : RecordFeedback{};
-    const bool new_record = official_eligible && current_policy && record_score_improved(effective_score, previous);
+    const bool new_record = official_eligible && current_policy && record_score_improved(candidate.ex_score.value_or(0), previous);
 
     LocalPlayRecord record;
     record.judgement_generation = candidate.judgement_generation;
@@ -266,6 +268,8 @@ bool MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
     record.replay_claims_match = replay_verified && verification.claims_match;
     record.raw_score = effective_stats.raw_score;
     record.score = candidate.best_score;
+    record.ex_score = candidate.ex_score;
+    record.max_ex_score = candidate.max_ex_score;
     record.detail_score = candidate.detail_score;
     record.accuracy = menu_records::calculate_accuracy(effective_stats);
     record.detailed_accuracy = menu_records::calculate_detailed_accuracy(effective_stats);
@@ -320,24 +324,18 @@ bool MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
                                                 existing->second.game_over,
                                                 existing->second.final_gauge);
         const auto beats_existing = [&](std::string_view created_utc) {
-            return menu_records::is_better_record(candidate.best_score,
-                                           candidate_clear_priority,
-                                           candidate.detail_score,
-                                           candidate.detailed_accuracy,
-                                           candidate.max_combo,
-                                           candidate_judged,
-                                           created_utc,
-                                           existing->second.best_score,
-                                           existing_clear_priority,
-                                           existing->second.detail_score,
-                                           existing->second.detailed_accuracy,
-                                           existing->second.max_combo,
-                                           existing_judged,
-                                           existing->second.created_utc);
+            // This cache owns the highest clear lamp. EX high-water and its
+            // replay are tracked independently above, so a score improvement
+            // must not downgrade an already earned clear.
+            if (candidate_clear_priority != existing_clear_priority)
+                return candidate_clear_priority > existing_clear_priority;
+            return menu_records::is_better_ex_record(candidate.ex_score, candidate_clear_priority,
+                candidate.max_combo, created_utc, existing->second.ex_score, existing_clear_priority,
+                existing->second.max_combo, existing->second.created_utc);
         };
         if (beats_existing(candidate.created_utc)) {
-            // Keep clear-first storage and its recency tiebreak independent
-            // of score-only celebration and the replay comparison maximum.
+            // Within the same clear tier, EX then recency choose its record.
+            // Legacy normalized/detail values never participate.
             existing->second = candidate;
         }
     }
@@ -359,6 +357,9 @@ const Lr2ImportedLamp* MenuApp::lr2_lamp_to_show(const SongEntry& entry, const B
 void MenuApp::reload_chart_best_results() {
     using namespace menu_song_select;
 
+    // BEST/high-water are derived memory caches, not a persisted score DB.
+    // Always invalidate and rebuild using count-derived EX. Historical JSON is
+    // read-only; files lacking complete counts remain unavailable, never zero.
     chart_best_results_.clear();
     chart_score_high_water_.clear();
     local_play_records_.clear();
@@ -592,24 +593,12 @@ void MenuApp::rebuild_current_song_record_indices() {
         }
     }
 
-    // Records are shown by clear strength first, then score/combo recency.
+    // Available EX records sort first, then EX value and recency.
     std::stable_sort(current_song_record_indices_.begin(), current_song_record_indices_.end(),
                      [this](std::size_t lhs_index, std::size_t rhs_index) {
                          const auto& lhs = local_play_records_[lhs_index];
                          const auto& rhs = local_play_records_[rhs_index];
-                         const int lhs_clear =
-                             menu_records::clear_status_priority(lhs.clear_status, lhs.game_over, lhs.final_gauge);
-                         const int rhs_clear =
-                             menu_records::clear_status_priority(rhs.clear_status, rhs.game_over, rhs.final_gauge);
-                         if (lhs_clear != rhs_clear) {
-                             return lhs_clear > rhs_clear;
-                         }
-                         if (lhs.score != rhs.score) {
-                             return lhs.score > rhs.score;
-                         }
-                         if (lhs.max_combo != rhs.max_combo) {
-                             return lhs.max_combo > rhs.max_combo;
-                         }
+                         if (lhs.ex_score != rhs.ex_score) return lhs.ex_score > rhs.ex_score;
                          return lhs.created_utc > rhs.created_utc;
                      });
 
@@ -733,6 +722,7 @@ bool MenuApp::open_result_record(const std::string& result_path,
     last_result_rate_multiplier_ = parsed->rate_multiplier;
     last_result_score_multiplier_ = parsed->score_multiplier;
     last_result_final_score_ = parsed->final_score;
+    last_result_ex_score_ = parsed->ex_score;
     last_pause_used_ = parsed->pause_used;
     last_result_player_name_ =
         parsed->player_name.empty() ? profile_display_name() : parsed->player_name;
@@ -762,7 +752,9 @@ bool MenuApp::open_selected_record_result() {
 }
 
 bool MenuApp::open_current_song_best_result() {
-    const BestResultRecord best = current_song_best_result();
+    const SongEntry* entry = selected_song_ >= 0
+        ? visible_song_entry(static_cast<std::size_t>(selected_song_)) : nullptr;
+    const BestResultRecord best = entry ? best_score_result_for_song_entry(*entry) : BestResultRecord{};
     return best.has_value && open_result_record(best.result_path, best.replay_path);
 }
 
@@ -805,7 +797,7 @@ std::string MenuApp::best_replay_path_for_selected_song() const {
             continue;
         }
         const auto& record = local_play_records_[record_index];
-        if (!record.replay_path.empty() &&
+        if (record.ex_score.has_value() && !record.replay_path.empty() &&
             equivalent_mode_mod_tokens(record.mods, config_.mode.mods) &&
             (!mode_mod_long_note_mix(record.mods) ||
              record.long_note_mix_version == static_cast<int>(LongNoteMixVersion::MineSafeMusical)) &&

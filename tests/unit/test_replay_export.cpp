@@ -1864,6 +1864,7 @@ TEST_CASE("legacy result parsing falls back to derived score metadata") {
     CHECK(parsed->score_multiplier == doctest::Approx(1.0));
     CHECK(parsed->stats.raw_score == 4167);
     CHECK(parsed->final_score == 4167);
+    CHECK_FALSE(parsed->ex_score.has_value());
     CHECK_FALSE(parsed->pause_used);
 
     std::error_code ec;
@@ -1926,6 +1927,7 @@ TEST_CASE("legacy replay parsing falls back to derived final score") {
     CHECK(parsed->score_multiplier == doctest::Approx(1.0));
     CHECK(parsed->raw_score == 5000);
     CHECK(parsed->final_score == 5000);
+    CHECK_FALSE(parsed->ex_score.has_value());
     CHECK_FALSE(parsed->pause_used);
 
     std::error_code ec;
@@ -2660,4 +2662,55 @@ TEST_CASE("scratch-free BMS new native7 historical native7 native8 and explicit 
     }
     }
     std::filesystem::remove_all(directory);
+}
+
+TEST_CASE("EX migration derives only complete bounded counts and never trusts legacy score") {
+    const std::filesystem::path path = "ex_migration_result_test.json";
+    const std::string prefix = R"({"version":2,"chart_path":"synthetic.bms","final_score":999999,"stats":{"raw_score":9999,"ex_score":999999,"counts":)";
+    const auto parse = [&](const std::string& counts) {
+        write_file(path, prefix + counts + ",\"total_notes\":5}}");
+        return tenriff::app::menu_records::parse_result_file(path, nullptr);
+    };
+    auto loaded = parse(R"({"pg":2,"gr":1,"gd":1,"bd":1,"pr":0})");
+    REQUIRE(loaded.has_value());
+    CHECK(loaded->ex_score == 5);
+    CHECK(loaded->stats.raw_score == 9999);
+    loaded = parse(R"({"pg":0,"gr":0,"gd":0,"bd":0,"pr":0})");
+    REQUIRE(loaded.has_value());
+    CHECK(loaded->ex_score == 0);
+    for (const auto counts : {R"({"pg":2,"gr":1,"gd":1,"bd":1})", R"({})", "null"}) {
+        loaded = parse(counts);
+        REQUIRE(loaded.has_value());
+        CHECK_FALSE(loaded->ex_score.has_value());
+    }
+    for (const auto counts : {R"({"pg":-1})", R"({"pg":0.5})", R"({"pg":2147483648})",
+                              R"({"pg":2147483647,"gr":1})", R"({"pg":"2"})"})
+        CHECK_FALSE(parse(counts).has_value());
+    write_file(path, std::string(32 * 1024 * 1024 + 1, ' '));
+    CHECK_FALSE(tenriff::app::menu_records::parse_result_file(path, nullptr).has_value());
+    std::error_code ec;
+    std::filesystem::remove(path, ec);
+}
+
+TEST_CASE("modern BEST compares EX then recency with missing scores below a real zero") {
+    using tenriff::app::menu_records::is_better_ex_record;
+    CHECK(is_better_ex_record(2, 0, 0, "old", 1, 99, 999, "new"));
+    CHECK(is_better_ex_record(0, 0, 0, "old", std::nullopt, 99, 999, "new"));
+    CHECK_FALSE(is_better_ex_record(std::nullopt, 99, 999, "new", 0, 0, 0, "old"));
+    CHECK(is_better_ex_record(3, 0, 0, "202602", 3, 99, 999, "202601"));
+    CHECK_FALSE(is_better_ex_record(3, 99, 999, "202601", 3, 0, 0, "202602"));
+}
+
+TEST_CASE("EX count math excludes GOOD BAD POOR and retains long note judgement steps") {
+    tenriff::gameplay::ResultStats stats;
+    stats.counts.pg = 7; stats.counts.gr = 3;
+    stats.counts.gd = 100; stats.counts.bd = 100; stats.counts.pr = 100;
+    stats.raw_score = 10000; stats.detail_score = 99999;
+    CHECK(tenriff::gameplay::ex_score_from_counts(stats.counts) == 17);
+    stats.total_notes = 10; stats.total_combo_steps = 14;
+    CHECK(tenriff::gameplay::maximum_ex_score(stats) == 28);
+    stats.total_combo_steps = 0;
+    CHECK(tenriff::gameplay::maximum_ex_score(stats) == 20);
+    stats.counts.pg = (std::numeric_limits<int>::max)();
+    CHECK(tenriff::gameplay::ex_score_from_counts(stats.counts) == 4294967297LL);
 }

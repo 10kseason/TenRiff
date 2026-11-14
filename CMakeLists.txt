@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.9.9.9 DESCRIPTION "TenRiff 1.9.9.9 final 7" LANGUAGES C CXX)
+project(TenRiff VERSION 2.0.0 DESCRIPTION "TenRiff 2.0.0" LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -190,6 +190,7 @@ add_library(tenriff_core
     src/network/LanDiscovery.cpp
     src/network/PeerProtocol.cpp
     src/network/PeerSession.cpp
+    src/network/HostedPeerSession.cpp
     src/app/BmsGameplayBuilder.cpp
     src/app/BmsEditor.cpp
     src/app/BmsEditorPreview.cpp
@@ -924,6 +925,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_lan_discovery.cpp
         tests/unit/test_peer_protocol.cpp
         tests/unit/test_peer_session.cpp
+        tests/unit/test_hosted_peer_session.cpp
         tests/unit/test_multiplayer_menu_state.cpp
         tests/unit/test_chat_interaction.cpp
         tests/unit/test_online_records_client.cpp
@@ -980,6 +982,13 @@ if(TENRIFF_ENABLE_TESTS)
         add_test(NAME bms_parser_tests COMMAND bms_parser_tests)
         set_tests_properties(bms_parser_tests PROPERTIES TIMEOUT 600)
     endif()
+endif()
+
+if(WIN32)
+    # Explicit loopback-only integration driver. It is not a production client
+    # and never loads a local profile or real connection credentials.
+    add_executable(tenriff_hosted_multiplayer_smoke tools/hosted_multiplayer_smoke.cpp)
+    target_link_libraries(tenriff_hosted_multiplayer_smoke PRIVATE tenriff_core)
 endif()
 
 # Bundled menu music/SFX are resolved from the executable, including standalone

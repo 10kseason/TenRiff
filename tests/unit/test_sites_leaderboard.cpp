@@ -370,7 +370,7 @@ TEST_CASE("Ranked rejects fixed timing identities before URL handling even for o
 }
 #endif
 
-TEST_CASE("Sites payload preserves all four native metrics without display rounding") {
+TEST_CASE("Sites v2 payload derives EX and excludes legacy score metrics") {
     const auto replay = score_fixture();
     std::string payload, error;
     REQUIRE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "FULLCOMBO", payload, error));
@@ -378,14 +378,14 @@ TEST_CASE("Sites payload preserves all four native metrics without display round
     REQUIRE(json.success());
     const auto* object = json.root->as_object();
     REQUIRE(object != nullptr);
-    CHECK(object->at("schema_version").as_number() == 1);
+    CHECK(object->at("schema_version").as_number() == 2);
     CHECK(object->at("ruleset_id").as_string() == app::kRuleset9ReplayRulesetId);
-    CHECK(object->at("score").as_number() == replay.final_score);
-    CHECK(object->at("detail_score").as_number() == replay.stats.detail_score);
+    CHECK(object->at("score").as_number() == gameplay::ex_score_from_counts(replay.stats.counts));
+    CHECK(object->find("detail_score") == object->end());
+    CHECK(object->at("score_version").as_string() == "ex-v1");
+    CHECK(object->at("perfect").as_number() == replay.stats.counts.pg);
     CHECK(object->at("accuracy").as_number() == replay.stats.accuracy_percent());
-    CHECK(object->at("detailed_accuracy").as_number() == replay.stats.detailed_accuracy_percent());
-    CHECK(object->at("accuracy").as_number() != object->at("detailed_accuracy").as_number());
-    CHECK(payload.find("\"detail_score\":496,") != std::string::npos);
+    CHECK(object->find("detailed_accuracy") == object->end());
     CHECK(object->at("timing_profile").as_string() == "bms-easy");
 }
 
@@ -832,7 +832,7 @@ TEST_CASE("Sites fixed baseline payload fails closed on missing or invalid timin
     }
 }
 
-TEST_CASE("Sites payload rejects malformed detailed metrics instead of uploading a fallback percentage") {
+TEST_CASE("Sites payload validates EX counts and accuracy but ignores frozen legacy metrics") {
     const double invalid_numbers[] = {
         std::numeric_limits<double>::quiet_NaN(),
         std::numeric_limits<double>::infinity(),
@@ -840,7 +840,7 @@ TEST_CASE("Sites payload rejects malformed detailed metrics instead of uploading
         -1.0
     };
     for (const auto bad : invalid_numbers) {
-        for (int field = 0; field < 4; ++field) {
+        for (int field = 0; field < 2; ++field) {
             auto replay = score_fixture();
             double* values[] = {&replay.stats.accuracy_points, &replay.stats.accuracy_weight,
                                &replay.stats.detailed_accuracy_points, &replay.stats.detailed_accuracy_weight};
@@ -855,7 +855,7 @@ TEST_CASE("Sites payload rejects malformed detailed metrics instead of uploading
         auto replay = score_fixture();
         replay.stats.detail_score = bad;
         std::string payload, error;
-        CHECK_FALSE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
+        CHECK(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
     }
     auto replay = score_fixture();
     replay.stats.counts.pg = std::numeric_limits<int>::max();
@@ -867,7 +867,7 @@ TEST_CASE("Sites payload rejects malformed detailed metrics instead of uploading
     CHECK_FALSE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
     replay = score_fixture();
     replay.stats.detailed_accuracy_points = 101.0;
-    CHECK_FALSE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
+    CHECK(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
     replay = score_fixture();
     replay.stats.accuracy_points = 1.0;
     CHECK_FALSE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
@@ -1045,4 +1045,18 @@ TEST_CASE("Sites marks explicit same-key conversions and unknown modes as unrank
             CHECK(payload.find("\"key_conversion\":\"" + expected + ":source_ln_e_v1\"") != std::string::npos);
         }
     }
+}
+
+TEST_CASE("Sites EX export requires known counts and ignores normalized multipliers") {
+    auto replay = score_fixture();
+    replay.final_score = 999999; replay.stats.raw_score = 10000;
+    replay.stats.counts.pg = 3; replay.stats.counts.gr = 2;
+    std::string payload, error;
+    REQUIRE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
+    auto parsed = config::parse_json(payload);
+    REQUIRE(parsed.success());
+    CHECK(parsed.root->as_object()->at("score").as_number() == 8);
+    replay.judgement_counts_available = false;
+    CHECK_FALSE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
+    CHECK(payload.empty());
 }

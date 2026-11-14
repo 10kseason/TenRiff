@@ -165,3 +165,25 @@ TEST_CASE("semantic text bloom is bounded without reducing crisp score or rank r
     CHECK(semantic_text_bloom_strength(std::numeric_limits<float>::quiet_NaN(), true) == 0.0f);
     CHECK(semantic_text_bloom_strength(std::numeric_limits<float>::infinity(), true) == 0.0f);
 }
+
+TEST_CASE("record celebration follows EX improvements even when legacy scores disagree") {
+    using namespace tenriff;
+    gameplay::ResultStats prior, tied, improved;
+    prior.counts.pg = 1; // EX 2, legacy 5/3/1 detail 5.
+    tied.counts.gr = 2; // EX 2, legacy detail 6: no new EX record.
+    prior.raw_score = 10000;
+    tied.raw_score = 15000;
+    app::RecordFeedback feedback;
+    feedback.has_previous = true;
+    feedback.previous_score = gameplay::ex_score_from_counts(prior.counts);
+    CHECK_FALSE(app::record_score_improved(gameplay::ex_score_from_counts(tied.counts), feedback));
+    improved.counts.pg = improved.counts.gr = 1; // EX 3, lower legacy score.
+    improved.raw_score = 1;
+    CHECK(app::record_score_improved(gameplay::ex_score_from_counts(improved.counts), feedback));
+    feedback.previous_score = 12000;
+    CHECK_FALSE(app::record_score_improved(12000, feedback));
+    CHECK(app::record_score_improved(12001, feedback)); // Long charts are not clamped at 10k.
+    feedback.has_previous = false;
+    CHECK_FALSE(app::record_score_improved(0, feedback));
+    CHECK(app::record_score_improved(1, feedback)); // Ignore a stale unavailable baseline.
+}

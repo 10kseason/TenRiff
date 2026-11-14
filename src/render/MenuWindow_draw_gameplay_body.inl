@@ -1202,7 +1202,7 @@
             // glyphs; "0.00% / DETAIL" previously rendered as "0.00%/ DETAIL".
             const std::string separator = " \xC2\xB7 ";
             std::string score_summary =
-                loc("SCORE  ", "점수  ") + format_int_with_commas(data.gameplay.score);
+                loc("EX Score  ", "EX Score  ") + (data.gameplay.ex_score ? format_int_with_commas(*data.gameplay.ex_score) : "--");
             scene_hud_cache.score_text = to_wide(score_summary);
             scene_hud_cache.combo_text =
                 to_wide(loc("COMBO ", "콤보 ") + std::to_string(data.gameplay.combo) +
@@ -1236,7 +1236,7 @@
             }
             scene_hud_cache.peer_status_text = to_wide(peer_status);
             scene_hud_cache.peer_score_text =
-                to_wide(loc("SCORE  ", "\uC810\uC218  ") + format_int_with_commas(data.gameplay.peer_score));
+                to_wide(loc("EX Score  ", "EX Score  ") + (data.gameplay.peer_ex_score ? format_int_with_commas(*data.gameplay.peer_ex_score) : "--"));
             scene_hud_cache.peer_combo_text =
                 to_wide(loc("COMBO ", "\uCF64\uBCF4 ") + std::to_string(data.gameplay.peer_combo) +
                         separator + loc("MAX ", "\uCD5C\uB300 ") + std::to_string(data.gameplay.peer_max_combo));
@@ -1264,7 +1264,7 @@
                              ? loc("OPPONENT", "\uC0C1\uB300")
                              : data.gameplay.peer_name));
             std::string ghost_score_summary =
-                loc("SCORE  ", "점수  ") + format_int_with_commas(data.gameplay.ghost_score);
+                loc("EX Score  ", "EX Score  ") + (data.gameplay.ghost_ex_score ? format_int_with_commas(*data.gameplay.ghost_ex_score) : "--");
             scene_hud_cache.ghost_score_text = to_wide(ghost_score_summary);
             scene_hud_cache.ghost_combo_text =
                 to_wide(loc("COMBO ", "콤보 ") + std::to_string(data.gameplay.ghost_combo) +

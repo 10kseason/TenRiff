@@ -321,6 +321,16 @@ std::string calculate_rank(const gameplay::ResultStats& stats, bool game_over,
     return accuracy >= 70.0 ? "D" : "E";
 }
 
+bool is_better_ex_record(std::optional<int64_t> candidate_ex, int candidate_clear_priority,
+                        int candidate_combo, std::string_view candidate_created,
+                        std::optional<int64_t> current_ex, int current_clear_priority,
+                        int current_combo, std::string_view current_created) {
+    if (candidate_ex != current_ex) return candidate_ex > current_ex;
+    (void)candidate_clear_priority; (void)current_clear_priority;
+    (void)candidate_combo; (void)current_combo;
+    return candidate_created > current_created;
+}
+
 bool is_better_record(int64_t candidate_score,
                       int candidate_clear_priority,
                       int64_t candidate_detail_score,
@@ -357,18 +367,25 @@ bool is_better_record(int64_t candidate_score,
 }
 
 std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path& path, std::string* error) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file) {
+    // Read-only derived migration: bound each result before JSON parsing and
+    // never rewrite historical files or trust a stored normalized/EX claim.
+    constexpr std::streamoff kMaxResultBytes = 32 * 1024 * 1024;
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    if (!file || file.tellg() < 0 || file.tellg() > kMaxResultBytes) {
         if (error) {
             *error = "Failed to open result JSON.";
         }
         return std::nullopt;
     }
 
-    std::ostringstream buffer;
-    buffer << file.rdbuf();
-
-    auto parsed = config::parse_json(buffer.str());
+    const auto length = static_cast<std::size_t>(file.tellg());
+    file.seekg(0);
+    std::string contents(length, '\0');
+    if (!file.read(contents.data(), static_cast<std::streamsize>(length))) {
+        if (error) *error = "Incomplete result JSON read.";
+        return std::nullopt;
+    }
+    auto parsed = config::parse_json(contents);
     if (!parsed.success() || !parsed.root.has_value()) {
         if (error) {
             *error = parsed.error.empty() ? "Failed to parse result JSON." : parsed.error;
@@ -416,13 +433,31 @@ std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path&
     }
 
     const auto* counts_obj = find_json_object(*stats_obj, "counts");
+    bool complete_ex_counts = counts_obj != nullptr;
     if (counts_obj) {
+        for (const auto key : {"pg", "gr", "gd", "bd", "pr"}) {
+            const auto* value = find_json_value(*counts_obj, key);
+            if (!value) { complete_ex_counts = false; continue; }
+            const double number = value->as_number(-1.0);
+            if (!value->is_number() || !std::isfinite(number) || number < 0 ||
+                number > (std::numeric_limits<int>::max)() || std::floor(number) != number) {
+                if (error) *error = "Invalid judgement count in result JSON.";
+                return std::nullopt;
+            }
+        }
         out.stats.counts.pg = read_json_int(*counts_obj, "pg", 0);
         out.stats.counts.gr = read_json_int(*counts_obj, "gr", 0);
         out.stats.counts.gd = read_json_int(*counts_obj, "gd", 0);
         out.stats.counts.bd = read_json_int(*counts_obj, "bd", 0);
         out.stats.counts.pr = read_json_int(*counts_obj, "pr", 0);
     }
+    const int64_t count_total = int64_t(out.stats.counts.pg) + out.stats.counts.gr +
+        out.stats.counts.gd + out.stats.counts.bd + out.stats.counts.pr;
+    if (count_total > (std::numeric_limits<int>::max)()) {
+        if (error) *error = "Judgement count total exceeds supported result range.";
+        return std::nullopt;
+    }
+    if (complete_ex_counts) out.ex_score = gameplay::ex_score_from_counts(out.stats.counts);
     out.stats.max_combo = read_json_int(*stats_obj, "max_combo", 0);
     out.stats.total_notes = read_json_int(*stats_obj, "total_notes", 0);
     out.stats.total_combo_steps = read_json_int(*stats_obj, "total_combo_steps", out.stats.total_notes);
@@ -625,6 +660,7 @@ std::optional<ParsedReplayRecord> parse_replay_file(const std::filesystem::path&
     out.raw_score = calculate_score(replay.stats);
     out.final_score = replay.final_score > 0 ? replay.final_score
                                              : clamp_final_score(out.raw_score, out.score_multiplier);
+    if (replay.judgement_counts_available) out.ex_score = gameplay::ex_score_from_counts(replay.stats.counts);
     out.event_count = static_cast<int>(replay.trace.events.size());
     out.autoplay_enabled = replay.mode.autoplay_enabled;
     out.practice_no_fail_enabled = replay.mode.practice_no_fail_enabled;

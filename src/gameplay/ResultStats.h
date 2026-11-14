@@ -82,6 +82,18 @@ struct ResultStats {
     [[nodiscard]] double stddev_delta_ms() const;
 };
 
+// EX is an additive judgement count, unaffected by rate/score multipliers.
+// Legacy normalized and 5/3/1 fields below remain replay-verification evidence.
+[[nodiscard]] constexpr int64_t ex_score_from_counts(const JudgementCounts& counts) {
+    return static_cast<int64_t>(counts.pg) * 2 + counts.gr;
+}
+[[nodiscard]] constexpr int64_t maximum_ex_score(int judgement_steps) {
+    return judgement_steps > 0 ? static_cast<int64_t>(judgement_steps) * 2 : 0;
+}
+[[nodiscard]] inline int64_t maximum_ex_score(const ResultStats& stats) {
+    return maximum_ex_score(stats.total_combo_steps > 0 ? stats.total_combo_steps : stats.total_notes);
+}
+
 [[nodiscard]] int64_t scale_native_score(int64_t raw_score, double multiplier);
 [[nodiscard]] int64_t native_score_from_counts(const JudgementCounts& counts, int total_notes);
 [[nodiscard]] int64_t normalize_stored_native_score(int64_t score, int score_version);

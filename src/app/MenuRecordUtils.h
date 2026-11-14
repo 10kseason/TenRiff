@@ -32,7 +32,8 @@ struct ParsedResultRecord {
     std::optional<uint32_t> bms_random_seed;
     double rate_multiplier = 1.0;
     double score_multiplier = 1.0;
-    int64_t final_score = 0;
+    int64_t final_score = 0; // Historical normalized verification field.
+    std::optional<int64_t> ex_score; // Only complete, validated counts can populate this.
     bool pause_used = false;
     bool aborted = false;
     gameplay::ResultStats stats;
@@ -59,7 +60,8 @@ struct ParsedReplayRecord {
     std::optional<uint32_t> bms_random_seed;
     double rate_multiplier = 1.0;
     double score_multiplier = 1.0;
-    int64_t final_score = 0;
+    int64_t final_score = 0; // Historical normalized verification field.
+    std::optional<int64_t> ex_score; // Only complete, validated counts can populate this.
     bool pause_used = false;
     bool autoplay_enabled = false;
     bool practice_no_fail_enabled = false;
@@ -87,6 +89,12 @@ bool infer_game_over(const gameplay::ResultStats& stats);
 // those terminal flags while using available status evidence for their labels.
 std::string calculate_rank(const gameplay::ResultStats& stats, bool game_over,
                            std::string_view clear_status = {}, bool aborted = false);
+// Modern ordering: EX first; clear/combo/recency only break equal EX values.
+bool is_better_ex_record(std::optional<int64_t> candidate_ex, int candidate_clear_priority,
+                        int candidate_combo, std::string_view candidate_created,
+                        std::optional<int64_t> current_ex, int current_clear_priority,
+                        int current_combo, std::string_view current_created);
+// Frozen compatibility comparator; modern selection calls is_better_ex_record.
 bool is_better_record(int64_t candidate_score,
                       int candidate_clear_priority,
                        int64_t candidate_detail_score,

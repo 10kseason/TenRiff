@@ -80,8 +80,8 @@ inline constexpr double kPacemakerAccuracyMin = 0.0;
 inline constexpr double kPacemakerAccuracyMax = 100.0;
 inline constexpr double kPacemakerAccuracyDefault = 90.0;
 inline constexpr int64_t kPacemakerScoreMin = 0;
-inline constexpr int64_t kPacemakerScoreMax = 10'000;
-inline constexpr int64_t kPacemakerScoreDefault = 8'000;
+inline constexpr int64_t kPacemakerScoreMax = 4'294'967'294LL;
+inline constexpr int64_t kPacemakerScoreDefault = 2'000;
 
 struct JudgeConfig {
     // Stored reference calibration (R3-R8). R9/R10 apply the user-pinned

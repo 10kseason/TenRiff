@@ -174,28 +174,35 @@ MenuApp::BestResultRecord MenuApp::best_result_for_song_entry(const SongEntry& e
             const int best_judged = best.perfect + best.great + best.good + best.bad;
             const int found_judged = found->second.perfect + found->second.great + found->second.good +
                                      found->second.bad;
-            if (menu_records::is_better_record(found->second.best_score,
-                                               menu_records::clear_status_priority(found->second.clear_status,
-                                                                                   found->second.game_over,
-                                                                                   found->second.final_gauge),
-                                               found->second.detail_score,
-                                               found->second.detailed_accuracy,
-                                               found->second.max_combo,
-                                               found_judged,
-                                               found->second.created_utc,
-                                               best.best_score,
-                                               menu_records::clear_status_priority(best.clear_status,
-                                                                                   best.game_over,
-                                                                                   best.final_gauge),
-                                               best.detail_score,
-                                               best.detailed_accuracy,
-                                               best.max_combo,
-                                               best_judged,
-                                               best.created_utc)) {
+            const int found_clear = menu_records::clear_status_priority(
+                found->second.clear_status, found->second.game_over, found->second.final_gauge);
+            const int best_clear = menu_records::clear_status_priority(
+                best.clear_status, best.game_over, best.final_gauge);
+            if (found_clear > best_clear || (found_clear == best_clear &&
+                menu_records::is_better_ex_record(found->second.ex_score, found_clear,
+                    found->second.max_combo, found->second.created_utc, best.ex_score, best_clear,
+                    best.max_combo, best.created_utc))) {
                 best = found->second;
             }
         }
     } catch (...) {
+    }
+    return best;
+}
+
+MenuApp::BestResultRecord MenuApp::best_score_result_for_song_entry(const SongEntry& entry) const {
+    BestResultRecord best;
+    for (const auto& key : menu_songs::build_chart_path_keys(entry.path, songs_path_)) {
+        const auto found = chart_score_high_water_.find(key);
+        if (found == chart_score_high_water_.end() || !found->second.best.ex_score) continue;
+        const auto& candidate = found->second.best;
+        const auto candidate_policy = std::tie(candidate.judgement_generation, candidate.bms_gauge_version,
+            candidate.bms_control_flow_version, candidate.bms_timing_version);
+        const auto best_policy = std::tie(best.judgement_generation, best.bms_gauge_version,
+            best.bms_control_flow_version, best.bms_timing_version);
+        if (!best.has_value || candidate_policy > best_policy || (candidate_policy == best_policy &&
+            menu_records::is_better_ex_record(candidate.ex_score, 0, 0, candidate.created_utc,
+                best.ex_score, 0, 0, best.created_utc))) best = candidate;
     }
     return best;
 }
@@ -499,7 +506,7 @@ void MenuApp::record_current_session_mix_result() {
     if (!last_game_over_) {
         ++session_mix_cleared_;
     }
-    session_mix_total_score_ += last_result_final_score_;
+    session_mix_total_score_ += last_result_ex_score_.value_or(0);
 }
 
 void MenuApp::advance_session_mix_from_result() {

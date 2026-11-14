@@ -1,3 +1,7 @@
+> **2026-11-14 · 2.0.0** Integrates EX Score (2×PG + GR), account-linked hosted multiplayer, constellation Home/Song Select/Options, verified ALL COMBO presentation, and room-chat, Library and Session Mix fixes. [English](release-2.0.0.en.md)
+
+The compatibility reference remains **1.9.9.9-final4**. **After 2.0.0, development is bug-fix-only; no new features.** See the [verification gate](release-2.0.0-gate.md) for release checks and publication status. Earlier version notices below are historical.
+
 > **2026-11-10 · 1.9.9.9-final4:** Adds `tenriff-lr2-import`, a display-only import of clear lamps from an LR2 score database. EX is shown only for plays whose LR2 judgement order survives the EX-HARD gauge under worst-case timing. Adds a preventive measure for the lock shared by the audio callback and the HUD thread. The fixed baseline moves to **1.9.9.9-final4**. [Release](release-1.9.9.9-final4.en.md). Earlier candidate/release notices below are historical.
 
 > **2026-11-09 · 1.9.9.9-final3:** Clip failed notes below the judgement line, add a judgement-line dimmer, redesign twelve bundled themes in a common modern style, and include TenRiff Code / CLI with three loop videos. The AI authoring guide, v1 schema and web/offline editors support the new brightness and video fields. [Release](release-1.9.9.9-final3.en.md). Earlier candidate/release notices below are historical.

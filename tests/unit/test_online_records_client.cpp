@@ -24,6 +24,7 @@ std::string sites_timing_board_fixture(const tenriff::config::JsonValue* profile
     board.emplace("rate_milli", JsonValue{1000.0});
     board.emplace("conditions", JsonValue{json_stringify(JsonValue{conditions})});
     JsonObject response;
+    response.emplace("score_version", JsonValue{"ex-v1"});
     response.emplace("boards", JsonValue{JsonArray{JsonValue{board}}});
     return json_stringify(JsonValue{response});
 }
@@ -171,7 +172,7 @@ TEST_CASE("Sites boards preserve conditions and reject substring chart matches")
     using namespace tenriff::app;
     std::vector<SitesRecordBoard> boards;
     std::string error;
-    const auto json = std::string("{\"boards\":[{\"id\":\"") + std::string(64, 'a') +
+    const auto json = std::string("{\"score_version\":\"ex-v1\",\"boards\":[{\"id\":\"") + std::string(64, 'a') +
         "\",\"title\":\"Fixture\",\"chart_sha256\":\"" + std::string(64, 'b') +
         "\",\"key_mode\":\"5K\",\"rate_milli\":1000,\"conditions\":\"{\\\"ruleset\\\":\\\"tenriff-native-v2\\\",\\\"gauge\\\":\\\"normal\\\",\\\"random\\\":\\\"off\\\",\\\"mods\\\":[]}\"}]}";
     REQUIRE(parse_sites_record_boards(json, "Fixture", boards, error));
@@ -180,7 +181,7 @@ TEST_CASE("Sites boards preserve conditions and reject substring chart matches")
     CHECK(boards[0].ruleset_id == "tenriff-native-v2");
     REQUIRE(parse_sites_record_boards(json, "Fixt", boards, error));
     CHECK(boards.empty());
-    CHECK_FALSE(parse_sites_record_boards("{\"boards\":[{}]}", "Fixture", boards, error));
+    CHECK_FALSE(parse_sites_record_boards("{\"score_version\":\"ex-v1\",\"boards\":[{}]}", "Fixture", boards, error));
     CHECK(boards.empty());
 }
 
@@ -191,11 +192,12 @@ TEST_CASE("Sites rankings accept ties and nullable detail without claiming repla
     board.ruleset_id = "tenriff-native-v2";
     std::string error;
     std::vector<OnlineRecordEntry> records;
-    const std::string row = "{\"rank\":1,\"nickname\":\"Fixture\",\"score\":9000,\"detail_score\":null,\"detailed_accuracy\":null,\"accuracy\":99.5,\"max_combo\":200,\"clear_status\":\"CLEAR\",\"played_at\":\"2026-10-02T00:00:00Z\"}";
-    const auto json = "{\"board\":{\"id\":\"" + board.id + "\"},\"rankings\":[" + row + "," + row + "]}";
+    const std::string row = "{\"rank\":1,\"nickname\":\"Fixture\",\"score_version\":\"ex-v1\",\"perfect\":100,\"great\":0,\"good\":0,\"bad\":0,\"poor\":0,\"score\":200,\"detail_score\":null,\"detailed_accuracy\":null,\"accuracy\":99.5,\"max_combo\":200,\"clear_status\":\"CLEAR\",\"played_at\":\"2026-10-02T00:00:00Z\"}";
+    const auto json = "{\"score_version\":\"ex-v1\",\"board\":{\"id\":\"" + board.id + "\"},\"rankings\":[" + row + "," + row + "]}";
     REQUIRE(parse_sites_record_rankings(json, board, records, error));
     REQUIRE(records.size() == 2);
     CHECK(records[1].rank == 1);
+    CHECK(records[0].ex_score == 200);
     CHECK(records[0].verification_status == "sites_community");
     CHECK(records[0].detailed_accuracy == doctest::Approx(99.5));
     board.id[0] = 'b';
@@ -226,6 +228,7 @@ TEST_CASE("online records parser accepts verified schema-v1 records") {
     CHECK(response.records[0].rank == 1);
     CHECK(response.records[0].player_name == "ryui");
     CHECK(response.records[0].score == 987654);
+    CHECK_FALSE(response.records[0].ex_score.has_value());
     CHECK(response.records[0].accuracy == doctest::Approx(98.7654));
     CHECK(response.records[0].verification_status == "online_verified");
 }
@@ -250,4 +253,37 @@ TEST_CASE("online records parser rejects mismatched charts and client claims") {
     CHECK_FALSE(tenriff::app::parse_online_records_response(
         claim, hash, response, error));
     CHECK(error.find("unverified") != std::string::npos);
+}
+
+TEST_CASE("Sites EX rankings reject missing version counts mismatch and overflow") {
+    using namespace tenriff;
+    app::SitesRecordBoard board; board.id = std::string(64, 'a');
+    config::JsonObject row{{"rank", config::JsonValue{1.0}}, {"nickname", config::JsonValue{"Synthetic"}},
+        {"score_version", config::JsonValue{"ex-v1"}}, {"score", config::JsonValue{5.0}},
+        {"perfect", config::JsonValue{2.0}}, {"great", config::JsonValue{1.0}},
+        {"good", config::JsonValue{0.0}}, {"bad", config::JsonValue{0.0}}, {"poor", config::JsonValue{0.0}},
+        {"accuracy", config::JsonValue{90.0}}, {"max_combo", config::JsonValue{3.0}},
+        {"clear_status", config::JsonValue{"CLEAR"}}, {"played_at", config::JsonValue{"2026-11-14"}}};
+    const auto check = [&](const config::JsonObject& item, const char* version) {
+        config::JsonObject root{{"board", config::JsonValue{config::JsonObject{{"id", config::JsonValue{board.id}}}}},
+            {"rankings", config::JsonValue{config::JsonArray{config::JsonValue{item}}}}};
+        if (version) root["score_version"] = config::JsonValue{version};
+        std::vector<app::OnlineRecordEntry> records; std::string error;
+        const bool ok = app::parse_sites_record_rankings(config::json_stringify(config::JsonValue{root}), board, records, error);
+        if (ok) { REQUIRE(records.size() == 1); CHECK(records.front().ex_score == 5); }
+        else CHECK(records.empty());
+        return ok;
+    };
+    CHECK(check(row, "ex-v1"));
+    CHECK_FALSE(check(row, nullptr));
+    CHECK_FALSE(check(row, "legacy"));
+    for (const auto* field : {"score_version", "perfect", "great", "good", "bad", "poor"}) {
+        auto bad = row; bad.erase(field); CHECK_FALSE(check(bad, "ex-v1"));
+    }
+    for (const auto& value : {config::JsonValue{-1.0}, config::JsonValue{0.5},
+                              config::JsonValue{10000001.0}, config::JsonValue{"2"}}) {
+        auto bad = row; bad["perfect"] = value; CHECK_FALSE(check(bad, "ex-v1"));
+    }
+    auto bad = row; bad["score"] = config::JsonValue{9999.0}; CHECK_FALSE(check(bad, "ex-v1"));
+    bad = row; bad["poor"] = config::JsonValue{10000000.0}; CHECK_FALSE(check(bad, "ex-v1"));
 }

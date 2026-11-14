@@ -19,7 +19,7 @@
                 draw_text_clipped(text, format, native_rect("result_multiplayer.rect.005", D2D1::RectF(left, top, right, top + 40.0f)), brush);
             };
             column_text(wloc("RANK / PLAYER", "순위 / 플레이어"), 96, 610, 178, d2d_->hud_format.Get(), d2d_->muted_brush.Get());
-            column_text(wloc("SCORE", "점수"), 620, 860, 178, d2d_->hud_format.Get(), d2d_->muted_brush.Get());
+            column_text(wloc("EX Score", "EX Score"), 620, 860, 178, d2d_->hud_format.Get(), d2d_->muted_brush.Get());
             column_text(wloc("MAX COMBO", "최대 콤보"), 890, 1080, 178, d2d_->hud_format.Get(), d2d_->muted_brush.Get());
             column_text(wloc("GAUGE", "게이지"), 1090, 1270, 178, d2d_->hud_format.Get(), d2d_->muted_brush.Get());
             column_text(wloc("JUDGEMENTS / STATUS", "판정 / 상태"), 1280, 1820, 178, d2d_->hud_format.Get(), d2d_->muted_brush.Get());
@@ -31,10 +31,10 @@
                 const std::string name = (player.rank > 0 ? std::to_string(player.rank) : "--") +
                     "   " + player.name + (player.local ? loc(" / YOU", " / 나") : "");
                 column_text(to_wide(name), 96, 600, y + 16, d2d_->body_format.Get(), ink);
-                column_text(to_wide(!player.has_score ? "--" : player.local
-                    ? result_record_score_text(player.score, 1.0f, record_elapsed_ns, data.result.new_record,
+                column_text(to_wide(!player.ex_score ? "--" : player.local
+                    ? result_record_score_text(*player.ex_score, 1.0f, record_elapsed_ns, data.result.new_record,
                                                record_effect_skipped)
-                    : std::to_string(player.score)),
+                    : ex_score_text(player.ex_score)),
                     620, 875, y + 14, d2d_->title_format.Get(), ink);
                 if (player.local && player.has_score && data.result.new_record) {
                     const float old_opacity = d2d_->accent_brush->GetOpacity();

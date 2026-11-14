@@ -14,8 +14,9 @@
         };
         auto update_studio_text = [&] {
             auto& c = scene_hud_cache;
-            const auto score = make_gameplay_studio_score_counter(data.gameplay.score);
-            c.studio_score_padded = score.padded; c.studio_score_significant = score.significant;
+            const auto score = make_gameplay_studio_score_counter(data.gameplay.ex_score.value_or(0));
+            c.studio_score_padded = data.gameplay.ex_score ? score.padded : L"--";
+            c.studio_score_significant = data.gameplay.ex_score ? score.significant : L"--";
             c.studio_setting_labels = {L"RATE", L"HS", L"BPM", wloc("SCROLL", "스크롤"),
                 wloc("LINE", "판정선"), wloc("LATENCY", "레이턴시")};
             c.studio_setting_values = {to_wide("x" + format_decimal(data.gameplay.rate, 2)),
@@ -25,7 +26,7 @@
                 to_wide(std::to_string(static_cast<int>(std::llround(data.gameplay.judgement_line_position * 100))) + "%"),
                 to_wide(format_signed_ms(data.gameplay.visual_offset_ms, 0))};
             c.studio_accuracy = to_wide(format_decimal(data.gameplay.accuracy, 2) + "%");
-            c.studio_detail = to_wide("DETAIL " + format_decimal(data.gameplay.detailed_accuracy, 2));
+            c.studio_detail = to_wide(loc("DETAIL ACCURACY ", "상세 정확도 ") + format_decimal(data.gameplay.detailed_accuracy, 2) + "%");
             c.studio_max = L"MAX " + std::to_wstring(data.gameplay.max_combo);
             const std::array<int, 5> counts{data.gameplay.pg, data.gameplay.gr, data.gameplay.gd, data.gameplay.bd, data.gameplay.pr};
             for (std::size_t i = 0; i < counts.size(); ++i) c.studio_judge_counts[i] = std::to_wstring(counts[i]);
@@ -103,7 +104,7 @@
             ctx->SetTransform(D2D1::Matrix3x2F::Scale(deck.score_scale, deck.score_scale) *
                 D2D1::Matrix3x2F::Translation(deck.score_x, deck.score_y) * saved_transform);
             const float x = 0.0f, right = deck.score_width / deck.score_scale;
-            static const std::wstring score_label = L"SCORE";
+            const std::wstring score_label = wloc("EX Score", "EX Score");
             studio_text(score_label, studio_fonts.studio_numbers[1].Get(), D2D1::RectF(x, 0, right, 20), muted, DWRITE_TEXT_ALIGNMENT_LEADING, 3);
             const auto score_rect = D2D1::RectF(x, 22, right, 92);
             D2D1_MATRIX_3X2_F deck_transform{};

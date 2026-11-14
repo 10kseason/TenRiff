@@ -239,7 +239,9 @@ struct MenuAppSongSourceTestAccess {
             parsed.bms_control_flow_version = policy[1];
             parsed.bms_timing_version = policy[2];
             parsed.bms_random_seed = seed;
-            verified.final_score = score;
+            verified.final_score = score; // Frozen legacy evidence stays separately observable.
+            verified.stats.counts.pg = static_cast<int>(score / 2);
+            verified.stats.counts.gr = static_cast<int>(score % 2);
             const auto name = std::to_string(menu->local_play_records_.size());
             menu->append_chart_result_record(parsed, "result-" + name, "replay-" + name, verified);
             const auto& stored = menu->local_play_records_.back();
@@ -256,12 +258,16 @@ struct MenuAppSongSourceTestAccess {
                 CHECK(item.second.bms_control_flow_version == policies[i][1]);
                 CHECK(item.second.bms_timing_version == policies[i][2]);
                 CHECK(item.second.best_score == score);
+                CHECK(item.second.ex_score == score);
             }
         }
         for (std::size_t i = 0; i + 1 < policies.size(); ++i) append(policies[i], 99999, 42);
         for (const auto& item : menu->chart_best_results_) CHECK(item.second.best_score == 300);
         append(policies.back(), 400, UINT32_MAX);
-        for (const auto& item : menu->chart_best_results_) CHECK(item.second.best_score == 400);
+        for (const auto& item : menu->chart_best_results_) {
+            CHECK(item.second.best_score == 400);
+            CHECK(item.second.ex_score == 400);
+        }
         CHECK(menu->local_play_records_.size() == 14);
         // Loading aliases in either order must not compare legacy high scores
         // with the newest policy's score. Random seed never partitions BEST.
@@ -278,6 +284,7 @@ struct MenuAppSongSourceTestAccess {
             menu->chart_best_results_[keys[0]] = reverse ? current : historical;
             menu->chart_best_results_[keys[1]] = reverse ? historical : current;
             CHECK(menu->best_result_for_song_entry(entry).best_score == 400);
+            CHECK(menu->best_result_for_song_entry(entry).ex_score == 400);
         }
     }
     static void check_bms_policy_live_and_restore(const std::filesystem::path& root) {

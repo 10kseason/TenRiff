@@ -68,11 +68,13 @@ struct MenuAppScoreComparisonTestAccess {
         best.has_value = best.replay_verified = true;
         best.replay_path = replay_path;
         best.best_score = 10000;
+        best.ex_score = 4;
         const auto keys = menu_songs::build_chart_path_keys(menu->song_absolute_path(song), menu->songs_path_);
         REQUIRE_FALSE(keys.empty());
         menu->chart_score_high_water_[keys.front()].best = best;
         MenuApp::LocalPlayRecord record;
         record.replay_path = replay_path;
+        record.ex_score = 4;
         record.pause_used = true;
         record.clear_status = "NORMAL CLEAR";
         menu->local_play_records_.push_back(record);
@@ -98,14 +100,25 @@ struct MenuAppScoreComparisonTestAccess {
         best.has_value = best.replay_verified = true;
         best.replay_path = "score-best.replay.json";
         best.best_score = 9500;
+        best.ex_score = 3;
         const auto keys = menu_songs::build_chart_path_keys(menu->song_absolute_path(song), menu->songs_path_);
         REQUIRE_FALSE(keys.empty());
         menu->chart_score_high_water_[keys.front()].best = best;
         MenuApp::LocalPlayRecord record;
         record.replay_path = best.replay_path;
+        record.ex_score = 3;
         record.clear_status = "NORMAL CLEAR";
         menu->local_play_records_.push_back(record);
         CHECK(menu->score_comparison_replay_path_for_selected_song() == best.replay_path);
+        // A large historical score does not establish EX evidence. Zero EX,
+        // however, is a valid known result and may provide the replay reference.
+        auto& selected_best = menu->chart_score_high_water_[keys.front()].best;
+        selected_best.ex_score.reset();
+        selected_best.best_score = 10000;
+        CHECK(menu->score_comparison_replay_path_for_selected_song().empty());
+        selected_best.ex_score = 0;
+        CHECK(menu->score_comparison_replay_path_for_selected_song() == best.replay_path);
+        selected_best = best;
         menu->chart_best_results_[keys.front()] = best;
         menu->chart_best_results_[keys.front()].replay_path = "clear-best.replay.json";
         CHECK(menu->score_comparison_replay_path_for_selected_song() == best.replay_path);
@@ -261,9 +274,9 @@ struct GameSessionScoreComparisonTestAccess {
         CHECK(session->ghost_replay_source_.trace.events.front().sample == 49500);
         const auto mid = session->hud_snapshot();
         CHECK(mid.ghost_visible);
-        CHECK(mid.ghost_score == 2500);
+        CHECK(mid.ghost_score == 1); // One GR; legacy engine score remains 2500 above.
         CHECK(mid.score_comparison.best_available);
-        CHECK(mid.score_comparison.best_score == 5000);
+        CHECK(mid.score_comparison.best_score == 2);
         CHECK(mid.score_comparison.score_difference == 0);
         session->paused_.store(true);
         session->pause_used_.store(true);
@@ -277,7 +290,7 @@ struct GameSessionScoreComparisonTestAccess {
         const auto end = session->hud_snapshot();
         CHECK(end.score_comparison.live);
         CHECK(end.score_comparison.best_available);
-        CHECK(end.score_comparison.score_difference == -5000);
+        CHECK(end.score_comparison.score_difference == -2);
         MenuAppScoreComparisonTestAccess::check_render_publication({mid.score_comparison, end.score_comparison});
         CHECK(session->ghost_engine_->stats().raw_score == 2500);
         CHECK(session->engine_->stats().raw_score == player_score);
@@ -306,36 +319,36 @@ struct GameSessionScoreComparisonTestAccess {
         CHECK(session->hud_snapshot().score_comparison.best_score == 0);
         (void)session->engine_->handle_input(1, input::InputState::Pressed, 48000);
         session->audio_callback(output, 1, 48000, 48000);
-        CHECK(session->hud_snapshot().score_comparison.best_score == 5000);
+        CHECK(session->hud_snapshot().score_comparison.best_score == 2);
         session->audio_callback(output, 1, 50000, 50000);
-        CHECK(session->hud_snapshot().ghost_score == 2500);
+        CHECK(session->hud_snapshot().ghost_score == 1);
         session->pause_used_.store(true);
         session->paused_.store(true);
         session->audio_callback(output, 1, 96000, 96000);
         const auto paused = session->hud_snapshot();
         CHECK(paused.current_sample == 96000);
         CHECK(paused.score_comparison.live);
-        CHECK(paused.score_comparison.best_score == 5000);
+        CHECK(paused.score_comparison.best_score == 2);
         session->audio_callback(output, 1, 144000, 144000);
         CHECK(session->hud_snapshot().current_sample == paused.current_sample);
-        CHECK(session->hud_snapshot().score_comparison.best_score == 5000);
+        CHECK(session->hud_snapshot().score_comparison.best_score == 2);
         session->pause_resume_requested_.store(true);
         session->audio_callback(output, 1, 144000, 144000);
         REQUIRE(session->pause_resume_end_sample_ > 144000);
         const auto resume_sample = session->pause_resume_end_sample_;
         session->audio_callback(output, 1, resume_sample, resume_sample);
         CHECK_FALSE(session->paused_.load());
-        CHECK(session->hud_snapshot().score_comparison.best_score == 5000);
+        CHECK(session->hud_snapshot().score_comparison.best_score == 2);
         const auto physical_second_note = session->pause_sample_offset_ + 144000;
         session->audio_callback(output, 1, physical_second_note, physical_second_note);
         const auto resumed = session->hud_snapshot();
         CHECK(resumed.current_sample == 144000);
         CHECK(resumed.score_comparison.live);
         CHECK(resumed.score_comparison.best_available);
-        CHECK(resumed.score_comparison.best_score == 10000);
-        CHECK(resumed.score_comparison.score_difference == -5000);
-        CHECK(resumed.score == 5000);
-        CHECK(resumed.ghost_score == 2500);
+        CHECK(resumed.score_comparison.best_score == 4);
+        CHECK(resumed.score_comparison.score_difference == -2);
+        CHECK(resumed.score == 2); // One PG, independent of the two-note normalization.
+        CHECK(resumed.ghost_score == 1);
     }
     static void check_hidden_snapshot() {
         auto session = std::make_unique<GameSession>();
@@ -358,7 +371,7 @@ struct GameSessionScoreComparisonTestAccess {
         CHECK_FALSE(hidden.ghost_visible);
         CHECK(hidden.score_comparison.live);
         CHECK(hidden.score_comparison.best_available);
-        CHECK(hidden.score_comparison.best_score == 5000);
+        CHECK(hidden.score_comparison.best_score == 2);
         CHECK(hidden.score_comparison.score_difference == 0);
         CHECK(session->engine_->stats().raw_score == before_score);
         CHECK(session->engine_->replay().events.size() == before_events);
@@ -442,11 +455,15 @@ TEST_CASE("live comparison distinguishes missing best inactive and exact ties") 
     auto tied = live_score_comparison(current, 1, true, &current);
     CHECK(tied.best_available);
     CHECK(tied.score_difference == 0);
+    ResultStats legacy_only = current;
+    legacy_only.raw_score += 9999;
+    CHECK(live_score_comparison(legacy_only, 9, true, &current, .1).score_difference == 0);
     ResultStats other = current;
-    other.raw_score += 1;
+    other.counts.gr += 1;
+    other.raw_score += 9999;
     CHECK(live_score_comparison(other, 1, true, &current).score_difference == 1);
     CHECK(live_score_comparison(current, 1, true, &other).score_difference == -1);
-    CHECK(live_score_comparison(current, 0.5, true, &current, 1).score_difference == -50);
+    CHECK(live_score_comparison(current, 0.5, true, &current, 1).score_difference == 0);
 }
 
 TEST_CASE("rank tracker follows categorical accuracy instead of native score") {
@@ -482,7 +499,7 @@ TEST_CASE("live best comparison advances an actual replay engine to the shared c
     player.advance(2000);
     best.advance(2000);
     const auto mid = live_score_comparison(player.stats(), 1, true, &best.stats());
-    CHECK(mid.best_score == 5000);
+    CHECK(mid.best_score == 2);
     CHECK(mid.score_difference == 0);
     (void)player.handle_input(1, input::InputState::Released, 2001);
     (void)best.handle_input(1, input::InputState::Released, 2001);
@@ -490,8 +507,8 @@ TEST_CASE("live best comparison advances an actual replay engine to the shared c
     player.advance(4000);
     best.advance(4000);
     const auto end = live_score_comparison(player.stats(), 1, true, &best.stats());
-    CHECK(end.best_score == 10000);
-    CHECK(end.score_difference == -5000);
+    CHECK(end.best_score == 4);
+    CHECK(end.score_difference == -2);
 }
 
 TEST_CASE("score comparison excludes historical or assisted replay policies") {
@@ -544,4 +561,26 @@ TEST_CASE("comparison settings are opt in bounded and portable with skin presets
     (void)controller.handle(MenuAction::adjust(1), runtime, {}, {}, SkinSettingsRowId::ScoreComparisonY);
     CHECK(runtime.skin.score_comparison_y == doctest::Approx(0.29));
     CHECK(skin_settings_category(SkinSettingsRowId::ScoreComparisonX) == SkinSettingsCategory::Hud);
+}
+
+TEST_CASE("live EX comparison ignores contradictory normalized totals and score multipliers") {
+    ResultStats current, best;
+    current.counts.pg = 100; // EX 200
+    current.raw_score = 1;
+    best.counts.gr = 199; // EX 199
+    best.raw_score = 10000;
+    for (double multiplier : {.25, 1.0, 4.0}) {
+        const auto ahead = live_score_comparison(current, multiplier, true, &best, 8.0);
+        CHECK(ahead.best_available);
+        CHECK(ahead.best_score == 199);
+        CHECK(ahead.score_difference == 1);
+        CHECK(live_score_comparison(best, 8.0, true, &current, multiplier).score_difference == -1);
+    }
+    ResultStats zero;
+    zero.raw_score = 10000; // No PG/GR evidence in this current engine snapshot.
+    const auto known_zero = live_score_comparison(zero, 1, true, &zero);
+    CHECK(known_zero.best_available);
+    CHECK(known_zero.best_score == 0);
+    CHECK(known_zero.score_difference == 0);
+    CHECK_FALSE(live_score_comparison(zero, 1, true).best_available);
 }
