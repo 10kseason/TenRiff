@@ -1,6 +1,8 @@
+> **2026-11-15 · 2.0.1** Fix Options screen readability. Dim the default Options galaxy to 40% of its 2.0.0 brightness (source RGB multiplier 0.392). Reduce all eight cards to 85% width and height, including text/icons, and match their clickable bounds. Show the selected option description on one line below the cards in Korean, English, Japanese and Simplified Chinese. [Release](docs/release-2.0.1.en.md)
+
 > **2026-11-14 · 2.0.0** Integrates EX Score (2×PG + GR), account-linked hosted multiplayer, constellation Home/Song Select/Options, verified ALL COMBO presentation, and room-chat, Library and Session Mix fixes. [English](docs/release-2.0.0.en.md)
 
-The compatibility reference remains **1.9.9.9-final4**. **After 2.0.0, development is bug-fix-only; no new features.** See the [verification gate](docs/release-2.0.0-gate.md) for release checks and publication status. Earlier version notices below are historical.
+The compatibility reference remains **1.9.9.9-final4**. **After 2.0.0, development is bug-fix-only; no new features.** See the [verification gate](docs/release-2.0.1-gate.md) for release checks and publication status. Earlier version notices below are historical.
 
 > **2026-11-12 · 1.9.9.9-final7** Fixes a missed note blanking the judgement shown on screen. A miss now shows its BAD/POOR when it is decided. Scores, gauge, judgement windows and replays are unchanged. [English](docs/release-1.9.9.9-final7.en.md)
 
