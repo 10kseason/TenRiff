@@ -524,7 +524,11 @@ void MenuWindow::draw(const MenuRenderData& data) {
             ctx->SetTransform(saved);
             ctx->PopAxisAlignedClip();
             benchmark_options_galaxy_adjusted_ = true;
-        } else ctx->DrawBitmap(options_background, full_screen_rect, 1, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, &source);
+        } else {
+            ctx->DrawBitmap(options_background, full_screen_rect, 1, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, &source);
+            // Preserve the brightness ceiling even if the color-matrix effect is unavailable.
+            ctx->FillRectangle(full_screen_rect, semantic_color(0x000000, 1 - kOptionsGalaxyBrightness));
+        }
         benchmark_options_galaxy_drawn_ = true;
     }
 

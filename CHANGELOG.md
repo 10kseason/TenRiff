@@ -1,3 +1,10 @@
+# 2.0.1 — 2026-11-15
+
+- Dim the default Options galaxy to 40% of its 2.0.0 brightness (source RGB multiplier 0.392).
+- Reduce all eight cards to 85% width and height, including text/icons, and match their clickable bounds.
+- Show the selected option description on one line below the cards in Korean, English, Japanese and Simplified Chinese.
+- Preserve final4 compatibility, gameplay rules and existing save formats. [Release notes](docs/release-2.0.1.en.md)
+
 # 2.0.0 — 2026-11-14
 
 - Use EX Score = 2×P-Great + Great across display, personal bests, ghosts, Session Mix, multiplayer and web ranking; retain legacy replay scoring and exclude missing-count records from EX ranking without guessing.

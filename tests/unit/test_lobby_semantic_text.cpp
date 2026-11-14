@@ -443,11 +443,11 @@ TEST_CASE("options galaxy reduces chroma and brightness while retaining source t
     };
     for (float alpha : {0.0f, .25f, 1.0f}) {
         const auto gray = apply({.4f, .4f, .4f, alpha});
-        for (std::size_t channel = 0; channel < 3; ++channel) CHECK(gray[channel] == doctest::Approx(.392f));
+        for (std::size_t channel = 0; channel < 3; ++channel) CHECK(gray[channel] == doctest::Approx(.1568f));
         CHECK(gray[3] == alpha);
         const auto color = apply({.6f, .4f, .2f, alpha});
-        CHECK(color[0] - color[1] == doctest::Approx(.2f * .92f * .98f));
-        CHECK(color[1] - color[2] == doctest::Approx(.2f * .92f * .98f));
+        CHECK(color[0] - color[1] == doctest::Approx(.2f * .92f * .98f * .40f));
+        CHECK(color[1] - color[2] == doctest::Approx(.2f * .92f * .98f * .40f));
         CHECK(color[3] == alpha);
     }
 }

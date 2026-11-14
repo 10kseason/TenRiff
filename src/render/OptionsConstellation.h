@@ -3,7 +3,8 @@
 
 namespace tenriff::render {
 inline constexpr float kOptionsGalaxySaturation = .92f;
-inline constexpr float kOptionsGalaxyBrightness = .98f;
+// 40% of the 2.0.0 background brightness; text and cards stay independent.
+inline constexpr float kOptionsGalaxyBrightness = .98f * .40f;
 // Row-vector color transform: preserve alpha, reduce chroma around Rec.709
 // luminance, then apply the requested linear brightness multiplier to RGB.
 inline constexpr std::array<float, 20> options_galaxy_color_matrix() {
