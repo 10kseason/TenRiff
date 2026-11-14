@@ -104,7 +104,14 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                                                const MenuApp::BestResultRecord& current_best,
                                                const MenuApp::LocalPlayRecord* selected_record) {
     using namespace menu_song_select;
+    const SongEntry* score_entry = selected_song_ >= 0
+        ? visible_song_entry(static_cast<std::size_t>(selected_song_)) : nullptr;
+    const BestResultRecord current_score_best = score_entry
+        ? best_score_result_for_song_entry(*score_entry) : BestResultRecord{};
     render.song_select.score_clear_status.clear();
+    render.song_select.ex_score.reset();
+    render.song_select.high_ex_score.reset();
+    render.song_select.max_ex_score = 0;
     render.song_select.selected_song_lr2oraja_label.clear();
     render.song_select.selected_song_lr2oraja_score.clear();
     render.song_select.verified_full_combo = false;
@@ -193,8 +200,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         render.song_select.showing_records
             ? (!render.song_select.online_records && selected_record &&
                !selected_record->result_path.empty())
-            : (!render.song_select.showing_sources && current_best.has_value &&
-               !current_best.result_path.empty());
+            : (!render.song_select.showing_sources && current_score_best.has_value &&
+               !current_score_best.result_path.empty());
     const ui::Language language = ui_language();
     const auto key_filter_summary = [&]() {
         return song_key_filter_ <= 0 ? ui_text("All Keys", "전체 키") : key_mode_label(std::to_string(song_key_filter_) + "k");
@@ -243,7 +250,14 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         (render.song_select.online_records
              ? (selected_online_record ? selected_online_record->score : 0)
          : render.song_select.showing_records && selected_record ? selected_record->score :
-         (current_best.has_value ? current_best.best_score : 0));
+         (current_score_best.has_value ? current_score_best.best_score : 0));
+    if (!render.song_select.showing_sources) {
+        render.song_select.high_ex_score = render.song_select.online_records
+            ? (selected_online_record ? selected_online_record->ex_score : std::nullopt)
+            : render.song_select.showing_records
+                ? (selected_record ? selected_record->ex_score : std::nullopt)
+                : (current_score_best.has_value ? current_score_best.ex_score : std::nullopt);
+    }
     render.song_select.current_source_name =
         config_.ui.all_song_sources ? "ALL SONG" :
         safe_ui_text(menu_songs::song_source_display_name(songs_path_), ui_text("Songs", "곡"));
@@ -502,12 +516,13 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                     render::SongCardData card;
                     card.has_score = true;
                     card.score = record.score;
+                    card.ex_score = record.ex_score;
                     card.lamp = record.clear_status;
                     card.title = "#" + std::to_string(record.rank) + "  " +
                                  safe_ui_text(record.player_name, "PLAYER");
                     card.artist = render::song_select_lamp_presentation(record.clear_status).label + "  " +
-                                  ui_text("SCORE ", "점수 ") +
-                                  format_int_with_commas(record.score) + "  " +
+                                  ui_text("EX Score ", "EX Score ") +
+                                  (record.ex_score ? format_int_with_commas(*record.ex_score) : "--") + "  " +
                                   format_decimal(record.accuracy) + "%";
                     card.detail = ui_text("WEB / ", "웹 / ") +
                                   safe_ui_text(record.ruleset_id, "--") + " / " +
@@ -523,11 +538,13 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 render::SongCardData card;
                 card.has_score = true;
                 card.score = record.score;
+                card.ex_score = record.ex_score;
                 card.lamp = record.clear_status;
+                card.verified_full_combo = record.verified_full_combo;
                 card.title = menu_records::compact_timestamp_label(record.created_utc);
                 card.artist = record.player_name + "  " + render::song_select_lamp_presentation(record.clear_status).label + "  " +
-                              record.rank + "  " + ui_text("SCORE ", "점수 ") +
-                              format_int_with_commas(record.score);
+                              record.rank + "  " + ui_text("EX Score ", "EX Score ") +
+                              (record.ex_score ? format_int_with_commas(*record.ex_score) : "--");
                 card.detail = record.replay_path.empty()
                                   ? ui_text("RESULT ONLY", "결과만 있음")
                                   : ui_text("REPLAY ", "리플레이 ") + filename_only(record.replay_path);
@@ -630,9 +647,12 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 card.background_path = song_background_preview_path_for_entry(*entry);
                 const BestResultRecord best = best_result_for_song_entry(*entry);
                 card.lamp = best.has_value ? best.clear_status : std::string{};
+                card.verified_full_combo = best.has_value && best.verified_full_combo;
                 if (const auto* imported = lr2_lamp_to_show(*entry, best)) card.lamp = imported->clear_status;
-                card.has_score = best.has_value;
-                card.score = best.has_value ? best.best_score : 0;
+                const BestResultRecord score_best = best_score_result_for_song_entry(*entry);
+                card.has_score = score_best.has_value;
+                card.score = score_best.has_value ? score_best.best_score : 0;
+                card.ex_score = score_best.ex_score;
                 card.level_label = song_difficulty_label(*entry);
                 card.difficulty_is_aery_five_key =
                     song_difficulty_is_aery_five_key(*entry, config_.ui.difficulty_table_url);
@@ -704,7 +724,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                         "LR2oraja " + std::string(modes[mode]) + "  " +
                         std::string(lr2oraja_clear_label(score->clear));
                     render.song_select.selected_song_lr2oraja_score =
-                        "EX " + std::to_string(score->ex_score()) + "/" + std::to_string(maximum) +
+                        "EX Score " + std::to_string(score->ex_score()) + "/" + std::to_string(maximum) +
                         "  COMBO " + std::to_string(score->maxcombo) + "  BP " + minbp;
                     // Prefer LN, then CN and HCN, and display the chosen source mode.
                     break;
@@ -776,6 +796,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         if (render.song_select.online_records && selected_online_record) {
             render.song_select.rank = "#" + std::to_string(selected_online_record->rank);
             render.song_select.best_score = selected_online_record->score;
+            render.song_select.ex_score = selected_online_record->ex_score;
             render.song_select.score_clear_status = selected_online_record->clear_status;
             // The online summary has no verified whole-chart LN-step evidence.
             render.song_select.max_score = gameplay::kNativeScoreMaximum;
@@ -796,6 +817,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         } else if (!render.song_select.online_records && selected_record) {
             render.song_select.rank = selected_record->rank;
             render.song_select.best_score = selected_record->score;
+            render.song_select.ex_score = selected_record->ex_score;
+            render.song_select.max_ex_score = selected_record->max_ex_score;
             render.song_select.score_clear_status = selected_record->clear_status;
             render.song_select.verified_full_combo = selected_record->verified_full_combo;
             render.song_select.max_score = gameplay::kNativeScoreMaximum;
@@ -840,23 +863,25 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             }
         }
     } else if (!render.song_select.showing_sources) {
-        render.song_select.rank = current_best.has_value ? current_best.rank : "--";
-        render.song_select.best_score = current_best.has_value ? current_best.best_score : 0;
-        render.song_select.score_clear_status = current_best.has_value ? current_best.clear_status : std::string{};
-        render.song_select.verified_full_combo = current_best.has_value && current_best.verified_full_combo;
+        render.song_select.rank = current_score_best.has_value ? current_score_best.rank : "--";
+        render.song_select.best_score = current_score_best.has_value ? current_score_best.best_score : 0;
+        render.song_select.ex_score = current_score_best.has_value ? current_score_best.ex_score : std::nullopt;
+        render.song_select.max_ex_score = current_score_best.has_value ? current_score_best.max_ex_score : 0;
+        render.song_select.score_clear_status = current_score_best.has_value ? current_score_best.clear_status : std::string{};
+        render.song_select.verified_full_combo = current_score_best.has_value && current_score_best.verified_full_combo;
         render.song_select.max_score = gameplay::kNativeScoreMaximum;
-        render.song_select.detail_score = current_best.has_value ? current_best.detail_score : 0;
-        render.song_select.max_detail_score = current_best.has_value
-                                                  ? gameplay::maximum_detail_score(current_best.total_notes)
+        render.song_select.detail_score = current_score_best.has_value ? current_score_best.detail_score : 0;
+        render.song_select.max_detail_score = current_score_best.has_value
+                                                  ? gameplay::maximum_detail_score(current_score_best.total_notes)
                                                   : 0;
-        render.song_select.accuracy = current_best.has_value ? current_best.accuracy : 0.0;
-        render.song_select.detailed_accuracy = current_best.has_value ? current_best.detailed_accuracy : 0.0;
-        render.song_select.max_combo = current_best.has_value ? current_best.max_combo : 0;
-        render.song_select.perfect = current_best.has_value ? current_best.perfect : 0;
-        render.song_select.great = current_best.has_value ? current_best.great : 0;
-        render.song_select.good = current_best.has_value ? current_best.good : 0;
-        render.song_select.bad = current_best.has_value ? current_best.bad : 0;
-        render.song_select.poor = current_best.has_value ? current_best.poor : 0;
+        render.song_select.accuracy = current_score_best.has_value ? current_score_best.accuracy : 0.0;
+        render.song_select.detailed_accuracy = current_score_best.has_value ? current_score_best.detailed_accuracy : 0.0;
+        render.song_select.max_combo = current_score_best.has_value ? current_score_best.max_combo : 0;
+        render.song_select.perfect = current_score_best.has_value ? current_score_best.perfect : 0;
+        render.song_select.great = current_score_best.has_value ? current_score_best.great : 0;
+        render.song_select.good = current_score_best.has_value ? current_score_best.good : 0;
+        render.song_select.bad = current_score_best.has_value ? current_score_best.bad : 0;
+        render.song_select.poor = current_score_best.has_value ? current_score_best.poor : 0;
     }
 }
 

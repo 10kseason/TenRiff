@@ -2,7 +2,26 @@
         // still owns button order, selection and the empty-library recovery action.
 #include "MenuWindow_draw_generic_help.inl"
 
-        if (d2d_->panel_brush) {
+        const auto home_panel = [&](const D2D1_RECT_F& rect, float radius, float opacity) {
+            if (midnight_home) {
+                const auto rounded = D2D1::RoundedRect(rect, radius, radius);
+                ctx->FillRoundedRectangle(rounded, semantic_color(0x10142D, opacity));
+                ctx->DrawRoundedRectangle(rounded, semantic_color(0xA2ACD3, .65f), 1.2f);
+            } else draw_glass_panel(rect, radius, .94f, 0, false, 0);
+        };
+        if (midnight_home) {
+            ctx->DrawLine(D2D1::Point2F(0, 124), D2D1::Point2F(1920, 124), semantic_color(0x9DA4CD, .20f), 1);
+            // Quiet, stationary lane marks echo the mockup without animating a
+            // gameplay chart or competing with the real action buttons.
+            for (int i = 0; i < 10; ++i) {
+                const float x = 1000 + i * 90.0f;
+                ctx->DrawLine(D2D1::Point2F(x, 146), D2D1::Point2F(x, 968), semantic_color(0x9FA9DF, .045f), 1);
+                for (int j = 0; j < 3; ++j) {
+                    const float y = 180 + ((i * 67 + j * 223) % 730);
+                    ctx->FillRectangle(D2D1::RectF(x + 13, y, x + 61, y + 5), semantic_color(0xA9B0DB, .075f));
+                }
+            }
+        } else if (d2d_->panel_brush) {
             ctx->FillRectangle(native_rect("title_native.rect.001", D2D1::RectF(0, 0, kBaseWidth, 126)), d2d_->panel_brush.Get());
         }
         const auto logo = skin_layout_rect(data, "title.logo", D2D1::RectF(56, 14, 440, 112));
@@ -13,7 +32,8 @@
                           native_rect("title_native.rect.004", D2D1::RectF(466, 44, 850, 88)), d2d_->muted_brush.Get());
         const D2D1_RECT_F profile = data.performance.visible
             ? native_rect("title_native.rect.005", D2D1::RectF(1030, 20, 1430, 110)) : native_rect("title_native.rect.006", D2D1::RectF(1424, 20, 1824, 110));
-        draw_glass_panel(profile, 12, 0.94f, 0, false, 0);
+        home_panel(profile, 12, .60f);
+        register_hit(profile, MenuHitTargetKind::SongProfilePanel, 0, MenuHitPart::Activate);
         const auto avatar = D2D1::RectF(profile.left + 12, profile.top + 12, profile.left + 78, profile.top + 78);
         if (auto* bitmap = find_song_card_preview_bitmap(data.title.profile_avatar_path)) {
             const auto source = centered_bitmap_source_rect(bitmap->GetSize(), avatar);
@@ -41,13 +61,16 @@
                           0.85f * hero_reveal, static_cast<float>(std::sin(native_seconds * 0.35) * 5));
         draw_native_asset(native_menu_assets::kSpark, native_rect("title_native.rect.011", D2D1::RectF(916, 255, 934, 273)), hero_reveal * 0.8f);
         }
-        draw_text_clipped(wloc("Your music.", "나만의 음악,"), d2d_->header_format.Get(),
-                          native_rect("title_native.rect.012", D2D1::RectF(96, 254, 664, 334)), d2d_->text_brush.Get());
-        draw_text_clipped(wloc("Your rhythm.", "나만의 리듬."), d2d_->header_format.Get(),
-                          native_rect("title_native.rect.013", D2D1::RectF(96, 334, 664, 414)), d2d_->accent_brush.Get());
-        draw_text_clipped(wloc("Pick a track. Set your pace. Enjoy the next play.",
-                               "좋아하는 곡을 고르고, 나의 리듬으로."),
-                          d2d_->song_artist_format.Get(), native_rect("title_native.rect.014", D2D1::RectF(98, 438, 684, 476)), d2d_->muted_brush.Get());
+        // User-selected product line is literal in every language. The former
+        // subtitle is intentionally absent; operational help remains below.
+        static constexpr wchar_t home_hero[] = L"Tenriff BMS Rhythm Game Client";
+        const auto hero_wrap = d2d_->header_format->GetWordWrapping();
+        d2d_->header_format->SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP);
+        draw_text_exact(home_hero, static_cast<UINT32>(std::size(home_hero) - 1), d2d_->header_format.Get(),
+            native_rect("title_native.rect.012", D2D1::RectF(96, 270, 932, 426)), d2d_->text_brush.Get(),
+            D2D1_DRAW_TEXT_OPTIONS_CLIP, DWRITE_MEASURING_MODE_NATURAL);
+        d2d_->header_format->SetWordWrapping(hero_wrap);
+        benchmark_home_hero_drawn_ = true;
 
         draw_generic_help(native_rect("title_native.rect.015", skin_layout_rect(data, "title.guide", D2D1::RectF(96, 516, 932, 924))), "title", data.title.guides, {}, false);
 
@@ -76,18 +99,33 @@
             register_hit(rect, MenuHitTargetKind::TitleButton, static_cast<int>(index));
             // The action edge owns the color; a generic white focus underneath
             // would wash out the icon-matched outline, especially on selection.
-            if (d2d_->panel_brush) {
+            if (midnight_home) {
+                ctx->FillRoundedRectangle(rounded, semantic_color(0x101A30, primary ? .72f : .57f));
+                ctx->PushAxisAlignedClip(D2D1::RectF(rect.left + 12, rect.top + 10, rect.right - 90, rect.bottom - 10),
+                                          D2D1_ANTIALIAS_MODE_ALIASED);
+                constexpr std::array<D2D1_POINT_2F, 5> stars{{{.66f,.61f},{.70f,.37f},{.75f,.45f},{.79f,.19f},{.81f,.28f}}};
+                const auto point = [&](std::size_t i) { return D2D1::Point2F(rect.left + stars[i].x * (rect.right - rect.left),
+                    rect.top + stars[i].y * (rect.bottom - rect.top)); };
+                for (std::size_t i = 1; i < stars.size(); ++i)
+                    ctx->DrawLine(point(i - 1), point(i), semantic_color(0xBCD8F2, .17f), .8f);
+                for (std::size_t i = 0; i < stars.size(); ++i) {
+                    const auto p = point(i);
+                    ctx->FillEllipse(D2D1::Ellipse(p, 4, 4), semantic_color(0xBBDDF4, .06f));
+                    ctx->FillEllipse(D2D1::Ellipse(p, 1.1f, 1.1f), semantic_color(0xE5F5FF, .70f));
+                }
+                ctx->PopAxisAlignedClip();
+            } else if (d2d_->panel_brush) {
                 const float opacity = d2d_->panel_brush->GetOpacity();
                 d2d_->panel_brush->SetOpacity(0.95f);
                 ctx->FillRoundedRectangle(rounded, d2d_->panel_brush.Get());
                 d2d_->panel_brush->SetOpacity(opacity);
             }
-            if (primary && d2d_->card_brush) {
+            if (!midnight_home && primary && d2d_->card_brush) {
                 const auto saved = d2d_->card_brush->GetColor();
                 d2d_->card_brush->SetColor(native_palette("title.primary", D2D1::ColorF(0x111111)));
                 ctx->FillRoundedRectangle(rounded, d2d_->card_brush.Get());
                 d2d_->card_brush->SetColor(saved);
-            } else if (button.selected && d2d_->button_selected_brush) {
+            } else if (!midnight_home && button.selected && d2d_->button_selected_brush) {
                 ctx->FillRoundedRectangle(rounded, d2d_->button_selected_brush.Get());
             }
             // Slots 0/1 belong to library/result profiles. Reuse one cached
@@ -142,7 +180,7 @@
                           d2d_->body_format.Get(), native_rect("title_native.rect.022", D2D1::RectF(buttons.left + 2, compact_bottom + 32, buttons.right, compact_bottom + 68)), d2d_->muted_brush.Get());
 
         const D2D1_RECT_F footer = native_rect("title_native.rect.023", skin_layout_rect(data, "title.footer", D2D1::RectF(64, 972, 1856, 1048)));
-        draw_glass_panel(footer, 12, 0.9f, 0, false, 0);
+        home_panel(footer, 12, .64f);
         draw_text_clipped(wloc("SELECTED TRACK", "선택한 곡"), d2d_->hud_format.Get(),
                           native_rect("title_native.rect.024", D2D1::RectF(footer.left + 24, footer.top + 18, footer.left + 266, footer.top + 56)), d2d_->muted_brush.Get());
         const std::string track = data.title.track.empty() || data.title.track == "-"

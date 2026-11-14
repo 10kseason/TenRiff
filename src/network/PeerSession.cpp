@@ -1,4 +1,5 @@
 #include "network/PeerSession.h"
+#include "network/HostedPeerSession.h"
 
 #include <algorithm>
 #include <array>
@@ -2113,7 +2114,58 @@ PeerSession::~PeerSession() {
     disconnect("Session shutdown");
 }
 
+void PeerSession::collect_retired_hosted() {
+    retired_hosted_.erase(std::remove_if(retired_hosted_.begin(), retired_hosted_.end(),
+        [](const auto& session) { return !session->running(); }), retired_hosted_.end());
+}
+void PeerSession::retire_hosted(std::shared_ptr<HostedPeerSession> hosted) {
+    if (!hosted) return;
+    hosted->request_stop();
+    if (hosted->running()) retired_hosted_.push_back(std::move(hosted));
+}
+bool PeerSession::configure_hosted(std::string upload_token) {
+    std::lock_guard configuration(hosted_configuration_mutex_);
+    collect_retired_hosted();
+    // At most eight transport objects may still be retiring, including the
+    // current object when Guest detaches it. Rapid account changes fail closed.
+    if (retired_hosted_.size() >= 7) {
+        if (const auto hosted = std::atomic_load(&hosted_)) hosted->request_stop();
+        std::fill(upload_token.begin(), upload_token.end(), '\0');
+        return false;
+    }
+    if (!std::atomic_load(&hosted_)) disconnect();
+    auto hosted = std::make_shared<HostedPeerSession>();
+    const bool configured = hosted->configure(std::move(upload_token));
+    retire_hosted(std::atomic_exchange(&hosted_, std::move(hosted)));
+    return configured;
+}
+bool PeerSession::browse_hosted() {
+    const auto hosted = std::atomic_load(&hosted_);
+    return hosted && hosted->browse();
+}
+bool PeerSession::host_hosted() {
+    const auto hosted = std::atomic_load(&hosted_);
+    return hosted && hosted->host();
+}
+bool PeerSession::join_hosted(std::string room_id) {
+    const auto hosted = std::atomic_load(&hosted_);
+    return hosted && hosted->join(std::move(room_id));
+}
+std::vector<HostedRoomInfo> PeerSession::hosted_rooms() const {
+    const auto hosted = std::atomic_load(&hosted_);
+    return hosted ? hosted->rooms() : std::vector<HostedRoomInfo>{};
+}
+bool PeerSession::is_hosted() const { return std::atomic_load(&hosted_) != nullptr; }
+void PeerSession::disable_hosted() {
+    std::lock_guard configuration(hosted_configuration_mutex_);
+    collect_retired_hosted();
+    // Gameplay retains per-call references. The menu detaches immediately;
+    // stopped transports are joined later, never during an in-flight request.
+    retire_hosted(std::atomic_exchange(&hosted_, std::shared_ptr<HostedPeerSession>{}));
+}
+
 bool PeerSession::host(uint16_t port, std::string name) {
+    if (std::atomic_load(&hosted_)) return false;
     if (name.empty() || name.size() > 64) return false;
     return impl_->start(
         PeerRole::Host, {}, port, std::move(name));
@@ -2122,6 +2174,7 @@ bool PeerSession::host(uint16_t port, std::string name) {
 bool PeerSession::join(std::string address,
                        uint16_t port,
                        std::string name) {
+    if (std::atomic_load(&hosted_)) return false;
     if (address.empty() || address.size() > 255 ||
         port == 0 || name.empty() || name.size() > 64) {
         return false;
@@ -2132,6 +2185,7 @@ bool PeerSession::join(std::string address,
 }
 
 void PeerSession::disconnect(std::string reason) {
+    if (const auto hosted = std::atomic_load(&hosted_)) { hosted->request_stop(); return; }
     bool join_worker = false;
     {
         std::lock_guard<std::mutex> lock(impl_->mutex);
@@ -2160,12 +2214,14 @@ void PeerSession::disconnect(std::string reason) {
 }
 
 PeerSessionSnapshot PeerSession::snapshot() const {
+    if (const auto hosted = std::atomic_load(&hosted_)) return hosted->snapshot();
     std::lock_guard<std::mutex> lock(impl_->mutex);
     return impl_->current;
 }
 
 void PeerSession::set_local_library(
     std::vector<std::string> chart_sha256) {
+    if (std::atomic_load(&hosted_)) return;
     std::vector<std::string> normalized;
     normalized.reserve(
         std::min(chart_sha256.size(),
@@ -2193,6 +2249,7 @@ void PeerSession::set_local_library(
 bool PeerSession::set_local_chart(
     const ChartFingerprint& fingerprint,
     std::string display_name) {
+    if (const auto hosted = std::atomic_load(&hosted_)) return hosted->set_local_chart(fingerprint, std::move(display_name));
     if (!fingerprint.valid() ||
         display_name.size() > 1024) return false;
     std::lock_guard<std::mutex> lock(impl_->mutex);
@@ -2245,6 +2302,7 @@ bool PeerSession::set_local_chart(
 }
 
 void PeerSession::clear_local_chart() {
+    if (const auto hosted = std::atomic_load(&hosted_)) { hosted->clear_local_chart(); return; }
     std::lock_guard<std::mutex> lock(impl_->mutex);
     impl_->current.local_chart = {};
     if (auto* local = impl_->participant_locked(
@@ -2266,6 +2324,7 @@ void PeerSession::clear_local_chart() {
 }
 
 bool PeerSession::set_ready(bool ready) {
+    if (const auto hosted = std::atomic_load(&hosted_)) { return hosted->set_ready(ready); }
     std::lock_guard<std::mutex> lock(impl_->mutex);
     if (impl_->current.state !=
             PeerSessionState::Connected ||
@@ -2297,6 +2356,7 @@ bool PeerSession::set_ready(bool ready) {
 }
 
 bool PeerSession::set_rate(uint32_t rate_milli) {
+    if (const auto hosted = std::atomic_load(&hosted_)) { return hosted->set_rate(rate_milli); }
     if (!peer_rate_milli_is_valid(rate_milli)) return false;
     std::lock_guard<std::mutex> lock(impl_->mutex);
     if ((impl_->current.state != PeerSessionState::Connected &&
@@ -2321,6 +2381,7 @@ bool PeerSession::set_rate(uint32_t rate_milli) {
 }
 
 bool PeerSession::send_chat(std::string text) {
+    if (const auto hosted = std::atomic_load(&hosted_)) { return hosted->send_chat(std::move(text)); }
     std::lock_guard<std::mutex> lock(impl_->mutex);
     if (impl_->current.state != PeerSessionState::Connected) {
         return false;
@@ -2336,6 +2397,7 @@ bool PeerSession::send_chat(std::string text) {
 }
 
 bool PeerSession::send_launch() {
+    if (const auto hosted = std::atomic_load(&hosted_)) { return hosted->send_launch(); }
     std::lock_guard<std::mutex> lock(impl_->mutex);
     if (!impl_->current.can_start ||
         impl_->active_round_nonce != 0) {
@@ -2364,6 +2426,7 @@ bool PeerSession::send_launch() {
 }
 
 std::optional<uint64_t> PeerSession::poll_launch() {
+    if (const auto hosted = std::atomic_load(&hosted_)) { return hosted->poll_launch(); }
     std::lock_guard<std::mutex> lock(impl_->mutex);
     if (impl_->current.state !=
             PeerSessionState::Connected ||
@@ -2377,6 +2440,7 @@ std::optional<uint64_t> PeerSession::poll_launch() {
 }
 
 bool PeerSession::mark_loaded() {
+    if (const auto hosted = std::atomic_load(&hosted_)) { return hosted->mark_loaded(); }
     std::lock_guard<std::mutex> lock(impl_->mutex);
     if (impl_->current.state !=
             PeerSessionState::Connected ||
@@ -2400,6 +2464,7 @@ bool PeerSession::mark_loaded() {
 
 bool PeerSession::wait_for_peer_loaded(
     std::chrono::milliseconds timeout) {
+    if (const auto hosted = std::atomic_load(&hosted_)) { return hosted->wait_for_peer_loaded(timeout); }
     std::unique_lock<std::mutex> lock(impl_->mutex);
     impl_->state_cv.wait_for(
         lock, timeout, [this]() {
@@ -2414,6 +2479,7 @@ bool PeerSession::wait_for_peer_loaded(
 }
 
 bool PeerSession::send_begin(uint32_t delay_ms) {
+    if (const auto hosted = std::atomic_load(&hosted_)) { return hosted->send_begin(); }
     std::lock_guard<std::mutex> lock(impl_->mutex);
     if (impl_->current.state !=
             PeerSessionState::Connected ||
@@ -2439,6 +2505,7 @@ bool PeerSession::send_begin(uint32_t delay_ms) {
 bool PeerSession::wait_for_begin(
     std::chrono::milliseconds timeout,
     uint32_t& out_delay_ms) {
+    if (const auto hosted = std::atomic_load(&hosted_)) { return hosted->wait_for_begin(timeout, out_delay_ms); }
     std::unique_lock<std::mutex> lock(impl_->mutex);
     impl_->state_cv.wait_for(
         lock, timeout, [this]() {
@@ -2459,6 +2526,7 @@ bool PeerSession::wait_for_begin(
 
 bool PeerSession::publish_score(
     const PeerScore& score, bool final) {
+    if (const auto hosted = std::atomic_load(&hosted_)) { return hosted->publish_score(score, final); }
     std::lock_guard<std::mutex> lock(impl_->mutex);
     if (impl_->current.state !=
             PeerSessionState::Connected ||
@@ -2495,6 +2563,7 @@ bool PeerSession::publish_score(
 }
 
 void PeerSession::reset_round() {
+    if (const auto hosted = std::atomic_load(&hosted_)) { hosted->reset_round(); return; }
     std::lock_guard<std::mutex> lock(impl_->mutex);
     if (impl_->active_round_nonce == 0 ||
         impl_->current.state !=

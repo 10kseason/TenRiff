@@ -63,6 +63,7 @@ void GameSession::shutdown() {
         result_.rate_multiplier = rate_multiplier_;
         result_.score_multiplier = score_multiplier_;
         result_.final_score = gameplay::scale_native_score(result_.stats.raw_score, result_.score_multiplier);
+        result_.ex_score = gameplay::ex_score_from_counts(result_.stats.counts);
         const bool user_aborted = user_aborted_.load(std::memory_order_acquire);
         // Pacemaker is a non-scoring live overlay: gauge failure and clear
         // eligibility are exactly the ordinary run's policy.

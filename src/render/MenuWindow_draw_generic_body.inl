@@ -14,6 +14,37 @@
         const float right = content_rect.right;
         const float bottom = content_rect.bottom;
 
+        const auto draw_options_stars = [&](const D2D1_RECT_F& rect, std::size_t motif, float opacity) {
+            if (!constellation_settings) return;
+            ctx->PushAxisAlignedClip(D2D1::RectF(rect.left + 8, rect.top + 8, rect.right - 8, rect.bottom - 8),
+                                      D2D1_ANTIALIAS_MODE_ALIASED);
+            const auto& stars = kOptionsConstellations[motif % kOptionsConstellations.size()];
+            const auto point = [&](unsigned index) { return D2D1::Point2F(
+                rect.left + stars[index].x * (rect.right - rect.left),
+                rect.top + stars[index].y * (rect.bottom - rect.top)); };
+            for (const auto& link : kOptionsStarLinks)
+                ctx->DrawLine(point(link[0]), point(link[1]), semantic_color(0xBBD6FF, .49f * opacity), 1.0f);
+            for (unsigned i = 0; i < stars.size(); ++i) {
+                const auto p = point(i);
+                ctx->FillEllipse(D2D1::Ellipse(p, 9, 9), semantic_color(0xB4CEFF, .045f * opacity));
+                ctx->FillEllipse(D2D1::Ellipse(p, 4.5f, 4.5f), semantic_color(0xDCEAFF, .15f * opacity));
+                ctx->FillEllipse(D2D1::Ellipse(p, 1.7f, 1.7f), semantic_color(0xFFFFFF, .88f * opacity));
+                ctx->DrawLine(D2D1::Point2F(p.x - 5, p.y), D2D1::Point2F(p.x + 5, p.y),
+                    semantic_color(0xEDF6FF, .32f * opacity), .7f);
+                ctx->DrawLine(D2D1::Point2F(p.x, p.y - 5), D2D1::Point2F(p.x, p.y + 5),
+                    semantic_color(0xEDF6FF, .32f * opacity), .7f);
+            }
+            ctx->PopAxisAlignedClip();
+        };
+        const auto draw_options_panel = [&](const D2D1_RECT_F& rect, std::size_t motif) {
+            if (constellation_settings) {
+                const auto rr = D2D1::RoundedRect(rect, 14, 14);
+                ctx->FillRoundedRectangle(rr, semantic_color(0x02091B, .79f));
+                draw_options_stars(rect, motif, .25f);
+                ctx->DrawRoundedRectangle(rr, semantic_color(0xD0DEFF, .65f), 1.3f);
+            } else draw_glass_panel(rect, 14, .92f, 0, false, 0);
+        };
+
         if (d2d_->card_brush && !modern_settings_screen) {
             D2D1_ROUNDED_RECT card =
                 D2D1::RoundedRect(native_rect("generic.rect.003", D2D1::RectF(left, top, right, bottom)), 18.0f, 18.0f);
@@ -29,7 +60,7 @@
         const std::wstring header_wide = to_wide(header);
         D2D1_RECT_F header_rect = native_rect("generic.rect.004", D2D1::RectF(left, 48.0f, right, 120.0f));
         if (modern_settings_screen) {
-            if (d2d_->panel_brush) ctx->FillRectangle(native_rect("generic.rect.005", D2D1::RectF(0, 0, kBaseWidth, 126)), d2d_->panel_brush.Get());
+            if (d2d_->panel_brush && !constellation_settings) ctx->FillRectangle(native_rect("generic.rect.005", D2D1::RectF(0, 0, kBaseWidth, 126)), d2d_->panel_brush.Get());
             draw_native_asset(native_menu_assets::kMark, D2D1::RectF(54, 20, 118, 98));
             draw_native_wordmark(d2d_->header_format.Get(),
                                 native_rect("generic.rect.006", D2D1::RectF(136, 24, 398, 100)));
@@ -37,7 +68,8 @@
                               d2d_->title_format.Get(), native_rect("generic.rect.007", D2D1::RectF(420, 34, 1470, 78)), d2d_->text_brush.Get());
             draw_text_clipped(wloc("SETTINGS & TOOLS", "설정 및 도구"), d2d_->hud_format.Get(),
                               native_rect("generic.rect.008", D2D1::RectF(422, 82, 1470, 110)), d2d_->muted_brush.Get());
-            draw_glass_panel(native_rect("generic.rect.009", D2D1::RectF(left, 984, right, 1048)), 12, 0.9f, 0, false, 0);
+            if (constellation_settings) draw_options_panel(native_rect("generic.rect.009", D2D1::RectF(left, 984, right, 1048)), 0);
+            else draw_glass_panel(native_rect("generic.rect.009", D2D1::RectF(left, 984, right, 1048)), 12, .9f, 0, false, 0);
             draw_text_clipped(wloc("ESC    Back or cancel", "ESC    뒤로 / 취소"),
                               d2d_->body_format.Get(), native_rect("generic.rect.010", D2D1::RectF(left + 24, 1004, left + 530, 1034)), d2d_->text_brush.Get());
             draw_text_clipped_aligned(wloc("UP / DOWN  Select     LEFT / RIGHT  Adjust     ENTER  Open     F1  Help",
@@ -246,7 +278,11 @@
         };
 
         if (data.generic.card_grid && data.generic.rows.size() == 8) {
+            if (constellation_settings) {
+#include "MenuWindow_draw_options_constellation.inl"
+            } else {
 #include "MenuWindow_draw_options_grid.inl"
+            }
             return;
         }
 
@@ -286,8 +322,7 @@
                 (modern_settings_screen || roomy_option_layout) && d2d_->option_format ? d2d_->option_format.Get() : d2d_->body_format.Get();
 
             if (modern_settings_screen) {
-                draw_glass_panel(native_rect("generic.rect.026", D2D1::RectF(left, top, native_list_right, list_bottom_limit + 20.0f)),
-                                 14, 0.92f, 0, false, 0);
+                draw_options_panel(native_rect("generic.rect.026", D2D1::RectF(left, top, native_list_right, list_bottom_limit + 20.0f)), 4);
                 draw_text_clipped(wloc("PREFERENCES", "설정 항목"), d2d_->hud_format.Get(),
                                   native_rect("generic.rect.027", D2D1::RectF(row_left + 6, top + 22, base_row_right, top + 48)), d2d_->muted_brush.Get());
                 draw_text_clipped_aligned(to_wide(std::to_string(data.generic.rows.size())) + wloc(" items", "개 항목"),

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -16,7 +17,8 @@ struct MultiplayerPlayerData {
     bool game_over = false;
     bool aborted = false;
     int rank = 0; // Competition rank; ties share a rank, missing scores are unranked.
-    int64_t score = 0;
+    int64_t score = 0; // Legacy compatibility only.
+    std::optional<int64_t> ex_score;
     int combo = 0;
     int max_combo = 0;
     int perfect = 0;

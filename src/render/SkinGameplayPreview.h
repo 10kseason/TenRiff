@@ -180,6 +180,7 @@ inline GameplayHudData make_skin_gameplay_preview(const SkinPreviewData& preview
         note.tail_visual_position = note.visual_position + (note.hold ? 0.15 : 0.0);
         note.tail_sample = static_cast<int64_t>(note.tail_visual_position * hud.sample_rate);
     }
+    hud.ex_score = 2LL * hud.pg + hud.gr;
     return hud;
 }
 

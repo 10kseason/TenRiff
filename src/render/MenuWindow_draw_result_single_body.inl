@@ -139,8 +139,10 @@
                                            ID2D1Brush* brush, float alpha,
                                            DWRITE_TEXT_ALIGNMENT alignment,
                                            const std::string& suffix) {
-            const auto text = result_record_score_text(data.result.score, presentation.score,
-                record_elapsed_ns, data.result.new_record, record_effect_skipped) + suffix;
+            const auto text = data.result.ex_score
+                ? result_record_score_text(*data.result.ex_score, presentation.score,
+                    record_elapsed_ns, data.result.new_record, record_effect_skipped) + suffix
+                : std::string("--");
             draw_result_text(text, format, rect, brush, alpha, alignment);
             if (data.result.new_record && record_effect.distortion > 0.0f) {
                 const int tick = static_cast<int>((record_elapsed_ns / 33'333'334LL) % 7);
@@ -572,11 +574,11 @@
         if (modern_library_screen) {
 #include "MenuWindow_draw_result_summary.inl"
         } else {
-        const double score_maximum = data.result.max_score > 0
-                                         ? static_cast<double>(data.result.max_score)
+        const double score_maximum = data.result.max_ex_score > 0
+                                         ? static_cast<double>(data.result.max_ex_score)
                                          : 1.0;
         const float score_quality = static_cast<float>(
-            std::clamp(static_cast<double>(data.result.score) / score_maximum, 0.0, 1.0));
+            std::clamp(static_cast<double>(data.result.ex_score.value_or(0)) / score_maximum, 0.0, 1.0));
         const float failed_completion = result_success ? 1.0f : 0.76f;
         const float prism_completion = presentation.prism * failed_completion;
         const float prism_top = 116.0f + (1.0f - score_quality) * 20.0f;
@@ -683,29 +685,21 @@
         if (data.result.new_record) {
             draw_record_score(d2d_->title_format.Get(), score_rect, d2d_->text_brush.Get(),
                               score_alpha * pulse_scale, DWRITE_TEXT_ALIGNMENT_CENTER,
-                              " / " + std::to_string(data.result.max_score));
+                              " / " + std::to_string(data.result.max_ex_score));
         } else {
-            draw_result_text(std::to_string(result_counted_score(data.result.score, presentation.score)) + " / " +
-                             std::to_string(data.result.max_score), d2d_->title_format.Get(), score_rect,
+            draw_result_text((data.result.ex_score ? std::to_string(result_counted_score(*data.result.ex_score, presentation.score)) : "--") + " / " +
+                             std::to_string(data.result.max_ex_score), d2d_->title_format.Get(), score_rect,
                              modern_library_screen ? native_color(0xFFFFFF, 1) : d2d_->text_brush.Get(),
                              score_alpha * pulse_scale, DWRITE_TEXT_ALIGNMENT_CENTER);
         }
-        draw_result_text(data.result.new_record ? "NEW RECORD" : result_loc("SCORE", "점수"),
+        draw_result_text(data.result.new_record ? "NEW RECORD" : result_loc("EX Score", "EX Score"),
                          d2d_->result_label_format.Get(),
                          native_rect("result_single.rect.018", D2D1::RectF(prism_center.x - 120.0f, 132.0f,
                                      prism_center.x + 120.0f, 160.0f)),
                          modern_library_screen ? native_color(0xFFFFFF, 1) : d2d_->muted_brush.Get(),
                          score_alpha,
                          DWRITE_TEXT_ALIGNMENT_CENTER);
-        draw_result_text(result_loc("DETAIL SCORE", "상세 점수") + "  " +
-                             std::to_string(data.result.detail_score) + " / " +
-                             std::to_string(data.result.max_detail_score),
-                         d2d_->result_label_format.Get(),
-                         native_rect("result_single.rect.019", D2D1::RectF(prism_center.x - 180.0f, 238.0f,
-                                     prism_center.x + 180.0f, 268.0f)),
-                         modern_library_screen ? native_color(0xFFFFFF, 1) : d2d_->accent_brush.Get(),
-                         score_alpha,
-                         DWRITE_TEXT_ALIGNMENT_CENTER);
+
 
         const std::string rank_text = data.result.rank.empty() ? std::string("--") : data.result.rank;
         const D2D1_RECT_F rank_rect =

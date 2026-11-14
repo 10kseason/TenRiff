@@ -303,5 +303,5 @@
             ctx->PopAxisAlignedClip();
         }
 
-        draw_footer(data.title.profile, data.title.high_score, data.title.track);
+        draw_footer(data.title.profile, data.title.high_ex_score, data.title.track);
 

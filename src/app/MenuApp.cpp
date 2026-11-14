@@ -405,121 +405,46 @@ std::string browse_for_json_file(const std::string& title) {
     return result;
 }
 
-std::string browse_for_lr2_course_file(const std::string& title) {
-    std::string result;
-
-    const HRESULT init_hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-    if (FAILED(init_hr)) {
-        return result;
-    }
-
-    IFileOpenDialog* dialog = nullptr;
-    HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_ALL,
-                                  IID_IFileOpenDialog, reinterpret_cast<void**>(&dialog));
-    if (SUCCEEDED(hr)) {
+NativeFileChoice browse_for_lr2_course_file(const std::string& title, bool save) {
+    // Menu audio can already own an MTA apartment. Create every shell interface
+    // on the same request-scoped STA used by the working folder/image pickers.
+    return run_native_file_dialog_sta([&]() -> NativeFileChoice {
+        const NativeFileChoice failure{{}, "LR2 course file picker failed.", false};
+        Microsoft::WRL::ComPtr<IFileDialog> dialog;
+        HRESULT hr = E_FAIL;
+        if (save) {
+            Microsoft::WRL::ComPtr<IFileSaveDialog> save_dialog;
+            hr = CoCreateInstance(CLSID_FileSaveDialog, nullptr, CLSCTX_INPROC_SERVER,
+                                  IID_PPV_ARGS(&save_dialog));
+            if (SUCCEEDED(hr)) hr = save_dialog.As(&dialog);
+        } else {
+            Microsoft::WRL::ComPtr<IFileOpenDialog> open_dialog;
+            hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER,
+                                  IID_PPV_ARGS(&open_dialog));
+            if (SUCCEEDED(hr)) hr = open_dialog.As(&dialog);
+        }
+        if (FAILED(hr) || !dialog) return failure;
         DWORD options = 0;
-        dialog->GetOptions(&options);
-        dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST);
-
         const COMDLG_FILTERSPEC filters[] = {
-            {L"LR2 course files (*.lr2crs)", L"*.lr2crs"},
-            {L"All files", L"*.*"},
+            {L"LR2 course files (*.lr2crs)", L"*.lr2crs"}, {L"All files", L"*.*"},
         };
-        dialog->SetFileTypes(static_cast<UINT>(std::size(filters)), filters);
-        dialog->SetFileTypeIndex(1);
-
-        std::wstring wide_title;
-        if (!title.empty()) {
-            const int count = MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, nullptr, 0);
-            if (count > 0) {
-                wide_title.resize(static_cast<std::size_t>(count));
-                MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, wide_title.data(), count);
-            }
-        }
-        if (!wide_title.empty()) {
-            dialog->SetTitle(wide_title.c_str());
-        }
-
-        if (SUCCEEDED(show_native_file_dialog(dialog))) {
-            IShellItem* item = nullptr;
-            if (SUCCEEDED(dialog->GetResult(&item)) && item) {
-                PWSTR path = nullptr;
-                if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &path)) && path) {
-                    const int length = WideCharToMultiByte(CP_UTF8, 0, path, -1, nullptr, 0, nullptr, nullptr);
-                    if (length > 0) {
-                        result.resize(static_cast<std::size_t>(length));
-                        WideCharToMultiByte(CP_UTF8, 0, path, -1, result.data(), length, nullptr, nullptr);
-                        if (!result.empty() && result.back() == '\0') {
-                            result.pop_back();
-                        }
-                    }
-                    CoTaskMemFree(path);
-                }
-                item->Release();
-            }
-        }
-        dialog->Release();
-    }
-
-    CoUninitialize();
-    return result;
-}
-
-std::string browse_for_lr2_course_save_file(const std::string& title) {
-    std::string result;
-    const HRESULT init_hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-    if (FAILED(init_hr)) {
-        return result;
-    }
-
-    IFileSaveDialog* dialog = nullptr;
-    const HRESULT create_hr = CoCreateInstance(CLSID_FileSaveDialog, nullptr, CLSCTX_ALL,
-                                               IID_IFileSaveDialog,
-                                               reinterpret_cast<void**>(&dialog));
-    if (SUCCEEDED(create_hr) && dialog) {
-        DWORD options = 0;
-        dialog->GetOptions(&options);
-        dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST | FOS_OVERWRITEPROMPT);
-        const COMDLG_FILTERSPEC filters[] = {
-            {L"LR2 course files (*.lr2crs)", L"*.lr2crs"},
-            {L"All files", L"*.*"},
-        };
-        dialog->SetFileTypes(static_cast<UINT>(std::size(filters)), filters);
-        dialog->SetFileTypeIndex(1);
-        dialog->SetDefaultExtension(L"lr2crs");
-        dialog->SetFileName(L"TenRiff Custom Course.lr2crs");
-
-        if (!title.empty()) {
-            const int count = MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, nullptr, 0);
-            if (count > 0) {
-                std::wstring wide_title(static_cast<std::size_t>(count), L'\0');
-                MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, wide_title.data(), count);
-                dialog->SetTitle(wide_title.c_str());
-            }
-        }
-
-        if (SUCCEEDED(show_native_file_dialog(dialog))) {
-            IShellItem* item = nullptr;
-            if (SUCCEEDED(dialog->GetResult(&item)) && item) {
-                PWSTR path = nullptr;
-                if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &path)) && path) {
-                    const int length = WideCharToMultiByte(CP_UTF8, 0, path, -1, nullptr, 0, nullptr, nullptr);
-                    if (length > 0) {
-                        result.resize(static_cast<std::size_t>(length));
-                        WideCharToMultiByte(CP_UTF8, 0, path, -1, result.data(), length, nullptr, nullptr);
-                        if (!result.empty() && result.back() == '\0') {
-                            result.pop_back();
-                        }
-                    }
-                    CoTaskMemFree(path);
-                }
-                item->Release();
-            }
-        }
-        dialog->Release();
-    }
-    CoUninitialize();
-    return result;
+        if (FAILED(dialog->GetOptions(&options)) ||
+            FAILED(dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST |
+                FOS_NOCHANGEDIR | (save ? FOS_OVERWRITEPROMPT : FOS_FILEMUSTEXIST))) ||
+            FAILED(dialog->SetFileTypes(static_cast<UINT>(std::size(filters)), filters)) ||
+            FAILED(dialog->SetFileTypeIndex(1)) ||
+            FAILED(dialog->SetTitle(util::wide_from_utf8_lossy(title).c_str()))) return failure;
+        if (save && (FAILED(dialog->SetDefaultExtension(L"lr2crs")) ||
+                     FAILED(dialog->SetFileName(L"TenRiff Custom Course.lr2crs")))) return failure;
+        hr = show_native_file_dialog(dialog.Get());
+        if (hr == HRESULT_FROM_WIN32(ERROR_CANCELLED)) return {{}, {}, true};
+        if (FAILED(hr)) return failure;
+        Microsoft::WRL::ComPtr<IShellItem> item;
+        if (FAILED(dialog->GetResult(&item)) || !item) return failure;
+        struct ShellPath { PWSTR value = nullptr; ~ShellPath() { CoTaskMemFree(value); } } raw;
+        if (FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, &raw.value)) || !raw.value) return failure;
+        return {util::utf8_from_wide_lossy(raw.value), {}, false};
+    });
 }
 
 #endif
@@ -2527,8 +2452,11 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
         menu_window_.text_composition_active()) return;
     // Result buttons use render.result, not the generic settings-row snapshot.
     // Validate their own activation contract in the Result branch below.
+    // Session Mix likewise owns session_mix.controls, not generic.rows; its
+    // dedicated click handler bounds and dispatches the course action buttons.
     if (event.kind == render::MenuHitTargetKind::SettingsRow &&
-        current_screen() != Screen::Keymap && current_screen() != Screen::Result) {
+        current_screen() != Screen::Keymap && current_screen() != Screen::Result &&
+        current_screen() != Screen::SessionMix) {
         std::lock_guard<std::mutex> lock(snapshot_mutex_);
         if (snapshot_.screen != current_screen()) return;
         const auto& rows = snapshot_.render.generic.rows;
@@ -3217,7 +3145,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
             handle_song_select_input(key_escape_);
             return;
         case render::MenuHitTargetKind::SongProfilePanel:
-            if (current_screen() != Screen::SongSelect) {
+            if (current_screen() != Screen::Title && current_screen() != Screen::SongSelect) {
                 return;
             }
             song_select_search_active_ = false;
@@ -3793,11 +3721,14 @@ void MenuApp::handle_text_input(std::string_view text) {
         return;
     }
     if (profile_control_key_capture_active_) return;
-    if (ranked_account_overlay_visible_) return;
-    if (chat_overlay_visible_ &&
-        global_chat_service_.snapshot().configured &&
-        multiplayer_menu_.edit_field == MultiplayerEditField::Chat &&
-        !text.empty()) {
+    if (ranked_account_overlay_visible_ || chat_url_warning_visible_) return;
+    // Room chat uses the active peer transport (including hosted rooms), not
+    // the unrelated legacy global-chat service. Match the overlay/send gate.
+    if (chat_overlay_visible_) {
+        // An inactive chat overlay still consumes text; it must not leak to a
+        // nickname/search field underneath it after a disconnect.
+        if (peer_session_.snapshot().state != network::PeerSessionState::Connected ||
+            multiplayer_menu_.edit_field != MultiplayerEditField::Chat || text.empty()) return;
         const std::string utf8 = util::ensure_utf8_text(text);
         std::string printable;
         printable.reserve(utf8.size());
@@ -4322,27 +4253,34 @@ void MenuApp::handle_session_mix_input(uint32_t keycode) {
             session_mix_auto_dirty_ = true;
             select_session_mix_course(0);
             session_mix_focus_ = 1;
+            refresh_session_mix_auto_plan();
+            session_mix_status_message_ = session_mix_auto_plan_.entries.empty()
+                ? ui_text("No playable charts match the current filter.", "현재 필터에 맞는 플레이 가능한 차트가 없습니다.")
+                : ui_text("Auto mix rebuilt: ", "자동 믹스 생성 완료: ") +
+                  std::to_string(session_mix_auto_plan_.entries.size()) + ui_text(" STAGES", " 스테이지");
             publish_snapshot();
         } else if (settings_cursor_ == 2) {
 #ifdef _WIN32
             if (!session_mix_draft_.empty()) {
-                const std::string path = browse_for_lr2_course_save_file(
-                    ui_text("Save LR2 Course File", "LR2 코스 파일 저장"));
-                if (!path.empty()) {
-                    (void)save_session_mix_draft(path);
-                }
+                const auto choice = browse_for_lr2_course_file(
+                    ui_text("Save LR2 Course File", "LR2 코스 파일 저장"), true);
+                if (!choice.path.empty()) (void)save_session_mix_draft(choice.path);
+                else if (!choice.cancelled) session_mix_status_message_ = ui_text(
+                    "Could not open the course file picker. Please try again.", "코스 파일 선택 창을 열지 못했습니다. 다시 시도해 주세요.");
             } else {
-                session_mix_status_message_ = ui_text("Course draft is empty.", "코스 초안이 비어 있습니다.");
+                session_mix_status_message_ = ui_text(
+                    "Course draft is empty. In Songs, select a chart and press C.",
+                    "코스 초안이 비어 있습니다. 곡 목록에서 채보를 선택하고 C를 눌러 추가하세요.");
             }
 #endif
             publish_snapshot();
         } else if (settings_cursor_ == 3) {
 #ifdef _WIN32
-            const std::string path = browse_for_lr2_course_file(
-                ui_text("Select LR2 Course File", "LR2 코스 파일 선택"));
-            if (!path.empty()) {
-                load_session_mix_lr2_course_file(path);
-            }
+            const auto choice = browse_for_lr2_course_file(
+                ui_text("Select LR2 Course File", "LR2 코스 파일 선택"), false);
+            if (!choice.path.empty()) load_session_mix_lr2_course_file(choice.path);
+            else if (!choice.cancelled) session_mix_status_message_ = ui_text(
+                "Could not open the course file picker. Please try again.", "코스 파일 선택 창을 열지 못했습니다. 다시 시도해 주세요.");
 #endif
             publish_snapshot();
         } else if (settings_cursor_ == 4) start_session_mix();

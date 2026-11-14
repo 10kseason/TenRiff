@@ -22,8 +22,8 @@ struct LiveScoreComparison {
     std::array<double, 4> rank_difference{};
 };
 
-// Grades depend on categorical accuracy, not native score: GR contributes 80%
-// accuracy but only 50% score. Showing a native 9500 as an S boundary is wrong.
+// Grades retain categorical accuracy. EX BEST compares 2*PG+GR at the same
+// replay sample, independent of historical score multipliers or normalized scores.
 // BEST is the replay engine's score at this same chart sample, never its final
 // score or an estimate proportional to wall-clock time.
 [[nodiscard]] inline LiveScoreComparison live_score_comparison(
@@ -34,8 +34,8 @@ struct LiveScoreComparison {
     if (!eligible) return out;
     out.best_available = best_stats != nullptr;
     if (best_stats) {
-        out.best_score = gameplay::scale_native_score(best_stats->raw_score, best_multiplier);
-        out.score_difference = gameplay::scale_native_score(stats.raw_score, multiplier) - out.best_score;
+        out.best_score = gameplay::ex_score_from_counts(best_stats->counts);
+        out.score_difference = gameplay::ex_score_from_counts(stats.counts) - out.best_score;
     }
     out.rank_available = stats.accuracy_weight > 0.0 && std::isfinite(stats.accuracy_points);
     if (out.rank_available) {

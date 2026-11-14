@@ -6,7 +6,11 @@
                                      const std::vector<std::string>& guide_notes,
                                      const std::vector<std::string>& footer_notes,
                                      bool separate_paragraphs = true) {
-            draw_glass_panel(rect, 14.0f, 0.92f, 0, false, 0);
+            if (constellation_settings || midnight_home) {
+                const auto rounded = D2D1::RoundedRect(rect, 14, 14);
+                ctx->FillRoundedRectangle(rounded, semantic_color(midnight_home ? 0x10142D : 0x02091B, midnight_home ? .48f : .79f));
+                ctx->DrawRoundedRectangle(rounded, semantic_color(midnight_home ? 0xA2ACD3 : 0xD0DEFF, .65f), 1.3f);
+            } else draw_glass_panel(rect, 14.0f, 0.92f, 0, false, 0);
             draw_text_clipped(data.generic.selected_help_heading.empty() ? wloc("GUIDE", "사용 안내")
                                 : to_wide(data.generic.selected_help_heading), d2d_->song_title_format.Get(),
                               native_rect("generic_help.rect.001", D2D1::RectF(rect.left + 24, rect.top + 20, rect.right - 24, rect.top + 54)),
@@ -56,6 +60,7 @@
             DWRITE_TEXT_METRICS metrics{};
             if (FAILED(d2d_->generic_help_layout->GetMetrics(&metrics))) return;
             const int page_count = std::max(1, static_cast<int>(std::ceil(metrics.height / page_height)));
+            if (data.kind == MenuScreenKind::TitleMenu) benchmark_home_help_pages_ = page_count;
             const int page = std::clamp(generic_help_page_.load(std::memory_order_relaxed), 0, page_count - 1);
             const D2D1_RECT_F body = native_rect("generic_help.rect.002", D2D1::RectF(rect.left + 24, rect.top + 72, rect.right - 24, rect.top + 72 + page_height));
             ctx->PushAxisAlignedClip(body, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);

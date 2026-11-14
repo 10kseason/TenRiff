@@ -125,8 +125,8 @@ struct GameplayStudioScoreCounter {
     std::wstring significant;
 };
 
-// Native scores are clamped to kNativeScoreMaximum = 10,000 in ResultStats.
-// Keep overflow digits for future score formats and construct these strings
+// EX scores scale with chart length; retain every digit, including above 10,000.
+// Construct these strings
 // only when the scene text revision changes, never in the frame drawing path.
 inline GameplayStudioScoreCounter make_gameplay_studio_score_counter(
     int64_t score, std::size_t min_digits = 5) {

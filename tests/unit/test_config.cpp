@@ -217,7 +217,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK_FALSE(config.mode.ghost_battle_enabled);
     CHECK(config.mode.pacemaker_mode == "off");
     CHECK(config.mode.pacemaker_target_accuracy == doctest::Approx(90.0));
-    CHECK(config.mode.pacemaker_target_score == 8000);
+    CHECK(config.mode.pacemaker_target_score == 2000);
     CHECK(config.mode.song_index_profile == "safe");
     CHECK(config.mode.gauge == "ex_hard");
     CHECK(config.audio_ui.gameplay_volume == doctest::Approx(0.2));
@@ -3034,4 +3034,28 @@ TEST_CASE("judgement line brightness defaults preserve old skins and portable va
     restored.judgement_line_brightness = std::numeric_limits<double>::quiet_NaN();
     REQUIRE(tenriff::config::deserialize_skin_config(tenriff::config::serialize_skin_config(restored), skin));
     CHECK(skin.judgement_line_brightness == 1.0);
+}
+
+TEST_CASE("legacy pacemaker score targets are not reinterpreted as EX units") {
+    TempDirGuard temp; temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    CurrentPathGuard cwd; std::error_code ec;
+    std::filesystem::current_path(temp.path, ec); REQUIRE_FALSE(bool(ec));
+    std::filesystem::create_directories(temp.path / "profiles" / "test", ec);
+    REQUIRE_FALSE(bool(ec));
+    write_file(temp.path / "profiles" / "test" / "config.json",
+        R"({"mode":{"pacemaker_mode":"score","pacemaker_target_score":9200}})");
+    ConfigLoader loader;
+    auto loaded = loader.load_profile("profiles/test");
+    REQUIRE(loaded.success());
+    CHECK(loaded.config.mode.pacemaker_mode == "off");
+    CHECK(loaded.config.mode.pacemaker_target_score == 2000);
+    loaded.config.mode.pacemaker_mode = "score";
+    loaded.config.mode.pacemaker_target_score = 20001;
+    std::string error;
+    REQUIRE(loader.save_profile("profiles/test", loaded.config, &error));
+    loaded = loader.load_profile("profiles/test");
+    REQUIRE(loaded.success());
+    CHECK(loaded.config.mode.pacemaker_mode == "score");
+    CHECK(loaded.config.mode.pacemaker_target_score == 20001);
 }

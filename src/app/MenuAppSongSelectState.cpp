@@ -106,7 +106,8 @@ void MenuApp::rebuild_visible_song_list(const std::string* selected_path) {
     for (std::size_t index = 0; index < indexed_songs_.size(); ++index) {
         const SongEntry& entry = indexed_songs_[index];
         if (multiplayer_selecting_chart_ &&
-            (!remote_library || !multiplayer_chart_is_shared(entry, *remote_library))) {
+            (entry.format != "bms" || (!peer_session_.is_hosted() &&
+             (!remote_library || !multiplayer_chart_is_shared(entry, *remote_library))))) {
             continue;
         }
         if (song_entry_matches_table_scope(entry, config_.ui.all_song_sources,

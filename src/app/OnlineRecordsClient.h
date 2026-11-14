@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -12,7 +13,8 @@ namespace tenriff::app {
 struct OnlineRecordEntry {
     int rank = 0;
     std::string player_name;
-    std::int64_t score = 0;
+    std::int64_t score = 0; // Legacy wire value; never displayed as EX without evidence.
+    std::optional<int64_t> ex_score;
     double accuracy = 0.0;
     int max_combo = 0;
     std::string clear_status;

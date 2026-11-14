@@ -16,6 +16,9 @@
 #include "render/ResultPresentation.h"
 #include "render/GameplayFeedbackText.h"
 #include "render/GameplayGaugePalette.h"
+#include "render/SongSelectClearArt.h"
+#include "render/ExScorePresentation.h"
+#include "render/SongSelectReviewLayout.h"
 #include "app/menu/settings/AudioSettingsView.h"
 #include "app/menu/settings/KeymapSettingsView.h"
 #include "config/KeycodeMap.h"
@@ -298,6 +301,30 @@ struct MenuWindowVisualTestAccess {
     }
     static bool owns_foreground(const MenuWindow& window) {
         return GetForegroundWindow() == static_cast<HWND>(window.hwnd_);
+    }
+    static void hover_sun(MenuWindow& window, float x, float y, bool leave) {
+        // App-local messages only: never move the desktop pointer or click.
+        const auto hwnd = static_cast<HWND>(window.hwnd_);
+        if (leave) SendMessageW(hwnd, WM_MOUSELEAVE, 0, 0);
+        else SendMessageW(hwnd, WM_MOUSEMOVE, 0, MAKELPARAM(
+            static_cast<int>(x * window.scale_ + window.offset_x_),
+            static_cast<int>(y * window.scale_ + window.offset_y_)));
+    }
+    static bool sunlight_visible(const MenuWindow& window) { return window.menu_sunlight_visible_; }
+    static bool hover_target(MenuWindow& window, const std::string& name, int index) {
+        const auto kind = name == "account-mode" ? MenuHitTargetKind::AccountPlayMode :
+            name == "account-action" ? MenuHitTargetKind::SitesLeaderboardAction :
+            name == "url-warning" ? MenuHitTargetKind::UrlWarningButton :
+            name == "chat-url" ? MenuHitTargetKind::ChatUrl :
+            name == "help-page" ? MenuHitTargetKind::GenericHelpPage :
+            name == "song-nav" ? MenuHitTargetKind::SongNavButton : MenuHitTargetKind::None;
+        for (const auto& hit : window.hit_regions_) {
+            if (kind != MenuHitTargetKind::None && hit.kind == kind && hit.index == index) {
+                hover_sun(window, (hit.left + hit.right) / 2, (hit.top + hit.bottom) / 2, false);
+                return true;
+            }
+        }
+        return false;
     }
     static config::JsonValue verify_preview_drag(MenuWindow& window, const MenuRenderData& source,
                                                  config::JsonArray& failures) {
@@ -613,6 +640,7 @@ struct MenuWindowVisualTestAccess {
         return {window.benchmark_timing_marker_bitmap_builds_, window.benchmark_timing_marker_bitmap_draws_};
     }
     static void benchmark(MenuWindow& window, bool enabled) { window.benchmark_timings_enabled_ = enabled; }
+    static void song_marquee_phase(MenuWindow& window, int phase) { window.benchmark_song_marquee_phase_ = phase; }
     static bool fullscreen(const MenuWindow& window) { return window.fullscreen_; }
     static std::array<bool, 2> studio_hud_flags(const MenuWindow& window) {
         return {window.gameplay_static_cache_.studio, window.gameplay_static_cache_.hud_riff_map_visible};
@@ -664,6 +692,10 @@ struct MenuWindowVisualTestAccess {
     static bool check_menu_motion(MenuWindow& window, MenuRenderData source, const std::string& output_path,
                                   bool result_video) {
         using namespace config;
+        // These probes cover the retained MP4 fallback and result decoder.
+        // Default artwork/decoder shutdown is checked by normal --verify-hits.
+        window.benchmark_timings_enabled_ = true;
+        window.benchmark_song_review_background_unavailable_ = true;
         using Clock = std::chrono::steady_clock;
         const auto began = Clock::now();
         const int loop_seconds = result_video ? 60 : 12;
@@ -735,6 +767,7 @@ struct MenuWindowVisualTestAccess {
                 {"passed", JsonValue(passed)}, {"asset", JsonValue(result_video
                     ? "assets/menu/continue_result_bga_ko_1080p60.mp4" : "assets/menu/song-select-loop.mp4")},
                 {"expected_frame_rate", JsonValue(static_cast<double>(expected_frame_rate))},
+                {"song_select_static_art_simulated_unavailable", JsonValue(true)},
                 {"system_reduced_motion", JsonValue(system_reduced_motion)},
                 {"real_clock_playback_seconds", JsonValue(playback_seconds)},
                 {"elapsed_ms", JsonValue(std::chrono::duration<double, std::milli>(Clock::now() - began).count())},
@@ -886,6 +919,7 @@ struct MenuWindowVisualTestAccess {
         std::set<int> verified_keymap_tabs;
         bool verified_skin_search = false;
         bool title_language_verified = false;
+        bool home_help_backward_verified = false;
         for (std::size_t visit = 0; visit < visits; ++visit) {
             if (verify) {
                 for (std::size_t row = 0; row < fixture.generic.rows.size(); ++row)
@@ -903,7 +937,9 @@ struct MenuWindowVisualTestAccess {
             for (const auto& region : regions) {
                 const bool menu_card = region.kind == MenuHitTargetKind::OptionsItem ||
                     region.kind == MenuHitTargetKind::TitleButton ||
-                    region.kind == MenuHitTargetKind::TitleLanguageButton;
+                    region.kind == MenuHitTargetKind::TitleLanguageButton ||
+                    (source.kind == MenuScreenKind::TitleMenu && (region.kind == MenuHitTargetKind::SongProfilePanel ||
+                     region.kind == MenuHitTargetKind::GenericHelpPage));
                 const bool song_control = (mix_fixture && (region.kind == MenuHitTargetKind::SongCard ||
                     region.kind == MenuHitTargetKind::SessionMixStagePage || region.kind == MenuHitTargetKind::SettingsRow)) || song_fixture &&
                     (region.kind == MenuHitTargetKind::SongCard || region.kind == MenuHitTargetKind::SongNavButton ||
@@ -970,8 +1006,10 @@ struct MenuWindowVisualTestAccess {
                         while (window.poll_click_event()) {}
                         window.on_mouse_click(window_x, window_y, false);
                         const auto dispatched = window.poll_click_event();
-                        const bool native_pass = dispatched && dispatched->kind == region.kind &&
-                            dispatched->index == region.index && dispatched->part == region.part;
+                        const bool native_pass = region.kind == MenuHitTargetKind::GenericHelpPage
+                            ? window.generic_help_page_.load(std::memory_order_relaxed) == region.index
+                            : dispatched && dispatched->kind == region.kind &&
+                                dispatched->index == region.index && dispatched->part == region.part;
                         item["native_dispatch_verified"] = JsonValue(native_pass);
                         native_dispatch_verified = native_dispatch_verified && native_pass;
                         if (!native_pass)
@@ -1000,6 +1038,8 @@ struct MenuWindowVisualTestAccess {
         if (verify && mix_fixture) {
             int cards=0; bool enter=false;
             for (const auto& hit:window.hit_regions_) {
+                if (hit.kind==MenuHitTargetKind::SongSourceAdd)
+                    failures.emplace_back("session mix exposes Library-only add-folder action");
                 if (hit.kind==MenuHitTargetKind::SongCard) ++cards;
                 if (hit.kind==MenuHitTargetKind::SettingsRow && hit.index==4) enter=true;
                 if (hit.left<0 || hit.top<0 || hit.right>1920 || hit.bottom>1080)
@@ -1010,6 +1050,25 @@ struct MenuWindowVisualTestAccess {
             if (enter!=source.session_mix.can_start) failures.emplace_back("session mix entry availability mismatch");
         }
         if (verify && song_fixture && !source.song_select.difficulty_table_editing) {
+            const auto add_count = std::count_if(window.hit_regions_.begin(), window.hit_regions_.end(), [](const auto& hit) {
+                return hit.kind == MenuHitTargetKind::SongSourceAdd;
+            });
+            const bool native_review = source.song_select.native_list_layout &&
+                (!source.lobby_skin.enabled || source.lobby_skin.native_menu_renderer);
+            // Alternate skins retain both their tab shortcut and Library detail
+            // action; neither may leak into Songs/Records. Native has one action.
+            const int expected_add_count = source.song_select.showing_sources ? (native_review ? 1 : 2) : 0;
+            if (add_count != expected_add_count)
+                failures.emplace_back("add-folder actions must remain Library-only for the active layout");
+            if (source.song_select.showing_sources && source.song_select.native_list_layout &&
+                (!source.lobby_skin.enabled || source.lobby_skin.native_menu_renderer)) {
+                for (const auto& hit : window.hit_regions_) {
+                    if (hit.kind == MenuHitTargetKind::SongSourceAdd &&
+                        (std::abs(hit.left - 416.0f) > 1.0f || std::abs(hit.top - 104.0f) > 1.0f ||
+                         std::abs(hit.right - 612.0f) > 1.0f || std::abs(hit.bottom - 144.0f) > 1.0f))
+                        failures.emplace_back("Library add-folder action is misaligned with header controls");
+                }
+            }
             const auto search = std::find_if(window.hit_regions_.begin(), window.hit_regions_.end(), [](const auto& hit) {
                 return hit.kind == MenuHitTargetKind::SongNavButton && hit.index == 2;
             });
@@ -1174,7 +1233,164 @@ struct MenuWindowVisualTestAccess {
         }
         for (const auto& item : source.song_select.left_nav) lobby_nav.emplace_back(item.label);
         const auto timing_text = gameplay_timing_feedback_text(source.gameplay.timing_feedback_delta_ms);
+        JsonArray clear_art_draws;
+        const bool native_clear_art = song_fixture && source.song_select.native_list_layout &&
+            (!source.lobby_skin.enabled || source.lobby_skin.native_menu_renderer) &&
+            !source.song_select.difficulty_table_editing;
+        if (native_clear_art) {
+            std::size_t expected_draws = 0;
+            for (const auto& card : source.song_select.songs) {
+                const auto expected_art = card.chart_count < 0
+                    ? song_select_clear_art_index(card.lamp, card.verified_full_combo) : std::nullopt;
+                if (!expected_art) continue;
+                ++expected_draws;
+                const auto end = window.benchmark_song_clear_art_.begin() + window.benchmark_song_clear_art_count_;
+                const auto found = std::find_if(window.benchmark_song_clear_art_.begin(), end,
+                    [&](const auto& draw) { return draw.song_index == card.song_index; });
+                if (verify && (found == end || found->art_index != static_cast<int>(*expected_art)))
+                    failures.emplace_back("missing or incorrect clear artwork for song " + std::to_string(card.song_index));
+            }
+            if (verify && expected_draws != window.benchmark_song_clear_art_count_)
+                failures.emplace_back("clear artwork count must exclude folders, failed and assisted rows");
+            for (std::size_t i = 0; i < window.benchmark_song_clear_art_count_; ++i) {
+                const auto& draw = window.benchmark_song_clear_art_[i];
+                clear_art_draws.emplace_back(JsonObject{{"song_index", JsonValue(double(draw.song_index))},
+                    {"art_index", JsonValue(double(draw.art_index))}, {"left", JsonValue(double(draw.left))},
+                    {"right", JsonValue(double(draw.right))}, {"source_width", JsonValue(double(draw.source_width))},
+                    {"bitmap_width", JsonValue(double(draw.bitmap_width))},
+                    {"source_height", JsonValue(double(draw.source_height))}, {"bitmap_height", JsonValue(double(draw.bitmap_height))},
+                    {"saturation", JsonValue(double(draw.saturation))},
+                    {"asset", JsonValue(std::string(kSongSelectClearArtFiles[draw.art_index]))}});
+                if (verify && (std::abs(draw.left - 800.0f) > .01f || std::abs(draw.right - 1034.0f) > .01f ||
+                    std::abs(draw.source_width - draw.bitmap_width) > .01f ||
+                    std::abs(draw.source_height - draw.bitmap_height) > .01f ||
+                    std::abs(draw.saturation - 1.2f) > .001f))
+                    failures.emplace_back("clear artwork must span x800..1034, stretch the full source image and apply runtime saturation 1.2");
+            }
+        }
+        const auto primary_ex = source.kind == MenuScreenKind::ResultScreen ? source.result.ex_score :
+            source.kind == MenuScreenKind::GameplayHud ? source.gameplay.ex_score : source.song_select.ex_score;
+        const auto primary_ex_text = ex_score_text(primary_ex);
+        if (verify && (!primary_ex && primary_ex_text != "--" || primary_ex == std::optional<int64_t>{0} && primary_ex_text != "0"))
+            failures.emplace_back("EX score presentation must distinguish missing evidence from a valid zero");
+        JsonArray review_marquees;
+        for (std::size_t i = 0; i < window.benchmark_song_marquee_count_; ++i) {
+            const auto& d = window.benchmark_song_marquee_[i];
+            review_marquees.emplace_back(JsonObject{{"slot", JsonValue(double(d.slot))},
+                {"offset", JsonValue(double(d.offset))}, {"overflow", JsonValue(double(d.overflow))},
+                {"left", JsonValue(double(d.left))}, {"right", JsonValue(double(d.right))},
+                {"centered", JsonValue(d.centered)}, {"reduced", JsonValue(d.reduced)}});
+            if (verify && (d.offset < 0 || d.offset > d.overflow + .01f || d.right <= d.left ||
+                d.reduced && d.offset != 0)) failures.emplace_back("song title marquee escaped its own bounded viewport");
+            if (verify && window.benchmark_song_marquee_phase_ >= 0 && !d.reduced) {
+                const float expected = window.benchmark_song_marquee_phase_ == 0 ? 0 :
+                    window.benchmark_song_marquee_phase_ == 2 ? d.overflow : d.overflow * .5f;
+                if (std::abs(d.offset - expected) > .02f) failures.emplace_back("song title marquee failed endpoint/dwell fixture");
+            }
+        }
+        if (verify && source.kind == MenuScreenKind::TitleMenu &&
+            (!source.lobby_skin.enabled || source.lobby_skin.native_menu_renderer)) {
+            const bool default_home = source.lobby_skin.background_path.empty() &&
+                (!source.lobby_skin.enabled || source.lobby_skin.background_video_path.empty());
+            if (default_home != window.benchmark_home_background_drawn_ || !window.benchmark_home_hero_drawn_)
+                failures.emplace_back("home must draw the literal product line and honor custom background priority");
+            unsigned buttons = 0, profile = 0, language = 0;
+            for (const auto& hit : window.hit_regions_) {
+                buttons += hit.kind == MenuHitTargetKind::TitleButton;
+                profile += hit.kind == MenuHitTargetKind::SongProfilePanel;
+                language += hit.kind == MenuHitTargetKind::TitleLanguageButton;
+            }
+            if (buttons != source.title.buttons.size() || profile != 1 || language != 1)
+                failures.emplace_back("home lost a menu, profile or language hit target");
+            if (foreground && window.generic_help_page_.load(std::memory_order_relaxed) > 0) {
+                window.render(source);
+                const auto previous = std::find_if(window.hit_regions_.begin(), window.hit_regions_.end(), [](const auto& hit) {
+                    return hit.kind == MenuHitTargetKind::GenericHelpPage && hit.index == 0;
+                });
+                if (previous != window.hit_regions_.end()) {
+                    const int x = static_cast<int>(std::lround(window.offset_x_ + (previous->left + previous->right) * .5f * window.scale_));
+                    const int y = static_cast<int>(std::lround(window.offset_y_ + (previous->top + previous->bottom) * .5f * window.scale_));
+                    const auto hit = window.resolve_menu_click(x, y, false, false);
+                    window.on_mouse_click(x, y, false);
+                    home_help_backward_verified = hit && hit->kind == MenuHitTargetKind::GenericHelpPage && hit->index == 0 &&
+                        window.generic_help_page_.load(std::memory_order_relaxed) == 0;
+                    if (!home_help_backward_verified) failures.emplace_back("home guide previous-page click did not return to page one");
+                    ++checked;
+                } else failures.emplace_back("home guide previous-page hit target missing after next-page activation");
+            }
+            window.generic_help_page_.store(0, std::memory_order_relaxed);
+            window.render(source);
+        }
+        if (verify && native_clear_art) {
+            const auto selected = std::find_if(source.song_select.songs.begin(), source.song_select.songs.end(),
+                [](const auto& card) { return card.selected; });
+            const std::string lamp = source.song_select.showing_records ? source.song_select.score_clear_status :
+                !source.song_select.selected_song_lamp.empty() ? source.song_select.selected_song_lamp :
+                selected != source.song_select.songs.end() ? selected->lamp : std::string{};
+            const bool clear_badge = !source.song_select.showing_sources && !source.song_select.showing_level_folders &&
+                !song_select_lamp_presentation(lamp).badge_label.empty();
+            const bool expected_combo = clear_badge && (source.song_select.showing_records
+                ? source.song_select.verified_full_combo : selected != source.song_select.songs.end() && selected->verified_full_combo);
+            if (expected_combo != window.benchmark_song_review_all_combo_ ||
+                expected_combo != window.benchmark_song_review_combo_light_)
+                failures.emplace_back("ALL COMBO text/light must follow the displayed clear record only");
+            if (expected_combo && (window.benchmark_song_review_combo_shimmer_ < .69f ||
+                window.benchmark_song_review_combo_shimmer_ > 1.01f || window.benchmark_song_review_combo_flare_x_ < 1574 ||
+                window.benchmark_song_review_combo_flare_x_ > 1721))
+                failures.emplace_back("ALL COMBO light escaped its subtle badge-local range");
+            if (expected_combo && window.benchmark_song_review_combo_reduced_ &&
+                (std::abs(window.benchmark_song_review_combo_shimmer_ - .85f) > .001f ||
+                 std::abs(window.benchmark_song_review_combo_flare_x_ - 1647.5f) > .001f))
+                failures.emplace_back("reduced motion must keep ALL COMBO illumination static");
+            const bool default_background = source.lobby_skin.background_path.empty() &&
+                (!source.lobby_skin.enabled || source.lobby_skin.background_video_path.empty());
+            if (default_background && !window.benchmark_song_review_background_drawn_)
+                failures.emplace_back("default song review background asset was not drawn");
+            if (!default_background && window.benchmark_song_review_background_drawn_)
+                failures.emplace_back("built-in song review background replaced a custom skin background");
+            if (window.benchmark_song_review_background_drawn_) {
+                const auto motion = window.menu_motion_background_diagnostics();
+                if (motion.source != MenuWindow::MenuMotionSource::None || motion.active || motion.decoder_active)
+                    failures.emplace_back("static song review artwork must stop the old video decoder");
+            }
+            float nav_left = 2000, nav_right = 0;
+            for (const auto& hit : window.hit_regions_) if (hit.kind == MenuHitTargetKind::SongNavButton && hit.top == 0) {
+                nav_left = std::min(nav_left, hit.left); nav_right = std::max(nav_right, hit.right);
+            }
+            if (std::abs((nav_left + nav_right) * .5f - 960) > .01f)
+                failures.emplace_back("song navigation group must be centered independently of logo and account");
+            if (nav_left < 418 || nav_right > 1530) failures.emplace_back("song navigation overlaps logo or account");
+        }
+        if (verify && source.kind == MenuScreenKind::GenericList && source.generic.card_grid) {
+            const bool default_options = (!source.lobby_skin.enabled || source.lobby_skin.native_menu_renderer) &&
+                source.lobby_skin.background_path.empty() && (!source.lobby_skin.enabled || source.lobby_skin.background_video_path.empty());
+            if (default_options != window.benchmark_options_galaxy_drawn_ ||
+                default_options != window.benchmark_options_galaxy_adjusted_)
+                failures.emplace_back("options must draw adjusted default galaxy only when no custom background is selected");
+            if (default_options && window.benchmark_options_constellation_cards_ != 8)
+                failures.emplace_back("options constellation surface must retain all eight cards");
+        }
         JsonObject report{
+            {"home_background_drawn", JsonValue(window.benchmark_home_background_drawn_)},
+            {"home_hero_text", JsonValue(window.benchmark_home_hero_drawn_ ? "Tenriff BMS Rhythm Game Client" : "")},
+            {"home_help_pages", JsonValue(double(window.benchmark_home_help_pages_))},
+            {"home_help_backward_verified", JsonValue(home_help_backward_verified)},
+            {"options_galaxy_drawn", JsonValue(window.benchmark_options_galaxy_drawn_)},
+            {"options_galaxy_adjusted", JsonValue(window.benchmark_options_galaxy_adjusted_)},
+            {"options_constellation_cards", JsonValue(double(window.benchmark_options_constellation_cards_))},
+            {"song_review_all_combo", JsonValue(window.benchmark_song_review_all_combo_)},
+            {"song_review_combo_light", JsonValue(window.benchmark_song_review_combo_light_)},
+            {"song_review_combo_reduced", JsonValue(window.benchmark_song_review_combo_reduced_)},
+            {"song_review_combo_shimmer", JsonValue(double(window.benchmark_song_review_combo_shimmer_))},
+            {"song_review_combo_flare_x", JsonValue(double(window.benchmark_song_review_combo_flare_x_))},
+            {"song_review_background_drawn", JsonValue(window.benchmark_song_review_background_drawn_)},
+            {"song_title_marquees", JsonValue(std::move(review_marquees))},
+            {"song_thumbnail_images", JsonValue(double(window.benchmark_song_thumbnail_images_))},
+            {"song_thumbnail_fallbacks", JsonValue(double(window.benchmark_song_thumbnail_fallbacks_))},
+            {"primary_ex_score_text", JsonValue(primary_ex_text)},
+            {"song_ex_score", source.song_select.ex_score ? JsonValue(double(*source.song_select.ex_score)) : JsonValue()},
+            {"result_ex_score", source.result.ex_score ? JsonValue(double(*source.result.ex_score)) : JsonValue()},
+            {"gameplay_ex_score", source.gameplay.ex_score ? JsonValue(double(*source.gameplay.ex_score)) : JsonValue()},
             {"ui_language", JsonValue(std::string(ui::language_token(source.ui_language)))},
             {"gameplay_gauge_label", JsonValue(source.gameplay.gauge_label)},
             {"ghost_gauge_label", JsonValue(source.gameplay.ghost_gauge_label)},
@@ -1227,6 +1443,7 @@ struct MenuWindowVisualTestAccess {
             {"native_dispatch_verified", JsonValue(native_dispatch_verified && checked > 0)},
             {"limitations", JsonValue(std::move(limitations))},
             {"verified_regions", JsonValue(static_cast<double>(checked))},
+            {"clear_art_draws", JsonValue(std::move(clear_art_draws))},
             {"rows", JsonValue(std::move(rows))}, {"regions", JsonValue(std::move(captured_regions))},
             {"failures", JsonValue(failures)}
         };
@@ -1283,6 +1500,7 @@ int main(int argc, char** argv) {
     bool analysis_unavailable = false;
     bool analysis_no_samples = false;
     bool options_grid = false;
+    bool home_guide_pages = false;
     bool table_editor = false;
     bool table_loading = false;
     bool gameplay = false;
@@ -1300,6 +1518,7 @@ int main(int argc, char** argv) {
     std::string fixture_gauge = "NORMAL";
     std::string lobby_score_clear;
     bool lobby_full_combo = false;
+    bool combo_badge_fixture = false;
     double fixture_gauge_value = 75.0;
     std::string fixture_pacemaker_mode;
     double fixture_pacemaker_delta = 240.0;
@@ -1429,6 +1648,10 @@ int main(int argc, char** argv) {
     bool level_folders_fixture = false;
     bool long_title_fixture = false;
     bool clear_card_fixture = false;
+    bool clear_art_v2_fixture = false;
+    bool review_redesign_fixture = false;
+    int song_marquee_phase = -1;
+    bool ex_score_missing_fixture = false, ex_score_zero_fixture = false;
     bool backdrop_off = false;
     double backdrop_opacity = -1.0;
     double backdrop_brightness = -1.0;
@@ -1458,6 +1681,13 @@ int main(int argc, char** argv) {
     bool bms_editor = false;
     bool cycle_font_scale = false;
     bool capture_once = false;
+    std::optional<std::pair<float, float>> hover_sun;
+    int hover_leave_frame = 0;
+    std::string hover_target_name;
+    int hover_target_index = 0;
+    std::optional<bool> expected_sunlight;
+    bool sunlight_assertion_verified = false;
+    bool hover_target_found = false;
     bool gpu_sprites = true;
     bool capture_requested = false;
     int rendered_frames = 0;
@@ -1483,6 +1713,30 @@ int main(int argc, char** argv) {
             continue;
         }
         const std::string arg = argv[i];
+        // Keep new standalone fixtures out of the legacy MSVC-depth-limited
+        // else-if option chain below.
+        if (arg == "--home-guide-pages") { title = true; home_guide_pages = true; continue; }
+        if (arg == "--hover-target" && i + 2 < argc) {
+            hover_target_name = argv[++i];
+            hover_target_index = std::stoi(argv[++i]);
+            continue;
+        }
+        if (arg == "--expect-sunlight" && i + 1 < argc) {
+            const std::string expected = argv[++i];
+            if (expected != "on" && expected != "off") return 2;
+            expected_sunlight = expected == "on";
+            continue;
+        }
+        if (arg == "--hover-sun" && i + 2 < argc) {
+            const float x = std::stof(argv[++i]);
+            const float y = std::stof(argv[++i]);
+            hover_sun = {x, y};
+            continue;
+        }
+        if (arg == "--hover-leave-frame" && i + 1 < argc) {
+            hover_leave_frame = std::stoi(argv[++i]);
+            continue;
+        }
         if (arg == "--released-hold" || arg == "--held-hold-reference") {
             hold_release_fixture = arg == "--released-hold" ? 2 : 1;
             gameplay = ghost = fixture_idle = no_feedback = true;
@@ -1506,6 +1760,16 @@ int main(int argc, char** argv) {
         }
         if (arg == "--judgement-counts") { judgement_counts = true; continue; }
         if (arg == "--lamp-fixture") { lamp_fixture = true; continue; }
+        if (arg == "--ex-score-missing") { ex_score_missing_fixture = true; continue; }
+        if (arg == "--ex-score-zero") { ex_score_zero_fixture = true; continue; }
+        if (arg == "--review-redesign") { review_redesign_fixture = clear_art_v2_fixture = true; continue; }
+        if (arg == "--song-marquee-phase" && i + 1 < argc) {
+            const std::string phase = argv[++i];
+            song_marquee_phase = phase == "start" ? 0 : phase == "middle" ? 1 : phase == "end" ? 2 : phase == "return" ? 3 : -1;
+            if (song_marquee_phase < 0) return 2;
+            continue;
+        }
+        if (arg == "--clear-art-v2") { clear_art_v2_fixture = true; continue; }
         if (arg == "--clear-card-fixture") { clear_card_fixture = true; continue; }
         if (arg == "--timing-delta-ms" && i + 1 < argc) {
             const double value = std::stod(argv[++i]);
@@ -1609,6 +1873,7 @@ int main(int argc, char** argv) {
         if (arg == "--key-overlay-scale" && i + 1 < argc) { key_overlay_scale = std::stod(argv[++i]); continue; }
         if (arg == "--lobby-score-clear" && i + 1 < argc) { lobby_score_clear = argv[++i]; continue; }
         if (arg == "--lobby-full-combo") { lobby_full_combo = true; continue; }
+        if (arg == "--combo-badge-fixture") { combo_badge_fixture = true; continue; }
         if (arg == "--score-comparison") { score_comparison_fixture = true; continue; }
         if (arg == "--score-comparison-missing-best") { score_comparison_fixture = true; score_comparison_missing_best = true; continue; }
         if (arg == "--score-comparison-x" && i + 1 < argc) { score_comparison_x = std::stod(argv[++i]); continue; }
@@ -2061,6 +2326,11 @@ int main(int argc, char** argv) {
             loc("F5 refreshes the current song source", "F5 현재 곡 소스 새로고침"),
             loc("F1 opens the control help overlay", "F1 조작 도움말 열기"),
             loc("ESC exits from the title menu", "ESC 타이틀에서 종료"), preview_backend};
+        if (home_guide_pages) {
+            const auto guides = data.title.guides;
+            data.title.guides.insert(data.title.guides.end(), guides.begin(), guides.end());
+            data.title.guides.insert(data.title.guides.end(), guides.begin(), guides.end());
+        }
     }
     auto& songs = data.song_select;
     songs.profile = "PLAYER";
@@ -2126,7 +2396,11 @@ int main(int argc, char** argv) {
     songs.search_active = search_active;
     songs.search_query = search_query;
     songs.rank = empty ? "--" : (result_grade.empty() ? "S+" : result_grade);
-    songs.best_score = 9452;
+    songs.best_score = 9452; // Deliberately distinct legacy sentinel.
+    songs.ex_score = empty ? std::nullopt : std::optional<int64_t>{3404};
+    songs.max_ex_score = 3648;
+    songs.high_ex_score = 3404;
+    data.title.high_ex_score = 3404;
     songs.detail_score = 8901;
     songs.max_detail_score = 9120;
     songs.max_combo = 742;
@@ -2193,17 +2467,44 @@ int main(int argc, char** argv) {
                 card.difficulty_prefix_key_count = 0;
                 card.background_path = bga_path;
             }
+            card.verified_full_combo = i == 0 && lobby_full_combo;
+            if (clear_art_v2_fixture) {
+                constexpr std::array<const char*, 10> statuses{
+                    "EASY CLEAR", "NORMAL CLEAR", "HARD CLEAR", "EX CLEAR", "NORMAL CLEAR",
+                    "FAILED", "ASSIST PRACTICE GAUGE SHIFT NORMAL CLEAR", "", "AUTOPLAY", "UNKNOWN CLEAR"};
+                card.lamp = statuses[static_cast<std::size_t>(i) % statuses.size()];
+                card.verified_full_combo = i == 4;
+                card.title = std::string(i == 4 ? "Verified full combo / " : "Clear artwork / ") + titles[i];
+            }
             card.has_score = !card.lamp.empty();
             card.score = 9452 - i * 207;
+            card.ex_score = card.has_score ? std::optional<int64_t>{3404 - i * 37} : std::nullopt;
             songs.songs.push_back(card);
         }
         songs.song_count = songs.list_total_count = 42;
         songs.record_count = songs.source_count = 42;
         songs.list_visible_count = fixture_visible_cards;
-        if (lamp_fixture) {
+        if (lamp_fixture || clear_art_v2_fixture) {
             songs.selected_song_lamp = songs.songs.front().lamp;
             if (lobby_score_clear.empty()) songs.score_clear_status = songs.songs.front().lamp;
         }
+    }
+    if (review_redesign_fixture && !songs.songs.empty()) {
+        songs.selected_song_title = songs.songs[0].title = "MARQUEE START / A luminous journey beyond the midnight constellation / Long title with a complete visible ending / MARQUEE END";
+        songs.selected_song_artist = songs.songs[0].artist = "Artist / stars and light";
+        songs.selected_song_difficulty = "LEVEL 4";
+        songs.difficulty_table_active = songs.selected_song_difficulty_is_aery_five_key = true;
+        songs.selected_song_lamp = "EX CLEAR";
+        songs.selected_song_bms_rank = "EZ";
+        songs.selected_song_background_path = bga_path;
+        songs.songs[0].background_path = bga_path;
+        if (songs.songs.size() > 1) songs.songs[1].background_path = bga_path;
+        if (songs.songs.size() > 2) songs.songs[2].background_path = "missing-preview-background.png";
+    }
+    if (combo_badge_fixture && !songs.songs.empty()) {
+        songs.selected_song_title = songs.songs[0].title = "Constellation / Full combo preview";
+        songs.selected_song_lamp = songs.score_clear_status = songs.songs[0].lamp = "EX CLEAR";
+        songs.songs[0].verified_full_combo = songs.verified_full_combo = lobby_full_combo;
     }
     if (songs.showing_sources && !empty) {
         songs.selected_source_all = true;
@@ -2277,6 +2578,8 @@ int main(int argc, char** argv) {
     score.good = 32;
     score.bad = 8;
     score.poor = 0;
+    score.ex_score = 2LL * score.perfect + score.great;
+    score.max_ex_score = 2LL * score.total_notes;
     score.mean_delta_ms = 2.4;
     score.stddev_delta_ms = 14.6;
     score.fast_count = 824;
@@ -2379,6 +2682,7 @@ int main(int argc, char** argv) {
     }
     if (result_perfect) {
         score.score = score.max_score;
+        score.ex_score = score.max_ex_score;
         score.accuracy = score.detailed_accuracy = 100.0;
     }
     if (options_grid || settings || keymap_settings || profile_settings) {
@@ -2392,6 +2696,8 @@ int main(int argc, char** argv) {
         player.local = i == 0; player.has_score = true; player.finished = result;
         player.score = 9500 - i * 640; player.combo = 123 + i; player.max_combo = 456;
         player.perfect = 620; player.great = 80; player.good = 12; player.bad = 3;
+        player.perfect -= i * 20;
+        player.ex_score = 2LL * player.perfect + player.great;
         player.gauge = 90 - i * 10;
         data.result.multiplayer_players.push_back(player);
         data.gameplay.multiplayer_players.push_back(player);
@@ -2438,7 +2744,9 @@ int main(int argc, char** argv) {
         hud.has_feedback = true; hud.feedback = "PG"; hud.combo = 123;
         hud.peer_visible = players > 0; hud.peer_score_available = players > 0;
         hud.peer_score = 8860; hud.score = 9500;
-        const auto lead = tenriff::app::peer_battle_score_lead(hud.score, hud.peer_score);
+        hud.ex_score = 2LL * hud.pg + hud.gr;
+        hud.peer_ex_score = 1280;
+        const auto lead = tenriff::app::peer_battle_score_lead(*hud.ex_score, *hud.peer_ex_score);
         hud.versus_score_difference = lead.difference; hud.versus_score_position = lead.position;
         hud.timing_history_count = 3;
         hud.timing_history_delta_ms[0] = -12; hud.timing_history_delta_ms[1] = 9; hud.timing_history_delta_ms[2] = 28;
@@ -2542,6 +2850,7 @@ int main(int argc, char** argv) {
             data.lobby_skin.layout_rects[item.first] = {r.left, r.top, r.right, r.bottom};
         }
     }
+    data.gameplay.ex_score = 2LL * data.gameplay.pg + data.gameplay.gr;
     data.gameplay.note_image_aspect = data.generic.skin_preview.note_image_aspect = NoteImageAspect::Auto;
     data.gameplay.lane_center_gap_scale = data.generic.skin_preview.lane_center_gap_scale =
         preview_keys == 16 ? tenriff::config::kLaneCenterGapScaleDefault : 0.0;
@@ -2721,6 +3030,8 @@ int main(int argc, char** argv) {
         data.chat_overlay.visible = true; data.chat_overlay.connected = true;
         data.chat_overlay.title = loc("Chat preview", "채팅 미리보기");
         data.chat_overlay.messages = {"PLAYER: Readable UI text", "PLAYER 2: 밝은 배경에서도 확인합니다."};
+        // Synthetic URL provides an actual ChatUrl hit for overlay hover checks.
+        data.chat_overlay.message_urls = {"", "https://example.test/synthetic"};
         data.chat_overlay.input = loc("Synthetic message", "합성 메시지");
         data.chat_overlay.status = loc("Preview only", "미리보기 전용");
         data.chat_overlay.hint = loc("ENTER Send / ESC Close", "ENTER 보내기 / ESC 닫기");
@@ -2789,10 +3100,23 @@ int main(int argc, char** argv) {
         data.url_warning_overlay.visible = false;
         frame_limit = 180;
     }
+    if (ex_score_missing_fixture || ex_score_zero_fixture) {
+        // Keep contradictory legacy scores populated: the renderer must never
+        // substitute them for missing EX evidence or a valid EX score of zero.
+        const auto ex = ex_score_missing_fixture ? std::optional<int64_t>{} : std::optional<int64_t>{0};
+        data.title.high_ex_score = data.song_select.high_ex_score = ex;
+        data.song_select.ex_score = data.result.ex_score = data.gameplay.ex_score = ex;
+        data.gameplay.peer_ex_score = data.gameplay.ghost_ex_score = ex;
+        data.result.presentation_skipped = true;
+        for (auto& card : data.song_select.songs) card.ex_score = ex;
+        for (auto& player : data.result.multiplayer_players) player.ex_score = ex;
+        for (auto& player : data.gameplay.multiplayer_players) player.ex_score = ex;
+    }
     MenuWindow window;
     window.set_config(config);
     MenuWindowVisualTestAccess::gpu_sprites(window, gpu_sprites);
     MenuWindowVisualTestAccess::benchmark(window, benchmark_frames > 0 || !hitmap_path.empty() || verify_hits);
+    MenuWindowVisualTestAccess::song_marquee_phase(window, song_marquee_phase);
     if (!retention_probe_directory.empty())
         return MenuWindowVisualTestAccess::check_background_retention(window, data, retention_probe_directory) ? 0 : 5;
     if (!layer_probe_directory.empty())
@@ -3008,6 +3332,7 @@ int main(int argc, char** argv) {
                 hud.score = hud.combo * 100;
                 hud.gr = hud.combo;
                 hud.pg = 0;
+                hud.ex_score = 2LL * hud.pg + hud.gr;
                 hud.has_feedback = chord && rendered_frames < repeat_frame + 30;
                 hud.feedback = "GR";
                 hud.text_revision = static_cast<uint64_t>(hud.combo + 1);
@@ -3039,6 +3364,7 @@ int main(int argc, char** argv) {
                 hud.ghost_accuracy = hud.accuracy;
                 hud.ghost_detailed_accuracy = hud.detailed_accuracy;
                 hud.ghost_pg = hud.pg; hud.ghost_gr = 23456 + (hit_motion_sequence ? hud.gr : 0);
+                hud.ghost_ex_score = 2LL * hud.ghost_pg + hud.ghost_gr;
                 hud.ghost_gd = 3456; hud.ghost_bd = 456; hud.ghost_pr = 56;
                 hud.ghost_gauge = hud.gauge; hud.ghost_gauge_label = hud.gauge_label;
                 hud.ghost_has_feedback = !no_feedback && (!hit_motion_sequence || hud.has_feedback);
@@ -3065,6 +3391,13 @@ int main(int argc, char** argv) {
         ++rendered_frames;
         const int roundtrip_phase = menu_roundtrip ? (rendered_frames - 1) / 60 : 0;
         const bool roundtrip_phase_end = menu_roundtrip && rendered_frames % 60 == 0;
+        if (gameplay || menu_roundtrip) {
+            // Dynamic preview counts change after initial fixture setup too.
+            data.gameplay.ex_score = ex_score_missing_fixture ? std::optional<int64_t>{} :
+                std::optional<int64_t>{ex_score_zero_fixture ? 0 : 2LL * data.gameplay.pg + data.gameplay.gr};
+            if (ghost) data.gameplay.ghost_ex_score = ex_score_missing_fixture ? std::optional<int64_t>{} :
+                std::optional<int64_t>{ex_score_zero_fixture ? 0 : 2LL * data.gameplay.ghost_pg + data.gameplay.ghost_gr};
+        }
         auto& render_data = menu_roundtrip && roundtrip_phase != 1 ? *roundtrip_menu : data;
         if (cycle_font_scale && rendered_frames == 40) data.ui_text_scale = 1.4f;
         if (rendered_frames == 35 && !bga_next_path.empty())
@@ -3102,6 +3435,10 @@ int main(int argc, char** argv) {
                 songs.selected_song_title = songs.songs[songs.list_selected_index].title;
             }
         }
+        if (!hover_target_name.empty()) hover_target_found =
+            MenuWindowVisualTestAccess::hover_target(window, hover_target_name, hover_target_index);
+        if (hover_sun) MenuWindowVisualTestAccess::hover_sun(window, hover_sun->first, hover_sun->second,
+            hover_leave_frame > 0 && rendered_frames >= hover_leave_frame);
         if (std::find(capture_frames.begin(), capture_frames.end(), rendered_frames) != capture_frames.end()) {
             window.request_screenshot();
             std::cout << "capture frame=" << rendered_frames << '\n';
@@ -3142,6 +3479,18 @@ int main(int argc, char** argv) {
             render_data.gameplay.key_overlay_scale = key_overlay_scale;
         }
         window.render(render_data);
+        if (hover_sun && (rendered_frames == 30 || rendered_frames == 90))
+            std::cout << "sunlight frame=" << rendered_frames << " visible="
+                      << MenuWindowVisualTestAccess::sunlight_visible(window) << '\n';
+        if (expected_sunlight && !sunlight_assertion_verified && rendered_frames >= 60 &&
+            MenuWindowVisualTestAccess::owns_foreground(window) &&
+            (hover_target_found || hover_sun.has_value())) {
+            const bool actual = MenuWindowVisualTestAccess::sunlight_visible(window);
+            std::cout << "sunlight_assertion verified=1 expected=" << *expected_sunlight
+                      << " actual=" << actual << " frame=" << rendered_frames << '\n';
+            if (actual != *expected_sunlight) { window.shutdown(); return 8; }
+            sunlight_assertion_verified = true;
+        }
         if (menu_roundtrip) {
             auto& phase = roundtrip_phases[roundtrip_phase];
             ++phase.frames;
@@ -3358,6 +3707,10 @@ int main(int argc, char** argv) {
             window, data.kind == MenuScreenKind::GameplayHud);
         std::cout << "Native x2 background uploaded: " << restored << '\n';
         if (!restored) { window.shutdown(); return 7; }
+    }
+    if (expected_sunlight && !sunlight_assertion_verified) {
+        std::cout << "sunlight_assertion verified=0 reason=foreground_or_target_unavailable\n";
+        window.shutdown(); return 9;
     }
     window.shutdown();
 }

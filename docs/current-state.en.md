@@ -1,3 +1,7 @@
+> **2026-11-14 · 2.0.0** Integrates EX Score (2×PG + GR), account-linked hosted multiplayer, constellation Home/Song Select/Options, verified ALL COMBO presentation, and room-chat, Library and Session Mix fixes. [English](release-2.0.0.en.md)
+
+The compatibility reference remains **1.9.9.9-final4**. **After 2.0.0, development is bug-fix-only; no new features.** See the [verification gate](release-2.0.0-gate.md) for release checks and publication status. Earlier version notices below are historical.
+
 > **2026-11-12 · 1.9.9.9-final7** Fixes a missed note blanking the judgement shown on screen. A miss now shows its BAD/POOR when it is decided. Scores, gauge, judgement windows and replays are unchanged. [English](release-1.9.9.9-final7.en.md)
 
 > **2026-11-11 · 1.9.9.9-final6** Separates 7+1/8K bindings, defaults scratch to red and clips notes at 16-lane gaps. Adds Unlimited VSync handling, timing-marker caching, LR2oraja score import, authored BMS levels and native high-resolution BGA frames. [English](release-1.9.9.9-final6.en.md)

@@ -1,3 +1,12 @@
+# 2.0.0 — 2026-11-14
+
+- Use EX Score = 2×P-Great + Great across display, personal bests, ghosts, Session Mix, multiplayer and web ranking; retain legacy replay scoring and exclude missing-count records from EX ranking without guessing.
+- Add account-linked official hosted rooms for up to eight players, separate protocol 2/ex-v1 negotiation, scheduled starts, leadership transfer and room chat. Scores remain client_submitted; no posted score is required to connect.
+- Integrate constellation Home, Song Select and Options, static galaxy backgrounds, verified ALL COMBO badges, improved record presentation and pointer lighting. Home slogan: `Tenriff BMS Rhythm Game Client`, with only its hero subtitle removed and the guide retained.
+- Fix room-chat input routing, Library-only Add Folder, and Session Mix generation/remix/save/import/cancel controls.
+- Keep final4 as the compatibility reference and preserve historical rulesets/replays and direct TCP protocol v9. After 2.0.0, maintenance is bug-fix-only.
+- Final release checks/publication are pending; see [four-language release notes](docs/release-2.0.0.en.md) and the [verification gate](docs/release-2.0.0-gate.md).
+
 # 1.9.9.9-final7 — 2026-11-12
 
 - Show a missed note's BAD/POOR when the miss is decided. It no longer blanks the judgement on screen.

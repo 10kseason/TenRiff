@@ -14,7 +14,7 @@
                 draw_text_clipped(to_wide(name), d2d_->hud_format.Get(),
                     D2D1::RectF(rect.left + 14, top + 7, rect.right - 14, top + 31), d2d_->accent_brush.Get());
                 const bool compact = rect.right - rect.left < 360.0f;
-                draw_text_clipped(to_wide(player.has_score ? format_int_with_commas(player.score) : "--"),
+                draw_text_clipped(to_wide(player.ex_score ? format_int_with_commas(*player.ex_score) : "--"),
                     d2d_->title_format.Get(), D2D1::RectF(rect.left + 14, top + 32, rect.right - (compact ? 14.0f : 140.0f), top + (compact ? 65.0f : 73.0f)),
                     d2d_->text_brush.Get());
                 const std::string state = data.gameplay.peer_disconnected ? loc("OFFLINE", "연결 끊김") :

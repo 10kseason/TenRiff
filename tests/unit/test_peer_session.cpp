@@ -424,11 +424,14 @@ TEST_CASE("peer result retains two and three player standings after the winner d
 
         network::PeerScore score;
         score.score = 1000;
+        score.perfect = 50;
         REQUIRE(host.publish_score(score, true));
         score.score = 3000;
+        score.perfect = 150;
         REQUIRE(opponents.front()->publish_score(score, true));
         if (count == 3) {
             score.score = 500;
+            score.perfect = 25;
             score.game_over = true;
             REQUIRE(opponents.back()->publish_score(score));
         }
@@ -443,6 +446,7 @@ TEST_CASE("peer result retains two and three player standings after the winner d
         local.has_score = true;
         local.finished = true;
         local.score = 1000;
+        local.ex_score = 100;
         CHECK(app::multiplayer_standings(initial, local).front().player_id == 2);
 
         opponents.front()->disconnect("Winner leaves result");
@@ -453,6 +457,7 @@ TEST_CASE("peer result retains two and three player standings after the winner d
             // A live GAME OVER update is not a FinalScore packet. A final result
             // arriving after another player leaves must still replace that score.
             score.score = 2000;
+            score.perfect = 100;
             REQUIRE(opponents.back()->publish_score(score, true));
             REQUIRE(wait_until([&]() {
                 return host.snapshot().round_participants[2].latest_score.finished;
@@ -465,6 +470,7 @@ TEST_CASE("peer result retains two and three player standings after the winner d
         REQUIRE(standings.size() == static_cast<std::size_t>(count));
         CHECK(standings.front().player_id == 2);
         CHECK(standings.front().score == 3000);
+        CHECK(standings.front().ex_score == std::optional<int64_t>{300});
         CHECK(standings.front().finished);
         const auto local_row = std::find_if(standings.begin(), standings.end(),
                                             [](const auto& player) { return player.local; });

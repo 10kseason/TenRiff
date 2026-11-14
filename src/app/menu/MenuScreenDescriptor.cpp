@@ -13,7 +13,7 @@ constexpr std::array<MenuScreenDescriptor, 21> kDescriptors{{
     {Screen::QuickSetup, "Quick Setup", "빠른 설정", "quick_setup", "", Snapshot::QuickSetup, Generic::None, false, true},
     {Screen::Title, "Title", "타이틀", "title", "", Snapshot::Title, Generic::None, false, true},
     {Screen::OptionsHub, "Options", "옵션", "options", "", Snapshot::Generic, Generic::OptionsHub, true, true},
-    {Screen::Multiplayer, "Peer Multiplayer", "P2P 멀티플레이", "multiplayer", "song_select", Snapshot::Generic, Generic::Multiplayer, false, true},
+    {Screen::Multiplayer, "Online Multiplayer", "온라인 멀티플레이", "multiplayer", "song_select", Snapshot::Generic, Generic::Multiplayer, false, true},
     {Screen::SongSelect, "Song Select", "곡 선택", "song_select", "", Snapshot::SongSelect, Generic::None, false, true},
     {Screen::SessionMix, "Session Mix", "세션 믹스", "session_mix", "", Snapshot::Generic, Generic::SessionMix, false, true},
     {Screen::SongBrowser, "Song Filters", "곡 필터", "song_browser", "song_select", Snapshot::SongBrowser, Generic::None, false, true},

@@ -245,7 +245,7 @@
             const D2D1_RECT_F slot =
                 native_rect("songselect.rect.010", D2D1::RectF(x0, nav_bar.top, x0 + nav_width - 8.0f, nav_bar.bottom));
             auto tab = slot;
-            if (source_index == 1) tab.bottom -= std::min(44.0f, (slot.bottom - slot.top) * 0.40f);
+            if (source_index == 1 && data.song_select.showing_sources) tab.bottom -= std::min(44.0f, (slot.bottom - slot.top) * 0.40f);
             const bool route_active =
                 (source_index == 0 && !data.song_select.showing_sources &&
                  !data.song_select.showing_records) ||
@@ -282,7 +282,7 @@
                                        ? static_cast<ID2D1Brush*>(d2d_->accent_brush.Get())
                                        : static_cast<ID2D1Brush*>(d2d_->text_brush.Get()), true);
             }
-            if (source_index == 1) {
+            if (source_index == 1 && data.song_select.showing_sources) {
                 const auto add = D2D1::RectF(tab.left + 4, tab.bottom, tab.right - 4, slot.bottom - 2);
                 register_hit(add, MenuHitTargetKind::SongSourceAdd, 0);
                 draw_glass_panel(add, 5, 0.78f, route_active ? 0.90f : 0.55f, route_active, 2.0f);
@@ -820,20 +820,15 @@
         const bool metrics_available = data.song_select.result_available ||
             (data.song_select.online_records && data.song_select.record_count > 0);
         const std::array<std::array<std::string, 4>, 3> best_columns = {{
-            {loc("SCORE", "점수"),
+            {loc("EX Score", "EX Score"),
              metrics_available
-                 ? std::to_string(data.song_select.best_score) +
-                       (modern_library_screen ? std::string() : " / " + std::to_string(data.song_select.max_score))
+                 ? ex_score_text(data.song_select.ex_score) +
+                       (modern_library_screen ? std::string() : " / " + std::to_string(data.song_select.max_ex_score))
                  : std::string("--"),
              metrics_available && modern_library_screen
-                 ? "MAX " + std::to_string(data.song_select.max_score)
+                 ? "MAX " + std::to_string(data.song_select.max_ex_score)
                  : std::string(),
-             metrics_available && (!data.song_select.online_records || data.song_select.online_detail_score_available)
-                 ? "DETAIL " + std::to_string(data.song_select.detail_score) + " / " +
-                       (data.song_select.max_detail_score > 0
-                            ? std::to_string(data.song_select.max_detail_score)
-                            : std::string("--"))
-                 : std::string()},
+             std::string()},
             {loc("ACCURACY", "정확도"),
              metrics_available
                  ? format_decimal(data.song_select.accuracy, 2) + "%"
@@ -1320,9 +1315,9 @@
         } else {
             draw_meta_pair(native_rect("songselect.rect.085", D2D1::RectF(right_left, right_panel.top + 162.0f,
                                        right_right, right_panel.top + 238.0f)),
-                           loc("SCORE", "점수"),
-                           std::to_string(data.song_select.best_score) + " / " +
-                               std::to_string(data.song_select.max_score), false, true);
+                           loc("EX Score", "EX Score"),
+                           ex_score_text(data.song_select.ex_score) + " / " +
+                               std::to_string(data.song_select.max_ex_score), false, true);
             draw_meta_pair(native_rect("songselect.rect.086", D2D1::RectF(right_left, right_panel.top + 252.0f,
                                        right_left + (right_right - right_left) * 0.62f, right_panel.top + 332.0f)),
                            loc("ACCURACY", "정확도"),
@@ -1334,11 +1329,7 @@
             if (d2d_->hud_format && d2d_->accent_brush) {
                 const std::string detail_line = data.song_select.online_records
                     ? loc("TENRIFF LEADERBOARD", "텐리프 리더보드")
-                    : loc("DETAIL SCORE ", "상세 점수 ") +
-                          std::to_string(data.song_select.detail_score) + " / " +
-                          (data.song_select.max_detail_score > 0
-                               ? std::to_string(data.song_select.max_detail_score)
-                               : std::string("--"));
+                    : std::string{};
                 draw_text_clipped(to_wide(detail_line),
                                   d2d_->hud_format.Get(),
                                   native_rect("songselect.rect.088", D2D1::RectF(right_left, right_panel.top + 354.0f,

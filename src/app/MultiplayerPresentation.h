@@ -28,6 +28,7 @@ inline render::MultiplayerPlayerData multiplayer_player_data(
     if (participant.has_score) {
         const auto& score = participant.latest_score;
         player.score = score.score;
+        player.ex_score = static_cast<int64_t>(score.perfect) * 2 + score.great;
         player.combo = score.combo;
         player.max_combo = score.max_combo;
         player.perfect = score.perfect;
@@ -50,6 +51,7 @@ inline std::vector<render::MultiplayerPlayerData> multiplayer_standings(
     const network::PeerSessionSnapshot& room, render::MultiplayerPlayerData local) {
     std::vector<render::MultiplayerPlayerData> players;
     local.local = true;
+    local.has_score = local.has_score && local.ex_score.has_value();
     local.player_id = room.local_player_id;
     const auto& participants = room.round_participants.empty()
         ? room.participants : room.round_participants;
@@ -63,12 +65,12 @@ inline std::vector<render::MultiplayerPlayerData> multiplayer_standings(
     players.push_back(std::move(local));
     std::stable_sort(players.begin(), players.end(), [](const auto& a, const auto& b) {
         if (a.has_score != b.has_score) return a.has_score;
-        if (a.has_score && a.score != b.score) return a.score > b.score;
+        if (a.has_score && a.ex_score != b.ex_score) return a.ex_score > b.ex_score;
         return a.player_id < b.player_id;
     });
     for (std::size_t i = 0; i < players.size(); ++i) {
         if (!players[i].has_score) continue;
-        players[i].rank = i > 0 && players[i - 1].has_score && players[i - 1].score == players[i].score
+        players[i].rank = i > 0 && players[i - 1].has_score && players[i - 1].ex_score == players[i].ex_score
             ? players[i - 1].rank : static_cast<int>(i + 1);
     }
     return players;

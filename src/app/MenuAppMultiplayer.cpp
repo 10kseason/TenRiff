@@ -94,307 +94,82 @@ bool current_process_is_foreground() {
 
 }  // namespace
 
+bool MenuApp::ensure_hosted_multiplayer() {
+    if (peer_session_.is_hosted()) return true;
+    multiplayer_account_checked_ = true;
+    if (!online_play_mode_) {
+        multiplayer_status_message_ = ui_text("Connect your leaderboard account with F10 to play online.", "F10에서 리더보드 계정을 연결해야 멀티플레이에 참가할 수 있습니다.");
+        return false;
+    }
+    SitesLeaderboardConnection connection;
+    bool missing = false;
+    std::string error;
+    if (!load_sites_leaderboard_connection("config", connection, missing, error) || missing) {
+        multiplayer_status_message_ = ui_text("Connect your leaderboard account with F10 to play online.", "F10에서 리더보드 계정을 연결해야 멀티플레이에 참가할 수 있습니다.");
+        return false;
+    }
+    // This only configures the transport. The server verifies the key before
+    // listing/creating/joining; a saved connection is never proof of identity.
+    if (!peer_session_.configure_hosted(std::move(connection.upload_token))) return false;
+    return peer_session_.browse_hosted();
+}
+
 void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
-    const network::PeerSessionSnapshot peer = peer_session_.snapshot();
+    const auto peer = peer_session_.snapshot();
     const bool active = peer_session_is_active(peer.state);
     const bool connected = peer.state == network::PeerSessionState::Connected;
-    const GlobalChatSnapshot global_chat = global_chat_service_.snapshot();
-    const bool chart_matches = multiplayer_chart_fingerprints_match(multiplayer_menu_);
     const bool round_active = last_game_was_multiplayer_ || peer_round_ui_locked(peer);
-    const bool leader_can_choose_chart =
-        !round_active && multiplayer_leader_can_choose_chart(multiplayer_menu_) &&
-        peer.remote_library_ready && multiplayer_common_chart_count_ > 0;
-    const bool can_edit_rate = peer.local_is_leader &&
-        (connected || peer.state == network::PeerSessionState::Listening) &&
-        !round_active && !peer.rate_change_pending;
-    const bool can_start = !round_active && !peer.rate_change_pending &&
-        multiplayer_leader_can_start(multiplayer_menu_);
-
-    const auto row_selected = [this](MultiplayerMenuRow row) {
-        return multiplayer_menu_.cursor == static_cast<int>(row);
+    const bool chart_matches = multiplayer_chart_fingerprints_match(multiplayer_menu_);
+    const auto rooms = peer_session_.hosted_rooms();
+    const auto* room = rooms.empty() ? nullptr : &rooms[std::min(multiplayer_server_room_index_, rooms.size() - 1)];
+    auto row = [&](MultiplayerMenuRow id, const std::string& label, const std::string& value, bool action, bool adjust = false) {
+        append_menu_row(render.generic, label, value,
+            multiplayer_menu_.cursor == static_cast<int>(id), render::MenuHitTargetKind::SettingsRow,
+            static_cast<int>(id), action, adjust);
     };
-    const std::string address_value =
-        multiplayer_menu_.address +
-        (multiplayer_menu_.edit_field == MultiplayerEditField::Address ? " _" : "");
-    const std::string port_value =
-        multiplayer_menu_.port_text +
-        (multiplayer_menu_.edit_field == MultiplayerEditField::Port ? " _" : "");
-    const network::LanDiscoveredRoom* selected_lan_room =
-        multiplayer_lan_rooms_.empty()
-            ? nullptr
-            : &multiplayer_lan_rooms_[std::min(
-                  multiplayer_lan_room_index_, multiplayer_lan_rooms_.size() - 1u)];
-    const RankedMultiplayerRoom* selected_server_room =
-        global_chat.rooms.empty()
-            ? nullptr
-            : &global_chat.rooms[std::min(
-                  multiplayer_server_room_index_, global_chat.rooms.size() - 1u)];
-    const bool browse_server_rooms = global_chat.configured;
-    std::string lan_room_value;
-    if (active) {
-        lan_room_value = ui_text("AVAILABLE WHILE DISCONNECTED", "연결 해제 후 사용");
-    } else if (browse_server_rooms && !selected_server_room) {
-        lan_room_value = global_chat.room_error.empty()
-                             ? ui_text("SEARCHING SELECTED SERVER...", "선택 서버 방 검색 중...")
-                             : ui_text("SERVER ROOM SEARCH FAILED", "서버 방 검색 실패");
-    } else if (browse_server_rooms) {
-        lan_room_value = selected_server_room->name + " / " +
-                         std::to_string(selected_server_room->player_count) + "/" +
-                         std::to_string(selected_server_room->max_players);
-        if (!selected_server_room->accepting_players) {
-            lan_room_value += ui_text(" / BUSY", " / 참가 불가");
-        }
-    } else if (!selected_lan_room) {
-        lan_room_value = ui_text("SCANNING LOCAL NETWORK...", "LAN 방 검색 중...");
-    } else {
-        lan_room_value = selected_lan_room->host_name + " / " +
-                         std::to_string(selected_lan_room->player_count) + "/" +
-                         std::to_string(selected_lan_room->max_players);
-        if (!selected_lan_room->accepting_players) {
-            lan_room_value += ui_text(" / BUSY", " / 참가 불가");
-        }
+    row(MultiplayerMenuRow::Address, ui_text("Leaderboard account", "리더보드 계정"),
+        connected ? ui_text("AUTHENTICATED", "인증됨") : ui_text("F10 TO CONNECT", "F10으로 연결"), true);
+    row(MultiplayerMenuRow::Port, ui_text("Hosting", "호스팅"), ui_text("OFFICIAL SERVER", "공식 서버"), false);
+    row(MultiplayerMenuRow::LanRoom, ui_text("Server Rooms", "서버 방 목록"),
+        room ? room->name + " / " + std::to_string(room->player_count) + "/8" : ui_text("No available rooms", "참가 가능한 방 없음"),
+        !active && room && room->accepting_players);
+    row(MultiplayerMenuRow::Host, active ? ui_text("Leave room", "방 나가기") : ui_text("Create room", "방 만들기"),
+        peer_session_state_label(peer.state), true);
+    row(MultiplayerMenuRow::Join, ui_text("Join selected room", "선택한 방 참가"), "", !active && room && room->accepting_players);
+    const bool choose = connected && peer.local_is_leader && !round_active;
+    row(MultiplayerMenuRow::Chart, ui_text("Battle Chart", "대전 차트"),
+        peer.selected_chart.name.empty() ? ui_text("Choose a BMS chart", "BMS 차트 선택") : peer.selected_chart.name, choose);
+    const bool rate = choose && !peer.rate_change_pending;
+    row(MultiplayerMenuRow::Rate, ui_text("Room Rate", "대전 Rate"),
+        format_multiplier(static_cast<double>(peer.rate_milli) / 1000.0), false, rate);
+    render.generic.rows.back().decrement_enabled = rate && peer.rate_milli > network::kPeerMinRateMilli;
+    render.generic.rows.back().increment_enabled = rate && peer.rate_milli < network::kPeerMaxRateMilli;
+    row(MultiplayerMenuRow::Ready, ui_text("Ready", "준비"), peer.local_ready ? ui_text("YOU READY", "나 준비") : ui_text("YOU WAIT", "나 대기"),
+        connected && !round_active && chart_matches && !peer.rate_change_pending);
+    row(MultiplayerMenuRow::Start, ui_text("Start Match", "대전 시작"), ui_text("LEADER + ALL READY", "리더 + 전원 준비 필요"),
+        !round_active && peer.can_start && peer.local_is_leader);
+    row(MultiplayerMenuRow::Chat, ui_text("Room Chat", "방 채팅"), multiplayer_menu_.chat_input, connected);
+    row(MultiplayerMenuRow::Options, ui_text("Options", "옵션"), "", !round_active);
+    row(MultiplayerMenuRow::Back, ui_text("Back", "뒤로"), "", true);
+    render.generic.notes.push_back(ui_text("Players: ", "인원: ") + std::to_string(peer.participant_count) + "/8");
+    for (const auto& player : peer.participants) {
+        std::string line = "#" + std::to_string(player.player_id) + " " + player.name;
+        if (player.local) line += ui_text(" [YOU]", " [나]");
+        if (player.leader) line += ui_text(" [LEADER]", " [리더]");
+        line += player.ready ? ui_text(" / READY", " / 준비") : ui_text(" / WAIT", " / 대기");
+        render.generic.notes.push_back(std::move(line));
     }
-    std::string chat_value;
-    if (!global_chat.configured) {
-        chat_value = ui_text("OFFLINE", "오프라인");
-    } else if (multiplayer_menu_.chat_input.empty()) {
-        chat_value = ui_text("ENTER TO CHAT", "ENTER로 채팅");
-    } else {
-        chat_value = "> " + multiplayer_menu_.chat_input;
-    }
-    if (multiplayer_menu_.edit_field == MultiplayerEditField::Chat) {
-        chat_value += " _";
-    }
-
-    append_menu_row(render.generic,
-                    ui_text("Server IP / Hostname", "서버 IP / 호스트명"),
-                    address_value,
-                    row_selected(MultiplayerMenuRow::Address),
-                    render::MenuHitTargetKind::SettingsRow,
-                    static_cast<int>(MultiplayerMenuRow::Address),
-                    !active,
-                    false);
-    append_menu_row(render.generic,
-                    ui_text("TCP Port", "TCP 포트"),
-                    port_value,
-                    row_selected(MultiplayerMenuRow::Port),
-                    render::MenuHitTargetKind::SettingsRow,
-                    static_cast<int>(MultiplayerMenuRow::Port),
-                    !active,
-                    false);
-    append_menu_row(render.generic,
-                    browse_server_rooms
-                        ? ui_text("Server Rooms", "선택 서버 방 검색")
-                        : ui_text("LAN Rooms", "LAN 방 자동 검색"),
-                    lan_room_value,
-                    row_selected(MultiplayerMenuRow::LanRoom),
-                    render::MenuHitTargetKind::SettingsRow,
-                    static_cast<int>(MultiplayerMenuRow::LanRoom),
-                    !active && (browse_server_rooms
-                                    ? selected_server_room &&
-                                          selected_server_room->accepting_players
-                                    : selected_lan_room && selected_lan_room->accepting_players),
-                    false);
-    append_menu_row(render.generic,
-                    ui_text("Host", "호스트"),
-                    peer.role == network::PeerRole::Host ? peer_session_state_label(peer.state) : "",
-                    row_selected(MultiplayerMenuRow::Host),
-                    render::MenuHitTargetKind::SettingsRow,
-                    static_cast<int>(MultiplayerMenuRow::Host),
-                    true,
-                    false);
-    append_menu_row(render.generic,
-                    ui_text("Join by IP", "IP로 참가"),
-                    peer.role == network::PeerRole::Joiner ? peer_session_state_label(peer.state) : "",
-                    row_selected(MultiplayerMenuRow::Join),
-                    render::MenuHitTargetKind::SettingsRow,
-                    static_cast<int>(MultiplayerMenuRow::Join),
-                    true,
-                    false);
-    std::string chart_value;
-    if (multiplayer_menu_.local_is_leader) {
-        if (!connected || !peer.remote_library_ready) {
-            chart_value = ui_text("Syncing song libraries", "곡 목록 동기화 중");
-        } else if (multiplayer_common_chart_count_ == 0) {
-            chart_value = ui_text("No shared songs", "공통 보유곡 없음");
-        } else {
-            chart_value = multiplayer_chart_title_.empty()
-                              ? ui_text("Choose Shared Song", "공통 곡 선택")
-                              : multiplayer_chart_title_;
-        }
-    } else if (peer.selected_chart.fingerprint.valid()) {
-        chart_value = peer.selected_chart.name.empty()
-                          ? ui_text("Matching leader HASH", "리더 HASH 곡 검색 중")
-                          : peer.selected_chart.name;
-        if (chart_matches && !multiplayer_chart_path_.empty()) {
-            chart_value += ui_text(" / HASH MATCH", " / HASH 일치");
-        }
-    } else {
-        chart_value = ui_text("Waiting for leader", "리더 선곡 대기");
-    }
-    append_menu_row(render.generic,
-                    ui_text("Battle Chart", "대전 차트"),
-                    chart_value,
-                    row_selected(MultiplayerMenuRow::Chart),
-                    render::MenuHitTargetKind::SettingsRow,
-                    static_cast<int>(MultiplayerMenuRow::Chart),
-                    leader_can_choose_chart,
-                    false);
-
-    std::string rate_value = format_multiplier(static_cast<double>(peer.rate_milli) / 1000.0);
-    if (peer.rate_change_pending) rate_value += ui_text(" / SYNCING", " / 동기화 중");
-    else if (!peer.local_is_leader) rate_value += ui_text(" / LEADER SETTING", " / 리더 설정");
-    append_menu_row(render.generic,
-                    ui_text("Room Rate", "대전 Rate"),
-                    rate_value,
-                    row_selected(MultiplayerMenuRow::Rate),
-                    render::MenuHitTargetKind::SettingsRow,
-                    static_cast<int>(MultiplayerMenuRow::Rate),
-                    false,
-                    can_edit_rate);
-    render.generic.rows.back().decrement_enabled = can_edit_rate && peer.rate_milli > network::kPeerMinRateMilli;
-    render.generic.rows.back().increment_enabled = can_edit_rate && peer.rate_milli < network::kPeerMaxRateMilli;
-
-    std::string ready_value = round_active
-                                  ? ui_text("ROUND IN PROGRESS", "대전 종료 대기")
-                                  : (multiplayer_menu_.local_ready ? ui_text("YOU READY", "나 준비")
-                                                                   : ui_text("YOU WAIT", "나 대기"));
-    ready_value += " / ";
-    ready_value += multiplayer_menu_.peer_ready ? ui_text("ALL READY", "상대 준비")
-                                                 : ui_text("PLAYERS WAIT", "상대 대기");
-    append_menu_row(render.generic,
-                    ui_text("Ready", "준비"),
-                    ready_value,
-                    row_selected(MultiplayerMenuRow::Ready),
-                    render::MenuHitTargetKind::SettingsRow,
-                    static_cast<int>(MultiplayerMenuRow::Ready),
-                    !round_active && connected && chart_matches && !peer.rate_change_pending,
-                    false);
-    append_menu_row(render.generic,
-                    ui_text("Start Match", "대전 시작"),
-                    can_start ? ui_text("READY TO START", "시작 가능")
-                              : ui_text("LEADER + ALL READY", "리더 + 전원 준비 필요"),
-                    row_selected(MultiplayerMenuRow::Start),
-                    render::MenuHitTargetKind::SettingsRow,
-                    static_cast<int>(MultiplayerMenuRow::Start),
-                    can_start,
-                    false);
-    append_menu_row(render.generic,
-                    ui_text("Global Chat", "글로벌 채팅"),
-                    chat_value,
-                    row_selected(MultiplayerMenuRow::Chat),
-                    render::MenuHitTargetKind::SettingsRow,
-                    static_cast<int>(MultiplayerMenuRow::Chat),
-                    global_chat.configured,
-                    false);
-    append_menu_row(render.generic,
-                    ui_text("Options", "옵션"),
-                    multiplayer_menu_.local_ready
-                        ? ui_text("READY WILL BE CLEARED", "진입 시 준비 해제")
-                        : "",
-                    row_selected(MultiplayerMenuRow::Options),
-                    render::MenuHitTargetKind::SettingsRow,
-                    static_cast<int>(MultiplayerMenuRow::Options),
-                    !round_active,
-                    false);
-    append_menu_row(render.generic,
-                    ui_text("Back", "뒤로"),
-                    "",
-                    row_selected(MultiplayerMenuRow::Back),
-                    render::MenuHitTargetKind::SettingsRow,
-                    static_cast<int>(MultiplayerMenuRow::Back),
-                    true,
-                    false);
-
-    std::string connection_line =
-        ui_text("Connection: ", "연결: ") + peer_session_state_label(peer.state);
-    connection_line += " / " + ui_text("Players: ", "인원: ") +
-                       std::to_string(peer.participant_count) + "/8";
-    render.generic.notes.push_back(std::move(connection_line));
-    for (const auto& participant : peer.participants) {
-        std::string player_line =
-            "#" + std::to_string(participant.player_id) + " " + participant.name;
-        if (participant.local) player_line += ui_text(" [YOU]", " [나]");
-        if (participant.leader) player_line += ui_text(" [LEADER]", " [리더]");
-        player_line += participant.ready
-                           ? ui_text(" / READY", " / 준비")
-                           : ui_text(" / WAIT", " / 대기");
-        render.generic.notes.push_back(std::move(player_line));
-    }
-    if (!peer.status_detail.empty()) {
-        render.generic.notes.push_back(peer.status_detail);
-    }
-    if (connected) {
-        if (peer.remote_library_ready) {
-            render.generic.notes.push_back(
-                ui_text("Shared BMS charts for all players: ", "전원 공통 BMS: ") +
-                std::to_string(multiplayer_common_chart_count_) + " / " +
-                std::to_string(indexed_songs_.size()));
-        } else {
-            render.generic.notes.push_back(
-                ui_text("Syncing exact BMS chart hashes for every player...", "전원의 정확한 BMS 차트 HASH 동기화 중..."));
-        }
-    }
-    if (!multiplayer_status_message_.empty()) {
-        render.generic.notes.push_back(multiplayer_status_message_);
-    }
-    if (global_chat.configured && !global_chat.room_error.empty()) {
-        render.generic.notes.push_back(
-            ui_text("Server room search: ", "서버 방 검색: ") + global_chat.room_error);
-    }
-    const network::LanDiscoverySnapshot lan_snapshot = lan_discovery_.snapshot();
-    if (!lan_snapshot.status_detail.empty()) {
-        render.generic.notes.push_back(
-            ui_text("LAN discovery: ", "LAN 검색: ") + lan_snapshot.status_detail);
-    } else if (lan_snapshot.advertising) {
-        render.generic.notes.push_back(ui_text(
-            "This room is visible to TenRiff players on the same LAN.",
-            "이 방은 같은 LAN의 TenRiff에서 자동으로 보입니다."));
-    }
-    if (connected && !multiplayer_menu_.local_is_leader &&
-        peer.selected_chart.fingerprint.valid() && !chart_matches) {
-        render.generic.notes.push_back(ui_text("Finding the leader BMS chart on this PC by exact HASH.",
-                                               "리더 BMS를 이 PC에서 정확한 HASH로 찾는 중입니다."));
-    } else if (connected && !multiplayer_menu_.local_chart_fingerprint) {
-        render.generic.notes.push_back(ui_text("The current leader chooses a BMS chart; every other player matches it by HASH.",
-                                               "현재 리더만 BMS를 고르고 나머지는 HASH로 자동 선택합니다."));
-    } else if (connected && multiplayer_menu_.local_chart_fingerprint && !chart_matches) {
-        render.generic.notes.push_back(ui_text("Chart mismatch: every player must resolve identical BMS bytes.",
-                                               "차트 불일치: 전원이 완전히 같은 BMS 파일을 선택해야 합니다."));
-    } else if (connected && chart_matches) {
-        render.generic.notes.push_back(ui_text("Chart match confirmed.", "차트 일치가 확인되었습니다."));
-    }
-    render.generic.notes.push_back(ui_text(
-        "The leader sets Room Rate (0.50-2.00x); changes clear everyone's Ready. Gauge Shift/default judge apply, Random/Mods/Assist are off; local key-mode conversion is allowed.",
-        "리더가 대전 Rate(0.50~2.00배)를 정하며 변경 시 전원 준비가 해제됩니다. Gauge Shift·기본 판정·랜덤/모드/어시스트 OFF과 로컬 키모드 변환을 사용합니다."));
-    render.generic.notes.push_back(ui_text(
-        "Signed-in players search rooms on the selected main/private server. Signed-out players can still search the LAN.",
-        "로그인하면 선택한 메인/사설 서버의 방을 검색합니다. 로그아웃 상태에서는 기존 LAN 검색을 사용합니다."));
-    render.generic.notes.push_back(ui_text(
-        "Copy host:port (or tenriff://host:port), select Server IP, then press Enter. Ctrl+V also replaces the active field.",
-        "host:port(또는 tenriff://host:port)를 복사하고 서버 IP에서 Enter를 누르세요. 편집 중 Ctrl+V로도 교체할 수 있습니다."));
+    if (!peer.status_detail.empty()) render.generic.notes.push_back(peer.status_detail);
+    if (!multiplayer_status_message_.empty()) render.generic.notes.push_back(multiplayer_status_message_);
+    render.generic.notes.push_back(ui_text("Every player must own the selected BMS chart. Files are not transferred.", "선택한 BMS 차트를 전원이 보유해야 합니다. 파일은 전송하지 않습니다."));
+    render.generic.notes.push_back(ui_text("Connected accounts only. A leaderboard score is not required.", "연결 계정만 참가할 수 있습니다. 리더보드 기록은 없어도 됩니다."));
+    render.generic.notes.push_back(ui_text("Scores are client claims. Network delay does not change local judgement.", "점수는 클라이언트 제출값입니다. 네트워크 지연은 로컬 판정을 변경하지 않습니다."));
     render.generic.footer_reserved_lines = 6;
-    render.generic.footer_notes.push_back(
-        ui_text("GLOBAL CHAT", "글로벌 채팅") + "  " +
-        std::to_string(global_chat.messages.size()) + "/100");
-    const std::size_t chat_begin = global_chat.messages.size() > 4
-                                       ? global_chat.messages.size() - 4
-                                       : 0;
-    for (std::size_t i = chat_begin; i < global_chat.messages.size(); ++i) {
-        const auto& chat = global_chat.messages[i];
-        std::string sender_name = chat.username;
-        if (chat.role == "admin") sender_name += ui_text(" [ADMIN]", " [관리자]");
-        render.generic.footer_notes.push_back(sender_name + ": " + chat.text);
-    }
-    if (global_chat.messages.empty()) {
-        render.generic.footer_notes.push_back(
-            global_chat.configured
-                ? ui_text("No global messages yet.", "아직 글로벌 메시지가 없습니다.")
-                : ui_text("Global chat is unavailable.", "글로벌 채팅을 사용할 수 없습니다."));
-    }
-    render.generic.footer_notes.push_back(ui_text(
-        "F11 opens chat. Enter sends. Delete clears an edit field. Esc closes editing or leaves Multiplayer.",
-        "F11로 채팅을 엽니다. Enter로 전송합니다. Delete는 편집 칸을 지우고 Esc는 편집을 닫거나 멀티플레이를 나갑니다."));
+    render.generic.footer_notes.push_back(ui_text("Room Chat", "방 채팅"));
+    const auto begin = peer.chat_messages.size() > 4 ? peer.chat_messages.size() - 4 : 0;
+    for (std::size_t i = begin; i < peer.chat_messages.size(); ++i)
+        render.generic.footer_notes.push_back("#" + std::to_string(peer.chat_messages[i].player_id) + ": " + peer.chat_messages[i].text);
+    render.generic.footer_notes.push_back(ui_text("F11 CHAT / F10 ACCOUNT / ESC BACK", "F11 채팅 / F10 계정 / ESC 뒤로"));
 }
 
 bool MenuApp::open_multiplayer_chat_shortcut() {
@@ -413,7 +188,7 @@ void MenuApp::set_multiplayer_chat_overlay(bool visible) {
     }
     gameplay_overlay_capture_active_.store(
         visible || ranked_account_overlay_visible_, std::memory_order_release);
-    const bool authenticated = global_chat_service_.snapshot().configured;
+    const bool authenticated = peer_session_.snapshot().state == network::PeerSessionState::Connected;
     if (visible && authenticated) {
         multiplayer_menu_.cursor = static_cast<int>(MultiplayerMenuRow::Chat);
         multiplayer_menu_.edit_field = MultiplayerEditField::Chat;
@@ -430,10 +205,10 @@ bool MenuApp::handle_multiplayer_chat_overlay_input(uint32_t keycode) {
         return true;
     }
 
-    const bool authenticated = global_chat_service_.snapshot().configured;
+    const bool authenticated = peer_session_.snapshot().state == network::PeerSessionState::Connected;
     if (!authenticated) {
         multiplayer_status_message_ =
-            ui_text("Global chat is unavailable.", "글로벌 채팅을 사용할 수 없습니다.");
+            ui_text("Join a room to chat.", "방에 참가한 뒤 채팅할 수 있습니다.");
         publish_snapshot();
         return true;
     }
@@ -464,9 +239,9 @@ bool MenuApp::send_multiplayer_chat_input() {
             "Type a message before sending.", "전송할 메시지를 먼저 입력하세요.");
         return false;
     }
-    if (!global_chat_service_.send(message)) {
+    if (!peer_session_.send_chat(message)) {
         multiplayer_status_message_ = ui_text(
-            "Global chat is unavailable.", "글로벌 채팅을 사용할 수 없습니다.");
+            "Join a room to chat.", "방에 참가한 뒤 채팅할 수 있습니다.");
         return false;
     }
     multiplayer_menu_.chat_input.clear();
@@ -485,7 +260,8 @@ std::string MenuApp::now_playing_chat_message() const {
             last_chart_artist_, ui_text("Unknown artist", "작곡가 미상"));
     } else if (selected_song_ >= 0 && selected_song_ < static_cast<int>(visible_song_count())) {
         if (const SongEntry* entry = visible_song_entry(static_cast<std::size_t>(selected_song_))) {
-            title = menu_song_select::song_title_for_ui(*entry);
+            title = entry->title.empty() ? ui_text("Unknown track", "알 수 없는 곡")
+                                        : menu_song_select::song_title_for_ui(*entry);
             artist = menu_song_select::song_artist_for_ui(*entry);
         }
     }
@@ -497,41 +273,19 @@ std::string MenuApp::now_playing_chat_message() const {
 }
 
 void MenuApp::populate_multiplayer_chat_overlay(render::ChatOverlayData& target) {
+    const auto peer = peer_session_.snapshot();
     target.visible = chat_overlay_visible_;
-    const GlobalChatSnapshot chat = global_chat_service_.snapshot();
-    target.connected = chat.configured;
-    target.title = ui_text("GLOBAL CHAT", "글로벌 채팅");
-    target.status = !chat.configured
-                        ? ui_text("OFFLINE", "오프라인")
-                        : (chat.online ? ui_text("ONLINE", "온라인")
-                                       : ui_text("SYNCING", "동기화 중"));
-    if (!chat.error.empty()) {
-        target.status = menu_song_select::safe_ui_text(chat.error, target.status);
-    }
-    target.input = target.connected
-                       ? multiplayer_menu_.chat_input + " _"
-                       : ui_text("Global chat is unavailable.", "글로벌 채팅을 사용할 수 없습니다.");
-    target.hint = ui_text("/np now playing   ENTER send   ESC/F11 close",
-                          "/np 현재 곡   ENTER 전송   ESC/F11 닫기");
-
-    const std::size_t begin = chat.messages.size() > 5
-                                  ? chat.messages.size() - 5
-                                  : 0;
+    target.connected = peer.state == network::PeerSessionState::Connected;
+    target.title = ui_text("Room Chat", "방 채팅");
+    target.status = target.connected ? ui_text("ONLINE", "온라인") : ui_text("OFFLINE", "오프라인");
+    target.input = target.connected ? multiplayer_menu_.chat_input + " _" : ui_text("Join a room to chat.", "방에 참가한 뒤 채팅할 수 있습니다.");
+    target.hint = ui_text("/np now playing   ENTER send   ESC/F11 close", "/np 현재 곡   ENTER 전송   ESC/F11 닫기");
     chat_overlay_message_urls_.clear();
-    for (std::size_t i = begin; i < chat.messages.size(); ++i) {
-        const auto& message = chat.messages[i];
-        std::string sender_name = message.username;
-        if (message.role == "admin") sender_name += ui_text(" [ADMIN]", " [관리자]");
-        target.messages.push_back(sender_name + ": " + message.text);
-        const auto url = first_chat_web_url(message.text);
-        chat_overlay_message_urls_.push_back(url.value_or(std::string{}));
-    }
-    if (target.messages.empty()) {
-        target.messages.push_back(
-            chat.configured
-                ? ui_text("No global messages yet.", "아직 글로벌 메시지가 없습니다.")
-                : ui_text("Global chat is unavailable.", "글로벌 채팅을 사용할 수 없습니다."));
-        chat_overlay_message_urls_.push_back({});
+    const auto begin = peer.chat_messages.size() > 5 ? peer.chat_messages.size() - 5 : 0;
+    for (std::size_t i = begin; i < peer.chat_messages.size(); ++i) {
+        const auto& message = peer.chat_messages[i];
+        target.messages.push_back("#" + std::to_string(message.player_id) + ": " + message.text);
+        chat_overlay_message_urls_.push_back(first_chat_web_url(message.text).value_or(std::string{}));
     }
     target.message_urls = chat_overlay_message_urls_;
 }
@@ -615,7 +369,7 @@ void MenuApp::drain_gameplay_chat_input() {
         handle_text_input(*text);
     }
     if (chat_overlay_visible_) {
-        const auto chat = global_chat_service_.snapshot();
+        const auto chat = peer_session_.snapshot();
         std::string signature = std::to_string(chat.revision);
         if (signature != chat_overlay_message_signature_) {
             chat_overlay_message_signature_ = std::move(signature);
@@ -730,185 +484,49 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
     const bool active = peer_session_is_active(peer.state);
     const bool round_active = last_game_was_multiplayer_ || peer_round_ui_locked(peer);
 
-    const auto begin_network_session = [this](MultiplayerRole role,
-                                               const std::string& address,
-                                               uint16_t port) {
-        multiplayer_status_message_.clear();
-        peer_session_.set_local_library(
-            build_multiplayer_chart_sha256_inventory(indexed_songs_));
-        multiplayer_local_library_index_revision_ = song_index_revision_;
-        multiplayer_remote_library_revision_ = 0;
-        multiplayer_remote_library_ready_ = false;
-        multiplayer_common_chart_count_ = 0;
-
+    if (row == MultiplayerMenuRow::Address) {
+        set_ranked_account_overlay(true);
+        publish_snapshot();
+        return;
+    }
+    if (row == MultiplayerMenuRow::Port) return;
+    if (row == MultiplayerMenuRow::LanRoom || row == MultiplayerMenuRow::Host || row == MultiplayerMenuRow::Join) {
+        if (active) {
+            if (row == MultiplayerMenuRow::Host && keycode == key_enter_) {
+                peer_session_.disconnect("Left room");
+                (void)peer_session_.browse_hosted();
+            }
+            publish_snapshot();
+            return;
+        }
+        if (!ensure_hosted_multiplayer()) {
+            set_ranked_account_overlay(true);
+            publish_snapshot();
+            return;
+        }
+        const auto rooms = peer_session_.hosted_rooms();
+        if (row == MultiplayerMenuRow::LanRoom && !rooms.empty() && keycode != key_enter_) {
+            multiplayer_server_room_index_ = keycode == key_left_
+                ? (multiplayer_server_room_index_ + rooms.size() - 1) % rooms.size()
+                : (multiplayer_server_room_index_ + 1) % rooms.size();
+            publish_snapshot();
+            return;
+        }
+        if (keycode != key_enter_) return;
         bool accepted = false;
-        if (role == MultiplayerRole::Host) {
-            multiplayer_menu_.role = MultiplayerRole::Host;
-            reset_multiplayer_chart_match_search();
-            accepted = peer_session_.host(port, profile_display_name());
-        } else {
-            multiplayer_menu_.role = MultiplayerRole::Join;
-            peer_session_.clear_local_chart();
-            multiplayer_chart_path_.clear();
-            multiplayer_chart_title_.clear();
-            multiplayer_chart_fingerprint_ = {};
-            multiplayer_menu_.local_chart_fingerprint = 0;
-            multiplayer_menu_.local_chart_size = 0;
-            reset_multiplayer_chart_match_search();
-            accepted = peer_session_.join(address, port, profile_display_name());
+        reset_multiplayer_chart_match_search();
+        multiplayer_chart_path_.clear();
+        multiplayer_chart_title_.clear();
+        multiplayer_chart_fingerprint_ = {};
+        if (row == MultiplayerMenuRow::Host) {
+            accepted = peer_session_.host_hosted();
+        } else if (!rooms.empty()) {
+            const auto& selected = rooms[std::min(multiplayer_server_room_index_, rooms.size() - 1)];
+            if (selected.accepting_players) accepted = peer_session_.join_hosted(selected.id);
         }
-        if (!accepted) {
-            multiplayer_status_message_ = ui_text("Could not start the network worker.",
-                                                  "네트워크 작업을 시작하지 못했습니다.");
-        }
+        multiplayer_status_message_ = accepted ? "" : ui_text("No available rooms", "참가 가능한 방 없음");
         multiplayer_last_revision_ = 0;
         publish_snapshot();
-    };
-
-    if (row == MultiplayerMenuRow::Address) {
-        if (!active) {
-            multiplayer_menu_.edit_field = MultiplayerEditField::Address;
-            if (const auto clipboard = clipboard_text_utf8(); clipboard.has_value()) {
-                if (const auto endpoint = parse_multiplayer_endpoint(*clipboard);
-                    endpoint.has_value()) {
-                    multiplayer_menu_.address = endpoint->address;
-                    if (endpoint->port.has_value()) {
-                        multiplayer_menu_.port_text = std::to_string(*endpoint->port);
-                    }
-                    multiplayer_status_message_ =
-                        ui_text("Server endpoint pasted.", "서버 주소를 붙여넣었습니다.");
-                }
-            }
-        }
-        publish_snapshot();
-        return;
-    }
-    if (row == MultiplayerMenuRow::Port) {
-        if (!active) multiplayer_menu_.edit_field = MultiplayerEditField::Port;
-        publish_snapshot();
-        return;
-    }
-    if (row == MultiplayerMenuRow::LanRoom) {
-        const GlobalChatSnapshot global_chat = global_chat_service_.snapshot();
-        if (active) {
-            multiplayer_status_message_ = ui_text(
-                "Disconnect before joining another room.",
-                "다른 방에 참가하려면 먼저 연결을 끊으세요.");
-            publish_snapshot();
-            return;
-        }
-        if (global_chat.configured) {
-            if (global_chat.rooms.empty()) {
-                multiplayer_status_message_ = global_chat.room_error.empty()
-                    ? ui_text("Searching for rooms on the selected server...",
-                              "선택한 서버에서 방을 검색 중입니다...")
-                    : ui_text("Could not search the selected server: ",
-                              "선택한 서버 방 검색 실패: ") + global_chat.room_error;
-                publish_snapshot();
-                return;
-            }
-            if (keycode == key_left_ || keycode == key_right_) {
-                const std::size_t count = global_chat.rooms.size();
-                if (keycode == key_left_) {
-                    multiplayer_server_room_index_ =
-                        (multiplayer_server_room_index_ + count - 1u) % count;
-                } else {
-                    multiplayer_server_room_index_ =
-                        (multiplayer_server_room_index_ + 1u) % count;
-                }
-                multiplayer_status_message_.clear();
-                publish_snapshot();
-                return;
-            }
-
-            multiplayer_server_room_index_ = std::min(
-                multiplayer_server_room_index_, global_chat.rooms.size() - 1u);
-            const RankedMultiplayerRoom& room =
-                global_chat.rooms[multiplayer_server_room_index_];
-            if (!room.accepting_players) {
-                multiplayer_status_message_ = ui_text(
-                    "That server room is full or currently in a match.",
-                    "해당 서버 방은 가득 찼거나 대전 중입니다.");
-                publish_snapshot();
-                return;
-            }
-            if (!is_valid_multiplayer_address_text(room.address) || room.tcp_port == 0) {
-                multiplayer_status_message_ = ui_text(
-                    "The selected server returned an invalid room endpoint.",
-                    "선택한 서버가 잘못된 방 주소를 반환했습니다.");
-                publish_snapshot();
-                return;
-            }
-            multiplayer_menu_.address = room.address;
-            multiplayer_menu_.port_text = std::to_string(room.tcp_port);
-            begin_network_session(MultiplayerRole::Join, room.address, room.tcp_port);
-            return;
-        }
-        if (multiplayer_lan_rooms_.empty()) {
-            multiplayer_status_message_ = ui_text(
-                "Searching for TenRiff rooms on this LAN...",
-                "같은 LAN의 TenRiff 방을 검색 중입니다...");
-            publish_snapshot();
-            return;
-        }
-        if (keycode == key_left_ || keycode == key_right_) {
-            const std::size_t count = multiplayer_lan_rooms_.size();
-            if (keycode == key_left_) {
-                multiplayer_lan_room_index_ =
-                    (multiplayer_lan_room_index_ + count - 1u) % count;
-            } else {
-                multiplayer_lan_room_index_ =
-                    (multiplayer_lan_room_index_ + 1u) % count;
-            }
-            multiplayer_status_message_.clear();
-            publish_snapshot();
-            return;
-        }
-
-        multiplayer_lan_room_index_ =
-            std::min(multiplayer_lan_room_index_, multiplayer_lan_rooms_.size() - 1u);
-        const network::LanDiscoveredRoom& room =
-            multiplayer_lan_rooms_[multiplayer_lan_room_index_];
-        if (!room.accepting_players) {
-            multiplayer_status_message_ = ui_text(
-                "That LAN room is full or currently in a match.",
-                "해당 LAN 방은 가득 찼거나 대전 중입니다.");
-            publish_snapshot();
-            return;
-        }
-        multiplayer_menu_.address = room.address;
-        multiplayer_menu_.port_text = std::to_string(room.tcp_port);
-        begin_network_session(MultiplayerRole::Join, room.address, room.tcp_port);
-        return;
-    }
-    if (row == MultiplayerMenuRow::Host || row == MultiplayerMenuRow::Join) {
-        if (active) {
-            peer_session_.disconnect("Disconnected from multiplayer menu");
-            multiplayer_status_message_ = ui_text("Disconnected.", "연결을 끊었습니다.");
-            publish_snapshot();
-            return;
-        }
-        const auto port = parse_multiplayer_port(multiplayer_menu_.port_text);
-        if (!port.has_value()) {
-            multiplayer_status_message_ = ui_text("Port must be between 1 and 65535.",
-                                                  "포트는 1~65535 사이여야 합니다.");
-            publish_snapshot();
-            return;
-        }
-        if (row == MultiplayerMenuRow::Join &&
-            !is_valid_multiplayer_address_text(multiplayer_menu_.address)) {
-            multiplayer_status_message_ = ui_text("Enter a valid IPv4 address or hostname.",
-                                                  "올바른 IPv4 주소 또는 호스트명을 입력하세요.");
-            publish_snapshot();
-            return;
-        }
-
-        if (row == MultiplayerMenuRow::Host) {
-            begin_network_session(MultiplayerRole::Host, {}, *port);
-        } else {
-            begin_network_session(
-                MultiplayerRole::Join, multiplayer_menu_.address, *port);
-        }
         return;
     }
     if (row == MultiplayerMenuRow::Chart) {
@@ -919,13 +537,13 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
             publish_snapshot();
             return;
         }
-        if (!peer.remote_library_ready) {
+        if (!peer_session_.is_hosted() && !peer.remote_library_ready) {
             multiplayer_status_message_ =
                 ui_text("Wait for song-library sync to finish.", "곡 목록 동기화가 끝날 때까지 기다리세요.");
             publish_snapshot();
             return;
         }
-        if (multiplayer_common_chart_count_ == 0) {
+        if (!peer_session_.is_hosted() && multiplayer_common_chart_count_ == 0) {
             multiplayer_status_message_ =
                 ui_text("No identical BMS charts exist across all connected players.",
                         "현재 접속자 전원이 가진 동일한 BMS가 없습니다.");
@@ -1011,9 +629,9 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
         return;
     }
     if (row == MultiplayerMenuRow::Chat) {
-        if (!global_chat_service_.snapshot().configured) {
+        if (peer_session_.snapshot().state != network::PeerSessionState::Connected) {
             multiplayer_status_message_ =
-                ui_text("Global chat is unavailable.", "글로벌 채팅을 사용할 수 없습니다.");
+                ui_text("Join a room to chat.", "방에 참가한 뒤 채팅할 수 있습니다.");
         } else {
             set_multiplayer_chat_overlay(true);
             multiplayer_status_message_.clear();
@@ -1079,7 +697,7 @@ void MenuApp::select_multiplayer_chart() {
     }
 
     std::string chart_title = selected_entry->title.empty()
-                                  ? selected_entry->path
+                                  ? ui_text("Unknown track", "알 수 없는 곡")
                                   : selected_entry->title;
     if (!peer_session_.set_local_chart(fingerprint, chart_title)) {
         multiplayer_status_message_ =
@@ -1111,6 +729,7 @@ void MenuApp::select_multiplayer_chart() {
 
 void MenuApp::reset_multiplayer_chart_match_search() {
     multiplayer_chart_match_target_ = {};
+    multiplayer_chart_ack_settings_revision_ = 0;
     multiplayer_chart_match_index_revision_ = 0;
     multiplayer_chart_match_source_inputs_.clear();
     multiplayer_chart_match_sources_.clear();
@@ -1121,7 +740,7 @@ void MenuApp::reset_multiplayer_chart_match_search() {
 }
 
 void MenuApp::service_multiplayer_chart_match(const network::PeerSessionSnapshot& peer) {
-    if (peer.local_is_leader ||
+    if ((peer.local_is_leader && !peer_session_.is_hosted()) ||
         peer.state != network::PeerSessionState::Connected ||
         !peer.selected_chart.fingerprint.valid() ||
         (last_game_was_multiplayer_ || peer_round_ui_locked(peer))) {
@@ -1139,7 +758,30 @@ void MenuApp::service_multiplayer_chart_match(const network::PeerSessionSnapshot
         !multiplayer_chart_path_.empty() &&
         multiplayer_chart_fingerprint_.hash == target.hash &&
         multiplayer_chart_fingerprint_.size == target.size;
+    // A leader may have just queued a different selection; an older in-flight
+    // snapshot must not replace it while that command is awaiting its reply.
+    if (peer.local_is_leader && !local_matches) return;
     if (local_matches) {
+        if (peer_session_.is_hosted() &&
+            (peer.local_chart.fingerprint.hash != target.hash ||
+             peer.local_chart.fingerprint.size != target.size)) {
+            // Hosted rounds clear server acknowledgements. Revalidate once per
+            // settings generation, then re-announce (transport deduplicates a
+            // pending command), even when the same local chart is cached.
+            if (multiplayer_chart_ack_settings_revision_ != peer.rate_revision) {
+                multiplayer_chart_ack_settings_revision_ = peer.rate_revision;
+                const auto actual = network::fingerprint_chart_file(multiplayer_chart_path_);
+                if (actual.hash != target.hash || actual.size != target.size) {
+                    multiplayer_chart_path_.clear();
+                    multiplayer_chart_fingerprint_ = {};
+                    peer_session_.clear_local_chart();
+                    reset_multiplayer_chart_match_search();
+                    return;
+                }
+            }
+            (void)peer_session_.set_local_chart(target, peer.selected_chart.name.empty()
+                ? ui_text("Unknown track", "알 수 없는 곡") : peer.selected_chart.name);
+        }
         multiplayer_chart_match_target_ = target;
         multiplayer_chart_match_index_revision_ = song_index_revision_;
         multiplayer_chart_match_source_inputs_ = std::move(source_inputs);
@@ -1265,7 +907,7 @@ void MenuApp::service_multiplayer_chart_match(const network::PeerSessionSnapshot
             continue;
         }
         const std::string title = peer.selected_chart.name.empty()
-                                      ? candidate.title
+                                      ? ui_text("Unknown track", "알 수 없는 곡")
                                       : peer.selected_chart.name;
         if (!peer_session_.set_local_chart(fingerprint, title)) {
             multiplayer_status_message_ =
@@ -1338,62 +980,17 @@ void MenuApp::open_multiplayer_options() {
 
 void MenuApp::service_multiplayer() {
     const network::PeerSessionSnapshot peer = peer_session_.snapshot();
-    const GlobalChatSnapshot global_chat = global_chat_service_.snapshot();
-    const bool peer_active = peer_session_is_active(peer.state);
-    if (peer.role == network::PeerRole::Host && peer_active && peer.local_port != 0) {
-        network::LanRoomAdvertisement advertisement;
-        advertisement.host_name = profile_display_name();
-        advertisement.tcp_port = peer.local_port;
-        advertisement.player_count = static_cast<uint8_t>(
-            std::min<std::size_t>(peer.participant_count, network::kPeerMaxPlayers));
-        advertisement.max_players = network::kPeerMaxPlayers;
-        advertisement.accepting_players =
-            !peer_round_ui_locked(peer) &&
-            peer.participant_count < network::kPeerMaxPlayers &&
-            (peer.state == network::PeerSessionState::Listening ||
-             peer.state == network::PeerSessionState::Connected);
-        lan_discovery_.advertise(std::move(advertisement));
-    } else if (current_screen() == Screen::Multiplayer && !peer_active &&
-               !global_chat.configured) {
-        lan_discovery_.start_browsing();
-    } else {
-        lan_discovery_.stop();
+    lan_discovery_.stop();
+    if (current_screen() == Screen::Multiplayer && !multiplayer_account_checked_) {
+        (void)ensure_hosted_multiplayer();
     }
-
-    const network::LanDiscoverySnapshot lan_snapshot = lan_discovery_.snapshot();
-    if (lan_snapshot.revision != multiplayer_lan_discovery_revision_) {
-        std::string selected_key;
-        if (!multiplayer_lan_rooms_.empty()) {
-            multiplayer_lan_room_index_ =
-                std::min(multiplayer_lan_room_index_, multiplayer_lan_rooms_.size() - 1u);
-            const auto& selected = multiplayer_lan_rooms_[multiplayer_lan_room_index_];
-            selected_key = selected.address + ":" + std::to_string(selected.tcp_port);
-        }
-        multiplayer_lan_rooms_ = lan_snapshot.rooms;
-        multiplayer_lan_room_index_ = 0;
-        if (!selected_key.empty()) {
-            const auto selected = std::find_if(
-                multiplayer_lan_rooms_.begin(), multiplayer_lan_rooms_.end(),
-                [&selected_key](const network::LanDiscoveredRoom& room) {
-                    return room.address + ":" + std::to_string(room.tcp_port) == selected_key;
-                });
-            if (selected != multiplayer_lan_rooms_.end()) {
-                multiplayer_lan_room_index_ = static_cast<std::size_t>(
-                    std::distance(multiplayer_lan_rooms_.begin(), selected));
-            }
-        }
-        multiplayer_lan_discovery_revision_ = lan_snapshot.revision;
-        if (current_screen() == Screen::Multiplayer) publish_snapshot();
+    if (current_screen() == Screen::Multiplayer && peer_session_.is_hosted() &&
+        peer.state == network::PeerSessionState::Disconnected) {
+        // Closing is asynchronous so leaving a slow room never stalls input.
+        // Resume discovery only after an intentional disconnect; Failed stays
+        // visible until the user retries or reconnects their account.
+        (void)peer_session_.browse_hosted();
     }
-
-    if (global_chat.revision != multiplayer_server_room_revision_) {
-        multiplayer_server_room_index_ = global_chat.rooms.empty()
-            ? 0
-            : std::min(multiplayer_server_room_index_, global_chat.rooms.size() - 1u);
-        multiplayer_server_room_revision_ = global_chat.revision;
-        if (current_screen() == Screen::Multiplayer) publish_snapshot();
-    }
-
     multiplayer_menu_.connected = peer.state == network::PeerSessionState::Connected;
     multiplayer_menu_.local_ready = peer.local_ready;
     multiplayer_menu_.peer_ready = peer.remote_ready;
@@ -1410,7 +1007,7 @@ void MenuApp::service_multiplayer() {
     if (peer.role == network::PeerRole::Joiner) multiplayer_menu_.role = MultiplayerRole::Join;
 
     const bool local_library_changed =
-        peer_session_is_active(peer.state) &&
+        !peer_session_.is_hosted() && peer_session_is_active(peer.state) &&
         song_index_revision_ != multiplayer_local_library_index_revision_;
     if (local_library_changed) {
         peer_session_.set_local_library(
@@ -1553,7 +1150,8 @@ bool MenuApp::coordinate_multiplayer_start() {
             return false;
         }
         delay_ms = kRoomBeginDelayMs;
-    } else if (room.local_player_id != 0) {
+    }
+    if ((!room.local_is_leader || peer_session_.is_hosted()) && room.local_player_id != 0) {
         bool begin_received = false;
         while (std::chrono::steady_clock::now() < timeout_at) {
             if (peer_session_.wait_for_begin(50ms, delay_ms)) {
@@ -1568,7 +1166,7 @@ bool MenuApp::coordinate_multiplayer_start() {
                         "리더 시작 대기가 시간 초과되었거나 취소되었습니다.");
             return false;
         }
-    } else {
+    } else if (room.local_player_id == 0) {
         multiplayer_status_message_ =
             ui_text("Multiplayer player id is unavailable.",
                     "멀티플레이 참가자 ID가 없습니다.");
@@ -1638,8 +1236,9 @@ bool MenuApp::wait_for_multiplayer_result() {
             std::string stage =
                 ui_text("Waiting for all player results", "상대 결과 대기 중");
             if (peer.has_remote_score) {
-                stage += " / " + ui_text("Claimed Score ", "미검증 점수 ") +
-                         std::to_string(peer.latest_remote_score.score);
+                stage += " / " + ui_text("Claimed EX Score ", "미검증 EX Score ") +
+                         std::to_string(static_cast<int64_t>(peer.latest_remote_score.perfect) * 2 +
+                                        peer.latest_remote_score.great);
             }
             update_gameplay_loading_state(100, stage);
             next_status_update = now + 250ms;
@@ -1656,6 +1255,8 @@ bool MenuApp::wait_for_multiplayer_result() {
 
 void MenuApp::reset_multiplayer_for_single_player() {
     lan_discovery_.stop();
+    peer_session_.disable_hosted();
+    multiplayer_account_checked_ = false;
     peer_session_.disconnect("Switching to single player");
     peer_session_.clear_local_chart();
     reset_multiplayer_menu_session(multiplayer_menu_);

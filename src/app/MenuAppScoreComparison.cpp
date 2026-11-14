@@ -27,12 +27,12 @@ std::string MenuApp::score_comparison_replay_path_for_selected_song() const {
     const BestResultRecord* best = nullptr;
     for (const auto& key : menu_songs::build_chart_path_keys(song_absolute_path(*entry), songs_path_)) {
         const auto found = chart_score_high_water_.find(key);
-        if (found == chart_score_high_water_.end() || !found->second.best.has_value) continue;
+        if (found == chart_score_high_water_.end() || !found->second.best.has_value || !found->second.best.ex_score) continue;
         const auto& candidate = found->second.best;
         if (!best || std::tie(candidate.judgement_generation, candidate.bms_gauge_version,
-                              candidate.bms_control_flow_version, candidate.bms_timing_version, candidate.best_score) >
+                              candidate.bms_control_flow_version, candidate.bms_timing_version, candidate.ex_score) >
                      std::tie(best->judgement_generation, best->bms_gauge_version,
-                              best->bms_control_flow_version, best->bms_timing_version, best->best_score)) best = &candidate;
+                              best->bms_control_flow_version, best->bms_timing_version, best->ex_score)) best = &candidate;
     }
     if (!best || !best->replay_verified || best->replay_path.empty()) return {};
     for (const auto& record : local_play_records_) {

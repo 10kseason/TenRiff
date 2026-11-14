@@ -142,7 +142,8 @@ inline std::string format_decimal(double value) {
 }
 
 inline std::string mode_score_summary(const std::vector<std::string>& mods, double rate) {
-    return mode_mod_summary(mods) + " / " + format_multiplier(final_score_multiplier(mods, rate));
+    (void)rate;
+    return mode_mod_summary(mods);
 }
 
 // The registry retains legacy judge presets for replay compatibility. Only the
@@ -222,7 +223,8 @@ inline std::string mode_patterns_score_summary(const std::vector<std::string>& m
         summary += mode_mod_value_label(*mod, language);
     }
     if (summary.empty()) summary = ui::text(language, "Off", "OFF");
-    return summary + " / " + format_multiplier(final_score_multiplier(mods, rate));
+    (void)rate;
+    return summary;
 }
 
 inline std::vector<std::string> cycle_mode_mod_category(const std::vector<std::string>& active_mods,

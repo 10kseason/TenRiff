@@ -603,11 +603,13 @@ TEST_CASE("room standings keep three to eight players and replace the throttled 
             player.name = "Player " + std::to_string(id);
             player.has_score = id != count;
             player.latest_score.score = 1000;
+            player.latest_score.perfect = 500;
             room.participants.push_back(player);
         }
         render::MultiplayerPlayerData local;
         local.has_score = true;
         local.score = 2000;
+        local.ex_score = 2000;
         const auto standings = app::multiplayer_standings(room, local);
         REQUIRE(standings.size() == static_cast<std::size_t>(count));
         CHECK(standings.front().local);
@@ -618,6 +620,31 @@ TEST_CASE("room standings keep three to eight players and replace the throttled 
         CHECK_FALSE(standings.back().has_score);
         for (std::size_t i = 1; i + 1 < standings.size(); ++i) CHECK(standings[i].rank == 2);
     }
+}
+
+TEST_CASE("room EX standings ignore legacy score and share ranks on EX ties") {
+    using namespace tenriff;
+    network::PeerSessionSnapshot room;
+    room.local_player_id = 1;
+    network::PeerParticipantSnapshot opponent;
+    opponent.player_id = 2; opponent.has_score = true;
+    opponent.latest_score.score = 9999; // Legacy value is deliberately misleading.
+    opponent.latest_score.perfect = 4; opponent.latest_score.great = 1;
+    opponent.latest_score.good = 900;
+    room.participants.push_back(opponent);
+    render::MultiplayerPlayerData local;
+    local.has_score = true; local.score = 0; local.ex_score = 10;
+    auto rows = app::multiplayer_standings(room, local);
+    REQUIRE(rows.size() == 2);
+    CHECK(rows.front().local);
+    CHECK(rows.back().ex_score == std::optional<int64_t>{9});
+    local.ex_score = 9;
+    rows = app::multiplayer_standings(room, local);
+    CHECK(rows[0].rank == 1); CHECK(rows[1].rank == 1);
+    local.ex_score.reset();
+    rows = app::multiplayer_standings(room, local);
+    CHECK_FALSE(rows.front().local);
+    CHECK(rows.back().rank == 0);
 }
 
 TEST_CASE("three-player spectating waits for every opponent to become terminal") {

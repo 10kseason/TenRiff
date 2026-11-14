@@ -327,6 +327,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
                                                    : ui_text("PLAYING", "플레이 중");
     target.peer_current_sample = 0;
     target.peer_score = 0;
+    target.peer_ex_score.reset();
     target.peer_combo = 0;
     target.peer_max_combo = 0;
     target.peer_pg = 0;
@@ -341,6 +342,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     if (target.peer_visible && peer.has_remote_score) {
         target.peer_current_sample = peer.latest_remote_score.current_sample;
         target.peer_score = peer.latest_remote_score.score;
+        target.peer_ex_score = static_cast<int64_t>(peer.latest_remote_score.perfect) * 2 + peer.latest_remote_score.great;
         target.peer_combo = peer.latest_remote_score.combo;
         target.peer_max_combo = peer.latest_remote_score.max_combo;
         target.peer_pg = peer.latest_remote_score.perfect;
@@ -372,6 +374,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         render::MultiplayerPlayerData local;
         local.has_score = true;
         local.score = gameplay_hud_.score;
+        local.ex_score = gameplay_hud_.score;
         local.combo = gameplay_hud_.combo;
         local.max_combo = gameplay_hud_.max_combo;
         local.gauge = gameplay_hud_.gauge;
@@ -383,7 +386,8 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
             [](const auto& player) { return !player.local && player.has_score; });
         target.peer_score_available = leader != target.multiplayer_players.end();
         if (target.peer_score_available) {
-            target.peer_score = leader->score;
+            target.peer_score = leader->ex_score.value_or(0);
+            target.peer_ex_score = leader->ex_score;
             target.peer_name = leader->name;
         }
     }
@@ -484,6 +488,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         target.notes[i] = out_note;
     }
     target.score = gameplay_hud_.score;
+    target.ex_score = gameplay_hud_.score;
     target.osu_od8_score_available = gameplay_hud_.osu_od8_score_available;
     target.osu_od8_score = gameplay_hud_.osu_od8_score;
 
@@ -494,6 +499,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         // Render-only perspective switch. Local result data stays untouched,
         // while the visible score/gauge panel follows the surviving peer.
         target.score = target.peer_score;
+        target.ex_score = target.peer_ex_score;
         target.osu_od8_score_available = false;
         target.osu_od8_score = 0;
         target.combo = target.peer_combo;
@@ -531,6 +537,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
 
     target.ghost_visible = gameplay_hud_.ghost_visible;
     target.ghost_score = gameplay_hud_.ghost_score;
+    target.ghost_ex_score = gameplay_hud_.ghost_visible ? std::optional<int64_t>{gameplay_hud_.ghost_score} : std::nullopt;
     target.ghost_osu_od8_score_available = gameplay_hud_.ghost_osu_od8_score_available;
     target.ghost_osu_od8_score = gameplay_hud_.ghost_osu_od8_score;
     target.ghost_combo = gameplay_hud_.ghost_combo;
@@ -1140,7 +1147,7 @@ void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
                     true,
                     false);
     append_menu_row(render.generic,
-                    ui_text("Gauge Shift Start", "게이지 시프트 시작"),
+                    ui_text("Gauge Shift", "게이지 시프트"),
                     ui_gauge_label(config_.mode.gauge),
                     settings_cursor_ == profile_setup::kGaugeRow,
                     render::MenuHitTargetKind::SettingsRow,
@@ -1269,6 +1276,9 @@ void MenuApp::populate_title_render_data(render::MenuRenderData& render,
     render.title.profile_avatar_path = config_.ui.profile_avatar_path;
     render.title.track = current_track;
     render.title.high_score = current_best.has_value ? current_best.best_score : 0;
+    const SongEntry* score_entry = selected_song_ >= 0
+        ? visible_song_entry(static_cast<std::size_t>(selected_song_)) : nullptr;
+    render.title.high_ex_score = score_entry ? best_score_result_for_song_entry(*score_entry).ex_score : std::nullopt;
     const bool no_songs_indexed = visible_song_count() == 0;
     render.title.buttons = {
         render::MenuButtonData{no_songs_indexed ? ui_text("ADD SONGS FOLDER", "곡 폴더 추가")
@@ -1313,6 +1323,8 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     render.result.new_record = has_result_ && !last_session_replay_playback_ && last_result_new_record_;
     render.result.has_previous_score = last_result_record_feedback_.has_previous;
     render.result.previous_score = last_result_record_feedback_.previous_score;
+    render.result.previous_ex_score = last_result_record_feedback_.has_previous
+        ? std::optional<int64_t>{last_result_record_feedback_.previous_score} : std::nullopt;
     render.result.previous_rank = last_result_record_feedback_.previous_rank;
     render.result.rank_upgraded = has_result_ && !last_session_replay_playback_ &&
         last_result_record_feedback_.rank_upgraded;
@@ -1419,6 +1431,8 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     render.result.cleared = !last_game_over_ &&
                             !menu_records::clear_status_is_autoplay(last_clear_status_);
     render.result.score = last_result_final_score_;
+    render.result.ex_score = last_result_ex_score_;
+    render.result.max_ex_score = last_result_ex_score_ ? gameplay::maximum_ex_score(last_result_) : 0;
     render.result.detail_score = menu_records::calculate_detail_score(last_result_);
     render.result.max_score = gameplay::kNativeScoreMaximum;
     render.result.max_detail_score = gameplay::maximum_detail_score(last_result_.total_notes);
@@ -1536,6 +1550,7 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
         local.game_over = render.result.status == "GAME OVER" || render.result.status == "FAILED";
         local.aborted = render.result.status == "ABORTED";
         local.score = render.result.score;
+        local.ex_score = render.result.ex_score;
         local.gauge = render.result.gauge_value;
         local.max_combo = render.result.max_combo;
         local.perfect = render.result.perfect;
@@ -1552,10 +1567,6 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
         } else if (!render.result.replay_file.empty()) {
             render.result.notes.push_back(ui_text("Replay file is missing or unavailable.", "리플레이 파일이 없거나 사용할 수 없습니다."));
         }
-    }
-    render.result.notes.push_back(ui_text("Score x", "점수 x") + format_decimal(last_result_score_multiplier_));
-    if (last_result_rate_multiplier_ != 1.0) {
-        render.result.notes.push_back(ui_text("Rate score x", "Rate 점수 x") + format_decimal(last_result_rate_multiplier_));
     }
     render.result.notes.push_back(ui_text("Mods: ", "모드: ") + render.result.analysis_mods);
     if (mode_mod_long_note_mix(last_result_mods_) && last_result_long_note_mix_version_ != 1) {
@@ -2442,7 +2453,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         uint64_t peer_revision = 0;
         if (peer_battle) {
             network::PeerScore score;
-            score.score = hud.score;
+            score.score = peer_session_.is_hosted() ? gameplay::ex_score_from_counts(hud.counts) : hud.legacy_score;
             score.current_sample = hud.current_sample;
             score.combo = hud.combo;
             score.max_combo = hud.max_combo;
@@ -2810,6 +2821,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         last_result_rate_multiplier_ = 1.0;
         last_result_score_multiplier_ = 1.0;
         last_result_final_score_ = 0;
+        last_result_ex_score_.reset();
         last_pause_used_ = false;
         last_result_player_name_.clear();
         last_replay_path_.clear();
@@ -2869,7 +2881,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         final_score.finished = true;
         final_score.aborted = session_aborted || !result.has_value;
         if (result.has_value) {
-            final_score.score = result.final_score;
+            final_score.score = peer_session_.is_hosted() ? result.ex_score : result.final_score;
             final_score.combo = result.stats.combo;
             final_score.max_combo = result.stats.max_combo;
             final_score.perfect = result.stats.counts.pg;
@@ -2921,6 +2933,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         last_result_rate_multiplier_ = result.rate_multiplier;
         last_result_score_multiplier_ = result.score_multiplier;
         last_result_final_score_ = result.final_score;
+        last_result_ex_score_ = result.ex_score;
         last_pause_used_ = result.pause_used;
         last_result_player_name_ =
             result.player_name.empty() ? profile_display_name() : result.player_name;
@@ -2949,6 +2962,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         last_result_rate_multiplier_ = 1.0;
         last_result_score_multiplier_ = 1.0;
         last_result_final_score_ = 0;
+        last_result_ex_score_.reset();
         last_pause_used_ = false;
         last_result_player_name_.clear();
         last_replay_path_.clear();

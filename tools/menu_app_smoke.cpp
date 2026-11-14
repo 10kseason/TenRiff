@@ -291,6 +291,22 @@ struct MenuAppVisualTestAccess {
             !app.active_recording_permission_->load());
         app.choose_play_mode(false);
         app.active_recording_permission_.reset();
+        // Admission must be enforced at the application boundary before any
+        // worker starts, including when stale UI hit targets request hosting.
+        report.check("multiplayer.guest_cannot_start_transport",
+            !app.ensure_hosted_multiplayer() && !app.peer_session_.is_hosted());
+        app.multiplayer_menu_.cursor = static_cast<int>(MultiplayerMenuRow::Host);
+        app.handle_multiplayer_input(app.key_enter_);
+        report.check("multiplayer.guest_host_opens_account_without_socket",
+            app.ranked_account_overlay_visible_ && !app.peer_session_.is_hosted() &&
+            app.peer_session_.snapshot().state == network::PeerSessionState::Idle);
+        app.choose_play_mode(true);
+        report.check("multiplayer.online_without_connection_is_not_authenticated",
+            !app.ensure_hosted_multiplayer() && !app.peer_session_.is_hosted());
+        app.choose_play_mode(false);
+        app.multiplayer_account_checked_ = false;
+        app.multiplayer_menu_.cursor = 0;
+        app.multiplayer_status_message_.clear();
     }
 
     static void check_records_routing(MenuApp& app, Report& report) {
@@ -373,7 +389,59 @@ struct MenuAppVisualTestAccess {
         verify("folder_picker.title_shortcut_before_options", [&] { key(app, shortcut.c_str()); });
         click(app, Kind::TitleButton, 0);
         report.check("folder_picker.enter_song_select_before_options", screen(app) == Screen::SongSelect);
-        verify("folder_picker.song_select_button_before_options", [&] { click(app, Kind::SongSourceAdd, 0); });
+        click(app, Kind::SongNavButton, 1);
+        report.check("folder_picker.library_tab", app.song_select_view_ == MenuApp::SongSelectView::Sources);
+        verify("folder_picker.library_button_before_options", [&] { click(app, Kind::SongSourceAdd, 0); });
+
+        // Exercise the real click dispatcher with its empty generic.rows, and
+        // shell dialogs while audio-style MTA initialization is already active.
+        const auto saved_config = app.config_;
+        const auto saved_draft = app.session_mix_draft_;
+        const auto saved_courses = app.session_mix_lr2_courses_;
+        const int saved_minutes = app.session_mix_minutes_;
+        app.session_mix_draft_.clear();
+        click(app, Kind::SongNavButton, 0);
+        app.song_select_focus_ = MenuApp::SongSelectFocus::SongList;
+        app.selected_song_ = 0;
+        key(app, "C");
+        key(app, "C");
+        report.check("session_mix.create_draft_preserves_repeats", app.session_mix_draft_.size() == 2);
+        click(app, Kind::SongNavButton, 5);
+        report.check("session_mix.nav_enters_browser", screen(app) == Screen::SessionMix);
+        click(app, Kind::SettingsRow, 0);
+        report.check("session_mix.length_click_dispatch", app.session_mix_minutes_ != saved_minutes);
+        click(app, Kind::SettingsRow, 1);
+        report.check("session_mix.remix_click_dispatch", !app.session_mix_auto_plan_.entries.empty() &&
+            app.session_mix_status_message_.find(app.ui_text("Auto mix rebuilt: ", "자동 믹스 생성 완료: ")) == 0);
+        click(app, Kind::SongCard, 1, render::MenuHitPart::SelectOnly);
+        verify("session_mix.save_picker_from_mta", [&] { click(app, Kind::SettingsRow, 2); });
+        verify("session_mix.import_picker_from_mta", [&] { click(app, Kind::SettingsRow, 3); });
+        report.check("session_mix.cancel_preserves_draft_and_course_path", app.session_mix_draft_.size() == 2 &&
+            app.config_.ui.session_mix_lr2_course_path == saved_config.ui.session_mix_lr2_course_path);
+        const auto fixture = std::filesystem::absolute("session-mix-fixture.lr2crs").u8string();
+        const bool saved = app.save_session_mix_draft(fixture);
+        report.check("session_mix.draft_export", saved);
+        if (saved) {
+            render::MenuClickEvent drop;
+            drop.kind = Kind::FileDrop;
+            drop.path = fixture;
+            app.handle_menu_click(drop);
+            report.check("session_mix.import_exported_course", app.session_mix_draft_.size() == 2 &&
+                app.session_mix_lr2_courses_.size() == 1 &&
+                app.session_mix_lr2_courses_[0].chart_md5.size() == 2 &&
+                app.session_mix_lr2_courses_[0].chart_md5[0] == app.session_mix_draft_[0].chart_md5 &&
+                app.session_mix_lr2_courses_[0].chart_md5[1] == app.session_mix_draft_[1].chart_md5 &&
+                app.session_mix_source_index_ == 2);
+        }
+        app.config_ = saved_config;
+        app.session_mix_draft_ = saved_draft;
+        app.session_mix_lr2_courses_ = saved_courses;
+        app.session_mix_minutes_ = saved_minutes;
+        app.session_mix_auto_dirty_ = true;
+        app.session_mix_source_index_ = 0;
+        app.session_mix_course_matches_.clear();
+        app.session_mix_match_revision_ = (std::numeric_limits<uint64_t>::max)();
+        app.persist_runtime_config();
         app.reset_screen(Screen::Title);
         app.publish_snapshot();
     }
@@ -724,6 +792,9 @@ struct MenuAppVisualTestAccess {
             shown = first_card_lamp();
             report.check("lobby.lr2_proven_ex_lamp_is_shown_with_full_combo",
                 shown.first == "EX-HARD CLEAR" && shown.second == "LR2 EX-HARD CLEAR (FC)", shown.second);
+            report.check("lobby.imported_full_combo_does_not_grant_verified_row_art",
+                !app.snapshot_.render.song_select.songs.empty() &&
+                !app.snapshot_.render.song_select.songs.front().verified_full_combo);
             imported.clear_status = "EASY CLEAR";
             app.lr2_imported_lamps_[entry.md5] = imported;
             shown = first_card_lamp();
@@ -1721,6 +1792,11 @@ struct MenuAppVisualTestAccess {
         int sequence = 0;
         RecordFeedback feedback;
         const auto append = [&] {
+            // Synthetic fixture EX is explicit counts; final_score is frozen
+            // compatibility evidence and cannot drive a modern improvement.
+            verified.stats.counts = {};
+            verified.stats.counts.pg = static_cast<int>(verified.final_score / 2);
+            verified.stats.counts.gr = static_cast<int>(verified.final_score % 2);
             return app.append_chart_result_record(record, "new-record-fixture-" + std::to_string(sequence++),
                                                   "fixture-replay", verified, &feedback);
         };
@@ -1741,7 +1817,7 @@ struct MenuAppVisualTestAccess {
         report.check("new_record.stronger_clear_lower_score_does_not_celebrate", !append());
         report.check("new_record.stronger_clear_still_stored", !app.chart_best_results_.empty() &&
             app.chart_best_results_.begin()->second.final_gauge == "ex_hard" &&
-            app.chart_best_results_.begin()->second.best_score == 98);
+            app.chart_best_results_.begin()->second.ex_score == 98);
         verified.final_score = 500;
         verified.clear_status = "GAUGE SHIFT NORMAL CLEAR";
         verified.final_gauge = "normal";
@@ -1751,9 +1827,9 @@ struct MenuAppVisualTestAccess {
             feedback.previous_score == 101 && feedback.previous_rank == "A" && feedback.rank_upgraded);
         report.check("new_record.weaker_clear_does_not_replace_clear_best", !app.chart_best_results_.empty() &&
             app.chart_best_results_.begin()->second.final_gauge == "ex_hard" &&
-            app.chart_best_results_.begin()->second.best_score == 98);
+            app.chart_best_results_.begin()->second.ex_score == 98);
         report.check("new_record.high_water_retains_actual_score_replay", !app.chart_score_high_water_.empty() &&
-            app.chart_score_high_water_.begin()->second.best.best_score == 500 &&
+            app.chart_score_high_water_.begin()->second.best.ex_score == 500 &&
             app.chart_score_high_water_.begin()->second.best.replay_path == "fixture-replay");
         verified.clear_status = "GAUGE SHIFT EX CLEAR";
         verified.final_gauge = "ex_hard";

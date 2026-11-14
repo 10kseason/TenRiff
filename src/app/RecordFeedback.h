@@ -6,8 +6,8 @@
 
 namespace tenriff::app {
 
-// Session-only presentation snapshot. The saved BEST still uses clear-first
-// ordering; score celebrations compare against the independent score maximum.
+// Session-only EX presentation snapshot. No legacy normalized/detail score
+// participates in BEST or score celebrations.
 struct RecordFeedback {
     bool has_previous = false;
     int64_t previous_score = 0;

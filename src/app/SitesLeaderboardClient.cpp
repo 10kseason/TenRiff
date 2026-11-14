@@ -168,15 +168,12 @@ bool build_sites_score_json(const gameplay::ReplayFile& replay,
     // accumulators here so NaN/Inf cannot silently become a valid upload of 0%.
     const auto& counts = stats.counts;
     const int64_t judged = static_cast<int64_t>(counts.pg) + counts.gr + counts.gd + counts.bd + counts.pr;
-    if (stats.detail_score < 0 || stats.detail_score > 1'000'000'000 ||
+    if (!replay.judgement_counts_available ||
         counts.pg < 0 || counts.gr < 0 || counts.gd < 0 || counts.bd < 0 || counts.pr < 0 ||
         judged > 10'000'000 ||
         !std::isfinite(stats.accuracy_points) || stats.accuracy_points < 0 ||
         !std::isfinite(stats.accuracy_weight) || stats.accuracy_weight < 0 ||
-        !std::isfinite(stats.detailed_accuracy_points) || stats.detailed_accuracy_points < 0 ||
-        !std::isfinite(stats.detailed_accuracy_weight) || stats.detailed_accuracy_weight < 0 ||
-        stats.accuracy_points > stats.accuracy_weight ||
-        stats.detailed_accuracy_points > stats.detailed_accuracy_weight) {
+        stats.accuracy_points > stats.accuracy_weight) {
         error = "Sites upload skipped: invalid score statistics."; return false;
     }
     const auto lanes = replay.trace.lane_count;
@@ -189,12 +186,9 @@ bool build_sites_score_json(const gameplay::ReplayFile& replay,
         (replay.mode.key_conversion_algorithm.empty() ? "unknown" : replay.mode.key_conversion_algorithm) +
         ":" + replay.mode.key_conversion_nk2_preset;
     const double accuracy = replay.stats.accuracy_percent();
-    const double detailed_accuracy = replay.stats.detailed_accuracy_percent();
     if (!is_hash(replay.chart_sha256) || !is_hash(replay_sha256) || lanes < 4 || (lanes > 14 && lanes != 16) ||
         !std::isfinite(replay.rate) || replay.rate < 0.5 || replay.rate > 2.0 ||
-        replay.final_score < 0 || replay.final_score > 1'000'000'000 ||
         !std::isfinite(accuracy) || accuracy < 0 || accuracy > 100 ||
-        !std::isfinite(detailed_accuracy) || detailed_accuracy < 0 || detailed_accuracy > 100 ||
         replay.stats.max_combo < 0 || replay.stats.max_combo > 10'000'000 ||
         chart_title.empty() || chart_title.size() > 480 || chart_author.size() > 480 ||
         clear_status.empty() || clear_status.size() > 32) {
@@ -202,7 +196,7 @@ bool build_sites_score_json(const gameplay::ReplayFile& replay,
     }
     std::ostringstream output;
     output.imbue(std::locale::classic());
-    output << "{\"schema_version\":1,\"chart_sha256\":" << quoted(replay.chart_sha256)
+    output << "{\"schema_version\":2,\"score_version\":\"ex-v1\",\"chart_sha256\":" << quoted(replay.chart_sha256)
            << ",\"replay_sha256\":" << quoted(replay_sha256)
            << ",\"chart_title\":" << quoted(chart_title);
     // Metadata is supplied by the indexed chart, not replay evidence. Omitting
@@ -232,10 +226,10 @@ bool build_sites_score_json(const gameplay::ReplayFile& replay,
     }
     // Keep the binary64 percentages intact through JSON; display rounding must
     // not turn distinct tied scores into identical comparison values.
-    output << "],\"score\":" << replay.final_score
-           << ",\"detail_score\":" << stats.detail_score
+    output << "],\"score\":" << gameplay::ex_score_from_counts(counts)
+           << ",\"perfect\":" << counts.pg << ",\"great\":" << counts.gr
+           << ",\"good\":" << counts.gd << ",\"bad\":" << counts.bd << ",\"poor\":" << counts.pr
            << ",\"accuracy\":" << std::setprecision(std::numeric_limits<double>::max_digits10) << accuracy
-           << ",\"detailed_accuracy\":" << detailed_accuracy
            << ",\"max_combo\":" << replay.stats.max_combo << ",\"clear_status\":" << quoted(clear_status)
            << ",\"played_at\":" << quoted(sites_utc_timestamp(replay.created_utc))
            << ",\"autoplay\":false,\"practice\":false,\"aborted\":false,\"pause_used\":false}";

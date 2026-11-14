@@ -4,6 +4,9 @@
 #include "render/SettingsListLayout.h"
 #include "render/DifficultyLabel.h"
 #include "render/MenuWindow.h"
+#include "render/ExScorePresentation.h"
+#include "render/SongSelectReviewLayout.h"
+#include "render/OptionsConstellation.h"
 #include "render/MenuViewport.h"
 #include "ui/FunctionKeyLabels.h"
 #include "render/GameplaySpriteBatch.h"
@@ -71,6 +74,7 @@
 #include "config/Config.h"
 #include "input/InputThread.h"
 #include "render/GameplayGaugePalette.h"
+#include "render/SongSelectClearArt.h"
 #include "render/GameplayGearLayout.h"
 #include "render/GameplayMotion.h"
 #include "render/GameplayNativeDigitalKey.h"
@@ -2284,9 +2288,17 @@ LRESULT CALLBACK menu_window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpa
             if (window) window->on_text_composition(true);
             break;
         case WM_IME_ENDCOMPOSITION:
-        case WM_KILLFOCUS:
             if (window) window->on_text_composition(false);
             break;
+        case WM_KILLFOCUS:
+            if (window) {
+                window->on_text_composition(false);
+                window->on_mouse_leave();
+            }
+            break;
+        case WM_MOUSELEAVE:
+            if (window) window->on_mouse_leave();
+            return 0;
         case WM_CHAR:
             if (window) {
                 window->on_text_input(static_cast<wchar_t>(wparam));
@@ -2450,6 +2462,31 @@ struct MenuWindow::D2DResources {
     D2D1_RECT_F all_combo_source_rect{};
     bool all_combo_bitmap_attempted = false;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> native_menu_brush;
+    std::array<Microsoft::WRL::ComPtr<ID2D1Bitmap>, kSongSelectClearArtFiles.size()> song_clear_nebula;
+    std::array<Microsoft::WRL::ComPtr<ID2D1Effect>, kSongSelectClearArtFiles.size()> song_clear_nebula_saturated;
+    bool song_clear_nebula_attempted = false;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> song_review_background;
+    bool song_review_background_attempted = false;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> home_nebula_background;
+    bool home_nebula_attempted = false;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> options_galaxy_background;
+    Microsoft::WRL::ComPtr<ID2D1Effect> options_galaxy_adjusted;
+    bool options_galaxy_attempted = false;
+    Microsoft::WRL::ComPtr<ID2D1RadialGradientBrush> song_review_combo_bloom;
+    Microsoft::WRL::ComPtr<ID2D1RadialGradientBrush> song_review_combo_flare;
+    bool song_review_combo_light_attempted = false;
+    struct SongReviewMarqueeCache {
+        std::wstring text;
+        IDWriteTextFormat* format = nullptr;
+        float font_size = 0;
+        int64_t start_ns = 0;
+        bool attempted = false;
+        Microsoft::WRL::ComPtr<IDWriteTextLayout> layout;
+        DWRITE_TEXT_METRICS metrics{};
+    };
+    std::array<SongReviewMarqueeCache, 24> song_review_marquee;
+
+    Microsoft::WRL::ComPtr<ID2D1RadialGradientBrush> menu_sunlight;
     Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> native_menu_background;
     std::unordered_map<uint32_t, D2D1_COLOR_F> native_menu_palette;
     std::array<Microsoft::WRL::ComPtr<ID2D1PathGeometry>, native_menu_assets::paths.size()> native_menu_geometry{};
@@ -2726,6 +2763,7 @@ void MenuWindow::shutdown() {
     update_cursor_visibility(false);
     clear_song_scrollbar_state();
     hit_regions_.clear();
+    on_mouse_leave();
 
     if (d2d_) {
         if (d2d_->swap_chain && fullscreen_) {
@@ -4909,6 +4947,15 @@ void MenuWindow::on_mouse_secondary_click(int window_x, int window_y) {
 }
 
 void MenuWindow::on_mouse_move(int window_x, int window_y) {
+    if (!menu_pointer_inside_ && hwnd_) {
+        TRACKMOUSEEVENT tracking{sizeof(TRACKMOUSEEVENT), TME_LEAVE, static_cast<HWND>(hwnd_), 0};
+        TrackMouseEvent(&tracking);
+    }
+    // Store client coordinates; the current draw transform handles subsequent resizes.
+    menu_pointer_x_ = window_x;
+    menu_pointer_y_ = window_y;
+    menu_pointer_inside_ = window_x >= 0 && window_y >= 0 &&
+        window_x < static_cast<int>(width_) && window_y < static_cast<int>(height_);
     float x = 0.0f;
     float y = 0.0f;
     static_cast<void>(translate_window_point(window_x, window_y, &x, &y));
@@ -5641,6 +5688,7 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family, const app::Native
     d2d_->native_wordmark_layout.Reset();
     d2d_->native_wordmark_format = nullptr;
     d2d_->menu_ellipsis_signs.clear();
+    for (auto& marquee : d2d_->song_review_marquee) marquee = {};
     d2d_->generic_help_layout.Reset();
     for (auto& text : d2d_->menu_readable_text) text = {};
     d2d_->result_ex_status_measure = {};

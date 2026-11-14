@@ -207,6 +207,8 @@ config::JsonValue build_shift_json(const std::vector<ShiftEvent>& shifts) {
 config::JsonValue build_stats_json(const ResultStats& stats) {
     config::JsonObject obj;
     obj.emplace("counts", build_counts_json(stats.counts));
+    obj.emplace("ex_score", config::JsonValue{static_cast<double>(ex_score_from_counts(stats.counts))});
+    obj.emplace("score_kind", config::JsonValue{std::string("ex-v1")});
     obj.emplace("combo", config::JsonValue{static_cast<double>(stats.combo)});
     obj.emplace("max_combo", config::JsonValue{static_cast<double>(stats.max_combo)});
     obj.emplace("total_notes", config::JsonValue{static_cast<double>(stats.total_notes)});
@@ -632,9 +634,18 @@ ReplayLoadResult load_replay_json(const std::string& path) {
         replay.trace.events.push_back(ReplayEvent{lane, state.value(), sample});
     }
 
+    replay.judgement_counts_available = false;
     if (const auto* stats = find_json_object(*root, "stats")) {
         replay.stats.analysis = parse_timing_analysis_json(find_json_value(*stats, "analysis_v1"));
         if (const auto* counts = find_json_object(*stats, "counts")) {
+            replay.judgement_counts_available = true;
+            for (const auto key : {"pg", "gr", "gd", "bd", "pr"}) {
+                const auto* value = find_json_value(*counts, key);
+                const double count = value ? value->as_number(-1) : -1;
+                if (!value || !value->is_number() || !std::isfinite(count) || count < 0 ||
+                    count > (std::numeric_limits<int>::max)() || std::floor(count) != count)
+                    replay.judgement_counts_available = false;
+            }
             replay.stats.counts.pg = read_json_int(*counts, "pg", 0);
             replay.stats.counts.gr = read_json_int(*counts, "gr", 0);
             replay.stats.counts.gd = read_json_int(*counts, "gd", 0);

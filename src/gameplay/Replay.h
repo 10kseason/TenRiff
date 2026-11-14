@@ -90,6 +90,7 @@ struct ReplayFile {
     bool pause_used = false;
     bool aborted = false;
 
+    bool judgement_counts_available = true; // Loader rejects absent/malformed counts for modern EX upload.
     ReplayModeSettings mode;
     ReplayTrace trace;
     ResultStats stats;
