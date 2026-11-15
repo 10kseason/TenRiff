@@ -41,11 +41,12 @@ inline float gameplay_studio_header_safe_right(bool performance_visible) {
 inline bool gameplay_studio_deck_enabled(std::string_view hud_layout,
                                          std::string_view skin_source,
                                          bool ghost_visible,
-                                         bool peer_visible) {
+                                         bool /*peer_visible*/) {
     // LR2 imports keep their note/key/gear assets and geometry; only the HUD
-    // adopts the deck. Other image skins and shared battle HUDs remain classic.
+    // adopts the deck in solo and online play. Image skins keep their own HUD;
+    // a two-field ghost battle still uses its dedicated shared layout.
     return hud_layout == "studio" && (skin_source == "native" || skin_source == "lr2") &&
-           !ghost_visible && !peer_visible;
+           !ghost_visible;
 }
 
 inline GameplayStudioDeckLayout compute_gameplay_studio_deck_layout(
@@ -101,6 +102,56 @@ inline GameplayStudioDeckLayout compute_gameplay_studio_deck_layout(
 inline GameplaySongTitleLayout gameplay_studio_song_title_layout(const GameplayStudioDeckLayout& deck) {
     return {deck.info_x, deck.info_y, deck.info_x + deck.info_width,
             deck.info_y + 34.0f * deck.info_scale};
+}
+
+struct GameplayStudioOpponentsLayout {
+    float left = 24.0f, right = 24.0f, top = 210.0f, card_scale = 0.0f;
+};
+
+// Fit the online standings into an unused side-column interval, leaving the
+// selected solo HUD, gauge and field exactly where the player put them.
+inline GameplayStudioOpponentsLayout compute_gameplay_studio_opponents_layout(
+    float field_left, float field_right, const GameplayStudioDeckLayout& deck, std::size_t opponents,
+    float performance_left = 1920.0f, float performance_bottom = 0.0f) {
+    GameplayStudioOpponentsLayout best;
+    if (!std::isfinite(field_left) || !std::isfinite(field_right) || field_right <= field_left) return best;
+    const bool gauge_left = deck.gauge_marker_x < field_left;
+    const float left_end = std::clamp(field_left - (gauge_left ? 132.0f : 32.0f), 24.0f, 1856.0f);
+    const float right_start = std::clamp(field_right + (gauge_left ? 32.0f : 132.0f), 24.0f, 1856.0f);
+    const std::array<std::array<float, 2>, 2> columns{{
+        {{right_start, 1856.0f}}, {{24.0f, left_end}}
+    }};
+    const float rows = static_cast<float>(std::clamp<std::size_t>(opponents, 1, 7));
+    for (const auto& column : columns) {
+        const float left = column[0], right = std::min(column[1], left + 488.0f);
+        if (right <= left) continue;
+        std::array<std::array<float, 2>, 4> blocked{};
+        blocked.fill({1020.0f, 1020.0f});
+        const auto reserve = [&](std::size_t index, bool visible, float x, float width, float top, float bottom) {
+            if (visible && left < x + width + 12.0f && right > x - 12.0f)
+                blocked[index] = {std::max(52.0f, top - 8.0f), std::min(1020.0f, bottom + 8.0f)};
+        };
+        reserve(0, deck.info_visible, deck.info_x, deck.info_width,
+            deck.info_y - 12.0f, deck.info_y + 210.0f * deck.info_scale);
+        reserve(1, deck.score_visible, deck.score_x, deck.score_width,
+            deck.score_y - 12.0f, deck.score_y + 444.0f * deck.score_scale + 12.0f);
+        reserve(2, deck.map_visible, deck.map_x, deck.map_width,
+            deck.map_top - 32.0f * deck.map_scale, deck.map_top + deck.map_height + 28.0f * deck.map_scale);
+        reserve(3, performance_bottom > 0.0f, performance_left, 1920.0f - performance_left,
+            0.0f, performance_bottom);
+        std::sort(blocked.begin(), blocked.end());
+        float cursor = 52.0f;
+        for (const auto& interval : blocked) {
+            // Reserve 60px above the cards for the online score-lead indicator.
+            const float scale = std::min({1.0f, (right - left) / 300.0f,
+                std::max(0.0f, interval[0] - cursor - 60.0f) / (104.0f * rows)});
+            if (scale >= 0.35f && scale > best.card_scale) best = {left, right, cursor + 60.0f, scale};
+            cursor = std::max(cursor, interval[1]);
+        }
+    }
+    // Zero means no readable, non-overlapping space; never fall back over the
+    // selected HUD or note field. The full standings remain on the results page.
+    return best;
 }
 
 inline float gameplay_studio_gauge_marker_y(float hit_y, double gauge_ratio) {

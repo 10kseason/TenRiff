@@ -8,6 +8,7 @@
 #include <functional>
 #include <mutex>
 #include <thread>
+#include <vector>
 
 namespace {
 using namespace tenriff::network;
@@ -49,6 +50,8 @@ struct HostedFixture {
     double begin = 0, received = 0;
     std::atomic<int> processing_delay_ms{0};
     Json claimed_score;
+    std::string reject_action;
+    std::vector<std::chrono::steady_clock::time_point> poll_times;
     Array chat_history;
     std::string first_create_id, retried_create_id;
     std::string last_chart_hash, last_nonce;
@@ -116,12 +119,23 @@ struct HostedFixture {
                         else retried_create_id = id;
                         if (drop_create_once.exchange(false)) return false;
                     }
-                    if (action == "launch") { phase = "loading"; nonce = "17"; }
+                    if (action == reject_action) {
+                        response.status = 409; response.body = "{\"error\":\"rejected_fixture\"}"; return true;
+                    }
+                    if (action == "poll") poll_times.push_back(std::chrono::steady_clock::now());
+                    if (action == "launch") { phase = "loading"; nonce = std::to_string(std::stoull(nonce) + 17); claimed_score = Json(); }
+                    if (action == "reset") { phase = "lobby"; loaded = false; }
                     if (action == "loaded") loaded = true;
                     if (action == "begin") { phase = "playing"; begin = now() + 5000; }
                     if (action == "chat") chat_history.emplace_back(Object{
                         {"player_id", Json(static_cast<double>(local))}, {"text", value(*parsed.root, "text")}});
-                    if (action == "score") claimed_score = value(*parsed.root, "score");
+                    if (action == "score") {
+                        const auto& next = value(*parsed.root, "score");
+                        if (!claimed_score.is_null() && value(next, "current_sample").as_number() < value(claimed_score, "current_sample").as_number()) {
+                            response.status = 409; response.body = "{\"error\":\"stale_score\"}"; return true;
+                        }
+                        claimed_score = next;
+                    }
                     if (action == "chart") { ++chart_calls; last_chart_hash = value(value(*parsed.root, "chart"), "hash").as_string(); }
                     last_nonce = value(*parsed.root, "nonce").as_string();
                     if (processing_delay_ms) std::this_thread::sleep_for(std::chrono::milliseconds(processing_delay_ms.load()));
@@ -409,4 +423,95 @@ TEST_CASE("Hosted room chat sends bounded UTF8 through session authentication an
     CHECK(client.snapshot().chat_messages.back().text == "Remote 확인");
     CHECK_FALSE(server.unsafe_credential);
     client.request_stop(); CHECK_FALSE(client.send_chat("after disconnect"));
+}
+
+TEST_CASE("Hosted final score cannot regress behind a live sample and resets on the next round") {
+    HostedFixture server;
+    HostedPeerSession client(server.transport());
+    REQUIRE(client.configure(upload_key));
+    REQUIRE(client.host());
+    REQUIRE(wait_hosted([&] { return client.snapshot().can_start; }));
+    for (int round = 0; round < 2; ++round) {
+        REQUIRE(client.send_launch());
+        REQUIRE(wait_hosted([&] { return client.snapshot().round_active; }));
+        PeerScore live;
+        live.current_sample = round == 0 ? 480000 : -48000;
+        REQUIRE(client.publish_score(live, false));
+        REQUIRE(wait_hosted([&] { return client.snapshot().participants[0].has_score; }));
+        PeerScore final = live;
+        final.current_sample -= 24000;
+        REQUIRE(client.publish_score(final, true));
+        REQUIRE(wait_hosted([&] { return client.snapshot().participants[0].latest_score.finished; }));
+        CHECK(client.snapshot().participants[0].latest_score.current_sample == live.current_sample);
+        CHECK(client.snapshot().state == PeerSessionState::Connected);
+        client.reset_round();
+        REQUIRE(wait_hosted([&] { return !client.snapshot().round_active; }));
+    }
+}
+
+TEST_CASE("Hosted rejected final score fails promptly instead of hanging at the result barrier") {
+    HostedFixture server;
+    HostedPeerSession client(server.transport());
+    REQUIRE(client.configure(upload_key));
+    REQUIRE(client.host());
+    REQUIRE(wait_hosted([&] { return client.snapshot().can_start; }));
+    REQUIRE(client.send_launch());
+    REQUIRE(wait_hosted([&] { return client.snapshot().round_active; }));
+    { std::lock_guard lock(server.mutex); server.reject_action = "score"; }
+    REQUIRE(client.publish_score(PeerScore{}, true));
+    REQUIRE(wait_hosted([&] { return client.snapshot().state == PeerSessionState::Failed; }));
+    CHECK_FALSE(client.snapshot().round_active);
+    CHECK(client.snapshot().status_detail.find("HTTP 409") != std::string::npos);
+}
+
+TEST_CASE("Hosted loading cancellation recovers to the lobby after loaded or begin rejection") {
+    for (const std::string action : {"loaded", "begin"}) {
+        HostedFixture server;
+        HostedPeerSession client(server.transport());
+        REQUIRE(client.configure(upload_key));
+        REQUIRE(client.host());
+        REQUIRE(wait_hosted([&] { return client.snapshot().can_start; }));
+        REQUIRE(client.send_launch());
+        REQUIRE(wait_hosted([&] { return client.snapshot().round_active; }));
+        if (action == "begin") {
+            REQUIRE(client.mark_loaded());
+            REQUIRE(wait_hosted([&] { return client.wait_for_peer_loaded(1ms); }));
+        }
+        // A peer resets loading while this client's command is in flight.
+        { std::lock_guard lock(server.mutex); server.reject_action = action; server.phase = "lobby"; }
+        if (action == "loaded") REQUIRE(client.mark_loaded());
+        else REQUIRE(client.send_begin());
+        REQUIRE(wait_hosted([&] { return !client.snapshot().round_active; }));
+        CHECK(client.snapshot().state == PeerSessionState::Connected);
+    }
+}
+
+TEST_CASE("Hosted loading and result barriers poll faster while respecting the server floor") {
+    HostedFixture server;
+    HostedPeerSession client(server.transport());
+    REQUIRE(client.configure(upload_key));
+    REQUIRE(client.host());
+    REQUIRE(wait_hosted([&] { return client.snapshot().can_start; }));
+    REQUIRE(client.send_launch());
+    REQUIRE(wait_hosted([&] { return client.snapshot().round_active; }));
+    for (int barrier = 0; barrier < 2; ++barrier) {
+        if (barrier == 1) {
+            REQUIRE(client.mark_loaded());
+            REQUIRE(wait_hosted([&] { return client.wait_for_peer_loaded(1ms); }));
+            REQUIRE(client.send_begin());
+            uint32_t delay = 0;
+            REQUIRE(wait_hosted([&] { return client.wait_for_begin(1ms, delay); }));
+            REQUIRE(client.publish_score(PeerScore{}, true));
+            REQUIRE(wait_hosted([&] { return client.snapshot().participants[0].latest_score.finished; }));
+        }
+        { std::lock_guard lock(server.mutex); server.poll_times.clear(); }
+        REQUIRE(wait_hosted([&] { std::lock_guard lock(server.mutex); return server.poll_times.size() >= 4; }));
+        std::lock_guard lock(server.mutex);
+        const auto span = std::chrono::duration_cast<std::chrono::milliseconds>(server.poll_times[3] - server.poll_times[0]).count();
+        // Three old 500 ms intervals take >=1500 ms. Leave scheduling slack.
+        CHECK(span < 1350);
+        for (std::size_t i = 1; i < 4; ++i)
+            CHECK(server.poll_times[i] - server.poll_times[i - 1] >= 200ms);
+        std::cout << "hosted barrier " << barrier << ": three poll intervals " << span << " ms\n";
+    }
 }

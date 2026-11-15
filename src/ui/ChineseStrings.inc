@@ -1518,3 +1518,15 @@
 {"NOTE SPEED", "音符速度"},
 {"Note Speed", "音符速度"},
 {"GAUGE SHIFT", "血量模式切换"},
+
+{"Choose Classic or Studio Deck for Native or imported LR2 in solo and multiplayer. Other image skins keep their own HUD; ghost battles keep the shared layout.", "在单人和多人游戏中为Native或导入的LR2选择Classic或Studio Deck。其他图像皮肤保留自身HUD，幽灵对战保留共享布局。"},
+{"Hash check complete.", "哈希检查完成"},
+{"Hash check pending.", "等待哈希检查"},
+
+{"Connect your account in online mode to chat.", "在在线模式下关联账号后即可聊天。"},
+
+{"Chat is unavailable. Check your connection and try again.", "无法发送聊天。请检查连接后重试。"},
+
+{"Chat unavailable. Open F10 to reconnect.", "聊天连接不可用。请按F10重新连接。"},
+
+{"Connecting...", "正在连接..."},

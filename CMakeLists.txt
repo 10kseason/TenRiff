@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 2.0.1 DESCRIPTION "TenRiff 2.0.1" LANGUAGES C CXX)
+project(TenRiff VERSION 2.0.2 DESCRIPTION "TenRiff 2.0.2" LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -926,6 +926,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_peer_protocol.cpp
         tests/unit/test_peer_session.cpp
         tests/unit/test_hosted_peer_session.cpp
+        tests/unit/test_global_chat_service.cpp
         tests/unit/test_multiplayer_menu_state.cpp
         tests/unit/test_chat_interaction.cpp
         tests/unit/test_online_records_client.cpp
@@ -988,7 +989,7 @@ if(WIN32)
     # Explicit loopback-only integration driver. It is not a production client
     # and never loads a local profile or real connection credentials.
     add_executable(tenriff_hosted_multiplayer_smoke tools/hosted_multiplayer_smoke.cpp)
-    target_link_libraries(tenriff_hosted_multiplayer_smoke PRIVATE tenriff_core)
+    target_link_libraries(tenriff_hosted_multiplayer_smoke PRIVATE tenriff_app)
 endif()
 
 # Bundled menu music/SFX are resolved from the executable, including standalone

@@ -1,4 +1,5 @@
 #include "network/HostedPeerSession.h"
+#include "app/GlobalChatService.h"
 
 #include <algorithm>
 #include <charconv>
@@ -83,7 +84,14 @@ int main(int argc, char** argv) {
     if (parsed.ec != std::errc{} || parsed.ptr != argument.data() + argument.size() || !value || value > 65535) return 2;
     HostedPeerSession alice(loopback_transport(static_cast<uint16_t>(value)));
     HostedPeerSession bob(loopback_transport(static_cast<uint16_t>(value)));
+    tenriff::app::GlobalChatService alice_chat(loopback_transport(static_cast<uint16_t>(value)));
+    tenriff::app::GlobalChatService bob_chat(loopback_transport(static_cast<uint16_t>(value)));
     try {
+        alice_chat.configure("tr_" + std::string(64, 'a'));
+        bob_chat.configure("tr_" + std::string(64, 'b'));
+        require(wait_for([&] { return alice_chat.snapshot().online && bob_chat.snapshot().online; }), "global chat authenticates without a room");
+        require(alice_chat.send("Global before rooms 안녕"), "send global chat without a room");
+        require(wait_for([&] { const auto chat = bob_chat.snapshot(); return !chat.messages.empty() && chat.messages.back().text == "Global before rooms 안녕"; }), "global chat crosses accounts without rooms");
         require(alice.configure("tr_" + std::string(64, 'a')), "configure account A");
         require(bob.configure("tr_" + std::string(64, 'b')), "configure account B");
         require(alice.host(), "queue create");
@@ -92,6 +100,9 @@ int main(int argc, char** argv) {
         require(wait_for([&] { return !bob.rooms().empty(); }), "discover room");
         require(bob.join(bob.rooms().front().id), "queue join");
         require(wait_for([&] { return alice.snapshot().participant_count == 2 && bob.snapshot().participant_count == 2; }), "two clients joined");
+        require(alice_chat.snapshot().online && bob_chat.snapshot().online, "room authentication preserves global chat sessions");
+        require(bob_chat.send("Global inside room 확인"), "send global chat while in a room");
+        require(wait_for([&] { const auto chat = alice_chat.snapshot(); return !chat.messages.empty() && chat.messages.back().text == "Global inside room 확인"; }), "same global channel inside a room");
         require(alice.send_chat("Hello 안녕하세요"), "queue Korean and ASCII chat A to B");
         require(wait_for([&] {
             const auto messages = bob.snapshot().chat_messages;
@@ -132,17 +143,32 @@ int main(int argc, char** argv) {
         score.gauge_milli = 100000;
         require(alice.publish_score(score, false), "signed intro sample accepted");
         require(wait_for([&] { return bob.snapshot().has_remote_score && bob.snapshot().latest_remote_score.current_sample == -48000; }), "signed score delivered");
+        // Reproduce a real finish: the last live frame is later than the final
+        // gauge-history point. The server must accept the clamped final packet.
+        score.current_sample = 96000;
+        require(alice.publish_score(score, false), "late live sample accepted");
+        require(wait_for([&] { return bob.snapshot().latest_remote_score.current_sample == 96000; }), "late live sample delivered");
         score.score = 20; score.current_sample = 48000; score.perfect = 10; score.combo = 10; score.max_combo = 10;
         require(alice.publish_score(score, true), "account A final score");
         score.score = 19; score.perfect = 9; score.great = 1;
         require(bob.publish_score(score, true), "account B final score");
         require(wait_for([&] { return alice.snapshot().all_remote_finished && bob.snapshot().all_remote_finished; }), "complete results delivered");
+        require(bob.snapshot().latest_remote_score.current_sample == 96000, "final sample preserves live progress");
         alice.reset_round(); bob.reset_round();
         require(wait_for([&] { return !alice.snapshot().round_active && !bob.snapshot().round_active; }), "round reset barrier");
         require(bob.snapshot().local_is_leader, "selection leadership rotates");
         alice.disconnect();
         require(wait_for([&] { return bob.snapshot().state == PeerSessionState::Connected && bob.snapshot().participant_count == 1; }), "creator departure preserves room");
         require(bob.snapshot().round_participants.size() == 2, "finished result participants retained");
+        require(alice_chat.send("Global after room exit"), "global chat remains available after room departure");
+        require(wait_for([&] { const auto chat = bob_chat.snapshot(); return !chat.messages.empty() && chat.messages.back().text == "Global after room exit"; }), "receive global chat across room boundaries");
+        // Cross the normal 20-second renewal boundary for both independent services.
+        std::this_thread::sleep_for(22s);
+        require(alice_chat.snapshot().online && bob_chat.snapshot().online && bob.snapshot().state == PeerSessionState::Connected,
+            "chat and room session renewals do not revoke each other");
+        alice_chat.clear();
+        require(!alice_chat.snapshot().online && alice_chat.snapshot().messages.empty() && !alice_chat.send("after logout"), "logout clears history and rejects send");
+        bob_chat.clear();
         bob.disconnect();
         std::cout << "PASS hosted multiplayer C++/Worker contract smoke\n";
         return 0;

@@ -22,6 +22,9 @@ using HostedHttpTransport = std::function<bool(std::string_view method,
     std::string_view path, std::string_view bearer, std::string_view body,
     HostedHttpResponse& response)>;
 
+// Shared fixed-origin transport for independently scoped hosted services.
+[[nodiscard]] HostedHttpTransport make_hosted_http_transport();
+
 // A separate HTTP protocol; it does not reinterpret legacy peer wire packets.
 class HostedPeerSession {
 public:

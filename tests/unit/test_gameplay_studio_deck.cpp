@@ -56,14 +56,67 @@ TEST_CASE("Full title fitting follows both measured dimensions without a truncat
     CHECK(gameplay_song_title_fit_scale(std::numeric_limits<float>::quiet_NaN(), 30, 200, 34) == 0);
 }
 
-TEST_CASE("Studio deck supports native and imported LR2 solo HUDs without changing battle fallback") {
+TEST_CASE("Studio deck keeps native and imported LR2 HUDs online while preserving ghost fallback") {
     for (const auto source : {"native", "lr2"}) {
         CHECK(gameplay_studio_deck_enabled("studio", source, false, false));
         CHECK_FALSE(gameplay_studio_deck_enabled("classic", source, false, false));
         CHECK_FALSE(gameplay_studio_deck_enabled("studio", source, true, false));
-        CHECK_FALSE(gameplay_studio_deck_enabled("studio", source, false, true));
+        CHECK(gameplay_studio_deck_enabled("studio", source, false, true));
+        CHECK_FALSE(gameplay_studio_deck_enabled("classic", source, false, true));
+        CHECK_FALSE(gameplay_studio_deck_enabled("studio", source, true, true));
     }
     CHECK_FALSE(gameplay_studio_deck_enabled("studio", "tenriff", false, false));
+    CHECK_FALSE(gameplay_studio_deck_enabled("studio", "tenriff", false, true));
+}
+
+TEST_CASE("Online Studio standings avoid the solo HUD and field across widths and player counts") {
+    for (float width : {490.0f, 980.0f, 1372.0f}) {
+        for (float left = 12.0f; left + width <= 1880.0f; left += 137.0f) {
+            for (bool performance : {false, true}) for (bool map : {false, true}) {
+                const float right = left + width;
+                const auto deck = compute_gameplay_studio_deck_layout(left, right,
+                    gameplay_studio_header_safe_right(performance), map);
+                for (std::size_t count : {1u, 2u, 7u}) {
+                    const auto opponents = compute_gameplay_studio_opponents_layout(left, right, deck, count,
+                        performance ? 1450.0f : 1920.0f, performance ? 592.0f : 0.0f);
+                    if (opponents.card_scale == 0.0f) {
+                        CHECK(opponents.left == opponents.right);
+                        continue; // No readable free rectangle: renderer omits only the auxiliary standings.
+                    }
+                    CHECK(opponents.card_scale >= 0.35f);
+                    CHECK(opponents.card_scale <= 1.0f);
+                    CHECK(opponents.left >= 24.0f);
+                    CHECK(opponents.right <= 1856.0f);
+                    CHECK((opponents.right < left || opponents.left > right));
+                    const float top = opponents.top - 60.0f;
+                    const float bottom = opponents.top + 104.0f * count * opponents.card_scale;
+                    CHECK(top >= 52.0f);
+                    CHECK(bottom <= 1020.001f);
+                    const auto clear = [&](bool visible, float x, float w, float y0, float y1) {
+                        if (visible) CHECK((opponents.right <= x - 12.0f || opponents.left >= x + w + 12.0f ||
+                            bottom <= y0 || top >= y1));
+                    };
+                    clear(deck.info_visible, deck.info_x, deck.info_width,
+                        deck.info_y - 12.0f, deck.info_y + 210.0f * deck.info_scale);
+                    clear(deck.score_visible, deck.score_x, deck.score_width,
+                        deck.score_y - 12.0f, deck.score_y + 444.0f * deck.score_scale + 12.0f);
+                    clear(deck.map_visible, deck.map_x, deck.map_width,
+                        deck.map_top - 32.0f * deck.map_scale,
+                        deck.map_top + deck.map_height + 28.0f * deck.map_scale);
+                    clear(performance, 1450.0f, 426.0f, 44.0f, 592.0f);
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("Online Studio standings stay readable by hiding only when the side column is full") {
+    for (std::size_t count : {1u, 2u, 7u}) {
+        auto deck = compute_gameplay_studio_deck_layout(470, 1450);
+        CHECK(compute_gameplay_studio_opponents_layout(470, 1450, deck, count).card_scale >= 0.35f);
+        deck = compute_gameplay_studio_deck_layout(12, 1384, 1422);
+        CHECK(compute_gameplay_studio_opponents_layout(12, 1384, deck, count, 1450, 592).card_scale == 0);
+    }
 }
 
 TEST_CASE("Studio riff map switch hides bars and clocks without moving the remaining HUD") {

@@ -379,7 +379,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `hit_burst_palette` | `soft`, `pastel`, `oil`, `mono`, `cyberpunk`; `soft` | 内置特效可选柔和默认、粉彩、油画、单色或赛博朋克。 |
 | `hit_burst_override` | bool; `false` | 启用时，配置文件中的样式和亮度优先于皮肤默认值。 |
 | `judgement_line_type2_color` | color token; `off` | 用指定的纯色填充类型 2 判定带。`off` 使用原有的绿色描边。 |
-| `hud_layout` | `classic`, `studio`; `studio` | Native／LR2单人HUD，保留LR2音符、按键、边框素材和比例。缺失或未知值使用`studio`，可在Options › Skins选择Classic。1.8.9采用右上信息、左下分数、右下横向地图，较窄外侧空间会触发整体缩放或移至另一侧。极端场地与Performance HUD占满两侧上方时只隐藏信息卡。其他图像皮肤、幽灵与多人保留Classic。[布局与验证范围](release-1.8.9-gate.md)。 |
+| `hud_layout` | `classic`, `studio`; `studio` | Native和导入的LR2在单人与多人游戏中使用相同的HUD选择。TenRiff图像皮肤和仅菜单皮肤保留所选素材与样式。 [Details](multiplayer-skins.zh-CN.md). |
 | `hud_riff_map_visible` | bool; `true` | 显示Studio Deck的64段横向密度图和已用／总时间。默认在右下，外侧空间不足时移动或缩小，极窄时省略时间文字。在Options › Skins › Studio Riff Map中修改并保存到配置和皮肤预设。隐藏后保留其他卡片位置和Classic HUD。 |
 | `ui_font` | `default`, `malgun`, `bahnschrift`, `consolas`; `default` | 菜单字体；default 为 Segoe UI，标志、等级与连击保留专用字体。 |
 | `key_label_position` | `bottom`, `top`, `off`; `bottom` | 轨道按键名称位置。 |

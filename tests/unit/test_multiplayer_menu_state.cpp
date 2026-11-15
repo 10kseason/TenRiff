@@ -312,6 +312,29 @@ TEST_CASE("multiplayer readiness requires a connection and matching nonzero char
     CHECK_FALSE(multiplayer_chart_fingerprints_match(state));
 }
 
+TEST_CASE("multiplayer hash completion requires the current local file and room acknowledgement") {
+    MultiplayerMenuState state;
+    state.connected = true;
+    state.local_chart_fingerprint = state.peer_chart_fingerprint = 42;
+    state.local_chart_size = state.peer_chart_size = 99;
+    const auto complete = [&] (uint64_t hash = 42, uint64_t size = 99) {
+        return tenriff::app::multiplayer_hash_check_complete(state, hash, size);
+    };
+    CHECK(complete());
+    CHECK_FALSE(complete(0, 0)); // Local matching invalidated, old room reply retained.
+    CHECK_FALSE(complete(43, 99)); // New local selection is not acknowledged yet.
+    CHECK_FALSE(complete(42, 100));
+    state.peer_chart_fingerprint = 43; // Leader selected another chart.
+    CHECK_FALSE(complete());
+    state.peer_chart_fingerprint = 42;
+    state.local_chart_fingerprint = 0; // Reset removed the room acknowledgement.
+    CHECK_FALSE(complete());
+    state.local_chart_fingerprint = 42;
+    CHECK(complete());
+    state.connected = false;
+    CHECK_FALSE(complete());
+}
+
 TEST_CASE("multiplayer start gate requires all ready and rotating leader authority") {
     MultiplayerMenuState state;
     state.connected = true;

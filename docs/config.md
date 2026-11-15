@@ -387,7 +387,7 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `hit_burst_palette` | `soft`, `pastel`, `oil`, `mono`, `cyberpunk`; `soft` | 내장 키밤의 부드러운 기본, 파스텔, 유화, 단색, 사이버펑크 팔레트. |
 | `hit_burst_override` | bool; `false` | 켜면 프로필의 키밤 모양과 밝기를 우선 적용합니다. |
 | `judgement_line_type2_color` | color token; `off` | 타입 2 판정선 띠를 지정한 단색으로 채웁니다. `off`는 기본 초록 테두리입니다. |
-| `hud_layout` | `classic`, `studio`; `studio` | Native·가져온 LR2 스킨의 단독 플레이 HUD 스타일. LR2 노트·건반·기어 이미지와 비율은 유지함. 키가 없는 기존 프로필도 기본값 `studio`를 사용하며 Options › Skins에서 Classic으로 변경. 1.8.9는 오른쪽 위 정보·왼쪽 아래 점수·오른쪽 아래 가로 맵을 배치하며 좁은 여백에서는 축소·반대쪽 이동. 극단 필드와 Performance HUD가 양쪽 상단을 막으면 정보 카드만 숨김. 다른 이미지 스킨·고스트·멀티는 Classic 유지. 알 수 없는 값은 `studio`. [배치와 검증 범위](release-1.8.9-gate.md). |
+| `hud_layout` | `classic`, `studio`; `studio` | Native·가져온 LR2의 HUD 선택은 싱글과 멀티에서 동일하게 적용됩니다. TenRiff 이미지 스킨과 메뉴 전용 스킨도 기존 선택·이미지·스타일을 유지합니다. [Details](multiplayer-skins.ko.md). |
 | `hud_riff_map_visible` | bool; `true` | Studio Deck의 64구간 가로 노트 밀도 맵과 경과/전체 시간 표시. 기본 위치는 오른쪽 아래이며 여백에 따라 이동·축소하고 아주 좁으면 시간 글자를 생략함. Options › Skins › 그래프 맵에서 변경하며 프로필·스킨 프리셋에 저장됨. 꺼도 다른 카드 위치와 Classic HUD는 유지. |
 | `indicator_background_visible` | bool; `false` | 이전 프로필·프리셋 호환용 필드. 1.8.9.3부터 네이티브 판정·FAST/SLOW·타이밍 배경은 값과 무관하게 표시하지 않으며 설정 행도 제거됨. 글자·눈금·오차 마커는 유지. `skin.json` 필드가 아님. |
 | `ui_font` | `default`, `malgun`, `bahnschrift`, `consolas`; `default` | 메뉴 글꼴. default는 Segoe UI; 로고·랭크·콤보 전용 글꼴은 유지. |

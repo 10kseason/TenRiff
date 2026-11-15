@@ -99,6 +99,9 @@ void MenuApp::choose_play_mode(bool online) {
     if (online) {
         refresh_sites_leaderboard_connection();
     } else {
+        global_chat_service_.clear();
+        global_chat_input_.clear();
+        global_chat_status_.clear();
         set_ranked_account_overlay(false);
     }
     publish_snapshot();
@@ -166,6 +169,15 @@ void MenuApp::refresh_sites_leaderboard_connection() {
     std::string error;
     const bool loaded = load_sites_leaderboard_connection("config", connection, missing, error);
     sites_connection_saved_ = loaded && !missing;
+    // Global chat follows the account, never room membership or the current screen.
+    // Repeated refreshes retain the existing worker; a key change fences old replies.
+    if (online_play_mode_ && sites_connection_saved_) {
+        global_chat_service_.configure(connection.upload_token);
+    } else {
+        global_chat_service_.clear();
+        global_chat_input_.clear();
+        global_chat_status_.clear();
+    }
     clear_secret(connection.upload_token);
     sites_connection_status_ = !online_play_mode_
         ? ui_text("Guest mode: records stay local and are never uploaded later.", "게스트 모드: 기록은 로컬 전용이며 나중에도 업로드되지 않습니다.")
@@ -194,6 +206,9 @@ void MenuApp::handle_sites_leaderboard_action(render::SitesLeaderboardAction act
         if (clear_sites_leaderboard_connection("config", error)) {
             peer_session_.disable_hosted();
             multiplayer_account_checked_ = false;
+            global_chat_service_.clear();
+            global_chat_input_.clear();
+            global_chat_status_.clear();
             sites_leaderboard_service_.cancel_pending();
             sites_last_upload_status_.clear();
             sites_result_replay_sha256_.clear();
@@ -235,6 +250,9 @@ void MenuApp::handle_sites_leaderboard_action(render::SitesLeaderboardAction act
         if (error.empty() && install_sites_leaderboard_connection("config", contents, error)) {
             peer_session_.disable_hosted();
             multiplayer_account_checked_ = false;
+            global_chat_service_.clear();
+            global_chat_input_.clear();
+            global_chat_status_.clear();
             sites_leaderboard_service_.cancel_pending();
             sites_last_upload_status_.clear();
             sites_result_replay_sha256_.clear();
