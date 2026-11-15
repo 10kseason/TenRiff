@@ -20,4 +20,4 @@ uses the embedded vector for the mark, so its logo stays in sync with the client
 Its earlier mark PNG is preserved as an unused legacy asset. `tools/skin_editor/sync_catalog.py`
 also embeds the same vector geometry into the offline editor preview catalog.
 
-The art uses the repository's MIT license. Gameplay sprites are unchanged.
+The art retains the [MIT license](../../LICENSE-MIT); see [licensing scope](../../LICENSING.md). Gameplay sprites are unchanged.

@@ -1,3 +1,5 @@
+> **ライセンス · 2026-11-16:** 新しい独自コードの再利用・改変・再配布には、明示的な許可範囲を除き事前の書面による許可が必要です。ゲーム実行・配信・スキン制作は可能で、文書・スキン・例はMITまたは個別条件を維持します。**既存のMIT許諾と第三者の権利は変わりません。** [適用範囲](LICENSING.md) · [ライセンス](LICENSE)
+
 > **2026-11-15 · 2.0.2** マルチプレイの安定性とオンライン全体チャットを修正しました。 [Release](docs/release-2.0.2.ja.md)
 
 > **2026-11-15 · 2.0.1** オプション画面の読みやすさを修正しました。 既定の銀河背景を2.0.0の明るさの40%に下げました（元画像のRGB倍率0.392）。 8枚のカードの幅・高さと内部の文字・アイコンを85%に縮小し、クリック領域も合わせました。 選択中の項目の説明をカードの下に1行で表示します。韓国語・英語・日本語・簡体字中国語に対応します。 [Release](docs/release-2.0.1.ja.md)
@@ -178,7 +180,7 @@ Local authoring update: [AI guide](docs/skin-agent-guide.md) · [v1 format and s
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | 日本語
 
-TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。固定基準は `1.9.0`、このソースのバージョンは `1.9.2` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
+TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。固定基準は `1.9.0`、このソースのバージョンは `1.9.2` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。ライセンスは構成要素ごとに異なります。新しい独自コードの条件と既存MIT許諾の維持は[ライセンス案内](LICENSING.md)を参照してください。
 
 この README は導入文書です。現在の挙動、`1.9.2` リリースと固定 `1.9.0` の基準、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
 
@@ -224,7 +226,7 @@ TenRiff のコードベースは、伝統的な長文設計書主導だけで積
 - オーディオ経路: WASAPI（既定）、ネイティブ ASIO（Windows x64 ドライバーが必要）
 - 入力経路: RawInput または高ポーリング polling + Xbox/XInputのデジタルボタン・トリガー
 - direct-IP multiplayer: 固定 host の TCP coordinator 方式で最大8人、multiplayer の選曲は BMS のみ（既定 `27301/TCP`、[利用案内](docs/multiplayer.md)）
-- ライセンス: [MIT](LICENSE)
+- ライセンス: [TenRiff Source-Available 1.0 および構成要素別の条件](LICENSING.md)
 - サードパーティ通知: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - リリース変更履歴: [CHANGELOG.md](CHANGELOG.md)
 

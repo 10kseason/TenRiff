@@ -1,3 +1,5 @@
+> **Licensing · 2026-11-16:** Reuse, modification and redistribution of new protected project code require prior written permission outside the express grants. Gameplay, gameplay media and skin creation are allowed; documentation, skins and examples retain MIT or their specific terms. **Earlier MIT grants and third-party rights remain intact.** [Scope](LICENSING.md) · [License](LICENSE)
+
 > **2026-11-15 · 2.0.2** Fix multiplayer stability and connect account-wide global chat. [Release](docs/release-2.0.2.en.md)
 
 > **2026-11-15 · 2.0.1** Fix Options screen readability. Dim the default Options galaxy to 40% of its 2.0.0 brightness (source RGB multiplier 0.392). Reduce all eight cards to 85% width and height, including text/icons, and match their clickable bounds. Show the selected option description on one line below the cards in Korean, English, Japanese and Simplified Chinese. [Release](docs/release-2.0.1.en.md)
@@ -178,7 +180,7 @@ Publication status and downloads: [**1.9.2 release page**](https://github.com/10
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The fixed baseline is `1.9.0` and this source targets `1.9.2`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The fixed baseline is `1.9.0` and this source targets `1.9.2`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses component-specific licensing; see [LICENSING.md](LICENSING.md) for new protected code and preserved MIT rights. Bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 This README explains what to read first when opening the project. For current behavior, the `1.9.2` release, the fixed `1.9.0` baseline, configuration and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
 
@@ -224,7 +226,7 @@ Adjust lanes and notes while checking the live preview.
 - Audio path: WASAPI (default), native ASIO (requires a Windows x64 driver)
 - Input path: RawInput or high-rate polling + Xbox/XInput digital buttons and triggers
 - Direct-IP/headless-server multiplayer: fixed TCP coordinator for up to 8 players, BMS-only shared charts, and `F8` chat (default `27301/TCP`; see [usage](docs/multiplayer.md))
-- License: [MIT](LICENSE)
+- License: [TenRiff Source-Available 1.0 and component-specific terms](LICENSING.md)
 - Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - Release changelog: [CHANGELOG.md](CHANGELOG.md)
 

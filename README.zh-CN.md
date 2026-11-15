@@ -1,3 +1,5 @@
+> **许可证 · 2026-11-16：** 新增受限自有代码的复用、修改和再分发，除明确许可外，须事先取得书面许可。允许运行游戏、游戏直播和制作皮肤；文档、皮肤和示例保留MIT或各自条款。**既有MIT授权及第三方权利保持不变。** [适用范围](LICENSING.md) · [许可证](LICENSE)
+
 > **2026-11-15 · 2.0.2** 修复多人稳定性并接通在线全体聊天。 [Release](docs/release-2.0.2.zh-CN.md)
 
 > **2026-11-15 · 2.0.1** 修复选项界面的可读性。 将默认银河背景的亮度降至2.0.0的40%（原图RGB倍率为0.392）。 将8张卡片的宽高及内部文字和图标缩小至85%，并同步调整点击区域。 在卡片下方以单行显示所选选项的说明，支持韩语、英语、日语和简体中文。 [Release](docs/release-2.0.1.zh-CN.md)
@@ -178,7 +180,7 @@ Local authoring update: [AI guide](docs/skin-agent-guide.md) · [v1 format and s
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。固定基准为 `1.9.0`，此源码版本为 `1.9.2`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
+TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。固定基准为 `1.9.0`，此源码版本为 `1.9.2`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用按组件区分的许可；新增受限代码的条件与既有MIT授权的保留请参阅[许可说明](LICENSING.md)。
 
 这份 README 是入门文档。关于当前行为、`1.9.2` 发行版和固定 `1.9.0` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
 
@@ -224,7 +226,7 @@ TenRiff 也明确属于一种 `vibe coding` 作品：它更多是在快速迭代
 - 音频路径：WASAPI（默认）、原生 ASIO（需要 Windows x64 驱动）
 - 输入路径：RawInput 或高轮询率键盘 polling，加Xbox/XInput数字按钮与扳机
 - direct-IP multiplayer：固定 host 的 TCP coordinator，最多8人；multiplayer 仅可选择 BMS（默认 `27301/TCP`，见[使用说明](docs/multiplayer.md)）
-- 许可证：[MIT](LICENSE)
+- 许可证：[TenRiff Source-Available 1.0及各组件条款](LICENSING.md)
 - 第三方说明：[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
 - 发布历史：[`CHANGELOG.md`](CHANGELOG.md)
 

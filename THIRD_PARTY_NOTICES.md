@@ -1,7 +1,11 @@
 Third-Party Notices
 
-TenRiff as a whole is distributed under the MIT license in [LICENSE](LICENSE).
-Some bundled third-party components remain under their own original licenses.
+TenRiff uses component-specific licensing. New original protected material is
+subject to [LICENSE](LICENSE), with scope and examples in [LICENSING.md](LICENSING.md).
+Previously MIT-licensed material keeps its MIT rights; the original text is in
+[LICENSE-MIT](LICENSE-MIT). Bundled third-party components and the Apache-2.0
+KeyModeConverter files below retain their original licenses. The new policy
+does not add permission requirements to those components or remove their notices.
 
 External audio drivers
 

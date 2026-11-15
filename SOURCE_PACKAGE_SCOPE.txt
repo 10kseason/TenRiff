@@ -71,6 +71,8 @@ Included in versioned source bundles:
 - .github/workflows/
 - .gitignore
 - LICENSE
+- LICENSE-MIT
+- LICENSING.md
 - README.md
 - README.en.md
 - README.zh-CN.md
@@ -146,7 +148,7 @@ Notes:
 - Internal agent instructions and private working context are intentionally excluded from the public source package.
 - Local caches, converted Safetensors ONNX outputs, external Python environments, packaged binaries, user profiles, and private working files are intentionally excluded.
 - Local LLM/tooling checkouts such as `external/llama.cpp/` are intentionally excluded from the public source package.
-- The repository license is MIT and should be shipped with both source and binary distributions.
+- Licensing is component-specific. Ship LICENSE, LICENSE-MIT, LICENSING.md, THIRD_PARTY_NOTICES.md and applicable component notices with both source and binary distributions. The new source-available policy preserves all earlier MIT grants and external component rights; see LICENSING.md for scope and permission requirements.
 - The generic external ONNX/Safetensors upscaler source, converter and compatibility tools are included, but BGA upscaler models, checkpoints, training data, and model-specific verification metadata are excluded. Bundled ONNX files are limited to the project-owned NK3 P64 graph and fixed-target generalized pattern MLP inference exports; raw charts, training caches, and checkpoints remain excluded.
 - Standalone BMS key-converter source is retained for development regression only. Official 1.9.8.5 binary archives do not contain its CLI or GUI executables, and the top-level build option defaults off.
 

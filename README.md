@@ -1,3 +1,5 @@
+> **라이선스 · 2026-11-16:** 새 자체 코드의 재사용·수정·재배포는 사전 서면 허락이 필요합니다. 게임 실행·방송·스킨 제작은 허용하며, 문서·스킨·예제 등은 MIT 또는 개별 조건을 유지합니다. **기존 MIT 배포분과 외부 코드의 권리는 그대로입니다.** [적용 범위](LICENSING.md) · [라이선스](LICENSE)
+
 > **2026-11-15 · 2.0.2** 멀티 안정화와 온라인 전체 채팅을 반영했습니다. [Release](docs/release-2.0.2.ko.md)
 
 > **2026-11-15 · 2.0.1** 옵션 화면 가독성을 수정했습니다. 기본 옵션 은하 배경 밝기를 2.0.0의 40%로 낮췄습니다(원본 RGB 배율 0.392). 8개 카드의 가로·세로와 내부 글자·아이콘을 각각 85%로 줄이고 클릭 영역도 맞췄습니다. 선택한 옵션의 설명을 카드 아래 한 줄로 표시합니다. 한국어·영어·일본어·중국어를 지원합니다. [Release](docs/release-2.0.1.ko.md)
@@ -179,7 +181,7 @@ Local authoring update: [AI guide](docs/skin-agent-guide.md) · [v1 format and s
 
 Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff는 Windows GUI 기반 BMS 리듬게임 런타임/런처 프로젝트입니다. 고정 기준은 `1.9.0`, 이 소스의 버전은 `1.9.2`이며, 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용입니다. Graphics Settings에서 권리 정리된 외부 ONNX 모델을 선택해 BGA/BGI 확대에 사용할 수 있습니다. 공개 패키지에는 BGA 업스케일러 모델을 넣지 않으며, 키 모드 변환용 NK3 P64 결정 모델과 일반화 패턴 MLP만 포함합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
+TenRiff는 Windows GUI 기반 BMS 리듬게임 런타임/런처 프로젝트입니다. 고정 기준은 `1.9.0`, 이 소스의 버전은 `1.9.2`이며, 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용입니다. Graphics Settings에서 권리 정리된 외부 ONNX 모델을 선택해 BGA/BGI 확대에 사용할 수 있습니다. 공개 패키지에는 BGA 업스케일러 모델을 넣지 않으며, 키 모드 변환용 NK3 P64 결정 모델과 일반화 패턴 MLP만 포함합니다. 구성요소별 라이선스를 사용합니다. 새 자체 코드의 조건과 기존 MIT 권리 보존은 [라이선스 안내](LICENSING.md)를 참고하세요. 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
 
 이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, `1.9.2` 릴리스와 고정 `1.9.0` 기준, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽으세요.
 
@@ -225,7 +227,7 @@ TenRiff 코드는 전통적인 장기 설계 문서 중심 개발만으로 쌓�
 - 오디오 경로: WASAPI(기본), 네이티브 ASIO(Windows x64 드라이버 필요)
 - 입력 경로: RawInput 또는 고주사율 polling + Xbox/XInput 디지털 버튼·트리거
 - 직접 IP/헤드리스 서버 멀티플레이: 고정 코디네이터 기반 최대 8인 TCP 대전, BMS 전용 공통곡과 `F8` 채팅(기본 `27301/TCP`, [사용 안내](docs/multiplayer.md))
-- 라이선스: [MIT](LICENSE)
+- 라이선스: [TenRiff Source-Available 1.0 및 구성요소별 조건](LICENSING.md)
 - 서드파티 고지: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - 릴리스 변경 이력: [CHANGELOG.md](CHANGELOG.md)
 

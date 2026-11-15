@@ -70,6 +70,8 @@ $topFiles = @(
     "CHANGELOG.md",
     "launch_win.bat",
     "LICENSE",
+    "LICENSE-MIT",
+    "LICENSING.md",
     "README.md",
     "README.en.md",
     "README.ja.md",

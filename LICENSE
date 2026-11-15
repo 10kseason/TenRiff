@@ -1,21 +1,139 @@
-MIT License
+TenRiff Source-Available License 1.0
+Policy date: 2026-11-16
 
-Copyright (c) 2026 TenRiff contributors
+Copyright (c) 2026 TenRiff contributors.
+Each contributor retains copyright in their own contribution. This license
+does not assign ownership to the repository maintainer.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+1. Scope and precedence
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+This is a source-available license, not an open-source license. It applies
+only to original TenRiff material that its copyright holder first releases
+under these terms, outside the exceptions below (the "Covered Material").
+The licensor is the copyright holder granting rights in that material, or
+their authorized representative, not automatically the repository owner.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+The following exceptions take precedence over every restriction below:
+
+(a) Previously licensed material. No existing MIT or other license grant is
+    revoked or narrowed. In particular, the public snapshot at commit
+    c6f6a3a817f63f59dab13dba8a87290288cd232d and earlier MIT releases remain
+    available under MIT for their MIT-covered portions. The original MIT
+    text and copyright notice are preserved in LICENSE-MIT. Their original
+    third-party exceptions also remain. Anyone may continue to obtain, use,
+    modify and redistribute those portions under those terms, including
+    when the same material appears unchanged in a later version. A new
+    filename, version number or license notice does not remove those rights.
+    Material previously licensed permissively elsewhere is also excluded.
+
+(b) Third-party and separately licensed material. Existing file-level and
+    component licenses, copyright notices, patent grants, source-offer
+    obligations and attribution requirements remain in force. See
+    THIRD_PARTY_NOTICES.md and each component's notices. This includes
+    external/, third_party/, nk2e/, nk2eplus/, and the Apache-2.0-licensed
+    src/gameplay/KeyModeConverter.cpp and src/gameplay/KeyModeConverter.h.
+    This license grants no additional rights in another person's work and
+    imposes no additional restrictions on rights granted by its license.
+    Separately licensed material keeps its license when copied elsewhere.
+
+(c) Permissive project materials. Original project contributions in docs/,
+    examples/, skins/, assets/, Mainmusic/, config/, models/, and
+    tools/skin_editor/, plus launch_skin_editor.bat, remain under LICENSE-MIT,
+    unless a more specific license or third-party notice applies. This
+    permission is given only by contributors entitled to grant it. It does
+    not claim ownership of third-party music, charts, fonts, models or art.
+
+Subject to these exceptions, the default for new original engine/game code,
+tests, development tools and build scripts first released with this policy
+is this license. Merely placing an old contribution in such a path does not
+relicense it. For a file containing both earlier permissive code and new
+Covered Material, these terms apply only to the new Covered Material.
+
+2. Permissions without a separate agreement
+
+Subject to retaining applicable notices, you may, without a license fee:
+
+(a) View, download and keep copies of the Covered Material for private study
+    and evaluation, and build and run unmodified source for your own use.
+(b) Install and run official TenRiff binaries for gameplay and operate an
+    unmodified TenRiff multiplayer server. These permissions do not depend
+    on whether gameplay, an event or a gameplay recording earns revenue.
+(c) Share complete, unmodified official binary release packages without
+    charging for the package, preserving this license and all applicable
+    third-party notices and required source materials or source offers.
+(d) Create, use and distribute independently authored charts, skins,
+    configurations and tools using the documented formats/interfaces. Your
+    original creations and game output are not subject to this license
+    merely because they work with TenRiff. Third-party content still needs
+    its own permission. Reusing Covered Material in a tool is not authorized
+    by this paragraph.
+(e) Publish gameplay screenshots, videos, streams, reviews and commentary,
+    including monetized content, to the extent the licensor owns the rights.
+(f) Make changes solely to prepare a contribution to TenRiff and submit that
+    contribution through this repository's review process. Hosting the
+    corresponding review branch and patch for that purpose is permitted.
+    This does not permit distributing a separate modified game or product.
+
+Rights granted by GitHub's applicable Terms of Service, including public
+repository viewing and forking, are not restricted by this license. Such
+forking does not by itself grant any additional right to reuse Covered
+Material outside those terms and the permissions above.
+
+3. Uses requiring prior written permission
+
+Except as permitted in section 2 or by an exception in section 1, you must
+obtain prior written permission from the relevant copyright holder(s) to:
+
+(a) Copy or incorporate Covered Material into another project or product.
+(b) Modify, adapt, port, translate or otherwise create derivative works of
+    Covered Material.
+(c) Redistribute Covered Material as source or binaries, including modified
+    versions, or sell, sublicense or commercially license it.
+
+These requirements apply to both commercial and noncommercial reuse. A
+copyright notice or credit alone is not permission. No blanket commercial
+reuse license is granted. All rights not expressly granted are reserved.
+Nothing here restricts uses allowed by applicable law, including copyright
+exceptions, or any third-party license rights (including LGPL modification,
+replacement, relinking and reverse-engineering rights where applicable).
+
+4. Permission requests and contributions
+
+Request permission at https://github.com/10kseason/TenRiff/issues using the
+subject "License permission request", identifying the files/version, intended
+use, modifications and distribution. Do not post confidential information.
+The repository maintainer can grant permission only for rights they own or
+are authorized to license. Silence or issue closure is not approval. Written
+permission must explicitly identify the authorized use and relevant rights.
+
+Contributors retain ownership. Submit new original contributions under the
+terms applicable to their destination, and identify any separately licensed
+material. No copyright assignment, retroactive relicensing or authority to
+relicense somebody else's contribution is implied by accepting a patch.
+By intentionally submitting new Covered Material for inclusion in TenRiff,
+you grant its maintainers a nonexclusive, worldwide, royalty-free permission
+to use, reproduce, modify and distribute your contribution as part of
+official TenRiff source and binary releases under this license. This grant
+does not authorize them to remove third-party terms or relicense your
+contribution under unrelated terms. Separately licensed submissions retain
+their stated terms instead.
+
+5. Names and notices
+
+No trademark right or right to imply official endorsement is granted.
+Truthful attribution and identification of compatibility remain permitted.
+Do not remove applicable copyright, license or third-party notices from
+copies made under this license. See LICENSING.md for scope and examples.
+
+6. Disclaimer
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE COVERED MATERIAL IS
+PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+BUT NOT LIMITED TO MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL ITS AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM THE MATERIAL
+OR ITS USE, WHETHER IN CONTRACT, TORT OR OTHERWISE. MANDATORY STATUTORY
+RIGHTS ARE NOT EXCLUDED.
+
+This English license text governs; explanatory translations and summaries
+do not expand its scope or override the exceptions in section 1.
