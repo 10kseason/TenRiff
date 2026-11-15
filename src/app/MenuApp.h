@@ -98,7 +98,7 @@ class MenuApp {
     friend struct MenuAppFeedbackTestAccess;
     friend struct MenuAppRoomChatTestAccess;
 public:
-    MenuApp();
+    explicit MenuApp(network::HostedHttpTransport chat_transport = {});
     ~MenuApp();
 
     MenuApp(const MenuApp&) = delete;
@@ -331,6 +331,7 @@ private:
     [[nodiscard]] bool open_multiplayer_chat_shortcut();
     [[nodiscard]] bool handle_multiplayer_chat_overlay_input(uint32_t keycode);
     void set_multiplayer_chat_overlay(bool visible);
+    [[nodiscard]] bool global_chat_available() const;
     void populate_multiplayer_chat_overlay(render::ChatOverlayData& target);
     [[nodiscard]] bool send_multiplayer_chat_input();
     [[nodiscard]] std::string now_playing_chat_message() const;
@@ -786,6 +787,8 @@ private:
     OnlineRecordsService online_records_service_{};
     SitesLeaderboardService sites_leaderboard_service_{};
     GlobalChatService global_chat_service_{};
+    std::string global_chat_input_;
+    std::string global_chat_status_;
     network::LanDiscoveryService lan_discovery_{};
     MultiplayerMenuState multiplayer_menu_{};
     bool multiplayer_account_checked_ = false;

@@ -379,7 +379,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | `hit_burst_palette` | `soft`, `pastel`, `oil`, `mono`, `cyberpunk`; `soft` | 内蔵エフェクトの標準、パステル、油彩、単色、サイバーパンク。 |
 | `hit_burst_override` | bool; `false` | 有効時はスキンの既定値よりプロファイルの形と明るさを優先します。 |
 | `judgement_line_type2_color` | color token; `off` | タイプ 2 の帯を指定色で塗りつぶします。`off` は既定の緑の枠です。 |
-| `hud_layout` | `classic`, `studio`; `studio` | Native・LR2ソロ用HUD。LR2ノート・キー・ギア画像と比率を維持。欠落・不明値は`studio`で、Options › SkinsでClassicへ変更できます。1.8.9は右上情報・左下点数・右下横向きマップを配置し、狭い余白では全体縮小・反対側移動。極端なフィールドとPerformance HUDが両側上部を塞ぐ場合は情報カードだけを非表示。他の画像スキン・ゴースト・マルチはClassic維持。[配置と検証範囲](release-1.8.9-gate.md)。 |
+| `hud_layout` | `classic`, `studio`; `studio` | Native・取り込んだLR2はソロとマルチで同じHUD選択を使います。TenRiff画像スキンとメニュー専用スキンも選択中の素材・スタイルを維持します。 [Details](multiplayer-skins.ja.md). |
 | `hud_riff_map_visible` | bool; `true` | Studio Deckの64区間の横向き密度マップと経過／全体時間。基本位置は右下で、余白に応じて移動・縮小し、非常に狭い場合は時間文字を省略。Options › Skins › Studio Riff Mapで変更しプロファイル・スキンプリセットに保存。非表示でも他のカード位置とClassic HUDは維持。 |
 | `ui_font` | `default`, `malgun`, `bahnschrift`, `consolas`; `default` | メニューの書体。default は Segoe UI。ロゴ・ランク・コンボ専用書体は維持。 |
 | `key_label_position` | `bottom`, `top`, `off`; `bottom` | レーンのキー名表示位置。 |

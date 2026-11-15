@@ -1507,3 +1507,15 @@
 {"NOTE SPEED", "ノート速度"},
 {"Note Speed", "ノート速度"},
 {"GAUGE SHIFT", "ゲージシフト"},
+
+{"Choose Classic or Studio Deck for Native or imported LR2 in solo and multiplayer. Other image skins keep their own HUD; ghost battles keep the shared layout.", "Native・LR2のソロとマルチでClassicかStudio Deckを選びます。他の画像スキンは独自HUD、ゴースト対戦は共有配置を維持します。"},
+{"Hash check complete.", "ハッシュチェック完了"},
+{"Hash check pending.", "ハッシュチェック待機中"},
+
+{"Connect your account in online mode to chat.", "オンラインモードでアカウントを連携するとチャットできます。"},
+
+{"Chat is unavailable. Check your connection and try again.", "チャットを送信できません。接続を確認して再試行してください。"},
+
+{"Chat unavailable. Open F10 to reconnect.", "チャットに接続できません。F10で再接続してください。"},
+
+{"Connecting...", "接続中..."},

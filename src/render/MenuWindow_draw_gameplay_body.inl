@@ -2540,10 +2540,20 @@
         };
 
         const bool opponents_on_left = field_left - 52.0f >= 1776.0f - field_right;
-        const float opponents_left = surface_layout.ghost_visible ? 820.0f :
+        const auto studio_opponents = studio && data.gameplay.peer_visible
+            ? compute_gameplay_studio_opponents_layout(field_left, field_right, studio_deck,
+                static_cast<std::size_t>(std::count_if(data.gameplay.multiplayer_players.begin(),
+                    data.gameplay.multiplayer_players.end(), [](const auto& player) { return !player.local; })),
+                data.performance.visible ? performance_overlay_panel_rect().left : 1920.0f,
+                data.performance.visible ? performance_overlay_panel_rect().bottom : 0.0f)
+            : GameplayStudioOpponentsLayout{};
+        const bool fit_studio_opponents = studio_opponents.card_scale > 0.0f;
+        const float opponents_left = fit_studio_opponents ? studio_opponents.left : surface_layout.ghost_visible ? 820.0f :
             opponents_on_left ? 32.0f : field_right + 112.0f;
-        const float opponents_right = surface_layout.ghost_visible ? 1100.0f :
+        const float opponents_right = fit_studio_opponents ? studio_opponents.right : surface_layout.ghost_visible ? 1100.0f :
             opponents_on_left ? std::min(520.0f, field_left - 20.0f) : std::min(1888.0f, opponents_left + 488.0f);
+        const float opponents_top = fit_studio_opponents ? studio_opponents.top : 210.0f;
+        const float opponents_card_scale = fit_studio_opponents ? studio_opponents.card_scale : 1.0f;
         GameplayProgressTrackLayout battle_header{};
         const auto player_summary = surface_layout.ghost_visible
             ? battle_summary_layout(surface_layout.player_field) : GameplayBattleSummaryLayout{};
@@ -2582,9 +2592,11 @@
                           ghost_summary.right - 12.0f, ghost_summary.bottom + 20.0f)
             : ng_rect("progress", D2D1::RectF(progress_track_layout.left, 16.0f, progress_track_layout.right, 36.0f));
         if (!studio && !embed_battle_header) draw_gameplay_progress_bar(progress_track_rect);
-        if (data.gameplay.peer_visible) {
+        if (data.gameplay.peer_visible && (!studio || fit_studio_opponents)) {
             const D2D1_RECT_F lead_track =
-                D2D1::RectF(opponents_left + 14.0f, 186.0f, opponents_right - 14.0f, 198.0f);
+                D2D1::RectF(opponents_left + 14.0f, opponents_top - 24.0f, opponents_right - 14.0f, opponents_top - 12.0f);
+            const float lead_label_width = fit_studio_opponents
+                ? (lead_track.right - lead_track.left) / 3.0f : 120.0f;
             const float lead_center_x = (lead_track.left + lead_track.right) * 0.5f;
             const float lead_position = static_cast<float>(
                 std::clamp(data.gameplay.versus_score_position, 0.0, 1.0));
@@ -2655,34 +2667,36 @@
             if (scene_body_format && d2d_->text_brush) {
                 const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
                 d2d_->text_brush->SetColor(ng_color("timing_slow",D2D1::ColorF(0xFF5A6B, 0.96f)));
-                draw_readable_text(L"LOSS",
+                draw_fitted_readable_text(L"LOSS",
                                   scene_body_format.Get(),
                                   D2D1::RectF(lead_track.left,
                                               lead_track.top - 31.0f,
-                                              lead_track.left + 120.0f,
+                                              lead_track.left + lead_label_width,
                                               lead_track.top - 3.0f),
-                                  d2d_->text_brush.Get());
+                                  d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING);
                 d2d_->text_brush->SetColor(D2D1::ColorF(0x89D185, 0.96f));
-                draw_readable_text_aligned(L"WIN",
+                draw_fitted_readable_text(L"WIN",
                                           scene_body_format.Get(),
-                                          D2D1::RectF(lead_track.right - 120.0f,
+                                          D2D1::RectF(lead_track.right - lead_label_width,
                                                       lead_track.top - 31.0f,
                                                       lead_track.right,
                                                       lead_track.top - 3.0f),
                                           d2d_->text_brush.Get(),
                                           DWRITE_TEXT_ALIGNMENT_TRAILING);
                 d2d_->text_brush->SetColor(D2D1::ColorF(0xF7FAFD, 0.94f));
-                draw_readable_text_aligned(scene_hud_cache.versus_score_difference_text,
+                draw_fitted_readable_text(scene_hud_cache.versus_score_difference_text,
                                           scene_body_format.Get(),
-                                          D2D1::RectF(lead_center_x - 120.0f,
+                                          D2D1::RectF(lead_center_x - lead_label_width * (fit_studio_opponents ? .5f : 1.0f),
                                                       lead_track.top - 31.0f,
-                                                      lead_center_x + 120.0f,
+                                                      lead_center_x + lead_label_width * (fit_studio_opponents ? .5f : 1.0f),
                                                       lead_track.top - 3.0f),
                                           d2d_->text_brush.Get(),
                                           DWRITE_TEXT_ALIGNMENT_CENTER);
                 d2d_->text_brush->SetColor(saved_text_color);
             }
 
+        }
+        if (data.gameplay.peer_visible) {
             if (data.gameplay.spectating_peer && d2d_->panel_brush &&
                 scene_header_format && d2d_->text_brush) {
                 const D2D1_RECT_F spectator_rect =
@@ -2698,7 +2712,7 @@
                                           DWRITE_TEXT_ALIGNMENT_CENTER);
             }
         }
-        if (data.gameplay.peer_visible) {
+        if (data.gameplay.peer_visible && (!studio || fit_studio_opponents)) {
 #include "MenuWindow_draw_gameplay_multiplayer.inl"
         }
         if (studio) draw_studio_rails();

@@ -119,7 +119,16 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
     const bool active = peer_session_is_active(peer.state);
     const bool connected = peer.state == network::PeerSessionState::Connected;
     const bool round_active = last_game_was_multiplayer_ || peer_round_ui_locked(peer);
-    const bool chart_matches = multiplayer_chart_fingerprints_match(multiplayer_menu_);
+    // Read selection and acknowledgement from the same transport snapshot;
+    // the cached menu state may precede a selection/reset reply by one frame.
+    MultiplayerMenuState acknowledged_chart;
+    acknowledged_chart.connected = connected;
+    acknowledged_chart.local_chart_fingerprint = peer.local_chart.fingerprint.hash;
+    acknowledged_chart.local_chart_size = peer.local_chart.fingerprint.size;
+    acknowledged_chart.peer_chart_fingerprint = peer.selected_chart.fingerprint.hash;
+    acknowledged_chart.peer_chart_size = peer.selected_chart.fingerprint.size;
+    const bool chart_matches = !multiplayer_chart_path_.empty() && multiplayer_hash_check_complete(
+        acknowledged_chart, multiplayer_chart_fingerprint_.hash, multiplayer_chart_fingerprint_.size);
     const auto rooms = peer_session_.hosted_rooms();
     const auto* room = rooms.empty() ? nullptr : &rooms[std::min(multiplayer_server_room_index_, rooms.size() - 1)];
     auto row = [&](MultiplayerMenuRow id, const std::string& label, const std::string& value, bool action, bool adjust = false) {
@@ -148,9 +157,16 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
         connected && !round_active && chart_matches && !peer.rate_change_pending);
     row(MultiplayerMenuRow::Start, ui_text("Start Match", "대전 시작"), ui_text("LEADER + ALL READY", "리더 + 전원 준비 필요"),
         !round_active && peer.can_start && peer.local_is_leader);
-    row(MultiplayerMenuRow::Chat, ui_text("Room Chat", "방 채팅"), multiplayer_menu_.chat_input, connected);
+    row(MultiplayerMenuRow::Chat, ui_text("Global Chat", "전체 채팅"), global_chat_input_, global_chat_available());
     row(MultiplayerMenuRow::Options, ui_text("Options", "옵션"), "", !round_active);
     row(MultiplayerMenuRow::Back, ui_text("Back", "뒤로"), "", true);
+    // Keep verification visible even after chat or other actions clear the
+    // transient status message, and before an eight-player roster fills notes.
+    if (connected && peer.selected_chart.fingerprint.valid()) {
+        render.generic.notes.push_back(chart_matches
+            ? ui_text("Hash check complete.", "해시 체크 완료")
+            : ui_text("Hash check pending.", "해시 체크 대기 중"));
+    }
     render.generic.notes.push_back(ui_text("Players: ", "인원: ") + std::to_string(peer.participant_count) + "/8");
     for (const auto& player : peer.participants) {
         std::string line = "#" + std::to_string(player.player_id) + " " + player.name;
@@ -165,19 +181,26 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
     render.generic.notes.push_back(ui_text("Connected accounts only. A leaderboard score is not required.", "연결 계정만 참가할 수 있습니다. 리더보드 기록은 없어도 됩니다."));
     render.generic.notes.push_back(ui_text("Scores are client claims. Network delay does not change local judgement.", "점수는 클라이언트 제출값입니다. 네트워크 지연은 로컬 판정을 변경하지 않습니다."));
     render.generic.footer_reserved_lines = 6;
-    render.generic.footer_notes.push_back(ui_text("Room Chat", "방 채팅"));
-    const auto begin = peer.chat_messages.size() > 4 ? peer.chat_messages.size() - 4 : 0;
-    for (std::size_t i = begin; i < peer.chat_messages.size(); ++i)
-        render.generic.footer_notes.push_back("#" + std::to_string(peer.chat_messages[i].player_id) + ": " + peer.chat_messages[i].text);
+    render.generic.footer_notes.push_back(ui_text("Global Chat", "전체 채팅"));
+    const auto chat = global_chat_service_.snapshot();
+    if (online_play_mode_ && chat.online) {
+        const auto begin = chat.messages.size() > 4 ? chat.messages.size() - 4 : 0;
+        for (std::size_t i = begin; i < chat.messages.size(); ++i)
+            render.generic.footer_notes.push_back(chat.messages[i].username + ": " + chat.messages[i].text);
+    }
     render.generic.footer_notes.push_back(ui_text("F11 CHAT / F10 ACCOUNT / ESC BACK", "F11 채팅 / F10 계정 / ESC 뒤로"));
 }
 
 bool MenuApp::open_multiplayer_chat_shortcut() {
     const bool opening = !chat_overlay_visible_;
     set_multiplayer_chat_overlay(opening);
-    if (opening) multiplayer_status_message_.clear();
+    if (opening) global_chat_status_.clear();
     publish_snapshot();
     return true;
+}
+
+bool MenuApp::global_chat_available() const {
+    return online_play_mode_ && global_chat_service_.snapshot().online;
 }
 
 void MenuApp::set_multiplayer_chat_overlay(bool visible) {
@@ -188,7 +211,7 @@ void MenuApp::set_multiplayer_chat_overlay(bool visible) {
     }
     gameplay_overlay_capture_active_.store(
         visible || ranked_account_overlay_visible_, std::memory_order_release);
-    const bool authenticated = peer_session_.snapshot().state == network::PeerSessionState::Connected;
+    const bool authenticated = global_chat_available();
     if (visible && authenticated) {
         multiplayer_menu_.cursor = static_cast<int>(MultiplayerMenuRow::Chat);
         multiplayer_menu_.edit_field = MultiplayerEditField::Chat;
@@ -205,10 +228,10 @@ bool MenuApp::handle_multiplayer_chat_overlay_input(uint32_t keycode) {
         return true;
     }
 
-    const bool authenticated = peer_session_.snapshot().state == network::PeerSessionState::Connected;
+    const bool authenticated = global_chat_available();
     if (!authenticated) {
         multiplayer_status_message_ =
-            ui_text("Join a room to chat.", "방에 참가한 뒤 채팅할 수 있습니다.");
+            ui_text("Connect your account in online mode to chat.", "온라인 모드에서 계정을 연결하면 채팅할 수 있습니다.");
         publish_snapshot();
         return true;
     }
@@ -219,12 +242,12 @@ bool MenuApp::handle_multiplayer_chat_overlay_input(uint32_t keycode) {
         return true;
     }
     if (keycode == key_backspace_) {
-        erase_last_multiplayer_utf8_character(multiplayer_menu_.chat_input);
+        erase_last_multiplayer_utf8_character(global_chat_input_);
         publish_snapshot();
         return true;
     }
     if (keycode == key_delete_) {
-        multiplayer_menu_.chat_input.clear();
+        global_chat_input_.clear();
         publish_snapshot();
         return true;
     }
@@ -232,20 +255,20 @@ bool MenuApp::handle_multiplayer_chat_overlay_input(uint32_t keycode) {
 }
 
 bool MenuApp::send_multiplayer_chat_input() {
-    std::string message = util::sanitize_ui_text(multiplayer_menu_.chat_input);
+    std::string message = util::sanitize_ui_text(global_chat_input_);
     if (is_now_playing_chat_command(message)) message = now_playing_chat_message();
     if (message.empty()) {
-        multiplayer_status_message_ = ui_text(
+        global_chat_status_ = ui_text(
             "Type a message before sending.", "전송할 메시지를 먼저 입력하세요.");
         return false;
     }
-    if (!peer_session_.send_chat(message)) {
-        multiplayer_status_message_ = ui_text(
-            "Join a room to chat.", "방에 참가한 뒤 채팅할 수 있습니다.");
+    if (!global_chat_available() || !global_chat_service_.send(message)) {
+        global_chat_status_ = ui_text(
+            "Chat is unavailable. Check your connection and try again.", "채팅을 전송할 수 없습니다. 연결 상태를 확인한 뒤 다시 시도하세요.");
         return false;
     }
-    multiplayer_menu_.chat_input.clear();
-    multiplayer_status_message_.clear();
+    global_chat_input_.clear();
+    global_chat_status_.clear();
     return true;
 }
 
@@ -273,19 +296,27 @@ std::string MenuApp::now_playing_chat_message() const {
 }
 
 void MenuApp::populate_multiplayer_chat_overlay(render::ChatOverlayData& target) {
-    const auto peer = peer_session_.snapshot();
+    const auto chat = global_chat_service_.snapshot();
     target.visible = chat_overlay_visible_;
-    target.connected = peer.state == network::PeerSessionState::Connected;
-    target.title = ui_text("Room Chat", "방 채팅");
+    target.connected = online_play_mode_ && chat.online;
+    target.title = ui_text("Global Chat", "전체 채팅");
     target.status = target.connected ? ui_text("ONLINE", "온라인") : ui_text("OFFLINE", "오프라인");
-    target.input = target.connected ? multiplayer_menu_.chat_input + " _" : ui_text("Join a room to chat.", "방에 참가한 뒤 채팅할 수 있습니다.");
+    if (online_play_mode_ && chat.configured && !chat.online)
+        target.status = chat.error.empty() ? ui_text("Connecting...", "연결 중...") :
+            ui_text("Chat unavailable. Open F10 to reconnect.", "채팅 연결을 사용할 수 없습니다. F10에서 다시 연결하세요.");
+    if (target.connected && !global_chat_status_.empty()) target.status = global_chat_status_;
+    target.input = target.connected ? global_chat_input_ + " _" :
+        ui_text("Connect your account in online mode to chat.", "온라인 모드에서 계정을 연결하면 채팅할 수 있습니다.");
     target.hint = ui_text("/np now playing   ENTER send   ESC/F11 close", "/np 현재 곡   ENTER 전송   ESC/F11 닫기");
+    target.messages.clear();
     chat_overlay_message_urls_.clear();
-    const auto begin = peer.chat_messages.size() > 5 ? peer.chat_messages.size() - 5 : 0;
-    for (std::size_t i = begin; i < peer.chat_messages.size(); ++i) {
-        const auto& message = peer.chat_messages[i];
-        target.messages.push_back("#" + std::to_string(message.player_id) + ": " + message.text);
-        chat_overlay_message_urls_.push_back(first_chat_web_url(message.text).value_or(std::string{}));
+    if (online_play_mode_ && chat.online) {
+        const auto begin = chat.messages.size() > 5 ? chat.messages.size() - 5 : 0;
+        for (std::size_t i = begin; i < chat.messages.size(); ++i) {
+            const auto& message = chat.messages[i];
+            target.messages.push_back(message.username + ": " + message.text);
+            chat_overlay_message_urls_.push_back(first_chat_web_url(message.text).value_or(std::string{}));
+        }
     }
     target.message_urls = chat_overlay_message_urls_;
 }
@@ -369,7 +400,7 @@ void MenuApp::drain_gameplay_chat_input() {
         handle_text_input(*text);
     }
     if (chat_overlay_visible_) {
-        const auto chat = peer_session_.snapshot();
+        const auto chat = global_chat_service_.snapshot();
         std::string signature = std::to_string(chat.revision);
         if (signature != chat_overlay_message_signature_) {
             chat_overlay_message_signature_ = std::move(signature);
@@ -391,12 +422,12 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
             return;
         }
         if (keycode == key_backspace_) {
-            erase_last_multiplayer_utf8_character(multiplayer_menu_.chat_input);
+            erase_last_multiplayer_utf8_character(global_chat_input_);
             publish_snapshot();
             return;
         }
         if (keycode == key_delete_) {
-            multiplayer_menu_.chat_input.clear();
+            global_chat_input_.clear();
             publish_snapshot();
             return;
         }
@@ -629,9 +660,9 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
         return;
     }
     if (row == MultiplayerMenuRow::Chat) {
-        if (peer_session_.snapshot().state != network::PeerSessionState::Connected) {
+        if (!global_chat_available()) {
             multiplayer_status_message_ =
-                ui_text("Join a room to chat.", "방에 참가한 뒤 채팅할 수 있습니다.");
+                ui_text("Connect your account in online mode to chat.", "온라인 모드에서 계정을 연결하면 채팅할 수 있습니다.");
         } else {
             set_multiplayer_chat_overlay(true);
             multiplayer_status_message_.clear();

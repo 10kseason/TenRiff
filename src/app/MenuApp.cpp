@@ -720,7 +720,8 @@ std::vector<uint32_t> build_menu_probe_keycodes(const std::vector<uint32_t>& fix
     return keycodes;
 }
 
-MenuApp::MenuApp() = default;
+MenuApp::MenuApp(network::HostedHttpTransport chat_transport)
+    : global_chat_service_(std::move(chat_transport)) {}
 
 std::string MenuApp::profile_display_name() const {
     const std::string nickname =
@@ -1357,7 +1358,7 @@ void MenuApp::run() {
         const auto global_chat = global_chat_service_.snapshot();
         if (global_chat.revision != global_chat_last_revision_) {
             global_chat_last_revision_ = global_chat.revision;
-            if (chat_overlay_visible_) publish_snapshot();
+            if (chat_overlay_visible_ || current_screen() == Screen::Multiplayer) publish_snapshot();
         }
 
         if (current_screen() == Screen::SongSelect &&
@@ -3722,13 +3723,12 @@ void MenuApp::handle_text_input(std::string_view text) {
     }
     if (profile_control_key_capture_active_) return;
     if (ranked_account_overlay_visible_ || chat_url_warning_visible_) return;
-    // Room chat uses the active peer transport (including hosted rooms), not
-    // the unrelated legacy global-chat service. Match the overlay/send gate.
+    // Global chat follows the online account independently of room membership.
+    // Keep committed text aligned with the overlay/send gate.
     if (chat_overlay_visible_) {
         // An inactive chat overlay still consumes text; it must not leak to a
         // nickname/search field underneath it after a disconnect.
-        if (peer_session_.snapshot().state != network::PeerSessionState::Connected ||
-            multiplayer_menu_.edit_field != MultiplayerEditField::Chat || text.empty()) return;
+        if (!global_chat_available() || text.empty()) return;
         const std::string utf8 = util::ensure_utf8_text(text);
         std::string printable;
         printable.reserve(utf8.size());
@@ -3738,7 +3738,8 @@ void MenuApp::handle_text_input(std::string_view text) {
             }
         }
         if (try_append_multiplayer_chat_text(
-                multiplayer_menu_.chat_input, printable)) {
+                global_chat_input_, printable)) {
+            global_chat_status_.clear();
             publish_snapshot();
         }
         return;

@@ -3028,7 +3028,7 @@ int main(int argc, char** argv) {
     }
     if (chat_overlay) {
         data.chat_overlay.visible = true; data.chat_overlay.connected = true;
-        data.chat_overlay.title = loc("Chat preview", "채팅 미리보기");
+        data.chat_overlay.title = loc("Global Chat", "전체 채팅");
         data.chat_overlay.messages = {"PLAYER: Readable UI text", "PLAYER 2: 밝은 배경에서도 확인합니다."};
         // Synthetic URL provides an actual ChatUrl hit for overlay hover checks.
         data.chat_overlay.message_urls = {"", "https://example.test/synthetic"};

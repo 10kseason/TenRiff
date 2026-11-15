@@ -1,3 +1,11 @@
+# 2.0.2 — 2026-11-15
+
+- Keep the complete selected solo skin/HUD in multiplayer. Fit opponent information into free side space; hide only auxiliary cards if space is insufficient.
+- Show hash-check completion only after the local chart agrees with the server acknowledgement. Poll at 250ms instead of 500ms during start/end barriers and reuse HTTPS connections.
+- Fix final-score positions regressing behind the latest live update and blocking result synchronization.
+- After connecting an online account, use F11 global chat from Home, song selection, options, gameplay, results and multiplayer. The new UI uses global chat only; no room or score upload is required.
+- Preserve old room APIs, protocol 2/ex-v1 and final4 compatibility. [Release notes](docs/release-2.0.2.en.md)
+
 # 2.0.1 — 2026-11-15
 
 - Dim the default Options galaxy to 40% of its 2.0.0 brightness (source RGB multiplier 0.392).

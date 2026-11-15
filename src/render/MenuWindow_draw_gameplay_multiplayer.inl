@@ -1,9 +1,13 @@
             std::size_t opponent_index = 0;
             const float panel_left = opponents_left;
-            const float panel_right = opponents_right;
+            const float panel_right = panel_left + (opponents_right - panel_left) / opponents_card_scale;
             for (const auto& player : data.gameplay.multiplayer_players) {
                 if (player.local) continue;
-                const float top = 210.0f + static_cast<float>(opponent_index++) * 104.0f;
+                const float top = opponents_top + static_cast<float>(opponent_index++) * 104.0f * opponents_card_scale;
+                D2D1_MATRIX_3X2_F saved_opponent_transform{};
+                ctx->GetTransform(&saved_opponent_transform);
+                ctx->SetTransform(D2D1::Matrix3x2F::Scale(opponents_card_scale, opponents_card_scale,
+                    D2D1::Point2F(panel_left, top)) * saved_opponent_transform);
                 const D2D1_RECT_F rect = D2D1::RectF(panel_left, top, panel_right, top + 96.0f);
                 const auto saved_panel_color = d2d_->panel_brush->GetColor();
                 d2d_->panel_brush->SetColor(D2D1::ColorF(0x141D28, 0.96f));
@@ -28,4 +32,5 @@
                 ctx->FillRoundedRectangle(D2D1::RoundedRect(track, 3, 3), d2d_->button_border_brush.Get());
                 const float end = track.left + (track.right - track.left) * static_cast<float>(std::clamp(player.gauge / 100.0, 0.0, 1.0));
                 ctx->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(track.left, track.top, end, track.bottom), 3, 3), d2d_->accent_brush.Get());
+                ctx->SetTransform(saved_opponent_transform);
             }

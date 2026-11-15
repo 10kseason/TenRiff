@@ -214,6 +214,15 @@ inline bool try_append_multiplayer_chat_text(std::string& target,
     return state.connected && multiplayer_chart_fingerprints_match(state);
 }
 
+// The completion label needs both the room acknowledgement and this PC's
+// verified file. A cached acknowledgement must not complete a new selection.
+[[nodiscard]] inline constexpr bool multiplayer_hash_check_complete(
+    const MultiplayerMenuState& acknowledged, uint64_t verified_hash, uint64_t verified_size) {
+    return multiplayer_ready_gate_open(acknowledged) &&
+           acknowledged.local_chart_fingerprint == verified_hash &&
+           acknowledged.local_chart_size == verified_size;
+}
+
 [[nodiscard]] inline constexpr bool multiplayer_start_gate_open(const MultiplayerMenuState& state) {
     return multiplayer_ready_gate_open(state) && state.local_ready && state.peer_ready;
 }

@@ -182,14 +182,27 @@ bool production_transport(std::string_view method, std::string_view path,
         path.substr(0, 5) != "/api/" || body.size() > 16 * 1024 ||
         !(token_valid(bearer, "tr_") || token_valid(bearer, "mp_"))) return false;
 #ifdef _WIN32
-    InternetHandle session(WinHttpOpen(L"TenRiff/hosted-v2-ex", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
-                                       WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0));
-    if (!session.value || !WinHttpSetTimeouts(session.value, 2000, 2000, 2000, 2000)) return false;
-    InternetHandle connection(WinHttpConnect(session.value,
-        L"tenriff-multiplayer.lastestarcorp.chatgpt.site", INTERNET_DEFAULT_HTTPS_PORT, 0));
-    if (!connection.value) return false;
+    // One worker owns these handles. Keeping the session alive lets WinHTTP
+    // reuse HTTPS connections across polls; request headers/tokens remain local
+    // to each request and all handles close when this worker exits.
+    struct WorkerConnection {
+        InternetHandle session{nullptr};
+        InternetHandle connection{nullptr};
+        bool open() {
+            if (!session.value) {
+                session.value = WinHttpOpen(L"TenRiff/hosted-v2-ex", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
+                    WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+            }
+            if (!session.value || !WinHttpSetTimeouts(session.value, 2000, 2000, 2000, 2000)) return false;
+            if (!connection.value) connection.value = WinHttpConnect(session.value,
+                L"tenriff-multiplayer.lastestarcorp.chatgpt.site", INTERNET_DEFAULT_HTTPS_PORT, 0);
+            return connection.value != nullptr;
+        }
+    };
+    thread_local WorkerConnection transport;
+    if (!transport.open()) return false;
     const std::wstring wide_method(method.begin(), method.end()), wide_path(path.begin(), path.end());
-    InternetHandle request(WinHttpOpenRequest(connection.value, wide_method.c_str(), wide_path.c_str(),
+    InternetHandle request(WinHttpOpenRequest(transport.connection.value, wide_method.c_str(), wide_path.c_str(),
         nullptr, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE));
     if (!request.value) return false;
     DWORD policy = WINHTTP_OPTION_REDIRECT_POLICY_NEVER;
@@ -224,6 +237,8 @@ bool production_transport(std::string_view method, std::string_view path,
 }
 }  // namespace
 
+HostedHttpTransport make_hosted_http_transport() { return production_transport; }
+
 struct HostedPeerSession::Impl {
     explicit Impl(HostedHttpTransport sender) : transport(sender ? std::move(sender) : production_transport) {}
     HostedHttpTransport transport;
@@ -242,6 +257,8 @@ struct HostedPeerSession::Impl {
     std::optional<Clock::time_point> begin_at;
     bool begin_consumed = false;
     bool final_queued = false;
+    std::optional<int64_t> latest_local_sample;
+    bool loading_barrier = false;
     bool local_chart_invalidated = false;
     std::optional<ChartFingerprint> pending_chart;
     bool reset_queued = false;
@@ -274,6 +291,12 @@ struct HostedPeerSession::Impl {
         }
         commands.push_back({std::move(action), std::move(path), std::move(id), std::move(payload)});
         wake.notify_all(); return true;
+    }
+    std::chrono::milliseconds poll_interval_locked() const {
+        // The existing server rejects polls less than 200 ms apart. Speed up
+        // only synchronization barriers, retaining the normal play/lobby rate.
+        return current.round_active && (loading_barrier ||
+            (final_queued && !current.all_remote_finished) || reset_queued) ? 250ms : 500ms;
     }
     bool active_locked() const { return running && !stopping && current.state == PeerSessionState::Connected; }
 
@@ -405,11 +428,12 @@ struct HostedPeerSession::Impl {
         }
         next.revision = current.revision + 1;
         current = std::move(next);
+        loading_barrier = phase == "loading";
         if (phase == "loading" && nonce != seen_launch) {
-            seen_launch = nonce; pending_launch = current.selected_chart.fingerprint.hash; begin_at.reset(); begin_consumed = false; final_queued = false;
+            seen_launch = nonce; pending_launch = current.selected_chart.fingerprint.hash; begin_at.reset(); begin_consumed = false; final_queued = false; latest_local_sample.reset();
         }
         if (phase == "lobby") {
-            pending_launch.reset(); begin_at.reset(); begin_consumed = false; final_queued = false;
+            pending_launch.reset(); begin_at.reset(); begin_consumed = false; final_queued = false; latest_local_sample.reset();
             reset_queued = false;
         } else if (phase == "playing" && !begin_consumed && !begin_at) {
             // Match request midpoints on both clocks. Subtracting server-side
@@ -495,7 +519,7 @@ struct HostedPeerSession::Impl {
                     if (id.empty()) listing = true;
                     else {
                         if (!enqueue_locked("poll")) { lock.unlock(); fail("Could not poll multiplayer room."); fatal = true; break; }
-                        next_poll = Clock::now() + 500ms; continue;
+                        next_poll = Clock::now() + poll_interval_locked(); continue;
                     }
                 } else {
                     wake.wait_until(lock, std::min({next_poll, renew_at,
@@ -520,6 +544,16 @@ struct HostedPeerSession::Impl {
                      "Official multiplayer server is unavailable."); fatal = true; break;
             }
             if (status < 200 || status >= 300) {
+                const Json payload(command.payload);
+                const auto& score = field(payload, "score");
+                const bool final_score = command.action == "score" && field(score, "finished").as_bool();
+                // A rejected final score cannot complete the result barrier.
+                // Loading/begin rejection may instead mean another player
+                // canceled loading; keep polling so the lobby reset is seen.
+                if (final_score) {
+                    fail("Multiplayer synchronization action rejected (HTTP " + std::to_string(status) + "). Reconnect to the room.");
+                    fatal = true; break;
+                }
                 std::lock_guard lock(mutex);
                 current.status_detail = "Multiplayer action rejected (HTTP " + std::to_string(status) + ").";
                 current.rate_change_pending = false;
@@ -531,7 +565,8 @@ struct HostedPeerSession::Impl {
             if (listing ? !accept_rooms(reply) : !accept_room(reply, before, after)) {
                 fail("Invalid or late multiplayer server response; disconnected."); fatal = true; break;
             }
-            next_poll = Clock::now() + (listing ? 3s : 500ms);
+            { std::lock_guard lock(mutex);
+              next_poll = Clock::now() + (listing ? 3s : poll_interval_locked()); }
         }
         std::string leaving_room;
         uint64_t nonce = 0, revision = 1;
@@ -699,9 +734,14 @@ bool HostedPeerSession::publish_score(const PeerScore& score, bool final) {
     std::lock_guard lock(impl_->mutex);
     if (!impl_->active_locked() || !impl_->current.round_active || impl_->final_queued) return false;
     if (value.finished) {
+        // Final gauge history can end before the last live HUD frame. The
+        // server requires nondecreasing sample positions even for final scores.
+        if (impl_->latest_local_sample) value.current_sample = std::max(value.current_sample, *impl_->latest_local_sample);
         if (!impl_->enqueue_locked("score", {{"score", score_json(value)}})) return false;
         impl_->pending_score.reset(); impl_->final_queued = true;
     } else { impl_->pending_score = value; impl_->wake.notify_all(); }
+    impl_->latest_local_sample = impl_->latest_local_sample
+        ? std::max(*impl_->latest_local_sample, value.current_sample) : value.current_sample;
     return true;
 }
 void HostedPeerSession::reset_round() {
